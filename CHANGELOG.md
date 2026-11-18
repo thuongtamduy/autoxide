@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 51 P20: `POST /api/v1/kernel/tags/{id}/apply {kind, add, remove}` tags or untags up to 500 records at once, one
+  `kernel.record_tags_changed` event per changed record; records already in the wanted state are `skipped`.
 - Step 51 P12: pending approval requests show in the work inbox of the people who may decide them (source
   `kernel.approvals`); MCP tools `kernel.list_approvals` and `kernel.decide_approval` (a person decides, an agent cannot).
   `WorkSource::for_any_signed_in` lets a source filter its own items instead of requiring one permission.

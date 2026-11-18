@@ -166,8 +166,8 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`). Còn: cột `cf.<khoá>` trong xuất (P16) / nhập (56),
       đọc công khai mức `public`, đưa trường `personal_data` vào xuất / xoá dữ liệu cá nhân, hạn mức theo gói, tool MCP
 - [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
-      hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11) trừ gắn hàng loạt: thao tác hàng loạt (P8) chưa nhận
-      tham số (nhãn nào), làm khi thêm tham số cho `BulkAction`
+      hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11); gắn / gỡ hàng loạt (18/11): `POST /kernel/tags/{id}/apply`
+      (tối đa 500 bản ghi, chọn theo bộ lọc thì lấy id bằng `dry_run` của thao tác hàng loạt)
 - [x] Đổi câu chữ hiển thị theo khách (P21, D-235): chỉ câu module cho đổi và không gian `ui.*`, giữ chỗ điền, không
       đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với

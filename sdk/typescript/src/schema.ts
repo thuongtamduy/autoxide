@@ -244,6 +244,26 @@ export type ApiKeyResponse = {
   prefix: string;
 };
 
+/** Records to tag or untag in one call. */
+export type ApplyTagInput = {
+  /** Records that get the tag (those that have it already are skipped). */
+  add?: string[];
+  /** Type of the records, e.g. `content.entry`. */
+  kind: string;
+  /** Records that lose the tag. */
+  remove?: string[];
+};
+
+/** What a bulk tagging changed. */
+export type ApplyTagResult = {
+  /** Records that got the tag. */
+  added: string[];
+  /** Records that lost the tag. */
+  removed: string[];
+  /** Records left as they were: already tagged, untagged, at 50 tags, or not found. */
+  skipped: string[];
+};
+
 /** A command an AI agent asked to run, waiting for a person. */
 export type ApprovalRequest = {
   api_key_id?: string | null;
@@ -2831,6 +2851,19 @@ export type Data_AltSuggestionResponse = {
     decorative: boolean;
     /** The model that answered. */
     model: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ApplyTagResult = {
+  /** What a bulk tagging changed. */
+  data: {
+    /** Records that got the tag. */
+    added: string[];
+    /** Records that lost the tag. */
+    removed: string[];
+    /** Records left as they were: already tagged, untagged, at 50 tags, or not found. */
+    skipped: string[];
   };
 };
 
@@ -22539,6 +22572,21 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tags/{id}/apply": {
+    /** Tag or untag many records at once. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ApplyTagInput;
+      responses: {
+        200: Data_ApplyTagResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

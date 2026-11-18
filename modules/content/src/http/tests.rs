@@ -1778,3 +1778,79 @@ async fn dry_run_khong_ghi_khong_phat_event() {
     .await
     .unwrap();
 }
+
+/// Gắn nhãn hàng loạt (bước 51 P20): một nhãn lên nhiều bài một lần, bài đã có hay không có thì
+/// bỏ qua; gỡ hàng loạt; cần quyền ghi bài.
+#[tokio::test]
+async fn gan_nhan_hang_loat() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let mut ids = Vec::new();
+        for title in ["Một", "Hai"] {
+            let created = send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": title})),
+            )
+            .await;
+            ids.push(created.json()["data"]["id"].as_str().unwrap().to_owned());
+        }
+        // Nhãn mới tạo bằng cách gắn lên một bài thứ ba (người viết tạo được nhãn khi khách không hạn chế).
+        let third = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Ba"})),
+        )
+        .await;
+        let third = third.json()["data"]["id"].as_str().unwrap().to_owned();
+        let tagged = app
+            .put(&format!("/api/v1/kernel/records/content.entry/{third}/tags"))
+            .token("admin")
+            .json(json!({"new_tags": ["Mùa hè"]}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(tagged.status(), StatusCode::OK, "{}", tagged.json());
+        let tag = tagged.json()["data"][0]["id"].as_str().unwrap().to_owned();
+        let apply = |who: &'static str, body: Value| {
+            let app = &app;
+            let path = format!("/api/v1/kernel/tags/{tag}/apply");
+            async move { app.post(&path).token(who).json(body).send().await.unwrap() }
+        };
+        let missing = Uuid::now_v7().to_string();
+        let added =
+            apply("admin", json!({"kind": "content.entry", "add": [ids[0], ids[1], missing]}))
+                .await;
+        assert_eq!(added.status(), StatusCode::OK, "{}", added.json());
+        assert_eq!(added.json()["data"]["added"], json!([ids[0], ids[1]]));
+        assert_eq!(added.json()["data"]["skipped"], json!([missing]));
+        let again =
+            apply("admin", json!({"kind": "content.entry", "add": [ids[0]], "remove": [ids[1]]}))
+                .await;
+        assert_eq!(again.json()["data"]["skipped"], json!([ids[0]]), "đã có thì bỏ qua");
+        assert_eq!(again.json()["data"]["removed"], json!([ids[1]]));
+        let tagged =
+            send(&app, "GET", &format!("/entries?tags_any={tag}"), Some("admin"), &[], None).await;
+        let tagged = tagged.json();
+        let found: Vec<&str> =
+            tagged["data"].as_array().unwrap().iter().map(|e| e["id"].as_str().unwrap()).collect();
+        assert_eq!(found.len(), 2);
+        assert!(found.contains(&ids[0].as_str()) && !found.contains(&ids[1].as_str()));
+        assert_eq!(
+            apply("reader", json!({"kind": "content.entry", "add": [ids[1]]})).await.status(),
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            apply("admin", json!({"kind": "content.entry"})).await.status(),
+            StatusCode::UNPROCESSABLE_ENTITY
+        );
+    })
+    .await
+    .unwrap();
+}

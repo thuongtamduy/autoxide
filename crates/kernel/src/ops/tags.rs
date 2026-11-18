@@ -782,8 +782,184 @@ async fn set_record_tags(
     Ok(Data { data: tags.get(&id).cloned().unwrap_or_default() })
 }
 
+/// Records to tag or untag in one call.
+#[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ApplyTagInput {
+    /// Type of the records, e.g. `content.entry`.
+    #[schema(example = "content.entry")]
+    pub kind: String,
+    /// Records that get the tag (those that have it already are skipped).
+    #[serde(default)]
+    pub add: Vec<String>,
+    /// Records that lose the tag.
+    #[serde(default)]
+    pub remove: Vec<String>,
+}
+
+/// What a bulk tagging changed.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub(crate) struct ApplyTagResult {
+    /// Records that got the tag.
+    pub added: Vec<String>,
+    /// Records that lost the tag.
+    pub removed: Vec<String>,
+    /// Records left as they were: already tagged, untagged, at 50 tags, or not found.
+    pub skipped: Vec<String>,
+}
+
+/// Bản ghi tối đa của một lần gắn hàng loạt.
+const MAX_APPLY: usize = 500;
+
+/// Tag or untag many records at once.
+///
+/// Requires the write permission of the record type (as for `PUT /records/{kind}/{id}/tags`). Adds
+/// the tag to the records of `add` and removes it from those of `remove` — up to 500 records in all,
+/// in one transaction, one `kernel.record_tags_changed` event per changed record. Records not found,
+/// already in the wanted state, or at 50 tags are `skipped`. To act on a filter, ask
+/// `POST /api/v1/kernel/bulk/{resource}/{action}` with `dry_run` for the ids first.
+#[utoipa::path(
+    post,
+    path = "/tags/{id}/apply",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "apply_tag",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the tag.")),
+    request_body = ApplyTagInput,
+    responses(
+        (status = 200, description = "What changed.", body = Data<ApplyTagResult>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "You may not write records of this type; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No such tag (`kernel.tag_not_found`) or taggable type (`kernel.record_not_found`).", body = Problem),
+        (status = 422, description = "No records, or more than 500; see `errors`.", body = Problem),
+    )
+)]
+async fn apply_tag(
+    State(state): State<Arc<TagsState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(tag): Path<Uuid>,
+    ValidJson(input): ValidJson<ApplyTagInput>,
+) -> Result<Data<ApplyTagResult>, Error> {
+    let kind = input.kind.clone();
+    let write = state.taggables.write_permission(&kind).ok_or_else(|| {
+        Error::not_found("kernel.record_not_found", "There is no `{kind}` record `{id}` for you.")
+            .with_param("kind", kind.clone())
+            .with_param("id", "*")
+    })?;
+    principal.require(&write)?;
+    let total = input.add.len() + input.remove.len();
+    if total == 0 || total > MAX_APPLY {
+        return Err(Error::validation(vec![
+            FieldError::new("add", "invalid", "must hold 1 to {max} ids together with `remove`")
+                .with_param("max", MAX_APPLY),
+        ]));
+    }
+    find_view(&tenant, tag).await?;
+    // Tra bản ghi NGOÀI transaction ghi (có thể gọi module khác).
+    let found = state.resources.resolve_many(&tenant, &kind, &input.add, None).await?;
+    let tenant_id = tenant.id().as_uuid();
+    let mut result = ApplyTagResult { added: Vec::new(), removed: Vec::new(), skipped: Vec::new() };
+    let transaction = tenant.database().begin_write().await?;
+    for id in &input.add {
+        if !found.contains_key(id) {
+            result.skipped.push(id.clone());
+            continue;
+        }
+        let current = SqlQuery::select()
+            .column(Alias::new("tag_id"))
+            .from(Alias::new(RECORD_TAGS))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant_id))
+            .and_where(Expr::col(Alias::new("kind")).eq(kind.as_str()))
+            .and_where(Expr::col(Alias::new("record_id")).eq(id.as_str()))
+            .to_owned();
+        let had: Vec<Uuid> = transaction
+            .query_all(&current)
+            .await?
+            .iter()
+            .map(|row| row.try_get::<Uuid>("", "tag_id"))
+            .collect::<Result<_, _>>()?;
+        if had.contains(&tag) || had.len() >= MAX_PER_RECORD {
+            result.skipped.push(id.clone());
+            continue;
+        }
+        let insert = SqlQuery::insert()
+            .into_table(Alias::new(RECORD_TAGS))
+            .columns([
+                "id",
+                "tenant_id",
+                "kind",
+                "record_id",
+                "record_uuid",
+                "tag_id",
+                "created_by",
+                "created_at",
+            ])
+            .values_panic([
+                Uuid::now_v7().into(),
+                tenant_id.into(),
+                kind.clone().into(),
+                id.clone().into(),
+                id.parse::<Uuid>().ok().into(),
+                tag.into(),
+                principal.user_id().into(),
+                now().into(),
+            ])
+            .to_owned();
+        transaction.execute(&insert).await?;
+        state
+            .outbox
+            .record(
+                &transaction,
+                &tenant,
+                Actor::from(&principal),
+                Some(format!("{kind}:{id}")),
+                &RecordTagsChanged {
+                    kind: kind.clone(),
+                    id: id.clone(),
+                    added: vec![tag],
+                    removed: Vec::new(),
+                },
+            )
+            .await?;
+        result.added.push(id.clone());
+    }
+    for id in &input.remove {
+        let delete = SqlQuery::delete()
+            .from_table(Alias::new(RECORD_TAGS))
+            .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant_id))
+            .and_where(Expr::col(Alias::new("kind")).eq(kind.as_str()))
+            .and_where(Expr::col(Alias::new("record_id")).eq(id.as_str()))
+            .and_where(Expr::col(Alias::new("tag_id")).eq(tag))
+            .to_owned();
+        if transaction.execute(&delete).await?.rows_affected() == 0 {
+            result.skipped.push(id.clone());
+            continue;
+        }
+        state
+            .outbox
+            .record(
+                &transaction,
+                &tenant,
+                Actor::from(&principal),
+                Some(format!("{kind}:{id}")),
+                &RecordTagsChanged {
+                    kind: kind.clone(),
+                    id: id.clone(),
+                    added: Vec::new(),
+                    removed: vec![tag],
+                },
+            )
+            .await?;
+        result.removed.push(id.clone());
+    }
+    transaction.commit().await?;
+    Ok(Data { data: result })
+}
+
 pub(crate) fn routes(state: TagsState) -> OpenApiRouter {
     OpenApiRouter::new()
+        .routes(routes!(apply_tag))
         .routes(routes!(list_tags, create_tag))
         .routes(routes!(update_tag, delete_tag))
         .routes(routes!(merge_tag))
