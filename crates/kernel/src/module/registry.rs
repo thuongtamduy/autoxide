@@ -85,6 +85,8 @@ pub struct Modules {
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
     /// Nguồn số liệu báo cáo của mọi module (bước 38), đã kiểm.
     facts: crate::report::FactCatalog,
+    /// Loại sự kiện phân tích và phễu của mọi module (bước 57), đã kiểm.
+    analytics: crate::analytics::AnalyticsCatalog,
     /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
     automations: crate::automation::AutomationDirectory,
 }
@@ -184,6 +186,17 @@ impl Modules {
             problems.extend(errors);
             crate::report::FactCatalog::default()
         });
+        // Loại sự kiện phân tích và phễu (bước 57): sự kiện phía máy chủ chỉ nghe event của chính
+        // module.
+        let declared = modules
+            .iter()
+            .map(|module| (module.name(), module.analytics_events(), module.funnels()))
+            .collect();
+        let analytics =
+            crate::analytics::AnalyticsCatalog::new(declared, &events).unwrap_or_else(|errors| {
+                problems.extend(errors);
+                crate::analytics::AnalyticsCatalog::default()
+            });
         let mut seen = Vec::new();
         let mut declared_settings = Vec::new();
         for module in &modules {
@@ -255,6 +268,7 @@ impl Modules {
                 moves,
                 tenancy: None,
                 facts,
+                analytics,
                 automations,
             })
         } else {
@@ -355,6 +369,7 @@ impl Modules {
                 entitlements: &self.entitlements,
                 counters: &mut counters,
                 facts: &self.facts,
+                analytics: &self.analytics,
                 automations: &self.automations,
             };
             module.start(&mut context).map_err(|error| {
