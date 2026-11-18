@@ -25,6 +25,9 @@
   "support.mentioned.short": "Được nhắc tên ở phiếu {number}",
   "support.mentioned.title": "Bạn được nhắc tên ở phiếu {number}",
   "support.message_not_found": "Phiếu này không có tin `{id}`.",
+  "support.rule_not_found": "Không có quy tắc phân công `{id}` mà bạn xem được.",
+  "support.team_name_taken": "Nút này đã có nhóm hỗ trợ tên `{name}`.",
+  "support.team_not_found": "Không có nhóm hỗ trợ `{id}` mà bạn xem được.",
   "support.ticket_closed": "Phiếu này đã đóng. Hãy mở phiếu mới và nêu phiếu này ở `follow_up_of`.",
   "support.ticket_not_found": "Không có phiếu `{id}` mà bạn xem được.",
   "support.ticket_replied.body": "Đội ngũ của chúng tôi đã trả lời phiếu hỗ trợ {number} ({subject}) của bạn. Mở phiếu để đọc và trả lời.",
@@ -47,5 +50,6 @@
   "text:Guest tickets were attached to the account that verified the same email or phone number.": "Phiếu của khách vãng lai được gộp vào tài khoản đã xác thực cùng email hay số điện thoại.",
   "text:Hide messages of support tickets in your scope and hand tickets over as consumer complaints or to the platform.": "Ẩn tin của phiếu hỗ trợ trong phạm vi của bạn và chuyển phiếu thành khiếu nại người tiêu dùng hay lên sàn.",
   "text:See the support tickets of the units in your scope, with their messages and internal notes.": "Xem phiếu hỗ trợ của các nút trong phạm vi của bạn, cùng tin nhắn và ghi chú nội bộ.",
+  "text:Support teams, team members or routing rules changed.": "Nhóm hỗ trợ, thành viên nhóm hay quy tắc phân công thay đổi.",
   "text:The priority, category or assignee of a support ticket changed.": "Ưu tiên, loại hay người được giao của một phiếu hỗ trợ thay đổi."
 }
