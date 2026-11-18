@@ -19,6 +19,7 @@ mod events;
 mod http_admin;
 mod http_me;
 mod http_templates;
+mod kernel_events;
 mod layout;
 mod me;
 mod messages;
@@ -62,6 +63,7 @@ pub fn module() -> impl Module {
         config: NotificationsConfig::default(),
         listen_consents: false,
         listen_users: false,
+        listen_kernel: false,
     }
 }
 
@@ -72,6 +74,8 @@ struct NotificationsModule {
     listen_consents: bool,
     /// Có module khai event xoá tài khoản (`auth`): nghe để xoá dữ liệu của người đó.
     listen_users: bool,
+    /// Kernel có event job xong / ghi chú (bước 51): báo người yêu cầu, người được nhắc.
+    listen_kernel: bool,
 }
 
 impl Module for NotificationsModule {
@@ -144,6 +148,8 @@ impl Module for NotificationsModule {
         let kinds = Arc::new(Kinds::default());
         kinds.declare(registry::PLATFORM_NOTICE)?;
         kinds.declare(registry::PLATFORM_SECURITY_NOTICE)?;
+        kinds.declare(registry::JOB_FINISHED)?;
+        kinds.declare(registry::MENTIONED)?;
         let throttle = Throttle::new(
             "notifications",
             self.config.per_recipient_per_hour,
@@ -185,6 +191,7 @@ impl Module for NotificationsModule {
         self.listen_consents = service.consents.is_some()
             && context.events().contains(autoxide_compliance::api::CONSENT_WITHDRAWN);
         self.listen_users = context.events().contains(autoxide_kernel::privacy::USER_DELETED);
+        self.listen_kernel = context.events().contains(kernel_events::JOB_FINISHED);
         context.personal_data(Arc::new(privacy::NotificationsPersonalData))?;
         self.service = Some(service.clone());
         context.provide::<dyn api::Notifier>(Arc::new(provider::Provider(service)))
@@ -238,6 +245,11 @@ impl Module for NotificationsModule {
                 autoxide_compliance::api::CONSENT_WITHDRAWN,
                 Arc::new(delivery::ConsentWithdrawnListener(service.clone())),
             ));
+        }
+        if self.listen_kernel {
+            let listener = Arc::new(kernel_events::KernelListener(service.clone()));
+            subscriptions.push(Subscription::new(kernel_events::JOB_FINISHED, listener.clone()));
+            subscriptions.push(Subscription::new(kernel_events::NOTE_ADDED, listener));
         }
         if self.listen_users {
             subscriptions.push(Subscription::new(

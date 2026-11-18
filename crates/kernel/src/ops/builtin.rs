@@ -349,6 +349,7 @@ impl Module for KernelModule {
         vec![
             crate::tenancy::settings::SETTING_CHANGED,
             crate::job::runs::JOB_RETRIED,
+            crate::job::runs::JOB_FINISHED,
             crate::ops::records::RECORD_NOTE_ADDED,
             crate::ops::approvals::APPROVAL_DECIDED,
             crate::ops::tags::RECORD_TAGS_CHANGED,
