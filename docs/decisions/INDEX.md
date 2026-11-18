@@ -437,6 +437,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
 - **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
+- **[D-20261118-step42-reservations](D-20261118-step42-reservations.md)** Giữ chỗ tồn của `inventory`: chọn kho bằng số đọc rồi `adjust` làm trọng tài, khoá dòng chỗ giữ cho mọi chuyển trạng thái — 2026-11-18
 - **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18

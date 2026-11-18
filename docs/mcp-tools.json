@@ -6092,6 +6092,36 @@
     },
     {
       "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Release a stuck stock reservation by its id: units not shipped yet go back to the available stock. Releasing again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A reservation to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the reservation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.release_reservation",
+      "output_schema": null,
+      "permissions": [
+        "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
