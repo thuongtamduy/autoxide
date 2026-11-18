@@ -570,12 +570,60 @@ mod duplicate {
     pub async fn duplicate() {}
 }
 
+// Một header khai hai lần (khác hoa thường vẫn là một header): SDK TypeScript không biên dịch.
+/// Declares a header twice.
+#[utoipa::path(
+    get,
+    path = "/header-twice",
+    params(
+        ("X-Thing" = String, Header, description = "Required."),
+        ("x-thing" = Option<String>, Header, description = "Optional."),
+    ),
+    extensions(("x-public" = json!(true))),
+    responses((status = 200, description = "ok"))
+)]
+async fn header_twice() {}
+
+// Tự khai `Accept-Language`: kernel không thêm bản chung thứ hai.
+/// Declares a common header itself.
+#[utoipa::path(
+    get,
+    path = "/own-language",
+    params(("Accept-Language" = String, Header, description = "Required here.")),
+    extensions(("x-public" = json!(true))),
+    responses((status = 200, description = "ok"))
+)]
+async fn own_language() {}
+
+#[tokio::test]
+async fn header_chung_khong_bi_khai_lan_hai() {
+    let api = http::build(
+        &default_config(),
+        OpenApiRouter::new(),
+        vec![("notes", OpenApiRouter::new().routes(routes!(own_language)))],
+        http::Extras::default(),
+    );
+    assert_eq!(http::lint(&api.openapi), Vec::<String>::new());
+    let document = serde_json::to_value(api.openapi).unwrap();
+    let parameters = document["paths"]["/api/v1/notes/own-language"]["get"]["parameters"]
+        .as_array()
+        .unwrap()
+        .clone();
+    let languages: Vec<_> =
+        parameters.iter().filter(|parameter| parameter["name"] == "Accept-Language").collect();
+    assert_eq!(languages.len(), 1, "{parameters:?}");
+    assert_eq!(languages[0]["required"], true, "the endpoint's own declaration is kept");
+}
+
 #[tokio::test]
 async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
     // Tài liệu của các route mẫu đạt.
     assert_eq!(http::lint(&api_with(&default_config()).openapi), Vec::<String>::new());
 
-    let routes = notes_routes().routes(routes!(undocumented)).routes(routes!(duplicate::duplicate));
+    let routes = notes_routes()
+        .routes(routes!(undocumented))
+        .routes(routes!(duplicate::duplicate))
+        .routes(routes!(header_twice));
     let api = http::build(
         &default_config(),
         OpenApiRouter::new(),
@@ -589,6 +637,7 @@ async fn bo_kiem_tai_lieu_bat_endpoint_thieu_mo_ta() {
             "GET /api/v1/notes/duplicate: operationId `notes_list_notes` is used twice",
             // Hợp đồng quyền (D-245): permission khai phải được nói tới trong chữ; không khai gì là lỗi.
             "GET /api/v1/notes/duplicate: `x-permissions` lists `notes.purge`, but neither the description nor the 403 response mentions it",
+            "GET /api/v1/notes/header-twice: header parameter `x-thing` is declared twice",
             "GET /api/v1/notes/undocumented: no summary — add a `///` doc comment to the handler",
             "GET /api/v1/notes/undocumented: no success response — declare what the endpoint returns",
             "GET /api/v1/notes/undocumented: declare who may call it — add `extensions((\"x-permissions\" = json!([\"<module>.<permission>\"])))` (`[]`: any signed-in caller) or `extensions((\"x-public\" = json!(true)))` to `#[utoipa::path]` (D-245)",

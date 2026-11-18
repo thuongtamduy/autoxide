@@ -29,8 +29,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất.
-        postgres: ["16", "18"]
+        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất. Pull request chỉ chạy bản thấp nhất (dễ
+        # hỏng nhất) để có kết quả sớm; push lên main và chạy tay thì chạy cả hai (D-378).
+        postgres: ${{ github.event_name == 'pull_request' && fromJSON('["16"]') || fromJSON('["16", "18"]') }}
     services:
       postgres:
         image: postgres:${{ matrix.postgres }}-alpine
