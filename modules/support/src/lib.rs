@@ -18,6 +18,7 @@ mod permissions;
 mod privacy;
 mod service;
 mod status;
+mod teams;
 mod tickets;
 
 #[cfg(test)]
@@ -99,6 +100,8 @@ impl Module for SupportModule {
             notifier,
             media: context.require::<dyn autoxide_media::api::Media>().ok(),
             accounts: context.require::<dyn autoxide_compliance::api::AccountVerification>().ok(),
+            // Hỏi quyền của người được giao (`principal_of`); không có thì không tự giao cho ai.
+            authenticator: context.require::<dyn autoxide_kernel::access::Authenticator>().ok(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;

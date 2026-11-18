@@ -265,7 +265,20 @@ impl SupportService {
         outbox.record(&transaction, tenant, actor, subject, &added).await?;
         transaction.commit().await?;
         tracing::info!(ticket_id = %id, channel = opening.channel.as_str(), "support ticket opened");
-        Ok(Opened { ticket: inserted, access_token: token, created: true })
+        // Tự phân công theo quy tắc của nút (ngoài transaction tạo: hỏi quyền người nhận). Lỗi chỉ
+        // ghi log — phiếu đã có, nhân viên giao tay được.
+        let ticket = match self.route(tenant, &inserted).await {
+            Ok(()) => ticket::Entity::find_by_id(id)
+                .scoped(tenant)
+                .one(tenant.database().read())
+                .await?
+                .unwrap_or(inserted),
+            Err(error) => {
+                tracing::warn!(ticket_id = %id, code = error.code(), "support ticket not routed");
+                inserted
+            }
+        };
+        Ok(Opened { ticket, access_token: token, created: true })
     }
 
     /// Nhân viên mở phiếu thay người mua (ghi hộ cuộc gọi): cần `support.tickets.reply` ở nút của
@@ -455,7 +468,7 @@ impl SupportService {
         finish(problems)?;
         let before = self.get(tenant, Viewer::Staff(principal), id).await?;
         if let Some(Some(assignee)) = changes.assignee_user_id {
-            self.check_assignee(tenant, &before, principal, assignee, changes.team_id).await?;
+            self.check_assignee(tenant, &before, principal, assignee).await?;
         }
         if let Some(Some(team)) = changes.team_id {
             self.check_team(tenant, &before, team).await?;
@@ -572,36 +585,6 @@ impl SupportService {
         .insert(connection)
         .await?;
         Ok(())
-    }
-
-    /// Người được giao phải làm việc ở nút của phiếu: chính người gọi (đã có quyền trả lời ở đó).
-    /// Nhóm nhân viên (bước 53 mục 2) mở rộng thêm thành viên của nhóm phủ nút của phiếu.
-    pub(crate) async fn check_assignee(
-        &self,
-        tenant: &TenantContext,
-        ticket: &Ticket,
-        principal: &autoxide_kernel::access::Principal,
-        assignee: Uuid,
-        _team: Option<Option<Uuid>>,
-    ) -> Result<(), Error> {
-        let _ = (tenant, ticket);
-        if assignee == principal.user_id() {
-            return Ok(());
-        }
-        Err(assignee_out_of_scope(assignee))
-    }
-
-    /// Nhóm phải thuộc nút của phiếu hay tổ tiên của nó (bước 53 mục 2).
-    pub(crate) async fn check_team(
-        &self,
-        _tenant: &TenantContext,
-        _ticket: &Ticket,
-        team: Uuid,
-    ) -> Result<(), Error> {
-        Err(Error::validation(vec![
-            FieldError::new("team_id", "unknown", "is not a support team of this unit")
-                .with_param("team_id", team),
-        ]))
     }
 }
 

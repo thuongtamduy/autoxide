@@ -4,6 +4,7 @@
 
 mod me;
 mod public;
+mod settings;
 mod staff;
 pub(crate) mod views;
 
@@ -28,5 +29,10 @@ pub(crate) fn routes(service: Arc<SupportService>) -> OpenApiRouter {
         .routes(routes!(public::get_public_ticket))
         .routes(routes!(public::add_public_message))
         .routes(routes!(public::verify_ticket))
+        .routes(routes!(settings::list_teams, settings::create_team))
+        .routes(routes!(settings::get_team, settings::delete_team))
+        .routes(routes!(settings::set_member, settings::remove_member))
+        .routes(routes!(settings::list_rules, settings::create_rule))
+        .routes(routes!(settings::delete_rule))
         .with_state(service)
 }
