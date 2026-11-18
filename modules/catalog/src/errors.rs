@@ -153,3 +153,21 @@ pub(crate) fn variant_required() -> Error {
         "A product must keep at least one variant; delete the product instead.",
     )
 }
+
+/// Website không có sản phẩm đang bán với slug này ở ngôn ngữ hỏi.
+pub(crate) fn product_slug_not_found(slug: &str) -> Error {
+    Error::not_found(
+        "catalog.product_slug_not_found",
+        "No product on sale on this website has the address `{slug}` in this language.",
+    )
+    .with_param("slug", slug)
+}
+
+/// Không có danh mục hiện được với slug này ở ngôn ngữ hỏi.
+pub(crate) fn category_slug_not_found(slug: &str) -> Error {
+    Error::not_found(
+        "catalog.category_slug_not_found",
+        "No visible category has the address `{slug}` in this language.",
+    )
+    .with_param("slug", slug)
+}

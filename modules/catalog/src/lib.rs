@@ -20,12 +20,14 @@ mod permissions;
 mod pricing;
 mod product_parts;
 mod products;
+mod public;
 mod readiness;
 mod restrictions;
 mod rounding;
 mod rules_pack;
 mod service;
 mod snapshots;
+mod storefront;
 mod tools;
 mod variants;
 
@@ -141,7 +143,15 @@ impl Module for CatalogModule {
                     derived::DERIVE_PRICES,
                     Arc::new(derived::Deriver(service.clone())),
                 ),
-                JobRegistration::new(bulk::APPLY_CHANGE, Arc::new(bulk::Applier(service))),
+                JobRegistration::new(bulk::APPLY_CHANGE, Arc::new(bulk::Applier(service.clone()))),
+                JobRegistration::new(
+                    storefront::REFRESH,
+                    Arc::new(storefront::Refresher(service.clone())),
+                ),
+                JobRegistration::new(
+                    storefront::SCHEDULED_PRICES,
+                    Arc::new(storefront::ScheduledPrices(service)),
+                ),
             ]
         })
     }
@@ -149,11 +159,18 @@ impl Module for CatalogModule {
     fn schedules(&self) -> Vec<Schedule> {
         // Giấy tờ hết hạn theo ngày: tính lại `readiness` mỗi ngày.
         let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day)]
+        // Giá hẹn giờ bắt đầu / hết hạn: dựng lại storefront mỗi phút.
+        let minute = std::time::Duration::from_secs(60);
+        vec![
+            Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day),
+            Schedule::new(storefront::SCHEDULED_PRICES, storefront::SCHEDULED_PRICES, minute),
+        ]
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![rules_pack::task(service)])
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![rules_pack::task(service.clone()), storefront::task(service)]
+        })
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {

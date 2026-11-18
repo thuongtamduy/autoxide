@@ -425,6 +425,7 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
             .await?;
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, "catalog product created");
         self.get_row(tenant, id).await
@@ -649,6 +650,7 @@ impl CatalogService {
         self.outbox
             .record(transaction, tenant, actor, events::product_subject(after.id), &event)
             .await?;
+        self.queue_products(transaction, tenant, vec![after.id]).await?;
         Ok(after)
     }
 
@@ -741,6 +743,7 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
             .await?;
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         self.entitlements.release(tenant.id(), &PRODUCTS_LIMIT, &reference(id)).await?;
         Ok(())
@@ -796,6 +799,7 @@ impl CatalogService {
             let event = events::ProductArchived(change());
             self.outbox.record(&transaction, tenant, actor, subject, &event).await?;
         }
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, status = status_str(to), "catalog product status changed");
         self.detail(tenant, after).await

@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41): public reads for websites under `/api/v1/catalog/public` — product cards with filters by
+  category, attribute, price range, text (with or without accents), seller and rating, product pages by slug,
+  the category tree and a sitemap, each with an `ETag` and `Cache-Control: public, no-cache`; stores hide chain
+  products with `PUT /api/v1/catalog/stores/{org_id}/overrides/{product_id}`; prices are kept ready by the job
+  `catalog.refresh_storefront`, the per-minute schedule `catalog.apply_scheduled_prices` (event
+  `catalog.price_effective`) and the task `catalog.rebuild_storefront`.
 - `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
   (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
   temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).

@@ -421,6 +421,7 @@ impl CatalogService {
             // Bảng suy ra mới: ghi giá từ mọi dòng hiện có của bảng gốc.
             self.queue_derivation(&transaction, tenant, source, Some(row.id)).await?;
         }
+        self.queue_all(&transaction, tenant).await?;
         transaction.commit().await?;
         Ok(row)
     }
@@ -544,6 +545,7 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::price_list_subject(id), &event)
             .await?;
+        self.queue_all(&transaction, tenant).await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -711,6 +713,8 @@ impl CatalogService {
                 .await?;
             // Bảng suy ra từ bảng này nhận dòng giá mới qua job, cùng transaction.
             self.queue_derivation(&transaction, tenant, id, None).await?;
+            let variants = rows.iter().map(|row| row.variant_id).collect();
+            self.queue_variants(&transaction, tenant, variants).await?;
             transaction.commit().await?;
             Ok(Submitted::Created(rows))
         })

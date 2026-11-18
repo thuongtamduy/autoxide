@@ -14,6 +14,8 @@ pub(crate) fn relocation() -> Relocation {
             "catalog_variant_costs",
             "catalog_store_overrides",
         ])
+        // Bảng dẫn xuất: dựng lại sau khi tách / gộp (`autoxide task catalog.rebuild_storefront`).
+        .follow("catalog_storefront_entries", "product_id", "catalog_products")
         .follow("catalog_product_translations", "product_id", "catalog_products")
         .follow("catalog_options", "product_id", "catalog_products")
         .follow("catalog_option_values", "option_id", "catalog_options")
