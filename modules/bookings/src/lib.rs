@@ -22,6 +22,7 @@ mod service;
 mod settings;
 mod setup;
 
+mod relocation;
 #[cfg(test)]
 mod tests;
 
@@ -103,5 +104,9 @@ impl Module for BookingsModule {
         self.service.clone().map_or_else(OpenApiRouter::new, |service| {
             http_setup::routes(service.clone()).merge(http_public::routes(service))
         })
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }

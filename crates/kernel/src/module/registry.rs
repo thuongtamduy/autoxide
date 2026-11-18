@@ -85,6 +85,8 @@ pub struct Modules {
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
     /// Nguồn số liệu báo cáo của mọi module (bước 38), đã kiểm.
     facts: crate::report::FactCatalog,
+    /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
+    automations: crate::automation::AutomationDirectory,
 }
 
 impl Modules {
@@ -227,6 +229,7 @@ impl Modules {
             problems.extend(errors);
             Translations::default()
         });
+        let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
         if problems.is_empty() {
             Ok(Modules {
                 modules,
@@ -252,6 +255,7 @@ impl Modules {
                 moves,
                 tenancy: None,
                 facts,
+                automations,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -351,6 +355,7 @@ impl Modules {
                 entitlements: &self.entitlements,
                 counters: &mut counters,
                 facts: &self.facts,
+                automations: &self.automations,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -377,6 +382,28 @@ impl Modules {
         self.catalog.fill_navigation(navigation);
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules, self.entitlements.catalog());
+        // Tool khai sai thì chương trình dừng khi dựng endpoint MCP (cùng `tools()`); ở đây chỉ để
+        // sổ rỗng.
+        let mut templates = Vec::new();
+        for module in &self.modules {
+            for template in module.automation_templates() {
+                if !template.id.starts_with(&format!("{}.", module.name()))
+                    || templates.iter().any(|known: &crate::automation::AutomationTemplate| {
+                        known.id == template.id
+                    })
+                {
+                    return Err(ModuleError(format!(
+                        "automation template `{}` of module `{}` must be named `{}.<name>` and \
+                         be declared once",
+                        template.id,
+                        module.name(),
+                        module.name()
+                    )));
+                }
+                templates.push(template);
+            }
+        }
+        self.automations.fill(self.tools().unwrap_or_default(), templates);
         self.client_configs.fill(&self.modules);
         self.seeds.fill(
             self.modules

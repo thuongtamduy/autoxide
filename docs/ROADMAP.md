@@ -371,13 +371,13 @@ Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không 
 Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
 MCP đã có, chạy với quyền của người tạo luật.
 
-- [ ] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
+- [x] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
       hành động là tool MCP có tham số điền từ event; lưu luật kiểm event, tool, quyền, tham số một lần
-- [ ] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
+- [x] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
       động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
-- [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
+- [x] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
       luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
-- [ ] Cảnh báo bất thường (D-229): kích hoạt theo số liệu tóm tắt so với ngưỡng hay mức nền 4 tuần (doanh thu
+- [x] Cảnh báo bất thường (D-229): kích hoạt theo số liệu tóm tắt so với ngưỡng hay mức nền 4 tuần (doanh thu
       tụt, sắp hết hàng theo tốc độ bán, tỉ lệ bom hàng tăng), thống kê tất định, một lần báo mỗi kỳ
 
 ## 67. Trang dựng từ khối, AI tạo trang, bộ giao diện website (chủ dự án giao ngày 14/11/2026, D-229)

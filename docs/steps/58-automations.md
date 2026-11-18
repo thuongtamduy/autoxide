@@ -20,27 +20,34 @@ trợ". Luật chạy **bên trong** Autoxide, mỗi hành động gọi đúng 
 ### Luật
 
 `automations_rules`: `id`, `tenant_id`, `org_id` (phạm vi), `name`, `trigger`, `conditions` JSON, `actions`
-JSON, `enabled`, `run_as` (người tạo luật — hành động chạy **với quyền hiện tại** của người đó; người đó mất
-quyền thì luật tự tắt, báo cho quản trị), `version`, `created_by`, `updated_at`.
+JSON, `status` (`active` / `disabled` / `pending_approval` / `paused` kèm `status_reason`), `run_as` (người tạo, hay
+người sửa thân luật / bật luật gần nhất — hành động chạy **với quyền hiện tại** của người đó; người đó mất quyền thì
+luật tự tạm dừng, event `automations.rule_paused`, hộp việc `automations.paused`), `version`, `created_by`,
+`updated_at` (D-20261118-step58-automations).
 
 - **Kích hoạt (`trigger`)**: một loại event đã khai trong sổ event (vd `orders.order_placed`), hoặc lịch
-  (`cron` đơn giản: mỗi giờ / ngày / tuần, theo múi giờ của nút), hoặc gọi tay / từ tool MCP, hoặc **số liệu bất
+  (không dùng cron: `every` = `hour` / `day` / `week` với `minute`, `hour`, `weekday`, theo múi giờ khai trong
+  kích hoạt, không thì của nút), hoặc gọi tay / từ tool MCP, hoặc **số liệu bất
   thường** (dưới).
-- **Cảnh báo bất thường (D-229)**: kích hoạt `metric` đọc một số liệu tóm tắt module đã khai (`SummaryMetric`, bước
-  51 P4 — vd doanh thu theo ngày, số đơn, tỉ lệ đơn COD giao thất bại, số ngày còn đủ hàng của biến thể theo tốc
-  độ bán 14 ngày của `inventory`) theo lịch, so với **ngưỡng cố định** hay **mức nền** (trung bình cùng thứ trong
+- **Cảnh báo bất thường (D-229)**: kích hoạt `metric` đọc `fact:<loại>` (số liệu báo cáo `Module::facts`, module cộng
+  theo giờ UTC vào bảng của mình chỉ cho loại có luật dùng; giá trị là ngày địa phương vừa hết) hay `summary:<id>`
+  (số liệu tóm tắt `SummaryMetric` của bước 51 P4, đọc lúc kiểm với quyền của `run_as`, mỗi lần một mẫu) — vd doanh
+  thu theo ngày, số đơn, tỉ lệ đơn COD giao thất bại (tỉ lệ tính phần vạn) — mỗi ngày lúc `hour:minute`, so với **ngưỡng cố định** hay **mức nền** (trung bình cùng thứ trong
   4 tuần trước) bằng toán tử `drop_pct` / `rise_pct` / `below` / `above`. Thống kê đơn giản, tất định, giải thích
   được ("doanh thu hôm nay 12 triệu, thấp hơn 45% so với trung bình 4 thứ Hai trước: 21,8 triệu"); không mô hình
-  học máy. Mỗi luật một lần báo mỗi kỳ (khoá theo khe thời gian). Mẫu luật dựng sẵn: doanh thu tụt, sắp hết hàng
-  theo tốc độ bán, tỉ lệ bom hàng tăng, phiếu hỗ trợ quá hạn tăng — hành động mặc định là thông báo cho người tạo
-  luật và đưa vào hộp việc.
+  học máy. Thiếu dữ liệu một trong 4 tuần nền thì không báo. Mỗi luật một lần báo mỗi kỳ (khoá `metric:<ngày>`). Mẫu
+  luật dựng sẵn (doanh thu tụt, sắp hết hàng theo tốc độ bán, tỉ lệ bom hàng tăng, phiếu hỗ trợ quá hạn tăng) do module
+  sở hữu số liệu khai qua `Module::automation_templates` (orders, inventory, shipping, support) — hành động mặc định
+  `notify` tới người tạo luật.
 - **Điều kiện**: cây `all` / `any` / `not` trên trường của payload event (đường dẫn JSON), toán tử cố định
   (`eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `contains`, `exists`); kiểu kiểm theo JSON Schema payload mà
   module khai cho event (thêm `EventInfo::payload_schema`, mặc định không có → chỉ so chuỗi). Không biểu
-  thức tự do, không mã — kiểm được lúc lưu, giải thích được.
-- **Hành động**: danh sách tuần tự, mỗi bước là một tool MCP (`tool`, `arguments` có thể lấy giá trị từ
-  payload bằng `{{ event.order.id }}` qua bộ dựng mẫu của kernel — D-206), cộng vài hành động có sẵn của module
-  này: `wait` (tối đa 30 ngày, bằng job hẹn giờ), `stop_if`.
+  thức tự do, không mã — kiểm được lúc lưu, giải thích được. Không có schema thì so số khi cả hai là số (cả chữ viết
+  số, như số tiền), không thì so JSON / chuỗi; `EventInfo::payload_schema` để sau.
+- **Hành động**: danh sách tuần tự (tối đa 20), mỗi bước là một tool MCP gọi qua `AutomationDirectory` của kernel
+  (`tool`, `arguments` có thể lấy giá trị từ payload bằng `{{ event.order.id }}` qua bộ dựng mẫu của kernel — D-206;
+  chuỗi chỉ gồm một đường dẫn giữ nguyên kiểu), cộng vài hành động có sẵn của module này: `wait` (tối đa 30 ngày,
+  bằng job hẹn giờ), `stop_if`, `notify` (thông báo tới `run_as`). Tool của chính `automations` không là hành động.
 - Hành động "tặng voucher" (D-222) gọi tool `promotions.grant_voucher` (`source = automation`, `source_ref =
   automation:<run_id>:<step>`) — chạy lại không cấp thêm; vẫn kiểm quyền của `run_as`.
 - Lưu luật thì kiểm: event / tool có thật, người tạo có permission của **mọi** tool trong luật, tham số khớp
@@ -53,34 +60,41 @@ quyền thì luật tự tắt, báo cho quản trị), `version`, `created_by`,
 - Mỗi lần chạy ghi `automations_runs` (`rule_id`, `rule_version`, `event_id`, `status`
   `running/waiting/succeeded/failed/awaiting_approval/skipped`, `steps` JSON: từng hành động, thời gian, kết quả
   rút gọn, lỗi `code`), giữ `AUTOXIDE_AUTOMATIONS_RUN_RETENTION_DAYS` (mặc định 90).
-- Hành động là lệnh rủi ro (tool `destructive`, `money`, hay đánh dấu `requires_approval_for_agent`) thì tạo
-  yêu cầu duyệt (P12) và chờ; người duyệt thấy luật nào, event nào sinh ra.
-- Chống vòng lặp: hành động do luật gây ra mang `Actor.automation = rule_id`; event sinh từ đó không kích hoạt
-  lại cùng luật, và độ sâu chuỗi luật tối đa 3. Giới hạn số lần chạy mỗi luật mỗi giờ (cấu hình, mặc định 1000);
+- Hành động là lệnh rủi ro (tool `destructive` hay `requires_approval_for_agent`) thì lần chạy dừng ở
+  `awaiting_approval`; người có `automations.run` và permission của tool đó (không phải agent) duyệt / từ chối bằng
+  `POST /runs/{id}/approve | reject` — duyệt gắn với lần chạy trong module (yêu cầu duyệt P12 là "gửi lại request HTTP",
+  không hợp với job); hộp việc `automations.approvals`; người duyệt thấy luật nào, event nào sinh ra (nhật ký lần chạy).
+- Chống vòng lặp: người chạy hành động mang đường vào `AccessPath::Automation(run_id)` (cột `actor_access` sẵn có của
+  outbox); event sinh từ đó không kích hoạt lại cùng luật, và độ sâu chuỗi luật tối đa 3 (vượt: lần chạy `skipped`,
+  `automations.loop_detected`). Giới hạn số lần chạy mỗi luật mỗi giờ (cấu hình, mặc định 1000);
   vượt thì tạm dừng luật và báo.
-- `Idempotency-Key` của mỗi hành động = `automation:<run_id>:<step>` — chạy lại sau lỗi không làm hai lần.
+- `Idempotency-Key` của mỗi hành động = `automation:<run_id>:<step>` qua nơi lưu idempotency chung với REST; mỗi bước
+  ghi lại ngay khi xong — chạy lại sau lỗi bắt đầu từ bước hỏng, không làm hai lần.
 
 ### API, MCP
 
 - REST `/api/v1/automations`: `GET/POST /rules`, `GET/PATCH/DELETE /rules/{id}` (`If-Match`), `POST
   /rules/{id}/test {event_sample}` (chạy thử khô: tính điều kiện, điền mẫu, kiểm quyền, **không** gọi tool),
-  `POST /rules/{id}/run` (chạy tay), `GET /runs?rule_id&status`, `GET /runs/{id}`, `POST /runs/{id}/retry`.
-  `GET /catalog` liệt kê kích hoạt (event + schema) và hành động (tool + schema) người gọi dùng được.
+  `POST /rules/{id}/enable | disable`, `POST /rules/{id}/run` (chạy tay), `GET /runs?rule_id&status`, `GET
+  /runs/{id}`, `POST /runs/{id}/retry | approve | reject`. `GET /catalog` liệt kê kích hoạt (event, số liệu) và hành
+  động (tool + schema) người gọi dùng được; `GET /templates` mẫu luật người gọi lưu được ngay.
 - Mẫu luật dựng sẵn do module khai (`Module::automation_templates`, mặc định rỗng).
 - MCP: `list_rules`, `get_rule`, `test_rule` (`read_only`), `create_rule`, `update_rule` — tạo / sửa luật
-  bằng key `agent` thì luật ở trạng thái **chờ duyệt** tới khi người có quyền bật (P12). AI gợi ý luật từ câu
+  bằng key `agent` thì luật ở trạng thái **chờ duyệt** (`pending_approval`) tới khi người có quyền bật (`enable`,
+  agent gọi thì `automations.human_required`). AI gợi ý luật từ câu
   lời thường chỉ là bản nháp (D-109).
-- Permission: `automations.read`, `automations.manage`, `automations.run`. Tính năng gói `automations`, hạn
-  mức số luật và số lần chạy mỗi tháng (bước 35).
+- Permission: `automations.read`, `automations.manage`, `automations.run`. Module bị gói chi phối như mọi module
+  (bước 35); hạn mức số luật / số lần chạy mỗi tháng để khi `plans` khai gói có tự động hoá.
 - Event: `automations.rule_changed`, `automations.run_failed`, `automations.rule_paused`.
-- Mã lỗi: `automations.trigger_unknown`, `automations.tool_unknown`, `automations.permission_missing`
-  (liệt kê tool thiếu quyền), `automations.arguments_invalid`, `automations.loop_detected`,
-  `automations.rule_paused` (409).
+- Mã lỗi: `automations.trigger_unknown`, `automations.tool_unknown`, `automations.tool_not_allowed`,
+  `automations.permission_missing` (mỗi tool thiếu quyền một dòng trong `errors`; tham số sai giữ mã của trường như
+  `required`, `type`), `automations.loop_detected`, `automations.rule_paused` (409), `automations.human_required`,
+  `automations.run_state` (409), `automations.approval_rejected`, `automations.owner_unavailable`.
 
 ### Bảng dữ liệu (có `tenant_id`)
 
 `automations_rules`, `automations_runs`, `automations_run_keys` (khoá chống chạy trùng `(tenant_id, rule_id,
-event_id)`), cùng `automations_events`, `automations_jobs`.
+trigger_key)`), `automations_metric_hours`, `automations_metric_seen`, cùng `automations_events`, `automations_jobs`.
 
 ## Test bắt buộc (cả hai database)
 
@@ -99,4 +113,5 @@ event_id)`), cùng `automations_events`, `automations_jobs`.
 
 ## Agent làm bước này tự quyết
 
-Cú pháp lịch; giới hạn độ dài luật; mẫu luật mặc định cho từng mô hình kinh doanh. Ghi vào `docs/DECISIONS.md`.
+Cú pháp lịch; giới hạn độ dài luật; mẫu luật mặc định cho từng mô hình kinh doanh. Đã ghi ở
+D-20261118-step58-automations.
