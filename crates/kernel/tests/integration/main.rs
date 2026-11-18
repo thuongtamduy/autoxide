@@ -7,6 +7,7 @@
 mod access;
 mod antispam;
 mod approvals_work;
+mod backlog;
 mod can;
 mod can_plan;
 mod client_config;
