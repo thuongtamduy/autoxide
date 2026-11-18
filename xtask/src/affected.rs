@@ -115,7 +115,10 @@ fn changed_since(
     Ok((base.clone(), changed_files(root, &base)?))
 }
 
-pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
+/// `keep_env`: chạy trên database và S3 của môi trường (`TEST_DATABASE_URL`, `TEST_S3_ENDPOINT`)
+/// như `test-all`, thay vì luôn SQLite — gate của pull request trên CI (`./gate.sh --pr`, D-379).
+/// Khi đó không ghi mốc "lần xanh gần nhất": mốc đó chỉ dành cho gate nhanh trên SQLite.
+pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<(), String> {
     // Chụp cây file TRƯỚC khi build: xanh thì đúng cây này được ghi là đã xanh.
     let current = snapshot_tree(&workspace.root)?;
     let (base, changed) = changed_since(&workspace.root, base, &current)?;
@@ -131,7 +134,9 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
         }
         Affected::Crates(crates) if crates.is_empty() => {
             println!("test-affected: no crate changed since {base}, nothing to test");
-            git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+            if !keep_env {
+                git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+            }
             return Ok(());
         }
         Affected::Crates(crates) => {
@@ -159,9 +164,12 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
     let workers = workers();
     println!("test-affected: running {} test binaries, {workers} at a time", jobs.len());
     let started = Instant::now();
-    let failed = run_parallel(&workspace.root, jobs, workers, &Mode::SqliteOnly)?;
+    let mode = if keep_env { Mode::from_env(workers) } else { Mode::SqliteOnly };
+    let failed = run_parallel(&workspace.root, jobs, workers, &mode)?;
     if failed.is_empty() {
-        git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        if !keep_env {
+            git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        }
         println!("\ntest-affected: all test binaries passed in {:.0?}", started.elapsed());
         Ok(())
     } else {
@@ -173,16 +181,8 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
 /// SQLite), các file test chạy song song — phần test của gate đầy đủ (D-299). `--doc` chạy thêm
 /// doc-test (gate chạy một lần, ở lượt SQLite).
 pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
-    let postgres = std::env::var("TEST_DATABASE_URL")
-        .is_ok_and(|url| url.starts_with("postgres:") || url.starts_with("postgresql:"));
     let workers = workers();
-    let mode = if postgres {
-        // Mỗi test giữ tới vài kết nối; đo được 16 test cùng lúc ≈ 141 kết nối đỉnh, dưới trần
-        // 300 của gate. Chia đều trần này cho các file test chạy cùng lúc.
-        Mode::Postgres { test_threads: (POSTGRES_CONCURRENT_TESTS / workers).max(1) }
-    } else {
-        Mode::Inherit
-    };
+    let mode = Mode::from_env(workers);
     let jobs: Vec<Job> = build_tests(&workspace.root)?
         .into_iter()
         .filter_map(|test| {
@@ -225,6 +225,21 @@ enum Mode {
     Inherit,
     /// Giữ nguyên môi trường, giới hạn số test mỗi file chạy cùng lúc.
     Postgres { test_threads: usize },
+}
+
+impl Mode {
+    /// Theo database của `TEST_DATABASE_URL`: Postgres thì giới hạn số test chạy cùng lúc.
+    fn from_env(workers: usize) -> Mode {
+        let postgres = std::env::var("TEST_DATABASE_URL")
+            .is_ok_and(|url| url.starts_with("postgres:") || url.starts_with("postgresql:"));
+        if postgres {
+            // Mỗi test giữ tới vài kết nối; đo được 16 test cùng lúc ≈ 141 kết nối đỉnh, dưới trần
+            // 300 của gate. Chia đều trần này cho các file test chạy cùng lúc.
+            Mode::Postgres { test_threads: (POSTGRES_CONCURRENT_TESTS / workers).max(1) }
+        } else {
+            Mode::Inherit
+        }
+    }
 }
 
 fn workers() -> usize {

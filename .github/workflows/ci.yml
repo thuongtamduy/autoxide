@@ -69,7 +69,9 @@ jobs:
             sleep 1
           done
           exit 1
-      - run: ./gate.sh
+      # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc, không doc-test; push lên
+      # main và chạy tay: gate đầy đủ (D-379).
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)

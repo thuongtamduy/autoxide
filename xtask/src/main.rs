@@ -16,7 +16,8 @@
 //!   `TEST_DATABASE_URL`; phần test của `./gate.sh` đầy đủ (xem `affected.rs`).
 //! - `test-affected [--base <ref>]` — chạy test của crate bị sửa kể từ lần chạy xanh gần nhất
 //!   (chưa có thì so với `main`) và crate phụ thuộc vào chúng, trên SQLite; phần test của
-//!   `./gate.sh --quick` (xem `affected.rs`).
+//!   `./gate.sh --quick` (xem `affected.rs`). `--base <ref> --keep-env`: trên database của
+//!   `TEST_DATABASE_URL` thay vì SQLite; phần test của `./gate.sh --pr` (CI cho pull request).
 
 mod affected;
 mod api_diff;
@@ -39,6 +40,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask upgrade-test [--from <tag>] [--image <image>] [--database sqlite|postgres|both]
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
        cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
+       cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)";
 
 fn main() -> ExitCode {
@@ -58,8 +60,9 @@ fn main() -> ExitCode {
         ["new-module", module, entity] => new_module(module, entity),
         ["test-all"] => test_all(false),
         ["test-all", "--doc"] => test_all(true),
-        ["test-affected"] => test_affected(None),
-        ["test-affected", "--base", base] => test_affected(Some(base)),
+        ["test-affected"] => test_affected(None, false),
+        ["test-affected", "--base", base] => test_affected(Some(base), false),
+        ["test-affected", "--base", base, "--keep-env"] => test_affected(Some(base), true),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::FAILURE
@@ -241,8 +244,8 @@ fn test_all(doc: bool) -> ExitCode {
     }
 }
 
-fn test_affected(base: Option<&str>) -> ExitCode {
-    let result = workspace::load().and_then(|workspace| affected::run(&workspace, base));
+fn test_affected(base: Option<&str>, keep_env: bool) -> ExitCode {
+    let result = workspace::load().and_then(|workspace| affected::run(&workspace, base, keep_env));
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
