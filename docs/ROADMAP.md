@@ -469,10 +469,10 @@ bước 35.
 - [x] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
       chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
       `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
-- [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
+- [x] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
       bán, ngừng bán, lưu trữ), ảnh qua `Media`, nội dung nhiều ngôn ngữ, cân nặng và kích thước (cho vận
       chuyển), nhóm thuế của engine thuế, `warranty_months`; slug và đường dẫn công khai
-- [ ] Danh mục dạng cây, thuộc tính theo danh mục; **thuộc tính bắt buộc là dữ liệu** (xuất xứ, hạn dùng, nhãn
+- [x] Danh mục dạng cây, thuộc tính theo danh mục; **thuộc tính bắt buộc là dữ liệu** (xuất xứ, hạn dùng, nhãn
       hàng hoá theo NĐ 43/2017, NĐ 111/2021 — cần đối chiếu); hàng cấm / có điều kiện là dữ liệu kèm giấy tờ
       phải có; `readiness` để lọc và đếm sản phẩm chưa mở bán được (D-223…D-227)
 - [ ] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày

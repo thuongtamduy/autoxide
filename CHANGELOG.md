@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
+  conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
+  product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
+  checked against the tax engine on going on sale, and the public `path` of each product translation.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
   `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
   dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day

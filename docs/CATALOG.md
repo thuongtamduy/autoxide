@@ -14,7 +14,8 @@ sales channels read products and prices through `autoxide_catalog::api::Catalog`
   `physical` (shipped, stocked), `digital`, `service` or `bundle`. `tax_category` is a code of the tax
   engine (`GET /api/v1/tax/categories`), e.g. `vat.standard`.
 - Texts are per language (`PUT /products/{id}/translations/{locale}`); the languages allowed are
-  `AUTOXIDE_CATALOG_LOCALES`. An empty `slug` is made from the name, with `-2`, `-3`… when taken. The
+  `AUTOXIDE_CATALOG_LOCALES`. Each translation has its public `path`,
+  `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`. An empty `slug` is made from the name, with `-2`, `-3`… when taken. The
   description is plain text (blank lines separate paragraphs); HTML is not interpreted.
 - Options (colour, size…) are set with `PUT /products/{id}/options`: up to 3 options of up to 100
   values. Adding an option gives every existing variant the option's first value. Each variant holds
@@ -42,6 +43,28 @@ The number of products is the plan limit `catalog.products` (archived products c
 One tree per tenant, at most 7 levels deep (`/categories`, permission `catalog.categories.manage`).
 `POST /categories/{id}/move` moves a category with everything below it; moving it under itself is
 refused (`catalog.category_cycle`). Filtering products by a category includes its subcategories.
+
+## Attributes, restricted goods and readiness
+
+- **Attributes** (`/attributes`, permission `catalog.categories.manage`) are typed: `text`, `integer`,
+  `decimal` (with `scale`), `boolean`, `date`, `option`, `options`. Products set their values with
+  `PUT /products/{id}/attributes`.
+- A category lists its attributes with `PUT /categories/{id}/attributes`; an attribute can be
+  **required**, from `effective_from` until `effective_to`, for the category and (by default) its
+  subcategories. Required attributes are data: new labelling rules are added with their start date.
+- **Prohibited and conditional goods** are shared rules with their legal basis
+  (`GET /restriction-rules`). The operator loads them with
+  `autoxide task catalog.load_restrictions` (the `vn` pack ships with the server; the same command
+  creates sample product-label attributes such as origin and use-by date for a tenant). Link rules to a
+  category with `PUT /categories/{id}/restrictions`. The rules were compiled from secondary sources —
+  check them against the source texts with a legal professional.
+- A conditional product needs valid documents (`/products/{id}/documents`, permission
+  `catalog.documents.manage`), e.g. an alcohol retail licence.
+- Every product has a **readiness**: `restricted` (prohibited goods), `missing_attributes`,
+  `missing_documents` or `ready`. Only `ready` products go on sale. Filter with `?readiness=` and count
+  with `GET /products/counts?group_by=readiness`. Expired documents are noticed by a daily job.
+- Going on sale also checks that the tax category exists in the tax engine for the unit's tax
+  profile (`catalog.tax_category_unknown`).
 
 ## Prices
 
