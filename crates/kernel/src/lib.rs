@@ -30,7 +30,7 @@ pub use ops::{
     resolve, setup, summary, tags, task, telemetry, texts, usages, work,
 };
 pub use security::{
-    access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,
+    access, antispam, entitlement, idempotency, ip_hash, net, secret, throttle, tls, tokens,
 };
 pub use values::{csv, decimal, email, money, public_url, template};
 

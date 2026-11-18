@@ -482,7 +482,12 @@ Mail mang link dùng một lần tới `AUTOXIDE_AUTH_INVITATION_URL` (trang c�
 không đặt thì mail chứa token), sống `AUTOXIDE_AUTH_INVITATION_DAYS` ngày (7). Chấp nhận thì tài
 khoản được tạo (hay, khi email đã có tài khoản, role được thêm sau khi người đó đăng nhập). **Đăng
 nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AUTOXIDE_AUTH_LOGIN_LINK=true` và đặt
-`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. Cả hai cần mail chạy được
+`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. **Đăng nhập bằng Google, Microsoft, GitHub
+hay OpenID Connect** tắt mặc định; bật bằng `AUTOXIDE_AUTH_OIDC=true`. Mỗi khách đăng ký ứng dụng ở
+nhà cung cấp rồi thêm bằng `POST /api/v1/auth/oidc-providers` ([`docs/guides/oidc.vi.md`](guides/oidc.vi.md));
+client secret lưu mã hoá bằng `AUTOXIDE_SECRET_KEY`. Máy chủ chỉ gọi nhà cung cấp ở địa chỉ public;
+giữ `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false` khi chạy thật, và cho máy chủ gọi ra ngoài qua
+HTTPS (cổng 443). Link và lời mời cần mail chạy được
 (`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
 `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8). Nhập danh mục đơn vị hành chính một lần để kiểm
 địa chỉ: `autoxide task address.import` ([`docs/ADDRESS.vi.md`](ADDRESS.vi.md)).

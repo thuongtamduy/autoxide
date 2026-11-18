@@ -22,6 +22,7 @@ hmac.workspace = true
 ring.workspace = true
 http-body-util.workspace = true
 metrics.workspace = true
+reqwest.workspace = true
 minijinja.workspace = true
 metrics-exporter-prometheus.workspace = true
 opentelemetry.workspace = true

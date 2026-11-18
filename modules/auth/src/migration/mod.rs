@@ -31,6 +31,7 @@ mod m0032_delegations;
 mod m0033_invitations;
 mod m0034_support_grants;
 mod m0035_api_key_kind;
+mod m0036_oidc;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -102,6 +103,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0035_api_key_kind::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "auth"),
+        // Đăng nhập qua nhà cung cấp danh tính (bước 40 P3).
+        Box::new(m0036_oidc::Migration),
     ]
 }
 

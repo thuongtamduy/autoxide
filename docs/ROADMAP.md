@@ -75,10 +75,13 @@ và tổ chức. Endpoint mới có OpenAPI và tool MCP
 tương ứng; thêm thư viện thì kiểm đúng phiên bản và ghi `STACK.md`; mọi mục chạy và có test trên
 cả SQLite và Postgres.
 
-- [ ] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
+- [x] Đăng nhập qua nhà cung cấp danh tính theo OpenID Connect (Google, Microsoft, GitHub qua
       OAuth 2.0, và một nhà cung cấp OIDC bất kỳ khai bằng cấu hình): PKCE, kiểm `state` / `nonce`,
       kiểm chữ ký `id_token` qua JWKS; liên kết với tài khoản sẵn có theo email đã xác minh, không
-      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình
+      tự gộp khi email chưa xác minh; MFA của Autoxide vẫn áp dụng; tắt mặc định, bật bằng cấu hình —
+      `auth_oidc_provider` theo khách (quản trị `/auth/oidc-providers`, `auth.oidc.manage`), `/auth/oidc/{slug}/start` +
+      `/callback`, `/auth/me/identities…`; `id_token` kiểm bằng `ring` (RS256) + `p256` (ES256), JWKS cache + tải lại khi
+      `kid` lạ tối đa mỗi phút; SSRF qua `autoxide_kernel::net`; `AUTOXIDE_AUTH_OIDC` (D-380)
 - [x] Tải file lớn thẳng lên nơi lưu: khi nơi lưu là S3, cấp link tải lên ký sẵn có hạn và giới hạn
       cỡ / loại, rồi một lệnh xác nhận kiểm file (cỡ, loại thật, hash) trước khi ghi bản ghi; nơi
       lưu là ổ đĩa thì đi qua máy chủ như cũ. Một trait trong `Storage`, `files` và `media` dùng

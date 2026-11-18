@@ -9315,3 +9315,45 @@ liệu cá nhân.
    `AUTOXIDE_FILES_DIRECT_MAX_BYTES` (5 GiB), `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS` (900), `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`
    (1 GiB — xác nhận đọc lại cả item), `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS` (900). Test: link giả của `MemoryStorage::presign`
    (testkit) trên hai database; S3 thật (moto) ở `files` và e2e `media`.
+
+## D-380 · Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18 — agent quyết
+
+1. **Không thêm thư viện:** kiểm `id_token` tự viết (`modules/auth/src/oidc/jwt.rs`, như D-045) — chỉ `RS256` (`ring`
+   `RsaPublicKeyComponents::verify`, `RSA_PKCS1_2048_8192_SHA256`) và `ES256` (`p256`, khoá dựng từ SEC1 `04‖x‖y`); không
+   bao giờ `none` / `HS*`. `ring` và `p256` thành phụ thuộc trực tiếp của `auth` (đều đã có trong cây) — không `rsa`,
+   `jsonwebtoken`, `openidconnect`, không mở rộng ngoại lệ RUSTSEC của D-077. RS256 kiểm bằng ví dụ RFC 7515 A.2 (chỉ
+   khoá công khai); ES256 ký bằng khoá sinh lúc chạy trong máy chủ OIDC giả của test.
+2. **Bộ lọc SSRF dời vào kernel:** `webhooks/src/network.rs` → `autoxide_kernel::net` (`is_public`, `is_public_host`,
+   `PublicOnly`); `webhooks` dùng lại. Kernel thêm `reqwest` (đã có trong cây) cho trait phân giải. Client OIDC: không
+   theo chuyển hướng, không proxy hệ thống, kiểm host là IP trước MỖI lần gọi (reqwest không hỏi bộ phân giải cho IP),
+   `https://` bắt buộc trừ khi `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=true`, thân trả lời tối đa 1 MiB, hạn 10 s.
+3. **Cache:** discovery và JWKS trong bộ nhớ theo `max-age` (kẹp 5 phút – 24 giờ). `kid` lạ khi đang giữ JWKS còn hạn → tải
+   lại tối đa một lần mỗi phút mỗi issuer (lần tải đầu không tính).
+4. **`state`:** token một lần của kernel (`auth_tokens`, `purpose = oidc_state`, `subject` = ID nhà cung cấp, tra bằng
+   bản băm), mang khách theo `link_token` như link trong mail. `nonce`, `code_verifier`, `redirect_uri`, `link_user_id` lưu
+   trong `data`, mã hoá bằng `Sealer` (AAD: khách + ID nhà cung cấp). Lượt liên kết (`link_user_id`) không dùng được để
+   đăng nhập và ngược lại. Đặc tả có cờ `link` ở `/oidc/{slug}/start` — bỏ: liên kết đi qua
+   `/me/identities/{slug}/start` (đòi mật khẩu hay `reauth_token`), một cách làm.
+5. **Liên kết tài khoản:** liên kết sẵn có → tài khoản đó; khớp email → chỉ khi CẢ email nhà cung cấp (Google / OIDC
+   `email_verified`, GitHub email `primary && verified`, Microsoft chỉ `xms_edov = true`) lẫn email trong Autoxide đã xác
+   minh, không thì `auth.oidc_link_required`; không khớp → tài khoản mới (email đã xác minh, không mật khẩu) khi
+   `allow_signup` **và** (đăng ký mở — `AUTOXIDE_AUTH_SELF_REGISTRATION` cho nhân sự, `auth.customer_registration` cho người
+   mua — **hoặc** nhà cung cấp có `default_role_id`: quản trị khách chủ động cho người của IdP công ty vào, lệch đặc tả để
+   chuỗi dùng Entra không phải mở đăng ký công khai). Email chưa xác minh không bao giờ tạo tài khoản
+   (`auth.oidc_email_unverified`). Người khai `default_role_id` phải có mọi permission của role (`grant_problems`), giữ chỗ
+   hạn mức số nhân sự như lời mời (D-326). MFA qua `SessionService::login_verified` (chung với link qua email): phiên
+   `method = "oidc"`.
+6. **Bảng:** `auth_oidc_provider`, `auth_identity` — tên số ít theo quy ước bảng của `auth` (đặc tả ghi số nhiều); khoá
+   chính `(tenant_id, id)`, không foreign key: xoá tài khoản / nhà cung cấp xoá liên kết trong cùng transaction. Thêm cột
+   `realm` (`staff` | `customer`, D-309) — sàn cho người mua đăng nhập Google. `client_secret` mã hoá AEAD (mang `key_id`).
+7. **Permission:** thêm `auth.oidc.read` (xem danh sách nhà cung cấp, đọc được qua tool read-only — luật e2e: tool
+   read-only phải có permission mức đọc) bên cạnh `auth.oidc.manage` của đặc tả. **Mã lỗi:** theo đặc tả, trừ
+   `auth.oidc_provider_unavailable` là **503** (`ErrorKind` không có 502) và thêm
+   `auth.identity_taken` (409, danh tính đã liên kết với tài khoản khác). Tool MCP: `auth.list_oidc_providers`,
+   `auth.create_oidc_provider`, `auth.update_oidc_provider` (đầu vào phẳng — MCP không theo `$ref`),
+   `auth.delete_oidc_provider`, `auth.list_my_identities`; luồng đăng nhập không có tool. GitHub Enterprise Server: `kind`
+   `github` có `issuer` là địa chỉ gốc (API ở `/api/v3`) — cũng là cách test chạy trên máy chủ giả.
+8. **Pháp lý:** danh tính ở nhà cung cấp (subject, email) là dữ liệu cá nhân (Luật 91/2025/QH15, NĐ 356/2025, hiệu lực
+   01/01/2026): chỉ xin scope `openid email profile`, có trong `GET /me/export`, xoá cùng tài khoản. Đăng nhập Google / GitHub
+   không thay xác thực số điện thoại của NĐ 147/2024/NĐ-CP — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý về sổ
+   đồng ý khi liên kết.

@@ -242,6 +242,12 @@ and signs in with `POST /api/v1/auth/login/passkey/options` and
 `PublicKeyCredential.parseCreationOptionsFromJSON()` / `parseRequestOptionsFromJSON()` in the
 browser.
 
+Signing in with Google, Microsoft, GitHub or any OpenID Connect provider is off by default;
+turn it on with `AUTOXIDE_AUTH_OIDC=true`, then each tenant adds its providers with
+`POST /api/v1/auth/oidc-providers` (permission `auth.oidc.manage`). An existing account is linked
+only when both sides have verified the email, and two-step sign-in still applies. See
+[`docs/guides/oidc.md`](docs/guides/oidc.md).
+
 Users with the `files.upload` permission upload a file by sending its raw content to
 `POST /api/v1/files?name=report.pdf` with its `Content-Type`, then list, download
 (`GET /api/v1/files/{id}/content`) and delete their own files; `files.manage` reaches

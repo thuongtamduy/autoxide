@@ -10,6 +10,7 @@ pub(crate) mod invitations;
 mod login_link;
 pub(crate) mod memberships;
 mod mfa;
+pub(crate) mod oidc;
 mod passkeys;
 mod reauth;
 mod reset;
@@ -34,6 +35,8 @@ use crate::verify::EmailVerifications;
 /// Các service mà handler dùng.
 #[derive(Clone)]
 pub(crate) struct HttpState {
+    /// Đăng nhập qua nhà cung cấp danh tính (bước 40 P3).
+    pub oidc: Arc<crate::oidc::OidcService>,
     pub sessions: Arc<SessionService>,
     pub users: Arc<UserService>,
     pub roles: Arc<RoleService>,
@@ -81,6 +84,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(customers::routes())
         .merge(delegations::routes())
         .merge(login_link::routes())
+        .merge(oidc::routes())
         .merge(invitations::routes())
         .merge(support::routes())
         .with_state(Arc::new(state))

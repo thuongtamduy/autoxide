@@ -79,13 +79,17 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `auth.count_role_members` | `auth.roles.read` | read-only |
 | `auth.create_api_key` | — | writes |
 | `auth.create_invitation` | `auth.invitations.manage` | writes |
+| `auth.create_oidc_provider` | `auth.oidc.manage` | writes |
 | `auth.create_role` | `auth.roles.manage` | writes |
+| `auth.delete_oidc_provider` | `auth.oidc.manage` | destructive |
 | `auth.delete_role` | `auth.roles.manage` | destructive |
 | `auth.get_role` | `auth.roles.read` | read-only |
 | `auth.get_user_roles` | `auth.users.read` | read-only |
 | `auth.list_api_keys` | — | read-only |
 | `auth.list_invitations` | `auth.invitations.manage` | read-only |
 | `auth.list_memberships` | `auth.users.read` | read-only |
+| `auth.list_my_identities` | — | read-only |
+| `auth.list_oidc_providers` | `auth.oidc.read` | read-only |
 | `auth.list_permissions` | `auth.roles.read` | read-only |
 | `auth.list_roles` | `auth.roles.read` | read-only |
 | `auth.list_users` | `auth.users.read` | read-only |
@@ -94,6 +98,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `auth.revoke_invitation` | `auth.invitations.manage` | writes |
 | `auth.set_memberships` | `auth.roles.manage` | writes |
 | `auth.set_user_roles` | `auth.roles.manage` | writes |
+| `auth.update_oidc_provider` | `auth.oidc.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |
 | `comments.answer` | `comments.post` | writes |

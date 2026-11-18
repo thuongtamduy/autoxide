@@ -38,7 +38,7 @@ events! {
     USER_UPDATED, UserUpdated, "auth.user_updated", "A user account was renamed, disabled or enabled.";
     USER_DELETED, UserDeleted, "auth.user_deleted", "A user account was deleted; `before.id` is its id. Modules that keep data about users delete theirs when they receive it.";
     PASSWORD_CHANGED, PasswordChanged, "auth.password_changed", "A user's password was changed; their sessions were ended.";
-    SIGNED_IN, SignedIn, "auth.signed_in", "A user signed in.";
+    SIGNED_IN, SignedIn, "auth.signed_in", "A user signed in; `after.method` says how (`password`, `password_and_mfa`, `passkey`, `email_link`, `oidc`…).";
     SIGNED_OUT, SignedOut, "auth.signed_out", "A user signed out of one session; `after.session_id` names it when it was ended from the session list.";
     SESSIONS_REVOKED, SessionsRevoked, "auth.sessions_revoked", "Several sessions of a user were ended at once: by the user (`after.kept` is the session they kept) or by an administrator; `after.count` is how many.";
     REFRESH_TOKEN_REUSED, RefreshTokenReused, "auth.refresh_token_reused", "A used refresh token was sent again; the session was ended in case it was stolen.";
@@ -68,6 +68,11 @@ events! {
     SUPPORT_ACCESS_REVOKED, SupportAccessRevoked, "auth.support_access_revoked", "A support access grant was revoked (`after.revoked_by_tenant` is `true` when the tenant revoked it).";
     DELEGATION_GRANTED, DelegationGranted, "auth.delegation_granted", "This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).";
     DELEGATION_REVOKED, DelegationRevoked, "auth.delegation_revoked", "A delegation to a child tenant was revoked; holders of the role lose access at their next request.";
+    IDENTITY_LINKED, IdentityLinked, "auth.identity_linked", "A sign-in with an outside provider (Google, Microsoft, GitHub, OpenID Connect) was linked to an account (`after`: provider id and slug, identity id, `reason` `verified_email`, `signup` or `user`).";
+    IDENTITY_UNLINKED, IdentityUnlinked, "auth.identity_unlinked", "A sign-in with an outside provider was removed from an account (`before`: provider id, identity id).";
+    OIDC_PROVIDER_CREATED, OidcProviderCreated, "auth.oidc_provider_created", "A sign-in provider was added to the tenant (`after`: slug, kind, name, issuer; never the client secret).";
+    OIDC_PROVIDER_UPDATED, OidcProviderUpdated, "auth.oidc_provider_updated", "A sign-in provider of the tenant was changed (`before` / `after` without the client secret; `after.secret_changed`).";
+    OIDC_PROVIDER_DELETED, OidcProviderDeleted, "auth.oidc_provider_deleted", "A sign-in provider was removed from the tenant, with every account link to it.";
 }
 
 /// Chủ thể (subject) của event về người dùng `id`.

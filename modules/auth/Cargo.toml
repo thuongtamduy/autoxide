@@ -19,6 +19,9 @@ chrono-tz.workspace = true
 getrandom.workspace = true
 hmac.workspace = true
 metrics.workspace = true
+p256.workspace = true
+reqwest.workspace = true
+ring.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -33,7 +36,6 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
-p256.workspace = true
 autoxide-testkit.workspace = true
 
 [lints]

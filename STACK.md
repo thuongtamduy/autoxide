@@ -74,6 +74,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Mã hoá khi lưu     | `ring` (AEAD AES-256-GCM), `zeroize` | 0.17, 1 | `Sealer` của kernel: secret cần đọc lại lưu mã hoá, khoá ngoài database (D-257). Cả hai đã có trong cây phụ thuộc |
 | MFA                | `totp-rs`         | 6.0       | TOTP + recovery code                             |
 | Passkey            | `webauthn_rp`     | 0.3       | WebAuthn phía máy chủ, thuần Rust (RustCrypto: p256, p384, ed25519, rsa — chỉ kiểm chữ ký bằng khoá công khai), không OpenSSL. Test dùng `p256` làm authenticator phần mềm (D-077) |
+| Đăng nhập OIDC / OAuth 2.0 | Tự viết trên `ring` (RS256), `p256` (ES256), `reqwest` sẵn có | 0.17 / 0.13 / 0.13 | Module `auth` là bên dùng của Google, Microsoft, GitHub, issuer OIDC bất kỳ: PKCE, `state` / `nonce`, kiểm `id_token` qua JWKS ~250 dòng. `ring` và `p256` thành phụ thuộc trực tiếp của `auth` (đã có trong cây); không dùng `openidconnect` / `jsonwebtoken` / `rsa` (D-077, D-380). Gọi ra ngoài qua bộ lọc SSRF `autoxide_kernel::net` (dời từ `webhooks`) |
 | Rate limiting  | Tự viết (GCRA, ~100 dòng) | —   | Theo địa chỉ client, trong bộ nhớ; login throttling đếm trong database. Không dùng `tower_governor` (D-047) |
 
 ### Dịch vụ của core
