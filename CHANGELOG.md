@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `support` (step 53): customer support tickets. Customers open tickets from the website (signed in, or
+  as guests with an email or phone number confirmed by a one-time code; guests keep a ticket token), staff open
+  tickets for customers, other modules through `SupportIntake`. Messages are only added (hidden with a reason, never
+  edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
+  machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
+  tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
@@ -28,6 +34,12 @@ endpoints are marked deprecated with a sunset date first.
 - Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
   equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
   (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
+- Bookings that never overlap (step 60): customers book at `POST /api/v1/bookings/public/bookings`, the shop at
+  `POST /api/v1/bookings/bookings`; a unique key on 5-minute cells stops double booking on SQLite and PostgreSQL, a
+  conditional update keeps classes within capacity (`bookings.slot_taken`, `bookings.capacity_full`). Deposits hold
+  the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
+  no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
+  `bookings.read`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and

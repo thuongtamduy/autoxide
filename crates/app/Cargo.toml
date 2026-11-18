@@ -30,6 +30,7 @@ autoxide-ledger.workspace = true
 autoxide-invoices.workspace = true
 autoxide-compliance.workspace = true
 autoxide-notifications.workspace = true
+autoxide-support.workspace = true
 autoxide-bookings.workspace = true
 autoxide-reporting.workspace = true
 autoxide-automations.workspace = true
