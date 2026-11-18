@@ -25,7 +25,7 @@ use crate::forms::Form;
 use crate::forms::fields::{self, Field};
 use crate::permissions::{FORMS_EXPORT, FORMS_READ, FORMS_REVIEW};
 use crate::service::{FormsService, from_json, now, submission_not_found};
-use crate::submissions::csv;
+use autoxide_kernel::csv;
 
 /// Where a submission is in the inbox.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

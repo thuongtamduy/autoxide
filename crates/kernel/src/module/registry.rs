@@ -719,7 +719,14 @@ impl Modules {
                     || event == crate::moderation::TARGET_RESTRICTED
                     || event == crate::moderation::TARGET_RESTORED
                     || self.events.contains(event);
-                if !known {
+                if !known && subscription.is_optional() {
+                    // Module phát event chưa cài: không lỗi, chỉ ghi lại để người vận hành biết.
+                    tracing::info!(
+                        module = module.name(),
+                        event,
+                        "optional subscription to an event no installed module declares"
+                    );
+                } else if !known {
                     problems.push(format!(
                         "module `{}` subscribes to event `{event}`, which no module declares",
                         module.name()

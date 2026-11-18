@@ -461,7 +461,7 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
-- [ ] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
+- [x] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
       chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
       `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
 - [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
