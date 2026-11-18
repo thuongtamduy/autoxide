@@ -62,6 +62,48 @@ Mỗi cửa hàng tự đặt phí dưới `/api/v1/shipping` (permission `shipp
 - Mỗi lựa chọn có `option_key`. Gửi lại khi đặt hàng: `ShippingRates::confirm_option` trả `shipping.option_changed`
   khi phí hay địa chỉ đã đổi.
 
+## Tài khoản hãng vận chuyển
+
+`/api/v1/shipping/carrier-accounts` (permission `shipping.carriers.manage`, tính năng gói `shipping.carriers`):
+`GET`, `POST`, `PATCH /{id}`, `POST /{id}/test`. Thông tin đăng nhập lưu mã hoá theo khách và không bao giờ hiện lại
+(chỉ có `credential_fields`). Response khi tạo có `webhook_path` một lần — đưa cho hãng. `check_status` (`never`, `ok`,
+`failed`) đặt bởi lệnh kiểm và mỗi khi hãng từ chối thông tin đăng nhập. Phương thức `carrier` báo giá qua tài khoản
+của nó; hãng không trả lời trong `AUTOXIDE_SHIPPING_CARRIER_TIMEOUT_SECONDS` thì nằm trong `unavailable`
+(`shipping.carrier_unavailable`), không làm hỏng báo giá.
+
+## Vận đơn
+
+| Method | Đường dẫn | Permission |
+|---|---|---|
+| `GET` | `/shipments?order_id&status&org_id&tracking`, `/shipments/{id}` | `shipping.shipments.read` |
+| `POST` | `/shipments` (tạo tay), `/shipments/{id}/book`, `/cancel`, `/split`, `/status` | `shipping.shipments.manage` |
+| `PUT` | `/shipments/{id}/parcels` | `shipping.shipments.manage` |
+| `GET` | `/shipments/{id}/label` | `shipping.shipments.read` |
+
+- Đơn hàng xin giao bằng event `orders.fulfillment_requested` (hàng trả: `orders.return_pickup_requested`), payload
+  `{"after": {"shipment": ShipmentRequest}}`. Cùng `order_id` + `request_key` không bao giờ tạo vận đơn thứ hai; cùng
+  khoá khác nội dung bị từ chối và ghi log. `orders.order_cancelled` huỷ các vận đơn chưa lấy hàng.
+- Trạng thái: `pending`, `booking`, `ready_to_ship`, `picked_up`, `in_transit`, `out_for_delivery`, `delivered`,
+  `delivery_failed`, `returning`, `returned`, `ready_for_pickup`, `picked_up_by_buyer`, `cancelled`, `lost`. Chỉ đi tới
+  theo một bảng cố định (giao lại sau `delivery_failed` được phép). Cập nhật của hãng đến muộn hay sai thứ tự được giữ
+  trong hành trình nhưng không kéo trạng thái lùi.
+- Đặt hãng gọi hãng ngoài transaction: lưu `pending → booking` trước, rồi gọi hãng với ID vận đơn làm
+  `client_reference`. Vận đơn kẹt `booking` hỏi hãng (`find_by_reference`) trước khi đặt lại (mỗi 5 phút cho vận đơn kẹt
+  quá 10 phút).
+- Phương thức có `auto_book` đặt hãng ngay khi đơn xin giao; không thì nhân viên kiểm hàng rồi bấm đặt.
+- Kiện: ban đầu một kiện; `PUT /parcels` chia món thành nhiều kiện trước khi đặt. `split` chuyển một số dòng sang vận
+  đơn mới (giao một phần); tiền thu hộ ở lại vận đơn gốc.
+- Event (`after` là `ShipmentEvent`, không có dữ liệu cá nhân): `shipping.shipment_created`, `…_booked`,
+  `…_status_changed`, `…_delivered`, `…_delivery_failed`, `…_returned`, `…_cancelled`, `shipping.booking_failed`,
+  `shipping.cod_collected`.
+
+## Webhook của hãng
+
+`POST /api/v1/shipping/webhooks/{carrier_code}/{token}` là công khai. Bộ nối kiểm chữ ký trên thân thô; sai chữ ký trả
+401 và không lưu gì. Thân hợp lệ được lưu nguyên văn (bỏ header bí mật) rồi trả 202; một job áp nó. Cập nhật lặp lại
+chỉ áp một lần (`event_key`); thân lớn hơn `AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` trả 413. Hãng không có webhook được hỏi
+mỗi 30 phút.
+
 ## Hợp đồng cho module khác
 
 ```rust
@@ -103,10 +145,9 @@ Luật mọi bộ nối phải theo (ví dụ đầy đủ: `autoxide_shipping::
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` đăng ký hãng giả `fake` để thử mọi thứ trên máy phát triển. `autoxide
 doctor` cảnh báo khi bật; không bao giờ bật trên production.
 
-## Vận đơn, COD, ngày giao *(đang làm)*
+## COD, ngày giao *(đang làm)*
 
-Tài khoản hãng, webhook, vận đơn nhiều kiện, đối soát
-COD, lịch giao và ước tính công khai sẽ được ghi ở đây khi xong.
+Đối soát COD, lịch giao và ước tính công khai sẽ được ghi ở đây khi xong.
 
 ## Cấu hình
 

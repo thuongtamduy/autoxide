@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `shipping`: carrier accounts (encrypted credentials, connection test), carrier quotes with a timeout, shipments
+  from `orders.fulfillment_requested` or by hand (parcels, partial delivery, booking between two transactions,
+  cancel, labels), one status table for every carrier, signed carrier webhooks stored as received and applied by
+  a job, events `shipping.shipment_*` for orders.
 - `shipping`: shipping rates set by each shop (zones by province, weight tiers with volumetric weight, free
   shipping from an order value, store pickup, methods inherited down the organization tree) and `POST /quote`,
   the same computation as `ShippingRates::quote` / `confirm_option` for orders.

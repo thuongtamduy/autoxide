@@ -5,12 +5,18 @@
 
 mod addresses;
 pub mod api;
+mod booking;
+mod carriers;
 mod config;
 mod entity;
 mod errors;
+mod events;
 mod http;
+mod jobs;
+mod listeners;
 mod methods;
 mod migration;
+mod parcels;
 mod permissions;
 mod privacy;
 mod quote;
@@ -18,6 +24,9 @@ mod registry;
 mod relocation;
 mod service;
 mod settings;
+mod shipments;
+mod status;
+mod webhooks;
 
 #[cfg(test)]
 mod tests;
@@ -69,6 +78,26 @@ impl Module for ShippingModule {
         permissions::all()
     }
 
+    fn events(&self) -> Vec<autoxide_kernel::event::EventInfo> {
+        events::all()
+    }
+
+    fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
+        service::features()
+    }
+
+    fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
+        vec![service::CARRIER_ACCOUNTS_LIMIT]
+    }
+
+    fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
+        self.service.as_ref().map_or_else(Vec::new, jobs::registrations)
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        jobs::schedules()
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -87,7 +116,16 @@ impl Module for ShippingModule {
         if config.fake_carrier {
             registry.register(Arc::new(api::fake::FakeCarrier::new()))?;
         }
-        let service = Arc::new(ShippingService::new(config, units));
+        let parts = service::Parts {
+            outbox: context.outbox()?,
+            jobs: context.jobs(),
+            entitlements: context.entitlements(),
+            databases: context.tenancy(),
+            secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
+            carriers: registry.clone(),
+            units,
+        };
+        let service = Arc::new(ShippingService::new(parts, config));
         context.personal_data(service.clone())?;
         // `Arc<ShippingService>` tự đổi thành `Arc<dyn …>`: module khác chỉ thấy trait.
         context.provide::<dyn api::AddressBook>(service.clone())?;
@@ -101,11 +139,14 @@ impl Module for ShippingModule {
         let Some(service) = self.service.clone() else {
             return Vec::new();
         };
+        // Yêu cầu giao / huỷ đơn của `orders` (có thể chưa cài: `optional`).
+        let mut all = listeners::subscriptions(&service);
         // Tài khoản bị xoá: xoá sổ địa chỉ (`privacy.rs`).
-        vec![Subscription::new(
+        all.push(Subscription::new(
             autoxide_kernel::privacy::USER_DELETED,
             Arc::new(privacy::Erasure(service)),
-        )]
+        ));
+        all
     }
 
     fn routes(&self) -> OpenApiRouter {

@@ -11,7 +11,14 @@ use chrono::Utc;
 use super::*;
 use crate::api::{QuoteItem, QuoteRequest, ShippingRates};
 
-const STAFF: [&str; 2] = ["shipping.settings.manage", "shipping.read"];
+const STAFF: [&str; 6] = [
+    "shipping.settings.manage",
+    "shipping.read",
+    "shipping.carriers.manage",
+    "shipping.shipments.read",
+    "shipping.shipments.manage",
+    "shipping.cod.manage",
+];
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
 pub(crate) struct Tree {

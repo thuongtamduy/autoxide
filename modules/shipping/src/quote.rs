@@ -278,10 +278,19 @@ impl ShippingService {
                 quote.unavailable.push(UnavailableMethod::new(&method.code, NO_PICKUP_POINT));
                 continue;
             }
+            let carrier_code = match (kind, method.carrier_account_id) {
+                (MethodKind::Carrier, Some(account)) => Some(
+                    crate::carriers::find_account(tenant.database().read(), tenant, account)
+                        .await?
+                        .carrier_code,
+                ),
+                _ => None,
+            };
             for (amount, pickup, service, days) in options {
-                quote.options.push(
-                    self.option(&method, kind, amount, pickup, service, days, load, request)?,
-                );
+                let mut option =
+                    self.option(&method, kind, amount, pickup, service, days, load, request)?;
+                option.carrier_code.clone_from(&carrier_code);
+                quote.options.push(option);
             }
         }
         quote.options.sort_by_key(|option| option.amount.minor());
@@ -415,16 +424,43 @@ impl ShippingService {
 }
 
 impl ShippingService {
-    /// Phí của hãng cho phương thức `Carrier` (bước 44 mục 3 cài thật). Chưa có tài khoản hãng: không
-    /// dùng được.
+    /// Phí của hãng cho phương thức `Carrier`: gọi `ShippingCarrier::quote` ngoài transaction, có
+    /// giới hạn thời gian. Lỗi → phương thức vào `unavailable` (không làm hỏng cả báo giá).
     async fn carrier_rates(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
         method: &method::Model,
-        _request: &QuoteRequest,
-        _load: Load,
+        request: &QuoteRequest,
+        load: Load,
     ) -> Result<Vec<(i64, Option<OrgId>, Option<String>, Option<(u16, u16)>)>, Error> {
-        Err(errors::carrier_unknown(method.service_code.as_deref().unwrap_or_default()))
+        let account_id = method.carrier_account_id.ok_or_else(errors::no_carrier)?;
+        let (row, account, carrier) = self.account(tenant, account_id).await?;
+        if !row.active {
+            return Err(errors::no_carrier());
+        }
+        let Some(destination) = request.destination.clone() else { return Ok(Vec::new()) };
+        let parcel = crate::api::CarrierParcel::new(load.chargeable_grams.max(1));
+        let ask =
+            crate::api::CarrierQuoteRequest::new(destination, vec![parcel], request.order_value)
+                .service(method.service_code.clone());
+        let rates = match crate::carriers::within(
+            self.config.carrier_timeout_seconds,
+            carrier.quote(&account, &ask),
+        )
+        .await
+        {
+            Ok(rates) => rates,
+            Err(error) => {
+                self.note_carrier_error(tenant, account_id, &error).await;
+                return Err(error);
+            }
+        };
+        let currency = request.order_value.currency();
+        Ok(rates
+            .into_iter()
+            .filter(|rate| rate.amount.currency() == currency)
+            .map(|rate| (rate.amount.minor(), None, Some(rate.service_code), rate.estimated_days))
+            .collect())
     }
 }
 

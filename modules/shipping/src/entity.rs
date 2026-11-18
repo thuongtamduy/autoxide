@@ -168,3 +168,181 @@ pub(crate) mod pickup_point {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod carrier_account {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_carrier_accounts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        pub carrier_code: String,
+        pub name: String,
+        pub credentials_sealed: String,
+        pub webhook_token_hash: String,
+        pub settings: String,
+        pub sandbox: bool,
+        pub active: bool,
+        pub check_status: String,
+        pub checked_at: Option<DateTimeUtc>,
+        pub check_error_code: Option<String>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod shipment {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_shipments")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        pub origin_org_id: Uuid,
+        pub order_id: Uuid,
+        pub order_number: String,
+        pub request_key: String,
+        pub request_fingerprint: String,
+        pub direction: String,
+        pub buyer_id: Option<Uuid>,
+        pub method_id: Uuid,
+        pub method_kind: String,
+        pub carrier_account_id: Option<Uuid>,
+        pub carrier_code: Option<String>,
+        pub service_code: Option<String>,
+        pub tracking_number: Option<String>,
+        pub status: String,
+        pub status_at: DateTimeUtc,
+        pub recipient_name: String,
+        pub recipient_phone: String,
+        pub country: String,
+        pub province_code: String,
+        pub province_name: String,
+        pub commune_code: String,
+        pub commune_name: String,
+        pub line: String,
+        pub postal_code: Option<String>,
+        pub declared_value_minor: i64,
+        pub cod_minor: Option<i64>,
+        pub currency: String,
+        pub quoted_fee_minor: Option<i64>,
+        pub actual_fee_minor: Option<i64>,
+        pub cod_status: String,
+        pub delivered_at: Option<DateTimeUtc>,
+        pub attempts: i32,
+        pub last_error_code: Option<String>,
+        pub note: String,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod parcel {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_parcels")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub shipment_id: Uuid,
+        pub position: i32,
+        pub weight_grams: i64,
+        pub length_mm: Option<i64>,
+        pub width_mm: Option<i64>,
+        pub height_mm: Option<i64>,
+        pub tracking_number: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod shipment_item {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_shipment_items")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub shipment_id: Uuid,
+        pub parcel_id: Option<Uuid>,
+        pub order_line_key: String,
+        pub variant_id: Uuid,
+        pub sku: String,
+        pub name: String,
+        pub quantity: i64,
+        pub weight_grams: Option<i64>,
+        pub length_mm: Option<i64>,
+        pub width_mm: Option<i64>,
+        pub height_mm: Option<i64>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod tracking_event {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_tracking_events")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub shipment_id: Uuid,
+        pub source: String,
+        pub event_key: String,
+        pub status: String,
+        pub carrier_status: String,
+        pub occurred_at: DateTimeUtc,
+        pub note: String,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod webhook_inbox {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "shipping_webhook_inbox")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub carrier_account_id: Uuid,
+        pub received_at: DateTimeUtc,
+        pub headers: String,
+        pub body: String,
+        pub status: String,
+        pub error: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

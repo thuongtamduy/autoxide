@@ -4,6 +4,8 @@
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use uuid::Uuid;
 
+use crate::api::ShipmentStatus;
+
 pub(crate) fn address_not_found(id: Uuid) -> Error {
     Error::not_found(
         "shipping.address_not_found",
@@ -83,4 +85,88 @@ pub(crate) fn carrier_unknown(code: &str) -> Error {
         "No connector for the carrier `{carrier}` is installed.",
     )
     .with_param("carrier", code)
+}
+
+pub(crate) fn carrier_account_not_found(id: Uuid) -> Error {
+    Error::not_found(
+        "shipping.carrier_account_not_found",
+        "There is no carrier account `{id}` in your scope.",
+    )
+    .with_param("id", id)
+}
+
+pub(crate) fn shipment_not_found(id: Uuid) -> Error {
+    Error::not_found("shipping.shipment_not_found", "There is no shipment `{id}` in your scope.")
+        .with_param("id", id)
+}
+
+/// Hai lệnh cùng tạo một vận đơn (unique `order_id` + `request_key`): bên gọi đọc lại.
+pub(crate) fn request_duplicate() -> Error {
+    Error::conflict(
+        "shipping.request_duplicate",
+        "This shipment request was received at the same time by another call.",
+    )
+}
+
+pub(crate) fn request_conflict(key: &str) -> Error {
+    Error::conflict(
+        "shipping.request_conflict",
+        "The request key `{key}` was already used for this order with other content.",
+    )
+    .with_param("key", key)
+}
+
+pub(crate) fn invalid_transition(from: ShipmentStatus, to: ShipmentStatus) -> Error {
+    Error::conflict("shipping.invalid_transition", "A shipment cannot go from `{from}` to `{to}`.")
+        .with_param("from", from)
+        .with_param("to", to)
+}
+
+pub(crate) fn already_booked() -> Error {
+    Error::conflict("shipping.already_booked", "The shipment is already booked with the carrier.")
+}
+
+pub(crate) fn not_booked() -> Error {
+    Error::conflict("shipping.not_booked", "The shipment is not booked with a carrier yet.")
+}
+
+pub(crate) fn no_carrier() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.no_carrier",
+        "The shipping method of this shipment has no carrier account.",
+    )
+}
+
+pub(crate) fn booking_rejected(code: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.booking_rejected",
+        "The carrier refused the booking (`{reason}`); fix the shipment and book again.",
+    )
+    .with_param("reason", code)
+}
+
+pub(crate) fn webhook_too_large(max: usize) -> Error {
+    Error::new(
+        ErrorKind::PayloadTooLarge,
+        "shipping.webhook_too_large",
+        "The webhook body is larger than {max} bytes.",
+    )
+    .with_param("max", max)
+}
+
+pub(crate) fn webhook_unknown() -> Error {
+    Error::not_found(
+        "shipping.webhook_unknown",
+        "No active carrier account has this webhook address.",
+    )
+}
+
+pub(crate) fn webhook_body() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.webhook_body",
+        "The webhook body is not UTF-8 text.",
+    )
 }

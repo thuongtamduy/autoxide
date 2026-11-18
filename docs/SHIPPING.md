@@ -65,6 +65,49 @@ Each shop sets its own rates under `/api/v1/shipping` (permission `shipping.sett
 - Every option has an `option_key`. Send it back when placing the order: `ShippingRates::confirm_option`
   answers `shipping.option_changed` when the fee or destination changed.
 
+## Carrier accounts
+
+`/api/v1/shipping/carrier-accounts` (permission `shipping.carriers.manage`, plan feature `shipping.carriers`):
+`GET`, `POST`, `PATCH /{id}`, `POST /{id}/test`. Credentials are stored encrypted per tenant and never shown again
+(only `credential_fields`). The create answer holds `webhook_path` once — give it to the carrier. `check_status`
+(`never`, `ok`, `failed`) is set by the test call and whenever the carrier refuses the credentials. A `carrier`
+method quotes through its account; a carrier that does not answer within `AUTOXIDE_SHIPPING_CARRIER_TIMEOUT_SECONDS`
+is listed in `unavailable` (`shipping.carrier_unavailable`) without breaking the quote.
+
+## Shipments
+
+| Method | Path | Permission |
+|---|---|---|
+| `GET` | `/shipments?order_id&status&org_id&tracking`, `/shipments/{id}` | `shipping.shipments.read` |
+| `POST` | `/shipments` (by hand), `/shipments/{id}/book`, `/cancel`, `/split`, `/status` | `shipping.shipments.manage` |
+| `PUT` | `/shipments/{id}/parcels` | `shipping.shipments.manage` |
+| `GET` | `/shipments/{id}/label` | `shipping.shipments.read` |
+
+- Orders ask for a shipment with the event `orders.fulfillment_requested` (returns:
+  `orders.return_pickup_requested`), payload `{"after": {"shipment": ShipmentRequest}}`. The same `order_id` +
+  `request_key` never creates a second shipment; the same key with other content is refused and logged.
+  `orders.order_cancelled` cancels the shipments not picked up yet.
+- Statuses: `pending`, `booking`, `ready_to_ship`, `picked_up`, `in_transit`, `out_for_delivery`, `delivered`,
+  `delivery_failed`, `returning`, `returned`, `ready_for_pickup`, `picked_up_by_buyer`, `cancelled`, `lost`. They only
+  move forward along a fixed table (a new attempt after `delivery_failed` is allowed). Carrier updates that arrive
+  late or out of order are kept in the tracking history but do not move the status back.
+- Booking calls the carrier outside any database transaction: `pending → booking` is saved first, then the carrier
+  is called with the shipment id as `client_reference`. A shipment stuck in `booking` asks the carrier
+  (`find_by_reference`) before ever booking again (every 5 minutes for shipments stuck over 10 minutes).
+- A method with `auto_book` books as soon as the order asks; otherwise staff check the goods and press book.
+- Parcels: one parcel at first; `PUT /parcels` splits the items into several parcels before booking. `split` moves
+  some lines to a new shipment (partial delivery); cash on delivery stays with the original.
+- Events (`after` is a `ShipmentEvent`, without personal data): `shipping.shipment_created`, `…_booked`,
+  `…_status_changed`, `…_delivered`, `…_delivery_failed`, `…_returned`, `…_cancelled`, `shipping.booking_failed`,
+  `shipping.cod_collected`.
+
+## Carrier webhooks
+
+`POST /api/v1/shipping/webhooks/{carrier_code}/{token}` is public. The connector checks the signature on the raw
+body; a wrong signature answers 401 and nothing is stored. A valid body is stored as received (secret headers
+removed) and answered 202; a job applies it. Repeated updates are applied once (`event_key`); bodies above
+`AUTOXIDE_SHIPPING_WEBHOOK_MAX_BYTES` answer 413. Carriers without webhooks are polled every 30 minutes.
+
 ## Contract for other modules
 
 ```rust
@@ -106,10 +149,9 @@ Rules every connector follows (see `autoxide_shipping::api::fake::FakeCarrier` f
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` registers the fake carrier `fake` for trying everything on a development
 machine. `autoxide doctor` warns while it is on; never turn it on in production.
 
-## Shipments, COD, delivery dates *(coming)*
+## COD, delivery dates *(coming)*
 
-Carrier accounts, webhooks, shipments with
-parcels, COD reconciliation, delivery calendars and the public estimate are documented here as they land.
+COD reconciliation, delivery calendars and the public estimate are documented here as they land.
 
 ## Configuration
 

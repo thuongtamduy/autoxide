@@ -2,8 +2,10 @@
 //! gọi service → trả envelope.
 
 pub(crate) mod addresses;
+mod carriers;
 mod quote;
 mod settings;
+mod shipments;
 
 use std::sync::Arc;
 
@@ -30,5 +32,17 @@ pub(crate) fn routes(service: Arc<ShippingService>) -> OpenApiRouter {
         .routes(routes!(settings::set_method_rates))
         .routes(routes!(settings::set_method_pickup_points))
         .routes(routes!(quote::quote))
+        .routes(routes!(carriers::list_accounts, carriers::create_account))
+        .routes(routes!(carriers::update_account))
+        .routes(routes!(carriers::test_account))
+        .routes(routes!(carriers::receive_webhook))
+        .routes(routes!(shipments::list_shipments, shipments::create_shipment))
+        .routes(routes!(shipments::get_shipment))
+        .routes(routes!(shipments::book_shipment))
+        .routes(routes!(shipments::cancel_shipment))
+        .routes(routes!(shipments::split_shipment))
+        .routes(routes!(shipments::set_parcels))
+        .routes(routes!(shipments::set_status))
+        .routes(routes!(shipments::get_label))
         .with_state(service)
 }
