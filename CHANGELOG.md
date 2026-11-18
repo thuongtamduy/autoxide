@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Benchmark dataset (step 39): `scripts/bench-seed.sh small|full` fills a fresh benchmark database with
+  made-up data of real size (full: 5,000 users, 50,000 images with their smaller copies, 100,000 posts in two
+  languages with categories, tags and authors, 1,000,000 comments in reply threads) through the tasks
+  `auth.bench_seed`, `media.bench_seed`, `content.bench_seed`, `comments.bench_seed`. The tasks exist only in a
+  binary built with the cargo feature `bench-seed` (release builds do not have it) and refuse to run without
+  `confirm=yes-this-is-a-benchmark-database` or on a customer that already has data. `scripts/loadtest.sh` takes
+  `LOADTEST_DATASET=small|full` to measure the public read paths of a website on that data.
 - Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
   `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
