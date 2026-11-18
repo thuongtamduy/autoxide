@@ -340,13 +340,7 @@ pub(crate) async fn publish<C: ConnectionTrait>(
                 after: Some(after.clone()),
             };
             outbox
-                .record(
-                    transaction,
-                    tenant,
-                    actor.clone(),
-                    subject.clone(),
-                    &events::LevelChanged(change),
-                )
+                .record(transaction, tenant, *actor, subject.clone(), &events::LevelChanged(change))
                 .await?;
         }
         if let Some(point) = row.reorder_point
@@ -359,7 +353,7 @@ pub(crate) async fn publish<C: ConnectionTrait>(
                 .record(
                     transaction,
                     tenant,
-                    actor.clone(),
+                    *actor,
                     subject.clone(),
                     &events::LowStock(Change::after(after)),
                 )
@@ -370,7 +364,7 @@ pub(crate) async fn publish<C: ConnectionTrait>(
                 .record(
                     transaction,
                     tenant,
-                    actor.clone(),
+                    *actor,
                     subject.clone(),
                     &events::OutOfStock(Change::after(after)),
                 )
@@ -392,7 +386,7 @@ pub(crate) async fn publish<C: ConnectionTrait>(
             .record(
                 transaction,
                 tenant,
-                actor.clone(),
+                *actor,
                 events::level_subject(row.level_id),
                 &events::MovementRecorded(Change::after(after)),
             )
@@ -413,7 +407,7 @@ pub(crate) async fn publish<C: ConnectionTrait>(
             .record(
                 transaction,
                 tenant,
-                actor.clone(),
+                *actor,
                 events::level_subject(*id),
                 &events::CostChanged(Change::after(after)),
             )
