@@ -122459,7 +122459,7 @@
                 }
               }
             },
-            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `inventory.read` and `inventory.count`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {

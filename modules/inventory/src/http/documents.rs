@@ -552,6 +552,7 @@ async fn open_count(
     responses(
         (status = 200, description = "The stock count.", body = Data<CountResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `inventory.read` and `inventory.count`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No stock count with this id in your scope; code `inventory.count_not_found`.", body = Problem),
     )
 )]
@@ -561,6 +562,9 @@ async fn get_count(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<CountResponse>, Error> {
+    if !principal.has(&READ) {
+        principal.require(&COUNT)?;
+    }
     Ok(Data { data: service.get_count(&tenant, &principal, id).await?.into() })
 }
 
