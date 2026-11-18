@@ -528,12 +528,62 @@ export type BookingAvailability = {
   timezone: string;
 };
 
+/** Where the customer pays the deposit. */
+export type BookingCheckout = {
+  /** Partner page where the customer pays. */
+  checkout_url?: string | null;
+  /** Pay before this moment, or the place is released. */
+  expires_at: string;
+  payment_id: string;
+  /** QR code payload, when the partner gives one. */
+  qr_payload?: string | null;
+};
+
+/** A booking just made, with the deposit checkout when one is due. */
+export type BookingCreated = {
+  booking: BookingRecord;
+  checkout?: BookingCheckout | null;
+};
+
+/** The customer of a booking. */
+export type BookingCustomer = {
+  email?: string | null;
+  name: string;
+  /** E.164, e.g. `+84912345678`. */
+  phone?: string | null;
+  /** The customer's account, for signed-in customers. */
+  user_id?: string | null;
+};
+
+/** Who the booking is for. */
+export type BookingCustomerInput = {
+  email?: string | null;
+  /** 1 to 200 characters. */
+  name: string;
+  /** Phone number, e.g. `0912345678` or `+84912345678`; stored as E.164. */
+  phone?: string | null;
+};
+
 /** How much deposit a booking asks for, paid through the shop's payment partner. */
 export type BookingDeposit = {
   /** `none`, `percent` (of the price) or `amount` (fixed, in the price's currency). */
   kind: string;
   /** Percent 1–100, or the amount in minor units; `0` for `none`. */
   value?: number;
+};
+
+/** A deposit and where it stands. */
+export type BookingDepositState = {
+  amount: Money;
+  /** The payment at the partner (`GET /api/v1/ledger/payments/{id}`). */
+  payment_id?: string | null;
+  /** The part given back (or being given back). */
+  refund: Money;
+  /**
+   * `none`, `pending` (waiting for the payment), `paid`, `refund_pending`, `refunded` or `retained`
+   * (kept by the policy).
+   */
+  status: string;
 };
 
 /** Time off or extra working hours. */
@@ -557,6 +607,36 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A booking. */
+export type BookingRecord = {
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
+  created_at: string;
+  customer: BookingCustomer;
+  deposit: BookingDepositState;
+  ends_at: string;
+  /** Until when a `held` booking waits for the deposit. */
+  hold_expires_at?: string | null;
+  id: string;
+  note: string;
+  /** The unit (shop, branch) of the staff member. */
+  org_id: string;
+  /** Price of all places. */
+  price: Money;
+  /** The staff member (or court, room…) booked. */
+  resource_id: string;
+  /** Places taken (classes). */
+  seats: number;
+  service_id: string;
+  starts_at: string;
+  /**
+   * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+   * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+   */
+  status: string;
+  updated_at: string;
 };
 
 /** A staff member, room or equipment. */
@@ -747,6 +827,12 @@ export type CanCheck = {
 export type CanRequest = {
   /** 1 to 50 questions. */
   checks: CanCheck[];
+};
+
+/** Why the booking is cancelled. */
+export type CancelBookingRequest = {
+  /** Up to 200 characters. */
+  reason?: string | null;
 };
 
 /** Cancel your tenant's subscription. */
@@ -2698,6 +2784,22 @@ export type CreateBookingExceptionRequest = {
   starts_at: string;
 };
 
+/** A booking made by the shop (phone call, walk-in): confirmed at once, no deposit. */
+export type CreateBookingRequest = {
+  customer: BookingCustomerInput;
+  /** Language of messages to the customer, e.g. `vi`. */
+  locale?: string | null;
+  /** Up to 500 characters. Never put health information here. */
+  note?: string;
+  /** Omitted: the first free staff member who gives the service. */
+  resource_id?: string | null;
+  /** Places (classes); default 1. */
+  seats?: number;
+  service_id: string;
+  /** On a 5-minute mark, e.g. a `starts_at` from the availability. */
+  starts_at: string;
+};
+
 /** A new staff member, room or equipment. */
 export type CreateBookingResourceRequest = {
   /**
@@ -3095,6 +3197,26 @@ export type CustomFieldView = {
   visibility: string;
 };
 
+/** A booking by the customer. */
+export type CustomerBookingRequest = {
+  customer: BookingCustomerInput;
+  /** Language of messages to the customer, e.g. `vi`. */
+  locale?: string | null;
+  /** Up to 500 characters. Never put health information here. */
+  note?: string;
+  /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
+  payment_method?: string | null;
+  /** A staff member (or court, room…) from the availability; omitted: the first one free. */
+  resource_id?: string | null;
+  /** Page of the shop to open after paying the deposit. */
+  return_url?: string | null;
+  /** Places (classes); default 1. */
+  seats?: number;
+  service_id: string;
+  /** A `starts_at` from the availability. */
+  starts_at: string;
+};
+
 /** A customer account of the tenant's shop. */
 export type CustomerResponse = {
   created_at: string;
@@ -3383,6 +3505,15 @@ export type Data_BookingAvailability = {
 };
 
 /** Envelope of a single result. */
+export type Data_BookingCreated = {
+  /** A booking just made, with the deposit checkout when one is due. */
+  data: {
+    booking: BookingRecord;
+    checkout?: BookingCheckout | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BookingException = {
   /** Time off or extra working hours. */
   data: {
@@ -3393,6 +3524,39 @@ export type Data_BookingException = {
     reason: string;
     resource_id: string;
     starts_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingRecord = {
+  /** A booking. */
+  data: {
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    created_at: string;
+    customer: BookingCustomer;
+    deposit: BookingDepositState;
+    ends_at: string;
+    /** Until when a `held` booking waits for the deposit. */
+    hold_expires_at?: string | null;
+    id: string;
+    note: string;
+    /** The unit (shop, branch) of the staff member. */
+    org_id: string;
+    /** Price of all places. */
+    price: Money;
+    /** The staff member (or court, room…) booked. */
+    resource_id: string;
+    /** Places taken (classes). */
+    seats: number;
+    service_id: string;
+    starts_at: string;
+    /**
+     * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+     * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+     */
+    status: string;
+    updated_at: string;
   };
 };
 
@@ -13486,6 +13650,40 @@ export type Page_AuthorResponse = {
 };
 
 /** One page of a list. */
+export type Page_BookingRecord = {
+  /** The items of this page, in the requested order. */
+  data: {
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    created_at: string;
+    customer: BookingCustomer;
+    deposit: BookingDepositState;
+    ends_at: string;
+    /** Until when a `held` booking waits for the deposit. */
+    hold_expires_at?: string | null;
+    id: string;
+    note: string;
+    /** The unit (shop, branch) of the staff member. */
+    org_id: string;
+    /** Price of all places. */
+    price: Money;
+    /** The staff member (or court, room…) booked. */
+    resource_id: string;
+    /** Places taken (classes). */
+    seats: number;
+    service_id: string;
+    starts_at: string;
+    /**
+     * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+     * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+     */
+    status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_BookingResource = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17457,6 +17655,14 @@ export type ReportRequest = {
   /** What is wrong, for the moderators (at most 500 characters). */
   note?: string | null;
   reason: CommentReportReason;
+};
+
+/** The new time of a booking. */
+export type RescheduleBookingRequest = {
+  /** Another staff member who gives the service; omitted: the same one. */
+  resource_id?: string | null;
+  /** On a 5-minute mark. */
+  starts_at: string;
 };
 
 /** A new password, with the token from the reset mail. */
@@ -21627,6 +21833,134 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings": {
+    /** List bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Book for a customer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingRequest;
+      responses: {
+        201: Data_BookingCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}": {
+    /** Get a booking. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/cancel": {
+    /** Cancel a booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CancelBookingRequest;
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/check-in": {
+    /** Check the customer in. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/complete": {
+    /** Mark a booking done. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/confirm": {
+    /** Confirm a pending booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/no-show": {
+    /** Mark a no-show. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/reschedule": {
+    /** Move a booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RescheduleBookingRequest;
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/exceptions": {
     /** List time off and extra hours of a resource. */
     get: {
@@ -21675,6 +22009,23 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings": {
+    /** Book a service (customer). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CustomerBookingRequest;
+      responses: {
+        201: Data_BookingCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };
