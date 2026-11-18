@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
+  (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
+  concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
+  `PUT /settings/{store}`: nearby first, split); the minute job `inventory.expire_reservations`;
+  `GET /reservations`, `POST /reservations/{id}/release`, MCP tool `inventory.release_reservation`.
 - Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
   `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with

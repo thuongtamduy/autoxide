@@ -22,6 +22,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("inventory")],
         ),
+        Box::new(CreateReservations),
     ]
 }
 
@@ -156,5 +157,168 @@ impl MigrationTrait for CreateStock {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &STOCK_TABLES).await
+    }
+}
+
+struct CreateReservations;
+
+impl MigrationName for CreateReservations {
+    fn name(&self) -> &str {
+        "m0007_create_reservations"
+    }
+}
+
+const RESERVATION_TABLES: [&str; 6] = [
+    "inventory_settings",
+    "inventory_sources",
+    "inventory_reservations",
+    "inventory_reservation_lines",
+    "inventory_fulfilments",
+    "inventory_restocks",
+];
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateReservations {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Cài đặt theo nút: cách cửa hàng chọn kho, và tỉnh / nhận tại cửa hàng của nút (chép từ
+        // event `organizations.public_profile_updated` — module không đọc bảng của `organizations`).
+        let mut settings = table("inventory_settings");
+        settings
+            .col(schema::uuid("org_id"))
+            .col(schema::boolean("prefer_nearby"))
+            .col(schema::boolean("allow_split"))
+            .col(schema::string_len_null("province_code", 16))
+            .col(schema::boolean("pickup"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(settings).await?;
+        index(
+            manager,
+            "inventory_settings",
+            "inventory_settings_key",
+            &["tenant_id", "org_id"],
+            true,
+        )
+        .await?;
+
+        // Kho phục vụ một cửa hàng / kênh bán, theo thứ tự ưu tiên.
+        let mut sources = table("inventory_sources");
+        sources
+            .col(schema::uuid("selling_org_id"))
+            .col(schema::uuid("warehouse_org_id"))
+            .col(schema::integer("priority"))
+            .col(schema::boolean("active"));
+        manager.create_table(sources).await?;
+        index(
+            manager,
+            "inventory_sources",
+            "inventory_sources_key",
+            &["tenant_id", "selling_org_id", "warehouse_org_id"],
+            true,
+        )
+        .await?;
+
+        // Chỗ giữ hàng: một đơn một dòng.
+        let mut reservations = table("inventory_reservations");
+        reservations
+            .col(schema::uuid("order_id"))
+            .col(schema::uuid("selling_org_id"))
+            .col(schema::string_len("status", 16))
+            .col(schema::timestamp_with_time_zone_null("expires_at"))
+            .col(schema::string_len("fingerprint", 64))
+            .col(schema::string_len_null("release_reason", 32))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(reservations).await?;
+        let t = "inventory_reservations";
+        index(manager, t, "inventory_reservations_order_key", &["tenant_id", "order_id"], true)
+            .await?;
+        index(
+            manager,
+            t,
+            "inventory_reservations_due_idx",
+            &["tenant_id", "status", "expires_at"],
+            false,
+        )
+        .await?;
+        // Job hết hạn quét cả database (mọi khách): index không bắt đầu bằng `tenant_id`.
+        index(manager, t, "inventory_reservations_expiry_idx", &["status", "expires_at"], false)
+            .await?;
+
+        // Phần đã giữ của từng dòng đơn ở một kho. `per_unit`: số đơn vị của biến thể này trong
+        // một đơn vị của dòng đơn (thành phần combo; 1 với dòng thường).
+        let mut lines = table("inventory_reservation_lines");
+        lines
+            .col(schema::uuid("reservation_id"))
+            .col(schema::string_len("line_key", 100))
+            .col(schema::uuid("variant_id"))
+            .col(schema::uuid_null("bundle_variant_id"))
+            .col(schema::big_integer("per_unit"))
+            .col(schema::uuid("level_id"))
+            .col(schema::uuid("org_id"))
+            .col(schema::big_integer("quantity"))
+            .col(schema::big_integer("fulfilled_quantity"))
+            .col(schema::big_integer("released_quantity"))
+            .col(schema::boolean("backordered"))
+            .col(schema::boolean("preordered"));
+        manager.create_table(lines).await?;
+        let t = "inventory_reservation_lines";
+        index(
+            manager,
+            t,
+            "inventory_reservation_lines_idx",
+            &["tenant_id", "reservation_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "inventory_reservation_lines_level_idx",
+            &["tenant_id", "level_id"],
+            false,
+        )
+        .await?;
+
+        // Lần xuất kho theo chỗ giữ: chống xuất hai lần cùng `fulfilment_key`.
+        let mut fulfilments = table("inventory_fulfilments");
+        fulfilments
+            .col(schema::uuid("reservation_id"))
+            .col(schema::string_len("fulfilment_key", 100))
+            .col(schema::string_len("fingerprint", 64))
+            .col(schema::timestamp_with_time_zone("created_at"));
+        manager.create_table(fulfilments).await?;
+        index(
+            manager,
+            "inventory_fulfilments",
+            "inventory_fulfilments_key",
+            &["tenant_id", "reservation_id", "fulfilment_key"],
+            true,
+        )
+        .await?;
+
+        // Lần nhập lại hàng trả về: `reference` vĩnh viễn (D-184); dòng không bán lại được chỉ ghi
+        // nhận trong `lines` (JSON).
+        let mut restocks = table("inventory_restocks");
+        restocks
+            .col(schema::string_len("reference", 100))
+            .col(schema::string_len("reference_fingerprint", 64))
+            .col(schema::uuid_null("order_id"))
+            .col(schema::uuid("org_id"))
+            .col(schema::text("lines"))
+            .col(schema::timestamp_with_time_zone("created_at"));
+        manager.create_table(restocks).await?;
+        index(
+            manager,
+            "inventory_restocks",
+            "inventory_restocks_reference_key",
+            &["tenant_id", "reference"],
+            true,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(manager, &RESERVATION_TABLES).await
     }
 }

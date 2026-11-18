@@ -58,6 +58,39 @@ cost. A change sends `inventory.cost_changed` (`catalog` uses it for price floor
 `available` falls from above the reorder point to it or below; `inventory.out_of_stock` when it falls from above 0
 to 0 or below. `GET /levels?below_reorder=true` and the MCP tool `inventory.list_low_stock` list them.
 
+## Reservations (for orders)
+
+Module `orders` holds stock through `autoxide_inventory::api::Inventory`:
+
+1. `reserve` — all lines of an order or nothing, until `expires_at` (at most
+   `AUTOXIDE_INVENTORY_MAX_HOLD_HOURS`). Calling again with the same `order_id` and content returns the same
+   reservation; other content is `reference_reused`. Bundles take stock from each component; digital goods and services
+   are skipped. Variants sold as `backorder` or `preorder` may take `available` below 0 (`backordered`).
+2. `confirm` — the order was placed: the reservation no longer expires.
+3. `fulfil` — ship some or all reserved units (`fulfilment_key` makes it safe to retry); writes `sale` lines.
+4. `release` — give back what was not shipped (cancelled, payment failed…). Releasing twice adds back once.
+5. `restock` — returned goods come back in (`reference` such as `return:<id>`); unsellable lines are only recorded.
+
+Unconfirmed reservations past `expires_at` are released by the job `inventory.expire_reservations` (every minute).
+Each reservation takes stock with one conditional `UPDATE` per line, in a fixed order, so 100 buyers of the last
+unit get exactly one success.
+
+Admins see reservations with `GET /reservations` (`inventory.reservations.read`) and release a stuck one with
+`POST /reservations/{id}/release` (`inventory.adjust`; recorded with their user id).
+
+## Choosing warehouses
+
+`PUT /sources/{store}` lists the warehouses serving a store or channel, by `priority`; without rows the store sells
+its own stock. `PUT /settings/{store}`:
+
+- `prefer_nearby` — warehouses in the buyer's province first (the province comes from the units' public profile in
+  module `organizations`);
+- `allow_split` — split an order over several warehouses when none has every line (default off: one order, one
+  warehouse).
+
+A reservation tries one warehouse that has every line first; with no candidate at all it answers
+`inventory.no_source`, with not enough stock `inventory.insufficient_stock` naming each line.
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and
