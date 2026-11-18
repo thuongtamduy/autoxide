@@ -865,7 +865,7 @@ async fn job_xong_va_nhac_ten_thanh_tin_trong_ung_dung() {
             status: "succeeded",
             requested_by: alice,
         };
-        outbox.record(&transaction, &tenant, actor.clone(), None, &job).await.unwrap();
+        outbox.record(&transaction, &tenant, actor, None, &job).await.unwrap();
         let note = NoteAdded {
             kind: "content.entry",
             record_id: "e1",
