@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 52, AI in the admin: `POST /api/v1/kernel/filters/parse {resource, text}` turns a sentence into the query parameters of
+  a list, each checked against the list's filter schema (invalid ones come back in `ignored`); nothing is run. Needs the `ai`
+  module.
+- Step 52, safe undo: `POST /api/v1/content/entries/{id}/unarchive` brings an archived post or page back as a draft
+  (event `content.entry_unarchived`).
 - Step 52, developer tools: `GET /api/v1/webhooks/deliveries` lists the deliveries of every endpoint (filter `status`,
   `endpoint_id`); `POST /api/v1/webhooks/deliveries/{id}/redeliver` sends a finished delivery again with the same body and
   `webhook-id` (event `webhooks.delivery_redelivered`); MCP tools `webhooks.list_deliveries` and `webhooks.redeliver`.

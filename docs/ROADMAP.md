@@ -242,9 +242,13 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       `actor_kind` (đủ `ActorKind`, D-224) và theo key; dòng của lệnh `202 approval_required` giữ `approval_id`
       - [x] Bảng `kernel_request_log`, ghi bất đồng bộ, `GET /kernel/devtools/requests`, tool `kernel.request_log`,
             lệnh MCP `mcp:<tool>`, `approval_id`, hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (D-370)
-- [ ] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+- [x] Hoàn tác an toàn: lưu trữ / ẩn có `restore`; lệnh ghi lớn có `dry_run` trả trước những gì sẽ đổi
+      - `POST /content/entries/{id}/unarchive`; media đã có `restore`, bình luận và người đăng ký bản tin có thao tác ngược
+        (`approve` / `unblock`); `dry_run` ở thao tác hàng loạt (P8), nhập menu cũ. Nhập CSV (bước 56) và đổi giá hàng loạt
+        (thương mại) thêm `dry_run` khi làm tới.
 - [ ] AI trong quản trị (D-109): lời thường thành bộ lọc đã kiểm theo schema (`ai/filters/parse`); trợ lý chạy
       tool MCP với quyền người gọi, mọi lệnh ghi là bản nháp hay yêu cầu duyệt, trả kèm tool đã gọi
+      - [x] `POST /kernel/filters/parse`: lời thường thành bộ lọc đã kiểm theo schema (D-372). Còn: trợ lý.
 - [ ] Thông báo: lý do nhận, trạng thái xong / lưu, bộ lọc, cấu hình kênh theo loại event; ghim màn hình hay
       dùng (`/me/pins`)
       - [x] `/api/v1/me/pins`: ghim màn hình hay bản ghi, tối đa 20, xếp lại, dữ liệu cá nhân

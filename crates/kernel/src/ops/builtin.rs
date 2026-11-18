@@ -390,6 +390,12 @@ impl Module for KernelModule {
             ));
         }
         routes = routes.merge(crate::ops::request_log::routes());
+        routes = routes.merge(crate::ops::filter_parse::routes(
+            crate::ops::filter_parse::FilterParseState {
+                lists: self.catalog.lists(),
+                model: self.catalog.text_model(),
+            },
+        ));
         routes = routes.merge(crate::ops::custom_fields::routes(
             crate::ops::custom_fields::CustomFieldsState { fields: self.catalog.custom_fields() },
         ));

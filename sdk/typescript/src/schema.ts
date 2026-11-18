@@ -5836,6 +5836,24 @@ export type Data_OverrideResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ParsedFilters = {
+  /** Filters understood from the sentence. */
+  data: {
+    /**
+     * What could not be turned into a valid filter: parts of the sentence, or parameters the
+     * model proposed that the list does not accept.
+     */
+    ignored: string[];
+    /**
+     * Query parameters of the list, each checked against the list's filter schema; send them
+     * to the list endpoint as they are.
+     */
+    params: Record<string, unknown>;
+    resource: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PasskeyResponse = {
   /** A passkey of the signed-in user. Holds no secret. */
   data: {
@@ -14154,6 +14172,29 @@ export type Pagination = {
   next_cursor?: string | null;
 };
 
+/** A sentence to turn into the filters of a list. */
+export type ParseRequest = {
+  /** The list, as `x-autoxide-list` in the API document, e.g. `content.list_content_entries`. */
+  resource: string;
+  /** What the person typed, 1 to 500 characters, in any language. */
+  text: string;
+};
+
+/** Filters understood from the sentence. */
+export type ParsedFilters = {
+  /**
+   * What could not be turned into a valid filter: parts of the sentence, or parameters the
+   * model proposed that the list does not accept.
+   */
+  ignored: string[];
+  /**
+   * Query parameters of the list, each checked against the list's filter schema; send them
+   * to the list endpoint as they are.
+   */
+  params: Record<string, unknown>;
+  resource: string;
+};
+
 /** The authenticator's answer to a sign-in ceremony. */
 export type PasskeyLoginRequest = {
   /** The `ceremony_id` from `POST /api/v1/auth/login/passkey/options`. */
@@ -20659,6 +20700,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/entries/{id}/unarchive": {
+    /** Bring an archived post or page back. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/entries/{id}/unpublish": {
     /** Take a post or page down. */
     post: {
@@ -22063,6 +22120,21 @@ export interface paths {
         200: string;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/filters/parse": {
+    /** Turn a sentence into the filters of a list. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ParseRequest;
+      responses: {
+        200: Data_ParsedFilters;
+        401: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };

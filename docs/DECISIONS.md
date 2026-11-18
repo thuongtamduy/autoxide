@@ -9138,3 +9138,16 @@ liệu cá nhân.
 3. `GET /api/v1/kernel/devtools/events?object=<kind>:<id>` đọc từ audit qua `RecordHistory` (outbox bị dọn sau khi giao); chưa
    cài audit thì trả rỗng. Chạy lại job trong dead-letter queue đã có từ bước 51 P15 (`POST /kernel/jobs/{id}/retry`, event
    `kernel.job_retried`).
+
+## D-372 · Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18 — agent quyết
+
+1. Đặc tả ghi `POST /api/v1/ai/filters/parse`. Endpoint đặt ở kernel (`/api/v1/kernel/filters/parse`) vì schema bộ lọc (P7) là của
+   kernel và module `ai` chỉ công bố mô hình (`dyn TextModel`); để ở `ai` thì module `ai` phải đọc phần bên trong kernel. Mô hình
+   nối vào sau khi mọi module khởi động (như `RecordHistory`); không có module `ai` thì 503 `kernel.filters_need_ai`.
+2. Mô hình chỉ đề xuất; kernel kiểm **từng** tham số bằng `check_params` (sai tên, sai kiểu, ngoài tập giá trị → `ignored`), bỏ
+   `cursor` / `limit`. Không chạy lệnh nào, không đọc dữ liệu: người gọi gọi danh sách với `params`, permission áp như thường —
+   nên endpoint chỉ cần đăng nhập. Câu của người dùng ở `input`, luật ở `instructions` (D-109); hạn mức token của `ai` áp dụng.
+3. Trợ lý (`/ai/assistant/messages`) chưa làm: cần thiết kế vòng gọi tool có giới hạn và duyệt; để lại trong lộ trình.
+4. Hoàn tác lưu trữ: `POST /api/v1/content/entries/{id}/unarchive` đưa bài về nháp nguyên nội dung (event
+   `content.entry_unarchived`); bài đã đăng trước khi lưu trữ thì đăng lại thẳng từ lưu trữ như trước (đường dẫn cũ trả 410 tới lúc
+   đó). Media đã có `restore`; bình luận, người đăng ký bản tin có thao tác ngược (`approve`, `unblock`).

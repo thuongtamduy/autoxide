@@ -17155,6 +17155,40 @@
         ],
         "type": "object"
       },
+      "Data_ParsedFilters": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Filters understood from the sentence.",
+            "properties": {
+              "ignored": {
+                "description": "What could not be turned into a valid filter: parts of the sentence, or parameters the\nmodel proposed that the list does not accept.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "params": {
+                "description": "Query parameters of the list, each checked against the list's filter schema; send them\nto the list endpoint as they are.",
+                "type": "object"
+              },
+              "resource": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource",
+              "params",
+              "ignored"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PasskeyResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -42742,6 +42776,52 @@
         },
         "required": [
           "limit"
+        ],
+        "type": "object"
+      },
+      "ParseRequest": {
+        "additionalProperties": false,
+        "description": "A sentence to turn into the filters of a list.",
+        "properties": {
+          "resource": {
+            "description": "The list, as `x-autoxide-list` in the API document, e.g. `content.list_content_entries`.",
+            "example": "content.list_content_entries",
+            "type": "string"
+          },
+          "text": {
+            "description": "What the person typed, 1 to 500 characters, in any language.",
+            "example": "my drafts about Da Lat",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource",
+          "text"
+        ],
+        "type": "object"
+      },
+      "ParsedFilters": {
+        "description": "Filters understood from the sentence.",
+        "properties": {
+          "ignored": {
+            "description": "What could not be turned into a valid filter: parts of the sentence, or parameters the\nmodel proposed that the list does not accept.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "params": {
+            "description": "Query parameters of the list, each checked against the list's filter schema; send them\nto the list endpoint as they are.",
+            "type": "object"
+          },
+          "resource": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource",
+          "params",
+          "ignored"
         ],
         "type": "object"
       },
@@ -80020,6 +80100,152 @@
         ]
       }
     },
+    "/api/v1/content/entries/{id}/unarchive": {
+      "post": {
+        "description": "Requires `content.publish`. The undo of archiving: the entry becomes a draft again, unchanged.\nIts old address keeps answering 410 until it is published again (an archived entry may also be\npublished directly). `If-Match` is required.",
+        "operationId": "content_unarchive_content_entry",
+        "parameters": [
+          {
+            "description": "Id of the entry.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: the `ETag` of the entry (or `*`). Done only if nobody changed the entry since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_EntryResponse"
+                }
+              }
+            },
+            "description": "A draft again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No entry has this id; code `content.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The entry is not archived; code `content.not_archived`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The entry changed since you read it; code `precondition_failed`."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Bring an archived post or page back.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.publish"
+        ]
+      }
+    },
     "/api/v1/content/entries/{id}/unpublish": {
       "post": {
         "description": "Requires `content.publish`, or `content.publish_own` for an entry you created. Readers no longer\nsee it (its address answers 404); it is a draft again and may be published later. A pending\nscheduled publish of the entry is canceled. A page with published subpages cannot be taken\ndown. `If-Match` is required.",
@@ -92848,6 +93074,121 @@
           "kernel"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/kernel/filters/parse": {
+      "post": {
+        "description": "Any signed-in user. An AI model proposes query parameters for the list `resource`; each one is\nchecked against the list's filter schema (`x-autoxide-filters`), and what is not valid is\nreturned in `ignored`. Nothing is run: call the list endpoint with `params`, where your\npermissions apply as usual. Needs the `ai` module; its daily token limit applies.",
+        "operationId": "kernel_parse_list_filters",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ParsedFilters"
+                }
+              }
+            },
+            "description": "The filters understood."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`resource` is not a list or `text` is empty or too long; see `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant used its AI tokens for today; code `ai.quota_exceeded`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No AI on this server (code `kernel.filters_need_ai`), AI is turned off (code `ai.disabled`) or the provider is unavailable (code `ai.provider_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn a sentence into the filters of a list.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
       }
     },
     "/api/v1/kernel/find": {

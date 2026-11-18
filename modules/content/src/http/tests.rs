@@ -1655,3 +1655,126 @@ async fn viec_va_tim_khong_lo_sang_nhanh_anh_em() {
     .await
     .unwrap();
 }
+
+/// Số event `content` đang nằm trong outbox (chưa giao: test không chạy bộ phát).
+async fn outbox_count(app: &TestApp) -> i64 {
+    use sea_orm::ConnectionTrait;
+    let database = app.database().read();
+    let sql = "SELECT COUNT(*) AS n FROM content_events";
+    let row = database
+        .query_one_raw(sea_orm::Statement::from_string(database.get_database_backend(), sql))
+        .await
+        .unwrap()
+        .unwrap();
+    row.try_get("", "n").unwrap()
+}
+
+/// Hoàn tác an toàn (bước 52): bài đã lưu trữ về lại nháp nguyên nội dung; bài chưa lưu trữ thì
+/// 409; chạy thử thao tác hàng loạt không ghi gì, không phát event.
+#[tokio::test]
+async fn restore_tra_lai_trang_thai_truoc() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Lưu rồi lấy lại", "excerpt": "Tóm tắt"})),
+        )
+        .await;
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let etag_of = async |id: &str| {
+            send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None)
+                .await
+                .header(header::ETAG)
+                .to_owned()
+        };
+        let etag = etag_of(&id).await;
+        let early = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/unarchive"),
+            Some("admin"),
+            &[("if-match", etag.as_str())],
+            None,
+        )
+        .await;
+        assert_eq!(
+            (early.status(), early.json()["code"].as_str()),
+            (StatusCode::CONFLICT, Some("content.not_archived"))
+        );
+        let archived = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/archive"),
+            Some("admin"),
+            &[("if-match", etag.as_str())],
+            None,
+        )
+        .await;
+        assert_eq!(archived.json()["data"]["status"], "archived", "{}", archived.json());
+        let etag = etag_of(&id).await;
+        let denied = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/unarchive"),
+            Some("reader"),
+            &[("if-match", etag.as_str())],
+            None,
+        )
+        .await;
+        assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+        let restored = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/unarchive"),
+            Some("admin"),
+            &[("if-match", etag.as_str())],
+            None,
+        )
+        .await;
+        assert_eq!(restored.status(), StatusCode::OK, "{}", restored.json());
+        let data = restored.json()["data"].clone();
+        assert_eq!(
+            (data["status"].as_str(), data["title"].as_str(), data["excerpt"].as_str()),
+            (Some("draft"), Some("Lưu rồi lấy lại"), Some("Tóm tắt"))
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn dry_run_khong_ghi_khong_phat_event() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        for title in ["Một", "Hai"] {
+            send(
+                &app,
+                "POST",
+                "/entries",
+                Some("admin"),
+                &[],
+                Some(json!({"kind": "post", "title": title})),
+            )
+            .await;
+        }
+        let before = outbox_count(&app).await;
+        let preview = app
+            .request(Method::POST, "/api/v1/kernel/bulk/content.list_content_entries/archive")
+            .token("admin")
+            .json(json!({"filter": {"kind": "post"}, "dry_run": true}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(preview.status(), StatusCode::OK, "{}", preview.json());
+        assert_eq!(preview.json()["data"]["count"], 2);
+        assert_eq!(outbox_count(&app).await, before, "không phát event");
+        let list = send(&app, "GET", "/entries?status=archived", Some("admin"), &[], None).await;
+        assert_eq!(list.json()["data"], json!([]), "không ghi gì");
+    })
+    .await
+    .unwrap();
+}
