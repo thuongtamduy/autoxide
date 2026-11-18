@@ -4566,6 +4566,33 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the custom fields this tenant added to record types you may read (key, type, labels, options, whether lists filter on it with `cf.<key>=`). Write their values in a record's `custom_fields`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which custom fields to list.",
+        "properties": {
+          "target": {
+            "description": "Only the fields of this record type, e.g. `content.entry`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_custom_fields",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the current tenant's own domains, newest first, with their status (`pending`, `verified`, `failed`) and the DNS TXT record that verifies each.",
       "input_schema": {
         "additionalProperties": false,

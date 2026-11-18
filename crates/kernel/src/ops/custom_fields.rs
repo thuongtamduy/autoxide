@@ -1283,7 +1283,8 @@ pub(crate) fn tools(fields: CustomFields) -> Vec<crate::mcp::Tool> {
                             .await?
                             .into_iter()
                             .filter(|field| {
-                                field.active && state.require_read(&principal, &field.target).is_ok()
+                                field.active
+                                    && state.require_read(&principal, &field.target).is_ok()
                             })
                             .collect(),
                     )

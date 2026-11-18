@@ -46,7 +46,13 @@ impl Entitlements for OneField {
         Ok(Arc::new(all))
     }
 
-    async fn reserve(&self, _: TenantId, limit: &Limit, _: i64, reference: &str) -> Result<(), Error> {
+    async fn reserve(
+        &self,
+        _: TenantId,
+        limit: &Limit,
+        _: i64,
+        reference: &str,
+    ) -> Result<(), Error> {
         assert_eq!(limit.key(), "kernel.custom_fields");
         let mut used = self.0.lock().unwrap();
         if used.len() >= 1 {

@@ -24266,6 +24266,10 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "custom_fields": {
+                  "description": "The tenant's custom fields shown to readers (those of visibility `public`), by key, as they\nwere when the entry was published.",
+                  "type": "object"
+                },
                 "embeds": {
                   "additionalProperties": {
                     "$ref": "#/components/schemas/PublicEmbed"
@@ -24381,7 +24385,8 @@
                 "ai_generated",
                 "ai_reviewed",
                 "ai_assisted",
-                "embeds"
+                "embeds",
+                "custom_fields"
               ],
               "type": "object"
             },
@@ -41016,6 +41021,10 @@
                   "format": "date-time",
                   "type": "string"
                 },
+                "custom_fields": {
+                  "description": "The tenant's custom fields shown to readers (those of visibility `public`), by key, as they\nwere when the entry was published.",
+                  "type": "object"
+                },
                 "embeds": {
                   "additionalProperties": {
                     "$ref": "#/components/schemas/PublicEmbed"
@@ -41131,7 +41140,8 @@
                 "ai_generated",
                 "ai_reviewed",
                 "ai_assisted",
-                "embeds"
+                "embeds",
+                "custom_fields"
               ],
               "type": "object"
             },
@@ -44783,6 +44793,10 @@
             "format": "date-time",
             "type": "string"
           },
+          "custom_fields": {
+            "description": "The tenant's custom fields shown to readers (those of visibility `public`), by key, as they\nwere when the entry was published.",
+            "type": "object"
+          },
           "embeds": {
             "additionalProperties": {
               "$ref": "#/components/schemas/PublicEmbed"
@@ -44898,7 +44912,8 @@
           "ai_generated",
           "ai_reviewed",
           "ai_assisted",
-          "embeds"
+          "embeds",
+          "custom_fields"
         ],
         "type": "object"
       },

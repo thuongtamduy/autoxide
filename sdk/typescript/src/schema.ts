@@ -8190,6 +8190,11 @@ export type Data_Vec_PublicEntryResponse = {
     /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
     content_modified_at: string;
     /**
+     * The tenant's custom fields shown to readers (those of visibility `public`), by key, as they
+     * were when the entry was published.
+     */
+    custom_fields: Record<string, unknown>;
+    /**
      * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
      * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
      * (any more) is left out: skip its node. Prices and stock are not here — read them from the
@@ -13594,6 +13599,11 @@ export type Page_PublicEntryResponse = {
     /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
     content_modified_at: string;
     /**
+     * The tenant's custom fields shown to readers (those of visibility `public`), by key, as they
+     * were when the entry was published.
+     */
+    custom_fields: Record<string, unknown>;
+    /**
      * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
      * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
      * (any more) is left out: skip its node. Prices and stock are not here — read them from the
@@ -14898,6 +14908,11 @@ export type PublicEntryResponse = {
   body_schema_version: number;
   /** Last change of the published content (sitemap `lastmod`, feed `updated`). */
   content_modified_at: string;
+  /**
+   * The tenant's custom fields shown to readers (those of visibility `public`), by key, as they
+   * were when the entry was published.
+   */
+  custom_fields: Record<string, unknown>;
   /**
    * Records of other modules embedded in `body` (nodes `embed` with `kind` and `id`, e.g. a
    * product), keyed by `<kind>:<id>`, in the entry's language. A record that is not public
