@@ -33,6 +33,8 @@ use std::path::Path;
 
 use crate::workspace::{DepKind, Package, Role, Workspace};
 
+mod test_layout;
+
 /// License mọi crate phải khai (D-021).
 pub const LICENSE: &str = "MIT OR Apache-2.0";
 
@@ -62,6 +64,10 @@ pub fn check_workspace(workspace: &Workspace) -> Result<Vec<Violation>, String> 
     }
 
     violations.extend(check_dependencies(workspace));
+
+    for package in &workspace.packages {
+        violations.extend(test_layout::check(&workspace.root, package));
+    }
 
     for package in &workspace.packages {
         let crate_dir = workspace.root.join(&package.dir);

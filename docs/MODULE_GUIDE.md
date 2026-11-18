@@ -403,7 +403,7 @@ A module that keeps data about users takes part in data export and account delet
 ### Money and balances
 
 A module that keeps amounts of money, balances or transactions uses the tools in the
-kernel; `crates/kernel/tests/money.rs` shows all of them on a sample wallet table, on both
+kernel; `crates/kernel/tests/integration/money.rs` shows all of them on a sample wallet table, on both
 databases.
 
 - **Amounts are `autoxide_kernel::money::Money`**: an `i64` count of the currency's minor

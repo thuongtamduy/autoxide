@@ -26,7 +26,7 @@ const IMAGE_VARIABLE: &str = "TEST_UPGRADE_IMAGE";
 const EMAIL: &str = "admin@example.com";
 const PASSWORD: &str = "correct horse battery staple";
 /// Ảnh PNG thật (48 × 32) dùng chung với hướng dẫn.
-const PHOTO: &[u8] = include_bytes!("../../../docs/guides/files/photo.png");
+const PHOTO: &[u8] = include_bytes!("../../../../docs/guides/files/photo.png");
 
 /// Thư mục làm việc của một lần chạy: `data/` của nó là `/var/lib/autoxide/data` trong container,
 /// và binary hiện tại chạy với thư mục này làm thư mục hiện tại — hai bản thấy cùng `data/`.
