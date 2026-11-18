@@ -2,6 +2,8 @@
 //! `TestApp` dựng module như binary dựng; cây tổ chức giả ([`Orgs`]) cho múi giờ và chính sách theo
 //! nút (module khác chỉ dùng qua `api`).
 
+mod bookings;
+mod fakes;
 mod setup;
 
 use std::collections::HashMap;
