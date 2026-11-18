@@ -121,7 +121,9 @@ impl SupportService {
         let body = self.check_body("body", &opening.body, &mut problems);
         let name = opening.requester_name.trim().chars().take(NAME_MAX).collect::<String>();
         let category = opening.category.trim().to_owned();
-        if !self.category_known(tenant, &category).await? {
+        let org_uuid = opening.org_id.unwrap_or_else(|| root_of(tenant.id()).as_uuid());
+        let policy = self.policy(tenant, org_uuid).await?.policy;
+        if !policy.categories.contains(&category) {
             problems.push(category_unknown());
         }
         if opening.links.len() > LINKS_MAX {
@@ -150,6 +152,7 @@ impl SupportService {
             Who::Phone(phone) => (None, None, Some(phone.clone())),
         };
         let priority = opening.priority.unwrap_or(Priority::Normal);
+        let (first_due, resolve_due) = crate::sla::due_dates(&policy, at, priority, 0);
         let id = Uuid::now_v7();
         let transaction = tenant.database().begin_write().await?;
         // Số phiếu cấp ở cuối, ngay trước khi ghi (giữ khoá dãy số ngắn nhất).
@@ -177,10 +180,11 @@ impl SupportService {
             channel: Set(opening.channel.as_str().to_owned()),
             assignee_user_id: Set(None),
             team_id: Set(None),
-            first_response_due_at: Set(None),
-            resolve_due_at: Set(None),
+            first_response_due_at: Set(first_due),
+            resolve_due_at: Set(resolve_due),
             first_responded_at: Set(None),
             sla_paused_at: Set(None),
+            sla_paused_minutes: Set(0),
             solved_at: Set(None),
             closed_at: Set(None),
             breached: Set(false),
@@ -347,13 +351,14 @@ impl SupportService {
         required_text(field, body, self.config.max_body_chars, problems)
     }
 
-    /// Loại phiếu có trong danh sách của khách (mặc định [`DEFAULT_CATEGORIES`]).
+    /// Loại phiếu có trong danh sách của chính sách đang hiệu lực ở nút `org`.
     pub(crate) async fn category_known(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
+        org: Uuid,
         category: &str,
     ) -> Result<bool, Error> {
-        Ok(DEFAULT_CATEGORIES.contains(&category))
+        Ok(self.policy(tenant, org).await?.policy.categories.iter().any(|known| known == category))
     }
 
     /// Một trang phiếu trong phạm vi `support.tickets.read` của nhân viên, mới trước (mặc định).
@@ -459,14 +464,13 @@ impl SupportService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Ticket, Error> {
         let actor = Actor::from(principal);
-        let mut problems = Vec::new();
-        if let Some(category) = &changes.category
-            && !self.category_known(tenant, category).await?
-        {
-            problems.push(category_unknown());
-        }
-        finish(problems)?;
         let before = self.get(tenant, Viewer::Staff(principal), id).await?;
+        let policy = self.policy(tenant, before.org_id).await?.policy;
+        if let Some(category) = &changes.category
+            && !policy.categories.contains(category)
+        {
+            return Err(Error::validation(vec![category_unknown()]));
+        }
         if let Some(Some(assignee)) = changes.assignee_user_id {
             self.check_assignee(tenant, &before, principal, assignee).await?;
         }
@@ -487,7 +491,7 @@ impl SupportService {
         if let Some(to) = changes.status {
             status::transition(from, to)?;
             if to != from {
-                apply_status(&mut row, &before, to, changes.resolution, at);
+                crate::sla::transition(&mut row, &before, to, changes.resolution, &policy, at);
                 lines.push(format!("status:{}", to.as_str()));
             }
         }
@@ -495,6 +499,15 @@ impl SupportService {
             && priority.as_str() != before.priority
         {
             row.priority = Set(priority.as_str().to_owned());
+            // Đổi ưu tiên: tính lại hạn từ lúc tạo, giữ phút đã chờ người mua.
+            let (first, resolve) = crate::sla::due_dates(
+                &policy,
+                before.created_at,
+                priority,
+                before.sla_paused_minutes,
+            );
+            row.first_response_due_at = Set(first);
+            row.resolve_due_at = Set(resolve);
             lines.push(format!("priority:{}", priority.as_str()));
         }
         if let Some(category) = changes.category
