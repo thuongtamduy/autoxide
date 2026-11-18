@@ -1,0 +1,99 @@
+{
+  "code": "vn",
+  "version": 1,
+  "checked_on": "2026-11-13",
+  "source_note": "Compiled from secondary sources on 2026-11-13. Must be checked against the original legal texts or by a legal professional before real use (D-186). / Đối chiếu ngày 13/11/2026 qua nguồn tổng hợp — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý trước khi chạy thật.",
+  "limits": [
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "price_reduction",
+      "program_kind": "regular",
+      "max_bp": 5000,
+      "max_days_per_program": 45,
+      "max_days_per_year": 90,
+      "effective_from": "2018-05-22",
+      "effective_to": "2024-12-01",
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 7 (mức giảm tối đa 50%) và Điều 10 (thời gian giảm giá)",
+      "source_url": "https://vbpl.vn/",
+      "note": "Cần đối chiếu văn bản gốc."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "price_reduction",
+      "program_kind": "regular",
+      "max_bp": 5000,
+      "max_days_per_program": null,
+      "max_days_per_year": 120,
+      "effective_from": "2024-12-01",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP sửa đổi bởi Nghị định 128/2024/NĐ-CP; Thông tư 39/2025/TT-BCT (50% giá ngay trước thời gian khuyến mại); Nghị định 239/2026 giao Bộ Công Thương quy định hạn mức",
+      "source_url": "https://vbpl.vn/",
+      "note": "Cần đối chiếu số hiệu, ngày hiệu lực của Nghị định 239/2026 và Thông tư 39/2025/TT-BCT. Trên sàn: cộng mọi khoản giảm (voucher sàn và người bán) trên một đơn vị rồi so trần — cách an toàn (D-222)."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "price_reduction",
+      "program_kind": "national_focus",
+      "max_bp": 10000,
+      "max_days_per_program": null,
+      "max_days_per_year": null,
+      "effective_from": "2018-05-22",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 7 khoản 2 (chương trình khuyến mại tập trung quốc gia); Thông tư 39/2025/TT-BCT",
+      "source_url": "https://vbpl.vn/",
+      "note": "Ngoại lệ cho chương trình khuyến mại tập trung quốc gia, thời gian do Thủ tướng / Bộ Công Thương quyết định. Cần đối chiếu."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "gift_value",
+      "program_kind": "regular",
+      "max_bp": 5000,
+      "max_days_per_program": null,
+      "max_days_per_year": null,
+      "effective_from": "2018-05-22",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 6 (giá trị hàng tặng tối đa 50% tổng giá trị hàng được khuyến mại)",
+      "source_url": "https://vbpl.vn/",
+      "note": "Cần đối chiếu văn bản gốc."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "gift_value",
+      "program_kind": "national_focus",
+      "max_bp": 10000,
+      "max_days_per_program": null,
+      "max_days_per_year": null,
+      "effective_from": "2018-05-22",
+      "effective_to": null,
+      "legal_basis": "Nghị định 81/2018/NĐ-CP, Điều 6 khoản 2",
+      "source_url": "https://vbpl.vn/",
+      "note": "Cần đối chiếu văn bản gốc."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "free_shipping",
+      "program_kind": "regular",
+      "max_bp": 10000,
+      "max_days_per_program": null,
+      "max_days_per_year": null,
+      "effective_from": "2018-05-22",
+      "effective_to": null,
+      "legal_basis": "Luật Thương mại 36/2005/QH11, Điều 92 (cung ứng dịch vụ không thu tiền)",
+      "source_url": "https://vbpl.vn/",
+      "note": "Miễn / giảm phí giao là cung ứng dịch vụ không thu tiền; chưa rõ có tính vào trần giảm giá — cần đối chiếu (D-225)."
+    },
+    {
+      "jurisdiction": "VN",
+      "promotion_kind": "free_shipping",
+      "program_kind": "national_focus",
+      "max_bp": 10000,
+      "max_days_per_program": null,
+      "max_days_per_year": null,
+      "effective_from": "2018-05-22",
+      "effective_to": null,
+      "legal_basis": "Luật Thương mại 36/2005/QH11, Điều 92",
+      "source_url": "https://vbpl.vn/",
+      "note": "Cần đối chiếu."
+    }
+  ]
+}
