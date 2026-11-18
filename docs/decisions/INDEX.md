@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-393 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+399 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -82,7 +82,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 
-## Kiến trúc module và kernel (10)
+## Kiến trúc module và kernel (11)
 
 - **D-005** Một binary, ranh giới module chặt — 2026-11-11 · **chủ dự án quyết**
 - **D-025** Không foreign key xuyên module, không ngoại lệ — 2026-11-11 · **chủ dự án quyết**
@@ -94,8 +94,9 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-170** Hàm tạo cho các kiểu module dựng bằng literal, rồi `#[non_exhaustive]` — 2026-11-13
 - **D-351** Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
+- **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 
-## Database, dữ liệu, job, event (25)
+## Database, dữ liệu, job, event (26)
 
 - **D-001** Database: SQLite và Postgres — 2026-11-11 · **chủ dự án quyết**
 - **D-002** UUIDv7 cho mọi ID — 2026-11-11 · **chủ dự án quyết**
@@ -122,6 +123,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-377** Báo khi job xong và khi được nhắc trong ghi chú (bước 51 P13, P16) — 2026-11-18
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
+- **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
 
 ## HTTP, REST, OpenAPI (14)
 
@@ -140,7 +142,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 
-## MCP, AI, agent dùng API (20)
+## MCP, AI, agent dùng API (21)
 
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
@@ -162,6 +164,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-372** Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18
 - **D-374** MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18
 - **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
+- **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 
 ## Xác thực, phân quyền, bảo mật (52)
 
@@ -419,7 +422,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
 
-## Thương mại (9)
+## Thương mại (10)
 
 - **D-191** Module thương mại: sáu module, bước 41–46 — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-193*
 - **D-203** Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 · **chủ dự án quyết**
@@ -430,8 +433,9 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-225** Khuyến mại: thời hạn bắt buộc, thông báo theo nơi nhận, kiểm trước khi bật, "Lưu mã", nhắc flash sale — 2026-11-14
 - **D-226** Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
+- **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 
-## Vận hành và hiệu năng (7)
+## Vận hành và hiệu năng (9)
 
 - **D-034** Quy ước cấu hình — 2026-11-11
 - **D-043** Log, metrics, tracing — 2026-11-11
@@ -440,3 +444,5 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-166** `autoxide doctor` và `Module::checks` — 2026-11-13
 - **D-195** Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13
 - **D-317** Số đo đường nóng sau bước 34 — 2026-11-16
+- **[D-20261118-step39-backlog-gauges](D-20261118-step39-backlog-gauges.md)** Gauge tồn đọng của job, event và pool kết nối — 2026-11-18
+- **[D-20261118-step39-monitoring-files](D-20261118-step39-monitoring-files.md)** Luật cảnh báo, dashboard và sổ tay sự cố nằm trong repo, `xtask` giữ khớp — 2026-11-18

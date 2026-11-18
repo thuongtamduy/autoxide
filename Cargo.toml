@@ -52,6 +52,7 @@ autoxide-newsletter = { path = "modules/newsletter" }
 autoxide-comments = { path = "modules/comments" }
 autoxide-menus = { path = "modules/menus" }
 autoxide-reporting = { path = "modules/reporting" }
+autoxide-automations = { path = "modules/automations" }
 autoxide-address = { path = "modules/address" }
 autoxide-organizations = { path = "modules/organizations" }
 autoxide-plans = { path = "modules/plans" }
@@ -60,6 +61,7 @@ autoxide-ledger = { path = "modules/ledger" }
 autoxide-invoices = { path = "modules/invoices" }
 autoxide-compliance = { path = "modules/compliance" }
 autoxide-notifications = { path = "modules/notifications" }
+autoxide-bookings = { path = "modules/bookings" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

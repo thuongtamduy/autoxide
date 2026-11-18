@@ -280,7 +280,7 @@ Nhóm A — vận hành:
 - [ ] Xoay khoá không gián đoạn: `AUTOXIDE_AUTH_TOKEN_SECRET` (và các khoá ký khác) nhận thêm khoá
       cũ trong một khoảng chuyển tiếp — ký bằng khoá mới, kiểm bằng cả hai — để đổi khoá (định kỳ
       hay khi bị lộ) không đăng xuất mọi người; test; quy trình trong `docs/DEPLOY.md`
-- [ ] Sổ tay xử lý sự cố trong `docs/DEPLOY.md` (EN + VI): hàng đợi kẹt, job trong dead-letter
+- [x] Sổ tay xử lý sự cố trong `docs/DEPLOY.md` (EN + VI): hàng đợi kẹt, job trong dead-letter
       (`autoxide jobs retry`), database đầy, lộ khoá, mất admin cuối cùng (`autoxide user …`),
       nâng cấp khi nhiều máy chủ chạy hai phiên bản code cùng lúc (migration theo kiểu mở rộng
       trước, thu hẹp sau). Mỗi tình huống: dấu hiệu, lệnh kiểm, cách sửa
@@ -369,13 +369,13 @@ Bắt đầu SAU bước 37. Số liệu truy cập ngay trong Autoxide, không 
 Bắt đầu SAU bước 51 (lệnh chờ duyệt, job API). Luật "khi … thì …" như Shopify Flow; mỗi hành động là một tool
 MCP đã có, chạy với quyền của người tạo luật.
 
-- [ ] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
+- [x] Luật: kích hoạt bằng event, lịch hay gọi tay; điều kiện là cây toán tử cố định (không biểu thức tự do);
       hành động là tool MCP có tham số điền từ event; lưu luật kiểm event, tool, quyền, tham số một lần
-- [ ] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
+- [x] Chạy bằng job ngoài transaction, nhận lại event không chạy hai lần, mỗi bước có `Idempotency-Key`; hành
       động rủi ro chờ duyệt; chống vòng lặp và giới hạn số lần chạy; nhật ký từng lần chạy, chạy lại
-- [ ] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
+- [x] Chạy thử khô, danh mục kích hoạt và hành động người gọi dùng được, mẫu luật do module khai; agent tạo
       luật thì chờ duyệt; người tạo mất quyền thì luật tự tắt; test trên cả hai database
-- [ ] Cảnh báo bất thường (D-229): kích hoạt theo số liệu tóm tắt so với ngưỡng hay mức nền 4 tuần (doanh thu
+- [x] Cảnh báo bất thường (D-229): kích hoạt theo số liệu tóm tắt so với ngưỡng hay mức nền 4 tuần (doanh thu
       tụt, sắp hết hàng theo tốc độ bán, tỉ lệ bom hàng tăng), thống kê tất định, một lần báo mỗi kỳ
 
 ## 67. Trang dựng từ khối, AI tạo trang, bộ giao diện website (chủ dự án giao ngày 14/11/2026, D-229)
@@ -464,7 +464,7 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
-- [ ] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
+- [x] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
       chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
       `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
 - [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
@@ -838,7 +838,7 @@ Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ th�
 
 Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, phòng khám, lớp học, sân thể thao.
 
-- [ ] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
+- [x] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
       theo múi giờ của nút; tính giờ trống công khai
 - [ ] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
       database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách

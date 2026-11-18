@@ -17,6 +17,7 @@
 //! Chạy **ít nhất một lần**: tiến trình chết giữa lúc chạy thì job được chạy lại khi
 //! hết hạn giữ. Bộ chạy phải chịu được việc chạy lại.
 
+pub mod backlog;
 mod claim;
 mod migration;
 pub(crate) mod queue;
@@ -131,11 +132,26 @@ pub trait JobHandler: Send + Sync {
 pub struct JobRegistration {
     kind: &'static str,
     handler: Arc<dyn JobHandler>,
+    timeout: Option<Duration>,
 }
 
 impl JobRegistration {
     pub fn new(kind: &'static str, handler: Arc<dyn JobHandler>) -> Self {
-        JobRegistration { kind, handler }
+        JobRegistration { kind, handler, timeout: None }
+    }
+
+    /// Cho job loại này chạy tối đa `limit` (mặc định: 4 phút 30 giây, dưới hạn giữ 5 phút của
+    /// worker). Dài hơn hạn giữ thì worker gia hạn giữ job định kỳ trong lúc chạy, để worker khác
+    /// không lấy lại nó và chạy chồng; mất quyền giữ (vd bị `autoxide jobs` trả về hàng đợi) thì job
+    /// bị dừng. Cho việc dài như backup (bước 39).
+    #[must_use]
+    pub fn timeout(mut self, limit: Duration) -> Self {
+        self.timeout = Some(limit);
+        self
+    }
+
+    pub(crate) fn time_limit(&self) -> Option<Duration> {
+        self.timeout
     }
 
     pub fn kind(&self) -> &'static str {

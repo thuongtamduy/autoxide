@@ -201,15 +201,19 @@ pub enum AccessPath {
     Delegation(Uuid),
     /// Qua lần cấp quyền vào hỗ trợ có ID này.
     Support(Uuid),
+    /// Hành động của một luật tự động hoá (bước 58), trong lần chạy có ID này: luật chạy với quyền
+    /// của người tạo, event sinh ra mang lần chạy để module `automations` chống vòng lặp giữa các luật.
+    Automation(Uuid),
 }
 
 impl AccessPath {
-    /// Tên ổn định: `direct`, `delegation`, `support`.
+    /// Tên ổn định: `direct`, `delegation`, `support`, `automation`.
     pub const fn as_str(self) -> &'static str {
         match self {
             AccessPath::Direct => "direct",
             AccessPath::Delegation(_) => "delegation",
             AccessPath::Support(_) => "support",
+            AccessPath::Automation(_) => "automation",
         }
     }
 
@@ -217,7 +221,9 @@ impl AccessPath {
     pub const fn id(self) -> Option<Uuid> {
         match self {
             AccessPath::Direct => None,
-            AccessPath::Delegation(id) | AccessPath::Support(id) => Some(id),
+            AccessPath::Delegation(id) | AccessPath::Support(id) | AccessPath::Automation(id) => {
+                Some(id)
+            }
         }
     }
 }

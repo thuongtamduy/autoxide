@@ -83,6 +83,10 @@ pub(crate) use extract::{contains_nul_escape, nul_refused, value_contains_nul};
 pub use health::{Draining, Health, health_routes};
 pub use llms::LLMS_PATH;
 pub use mcp::MCP_PATH;
+pub(crate) use mcp::{
+    call_tool as call_mcp_tool, module_allowed as mcp_module_allowed,
+    tool_allowed as mcp_tool_allowed,
+};
 pub use metrics::metrics_routes;
 pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};

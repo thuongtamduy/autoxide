@@ -48,6 +48,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // đứng trước); `plans` (thông báo thuê bao tới quản trị khách) và module sau khai loại thông
         // báo và gửi qua `dyn Notifier`.
         Box::new(autoxide_notifications::module()),
+        // Đặt lịch dịch vụ (bước 60): múi giờ và chính sách theo nút qua `dyn OrgDirectory`, cọc qua
+        // `dyn Ledger`, nhắc lịch qua `dyn Notifier` — đều đứng trước; không module nào cần nó.
+        Box::new(autoxide_bookings::module()),
         // Gói, thuê bao, quyền dùng (bước 35): sau mọi module nền nó cần — `invoices` (hoá đơn thuê
         // bao), `ledger` (thu tiền) — và (bước 37) `compliance`. Module đăng ký trước vẫn hỏi quyền
         // dùng được qua tay cầm của kernel, gắn sau khi mọi module khởi động (D-323).
@@ -75,6 +78,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
         Box::new(autoxide_reporting::module()),
+        // Tự động hoá quy trình (bước 58): nghe event của mọi module và gọi tool MCP của mọi module
+        // qua sổ tool của kernel, nên đứng CUỐI CÙNG (sau cả `reporting`).
+        Box::new(autoxide_automations::module()),
     ]
 }
 
@@ -222,8 +228,9 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 40);
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `automations` (luật tới hạn,
+            // dọn nhật ký — bước 58)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 42);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

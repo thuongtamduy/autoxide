@@ -25,6 +25,22 @@ export type AcceptedResponse = {
 /** What a schedule does: `publish` or `unpublish`. */
 export type Action = "publish" | "unpublish";
 
+/** An MCP tool that a rule can run as an action. */
+export type ActionInfo = {
+  description: string;
+  /** JSON Schema of `arguments`. */
+  input_schema: Record<string, unknown>;
+  /**
+   * The tool deletes or overwrites data, or needs a person's approval when an agent calls it:
+   * in a rule, the step waits for a person to approve each run.
+   */
+  needs_approval: boolean;
+  /** The permission the tool needs. */
+  permission?: string | null;
+  /** Full tool name `<module>.<tool>`. */
+  tool: string;
+};
+
 /** One line of a record's activity: a note, or an event recorded about it. */
 export type ActivityItem = {
   /** With `event`: its name, e.g. `content.entry_published`. */
@@ -489,6 +505,96 @@ export type BodyNode = {
   type: string;
 };
 
+/** Free times of a service, with what the customer must know before booking. */
+export type BookingAvailability = {
+  openings: BookingOpening[];
+  service_id: string;
+  terms: PublicBookingTerms;
+  /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
+  timezone: string;
+};
+
+/** How much deposit a booking asks for, paid through the shop's payment partner. */
+export type BookingDeposit = {
+  /** `none`, `percent` (of the price) or `amount` (fixed, in the price's currency). */
+  kind: string;
+  /** Percent 1–100, or the amount in minor units; `0` for `none`. */
+  value?: number;
+};
+
+/** Time off or extra working hours. */
+export type BookingException = {
+  created_at: string;
+  ends_at: string;
+  id: string;
+  kind: string;
+  reason: string;
+  resource_id: string;
+  starts_at: string;
+};
+
+/** A free time. */
+export type BookingOpening = {
+  ends_at: string;
+  /** `starts_at` in the local time of the unit, with its offset, e.g. `2026-11-23T09:00:00+07:00`. */
+  local_start: string;
+  /** The staff member (or court, room…) free at this time. */
+  resource_id: string;
+  /** Places left (always 1 for one-to-one services). */
+  seats_left: number;
+  starts_at: string;
+};
+
+/** A staff member, room or equipment. */
+export type BookingResource = {
+  active: boolean;
+  created_at: string;
+  id: string;
+  kind: string;
+  name: string;
+  org_id: string;
+  updated_at: string;
+  user_id?: string | null;
+};
+
+/** The weekly schedule of a resource. */
+export type BookingSchedule = {
+  ranges: BookingWeeklyRange[];
+  resource_id: string;
+};
+
+/** A bookable service. */
+export type BookingService = {
+  active: boolean;
+  buffer_after_minutes: number;
+  buffer_before_minutes: number;
+  capacity: number;
+  created_at: string;
+  deposit: BookingDeposit;
+  description: string;
+  duration_minutes: number;
+  id: string;
+  name: string;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  performers: string[];
+  price: Money;
+  required: string[];
+  updated_at: string;
+};
+
+/** A weekly working range, in the local time of the unit (setting `organizations.timezone`). */
+export type BookingWeeklyRange = {
+  /** Minutes after local midnight, up to 1440: 1020 is 17:00. */
+  end_minute: number;
+  /** Minutes after local midnight, in steps of 5: 540 is 09:00. */
+  start_minute: number;
+  /** 1 (Monday) to 7 (Sunday). */
+  weekday: number;
+};
+
 /** Kind of a bounce report. */
 export type BounceKind = "hard" | "soft" | "complaint";
 
@@ -636,6 +742,13 @@ export type CancelRequest = {
    * `false`: cancel now (data becomes read-only and is kept for the plan's retention days).
    */
   at_period_end?: boolean;
+};
+
+/** The triggers and actions you may use in rules. */
+export type Catalog = {
+  events: EventTriggerInfo[];
+  metrics: MetricTriggerInfo[];
+  tools: ActionInfo[];
 };
 
 /** A passkey ceremony in progress. */
@@ -2546,6 +2659,67 @@ export type CreateApiKeyRequest = {
   totp_code?: string | null;
 };
 
+/** Time off or extra working hours of a resource. */
+export type CreateBookingExceptionRequest = {
+  /** After `starts_at`, at most 366 days later. */
+  ends_at: string;
+  /** `closed` (time off, a holiday) or `open` (an extra shift). */
+  kind: string;
+  /** Up to 200 characters, e.g. "Lunar New Year holiday". */
+  reason?: string;
+  resource_id: string;
+  starts_at: string;
+};
+
+/** A new staff member, room or equipment. */
+export type CreateBookingResourceRequest = {
+  /**
+   * `staff`, `room` or `equipment`. Staff need a weekly schedule to be bookable; rooms and
+   * equipment without one are always open.
+   */
+  kind: string;
+  /** 1 to 200 characters, shown to customers. */
+  name: string;
+  /** The unit it belongs to; you need `bookings.services.manage` there. */
+  org_id?: string | null;
+  /**
+   * Staff only: the user account of this person, so they see their own appointments with
+   * `bookings.staff`.
+   */
+  user_id?: string | null;
+};
+
+/** A new bookable service. */
+export type CreateBookingServiceRequest = {
+  /** Time the resource needs after (cleaning), 0 to 240 in steps of 5. */
+  buffer_after_minutes?: number;
+  /** Time the resource needs before the customer arrives (setup), 0 to 240 in steps of 5. */
+  buffer_before_minutes?: number;
+  /** People per time slot: 1 for a haircut, more for a class. Default 1. */
+  capacity?: number;
+  deposit?: BookingDeposit | null;
+  /** Up to 2000 characters. Never put health information here. */
+  description?: string;
+  /** 5 to 1440, in steps of 5. */
+  duration_minutes: number;
+  /** 1 to 200 characters. */
+  name: string;
+  /** The name in other languages, e.g. `{"fr": "Coupe"}`. */
+  names?: {
+    [key: string]: string;
+  };
+  /**
+   * The unit that offers it; you need `bookings.services.manage` there. Omitted: your only unit,
+   * or the tenant's root.
+   */
+  org_id?: string | null;
+  /** Staff (or courts, rooms…) that can give the service; one of them is booked. */
+  performers: string[];
+  price: Money;
+  /** Rooms or equipment every booking also needs. */
+  required?: string[];
+};
+
 /** A new draft campaign. */
 export type CreateCampaignRequest = {
   /** Omitted: `false`. */
@@ -2688,6 +2862,34 @@ export type CreateListRequest = {
   new_posts?: NewPosts | null;
   /** Omitted: `false` (not open to public sign-up). */
   public?: boolean | null;
+};
+
+/**
+ * A new automation rule. Every problem (unknown event or tool, a tool you lack the permission
+ * for, arguments that do not fit the tool) is reported at once.
+ */
+export type CreateRuleRequest = {
+  /** See `actions` of the rule. */
+  actions: Record<string, unknown>[];
+  /** See `conditions` of the rule; omit for "always". */
+  conditions?: Record<string, unknown> | null;
+  /** Up to 2000 characters. */
+  description?: string | null;
+  /**
+   * `false` to save the rule disabled. Rules made by an AI agent always wait for a person to
+   * enable them.
+   */
+  enabled?: boolean;
+  /** 1 to 200 characters. */
+  name: string;
+  /**
+   * The organization unit of the rule; you need `automations.manage` there. Omit when you
+   * manage rules in one unit only (or for the whole tenant); otherwise
+   * `automations.org_required`.
+   */
+  org_id?: string | null;
+  /** See `trigger` of the rule. */
+  trigger: Record<string, unknown>;
 };
 
 /** A new menu. */
@@ -3127,6 +3329,81 @@ export type Data_BillingProfileResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_BookingAvailability = {
+  /** Free times of a service, with what the customer must know before booking. */
+  data: {
+    openings: BookingOpening[];
+    service_id: string;
+    terms: PublicBookingTerms;
+    /** IANA time zone of the unit, e.g. `Asia/Ho_Chi_Minh`. */
+    timezone: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingException = {
+  /** Time off or extra working hours. */
+  data: {
+    created_at: string;
+    ends_at: string;
+    id: string;
+    kind: string;
+    reason: string;
+    resource_id: string;
+    starts_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingResource = {
+  /** A staff member, room or equipment. */
+  data: {
+    active: boolean;
+    created_at: string;
+    id: string;
+    kind: string;
+    name: string;
+    org_id: string;
+    updated_at: string;
+    user_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingSchedule = {
+  /** The weekly schedule of a resource. */
+  data: {
+    ranges: BookingWeeklyRange[];
+    resource_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingService = {
+  /** A bookable service. */
+  data: {
+    active: boolean;
+    buffer_after_minutes: number;
+    buffer_before_minutes: number;
+    capacity: number;
+    created_at: string;
+    deposit: BookingDeposit;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    performers: string[];
+    price: Money;
+    required: string[];
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BounceOutcome = {
   /** What a bounce report did. */
   data: {
@@ -3197,6 +3474,16 @@ export type Data_CampaignResponse = {
     status: CampaignStatus;
     subject: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Catalog = {
+  /** The triggers and actions you may use in rules. */
+  data: {
+    events: EventTriggerInfo[];
+    metrics: MetricTriggerInfo[];
+    tools: ActionInfo[];
   };
 };
 
@@ -4407,6 +4694,20 @@ export type Data_DeliveryResponse = {
     response_status?: number | null;
     /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_DryRun = {
+  /** What a run would do, without calling any tool. */
+  data: {
+    /** What the templates see. */
+    context: Record<string, unknown>;
+    /** The conditions hold for the sample: a real run would run the actions. */
+    matched: boolean;
+    /** No problem anywhere: the rule would run as written. */
+    ok: boolean;
+    steps: DryStep[];
   };
 };
 
@@ -6749,6 +7050,101 @@ export type Data_RoleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RuleResponse = {
+  /** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
+  data: {
+    /**
+     * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+     * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+     * "body"}}`.
+     */
+    actions: Record<string, unknown>[];
+    /**
+     * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+     * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+     */
+    conditions?: Record<string, unknown> | null;
+    created_at: string;
+    created_by: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** When the schedule or metric check runs next. */
+    next_run_at?: string | null;
+    /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The actions run with the current permissions of this user: the author, or whoever enabled
+     * the rule last.
+     */
+    run_as: string;
+    /**
+     * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+     * `paused` (stopped by itself; see `status_reason`).
+     */
+    status: string;
+    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    status_reason?: string | null;
+    /** IANA time zone of the schedule. */
+    timezone: string;
+    /**
+     * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+     * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+     * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+     * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+     */
+    trigger: Record<string, unknown>;
+    updated_at: string;
+    /** Raised by one on every change of the rule; each run records the version it used. */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RunResponse = {
+  /** One run of an automation rule, with the log of each step. */
+  data: {
+    /** The step waiting for approval. */
+    approval_step?: number | null;
+    /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+    context: Record<string, unknown>;
+    created_at: string;
+    /** The next step to run, from 0. */
+    cursor: number;
+    /**
+     * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+     * in a chain (a rule's action caused the event of the next rule).
+     */
+    depth: number;
+    error_code?: string | null;
+    error_message?: string | null;
+    event_id?: string | null;
+    event_name?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** The unit of the rule. */
+    org_id: string;
+    /** When a `wait` step ends. */
+    resume_at?: string | null;
+    rule_id: string;
+    /**
+     * The version of the rule the run uses (changing the rule does not change runs already
+     * started).
+     */
+    rule_version: number;
+    /**
+     * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+     * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+     */
+    status: string;
+    steps: StepLog[];
+    /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+    trigger_key: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SavedView = {
   /** A saved list view. */
   data: {
@@ -7756,6 +8152,19 @@ export type Data_Vec_BillingPeriodResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BookingException = {
+  data: {
+    created_at: string;
+    ends_at: string;
+    id: string;
+    kind: string;
+    reason: string;
+    resource_id: string;
+    starts_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CanAnswer = {
   data: {
     allowed: boolean;
@@ -8572,6 +8981,24 @@ export type Data_Vec_ProviderResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PublicBookingService = {
+  data: {
+    capacity: number;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
+    performers: string[];
+    price: Money;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PublicEntryResponse = {
   data: {
     /**
@@ -9047,6 +9474,18 @@ export type Data_Vec_TaxWithholdingRateResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_TemplateInfo = {
+  data: {
+    description: string;
+    /** `<module>.<name>`. */
+    id: string;
+    /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
+    rule: Record<string, unknown>;
+    title: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TenantExport = {
   data: {
     created_at: string;
@@ -9330,6 +9769,45 @@ export type DeliveryResponse = {
   status: string;
 };
 
+/** A problem a real run would hit. */
+export type DryProblem = {
+  code: string;
+  field: string;
+  message: string;
+};
+
+/** What a run would do, without calling any tool. */
+export type DryRun = {
+  /** What the templates see. */
+  context: Record<string, unknown>;
+  /** The conditions hold for the sample: a real run would run the actions. */
+  matched: boolean;
+  /** No problem anywhere: the rule would run as written. */
+  ok: boolean;
+  steps: DryStep[];
+};
+
+/** What one step would do in a dry run. */
+export type DryStep = {
+  /** The tool name, or `wait`, `stop_if`, `notify`. */
+  action: string;
+  /** The arguments after filling the templates with the sample. */
+  arguments?: Record<string, unknown> | null;
+  index: number;
+  /** The step waits for a person's approval in each real run. */
+  needs_approval: boolean;
+  /**
+   * What would go wrong: unknown tool, missing permission of the rule's `run_as`, arguments
+   * that do not fit the tool after filling.
+   */
+  problems: DryProblem[];
+  /**
+   * For `stop_if`: whether the run would stop here (results of earlier steps are unknown in a
+   * dry run and read as missing).
+   */
+  would_stop?: boolean | null;
+};
+
 /** What to call the copy of a form. */
 export type DuplicateFormRequest = {
   /** Key of the copy; omitted: `<key>-copy` (then `-copy-2`, `-copy-3`… when taken). */
@@ -9579,6 +10057,13 @@ export type EraseRequest = {
 export type ErasedResponse = {
   /** Submissions deleted. */
   deleted: number;
+};
+
+/** An event that can trigger a rule. */
+export type EventTriggerInfo = {
+  description: string;
+  /** `<module>.<event>`. */
+  name: string;
 };
 
 /** A kind of event that endpoints can subscribe to. */
@@ -11529,6 +12014,21 @@ export type MergeTag = {
   into: string;
 };
 
+/** A figure that a `metric` trigger can watch. */
+export type MetricTriggerInfo = {
+  description: string;
+  /**
+   * `fact:<kind>` (daily total of a report figure) or `summary:<id>` (a dashboard figure read
+   * at check time).
+   */
+  name: string;
+  /**
+   * `amount` (smallest unit of a currency), `quantity`, or `reading` (a dashboard figure;
+   * ratios in basis points, 1% = 100).
+   */
+  unit: string;
+};
+
 /**
  * The value of a figure: `money` (`amount` in the smallest unit of `currency`), `count`, or
  * `ratio` (`numerator` / `denominator`).
@@ -12598,6 +13098,48 @@ export type Page_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BookingResource = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    created_at: string;
+    id: string;
+    kind: string;
+    name: string;
+    org_id: string;
+    updated_at: string;
+    user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BookingService = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    buffer_after_minutes: number;
+    buffer_before_minutes: number;
+    capacity: number;
+    created_at: string;
+    deposit: BookingDeposit;
+    description: string;
+    duration_minutes: number;
+    id: string;
+    name: string;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    performers: string[];
+    price: Money;
+    required: string[];
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -14454,6 +14996,103 @@ export type Page_RoleResponse = {
 };
 
 /** One page of a list. */
+export type Page_RuleResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+     * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+     * "body"}}`.
+     */
+    actions: Record<string, unknown>[];
+    /**
+     * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+     * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+     */
+    conditions?: Record<string, unknown> | null;
+    created_at: string;
+    created_by: string;
+    description?: string | null;
+    id: string;
+    name: string;
+    /** When the schedule or metric check runs next. */
+    next_run_at?: string | null;
+    /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+    org_id: string;
+    /**
+     * The actions run with the current permissions of this user: the author, or whoever enabled
+     * the rule last.
+     */
+    run_as: string;
+    /**
+     * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+     * `paused` (stopped by itself; see `status_reason`).
+     */
+    status: string;
+    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    status_reason?: string | null;
+    /** IANA time zone of the schedule. */
+    timezone: string;
+    /**
+     * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+     * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+     * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+     * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+     */
+    trigger: Record<string, unknown>;
+    updated_at: string;
+    /** Raised by one on every change of the rule; each run records the version it used. */
+    version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_RunResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** The step waiting for approval. */
+    approval_step?: number | null;
+    /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+    context: Record<string, unknown>;
+    created_at: string;
+    /** The next step to run, from 0. */
+    cursor: number;
+    /**
+     * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+     * in a chain (a rule's action caused the event of the next rule).
+     */
+    depth: number;
+    error_code?: string | null;
+    error_message?: string | null;
+    event_id?: string | null;
+    event_name?: string | null;
+    finished_at?: string | null;
+    id: string;
+    /** The unit of the rule. */
+    org_id: string;
+    /** When a `wait` step ends. */
+    resume_at?: string | null;
+    rule_id: string;
+    /**
+     * The version of the rule the run uses (changing the rule does not change runs already
+     * started).
+     */
+    rule_version: number;
+    /**
+     * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+     * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+     */
+    status: string;
+    steps: StepLog[];
+    /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+    trigger_key: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScheduleResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -15647,6 +16286,36 @@ export type PublicAuthorPage = {
   website_url: string;
 };
 
+/** A service customers can book. */
+export type PublicBookingService = {
+  capacity: number;
+  description: string;
+  duration_minutes: number;
+  id: string;
+  name: string;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  /** Staff (or courts, rooms…) that can give it; give one as `resource_id` to book that one. */
+  performers: string[];
+  price: Money;
+};
+
+/** The deposit a booking of this service asks for, and what happens to it. */
+export type PublicBookingTerms = {
+  /** Deposit paid when booking, through the shop's licensed payment partner; zero: none. */
+  deposit: Money;
+  /** Cancel at least this many hours before the start to get the whole deposit back. */
+  free_cancel_hours: number;
+  /** Percent of the deposit kept on a later cancellation. */
+  late_cancel_retain_percent: number;
+  /** Percent of the deposit kept when the customer does not come. */
+  no_show_retain_percent: number;
+  /** Bookings without a deposit wait for the shop to confirm them. */
+  requires_approval: boolean;
+};
+
 /** A comment, as shown to everyone. */
 export type PublicComment = {
   author: CommentAuthor;
@@ -16325,6 +16994,12 @@ export type RenameTagRequest = {
   name: string;
 };
 
+/** The whole weekly schedule of a resource. */
+export type ReplaceBookingScheduleRequest = {
+  /** At most 70 ranges; ranges of the same day must not overlap. Empty: never available (staff). */
+  ranges: BookingWeeklyRange[];
+};
+
 /** The whole item tree of a menu. */
 export type ReplaceSiteMenuItemsRequest = {
   items: SiteMenuItemInput[];
@@ -16486,6 +17161,101 @@ export type RoleResponse = {
   /** `true`: the role's permissions work only for accounts with two-step sign-in. */
   requires_mfa: boolean;
   updated_at: string;
+};
+
+/** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
+export type RuleResponse = {
+  /**
+   * Steps in order: `{"tool": "<module>.<tool>", "arguments": {…}}` (values may use `{{
+   * event.… }}`), `{"wait": {"minutes": N}}`, `{"stop_if": <condition>}`, `{"notify": {"title",
+   * "body"}}`.
+   */
+  actions: Record<string, unknown>[];
+  /**
+   * A tree of `all` / `any` / `not` over comparisons `{"field": "event.total", "op": "gt",
+   * "value": 5000000}` (`op`: eq, ne, gt, gte, lt, lte, in, contains, exists); `null`: always.
+   */
+  conditions?: Record<string, unknown> | null;
+  created_at: string;
+  created_by: string;
+  description?: string | null;
+  id: string;
+  name: string;
+  /** When the schedule or metric check runs next. */
+  next_run_at?: string | null;
+  /** The organization unit the rule belongs to; the root unit has the id of the tenant. */
+  org_id: string;
+  /**
+   * The actions run with the current permissions of this user: the author, or whoever enabled
+   * the rule last.
+   */
+  run_as: string;
+  /**
+   * `active`, `disabled`, `pending_approval` (made by an AI agent: a person must enable it) or
+   * `paused` (stopped by itself; see `status_reason`).
+   */
+  status: string;
+  /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+  status_reason?: string | null;
+  /** IANA time zone of the schedule. */
+  timezone: string;
+  /**
+   * What starts a run: `{"type": "event", "event": "<module>.<event>"}`, `{"type":
+   * "schedule", "every": "hour" | "day" | "week", "weekday", "hour", "minute", "timezone"}`,
+   * `{"type": "manual"}` or `{"type": "metric", "metric", "operator", "value", "currency",
+   * "hour", "minute", "timezone"}`. See `GET /api/v1/automations/catalog`.
+   */
+  trigger: Record<string, unknown>;
+  updated_at: string;
+  /** Raised by one on every change of the rule; each run records the version it used. */
+  version: number;
+};
+
+/** One run of an automation rule, with the log of each step. */
+export type RunResponse = {
+  /** The step waiting for approval. */
+  approval_step?: number | null;
+  /** The data of the trigger, as the templates see it: `event`, `trigger`. */
+  context: Record<string, unknown>;
+  created_at: string;
+  /** The next step to run, from 0. */
+  cursor: number;
+  /**
+   * 1 for a run started by a person, a schedule or an ordinary event; one more for each rule
+   * in a chain (a rule's action caused the event of the next rule).
+   */
+  depth: number;
+  error_code?: string | null;
+  error_message?: string | null;
+  event_id?: string | null;
+  event_name?: string | null;
+  finished_at?: string | null;
+  id: string;
+  /** The unit of the rule. */
+  org_id: string;
+  /** When a `wait` step ends. */
+  resume_at?: string | null;
+  rule_id: string;
+  /**
+   * The version of the rule the run uses (changing the rule does not change runs already
+   * started).
+   */
+  rule_version: number;
+  /**
+   * `queued`, `running`, `waiting` (a `wait` step), `awaiting_approval` (a risky step waits for
+   * a person), `succeeded`, `failed` or `skipped` (not run, see `error_code`).
+   */
+  status: string;
+  steps: StepLog[];
+  /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
+  trigger_key: string;
+  updated_at: string;
+};
+
+/** Data for a manual run. */
+export type RunRuleRequest = {
+  /** What the templates see as `event` (e.g. `{"order": {"id": "…"}}`); default `{}`. */
+  input?: Record<string, unknown> | null;
 };
 
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
@@ -16983,6 +17753,29 @@ export type StartUploadRequest = {
 
 /** Where an entry is in its life. */
 export type Status = "draft" | "published" | "archived";
+
+/** One step in the log of a run. */
+export type StepLog = {
+  /** The tool name, or `wait`, `stop_if`, `notify`. */
+  action: string;
+  /** Who approved the step, when it needed approval. */
+  approved_by?: string | null;
+  error_code?: string | null;
+  error_message?: string | null;
+  finished_at?: string | null;
+  /** `automation:<run id>:<step>`: calling again never does the step twice. */
+  idempotency_key?: string | null;
+  /** Position of the action in the rule, from 0. */
+  index: number;
+  /** The tool's result (cut down when large). */
+  result?: Record<string, unknown> | null;
+  started_at: string;
+  /**
+   * `succeeded`, `failed`, `skipped`, `waiting`, `awaiting_approval`, `stopped` (a `stop_if`
+   * that held) or `rejected`.
+   */
+  status: string;
+};
 
 /** Submissions of a form by status. */
 export type SubmissionCounts = {
@@ -17557,6 +18350,16 @@ export type TaxedLine = {
 /** What a term groups. */
 export type Taxonomy = "category" | "tag";
 
+/** A ready-made rule you can save now. */
+export type TemplateInfo = {
+  description: string;
+  /** `<module>.<name>`. */
+  id: string;
+  /** `{"trigger", "conditions", "actions"}`: send it to `POST /rules` with a name. */
+  rule: Record<string, unknown>;
+  title: string;
+};
+
 /** A customer (tenant) of the platform. */
 export type Tenant = {
   created_at: string;
@@ -17888,6 +18691,15 @@ export type TestRequest = {
   email: string;
 };
 
+/** Data for a dry run. */
+export type TestRuleRequest = {
+  /**
+   * What the templates and conditions see as `event` (e.g. a sample payload of the trigger
+   * event). Omit to use a sample for the trigger type.
+   */
+  event_sample?: Record<string, unknown> | null;
+};
+
 /** The tenant's wording. */
 export type TextInput = {
   /** Plain text (no HTML), 1 to 500 characters, with exactly the `{placeholders}` of the default. */
@@ -18053,6 +18865,34 @@ export type UnsubscribeResponse = {
   unsubscribed: boolean;
 };
 
+/** Changes to a resource. */
+export type UpdateBookingResourceRequest = {
+  /** `false`: not offered for new bookings. */
+  active?: boolean | null;
+  name?: string | null;
+  /** Staff only; `null` unlinks the account. */
+  user_id?: string | null;
+};
+
+/** Changes to a service; omitted fields stay as they are. */
+export type UpdateBookingServiceRequest = {
+  /** `false` stops new bookings; existing bookings stay. */
+  active?: boolean | null;
+  buffer_after_minutes?: number | null;
+  buffer_before_minutes?: number | null;
+  capacity?: number | null;
+  deposit?: BookingDeposit | null;
+  description?: string | null;
+  duration_minutes?: number | null;
+  name?: string | null;
+  names?: {
+    [key: string]: string;
+  } | null;
+  performers?: string[] | null;
+  price?: Money | null;
+  required?: string[] | null;
+};
+
 /** Changes to a draft or scheduled campaign. Omitted fields stay as they are. */
 export type UpdateCampaignRequest = {
   advertising?: boolean | null;
@@ -18180,6 +19020,22 @@ export type UpdateMeRequest = {
   name?: string | null;
   /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
   time_zone?: string | null;
+};
+
+/**
+ * Changes to an automation rule. Omitted fields stay as they are. Changing the trigger,
+ * conditions or actions checks the whole rule again with your permissions, and the rule then
+ * runs as you.
+ */
+export type UpdateRuleRequest = {
+  actions?: Record<string, unknown>[] | null;
+  /** New conditions; `{}` removes them (the rule then always runs its actions). */
+  conditions?: Record<string, unknown> | null;
+  /** Up to 2000 characters; an empty text removes it. */
+  description?: string | null;
+  /** 1 to 200 characters. */
+  name?: string | null;
+  trigger?: Record<string, unknown> | null;
 };
 
 /** A new status for a submission. */
@@ -19831,6 +20687,412 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/catalog": {
+    /** List the triggers and actions you may use in automation rules. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Catalog;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules": {
+    /** List the automation rules in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; status?: string; trigger_type?: string }; };
+      responses: {
+        200: Page_RuleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an automation rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateRuleRequest;
+      responses: {
+        201: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}": {
+    /** Get an automation rule. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change an automation rule. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateRuleRequest;
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete an automation rule. */
+    delete: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/disable": {
+    /** Disable an automation rule. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/enable": {
+    /** Enable an automation rule. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RuleResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/run": {
+    /** Run an automation rule now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RunRuleRequest;
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/rules/{id}/test": {
+    /** Dry-run an automation rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: TestRuleRequest;
+      responses: {
+        200: Data_DryRun;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs": {
+    /** List the runs of automation rules in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; rule_id?: string; status?: string }; };
+      responses: {
+        200: Page_RunResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}": {
+    /** Get a run of an automation rule, with the log of each step. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/approve": {
+    /** Approve the risky step a run waits on. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/reject": {
+    /** Reject the risky step a run waits on: the run ends as `failed`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/runs/{id}/retry": {
+    /** Retry a failed run from the step that failed. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        202: Data_RunResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/automations/templates": {
+    /** List the ready-made rule templates you can use. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_TemplateInfo;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/exceptions": {
+    /** List time off and extra hours of a resource. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { resource_id: string; from?: string; to?: string }; };
+      responses: {
+        200: Data_Vec_BookingException;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add time off or extra hours. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingExceptionRequest;
+      responses: {
+        201: Data_BookingException;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/exceptions/{id}": {
+    /** Remove time off or extra hours. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/availability": {
+    /** Find free times (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { service_id: string; org_id?: string; resource_id?: string; from: string; to: string }; };
+      responses: {
+        200: Data_BookingAvailability;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/services": {
+    /** List bookable services (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      responses: {
+        200: Data_Vec_PublicBookingService;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources": {
+    /** List staff, rooms and equipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingResource;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a staff member, room or equipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingResourceRequest;
+      responses: {
+        201: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources/{id}": {
+    /** Get a staff member, room or equipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a staff member, room or equipment. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBookingResourceRequest;
+      responses: {
+        200: Data_BookingResource;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/resources/{id}/schedule": {
+    /** Get the weekly schedule of a resource. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingSchedule;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the weekly schedule of a resource. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReplaceBookingScheduleRequest;
+      responses: {
+        200: Data_BookingSchedule;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/services": {
+    /** List bookable services. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingService;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a bookable service. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingServiceRequest;
+      responses: {
+        201: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/services/{id}": {
+    /** Get a bookable service. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a bookable service. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBookingServiceRequest;
+      responses: {
+        200: Data_BookingService;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

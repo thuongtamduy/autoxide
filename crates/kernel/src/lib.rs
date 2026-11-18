@@ -22,18 +22,18 @@ pub use contracts::{
     storage, zns,
 };
 pub use data::{
-    database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, upload,
-    version,
+    backup, database, migration, numbering, pagination, reference, rows, search, tenancy, transfer,
+    upload, version,
+};
+pub use ops::{
+    automation, bulk, connections, custom_fields, doctor, find, list_exports, logging, metrics,
+    reasons, resolve, setup, summary, tags, task, telemetry, texts, usages, work,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
-pub use ops::{
-    bulk, connections, custom_fields, doctor, find, list_exports, logging, metrics, reasons,
-    resolve, setup, summary, tags, task, telemetry, texts, usages, work,
-};
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, net, secret, throttle, tls, tokens,
 };
-pub use values::{csv, decimal, email, money, public_url, template};
+pub use values::{csv, decimal, email, money, public_url, slug, template};
 
 pub mod config;
 pub mod error;
