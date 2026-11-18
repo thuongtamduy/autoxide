@@ -265,7 +265,9 @@ impl DatabaseRegistry {
         if self.0.mode == TenancyMode::Single {
             return Ok(vec![self.default_tenant()]);
         }
-        let select = tenant_select().and_where(tenant_column("status").ne("deleted")).to_owned();
+        let select = tenant_select()
+            .and_where(tenant_column("status").is_not_in(["deleted", "merged"]))
+            .to_owned();
         let rows = self.0.control.read().query_all(&select).await?;
         let mut found = Vec::with_capacity(rows.len());
         for row in &rows {

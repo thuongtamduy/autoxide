@@ -24618,6 +24618,102 @@
         ],
         "type": "object"
       },
+      "Data_RelocationPlan": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a split or merge would do (dry run). Nothing is changed.",
+            "properties": {
+              "blocking": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationBlocker"
+                },
+                "type": "array"
+              },
+              "conflicts": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationConflict"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/RelocationKind"
+              },
+              "org_id": {
+                "description": "Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged\ntenant goes under.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "placement": {
+                "description": "Placement (database) of the target.",
+                "example": "acme-north-db",
+                "type": "string"
+              },
+              "ready": {
+                "description": "`true` when nothing blocks and there is no conflict.",
+                "type": "boolean"
+              },
+              "rows": {
+                "description": "Rows that move or are copied.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "source": {
+                "example": "acme",
+                "type": "string"
+              },
+              "source_tenant_id": {
+                "description": "Tenant whose rows go.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "tables": {
+                "description": "Every tenant-level table, in copy order.",
+                "items": {
+                  "$ref": "#/components/schemas/RelocationTable"
+                },
+                "type": "array"
+              },
+              "target": {
+                "example": "acme-north",
+                "type": "string"
+              },
+              "target_tenant_id": {
+                "description": "Tenant that receives them (split: the new tenant, its id is the id of the branch unit).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "warnings": {
+                "items": {
+                  "$ref": "#/components/schemas/RelocationWarning"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "kind",
+              "source_tenant_id",
+              "source",
+              "target_tenant_id",
+              "target",
+              "org_id",
+              "placement",
+              "ready",
+              "blocking",
+              "conflicts",
+              "warnings",
+              "tables",
+              "rows"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Resolution": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -27237,6 +27333,110 @@
               "rows",
               "files",
               "settle_seconds"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_TenantRelocation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A split or merge of tenants.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error": {
+                "description": "Why the last run stopped; running it again resumes it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "$ref": "#/components/schemas/RelocationKind"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "placement": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "plan": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/RelocationPlan",
+                    "description": "The plan made when it started (or when it was requested)."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reason": {
+                "type": "string"
+              },
+              "source_tenant_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "state": {
+                "description": "`requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`\n(the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.",
+                "example": "done",
+                "type": "string"
+              },
+              "tables": {
+                "description": "Rows written to the target per table (after `copied`).",
+                "items": {
+                  "$ref": "#/components/schemas/TenantTableRows"
+                },
+                "type": "array"
+              },
+              "target_tenant_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "state",
+              "source_tenant_id",
+              "reason",
+              "tables",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -57125,6 +57325,367 @@
         ],
         "type": "object"
       },
+      "RelocationAsk": {
+        "additionalProperties": false,
+        "description": "What a tenant asks the platform staff to do.",
+        "properties": {
+          "into": {
+            "description": "Merge: id or slug of the tenant to join.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind",
+            "description": "`split`: a branch of your tenant becomes a tenant of its own. `merge`: your tenant joins\n`into`."
+          },
+          "name": {
+            "description": "Split: wished name of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Split: wished placement (database), if the platform offers a choice.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why (contract, consent of the people whose data moves).",
+            "type": "string"
+          },
+          "slug": {
+            "description": "Split: wished slug of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "under_org": {
+            "description": "Merge: the unit of `into` to go under.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RelocationBlocker": {
+        "description": "Something that blocks a split or merge.",
+        "properties": {
+          "code": {
+            "description": "Stable code, the same as the error a real run would answer.",
+            "example": "tenancy.relocation_same_database",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
+      "RelocationConflict": {
+        "description": "Rows that cannot move as they are: a reference across the boundary or a unique value taken in\nthe target.",
+        "properties": {
+          "code": {
+            "description": "`reference` (a row that stays points to a row that goes, or the other way), `unique` (the\ntarget tenant already has the value) or a code of the module.",
+            "example": "unique",
+            "type": "string"
+          },
+          "count": {
+            "description": "Rows in conflict.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "rows": {
+            "description": "Keys of the first rows in conflict (at most 20).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "table": {
+            "example": "content_entries",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "code",
+          "message",
+          "count",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "RelocationKind": {
+        "description": "Split or merge.",
+        "enum": [
+          "split",
+          "merge"
+        ],
+        "type": "string"
+      },
+      "RelocationPlan": {
+        "description": "What a split or merge would do (dry run). Nothing is changed.",
+        "properties": {
+          "blocking": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationBlocker"
+            },
+            "type": "array"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationConflict"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind"
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged\ntenant goes under.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "placement": {
+            "description": "Placement (database) of the target.",
+            "example": "acme-north-db",
+            "type": "string"
+          },
+          "ready": {
+            "description": "`true` when nothing blocks and there is no conflict.",
+            "type": "boolean"
+          },
+          "rows": {
+            "description": "Rows that move or are copied.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "source": {
+            "example": "acme",
+            "type": "string"
+          },
+          "source_tenant_id": {
+            "description": "Tenant whose rows go.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Every tenant-level table, in copy order.",
+            "items": {
+              "$ref": "#/components/schemas/RelocationTable"
+            },
+            "type": "array"
+          },
+          "target": {
+            "example": "acme-north",
+            "type": "string"
+          },
+          "target_tenant_id": {
+            "description": "Tenant that receives them (split: the new tenant, its id is the id of the branch unit).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/RelocationWarning"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "source_tenant_id",
+          "source",
+          "target_tenant_id",
+          "target",
+          "org_id",
+          "placement",
+          "ready",
+          "blocking",
+          "conflicts",
+          "warnings",
+          "tables",
+          "rows"
+        ],
+        "type": "object"
+      },
+      "RelocationRequest": {
+        "additionalProperties": false,
+        "description": "A split or merge of tenants to run (platform staff).",
+        "properties": {
+          "dry_run": {
+            "default": true,
+            "description": "Only report what would happen, changing nothing. Defaults to `true`: send `false` to run.",
+            "type": "boolean"
+          },
+          "into": {
+            "description": "Merge: id or slug of the tenant that receives the rows.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "keep_parent": {
+            "default": true,
+            "description": "Split: the new tenant is a child of the source tenant. Defaults to `true`.",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind",
+            "description": "`split`: a branch of `tenant` becomes a tenant of its own. `merge`: `tenant` joins `into`."
+          },
+          "name": {
+            "description": "Split: name of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Split: the root unit of the branch. The new tenant gets this id.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Split: placement (database) of the new tenant; it must be another database than the\nsource tenant's.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "Why the data moves between tenants (contract, consent); kept with the run and in the audit\nlog.",
+            "type": "string"
+          },
+          "request_id": {
+            "description": "Carry out this request of a tenant (from `POST /tenant/relocation-requests`); the other\nfields still apply.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Split: slug of the new tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant": {
+            "description": "Id or slug of the tenant whose rows go (split: the tenant with the branch; merge: the\ntenant that is merged).",
+            "type": "string"
+          },
+          "under_org": {
+            "description": "Merge: the unit of `into` that the root of the merged tenant goes under.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "tenant",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RelocationTable": {
+        "description": "What happens to one table.",
+        "properties": {
+          "action": {
+            "description": "`move` (copied to the target, then deleted from the source), `copy` (the source keeps\nthem too), `stay`, `drain` (due queue rows that must run first) or `custom`.",
+            "example": "move",
+            "type": "string"
+          },
+          "existing": {
+            "description": "Merge: rows whose key the target already has (the copy made when the tenant was split);\nthey are skipped as the same rows.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "policy": {
+            "description": "The policy of the table: `by_org`, `org_tree`, `follow_parent`, `referenced`,\n`tenant_wide`, `must_be_empty`, `handled_by` or `custom`.",
+            "example": "follow_parent",
+            "type": "string"
+          },
+          "rows": {
+            "description": "Rows concerned.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "table": {
+            "example": "ledger_entries",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "policy",
+          "action",
+          "rows",
+          "existing"
+        ],
+        "type": "object"
+      },
+      "RelocationWarning": {
+        "description": "Something the operator should know; it does not block.",
+        "properties": {
+          "code": {
+            "example": "relocation_policy_inferred",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "table": {
+            "example": "shop_notes",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "code",
+          "message"
+        ],
+        "type": "object"
+      },
       "RenameTagRequest": {
         "additionalProperties": false,
         "description": "A new name for a tag.",
@@ -61983,6 +62544,101 @@
         },
         "required": [
           "to"
+        ],
+        "type": "object"
+      },
+      "TenantRelocation": {
+        "description": "A split or merge of tenants.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error": {
+            "description": "Why the last run stopped; running it again resumes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RelocationKind"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "plan": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RelocationPlan",
+                "description": "The plan made when it started (or when it was requested)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "source_tenant_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "state": {
+            "description": "`requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`\n(the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.",
+            "example": "done",
+            "type": "string"
+          },
+          "tables": {
+            "description": "Rows written to the target per table (after `copied`).",
+            "items": {
+              "$ref": "#/components/schemas/TenantTableRows"
+            },
+            "type": "array"
+          },
+          "target_tenant_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "source_tenant_id",
+          "reason",
+          "tables",
+          "created_at",
+          "updated_at"
         ],
         "type": "object"
       },
@@ -122475,6 +123131,255 @@
         "x-permissions": []
       }
     },
+    "/api/v1/kernel/relocations": {
+      "post": {
+        "description": "Requires `kernel.tenants.relocate` and an account of the platform tenant. With `dry_run` (the\ndefault) nothing changes: the answer lists what blocks, the conflicts (rows pointing across the\nboundary, unique values the target already has) and the rows of every table. With\n`\"dry_run\": false` the tenants answer `503 tenant_maintenance` while a background job copies the\nrows (keeping their ids), checks them, switches the tenants and cleans the source; follow it at\nthe `Location` of the answer. Source and target must be two databases.",
+        "operationId": "kernel_relocate_tenant",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RelocationPlan"
+                }
+              }
+            },
+            "description": "Dry run: what would happen; nothing changed."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The run started in the background; `Location` is its status.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tenants.relocate` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such tenant, placement or request; code `tenant_not_found`, `tenant_placement_not_found` or `tenancy.relocation_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken` or `tenant_placement_behind`. A dry run lists every reason."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or missing; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A database cannot be reached; code `tenant_move_unreachable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Split a tenant or merge tenants.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tenants.relocate"
+        ]
+      }
+    },
+    "/api/v1/kernel/relocations/{id}": {
+      "get": {
+        "description": "Requires `kernel.tenants.read` and an account of the platform tenant. `state` goes `planned` →\n`frozen` → `copied` → `verified` → `switched` → `cleaned` → `done` (or `failed`); `error` tells\nwhy a run stopped (the job runs it again).",
+        "operationId": "kernel_get_relocation",
+        "parameters": [
+          {
+            "description": "Id of the split or merge.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The split or merge."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.tenants.read` (`permission_denied`), or not an account of the platform tenant (`tenant_platform_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such run; code `tenancy.relocation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a split or merge of tenants.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.tenants.read"
+        ]
+      }
+    },
     "/api/v1/kernel/resolve": {
       "get": {
         "description": "Any signed-in user. Asks the modules' code readers (order numbers, tracking numbers, invoice\nnumbers, page addresses…), among those the caller has permission for, and answers the first\nrecord found. No record and no permission answer the same 404, so a code never reveals that a\nrecord exists.",
@@ -123844,6 +124749,215 @@
           "kernel"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/tenant/relocation-requests": {
+      "post": {
+        "description": "Requires `kernel.relocations.request`. Nothing changes: the request goes to the work inbox of\nthe platform staff, who check it and run it (or not). Follow it at the `Location` of the answer.",
+        "operationId": "kernel_request_relocation",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelocationAsk"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The request was sent to the platform staff.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.relocations.request`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid or missing; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask for a split or merge of your tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.relocations.request"
+        ]
+      }
+    },
+    "/api/v1/kernel/tenant/relocation-requests/{id}": {
+      "get": {
+        "description": "Requires `kernel.relocations.request`. `state` is `requested` until the platform staff run it.",
+        "operationId": "kernel_get_relocation_request",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_TenantRelocation"
+                }
+              }
+            },
+            "description": "The request (and the run, once started)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthorized` or the code of the authentication module."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.relocations.request`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Your tenant has no such request; code `tenancy.relocation_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a request of your tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.relocations.request"
+        ]
       }
     },
     "/api/v1/kernel/tenants": {

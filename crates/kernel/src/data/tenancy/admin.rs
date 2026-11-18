@@ -79,7 +79,7 @@ impl Seeds {
         let _ = self.0.set((seeds, samples));
     }
 
-    fn all(&self) -> &[NamedSeed] {
+    pub(super) fn all(&self) -> &[NamedSeed] {
         self.0.get().map_or(&[], |(seeds, _)| seeds.as_slice())
     }
 

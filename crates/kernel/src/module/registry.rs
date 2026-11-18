@@ -436,7 +436,19 @@ impl Modules {
             self.migrator().map_err(|error| ModuleError(error.to_string()))?,
         );
         let retained = self.modules.iter().flat_map(|module| module.retained_tables()).collect();
-        self.moves.fill(self.names(), self.control_plane_tables(), migrator, placements, retained);
+        // Chính sách tách / gộp (bước 38): bảng thuộc chính module, không khai hai lần.
+        let policies = crate::tenancy::relocate::Policies::collect(
+            self.modules.iter().map(|module| (module.name(), module.relocation())).collect(),
+        )
+        .map_err(|problems| ModuleError(problems.join("; ")))?;
+        self.moves.fill(
+            self.names(),
+            self.control_plane_tables(),
+            migrator,
+            placements,
+            retained,
+            policies,
+        );
         Ok(())
     }
 
@@ -1153,6 +1165,7 @@ mod tests {
                 "AUTOXIDE_TEXT_OVERRIDES_UI_MAX",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
                 "AUTOXIDE_SEARCH_BACKEND",
+                "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")

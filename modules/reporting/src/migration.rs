@@ -12,7 +12,51 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0003_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("reporting")],
         ),
+        Box::new(CreateRehomes),
     ]
+}
+
+/// Nhật ký dời kho báo cáo khi tách / gộp khách (bước 38).
+struct CreateRehomes;
+
+impl MigrationName for CreateRehomes {
+    fn name(&self) -> &str {
+        "m0004_create_rehomes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateRehomes {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("reporting_rehomes")
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("relocation_id"))
+                    .col(schema::uuid("from_root"))
+                    .col(schema::uuid("to_root"))
+                    .col(schema::string_len("status", 16))
+                    .col(schema::big_integer("moved_facts"))
+                    .col(schema::timestamp_with_time_zone("started_at"))
+                    .col(schema::timestamp_with_time_zone_null("finished_at"))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "reporting_rehomes",
+            "reporting_rehomes_started_idx",
+            &["tenant_id", "started_at"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("reporting_rehomes").to_owned()).await
+    }
 }
 
 async fn index(

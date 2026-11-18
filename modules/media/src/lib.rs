@@ -80,6 +80,18 @@ impl Module for MediaModule {
         "media"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            .copy_on_split(&["media_folder", "media_lock", "media_tag"])
+            .by_org(&["media_item"])
+            .follow("media_item_tag", "item_id", "media_item")
+            .follow("media_variant", "item_id", "media_item")
+            .follow("media_alt_translations", "media_id", "media_item")
+            .ephemeral(&["media_uploads"])
+    }
+
     fn description(&self) -> &'static str {
         "Media library: images, video, audio and documents in nested folders, with tags, alt \
          text and resized copies."

@@ -14,6 +14,7 @@ pub mod secrets;
 pub mod serve;
 pub mod task;
 pub mod tenant;
+mod tenant_relocate;
 pub mod user;
 
 use std::future::Future;

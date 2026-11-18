@@ -28,6 +28,7 @@ mod service;
 mod settings;
 mod setup;
 
+mod relocation;
 #[cfg(test)]
 mod tests;
 
@@ -140,5 +141,9 @@ impl Module for BookingsModule {
                 .merge(http_customer::routes(service.clone()))
                 .merge(http_public::routes(service))
         })
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }
