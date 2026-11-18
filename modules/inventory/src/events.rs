@@ -1,0 +1,73 @@
+//! Event module `inventory` phát. Cùng hình dạng `{"before": …, "after": …}` với mọi module; ghi
+//! CÙNG transaction với thay đổi (luật kiến trúc 3). Tên event module khác hay nghe là hằng trong
+//! `api::events`.
+
+use autoxide_kernel::event::{Event, EventInfo};
+use serde::Serialize;
+use serde_json::Value;
+
+use crate::api::events as names;
+
+/// Dữ liệu chung của mọi event của module.
+#[derive(Debug, Default, Serialize)]
+pub(crate) struct Change {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<Value>,
+}
+
+impl Change {
+    pub(crate) fn after(after: Value) -> Self {
+        Change { before: None, after: Some(after) }
+    }
+}
+
+/// Một loại event: tên + dữ liệu `Change`.
+macro_rules! event {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, Serialize)]
+        #[serde(transparent)]
+        pub(crate) struct $kind(pub Change);
+
+        impl Event for $kind {
+            const NAME: &'static str = $name;
+        }
+    };
+}
+
+event!(LevelChanged, names::LEVEL_CHANGED);
+event!(LowStock, names::LOW_STOCK);
+event!(OutOfStock, names::OUT_OF_STOCK);
+event!(MovementRecorded, names::MOVEMENT_RECORDED);
+event!(CostChanged, names::COST_CHANGED);
+
+pub(crate) fn all() -> Vec<EventInfo> {
+    vec![
+        EventInfo::new(
+            names::LEVEL_CHANGED,
+            "The stock of a variant in a warehouse changed (on hand, available).",
+        ),
+        EventInfo::new(
+            names::LOW_STOCK,
+            "The available stock of a variant in a warehouse fell to its reorder point or below.",
+        ),
+        EventInfo::new(
+            names::OUT_OF_STOCK,
+            "The available stock of a variant in a warehouse fell to zero or below.",
+        ),
+        EventInfo::new(
+            names::MOVEMENT_RECORDED,
+            "A line was added to the stock movement ledger (receipt, sale, return, adjustment…).",
+        ),
+        EventInfo::new(
+            names::COST_CHANGED,
+            "The weighted average unit cost of a variant in a warehouse changed.",
+        ),
+    ]
+}
+
+/// Chủ thể (subject) của event về dòng tồn `id`.
+pub(crate) fn level_subject(id: uuid::Uuid) -> Option<String> {
+    Some(format!("inventory.level:{id}"))
+}
