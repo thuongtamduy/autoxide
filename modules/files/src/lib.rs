@@ -19,6 +19,7 @@ mod permissions;
 mod service;
 mod store;
 mod tools;
+mod uploads;
 
 use std::sync::Arc;
 
@@ -123,6 +124,7 @@ impl Module for FilesModule {
         self.databases = Some(context.tenancy());
         let mut service = FileService::new(storage.clone(), outbox, config.limits);
         service.entitlements = context.entitlements();
+        service.direct = config.direct;
         context.usage_counter(&service::STORAGE_LIMIT, Arc::new(service::StorageCounter))?;
         let service = Arc::new(service);
         self.service = Some(service.clone());
@@ -159,10 +161,19 @@ impl Module for FilesModule {
 
     fn jobs(&self) -> Vec<JobRegistration> {
         match (self.service.clone(), self.databases.clone()) {
-            (Some(service), Some(databases)) => vec![JobRegistration::new(
-                cleanup::CLEAN_ORPHANS,
-                Arc::new(cleanup::CleanOrphans { service, databases }),
-            )],
+            (Some(service), Some(databases)) => vec![
+                JobRegistration::new(
+                    cleanup::CLEAN_ORPHANS,
+                    Arc::new(cleanup::CleanOrphans {
+                        service: service.clone(),
+                        databases: databases.clone(),
+                    }),
+                ),
+                JobRegistration::new(
+                    uploads::PURGE_UPLOADS,
+                    Arc::new(uploads::PurgeUploads { service, databases }),
+                ),
+            ],
             _ => Vec::new(),
         }
     }
@@ -171,7 +182,13 @@ impl Module for FilesModule {
         let day = std::time::Duration::from_secs(24 * 3600);
         // Một lần mỗi ngày cho cả bản cài (database điều khiển): job quét mọi nơi lưu file và đối
         // chiếu từng khoá với database của đúng khách — chạy trên mọi database chỉ lặp lại việc đó.
-        vec![Schedule::new(cleanup::CLEAN_ORPHANS, cleanup::CLEAN_ORPHANS, day).on_control_only()]
+        let hour = std::time::Duration::from_secs(3600);
+        vec![
+            Schedule::new(cleanup::CLEAN_ORPHANS, cleanup::CLEAN_ORPHANS, day).on_control_only(),
+            // Lượt tải thẳng bỏ dở (bước 40 P4): bảng `files_uploads` nằm ở database của từng khách,
+            // nên chạy trên mọi database.
+            Schedule::new(uploads::PURGE_UPLOADS, uploads::PURGE_UPLOADS, hour),
+        ]
     }
 }
 
@@ -196,6 +213,17 @@ pub(crate) mod testing {
 
     /// Service trên database (đã migrate) của test, lưu file trong một thư mục tạm.
     pub async fn service(test: &TestDatabase, limits: Limits) -> (Arc<FileService>, Database) {
+        let dir = std::env::temp_dir().join(format!("autoxide-files-{}", uuid::Uuid::now_v7()));
+        let storage = Arc::new(ObjectStorage::open(&Backend::Local { dir }).unwrap());
+        service_on(test, limits, storage).await
+    }
+
+    /// Như [`service`], lưu file ở `storage`.
+    pub async fn service_on(
+        test: &TestDatabase,
+        limits: Limits,
+        storage: Arc<dyn autoxide_kernel::storage::Storage>,
+    ) -> (Arc<FileService>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let config = Config::read(&mut reader);
@@ -206,8 +234,6 @@ pub(crate) mod testing {
             .up(&database)
             .await
             .unwrap();
-        let dir = std::env::temp_dir().join(format!("autoxide-files-{}", uuid::Uuid::now_v7()));
-        let storage = Arc::new(ObjectStorage::open(&Backend::Local { dir }).unwrap());
         let outbox = Outbox::standalone("files");
         (Arc::new(FileService::new(storage, outbox, limits)), database)
     }

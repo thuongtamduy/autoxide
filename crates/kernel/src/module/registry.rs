@@ -160,6 +160,19 @@ impl Modules {
             problems.extend(errors);
             EventCatalog::default()
         });
+        // Event stream được phải trỏ tới permission có thật (bước 40 P5).
+        for (module, event) in events.streamable() {
+            if let Some(permission) = event.stream_permission()
+                && !permissions.contains(permission.name())
+            {
+                problems.push(format!(
+                    "event `{}` of module `{module}` is streamable with permission `{}`, which no \
+                     module declares",
+                    event.name(),
+                    permission.name()
+                ));
+            }
+        }
         let resource_events = checked_resource_events(&modules, &events, &mut problems);
         let mut seen = Vec::new();
         let mut declared_settings = Vec::new();
@@ -1062,9 +1075,11 @@ mod tests {
                 "AUTOXIDE_JOBS_FILE_RETENTION_DAYS",
                 "AUTOXIDE_TEXT_OVERRIDES_UI_MAX",
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
+                "AUTOXIDE_SEARCH_BACKEND",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
+                || name.starts_with("AUTOXIDE_EVENTS_STREAM")
         };
         assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());

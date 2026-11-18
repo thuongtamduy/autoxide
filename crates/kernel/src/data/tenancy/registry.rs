@@ -259,6 +259,24 @@ impl DatabaseRegistry {
         self.context_of(&row).await
     }
 
+    /// Mọi khách còn dữ liệu (chế độ một khách: khách mặc định), cho lệnh duyệt mọi khách (vd dựng
+    /// lại chỉ mục tìm kiếm). Khách không mở được (placement hỏng…) bị bỏ qua, có ghi log.
+    pub async fn all_tenants(&self) -> Result<Vec<TenantContext>, Error> {
+        if self.0.mode == TenancyMode::Single {
+            return Ok(vec![self.default_tenant()]);
+        }
+        let select = tenant_select().and_where(tenant_column("status").ne("deleted")).to_owned();
+        let rows = self.0.control.read().query_all(&select).await?;
+        let mut found = Vec::with_capacity(rows.len());
+        for row in &rows {
+            match self.context_of(row).await {
+                Ok(tenant) => found.push(tenant),
+                Err(error) => tracing::warn!(%error, "a tenant was skipped"),
+            }
+        }
+        Ok(found)
+    }
+
     /// Ngữ cảnh của khách có tên rút gọn `slug`.
     pub async fn tenant_by_slug(&self, slug: &str) -> Result<TenantContext, Error> {
         if self.0.mode == TenancyMode::Single {

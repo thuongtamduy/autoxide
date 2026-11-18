@@ -1064,7 +1064,7 @@ impl MigrationTrait for Cases {
     }
 }
 
-/// Index đếm người đồng ý / đã rút theo mục đích (`GET /purposes`, D-378): đọc thẳng từ index, không
+/// Index đếm người đồng ý / đã rút theo mục đích (`GET /purposes`, D-382): đọc thẳng từ index, không
 /// quét bảng đồng ý.
 struct ConsentStatsIndex;
 

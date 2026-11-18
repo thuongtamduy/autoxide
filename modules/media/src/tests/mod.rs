@@ -7,6 +7,7 @@
 
 mod alt;
 mod alts;
+mod direct;
 mod folders;
 mod images;
 mod items;

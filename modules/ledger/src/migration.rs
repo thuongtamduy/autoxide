@@ -977,7 +977,7 @@ impl MigrationTrait for CreateExchangeRates {
     }
 }
 
-/// Index cho hai đường đọc của màn kế toán (đề bài giao diện, D-378): lọc thanh toán theo số tiền
+/// Index cho hai đường đọc của màn kế toán (đề bài giao diện, D-382): lọc thanh toán theo số tiền
 /// (hàng chờ sai lệch) và đếm bút toán theo kỳ (danh sách kỳ).
 struct AddListIndexes;
 

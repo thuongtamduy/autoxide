@@ -494,7 +494,13 @@ The mail carries a one-time link to `AUTOXIDE_AUTH_INVITATION_URL` (a page of yo
 Accepting creates the account (or, when the email already has one, adds the roles after the person
 signs in). **Signing in with a link** (no password) is off by default; turn it on with
 `AUTOXIDE_AUTH_LOGIN_LINK=true` and set `AUTOXIDE_AUTH_LOGIN_LINK_URL` to your interface's page.
-Both need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
+**Signing in with Google, Microsoft, GitHub or OpenID Connect** is off by default; turn it on with
+`AUTOXIDE_AUTH_OIDC=true`. Each tenant registers its application at the provider and adds it with
+`POST /api/v1/auth/oidc-providers` ([`docs/guides/oidc.md`](guides/oidc.md)); client secrets are
+stored encrypted with `AUTOXIDE_SECRET_KEY`. The server calls providers only on public addresses;
+keep `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false` in production, and let the server reach the
+providers over HTTPS (outbound port 443).
+Links and invitations need working mail (`AUTOXIDE_MAIL_SMTP_URL`) and a running worker. The organization tree of
 a tenant is at most `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` levels deep (8 by default). Import the list of
 administrative units once, for checking addresses: `autoxide task address.import`
 ([`docs/ADDRESS.md`](ADDRESS.md)).
@@ -644,6 +650,21 @@ up to N times its limit. To share the limit per API key between servers, set
 `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`: every server counts in the database, taking requests
 in small lots (a quarter of `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), so a key gets at most one
 lot per server more than its limit each minute. The limit per address stays per process.
+
+## Uploads straight to S3
+
+With files on S3, clients can upload large files straight to the bucket
+(`POST /api/v1/files/uploads`, guide: [`docs/guides/direct-uploads.md`](guides/direct-uploads.md)).
+Browsers need the bucket to allow it (CORS). On Amazon S3, for example:
+
+```json
+[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+```
+
+The server checks every completed upload by reading it back (size and SHA-256), because not every
+S3-compatible service checks the signed checksum; raise `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`
+if you allow very large files. Abandoned uploads are removed by an hourly job.
 
 ### Updating without dropping requests
 

@@ -95,8 +95,41 @@ pub(crate) struct SetUserRolesInput {
     role_ids: Vec<Uuid>,
 }
 
+/// Changes to a sign-in provider; fields left out stay as they are, `null` clears.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct UpdateOidcProviderInput {
+    /// Id of the provider.
+    id: Uuid,
+    name: Option<String>,
+    /// Issuer address; `null` resets it to the default of the kind.
+    #[serde(default, deserialize_with = "crate::http::oidc::present")]
+    #[schema(value_type = Option<String>, nullable)]
+    issuer: Option<Option<String>>,
+    client_id: Option<String>,
+    /// A new client secret (write-only).
+    client_secret: Option<String>,
+    /// Space-separated scopes.
+    scopes: Option<String>,
+    /// Pages of the interface the provider may send the browser back to (replaces the list).
+    redirect_uris: Option<Vec<String>>,
+    /// Only emails at these domains may sign in; `null`: any.
+    #[serde(default, deserialize_with = "crate::http::oidc::present")]
+    #[schema(value_type = Option<Vec<String>>, nullable)]
+    allowed_email_domains: Option<Option<Vec<String>>>,
+    allow_signup: Option<bool>,
+    #[serde(default, deserialize_with = "crate::http::oidc::present")]
+    #[schema(value_type = Option<Uuid>, nullable)]
+    default_org_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "crate::http::oidc::present")]
+    #[schema(value_type = Option<Uuid>, nullable)]
+    default_role_id: Option<Option<Uuid>>,
+    enabled: Option<bool>,
+}
+
 pub(crate) fn all(state: &Arc<HttpState>) -> Vec<Tool> {
     let mut tools = users(state);
+    tools.extend(oidc(state));
     tools.extend(memberships(state));
     tools.extend(roles(state));
     tools.extend(api_keys(state));
@@ -382,6 +415,27 @@ mod tests {
 
     fn state(services: &crate::testing::Services) -> Arc<HttpState> {
         Arc::new(HttpState {
+            oidc: Arc::new(crate::oidc::OidcService {
+                enabled: false,
+                providers: crate::oidc::ProviderService {
+                    secrets: autoxide_kernel::secret::SecretKey::new(
+                        services.database.clone(),
+                        None,
+                    ),
+                    outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                },
+                client: crate::oidc::OidcClient::new(false).unwrap(),
+                users: services.users.clone(),
+                sessions: services.sessions.clone(),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                secrets: autoxide_kernel::secret::SecretKey::new(services.database.clone(), None),
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                orgs: None,
+                entitlements: Default::default(),
+                self_registration: false,
+            }),
             sessions: services.sessions.clone(),
             users: services.users.clone(),
             roles: services.roles.clone(),
@@ -648,6 +702,107 @@ pub(crate) struct ListInvitationsInput {
     cursor: Option<String>,
     /// `desc` (newest first, the default) or `asc`.
     order: Option<String>,
+}
+
+/// Tool về nhà cung cấp đăng nhập (bước 40 P3): cùng service và permission với
+/// `/api/v1/auth/oidc-providers` và `/api/v1/auth/me/identities`. Luồng đăng nhập không có tool:
+/// nó cần trình duyệt, còn MCP xác thực bằng API key.
+fn oidc(state: &Arc<HttpState>) -> Vec<Tool> {
+    use crate::http::oidc::{IdentityResponse, ProviderRequest, ProviderResponse};
+    use crate::permissions::{OIDC_MANAGE, OIDC_READ};
+    let (list, create, update, delete, mine) =
+        (state.clone(), state.clone(), state.clone(), state.clone(), state.clone());
+    vec![
+        Tool::new(
+            "list_oidc_providers",
+            "List the sign-in providers (Google, Microsoft, GitHub, OpenID Connect) of this \
+             tenant, with disabled ones; client secrets are never shown.",
+            move |tenant: TenantContext, _: Principal, _: NoInput| {
+                let state = list.clone();
+                async move {
+                    let rows = state.oidc.providers.list(&tenant).await?;
+                    let data: Vec<ProviderResponse> = rows.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                }
+            },
+        )
+        .requires(OIDC_READ)
+        .read_only(),
+        Tool::new(
+            "create_oidc_provider",
+            "Add a sign-in provider to this tenant; register the application at the provider \
+             first. The client secret is stored encrypted and never shown again.",
+            move |tenant: TenantContext, principal: Principal, input: ProviderRequest| {
+                let state = create.clone();
+                async move {
+                    let oidc = &state.oidc;
+                    let row = oidc
+                        .providers
+                        .create(&tenant, &principal, &oidc.client, input.into_new())
+                        .await?;
+                    Ok::<_, Error>(ProviderResponse::from(row))
+                }
+            },
+        )
+        .requires(OIDC_MANAGE),
+        Tool::new(
+            "update_oidc_provider",
+            "Change a sign-in provider of this tenant (name, issuer, client, redirect pages, \
+             allowed email domains, sign-up, default role, enabled).",
+            move |tenant: TenantContext, principal: Principal, input: UpdateOidcProviderInput| {
+                let state = update.clone();
+                async move {
+                    let oidc = &state.oidc;
+                    let changes = crate::oidc::provider::ProviderChanges {
+                        name: input.name,
+                        issuer: input.issuer,
+                        client_id: input.client_id,
+                        client_secret: input.client_secret,
+                        scopes: input.scopes,
+                        redirect_uris: input.redirect_uris,
+                        allowed_email_domains: input.allowed_email_domains,
+                        allow_signup: input.allow_signup,
+                        default_org_id: input.default_org_id,
+                        default_role_id: input.default_role_id,
+                        enabled: input.enabled,
+                    };
+                    let row = oidc
+                        .providers
+                        .update(&tenant, &principal, &oidc.client, input.id, changes)
+                        .await?;
+                    Ok::<_, Error>(ProviderResponse::from(row))
+                }
+            },
+        )
+        .requires(OIDC_MANAGE),
+        Tool::new(
+            "delete_oidc_provider",
+            "Remove a sign-in provider from this tenant, with every account link to it.",
+            move |tenant: TenantContext, principal: Principal, input: IdInput| {
+                let state = delete.clone();
+                async move {
+                    state.oidc.providers.delete(&tenant, &principal, input.id).await?;
+                    Ok::<_, Error>(serde_json::json!({ "deleted": input.id }))
+                }
+            },
+        )
+        .requires(OIDC_MANAGE)
+        .destructive(),
+        Tool::new(
+            "list_my_identities",
+            "List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.",
+            move |tenant: TenantContext, principal: Principal, _: NoInput| {
+                let state = mine.clone();
+                async move {
+                    let linked = state.oidc.identities(&tenant, principal.user_id()).await?;
+                    let data: Vec<IdentityResponse> = linked.into_iter().map(Into::into).collect();
+                    Ok::<_, Error>(autoxide_kernel::response::Data { data })
+                }
+            },
+        )
+        .for_any_signed_in()
+        .read_only(),
+    ]
 }
 
 /// Tool về lời mời (D-312): cùng service với `/api/v1/auth/invitations`.

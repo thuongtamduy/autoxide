@@ -85,6 +85,18 @@ pub(crate) const DELEGATIONS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const OIDC_READ: Permission = Permission::new(
+    "auth.oidc.read",
+    "See the sign-in providers of the tenant and how they are set up (never their client secrets).",
+);
+
+pub(crate) const OIDC_MANAGE: Permission = Permission::new(
+    "auth.oidc.manage",
+    "Add, change and remove sign-in providers of the tenant (Google, Microsoft, GitHub, OpenID \
+     Connect). Whoever holds this decides who can sign in.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
     vec![
@@ -102,5 +114,7 @@ pub(crate) fn all() -> Vec<Permission> {
         SUPPORT_ACCESS_READ,
         SUPPORT_ACCESS_REVOKE,
         SUPPORT_GRANT,
+        OIDC_READ,
+        OIDC_MANAGE,
     ]
 }

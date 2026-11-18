@@ -294,6 +294,11 @@ Khai event trong `src/events.rs` và trả từ `Module::events`. Dữ liệu d�
 `audit` ghi mọi event; module khác đăng ký nhận qua `Module::subscriptions` và phải chịu
 được việc nhận lại cùng một event.
 
+Event mà màn hình của client cần thấy ngay thì đẩy qua stream thời gian thực
+(`GET /api/v1/kernel/events/stream`): khai bằng `EventInfo::new(…).streamable(NOTES_READ)`,
+nêu permission đọc bản ghi qua REST — payload tới mọi người có permission đó trong khách.
+Event không khai thì không được stream.
+
 ### 7. Tool MCP
 
 `Module::tools` trả các `autoxide_kernel::mcp::Tool`. Mỗi tool nhận một kiểu đầu vào
@@ -541,6 +546,15 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
 - **Tìm và mã**: `context.finder_source(…)` (một `FinderSource`; `fields` và `scoped` khi nó hiểu
   `trường:giá trị` và `scope=`) và `context.code_resolver(…)` (số đơn, đường dẫn trang… cho
   `GET /api/v1/kernel/resolve`).
+- **Chỉ mục tìm kiếm** (bảng lớn, bước 40 P7): `context.search_documents(kind, source)` khai một loại
+  tài liệu tìm được (`SearchKind`: trường kèm trọng số, bộ lọc so bằng, permission để đọc) và một
+  `SearchSource` đọc tài liệu từ bảng của chính module. Trong transaction đổi bản ghi, gọi
+  `SearchIndex::enqueue(&transaction, &tenant, kind, &ids)` (lấy bằng
+  `context.require::<SearchIndex>()`); một job đồng bộ bộ máy sau commit, cả với bản ghi đã xoá. Tìm
+  bằng `SearchIndex::search` — kết quả giới hạn theo khách và theo nút của người gọi ngay trong bộ
+  máy. Bộ máy mặc định là database; module khác thêm bộ máy bằng `context.search_backend(name, …)`,
+  chọn bằng `AUTOXIDE_SEARCH_BACKEND`, không module nào phải sửa. `autoxide task kernel.reindex`
+  dựng lại chỉ mục.
 - **Số liệu và thiết lập**: `context.summary_metric(…)` (`MetricInfo` luôn kèm câu định nghĩa) và
   `context.setup_step(…)` (xong hay chưa tính từ dữ liệu).
 - **Hoạt động**: `EventInfo::activity(…)` cho event một câu đọc được; ghi chú và lịch sử của mọi bản

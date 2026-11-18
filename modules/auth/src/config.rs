@@ -50,6 +50,24 @@ pub(crate) const LOGIN_LINK: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const OIDC: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OIDC",
+    "Let people sign in with an outside provider — Google, Microsoft, GitHub or any OpenID \
+     Connect issuer — that each tenant adds with `POST /api/v1/auth/oidc-providers` (`true` or \
+     `false`). Two-step sign-in still applies. Off: providers can still be managed, but signing in \
+     with them answers `auth.oidc_disabled`.",
+)
+.with_default("false");
+
+pub(crate) const OIDC_ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS",
+    "Let sign-in providers live on private or local network addresses, and over plain `http://` \
+     (`true` or `false`). Tenant administrators choose the provider address, so leave it `false` \
+     in production: otherwise they can make the server call internal services. For tests and a \
+     provider on your own network only.",
+)
+.with_default("false");
+
 pub(crate) const LOGIN_LINK_URL: Setting = Setting::new(
     "AUTOXIDE_AUTH_LOGIN_LINK_URL",
     "Address of the interface's page that signs in with a link, with `{token}` where the token \
@@ -190,6 +208,9 @@ pub(crate) struct AuthConfig {
     pub login_link: bool,
     pub login_link_url: Option<String>,
     pub login_link_minutes: i64,
+    /// Đăng nhập qua nhà cung cấp danh tính (bước 40 P3) và cho nhà cung cấp ở mạng riêng.
+    pub oidc: bool,
+    pub oidc_allow_private_networks: bool,
     /// Lời mời (D-312): trang của giao diện, hạn (ngày).
     pub invitation_url: Option<String>,
     pub invitation_days: i64,
@@ -231,6 +252,8 @@ impl AuthConfig {
             _ => Err("must be `true` or `false`".to_owned()),
         });
         let login_link_url = reader.optional_with(&LOGIN_LINK_URL, token_url);
+        let oidc = reader.get_with(&OIDC, boolean);
+        let oidc_allow_private_networks = reader.get_with(&OIDC_ALLOW_PRIVATE_NETWORKS, boolean);
         let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
         let support_max_hours =
             reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
@@ -310,6 +333,8 @@ impl AuthConfig {
             login_link: login_link?,
             login_link_url: login_link_url?,
             login_link_minutes: login_link_minutes?,
+            oidc: oidc?,
+            oidc_allow_private_networks: oidc_allow_private_networks?,
             invitation_url: invitation_url?,
             invitation_days: invitation_days?,
             support_max_hours: support_max_hours?,
@@ -346,6 +371,14 @@ fn passkey_config(
     Ok(Some(PasskeyConfig { rp_id, origins }))
 }
 
+fn boolean(raw: &str) -> Result<bool, String> {
+    match raw {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err("must be `true` or `false`".to_owned()),
+    }
+}
+
 /// Địa chỉ http(s) có chỗ điền `{token}`.
 fn token_url(raw: &str) -> Result<String, String> {
     let url = raw.trim();
@@ -378,6 +411,7 @@ mod tests {
         assert_eq!(config.login_max_failures, 5);
         assert_eq!(config.login_lock, Duration::from_secs(15 * 60));
         assert!(!config.self_registration);
+        assert!(!config.oidc && !config.oidc_allow_private_networks);
         assert_eq!(config.totp_issuer, "Autoxide");
         assert_eq!(config.password_reset_url, None);
         assert!(read(&[("AUTOXIDE_AUTH_PASSWORD_RESET_URL", "https://app/reset")]).is_err());

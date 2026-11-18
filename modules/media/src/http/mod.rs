@@ -7,6 +7,7 @@ mod content;
 mod folders;
 mod items;
 mod tags;
+mod uploads;
 
 use std::sync::Arc;
 
@@ -29,11 +30,14 @@ pub(crate) use assist::AltSuggestionResponse;
 pub(crate) use folders::FolderResponse;
 pub(crate) use items::{DuplicateItem, ItemsQuery, UploadedResponse};
 pub(crate) use tags::TagResponse;
+pub(crate) use uploads::{StartMediaUploadRequest, present_uploaded};
 
 pub(crate) fn routes(service: Arc<MediaService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(items::list_items, items::upload_item))
         .routes(routes!(items::library_summary))
+        .routes(routes!(uploads::start_media_upload))
+        .routes(routes!(uploads::complete_media_upload))
         .routes(routes!(folders::list_folders, folders::create_folder))
         .routes(routes!(folders::get_folder, folders::update_folder, folders::delete_folder))
         .routes(routes!(tags::list_tags))

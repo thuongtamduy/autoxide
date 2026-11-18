@@ -192,7 +192,14 @@ impl Module for MediaModule {
                 ),
                 JobRegistration::new(
                     CLEAN_ORPHANS,
-                    Arc::new(CleanOrphans { service: service.clone(), databases }),
+                    Arc::new(CleanOrphans {
+                        service: service.clone(),
+                        databases: databases.clone(),
+                    }),
+                ),
+                JobRegistration::new(
+                    library::direct::PURGE_UPLOADS,
+                    Arc::new(library::direct::PurgeUploads { service: service.clone(), databases }),
                 ),
                 JobRegistration::new(MAKE_VARIANTS, Arc::new(Generator(service))),
             ],
@@ -206,6 +213,12 @@ impl Module for MediaModule {
             Schedule::new(PURGE_TRASH, PURGE_TRASH, day),
             // Một lần cho cả bản cài: job quét mọi nơi lưu, đối chiếu với database của đúng khách.
             Schedule::new(CLEAN_ORPHANS, CLEAN_ORPHANS, day).on_control_only(),
+            // Lượt tải thẳng bỏ dở (bước 40 P4): bảng ở database của từng khách.
+            Schedule::new(
+                library::direct::PURGE_UPLOADS,
+                library::direct::PURGE_UPLOADS,
+                Duration::from_secs(3600),
+            ),
         ]
     }
 
@@ -304,6 +317,7 @@ pub(crate) mod testing {
             image_widths: vec![100, 200],
             ai_send_private: send_private,
             alt_locales: vec!["en".to_owned(), "vi".to_owned()],
+            direct: crate::config::Direct::default(),
         };
         let service = MediaService::new(
             storage.clone(),

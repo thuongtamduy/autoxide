@@ -79,9 +79,10 @@ pub(crate) fn with_activity() -> Vec<EventInfo> {
         .map(|event| match event.name() {
             "content.entry_created" => event
                 .activity("{actor} created the draft “{title}”", crate::permissions::CONTENT_READ),
-            "content.entry_published" => {
-                event.activity("{actor} published “{title}”", crate::permissions::CONTENT_READ)
-            }
+            // Stream SSE (bước 40 P5): website / giao diện làm mới khi bài lên.
+            "content.entry_published" => event
+                .activity("{actor} published “{title}”", crate::permissions::CONTENT_READ)
+                .streamable(crate::permissions::CONTENT_READ),
             "content.entry_unpublished" => {
                 event.activity("{actor} took down “{title}”", crate::permissions::CONTENT_READ)
             }

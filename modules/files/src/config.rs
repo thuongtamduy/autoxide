@@ -65,6 +65,20 @@ pub(crate) const ALLOWED_TYPES: Setting = Setting::new(
 )
 .with_example("image/*,application/pdf,text/plain");
 
+pub(crate) const DIRECT_MAX_BYTES: Setting = Setting::new(
+    "AUTOXIDE_FILES_DIRECT_MAX_BYTES",
+    "Largest file that can be uploaded straight to S3 with `POST /api/v1/files/uploads`, in bytes \
+     (1 to 5368709120, the most one S3 PUT takes). Only used when files are stored on S3.",
+)
+.with_default("5368709120");
+
+pub(crate) const DIRECT_UPLOAD_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS",
+    "How long a link to upload straight to S3 stays valid, in seconds (60 to 3600). Uploads not \
+     completed within an hour after that are removed.",
+)
+.with_default("900");
+
 /// Nơi lưu file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Backend {
@@ -89,6 +103,20 @@ pub(crate) struct S3Config {
 pub(crate) struct FilesConfig {
     pub backend: Backend,
     pub limits: Limits,
+    pub direct: Direct,
+}
+
+/// Tải thẳng lên S3 (bước 40 P4).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Direct {
+    pub max_bytes: u64,
+    pub ttl: std::time::Duration,
+}
+
+impl Default for Direct {
+    fn default() -> Self {
+        Direct { max_bytes: 5 * 1024 * 1024 * 1024, ttl: std::time::Duration::from_secs(900) }
+    }
 }
 
 /// Giới hạn của file tải lên.
@@ -167,7 +195,14 @@ impl FilesConfig {
                 })
                 .collect::<Result<Vec<_>, _>>()
         });
+        let direct_max = reader.get_with(&DIRECT_MAX_BYTES, |raw| {
+            parse_in_range(raw, 1u64, autoxide_kernel::upload::MAX_SINGLE_PUT_BYTES)
+        });
+        let direct_seconds =
+            reader.get_with(&DIRECT_UPLOAD_SECONDS, |raw| parse_in_range(raw, 60u64, 3600));
         let (dir, bucket, prefix, region, endpoint) = (dir?, bucket?, prefix?, region?, endpoint?);
+        let direct =
+            Direct { max_bytes: direct_max?, ttl: std::time::Duration::from_secs(direct_seconds?) };
         let limits = Limits { max_bytes: max_bytes?, allowed_types: allowed_types? };
         let (access_key_id, secret_access_key) = (access_key_id?, secret_access_key?);
         let backend = match bucket {
@@ -181,7 +216,7 @@ impl FilesConfig {
                 secret_access_key,
             }),
         };
-        Ok(FilesConfig { backend, limits })
+        Ok(FilesConfig { backend, limits, direct })
     }
 }
 

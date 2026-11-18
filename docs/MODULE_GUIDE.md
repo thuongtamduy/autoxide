@@ -301,6 +301,12 @@ Declare events in `src/events.rs` and return them from `Module::events`. The pay
 `audit` module records every event; other modules subscribe through
 `Module::subscriptions` and must accept receiving the same event twice.
 
+An event a client screen should see at once can be pushed over the real-time stream
+(`GET /api/v1/kernel/events/stream`): declare it with
+`EventInfo::new(…).streamable(NOTES_READ)`, naming the permission that reads the record over
+REST — the payload goes to everyone with that permission in the tenant. Events are not
+streamed unless declared.
+
 ### 7. MCP tools
 
 `Module::tools` returns `autoxide_kernel::mcp::Tool`s. Each tool takes an input type
@@ -555,6 +561,15 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
 - **Search and codes**: `context.finder_source(…)` (a `FinderSource`; `fields` and `scoped` when
   it understands `field:value` and `scope=`) and `context.code_resolver(…)` (order numbers, page
   addresses… for `GET /api/v1/kernel/resolve`).
+- **Search index** (large tables, step 40 P7): `context.search_documents(kind, source)` declares a
+  searchable kind (`SearchKind`: fields with weights, equality filters, read permission) and a
+  `SearchSource` that loads documents from the module's own tables. In the transaction that changes
+  a record, call `SearchIndex::enqueue(&transaction, &tenant, kind, &ids)` (from
+  `context.require::<SearchIndex>()`); a job syncs the engine after commit, also for deleted
+  records. Search with `SearchIndex::search` — results are limited to the tenant and to the caller's
+  units inside the engine. The engine is the database by default; a module adds another with
+  `context.search_backend(name, …)`, chosen by `AUTOXIDE_SEARCH_BACKEND`, without changes to other
+  modules. `autoxide task kernel.reindex` rebuilds the index.
 - **Figures and setup**: `context.summary_metric(…)` (a `MetricInfo` always carries its
   definition) and `context.setup_step(…)` (done is computed from data).
 - **Activity**: `EventInfo::activity(…)` gives an event a readable sentence; notes and history of

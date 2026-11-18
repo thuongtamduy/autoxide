@@ -6,7 +6,10 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::storage::{ByteStream, Storage, StorageLocation, StorageOpener, StoredFile};
+use autoxide_kernel::storage::{
+    ByteStream, PresignedUpload, Storage, StorageLocation, StorageOpener, StoredFile,
+    UploadConstraints,
+};
 use bytes::Bytes;
 use futures_util::{StreamExt as _, TryStreamExt as _};
 
@@ -19,6 +22,7 @@ use futures_util::{StreamExt as _, TryStreamExt as _};
 pub struct MemoryStorage {
     files: Mutex<BTreeMap<String, Bytes>>,
     failing: AtomicBool,
+    presigning: AtomicBool,
 }
 
 impl MemoryStorage {
@@ -30,6 +34,18 @@ impl MemoryStorage {
     /// `true`: mọi `put` sau đó trả lỗi (nội dung không được lưu); `false`: chạy lại bình thường.
     pub fn fail_writes(&self, failing: bool) {
         self.failing.store(failing, Ordering::SeqCst);
+    }
+
+    /// `true`: cấp link tải thẳng giả (bước 40 P4) như S3 — `url` là `memory://<khoá thật>`; test
+    /// "PUT" bằng [`MemoryStorage::put_presigned`]. Mặc định `false`: như ổ đĩa, không cấp link.
+    pub fn presign(&self, presigning: bool) {
+        self.presigning.store(presigning, Ordering::SeqCst);
+    }
+
+    /// Ghi `content` như client PUT lên link `url` đã cấp.
+    pub fn put_presigned(&self, url: &str, content: impl Into<Bytes>) {
+        let key = url.strip_prefix("memory://").unwrap_or(url);
+        self.lock().insert(key.to_owned(), content.into());
     }
 
     /// Nội dung của `key`, nếu có.
@@ -72,6 +88,24 @@ impl Storage for MemoryStorage {
 
     async fn keys(&self) -> Result<Vec<String>, Error> {
         Ok(self.lock().keys().cloned().collect())
+    }
+
+    async fn presign_upload(
+        &self,
+        key: &str,
+        constraints: &UploadConstraints,
+        ttl: std::time::Duration,
+    ) -> Result<Option<PresignedUpload>, Error> {
+        if !self.presigning.load(Ordering::SeqCst) {
+            return Ok(None);
+        }
+        let headers = vec![
+            ("content-length".to_owned(), constraints.size.to_string()),
+            ("content-type".to_owned(), constraints.content_type.clone()),
+        ];
+        let ttl = chrono::Duration::from_std(ttl).map_err(Error::internal)?;
+        let expires_at = chrono::Utc::now() + ttl;
+        Ok(Some(PresignedUpload::new("PUT", format!("memory://{key}"), headers, expires_at)))
     }
 }
 

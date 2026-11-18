@@ -21,7 +21,8 @@ pub use contracts::{
     ai, einvoice, identity, mail, moderation, payment, privacy, push, resource, sms, storage, zns,
 };
 pub use data::{
-    database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, version,
+    database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, upload,
+    version,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{
@@ -29,7 +30,7 @@ pub use ops::{
     resolve, setup, summary, tags, task, telemetry, texts, usages, work,
 };
 pub use security::{
-    access, antispam, entitlement, idempotency, ip_hash, secret, throttle, tls, tokens,
+    access, antispam, entitlement, idempotency, ip_hash, net, secret, throttle, tls, tokens,
 };
 pub use values::{csv, decimal, email, money, public_url, template};
 

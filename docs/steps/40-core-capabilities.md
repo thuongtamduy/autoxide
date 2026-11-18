@@ -160,11 +160,11 @@ Thuộc module `auth` (thư mục `modules/auth/src/oidc/`). Luồng cho core ch
 giao diện riêng điều khiển):
 
 1. `GET /api/v1/auth/oidc/providers` (công khai, theo khách của request) → `[{id, slug, kind, name}]`.
-2. `POST /api/v1/auth/oidc/{slug}/start` `{redirect_uri, link?: false}` → `{authorization_url,
-   expires_in}`. Máy chủ sinh `state` (32 byte), `nonce`, PKCE `code_verifier` (S256); lưu bằng
+2. `POST /api/v1/auth/oidc/{slug}/start` `{redirect_uri}` → `{authorization_url,
+   expires_in}` (liên kết khi đã đăng nhập đi qua `/me/identities/{slug}/start`, không qua cờ `link` — D-380). Máy chủ sinh `state` (32 byte), `nonce`, PKCE `code_verifier` (S256); lưu bằng
    `OneTimeTokens` của kernel (bảng `auth_tokens` sẵn có, `purpose = "oidc_state"`, `subject` =
-   provider id, `data` = JSON `{nonce, verifier, redirect_uri, tenant_id, link_user_id}` **mã hoá** bằng
-   AEAD của bước 33), hạn 10 phút. `redirect_uri` phải nằm trong `redirect_uris` của provider.
+   provider id, `data` = JSON `{nonce, verifier, redirect_uri, link_user_id}` **mã hoá** bằng
+   AEAD của bước 33 — khách nằm trong dữ liệu đi kèm của AEAD và trong `state` dạng `link_token`), hạn 10 phút. `redirect_uri` phải nằm trong `redirect_uris` của provider.
 3. Giao diện chuyển trình duyệt tới `authorization_url`; nhà cung cấp quay về `redirect_uri` của giao
    diện với `code` + `state`.
 4. `POST /api/v1/auth/oidc/{slug}/callback` `{code, state}` → **cùng hình dạng** với
@@ -200,7 +200,8 @@ Liên kết tài khoản (theo câu của ROADMAP):
   KHÔNG gộp, lỗi `auth.oidc_link_required` (đăng nhập bằng cách cũ rồi liên kết ở
   `POST /api/v1/auth/me/identities/{slug}/start`) — chặn "chiếm tài khoản dựng sẵn".
 - Không khớp ai → tạo tài khoản mới chỉ khi provider bật `allow_signup` **và** đăng ký mở
-  (`AUTOXIDE_AUTH_SELF_REGISTRATION` hay chính sách khách của bước 34); provider có `default_org_id` +
+  (`AUTOXIDE_AUTH_SELF_REGISTRATION` cho nhân sự, `auth.customer_registration` cho người mua) — hoặc provider có
+  `default_role_id` (quản trị khách chủ động mở cửa, D-380); provider có `default_org_id` +
   `default_role_id` thì gán thành viên nút đó (đăng nhập theo tổ chức: chuỗi dùng Entra của mình cho
   nhân viên). Không thì `auth.oidc_signup_closed`.
 - MFA của Autoxide vẫn áp dụng: TOTP bật thì trả `mfa_required` qua `challenge::open` y như mật khẩu.
@@ -219,17 +220,18 @@ Tool MCP: `auth.list_oidc_providers` (read-only), `auth.create_oidc_provider`, `
 
 Bảng (migration mới của `auth`, phân loại theo bước 34 — provider của khách là bảng cấp khách):
 
-`auth_oidc_providers`: `id` uuid pk, `tenant_id` uuid, `slug` string(64), `kind` string(16), `name`
+`auth_oidc_provider` (tên số ít theo quy ước bảng của `auth`, D-380): `id` uuid pk, `tenant_id` uuid, `slug` string(64), `kind` string(16), `name`
 string(100), `issuer` string(255) null (github: null), `client_id` string(255), `client_secret` text
 (mã hoá AEAD + số phiên bản khoá của bước 33), `scopes` string(255) (mặc định `openid email profile`),
-`redirect_uris` text (JSON mảng chuỗi), `allowed_email_domains` text null, `allow_signup` bool,
+`redirect_uris` text (JSON mảng chuỗi), `allowed_email_domains` text null, `allow_signup` bool, `realm` string(16) (`staff` | `customer`, D-309 — sàn cho
+người mua đăng nhập Google),
 `default_org_id` uuid null, `default_role_id` uuid null, `enabled` bool, `created_at`, `updated_at`.
 Unique (`tenant_id`, `slug`).
 
-`auth_identities`: `id` uuid pk, `tenant_id` uuid, `user_id` uuid, `provider_id` uuid, `subject`
+`auth_identity`: `id` uuid pk, `tenant_id` uuid, `user_id` uuid, `provider_id` uuid, `subject`
 string(255), `email` string(320) null, `email_verified` bool, `created_at`, `last_login_at` null.
-Unique (`tenant_id`, `provider_id`, `subject`); index (`tenant_id`, `user_id`). Không foreign key xuyên
-module (cùng module thì được theo quy ước sẵn có của `auth`). Dữ liệu cá nhân: thêm vào bộ xuất
+Unique (`tenant_id`, `provider_id`, `subject`); index (`tenant_id`, `user_id`). Không foreign key (bảng
+cấp khách khoá `(tenant_id, id)`): xoá tài khoản / nhà cung cấp xoá liên kết trong cùng transaction. Dữ liệu cá nhân: thêm vào bộ xuất
 (`PersonalData`) và xoá cùng tài khoản (`auth.user_deleted`).
 
 Cấu hình: `AUTOXIDE_AUTH_OIDC` (`false` mặc định — tắt thì mọi endpoint OIDC trả `auth.oidc_disabled`
@@ -348,7 +350,8 @@ hay request/s giảm quá 10 % — ghi quyết định với số đo.
 
 ### Permission · Mã lỗi (bản dịch `locales/vi.json` của crate tương ứng)
 
-Permission mới: `auth.oidc.manage` ("Add, change and remove sign-in providers of the tenant").
+Permission mới: `auth.oidc.manage` ("Add, change and remove sign-in providers of the tenant") và `auth.oidc.read`
+(xem danh sách, cho tool read-only, D-380).
 
 | `code` | HTTP | Tiếng Việt |
 |---|---|---|
@@ -357,13 +360,14 @@ Permission mới: `auth.oidc.manage` ("Add, change and remove sign-in providers 
 | `auth.oidc_redirect_not_allowed` | 422 | "Địa chỉ quay về `{redirect_uri}` không có trong danh sách của nhà cung cấp này." |
 | `auth.oidc_state_invalid` | 400 | "Lượt đăng nhập đã hết hạn hoặc đã dùng. Hãy bắt đầu lại." |
 | `auth.oidc_token_invalid` | 401 | "Nhà cung cấp trả về thông tin đăng nhập không hợp lệ ({reason}). Hãy thử lại." |
-| `auth.oidc_provider_unavailable` | 502 | "Không liên lạc được với nhà cung cấp đăng nhập. Hãy thử lại sau." |
+| `auth.oidc_provider_unavailable` | 503 (D-380: `ErrorKind` không có 502) | "Không liên lạc được với nhà cung cấp đăng nhập. Hãy thử lại sau." |
 | `auth.oidc_email_unverified` | 403 | "Nhà cung cấp chưa xác minh email của bạn, nên không dùng được để đăng nhập." |
 | `auth.oidc_email_domain_not_allowed` | 403 | "Email thuộc tên miền `{domain}` không được đăng nhập bằng nhà cung cấp này." |
 | `auth.oidc_link_required` | 409 | "Đã có tài khoản với email này. Hãy đăng nhập bằng cách cũ rồi liên kết nhà cung cấp trong phần tài khoản." |
 | `auth.oidc_signup_closed` | 403 | "Chưa có tài khoản cho danh tính này và không được tự đăng ký." |
 | `auth.oidc_slug_taken` | 409 | "Đã có nhà cung cấp mang tên `{slug}`." |
 | `auth.identity_not_found` | 404 | "Bạn không có liên kết đăng nhập mang id `{id}`." |
+| `auth.identity_taken` | 409 | "Danh tính đăng nhập này đã liên kết với tài khoản khác. Hãy gỡ ở tài khoản đó trước." |
 | `auth.identity_last_method` | 409 | "Không gỡ được: đây là cách đăng nhập cuối cùng của bạn. Hãy đặt mật khẩu hoặc thêm passkey trước." |
 | `files.direct_upload_unavailable` | 409 | "Nơi lưu hiện tại không nhận tải thẳng. Hãy tải lên qua `POST /api/v1/files`." |
 | `files.upload_not_found` | 404 | "Không có lượt tải lên mang id `{id}`." |
@@ -513,26 +517,40 @@ Mọi test chạm database qua `TestDatabase::run` (SQLite và Postgres), qua RE
 nghìn dòng. Thêm trait để sàn có hàng triệu sản phẩm cắm bộ tìm chuyên dụng mà module không phải sửa:
 
 ```rust
-#[async_trait] pub trait SearchBackend: Send + Sync {
+#[async_trait] pub trait SearchBackend: Send + Sync {          // autoxide_kernel::search (D-381)
     async fn index(&self, tenant: &TenantContext, docs: &[SearchDoc]) -> Result<(), Error>;   // upsert
     async fn remove(&self, tenant: &TenantContext, kind: &str, ids: &[Uuid]) -> Result<(), Error>;
-    async fn query(&self, tenant: &TenantContext, q: &SearchQuery) -> Result<SearchHits, Error>;
+    async fn clear(&self, tenant: &TenantContext, kind: &str) -> Result<(), Error>;            // trước khi dựng lại
+    async fn query(&self, tenant: &TenantContext, kind: &SearchKind, request: &SearchRequest)
+        -> Result<SearchHits, Error>;                                                           // Page<SearchHit>
 }
 pub struct SearchDoc { pub kind: String, pub id: Uuid, pub org_id: OrgId, pub locale: String,
-    pub fields: BTreeMap<String, String> /* đã khai trọng số */, pub filters: BTreeMap<String, Value> }
+    pub fields: BTreeMap<String, String>, pub filters: BTreeMap<String, Value> }
+pub struct SearchRequest { pub kind: String, pub text: String, pub filters: BTreeMap<String, String>,
+    pub locale: Option<String>, pub scope: Option<OrgScope>, pub page: PageRequest }
 ```
 
-- **Mặc định `DatabaseSearch`** (trong kernel): bảng `kernel_search_docs` (một dòng mỗi tài liệu, cột
-  `exact_key` và `fold_key` như D-202, bộ lọc là cột có index), hai tầng đúng dấu / không dấu
-  (`fetch_page_tiers`) — chạy như nhau trên hai database, không cần dịch vụ ngoài.
+Tên `SearchRequest` (không `SearchQuery`: tên đó đã là truy vấn đã phân tích của tìm xuyên phân hệ bước 51,
+`autoxide_kernel::find`). Một truy vấn một loại; `OrgScope` (`subtrees`, `units`, `fence`) do `SearchIndex::search`
+dựng từ grant của người gọi cho permission của loại (D-381).
+
+- **Mặc định `DatabaseSearch`** (trong kernel): bảng `kernel_search_docs` (một dòng mỗi tài liệu, khoá
+  `(tenant_id, kind, id)`, cột `primary_exact` / `primary_fold` cho trường trọng số cao nhất và `exact_key` /
+  `fold_key` cho mọi trường như D-202) và `kernel_search_filters` (một dòng mỗi bộ lọc, index `(tenant_id, kind,
+  name, value)` — bộ lọc là cột có index mà không đổi schema theo module); bốn tầng (`fetch_page_tiers`): tiêu đề
+  đúng dấu, nội dung đúng dấu, tiêu đề không dấu, nội dung không dấu — chạy như nhau trên hai database.
 - **Bộ cắm ngoài** (Meilisearch, Typesense, OpenSearch) là module riêng làm khi có nhu cầu đo được, đăng ký
-  bằng `context.search_backend(…)`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định). Gọi mạng
-  ngoài transaction: module ghi tài liệu cần đánh chỉ mục vào outbox, job đồng bộ sang backend (chịu nhận lại).
-- Module khai loại tài liệu tìm được (`Module::search_documents` → loại, trường, trọng số, bộ lọc, quyền
-  đọc) — dùng chung cho tìm công khai (gợi ý tìm bước 41) và tìm xuyên phân hệ (P3 bước 51). Kết quả luôn lọc
-  theo khách và phạm vi nút **trong** backend (bộ lọc `org_id`), không lọc sau.
-- `autoxide task kernel.reindex [--kind]` dựng lại chỉ mục. Đo trên bộ dữ liệu lớn của bước 39 trước khi
-  khuyên dùng backend ngoài; ghi số đo vào `docs/BENCHMARKS.md`.
+  bằng `context.search_backend(name, …)`; chọn bằng `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định). Gọi mạng
+  ngoài transaction: trong transaction của thay đổi, module gọi `SearchIndex::enqueue` (xếp job
+  `kernel.search_sync` mang loại + ID, cùng transaction như outbox); job đọc lại tài liệu qua
+  `SearchSource::load` — còn thì `index`, mất thì `remove` — chịu nhận lại.
+- Module khai loại tài liệu tìm được bằng `context.search_documents(SearchKind, Arc<dyn SearchSource>)` (loại,
+  trường + trọng số, bộ lọc, permission đọc; nguồn `load` / `scan` từ bảng của module) — như `finder_source`, vì
+  nguồn cần trạng thái có sau `start` (D-381, thay `Module::search_documents`). Tìm xuyên phân hệ bước 51 và ô tìm
+  của module giữ nguyên trên bảng của module (không phá API); module chuyển sang chỉ mục khi bảng lớn (catalog
+  bước 41). Kết quả luôn lọc theo khách và phạm vi nút **trong** backend (bộ lọc `org_id`), không lọc sau.
+- `autoxide task kernel.reindex [kind=…] [tenant=…]` dựng lại chỉ mục. Đo trên bộ dữ liệu lớn của bước 39 trước
+  khi khuyên dùng backend ngoài — khi module đầu tiên dùng chỉ mục (D-381); ghi số đo vào `docs/BENCHMARKS.md`.
 - Test (cả hai database): `tim_khong_dau_dung_dau_xep_truoc`, `ket_qua_khong_lo_sang_khach_khac`,
   `ket_qua_loc_theo_pham_vi_nut`, `xoa_ban_ghi_thi_bien_khoi_ket_qua`, `dong_bo_chiu_nhan_lai_event`,
   `backend_gia_thay_duoc_khong_sua_module`.

@@ -1,6 +1,6 @@
 //! Phần dữ liệu cá nhân module `auth` giữ về một người dùng, cho bản xuất dữ liệu
 //! (`GET /api/v1/auth/me/export`). Không có secret: không mật khẩu, hash, token, secret
-//! TOTP hay khoá công khai của passkey.
+//! TOTP hay khoá công khai của passkey. Có liên kết đăng nhập ngoài (subject, email).
 
 use std::future::Future;
 use std::sync::Arc;
@@ -49,6 +49,7 @@ impl PersonalData for AuthPersonalData {
         })
         .await?;
         let mfa = self.mfa.status(tenant, user_id).await?;
+        let identities = crate::oidc::identity::for_user(tenant, user_id).await?;
         Ok(json!({
             "profile": {
                 "id": user.id,
@@ -81,6 +82,16 @@ impl PersonalData for AuthPersonalData {
                 "name": passkey.name,
                 "created_at": passkey.created_at,
                 "last_used_at": passkey.last_used_at,
+            })).collect::<Vec<_>>(),
+            // Danh tính ở nhà cung cấp ngoài (bước 40 P3): subject, email lúc đăng nhập gần nhất.
+            "identities": identities.iter().map(|identity| json!({
+                "id": identity.id,
+                "provider_id": identity.provider_id,
+                "subject": identity.subject,
+                "email": identity.email,
+                "email_verified": identity.email_verified,
+                "created_at": identity.created_at,
+                "last_login_at": identity.last_login_at,
             })).collect::<Vec<_>>(),
             "two_step_sign_in": {
                 "totp_enabled": mfa.totp_enabled,

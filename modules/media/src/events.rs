@@ -67,9 +67,10 @@ pub(crate) fn with_activity() -> Vec<EventInfo> {
     all()
         .into_iter()
         .map(|event| match event.name() {
-            "media.item_uploaded" => {
-                event.activity("{actor} uploaded “{name}”", crate::permissions::MEDIA_READ)
-            }
+            // Stream SSE (bước 40 P5): thư viện media cập nhật ngay.
+            "media.item_uploaded" => event
+                .activity("{actor} uploaded “{name}”", crate::permissions::MEDIA_READ)
+                .streamable(crate::permissions::MEDIA_READ),
             "media.item_trashed" => event
                 .activity("{actor} moved “{name}” to the trash", crate::permissions::MEDIA_READ),
             _ => event,

@@ -258,6 +258,18 @@ impl SessionService {
         user_id: Uuid,
         user_agent: Option<&str>,
     ) -> Result<LoginOutcome, Error> {
+        self.login_verified(tenant, user_id, "email_link", user_agent).await
+    }
+
+    /// Người dùng `user_id` vừa chứng minh qua kênh `method` (`email_link`, `oidc`): bật MFA thì
+    /// vẫn cần mã như `/login`, không thì mở phiên. Tài khoản bị khoá thì từ chối.
+    pub(crate) async fn login_verified(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        method: &str,
+        user_agent: Option<&str>,
+    ) -> Result<LoginOutcome, Error> {
         let user = self.users.get(tenant, user_id).await?.ok_or_else(token::invalid_token)?;
         if !user.is_active() {
             return Err(crate::user::user_disabled());
@@ -270,8 +282,7 @@ impl SessionService {
                 expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
             });
         }
-        let tokens =
-            self.start_session(tenant, user.id, "email_link", user_agent, Proof::Active).await?;
+        let tokens = self.start_session(tenant, user.id, method, user_agent, Proof::Active).await?;
         Ok(LoginOutcome::Tokens(tokens))
     }
 

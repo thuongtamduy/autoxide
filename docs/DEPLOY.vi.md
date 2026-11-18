@@ -482,7 +482,12 @@ Mail mang link dùng một lần tới `AUTOXIDE_AUTH_INVITATION_URL` (trang c�
 không đặt thì mail chứa token), sống `AUTOXIDE_AUTH_INVITATION_DAYS` ngày (7). Chấp nhận thì tài
 khoản được tạo (hay, khi email đã có tài khoản, role được thêm sau khi người đó đăng nhập). **Đăng
 nhập bằng link** (không mật khẩu) tắt mặc định; bật bằng `AUTOXIDE_AUTH_LOGIN_LINK=true` và đặt
-`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. Cả hai cần mail chạy được
+`AUTOXIDE_AUTH_LOGIN_LINK_URL` là trang của giao diện. **Đăng nhập bằng Google, Microsoft, GitHub
+hay OpenID Connect** tắt mặc định; bật bằng `AUTOXIDE_AUTH_OIDC=true`. Mỗi khách đăng ký ứng dụng ở
+nhà cung cấp rồi thêm bằng `POST /api/v1/auth/oidc-providers` ([`docs/guides/oidc.vi.md`](guides/oidc.vi.md));
+client secret lưu mã hoá bằng `AUTOXIDE_SECRET_KEY`. Máy chủ chỉ gọi nhà cung cấp ở địa chỉ public;
+giữ `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=false` khi chạy thật, và cho máy chủ gọi ra ngoài qua
+HTTPS (cổng 443). Link và lời mời cần mail chạy được
 (`AUTOXIDE_MAIL_SMTP_URL`) và worker đang chạy. Cây tổ chức của một khách sâu tối đa
 `AUTOXIDE_ORGANIZATIONS_MAX_DEPTH` cấp (mặc định 8). Nhập danh mục đơn vị hành chính một lần để kiểm
 địa chỉ: `autoxide task address.import` ([`docs/ADDRESS.vi.md`](ADDRESS.vi.md)).
@@ -624,6 +629,21 @@ Mặc định giới hạn request đếm theo từng tiến trình: với N má
 `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database`: mọi máy chủ đếm trong database, lấy lượt theo lô nhỏ
 (một phần tư `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), nên mỗi phút một key được vượt giới hạn
 nhiều nhất một lô cho mỗi máy chủ. Giới hạn theo địa chỉ vẫn đếm theo từng tiến trình.
+
+## Tải thẳng lên S3
+
+Khi file nằm trên S3, client tải được file lớn thẳng lên bucket (`POST /api/v1/files/uploads`,
+hướng dẫn: [`docs/guides/direct-uploads.vi.md`](guides/direct-uploads.vi.md)). Trình duyệt cần
+bucket cho phép (CORS). Ví dụ với Amazon S3:
+
+```json
+[{"AllowedOrigins": ["https://admin.example.com"], "AllowedMethods": ["PUT"],
+  "AllowedHeaders": ["content-type", "x-amz-checksum-sha256"], "MaxAgeSeconds": 3600}]
+```
+
+Máy chủ kiểm mọi lượt được xác nhận bằng cách đọc lại file (cỡ và SHA-256), vì không phải dịch
+vụ tương thích S3 nào cũng kiểm checksum đã ký; tăng `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` nếu
+cho phép file rất lớn. Lượt bỏ dở bị một job chạy mỗi giờ xoá.
 
 ### Cập nhật không làm rơi request
 

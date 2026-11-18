@@ -52,12 +52,12 @@ pub(crate) struct Uploaded {
 }
 
 /// Nội dung đã nhận xong và đã kiểm.
-struct Received {
-    content_type: String,
-    size: i64,
-    sha256: String,
-    width: Option<i32>,
-    height: Option<i32>,
+pub(crate) struct Received {
+    pub content_type: String,
+    pub size: i64,
+    pub sha256: String,
+    pub width: Option<i32>,
+    pub height: Option<i32>,
 }
 
 /// Trạng thái của luồng đang nhận, chung giữa luồng và bên đọc kết quả.
@@ -183,6 +183,45 @@ impl MediaService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
+        ids: (Uuid, Uuid),
+        checked: NewUpload,
+        received: Received,
+    ) -> Result<Item, Error> {
+        let transaction = tenant.database().begin_write().await?;
+        let item = self.insert_new(&transaction, tenant, principal, ids, checked, received).await?;
+        transaction.commit().await?;
+        Ok(item)
+    }
+
+    /// Như [`save_new`](Self::save_new), cho lượt tải thẳng `ids.0` (bước 40 P4): trong cùng
+    /// transaction khoá dòng lượt và đánh dấu xong. `None`: lệnh xác nhận khác vừa xong trước.
+    pub(crate) async fn save_direct(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        ids: (Uuid, Uuid),
+        checked: NewUpload,
+        received: Received,
+    ) -> Result<Option<Item>, Error> {
+        use autoxide_kernel::upload::UploadStatus;
+        let transaction = tenant.database().begin_write().await?;
+        let locked = self.uploads.lock(&transaction, tenant, ids.0).await?;
+        if !locked.is_some_and(|upload| upload.status == UploadStatus::Pending) {
+            transaction.rollback().await?;
+            return Ok(None);
+        }
+        let item = self.insert_new(&transaction, tenant, principal, ids, checked, received).await?;
+        self.uploads.complete(&transaction, tenant, ids.0).await?;
+        transaction.commit().await?;
+        Ok(Some(item))
+    }
+
+    /// Dòng item mới, nhãn, việc tạo ảnh thu nhỏ và event, trong `transaction` của bên gọi.
+    async fn insert_new(
+        &self,
+        transaction: &sea_orm::DatabaseTransaction,
+        tenant: &TenantContext,
+        principal: &Principal,
         (id, version_id): (Uuid, Uuid),
         checked: NewUpload,
         received: Received,
@@ -192,11 +231,10 @@ impl MediaService {
         let org = org_id.map_or(root_of(tenant.id()), OrgId::from_uuid);
         let now = now();
         let folder = stored_folder(folder_id);
-        let transaction = tenant.database().begin_write().await?;
         // Nút do người tải nêu (hay nút mặc định): ngoài phạm vi → 403; nút đang khoá → `org_frozen`.
         let at = OrgTarget::new(org, Some(principal.user_id()));
-        principal.require_write_at(&transaction, &MEDIA_WRITE, at).await?;
-        if !touch_folder(&transaction, tenant, folder).await? {
+        principal.require_write_at(transaction, &MEDIA_WRITE, at).await?;
+        if !touch_folder(transaction, tenant, folder).await? {
             // Thư mục vừa bị xoá giữa lúc kiểm và lúc ghi.
             return Err(folder_gone("folder_id"));
         }
@@ -224,19 +262,18 @@ impl MediaService {
             updated_at: Set(now),
             trashed_at: Set(None),
         }
-        .insert(&transaction)
+        .insert(transaction)
         .await?;
         let tags = if tags.is_empty() {
             Vec::new()
         } else {
-            crate::library::tags::set_item_tags(&transaction, tenant, id, &tags).await?
+            crate::library::tags::set_item_tags(transaction, tenant, id, &tags).await?
         };
-        self.enqueue_variants(&transaction, tenant, &item).await?;
+        self.enqueue_variants(transaction, tenant, &item).await?;
         let after = crate::service::with_tags(snapshot(&item), &tags);
         let event = events::ItemUploaded(Change { before: None, after: Some(after) });
         let actor = Actor::from(principal);
-        self.outbox.record(&transaction, tenant, actor, events::item_subject(id), &event).await?;
-        transaction.commit().await?;
+        self.outbox.record(transaction, tenant, actor, events::item_subject(id), &event).await?;
         Ok(item)
     }
 
@@ -309,10 +346,47 @@ impl MediaService {
         declared: Option<String>,
         content: ByteStream,
     ) -> Result<Received, Error> {
+        let (checked, intake) =
+            self.checked(declared.clone(), content, self.config.limits.max_bytes);
+        self.store(tenant).put(key, checked).await?;
+        let finished = self.finished(&intake, declared.as_deref());
+        if finished.is_err() {
+            self.discard(tenant, key).await;
+        }
+        finished
+    }
+
+    /// Đọc lại nội dung đã có ở `key` (tải thẳng, bước 40 P4) qua cùng bộ kiểm như khi tải qua
+    /// máy chủ: loại thật, SVG chạy được, kích thước ảnh, cỡ, SHA-256. `None`: chưa có nội dung.
+    /// Không xoá gì — bên gọi quyết.
+    pub(crate) async fn inspect_stored(
+        &self,
+        tenant: &TenantContext,
+        key: &str,
+        declared: Option<String>,
+        max: u64,
+    ) -> Result<Option<Received>, Error> {
+        use futures_util::TryStreamExt as _;
+        let Some(file) = self.store(tenant).get(key).await? else {
+            return Ok(None);
+        };
+        let (checked, intake) = self.checked(declared.clone(), file.content, max);
+        checked.try_for_each(|_| std::future::ready(Ok(()))).await?;
+        self.finished(&intake, declared.as_deref()).map(Some)
+    }
+
+    /// Luồng `content` qua bộ kiểm (đếm tới `max`, băm, giữ phần đầu, nhận loại, quét SVG), và
+    /// trạng thái để đọc kết quả sau khi luồng chạy hết.
+    fn checked(
+        &self,
+        declared: Option<String>,
+        content: ByteStream,
+        max: u64,
+    ) -> (ByteStream, Arc<Mutex<Intake>>) {
         let limits = self.config.limits.clone();
         let intake = Arc::new(Mutex::new(Intake::default()));
         let state = intake.clone();
-        let (max, expected_type) = (limits.max_bytes, declared.clone());
+        let expected_type = declared;
         let checked: ByteStream = content
             .map(move |chunk| {
                 let chunk = chunk?;
@@ -339,21 +413,22 @@ impl MediaService {
                 Ok(chunk)
             })
             .boxed();
-        self.store(tenant).put(key, checked).await?;
+        (checked, intake)
+    }
 
-        let finished = {
-            let mut state = intake.lock().map_err(|_| Error::internal("media intake lock"))?;
-            let state = std::mem::take(&mut *state);
-            finish(state, declared.as_deref(), &self.config.limits)
-        };
-        if finished.is_err() {
-            self.discard(tenant, key).await;
-        }
-        finished
+    /// Kết quả của bộ kiểm sau khi luồng chạy hết.
+    fn finished(
+        &self,
+        intake: &Arc<Mutex<Intake>>,
+        declared: Option<&str>,
+    ) -> Result<Received, Error> {
+        let mut state = intake.lock().map_err(|_| Error::internal("media intake lock"))?;
+        let state = std::mem::take(&mut *state);
+        finish(state, declared, &self.config.limits)
     }
 
     /// Xoá nội dung ở `key`; hỏng thì chỉ ghi log (job dọn mồ côi xoá sau).
-    async fn discard(&self, tenant: &TenantContext, key: &str) {
+    pub(crate) async fn discard(&self, tenant: &TenantContext, key: &str) {
         if let Err(error) = self.store(tenant).delete(key).await {
             tracing::warn!(key, error = %error, "cannot remove unused media content");
         }
@@ -402,7 +477,7 @@ fn finish(state: Intake, declared: Option<&str>, limits: &Limits) -> Result<Rece
 /// Loại client khai (header `Content-Type`), đã chuẩn hoá và đã kiểm là được phép —
 /// trước khi đọc nội dung. `None`: không khai (hay `application/octet-stream`), máy chủ
 /// tự nhận loại.
-fn declared_type(raw: Option<&str>, limits: &Limits) -> Result<Option<String>, Error> {
+pub(crate) fn declared_type(raw: Option<&str>, limits: &Limits) -> Result<Option<String>, Error> {
     let Some(raw) = raw else {
         return Ok(None);
     };

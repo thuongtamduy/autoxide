@@ -123,9 +123,15 @@ where
     // phục vụ thêm `drain` để bộ cân bằng tải kịp chuyển request sang tiến trình khác. Hết khoảng
     // đó future này mới xong, và `http::serve` mới bắt đầu tắt (đếm `shutdown_grace` từ lúc ấy).
     let drain = config.http.drain;
+    // Stream event (SSE) không tự kết thúc: đóng chúng ngay khi bắt đầu tắt, client nối lại sang
+    // máy chủ khác bằng `Last-Event-ID` (bước 40 P5).
+    let streams = modules.api::<autoxide_kernel::event::StreamHub>();
     let shutdown = async move {
         shutdown.await;
         draining.start();
+        if let Some(streams) = &streams {
+            streams.close();
+        }
         if !drain.is_zero() {
             tracing::info!(drain_seconds = drain.as_secs(), "shutting down: draining");
             tokio::time::sleep(drain).await;
@@ -230,7 +236,7 @@ mod tests {
 
             assert_eq!(
                 error,
-                "35 migrations have not been applied to the database: kernel/m0001_create_secrets, \
+                "36 migrations have not been applied to the database: kernel/m0001_create_secrets, \
                  kernel/m0002_create_user_flags, kernel/m0003_create_tenancy, \
                  kernel/m0004_tenancy_user_flags, kernel/m0005_create_tenant_settings, \
                  kernel/m0006_create_events, kernel/m0007_add_event_actor, \
@@ -252,7 +258,8 @@ mod tests {
                  kernel/m0030_create_pins, \
                  kernel/m0031_create_request_log, \
                  kernel/m0032_create_throttle, \
-                 kernel/m0033_tenancy_throttle, notes/m0001_create_note; run `autoxide migrate up` first"
+                 kernel/m0033_tenancy_throttle, \
+                 kernel/m0034_create_search_docs, notes/m0001_create_note; run `autoxide migrate up` first"
             );
         })
         .await

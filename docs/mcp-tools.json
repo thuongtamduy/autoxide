@@ -575,6 +575,132 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Add a sign-in provider to this tenant; register the application at the provider first. The client secret is stored encrypted and never shown again.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new sign-in provider.",
+        "properties": {
+          "allow_signup": {
+            "description": "Let someone without an account get one by signing in (still needs registration open, or\n`default_role_id`). Default `false`.",
+            "type": "boolean"
+          },
+          "allowed_email_domains": {
+            "description": "Only emails at these domains may sign in; omit for any.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "client_id": {
+            "description": "The client (application) id registered at the provider.",
+            "type": "string"
+          },
+          "client_secret": {
+            "description": "The client secret registered at the provider; write-only. Required except for `oidc`\npublic clients.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_org_id": {
+            "description": "Unit where new accounts get `default_role_id`; omit for the root unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_role_id": {
+            "description": "Role new accounts get (staff only). You must hold every permission of it.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "description": "Default `true`.",
+            "type": "boolean"
+          },
+          "issuer": {
+            "description": "`oidc`: the issuer (required). `microsoft`: omit for any work or school account\n(`https://login.microsoftonline.com/organizations/v2.0`) or give\n`https://login.microsoftonline.com/<tenant id>/v2.0`. `github`: omit for github.com, or the\naddress of a GitHub Enterprise Server. `google`: omit.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`google`, `microsoft`, `github` or `oidc`.",
+            "example": "google",
+            "type": "string"
+          },
+          "name": {
+            "description": "Label for the \"Sign in with …\" button, 1 to 100 characters.",
+            "example": "Google",
+            "type": "string"
+          },
+          "realm": {
+            "allOf": [
+              {
+                "description": "The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of\none tenant's shop, without permissions).",
+                "enum": [
+                  "staff",
+                  "customer"
+                ],
+                "type": "string"
+              },
+              {
+                "description": "`staff` (default) or `customer`.",
+                "type": "object"
+              }
+            ]
+          },
+          "redirect_uris": {
+            "description": "Pages of the interface the provider may send the browser back to (1 to 20, exact match).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scopes": {
+            "description": "Space-separated scopes; default `openid email profile` (`read:user user:email` for GitHub).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "slug": {
+            "description": "Unique in the tenant: lowercase letters, digits and `-`, starting with a letter.",
+            "example": "google",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "kind",
+          "name",
+          "client_id",
+          "redirect_uris"
+        ],
+        "type": "object"
+      },
+      "name": "auth.create_oidc_provider",
+      "output_schema": null,
+      "permissions": [
+        "auth.oidc.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a role that grants the listed permissions (see `list_permissions`).",
       "input_schema": {
         "description": "The full content of a role.",
@@ -641,6 +767,36 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Remove a sign-in provider from this tenant, with every account link to it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A role or user to act on.",
+        "properties": {
+          "id": {
+            "description": "The id.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.delete_oidc_provider",
+      "output_schema": null,
+      "permissions": [
+        "auth.oidc.manage"
       ]
     },
     {
@@ -907,6 +1063,44 @@
       "output_schema": null,
       "permissions": [
         "auth.users.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the outside sign-ins (Google, Microsoft, GitHub…) linked to your own account.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.list_my_identities",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the sign-in providers (Google, Microsoft, GitHub, OpenID Connect) of this tenant, with disabled ones; client secrets are never shown.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "auth.list_oidc_providers",
+      "output_schema": null,
+      "permissions": [
+        "auth.oidc.read"
       ]
     },
     {
@@ -1268,6 +1462,115 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change a sign-in provider of this tenant (name, issuer, client, redirect pages, allowed email domains, sign-up, default role, enabled).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a sign-in provider; fields left out stay as they are, `null` clears.",
+        "properties": {
+          "allow_signup": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "allowed_email_domains": {
+            "description": "Only emails at these domains may sign in; `null`: any.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "client_secret": {
+            "description": "A new client secret (write-only).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "default_role_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the provider.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "issuer": {
+            "description": "Issuer address; `null` resets it to the default of the kind.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "redirect_uris": {
+            "description": "Pages of the interface the provider may send the browser back to (replaces the list).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "scopes": {
+            "description": "Space-separated scopes.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.update_oidc_provider",
+      "output_schema": null,
+      "permissions": [
+        "auth.oidc.manage"
       ]
     },
     {
@@ -3348,6 +3651,86 @@
       "permissions": [
         "content.write",
         "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Complete an upload started with `files.create_upload` after sending the file: the server checks its size and SHA-256 and creates the file (a mismatching file is removed). Calling it again returns the same file.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An upload straight to storage to complete.",
+        "properties": {
+          "id": {
+            "description": "Id of the upload, from `files.create_upload`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "files.confirm_upload",
+      "output_schema": null,
+      "permissions": [
+        "files.upload",
+        "files.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Start uploading a large file straight to storage (S3): give its name, type, exact size and SHA-256 (hex); you get a signed link. Send the file there yourself with the given method and headers, then call `files.confirm_upload`. On disk storage this answers `files.direct_upload_unavailable`: use `files.upload_file` instead.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A file to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "Media type of the file; the upload link only accepts this `Content-Type`.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "video.mp4",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits; checked when you complete the upload.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes; the link only accepts this size.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "name": "files.create_upload",
+      "output_schema": null,
+      "permissions": [
+        "files.upload"
       ]
     },
     {
@@ -5856,6 +6239,108 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Complete an upload started with `media.create_upload` after sending the file: the server checks its real type, size and SHA-256 and creates the item (a failing file is removed). Calling it again returns the same item.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the media item.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "media.confirm_upload",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Start uploading a large media item straight to storage (S3): give its name, real type, exact size and SHA-256 (hex), and optionally folder, tags and unit; you get a signed link. Send the file there yourself with the given method and headers, then call `media.confirm_upload`. On disk storage this answers `media.direct_upload_unavailable`: use `media.upload` instead.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A media item to upload straight to storage.",
+        "properties": {
+          "content_type": {
+            "description": "The real media type of the file; the upload link only accepts this `Content-Type`, and the\ncontent is checked against it when you complete the upload.",
+            "example": "video/mp4",
+            "type": "string"
+          },
+          "folder_id": {
+            "description": "Folder to put the item in. Omit for the root.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "File name, 1 to 255 characters, without `/` or `\\`.",
+            "example": "launch-video.mp4",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The organization unit that owns the item; you need `media.write` there. Omit when you work\nin one unit only (or for the whole tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, as 64 hex digits.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Exact size in bytes.",
+            "example": 734003200,
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "tags": {
+            "description": "Tags for the item (each 1 to 50 characters, at most 20).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "content_type",
+          "size",
+          "sha256"
+        ],
+        "type": "object"
+      },
+      "name": "media.create_upload",
+      "output_schema": null,
+      "permissions": [
+        "media.write"
       ]
     },
     {

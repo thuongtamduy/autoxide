@@ -9250,7 +9250,142 @@ liệu cá nhân.
    trong ứng dụng** (`notifications.job_finished`, `notifications.mentioned`, giao dịch), vì là việc vận hành hằng ngày — email
    cho mỗi bản xuất là thừa. `dedupe_key` theo ID event (và người được nhắc), nên event giao lại không tạo tin thứ hai.
 
-## D-378 · Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18 — agent quyết
+## D-378 · Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18 — agent quyết
+
+1. **Khác "realtime theo bảng"** (TrailBase, PocketBase — `docs/research/frameworks.md` đã không mượn): realtime theo bảng đẩy
+   mọi thay đổi dòng, nên lộ cấu trúc bảng (hợp đồng mới không ai thiết kế), bỏ qua luật service layer (quyền đọc tính lại ở
+   tầng dòng, khác REST) và phá luật "module sở hữu bảng". Ở đây chỉ stream **event module chủ động khai**
+   (`EventInfo::streamable(permission)`, mặc định không) — payload là hợp đồng event đã có (audit, webhook dùng chung), quyền là
+   permission đọc bản ghi như REST. Ban đầu: `content.entry_published` (`content.read`), `comments.comment_created`
+   (`comments.moderate`, payload không có chữ / tên / email), `media.item_uploaded` (`media.read`). `Modules` từ chối event
+   stream với permission không ai khai; sổ module ghi `stream_permission`.
+2. **Đọc từ bảng outbox, đúng khi nhiều máy chủ:** mỗi tiến trình một `StreamHub` (kernel công bố, `serve` đóng khi tắt), một
+   vòng hỏi chung mỗi `AUTOXIDE_EVENTS_STREAM_POLL_MS` (1000) cho mọi kết nối, chỉ hỏi database (placement) đang có người nghe,
+   phát qua `tokio::sync::broadcast`. Mỗi lượt hỏi theo khoá chính `id >= UUIDv7 nhỏ nhất của (lượt trước − GRACE)` — UUIDv7 xếp
+   theo thời điểm trên cả hai database và có index sẵn, không cần migration thêm index cho mọi module — **lùi `GRACE` = 5 s**
+   rồi khử trùng theo ID đã phát: ID gán lúc ghi, transaction commit muộn mang thời điểm sớm hơn event đã phát (test
+   `event_commit_muon_van_toi`). Không dùng LISTEN/NOTIFY: chỉ Postgres có, hỏi vòng đủ rẻ (một câu theo khoá chính mỗi
+   database, module) và chạy giống nhau trên hai database; nếu sau này đo thấy cần thì thêm sau một trait với nhánh hỏi vòng
+   làm mặc định. Hỏi qua kết nối ghi (dòng vừa commit chưa tới read replica vẫn thấy).
+3. **Nối lại:** `Last-Event-ID` (header, hay `last_event_id`) → đọc bù thẳng từ database của khách từ `thời điểm(id) − GRACE`,
+   bỏ chính `id` đó; giao **ít nhất một lần**, client khử trùng theo `id` (ghi trong OpenAPI). Kết nối tụt hậu (`Lagged`) đọc bù
+   cùng cách. ID cũ hơn 7 ngày (bộ phát dọn event đã giao sau 7 ngày) hay bù quá 10 000 event → `event: reset`.
+4. **Quyền:** cùng khách; permission của event; độ sâu: `tenant` không hàng rào nút → mọi event của khách, hẹp hơn → **chỉ event
+   do chính người gọi gây ra** (lệch đặc tả "lọc theo nhánh"): bảng `<module>_events` chưa có `org_id`, thêm cột cần migration
+   ở mọi module có event và `Outbox::record` nhận nút — việc lớn hơn bước này; cách hiện tại không bao giờ lộ bản ghi của nhánh
+   khác. Khi event mang nút thì thêm nhánh `Unit` / `Subtree` vào `Reach`. Quyền xét lúc mở; kết nối sống tối đa 30 phút rồi
+   đóng để quyền bị thu hồi có hiệu lực.
+5. **Giới hạn mỗi tiến trình:** `…_MAX_PER_USER` (5), `…_MAX_PER_TENANT` (200), `…_MAX_CONNECTIONS` (1000) → 429
+   `kernel.stream_too_many`. Tắt mặc định (`AUTOXIDE_EVENTS_STREAM=false` → 404 `kernel.stream_disabled`). Lớp timeout chung
+   không cắt stream (chỉ chờ header); graceful shutdown gọi `StreamHub::close` ngay khi bắt đầu rút. `X-Accel-Buffering: no`,
+   `: ping` mỗi 15 s, `retry: 3000`.
+6. **Không có tool MCP tương ứng** (lệch đặc tả `kernel.list_events`): MCP không giữ stream; agent cần "có gì mới" dùng webhook
+   hay đọc danh sách của module. Thêm khi có agent cần thật.
+
+## D-379 · Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18 — agent quyết
+
+1. **Một trait, hai hàm mới có mặc định (D-038):** `Storage::presign_upload(key, UploadConstraints, ttl) ->
+   Option<PresignedUpload>` (mặc định `None`: ổ đĩa, client tải qua máy chủ như cũ) và `Storage::head(key)` (mặc định qua
+   `get`). `TenantStorage` thêm tiền tố khách như mọi thao tác khác (D-259); `ObjectStorage` của `files` cài cho S3 bằng
+   `object_store::signer::Signer::signed_url_opts` (0.14.2). Không thêm thư viện.
+2. **Ký `content-type` và `x-amz-checksum-sha256`, không ký `content-length`** (lệch đặc tả): `object_store` giữ
+   `content-length` cho bộ ký và từ chối ký nó qua `SignedUrlOptions` (tra `validate_signed_url_extras`). Checksum đã ký mạnh
+   hơn: Amazon S3 từ chối nội dung khác hash, tức khác cả cỡ. Dịch vụ tương thích S3 có thể không kiểm checksum (moto của gate
+   không kiểm) — nên **lệnh xác nhận luôn đọc lại cả object, đo cỡ và băm SHA-256** (`upload::inspect`), không tin nơi lưu;
+   sai thì xoá object, giữ lượt (client PUT lại đúng file trước hạn). Đọc lại tốn một lượt GET; file rất lớn cần tăng
+   `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (ghi trong mô tả biến, như tải qua máy chủ).
+3. **Khung chung `autoxide_kernel::upload`:** bảng `<module>_uploads` (`uploads_migration`, như `jobs_migration`; khoá chính
+   `(tenant_id, id)`, index `(status, expires_at)`), `DirectUploads::{insert, find, lock, complete, delete, expired,
+   forget_completed}` viết bằng sea-query (tên bảng theo module), `UploadLink` (schema OpenAPI dùng chung). ID của lượt là ID
+   của bản ghi sẽ tạo: khoá lưu đặt sẵn ở chỗ cuối cùng (`files/<id>`, `media/<id>/<version>`), không chép. Xác nhận: kiểm
+   NGOÀI transaction; trong transaction `lock` (FOR UPDATE trên Postgres, SQLite một bên ghi) → lượt còn `pending` thì tạo bản
+   ghi + event + `complete`, không thì trả bản ghi đã có — hai lệnh xác nhận đồng thời chỉ tạo một bản ghi (test cả hai
+   database). Gọi lại sau khi xong: `200` cùng bản ghi.
+4. **Loại thật:** `media` đọc lại qua đúng bộ kiểm của tải qua máy chủ (magic bytes, SVG chạy được, kích thước ảnh), tách
+   `receive` thành `checked` + `finished` dùng chung. `files` giữ loại đã khai như khi tải qua máy chủ (S3 lưu đúng loại đã ký,
+   tải xuống có `nosniff` + CSP `sandbox`) — lệch đặc tả "kiểm loại thật" cho `files`: nhận loại bằng magic bytes đang là phần
+   của `media`; đưa bộ nhận loại vào kernel để `files` dùng thì phải đổi cả đường tải qua máy chủ của `files` cho nhất quán —
+   để khi có nhu cầu.
+5. **Mã lỗi:** `…direct_upload_unavailable` (409), `…upload_not_found` (404), `…upload_expired` (**409**, lệch đặc tả 410:
+   `ErrorKind` không có 410, thêm loại lỗi mới cho một mã là quá tay), `…upload_incomplete` (409), `…upload_mismatch` (422).
+6. **Hạn mức:** `files` giữ chỗ `files.storage_bytes` theo cỡ khai lúc cấp link, xác nhận khi xong, trả khi lượt bị dọn.
+   `media` chưa có hạn mức dung lượng nên không giữ chỗ.
+7. **Dọn:** job `files.purge_expired_uploads`, `media.purge_expired_uploads` mỗi giờ trên mọi database (bảng ở database của
+   khách): lượt `pending` quá hạn 1 giờ → xoá object, dòng (trả hạn mức); dòng lượt đã xong giữ 7 ngày. Cấu hình
+   `AUTOXIDE_FILES_DIRECT_MAX_BYTES` (5 GiB), `AUTOXIDE_FILES_DIRECT_UPLOAD_SECONDS` (900), `AUTOXIDE_MEDIA_DIRECT_MAX_BYTES`
+   (1 GiB — xác nhận đọc lại cả item), `AUTOXIDE_MEDIA_DIRECT_UPLOAD_SECONDS` (900). Test: link giả của `MemoryStorage::presign`
+   (testkit) trên hai database; S3 thật (moto) ở `files` và e2e `media`.
+
+## D-380 · Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18 — agent quyết
+
+1. **Không thêm thư viện:** kiểm `id_token` tự viết (`modules/auth/src/oidc/jwt.rs`, như D-045) — chỉ `RS256` (`ring`
+   `RsaPublicKeyComponents::verify`, `RSA_PKCS1_2048_8192_SHA256`) và `ES256` (`p256`, khoá dựng từ SEC1 `04‖x‖y`); không
+   bao giờ `none` / `HS*`. `ring` và `p256` thành phụ thuộc trực tiếp của `auth` (đều đã có trong cây) — không `rsa`,
+   `jsonwebtoken`, `openidconnect`, không mở rộng ngoại lệ RUSTSEC của D-077. RS256 kiểm bằng ví dụ RFC 7515 A.2 (chỉ
+   khoá công khai); ES256 ký bằng khoá sinh lúc chạy trong máy chủ OIDC giả của test.
+2. **Bộ lọc SSRF dời vào kernel:** `webhooks/src/network.rs` → `autoxide_kernel::net` (`is_public`, `is_public_host`,
+   `PublicOnly`); `webhooks` dùng lại. Kernel thêm `reqwest` (đã có trong cây) cho trait phân giải. Client OIDC: không
+   theo chuyển hướng, không proxy hệ thống, kiểm host là IP trước MỖI lần gọi (reqwest không hỏi bộ phân giải cho IP),
+   `https://` bắt buộc trừ khi `AUTOXIDE_AUTH_OIDC_ALLOW_PRIVATE_NETWORKS=true`, thân trả lời tối đa 1 MiB, hạn 10 s.
+3. **Cache:** discovery và JWKS trong bộ nhớ theo `max-age` (kẹp 5 phút – 24 giờ). `kid` lạ khi đang giữ JWKS còn hạn → tải
+   lại tối đa một lần mỗi phút mỗi issuer (lần tải đầu không tính).
+4. **`state`:** token một lần của kernel (`auth_tokens`, `purpose = oidc_state`, `subject` = ID nhà cung cấp, tra bằng
+   bản băm), mang khách theo `link_token` như link trong mail. `nonce`, `code_verifier`, `redirect_uri`, `link_user_id` lưu
+   trong `data`, mã hoá bằng `Sealer` (AAD: khách + ID nhà cung cấp). Lượt liên kết (`link_user_id`) không dùng được để
+   đăng nhập và ngược lại. Đặc tả có cờ `link` ở `/oidc/{slug}/start` — bỏ: liên kết đi qua
+   `/me/identities/{slug}/start` (đòi mật khẩu hay `reauth_token`), một cách làm.
+5. **Liên kết tài khoản:** liên kết sẵn có → tài khoản đó; khớp email → chỉ khi CẢ email nhà cung cấp (Google / OIDC
+   `email_verified`, GitHub email `primary && verified`, Microsoft chỉ `xms_edov = true`) lẫn email trong Autoxide đã xác
+   minh, không thì `auth.oidc_link_required`; không khớp → tài khoản mới (email đã xác minh, không mật khẩu) khi
+   `allow_signup` **và** (đăng ký mở — `AUTOXIDE_AUTH_SELF_REGISTRATION` cho nhân sự, `auth.customer_registration` cho người
+   mua — **hoặc** nhà cung cấp có `default_role_id`: quản trị khách chủ động cho người của IdP công ty vào, lệch đặc tả để
+   chuỗi dùng Entra không phải mở đăng ký công khai). Email chưa xác minh không bao giờ tạo tài khoản
+   (`auth.oidc_email_unverified`). Người khai `default_role_id` phải có mọi permission của role (`grant_problems`), giữ chỗ
+   hạn mức số nhân sự như lời mời (D-326). MFA qua `SessionService::login_verified` (chung với link qua email): phiên
+   `method = "oidc"`.
+6. **Bảng:** `auth_oidc_provider`, `auth_identity` — tên số ít theo quy ước bảng của `auth` (đặc tả ghi số nhiều); khoá
+   chính `(tenant_id, id)`, không foreign key: xoá tài khoản / nhà cung cấp xoá liên kết trong cùng transaction. Thêm cột
+   `realm` (`staff` | `customer`, D-309) — sàn cho người mua đăng nhập Google. `client_secret` mã hoá AEAD (mang `key_id`).
+7. **Permission:** thêm `auth.oidc.read` (xem danh sách nhà cung cấp, đọc được qua tool read-only — luật e2e: tool
+   read-only phải có permission mức đọc) bên cạnh `auth.oidc.manage` của đặc tả. **Mã lỗi:** theo đặc tả, trừ
+   `auth.oidc_provider_unavailable` là **503** (`ErrorKind` không có 502) và thêm
+   `auth.identity_taken` (409, danh tính đã liên kết với tài khoản khác). Tool MCP: `auth.list_oidc_providers`,
+   `auth.create_oidc_provider`, `auth.update_oidc_provider` (đầu vào phẳng — MCP không theo `$ref`),
+   `auth.delete_oidc_provider`, `auth.list_my_identities`; luồng đăng nhập không có tool. GitHub Enterprise Server: `kind`
+   `github` có `issuer` là địa chỉ gốc (API ở `/api/v3`) — cũng là cách test chạy trên máy chủ giả.
+8. **Pháp lý:** danh tính ở nhà cung cấp (subject, email) là dữ liệu cá nhân (Luật 91/2025/QH15, NĐ 356/2025, hiệu lực
+   01/01/2026): chỉ xin scope `openid email profile`, có trong `GET /me/export`, xoá cùng tài khoản. Đăng nhập Google / GitHub
+   không thay xác thực số điện thoại của NĐ 147/2024/NĐ-CP — cần đối chiếu văn bản gốc / người có chuyên môn pháp lý về sổ
+   đồng ý khi liên kết.
+
+## D-381 · Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18 — agent quyết
+
+1. **Xây trên cái sẵn có, không phá API:** `autoxide_kernel::search` giữ nguyên `fold` / `exact_key` / `contains*` (ô tìm
+   của module); tìm xuyên phân hệ bước 51 (`autoxide_kernel::find`, `FinderSource`, `SearchQuery`) giữ nguyên trên bảng
+   của từng module. Phần mới nằm cùng mô-đun `search`: trait `SearchBackend` (`index`, `remove`, `clear`, `query`),
+   `SearchSource` (`load`, `scan`), `SearchKind`, `SearchDoc`, `SearchRequest`, `OrgScope`, `SearchHits = Page<SearchHit>`,
+   sổ `SearchIndex` và bộ máy mặc định `DatabaseSearch`. Lệch đặc tả: tên `SearchRequest` thay `SearchQuery` (đã là
+   truy vấn của bước 51); thêm `clear` (dựng lại chỉ mục bỏ được tài liệu mồ côi); một truy vấn một loại.
+2. **Khai báo qua `StartContext`**, không qua `Module::search_documents` của đặc tả: `context.search_documents(kind,
+   source)` như `finder_source` — nguồn cần trạng thái có sau `start`. `context.search_backend(name, backend)` cho
+   module bộ máy ngoài; `AUTOXIDE_SEARCH_BACKEND` (`database` mặc định) chọn bộ máy, tra lúc dùng (bộ máy tên khác mà
+   không module nào thêm → lỗi nội bộ nêu rõ biến).
+3. **`DatabaseSearch`:** `kernel_search_docs` (khoá `(tenant_id, kind, id)`, index `(tenant_id, kind, org_id)`, bốn cột
+   khoá tìm) + `kernel_search_filters` (khoá `(tenant_id, kind, doc_id, name)`, index `(tenant_id, kind, name, value)`;
+   bộ lọc so bằng qua `EXISTS`). Xếp bốn tầng bằng `fetch_page_tiers`: tiêu đề (trường trọng số cao nhất) đúng dấu, mọi
+   trường đúng dấu, tiêu đề không dấu, mọi trường không dấu; trong tầng theo ID — trọng số chỉ phân "tiêu đề" và "phần
+   còn lại" (đủ cho cách xếp D-202; bộ máy ngoài dùng trọng số đầy đủ). Phạm vi nút lọc trong câu SQL
+   (`OrgTree::subtree_condition`, nút đúng, hàng rào) như `Principal::scope_condition`.
+4. **Đồng bộ:** module gọi `SearchIndex::enqueue(&transaction, …)` trong transaction của thay đổi → job
+   `kernel.search_sync` (hàng đợi `kernel`, cùng database của khách) mang loại + ID; job gọi `SearchSource::load`, đưa
+   tài liệu còn vào chỉ mục và bỏ ID không còn — chạy lại cho cùng kết quả, không gọi mạng trong transaction ghi.
+   `autoxide task kernel.reindex [kind=…] [tenant=…]` dựng lại theo lô 200 (`clear` rồi `scan`); `DatabaseRegistry::
+   all_tenants` duyệt mọi khách.
+5. **Chưa đo:** chưa module nào dùng chỉ mục (module tự chuyển khi bảng lớn — catalog bước 41 là chỗ đầu tiên); số đo
+   trên bộ dữ liệu lớn của bước 39 và khuyến nghị bộ máy ngoài ghi vào `docs/BENCHMARKS.md` khi đó. Test (SQLite và
+   Postgres): `tests/search_index.rs` với module mẫu và bộ máy giả.
+
+## D-382 · Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18 — agent quyết
 
 Chủ dự án bảo "trả nợ trước" (trước bước 40). Nguồn: các dòng còn thiếu của `docs/prompts/web-build-api-gaps.md` thuộc
 module đã xong (bước 36, 37 và kernel). Như đợt 1 (`web-api-requests.md`), làm ngoài lộ trình, chỉ thêm, không phá vỡ (D-059).

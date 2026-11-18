@@ -70,9 +70,10 @@ pub(crate) fn with_activity() -> Vec<EventInfo> {
     all()
         .into_iter()
         .map(|event| match event.name() {
-            "comments.comment_created" => {
-                event.activity("A new comment came in", crate::permissions::COMMENTS_READ)
-            }
+            // Stream SSE (bước 40 P5): hàng chờ kiểm duyệt cập nhật ngay.
+            "comments.comment_created" => event
+                .activity("A new comment came in", crate::permissions::COMMENTS_READ)
+                .streamable(crate::permissions::COMMENTS_MODERATE),
             "comments.comment_status_changed" => {
                 event.activity("{actor} moderated a comment", crate::permissions::COMMENTS_READ)
             }
