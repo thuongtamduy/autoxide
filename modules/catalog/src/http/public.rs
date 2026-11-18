@@ -65,10 +65,10 @@ fn fingerprint<T: Serialize>(tenant: &TenantContext, value: &T) -> Result<String
 }
 
 /// Trả `value` kèm `ETag` và `Cache-Control` công khai.
-fn cached<T: Serialize>(tenant: &TenantContext, value: T) -> Result<Response, Error>
-where
-    T: IntoResponse,
-{
+fn cached<T: Serialize + IntoResponse>(
+    tenant: &TenantContext,
+    value: T,
+) -> Result<Response, Error> {
     let etag = fingerprint(tenant, &value)?;
     let mut response = value.into_response();
     if let Ok(value) = HeaderValue::from_str(&etag) {
