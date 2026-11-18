@@ -223,7 +223,7 @@ impl PromotionsService {
         }
         if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
             let ids: Vec<Uuid> = translation::Entity::find()
-                .filter(autoxide_kernel::search::contains(translation::Column::Title, q))
+                .filter(translation::Column::Title.contains(q))
                 .scoped(tenant)
                 .all(read)
                 .await?

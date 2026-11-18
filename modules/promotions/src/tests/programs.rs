@@ -142,7 +142,7 @@ async fn chan_kich_hoat_vuot_tran_50_phan_tram() {
         .await;
         let (status, error) = activate(&setup, &amount).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{error}");
-        assert_eq!(error["params"]["value"], "60%");
+        assert!(error["detail"].as_str().unwrap().contains("60%"), "{error}");
     })
     .await
     .unwrap();

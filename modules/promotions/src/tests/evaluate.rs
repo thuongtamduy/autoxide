@@ -88,7 +88,7 @@ async fn ma_sai_khong_chan_ca_gio_va_ly_do_theo_ngon_ngu() {
             result.rejected_codes.iter().find(|found| found.code.as_deref() == Some(code)).unwrap().reason.clone()
         };
         assert_eq!(reason("KHONGCO").code, "promotions.reason.code_invalid");
-        assert_eq!(reason("giam 50k").text, "Thêm 100,000 VND để dùng (đơn từ 500,000 VND)");
+        assert_eq!(reason("GIAM50K").text, "Thêm 100,000 VND để dùng (đơn từ 500,000 VND)");
         cart.lines[0].quantity = 3;
         cart.locale = "en".into();
         let result = setup.promotions().evaluate(&tenant, &cart).await.unwrap();

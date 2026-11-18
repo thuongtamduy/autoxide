@@ -58,13 +58,13 @@ async fn ma_gioi_han_10_luot_100_nguoi() {
             "POST",
             &format!("/promotions/{id}/codes"),
             "boss",
-            Some(json!({"purpose": "redeem", "code": "TEN"})),
+            Some(json!({"purpose": "redeem", "code": "TEN10"})),
         )
         .await;
         let carts = (0..100)
             .map(|_| {
                 let mut cart = setup.cart(&[(variant, 1)]);
-                cart.codes = vec!["TEN".into()];
+                cart.codes = vec!["TEN10".into()];
                 cart
             })
             .collect();

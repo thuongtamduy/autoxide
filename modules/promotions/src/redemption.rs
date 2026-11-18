@@ -448,7 +448,12 @@ impl PromotionsService {
                     .await?
                     .rows_affected;
                 if changed == 0 {
-                    return Ok(None);
+                    // Lần trả khác vừa xong trước: trả trạng thái mới, không cộng lại lần nữa.
+                    let fresh = redemption::Entity::find_by_id(row.id)
+                        .scoped(tenant)
+                        .one(&transaction)
+                        .await?;
+                    return fresh.as_ref().map(present).transpose();
                 }
                 let redemption = present(&row)?;
                 let keep_usage: Vec<Uuid> = if was_confirmed {
