@@ -299,7 +299,7 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(VOUCHERS_GRANT)
+        .requires(READ)
         .read_only(),
     ]
 }

@@ -10646,7 +10646,7 @@
       "name": "promotions.list_vouchers_of_user",
       "output_schema": null,
       "permissions": [
-        "promotions.vouchers.grant"
+        "promotions.read"
       ]
     },
     {
