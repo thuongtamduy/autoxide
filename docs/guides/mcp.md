@@ -103,6 +103,16 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `auth.update_oidc_provider` | `auth.oidc.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |
+| `catalog.add_prices` | `catalog.prices.write` | writes |
+| `catalog.create_product` | `catalog.products.write` | writes |
+| `catalog.delete_product` | `catalog.products.write` | destructive |
+| `catalog.get_product` | `catalog.products.read` | read-only |
+| `catalog.list_categories` | `catalog.products.read` | read-only |
+| `catalog.list_products` | `catalog.products.read` | read-only |
+| `catalog.resolve_price` | `catalog.prices.read` | read-only |
+| `catalog.set_product_status` | `catalog.products.publish` | writes |
+| `catalog.update_product` | `catalog.products.write` | writes |
+| `catalog.upsert_variant` | `catalog.products.write` | writes |
 | `comments.answer` | `comments.post` | writes |
 | `comments.get` | `comments.read` | read-only |
 | `comments.moderate` | `comments.moderate` | writes |
