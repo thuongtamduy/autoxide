@@ -162,20 +162,37 @@ impl BookingsService {
         if let Some(locale) = &row.locale {
             notification = notification.locale(locale.clone());
         }
-        notifier.notify(tenant.id(), notification).await?;
         let column = match mark {
             Mark::Day => booking::Column::Reminded24hAt,
             Mark::TwoHours => booking::Column::Reminded2hAt,
         };
+        // Giành mốc nhắc bằng câu UPDATE có điều kiện TRƯỚC khi gửi: hai job chạy cùng lúc thì chỉ một
+        // bên được 1 dòng. Gửi lỗi thì trả mốc lại để lần sau gửi tiếp (khoá chống trùng của
+        // `notifications` chặn tin thứ hai nếu lần trước thật ra đã ghi).
+        let mark_at = |value: Option<chrono::DateTime<Utc>>,
+                       only_if: Option<chrono::DateTime<Utc>>| {
+            let mut update = booking::Entity::update_many()
+                .col_expr(column, Expr::value(value))
+                .filter(booking::Column::Id.eq(id))
+                .scoped(tenant);
+            update = match only_if {
+                Some(claimed) => update.filter(column.eq(claimed)),
+                None => update.filter(column.is_null()),
+            };
+            update
+        };
         let transaction = tenant.database().begin_write().await?;
-        booking::Entity::update_many()
-            .col_expr(column, Expr::value(at))
-            .filter(booking::Column::Id.eq(id))
-            .filter(column.is_null())
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
+        let claimed = mark_at(Some(at), None).exec(&transaction).await?;
         transaction.commit().await?;
+        if claimed.rows_affected == 0 {
+            return Ok(false);
+        }
+        if let Err(error) = notifier.notify(tenant.id(), notification).await {
+            let transaction = tenant.database().begin_write().await?;
+            mark_at(None, Some(at)).exec(&transaction).await?;
+            transaction.commit().await?;
+            return Err(error);
+        }
         Ok(true)
     }
 }
