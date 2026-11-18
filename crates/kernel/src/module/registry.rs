@@ -87,6 +87,8 @@ pub struct Modules {
     facts: crate::report::FactCatalog,
     /// Loại sự kiện phân tích và phễu của mọi module (bước 57), đã kiểm.
     analytics: crate::analytics::AnalyticsCatalog,
+    /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
+    automations: crate::automation::AutomationDirectory,
 }
 
 impl Modules {
@@ -240,6 +242,7 @@ impl Modules {
             problems.extend(errors);
             Translations::default()
         });
+        let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
         if problems.is_empty() {
             Ok(Modules {
                 modules,
@@ -266,6 +269,7 @@ impl Modules {
                 tenancy: None,
                 facts,
                 analytics,
+                automations,
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -366,6 +370,7 @@ impl Modules {
                 counters: &mut counters,
                 facts: &self.facts,
                 analytics: &self.analytics,
+                automations: &self.automations,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -392,6 +397,28 @@ impl Modules {
         self.catalog.fill_navigation(navigation);
         // Sau khi MỌI module đã khởi động: tool, job, lịch của module chỉ có từ lúc này.
         self.catalog.fill(&self.modules, self.entitlements.catalog());
+        // Tool khai sai thì chương trình dừng khi dựng endpoint MCP (cùng `tools()`); ở đây chỉ để
+        // sổ rỗng.
+        let mut templates = Vec::new();
+        for module in &self.modules {
+            for template in module.automation_templates() {
+                if !template.id.starts_with(&format!("{}.", module.name()))
+                    || templates.iter().any(|known: &crate::automation::AutomationTemplate| {
+                        known.id == template.id
+                    })
+                {
+                    return Err(ModuleError(format!(
+                        "automation template `{}` of module `{}` must be named `{}.<name>` and \
+                         be declared once",
+                        template.id,
+                        module.name(),
+                        module.name()
+                    )));
+                }
+                templates.push(template);
+            }
+        }
+        self.automations.fill(self.tools().unwrap_or_default(), templates);
         self.client_configs.fill(&self.modules);
         self.seeds.fill(
             self.modules
@@ -650,6 +677,7 @@ impl Modules {
     pub fn worker(&self, concurrency: u64) -> Result<Worker, ModuleError> {
         let databases = self.started()?;
         let mut handlers: HashMap<&'static str, Arc<dyn JobHandler>> = HashMap::new();
+        let mut timeouts: HashMap<&'static str, std::time::Duration> = HashMap::new();
         let mut modules = Vec::new();
         let mut schedules = Vec::new();
         let mut problems = Vec::new();
@@ -666,6 +694,9 @@ impl Modules {
                         "module `{name}` registers job kind `{kind}`; its job kinds must start \
                          with `{name}.`"
                     ));
+                }
+                if let Some(limit) = registration.time_limit() {
+                    timeouts.insert(kind, limit);
                 }
                 if handlers.insert(kind, registration.handler()).is_some() {
                     problems.push(format!("job kind `{kind}` has two handlers"));
@@ -700,6 +731,7 @@ impl Modules {
             return Err(ModuleError(problems.join("; ")));
         }
         Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
+            .with_timeouts(timeouts)
             .with_entitlements(self.entitlements.clone()))
     }
 

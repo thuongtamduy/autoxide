@@ -21,6 +21,20 @@ endpoints are marked deprecated with a sunset date first.
   `analytics.read`. Events are linked to a signed-in user only with consent `analytics.personal`; withdrawing
   unlinks them. MCP tools `analytics.overview`, `analytics.top_pages`, `analytics.top_objects`, `analytics.funnel`
   (read only); summary metric `analytics.visitors`; settings `AUTOXIDE_ANALYTICS_*`. Guide: `docs/ANALYTICS.md`.
+- New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
+  schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
+  (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
+  are a fixed tree of operators; actions are existing MCP tools (arguments filled from the trigger with templates)
+  plus `wait`, `stop_if` and `notify`. Rules run in jobs with the current permissions of their owner, once per
+  trigger, with an `Idempotency-Key` per step; risky steps wait for a person's approval; rules made by AI agents wait
+  until a person enables them; loops and too many runs pause the rule. REST under `/api/v1/automations` (rules,
+  runs, dry runs, catalog, templates), MCP tools `automations.list_rules`, `get_rule`, `test_rule`, `create_rule`,
+  `update_rule`; permissions `automations.read`, `automations.manage`, `automations.run`; settings
+  `AUTOXIDE_AUTOMATIONS_RUN_RETENTION_DAYS`, `AUTOXIDE_AUTOMATIONS_MAX_RUNS_PER_HOUR`,
+  `AUTOXIDE_AUTOMATIONS_TICK_SECONDS`. Guide: `docs/guides/automations.md`.
+- Kernel: `automation::AutomationDirectory` (every module's MCP tools, called with the same checks as `/mcp`),
+  `Module::automation_templates`, `AccessPath::Automation` (changes made by a rule's run carry it in the audit log),
+  `StartContext::summary_metrics()`.
 - Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
   equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
   (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
@@ -28,6 +42,11 @@ endpoints are marked deprecated with a sunset date first.
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
   `catalog`).
+- Jobs: `JobRegistration::timeout` lets a job kind run longer than 4.5 minutes; the worker extends its claim while
+  the job runs and stops the job if it loses the claim.
+- `autoxide_kernel::backup` (`write_backup`, `BackupSink`, `DirectorySink`, `StorageSink`): the core of `autoxide
+  backup`, shared with the scheduled backups of step 39. A backup never copies files under `kernel/backups/` (the
+  scheduled backups themselves).
 - `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
   `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
   requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,

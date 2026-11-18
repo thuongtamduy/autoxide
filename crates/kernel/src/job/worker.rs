@@ -57,6 +57,10 @@ pub struct Worker {
     /// Các module có bảng job.
     modules: Vec<&'static str>,
     handlers: Arc<HashMap<&'static str, Arc<dyn JobHandler>>>,
+    /// Thời gian chạy tối đa riêng của loại job (`JobRegistration::timeout`).
+    timeouts: Arc<HashMap<&'static str, Duration>>,
+    /// Hạn giữ một job đã claim ([`LEASE`]; test đặt ngắn hơn).
+    lease: Duration,
     schedules: Vec<Schedule>,
     /// Tên worker ghi vào `claimed_by`: phân biệt các tiến trình.
     id: String,
@@ -110,6 +114,8 @@ impl Worker {
             databases,
             modules,
             handlers: Arc::new(handlers),
+            timeouts: Arc::new(HashMap::new()),
+            lease: LEASE,
             schedules,
             id: format!("worker-{}", Uuid::now_v7()),
             concurrency: std::cmp::max(concurrency, 1),
@@ -118,6 +124,19 @@ impl Worker {
             turn: AtomicUsize::new(0),
             gate: Gate::default(),
         }
+    }
+
+    pub(crate) fn with_timeouts(mut self, timeouts: HashMap<&'static str, Duration>) -> Self {
+        self.timeouts = Arc::new(timeouts);
+        self
+    }
+
+    /// Hạn giữ một job đã claim (mặc định 5 phút). Chỉ để test việc gia hạn với hạn ngắn; chương
+    /// trình không đổi nó.
+    #[doc(hidden)]
+    pub fn lease(mut self, lease: Duration) -> Self {
+        self.lease = lease.max(Duration::from_secs(1));
+        self
     }
 
     /// Hoãn job của module mà gói của khách không có (bước 35). `Modules::worker` gọi.
@@ -238,7 +257,7 @@ impl Worker {
         limit: u64,
     ) -> Result<Vec<ClaimedJob>, Error> {
         let now = now();
-        let until = now + chrono::Duration::from_std(LEASE).map_err(Error::internal)?;
+        let until = now + chrono::Duration::from_std(self.lease).map_err(Error::internal)?;
         let table = table_name(module);
         let claim = claim_for(database.write().get_database_backend());
         let connection = database.write();
@@ -288,10 +307,18 @@ impl Worker {
         let database = database.clone();
         let registry = self.databases.clone();
         let handlers = Arc::clone(&self.handlers);
+        let timeouts = Arc::clone(&self.timeouts);
         let gate = self.gate.clone();
+        let lease = self.lease;
         let (table, worker) = (table_name(module), self.id.clone());
         async move {
-            let env = JobEnv { registry: &registry, handlers: &handlers, gate: &gate };
+            let env = JobEnv {
+                registry: &registry,
+                handlers: &handlers,
+                timeouts: &timeouts,
+                gate: &gate,
+                lease,
+            };
             let run = run_job(placement, &database, &env, &table, &worker, job);
             if let Err(error) = run.await {
                 tracing::error!(error = %error, "cannot record a job result");
@@ -497,7 +524,9 @@ fn log_task(result: Result<(), tokio::task::JoinError>) {
 struct JobEnv<'a> {
     registry: &'a DatabaseRegistry,
     handlers: &'a HashMap<&'static str, Arc<dyn JobHandler>>,
+    timeouts: &'a HashMap<&'static str, Duration>,
     gate: &'a Gate,
+    lease: Duration,
 }
 
 async fn run_job(
@@ -508,7 +537,7 @@ async fn run_job(
     worker: &str,
     job: ClaimedJob,
 ) -> Result<(), Error> {
-    let JobEnv { registry, handlers, gate } = env;
+    let JobEnv { registry, handlers, timeouts, gate, lease } = env;
     // Khách của job (`NO_TENANT`: job của cả database). Khách không còn: một lần lỗi như mọi lỗi.
     let tenant = if job.tenant == NO_TENANT {
         Ok(None)
@@ -543,16 +572,42 @@ async fn run_job(
                     tenant,
                     database: database.clone(),
                 };
-                // Dừng trước khi hết hạn giữ, để không worker nào khác chạy chồng.
-                let limit = LEASE - Duration::from_secs(30);
+                // Mặc định dừng trước khi hết hạn giữ, để không worker nào khác chạy chồng. Loại
+                // job khai thời gian dài hơn (`JobRegistration::timeout`) thì gia hạn giữ trong lúc
+                // chạy (bước 39).
+                let short =
+                    std::cmp::max(lease.saturating_sub(Duration::from_secs(30)), *lease / 2);
+                let limit = timeouts.get(job.kind.as_str()).copied().unwrap_or(short);
                 // Handler panic: ghi như một lần lỗi (thử lại, rồi vào dead-letter queue) thay
                 // vì để job nằm đó tới hết hạn giữ rồi chạy lại mãi (D-158).
                 let run = AssertUnwindSafe(handler.run(&context)).catch_unwind();
-                match tokio::time::timeout(limit, run).await {
-                    Ok(Ok(Ok(()))) => Ok(()),
-                    Ok(Ok(Err(error))) => Err(describe(&error)),
-                    Ok(Err(_)) => Err("the job handler panicked".to_owned()),
-                    Err(_) => Err(format!("timed out after {} seconds", limit.as_secs())),
+                let timed = tokio::time::timeout(limit, run);
+                let outcome = if limit > short {
+                    // `select!` chạy hai việc cùng lúc và lấy việc xong trước: job xong thì bỏ
+                    // vòng gia hạn; mất quyền giữ thì bỏ (drop) future của job — job bị dừng.
+                    tokio::select! {
+                        outcome = timed => Some(outcome),
+                        lost = keep_claim(database, table, worker, job.id, *lease) => {
+                            tracing::warn!(
+                                job_id = %job.id,
+                                kind = %job.kind,
+                                error = %lost,
+                                "job stopped: this worker lost its claim on it"
+                            );
+                            None
+                        }
+                    }
+                } else {
+                    Some(timed.await)
+                };
+                match outcome {
+                    // Không còn là job của worker này: không ghi kết quả (lệnh ghi bên dưới chỉ ghi
+                    // khi `claimed_by` còn là worker này nên cũng không ghi được).
+                    None => return Ok(()),
+                    Some(Ok(Ok(Ok(())))) => Ok(()),
+                    Some(Ok(Ok(Err(error)))) => Err(describe(&error)),
+                    Some(Ok(Err(_))) => Err("the job handler panicked".to_owned()),
+                    Some(Err(_)) => Err(format!("timed out after {} seconds", limit.as_secs())),
                 }
             }
         },
@@ -622,6 +677,43 @@ async fn run_job(
         tracing::warn!(job_id = %job.id, error = %error, "job_finished event not recorded");
     }
     Ok(())
+}
+
+/// Gia hạn giữ job `id` mỗi một phần ba `lease`, tới khi mất quyền giữ (không còn dòng nào
+/// `claimed_by` là worker này) hay lỗi database liên tiếp — khi đó trả lý do. Chỉ trả về khi phải
+/// dừng job; job xong trước thì future này bị bỏ.
+async fn keep_claim(
+    database: &Database,
+    table: &str,
+    worker: &str,
+    id: Uuid,
+    lease: Duration,
+) -> String {
+    let every = std::cmp::max(lease / 3, Duration::from_millis(200));
+    let Ok(length) = chrono::Duration::from_std(lease) else {
+        return "the lease is too long".to_owned();
+    };
+    loop {
+        tokio::time::sleep(every).await;
+        let mut update = Query::update();
+        update
+            .table(Alias::new(table))
+            .value(Alias::new("claimed_until"), now() + length)
+            .and_where(Expr::col(Alias::new("id")).eq(id))
+            .and_where(Expr::col(Alias::new("claimed_by")).eq(worker))
+            .and_where(Expr::col(Alias::new("completed_at")).is_null())
+            .and_where(Expr::col(Alias::new("failed_at")).is_null());
+        match database.write().execute(&update).await {
+            Ok(result) if result.rows_affected() == 0 => {
+                return "another worker or a command took the job back".to_owned();
+            }
+            Ok(_) => {}
+            // Một lần lỗi database: thử lại lần sau; hạn giữ còn hai phần ba.
+            Err(error) => {
+                tracing::warn!(job_id = %id, error = %error, "cannot extend a job's lease")
+            }
+        }
+    }
 }
 
 /// Khách đang dời: chờ sau chừng này rồi mới nhận lại job của khách.

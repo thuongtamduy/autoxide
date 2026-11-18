@@ -107,6 +107,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `auth.update_oidc_provider` | `auth.oidc.manage` | writes |
 | `auth.update_user` | `auth.users.manage` | writes |
 | `auth.whoami` | — | read-only |
+| `automations.create_rule` | `automations.manage` | writes |
+| `automations.get_rule` | `automations.read` | read-only |
+| `automations.list_rules` | `automations.read` | read-only |
+| `automations.test_rule` | `automations.read` | read-only |
+| `automations.update_rule` | `automations.manage` | writes |
 | `comments.answer` | `comments.post` | writes |
 | `comments.get` | `comments.read` | read-only |
 | `comments.moderate` | `comments.moderate` | writes |
