@@ -502,6 +502,38 @@ Không có bên cung cấp, khách nền tảng, khách không có gói: mọi l
   và một `TaskRun`, chạy bằng `autoxide task <module>.<lệnh> tên=giá_trị`. Nó gọi service,
   như REST. Xem `modules/media/src/images/refresh.rs`.
 
+### 9a. Phần của module trên giao diện
+
+Giao diện và agent biết module có gì qua kernel; module khai phần của mình một lần, cạnh code
+của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc định: không có).
+
+- **Menu**: `Module::navigation` — nhóm và mục kèm permission, tính năng của gói, bộ đếm việc. Nhãn
+  viết tiếng Anh, dịch qua khoá `text:` của module.
+- **Hộp việc**: `context.work_source(…)` — một `WorkSource` tính việc từ dữ liệu (không có cờ "đã
+  xong"), kèm số đếm cho menu. Mỗi việc có khoá ổn định `<nguồn>:<id bản ghi>`, nên người dùng hoãn
+  và giao được.
+- **Tìm và mã**: `context.finder_source(…)` (một `FinderSource`; `fields` và `scoped` khi nó hiểu
+  `trường:giá trị` và `scope=`) và `context.code_resolver(…)` (số đơn, đường dẫn trang… cho
+  `GET /api/v1/kernel/resolve`).
+- **Số liệu và thiết lập**: `context.summary_metric(…)` (`MetricInfo` luôn kèm câu định nghĩa) và
+  `context.setup_step(…)` (xong hay chưa tính từ dữ liệu).
+- **Hoạt động**: `EventInfo::activity(…)` cho event một câu đọc được; ghi chú và lịch sử của mọi bản
+  ghi trong sổ đối tượng do kernel lo.
+- **Danh sách**: mọi endpoint danh sách (`GET` có `cursor`) tự có `x-autoxide-filters` từ chính
+  tham số query của nó — giữ chúng trong một struct `IntoParams`. Xuất: `context.export_source(…)`
+  với id của danh sách. Thao tác hàng loạt: `context.bulk_action(…)`; hành động phải chịu được việc
+  làm lại.
+- **Lệnh rủi ro**: thêm `("x-approval" = json!("agent"))` vào `extensions` của route; tool MCP làm
+  cùng việc gọi `.requires_approval_for_agent()`.
+- **Lựa chọn của khách**: `Module::reason_lists` (mã kèm nhãn tiếng Anh; mã pháp lý luôn bật),
+  `Module::overridable_texts` (thuật ngữ khách đổi được; không bao giờ là câu của lỗi),
+  `context.taggable(kind, write_permission)` cho nhãn nội bộ, và `Module::custom_field_targets`
+  cho trường tự định nghĩa. Module nhận trường tự định nghĩa lưu `custom_fields` trên bản ghi, kiểm
+  bằng `CustomFields::validate`, thêm `custom_fields::index_migration` và ghi index bằng
+  `CustomFields::write_index` trong cùng transaction với bản ghi.
+- **Kết nối đối tác**: cấu hình tên `<module>.connection.<loại>.<trường>`;
+  `context.connection_probe(…)` để thử, `ConnectionStatus::record` sau mỗi lần dùng.
+
 ### 10. Bản dịch
 
 Mọi `code` lỗi và khoá mẫu mail có câu tiếng Việt trong `locales/vi.json`, trả từ

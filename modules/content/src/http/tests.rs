@@ -1540,3 +1540,88 @@ async fn truong_tu_dinh_nghia_tren_bai_viet() {
     .await
     .unwrap();
 }
+
+/// Hai nhánh anh em của cây tổ chức (bước 51, test bắt buộc): bài chờ duyệt ở nhánh A không hiện
+/// trong hộp việc, số đếm, kết quả tìm hay mở theo mã của người chỉ làm ở nhánh B.
+#[tokio::test]
+async fn viec_va_tim_khong_lo_sang_nhanh_anh_em() {
+    use autoxide_kernel::access::Scope;
+    use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+    TestDatabase::run(async |test| {
+        let (a, b) = (OrgId::from_uuid(Uuid::now_v7()), OrgId::from_uuid(Uuid::now_v7()));
+        let grants = [
+            ("content.read", Scope::Subtree),
+            ("content.write", Scope::Subtree),
+            ("content.publish", Scope::Subtree),
+        ];
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let app = TestApp::builder(test)
+            .member("north", 1, a, &grants)
+            .member("south", 2, b, &grants)
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let write = app.database().begin_write().await.unwrap();
+        let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, a, root, 8).await.unwrap();
+        OrgTree::insert(&write, DEFAULT_TENANT, b, root, 8).await.unwrap();
+        write.commit().await.unwrap();
+
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("north"),
+            &[],
+            Some(json!({"kind": "post", "title": "Nhanh bac bi mat"})),
+        )
+        .await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let read = send(&app, "GET", &format!("/entries/{id}"), Some("north"), &[], None).await;
+        let etag = read.header(header::ETAG).to_owned();
+        let asked = send(
+            &app,
+            "POST",
+            &format!("/entries/{id}/request-review"),
+            Some("north"),
+            &[("if-match", &etag)],
+            None,
+        )
+        .await;
+        assert_eq!(asked.status(), StatusCode::OK, "{}", asked.json());
+
+        let get = |who: &'static str, uri: String| {
+            let app = &app;
+            async move { app.get(&uri).token(who).send().await.unwrap().json() }
+        };
+        let (a_id, b_id) = (a.as_uuid(), b.as_uuid());
+        let north = get("north", format!("/api/v1/kernel/work?org_id={a_id}")).await;
+        assert_eq!(north["data"]["items"].as_array().unwrap().len(), 1, "{north}");
+        for unit in [format!("org_id={b_id}"), String::new()] {
+            let south = get("south", format!("/api/v1/kernel/work?{unit}")).await;
+            assert_eq!(south["data"]["items"], json!([]), "{south}");
+            let counts = get("south", format!("/api/v1/kernel/work/counts?{unit}")).await;
+            assert_eq!(counts["data"]["counts"]["work"], 0, "{counts}");
+            let found = get("south", format!("/api/v1/kernel/find?q=bi%20mat&{unit}")).await;
+            assert_eq!(found["data"]["groups"], json!([]), "{found}");
+        }
+        let theirs = get("north", format!("/api/v1/kernel/find?q=bi%20mat&org_id={a_id}")).await;
+        assert_eq!(theirs["data"]["groups"].as_array().unwrap().len(), 1, "{theirs}");
+        let resolved = app
+            .get("/api/v1/kernel/resolve?code=nhanh-bac-bi-mat")
+            .token("south")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(resolved.status(), StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}

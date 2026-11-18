@@ -171,7 +171,7 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       đổi mã lỗi và câu pháp lý, đọc qua cache không query
 - [ ] Nhập dữ liệu (P17, D-220): không làm ở kernel — `imports` (bước 56) thêm nguồn `autoxide` cùng cột với
       xuất chung và đích `content`, `media`, `newsletter` (người đăng ký chỉ khi có bằng chứng đồng ý)
-- [ ] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục "khai phần
+- [x] Khai menu, nguồn việc, nguồn tìm, số liệu cho mọi module đang có; MODULE_GUIDE (EN + VI) mục "khai phần
       của module cho giao diện"; test rò rỉ giữa hai nhánh anh em cho số đếm và kết quả tìm
 
 ## 68. Menu của website (`menus`, chủ dự án quyết ngày 14/11/2026, D-238)
