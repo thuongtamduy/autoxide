@@ -204,7 +204,7 @@ pub enum AutoSource { Macro(Uuid), Fact { intent: String } }
 | `support_macros` | `id`, `tenant_id`, `org_id`, `name`, `bodies` JSON (theo ngôn ngữ), `auto_reply` BOOL, `questions` JSON (cách hỏi mẫu theo ngôn ngữ), `approved_by` NULL, `approved_at` NULL, `review_due_on` NULL, `created_by`, `updated_at` | index (`tenant_id`, `org_id`), (`tenant_id`, `org_id`, `auto_reply`) |
 | `support_auto_replies` | `id`, `tenant_id`, `org_id`, `thread` (`support.ticket:<id>` / `conversations.thread:<id>`), `message_ref`, `source_kind` (`macro`/`fact`), `macro_id` NULL, `intent` NULL, `confidence_bp`, `feedback` NULL (`helpful`/`wrong`), `created_at` | index (`tenant_id`, `org_id`, `created_at`), (`tenant_id`, `macro_id`, `feedback`) |
 | `support_reply_drafts` | `id`, `tenant_id`, `ticket_id`, `body`, `ai_assisted`, `created_at`, `used_at` NULL | index (`tenant_id`, `ticket_id`) |
-| `support_routing_rules` | `id`, `tenant_id`, `org_id`, `match` JSON (loại, kênh), `team_id`, `position` | index (`tenant_id`, `org_id`, `position`) |
+| `support_routing_rules` | `id`, `tenant_id`, `org_id`, `category` NULL, `channel` NULL (D-20261118-step53-teams), `team_id`, `position` | index (`tenant_id`, `org_id`, `position`) |
 
 Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `support_tokens` của kernel.
 

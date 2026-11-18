@@ -40,6 +40,8 @@ pub(crate) struct Parts {
     pub media: Option<Arc<dyn Media>>,
     /// Số điện thoại đã xác thực của tài khoản (gộp phiếu vãng lai); `None` khi không cài.
     pub accounts: Option<Arc<dyn autoxide_compliance::api::AccountVerification>>,
+    /// Quyền hiện tại của người khác (`principal_of`): kiểm người được giao làm được phiếu.
+    pub authenticator: Option<Arc<dyn autoxide_kernel::access::Authenticator>>,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.

@@ -1,0 +1,28 @@
+{
+  "jurisdiction": "VN",
+  "pack_version": "2026-11-18",
+  "checked_on": "2026-11-18",
+  "note": "Compiled from secondary sources on 2026-11-18. Check the original legal texts with a legal professional before relying on this list (D-186).",
+  "rules": [
+    {"code": "narcotics", "level": "prohibited", "names": {"en": "Narcotic substances", "vi": "Chất ma tuý"}, "required_documents": [], "legal_basis": "Luật Đầu tư 61/2020/QH14, Điều 6 khoản 1 điểm a, Phụ lục I", "source_url": "https://vbpl.vn", "effective_from": "2021-01-01"},
+    {"code": "banned_chemicals", "level": "prohibited", "names": {"en": "Banned chemicals and minerals", "vi": "Hoá chất, khoáng vật cấm"}, "required_documents": [], "legal_basis": "Luật Đầu tư 61/2020/QH14, Điều 6 khoản 1 điểm b, Phụ lục II", "source_url": "https://vbpl.vn", "effective_from": "2021-01-01"},
+    {"code": "wild_specimens", "level": "prohibited", "names": {"en": "Wild animal and plant specimens of CITES Appendix I", "vi": "Mẫu vật động, thực vật hoang dã thuộc Phụ lục I CITES"}, "required_documents": [], "legal_basis": "Luật Đầu tư 61/2020/QH14, Điều 6 khoản 1 điểm c, Phụ lục III", "source_url": "https://vbpl.vn", "effective_from": "2021-01-01"},
+    {"code": "firecrackers", "level": "prohibited", "names": {"en": "Explosive firecrackers", "vi": "Pháo nổ"}, "required_documents": [], "legal_basis": "Luật Đầu tư 61/2020/QH14, Điều 6 khoản 1 điểm h (sửa đổi 2022)", "source_url": "https://vbpl.vn", "effective_from": "2021-01-01"},
+    {"code": "human_organs", "level": "prohibited", "names": {"en": "Human tissues, organs and body parts", "vi": "Mô, bộ phận cơ thể người"}, "required_documents": [], "legal_basis": "Luật Đầu tư 61/2020/QH14, Điều 6 khoản 1 điểm e", "source_url": "https://vbpl.vn", "effective_from": "2021-01-01"},
+    {"code": "medicines", "level": "conditional", "names": {"en": "Medicines", "vi": "Thuốc"}, "required_documents": ["pharmacy_business_certificate"], "legal_basis": "Luật Dược 105/2016/QH13, Điều 32; Luật Đầu tư 61/2020/QH14, Phụ lục IV", "source_url": "https://vbpl.vn", "effective_from": "2017-01-01"},
+    {"code": "alcohol", "level": "conditional", "names": {"en": "Alcoholic drinks", "vi": "Rượu"}, "required_documents": ["alcohol_retail_licence"], "legal_basis": "NĐ 105/2017/NĐ-CP (sửa bởi NĐ 17/2020/NĐ-CP)", "source_url": "https://vbpl.vn", "effective_from": "2017-11-01"},
+    {"code": "tobacco", "level": "conditional", "names": {"en": "Tobacco products", "vi": "Sản phẩm thuốc lá"}, "required_documents": ["tobacco_retail_licence"], "legal_basis": "NĐ 67/2013/NĐ-CP (sửa bởi NĐ 106/2017/NĐ-CP, NĐ 08/2018/NĐ-CP)", "source_url": "https://vbpl.vn", "effective_from": "2013-08-15"},
+    {"code": "cosmetics", "level": "conditional", "names": {"en": "Cosmetics", "vi": "Mỹ phẩm"}, "required_documents": ["cosmetic_notification"], "legal_basis": "NĐ 93/2016/NĐ-CP; Thông tư 06/2011/TT-BYT", "source_url": "https://vbpl.vn", "effective_from": "2016-07-01"},
+    {"code": "health_supplements", "level": "conditional", "names": {"en": "Health supplements", "vi": "Thực phẩm bảo vệ sức khoẻ"}, "required_documents": ["product_declaration_registration"], "legal_basis": "NĐ 15/2018/NĐ-CP, Điều 6", "source_url": "https://vbpl.vn", "effective_from": "2018-02-02"},
+    {"code": "medical_devices", "level": "conditional", "names": {"en": "Medical devices", "vi": "Thiết bị y tế"}, "required_documents": ["medical_device_registration"], "legal_basis": "NĐ 98/2021/NĐ-CP", "source_url": "https://vbpl.vn", "effective_from": "2022-01-01"},
+    {"code": "fuel", "level": "conditional", "names": {"en": "Petroleum fuel", "vi": "Xăng dầu"}, "required_documents": ["fuel_trading_licence"], "legal_basis": "NĐ 83/2014/NĐ-CP (sửa bởi NĐ 95/2021/NĐ-CP)", "source_url": "https://vbpl.vn", "effective_from": "2014-11-01"},
+    {"code": "gold_jewellery", "level": "conditional", "names": {"en": "Gold bullion", "vi": "Vàng miếng"}, "required_documents": ["gold_trading_licence"], "legal_basis": "NĐ 24/2012/NĐ-CP (sửa bởi NĐ 232/2025/NĐ-CP)", "source_url": "https://vbpl.vn", "effective_from": "2012-05-25"}
+  ],
+  "label_attributes": [
+    {"code": "origin", "data_type": "text", "names": {"en": "Origin", "vi": "Xuất xứ"}, "legal_basis": "NĐ 43/2017/NĐ-CP, Điều 10 (sửa bởi NĐ 111/2021/NĐ-CP)"},
+    {"code": "responsible_party", "data_type": "text", "names": {"en": "Party responsible for the goods", "vi": "Tổ chức, cá nhân chịu trách nhiệm về hàng hoá"}, "legal_basis": "NĐ 43/2017/NĐ-CP, Điều 10"},
+    {"code": "expiry_date", "data_type": "text", "names": {"en": "Use-by date or shelf life", "vi": "Hạn sử dụng"}, "legal_basis": "NĐ 43/2017/NĐ-CP, Điều 10, Phụ lục I"},
+    {"code": "ingredients", "data_type": "text", "names": {"en": "Ingredients", "vi": "Thành phần"}, "legal_basis": "NĐ 43/2017/NĐ-CP, Phụ lục I"},
+    {"code": "net_quantity", "data_type": "text", "names": {"en": "Net quantity", "vi": "Định lượng"}, "legal_basis": "NĐ 43/2017/NĐ-CP, Điều 10"}
+  ]
+}
