@@ -1,0 +1,64 @@
+//! Mọi test tích hợp của crate trong một chương trình: mỗi file `tests/*.rs` riêng là một chương trình
+//! test riêng, link lại toàn bộ thư viện, nên tốn đĩa và thời gian link gấp nhiều lần (D-20261118-build-size).
+//! Thêm test: tạo file trong thư mục này rồi khai `mod` ở đây.
+
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+mod access;
+mod antispam;
+mod approvals_work;
+mod can;
+mod can_plan;
+mod client_config;
+mod custom_fields_limit;
+mod database;
+mod event;
+mod event_stream;
+mod filter_parse;
+mod health;
+mod http;
+mod job;
+mod job_runs;
+mod mcp;
+mod mcp_resources;
+mod metrics;
+mod migration;
+mod module;
+mod module_catalog;
+mod money;
+mod navigation;
+mod numbering;
+mod ops_alerts;
+mod org_tree;
+mod pagination;
+mod pins;
+mod placement_migrations;
+mod placement_storage;
+mod placements;
+mod public_paths;
+mod rate_limit_shared;
+mod reasons;
+mod request_log;
+mod seal;
+mod search_index;
+mod secret;
+mod security_headers;
+mod stack;
+mod summary;
+mod telemetry;
+mod tenancy;
+mod tenancy_adopt;
+mod tenancy_jobs;
+mod tenancy_outside_tables;
+mod tenancy_scope;
+mod tenant_access;
+mod tenant_admin;
+mod tenant_domains;
+mod tenant_move;
+mod tenant_settings;
+mod texts;
+mod throttle;
+mod tokens;
+mod transfer;
+mod user_flags;
+mod work_inbox;

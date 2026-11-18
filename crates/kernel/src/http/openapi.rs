@@ -231,14 +231,16 @@ pub(super) fn finish(openapi: &mut OpenApi, idempotency: bool) {
                     )
                 });
             }
-            let parameters = operation.parameters.get_or_insert_default();
-            parameters.push(RefOr::T(accept_language()));
             // Lớp idempotency chỉ lưu lệnh ghi của người đã đăng nhập.
             let writes = matches!(method, "post" | "put" | "patch" | "delete");
             let signed_in =
                 operation.security.as_ref().is_some_and(|security| !security.is_empty());
+            let parameters = operation.parameters.get_or_insert_default();
+            // Endpoint tự khai một header chung (vd thao tác hàng loạt bắt buộc `Idempotency-Key`)
+            // thì giữ bản của nó: khai hai lần làm tài liệu sai và SDK TypeScript không biên dịch.
+            push_header(parameters, accept_language());
             if idempotency && writes && signed_in {
-                parameters.push(RefOr::T(idempotency_key()));
+                push_header(parameters, idempotency_key());
             }
         }
     }
@@ -322,6 +324,32 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
                 Some(id) => {
                     if !operation_ids.insert(id.clone()) {
                         problems.push(format!("{endpoint}: operationId `{id}` is used twice"));
+                    }
+                }
+            }
+            // Cùng tên và vị trí khai hai lần thì tài liệu mâu thuẫn (một bản bắt buộc, một bản
+            // không) và SDK TypeScript sinh ra không biên dịch được. Tên header không phân biệt hoa
+            // thường (RFC 9110), tên tham số khác thì có.
+            let mut seen = BTreeSet::new();
+            for parameter in operation.parameters.iter().flatten() {
+                if let RefOr::T(parameter) = parameter {
+                    let place = match parameter.parameter_in {
+                        ParameterIn::Header => "header",
+                        ParameterIn::Path => "path",
+                        ParameterIn::Query => "query",
+                        ParameterIn::QueryString => "querystring",
+                        ParameterIn::Cookie => "cookie",
+                    };
+                    let name = if place == "header" {
+                        parameter.name.to_ascii_lowercase()
+                    } else {
+                        parameter.name.clone()
+                    };
+                    if !seen.insert((place, name)) {
+                        problems.push(format!(
+                            "{endpoint}: {place} parameter `{}` is declared twice",
+                            parameter.name
+                        ));
                     }
                 }
             }
@@ -456,6 +484,18 @@ pub(crate) fn looks_vietnamese(text: &str) -> bool {
         matches!(c, 'ă' | 'Ă' | 'đ' | 'Đ' | 'ơ' | 'Ơ' | 'ư' | 'Ư')
             || ('\u{1EA0}'..='\u{1EF9}').contains(&c)
     })
+}
+
+/// Thêm một header chung vào danh sách tham số, trừ khi operation đã khai header cùng tên.
+fn push_header(parameters: &mut Vec<RefOr<Parameter>>, header: Parameter) {
+    let declared = parameters.iter().any(|parameter| {
+        matches!(parameter, RefOr::T(parameter)
+            if parameter.parameter_in == ParameterIn::Header
+                && parameter.name.eq_ignore_ascii_case(&header.name))
+    });
+    if !declared {
+        parameters.push(RefOr::T(header));
+    }
 }
 
 /// Header `Accept-Language`, có ở mọi operation.

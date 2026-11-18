@@ -148,7 +148,11 @@ async fn can_trait_cua_module_dang_ky_sau_thi_bao_ro_cach_sua() {
         let error = modules.start(&db).unwrap_err().to_string();
 
         assert!(error.starts_with("modules: module `notes` failed to start:"), "{error}");
-        assert!(error.contains("requires `dyn module::UserDirectory`"), "{error}");
+        // Tên kiểu đầy đủ tuỳ chỗ khai trait (ở đây có tiền tố của chương trình test).
+        assert!(
+            error.contains("requires `dyn ") && error.contains("module::UserDirectory`"),
+            "{error}"
+        );
         assert!(error.contains("register the providing module before `notes`"), "{error}");
         assert!(seen.lock().unwrap().is_empty());
     })

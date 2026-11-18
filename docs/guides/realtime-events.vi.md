@@ -64,23 +64,32 @@ Mỗi máy chủ giữ tối đa `AUTOXIDE_EVENTS_STREAM_MAX_PER_USER` stream m�
 `EventSource` không gửi được header `Authorization`, nên đọc stream bằng `fetch`:
 
 ```ts
-const response = await fetch(`${baseUrl}/api/v1/kernel/events/stream?names=content.entry_published`, {
-  headers: { Authorization: `Bearer ${token}`, ...(lastId ? { "Last-Event-ID": lastId } : {}) },
-});
-const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
-let buffer = "";
-for (;;) {
-  const { value, done } = await reader.read();
-  if (done) break; // closed by the server: reconnect with lastId
-  buffer += value;
-  let end;
-  while ((end = buffer.indexOf("\n\n")) >= 0) {
-    const frame = buffer.slice(0, end);
-    buffer = buffer.slice(end + 2);
-    const id = frame.match(/^id: (.*)$/m)?.[1];
-    const data = frame.match(/^data: (.*)$/m)?.[1];
-    if (frame.includes("event: reset")) { /* reload over REST */ }
-    if (id && data && !seen.has(id)) { seen.add(id); lastId = id; handle(JSON.parse(data)); }
+const baseUrl = "https://api.example.com";
+const token = "axk1_…"; // read it from your secret store
+let lastId: string | undefined; // keep it across reconnects
+const seen = new Set<string>(); // ids already handled
+declare function handle(event: unknown): void; // your code
+
+// Call it again when it returns: it resumes after lastId.
+export async function listen(): Promise<void> {
+  const response = await fetch(`${baseUrl}/api/v1/kernel/events/stream?names=content.entry_published`, {
+    headers: { Authorization: `Bearer ${token}`, ...(lastId ? { "Last-Event-ID": lastId } : {}) },
+  });
+  const reader = response.body!.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break; // closed by the server: reconnect with lastId
+    buffer += value;
+    let end;
+    while ((end = buffer.indexOf("\n\n")) >= 0) {
+      const frame = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const id = frame.match(/^id: (.*)$/m)?.[1];
+      const data = frame.match(/^data: (.*)$/m)?.[1];
+      if (frame.includes("event: reset")) { /* reload over REST */ }
+      if (id && data && !seen.has(id)) { seen.add(id); lastId = id; handle(JSON.parse(data)); }
+    }
   }
 }
 ```

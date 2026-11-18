@@ -20,11 +20,11 @@
 //!
 //! Doc-test không chạy ở đây (cần `rustdoc`); gate đầy đủ chạy chúng.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::sync::Mutex;
+use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -115,7 +115,10 @@ fn changed_since(
     Ok((base.clone(), changed_files(root, &base)?))
 }
 
-pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
+/// `keep_env`: chạy trên database và S3 của môi trường (`TEST_DATABASE_URL`, `TEST_S3_ENDPOINT`)
+/// như `test-all`, thay vì luôn SQLite — gate của pull request trên CI (`./gate.sh --pr`, D-20261118-ci-pr-affected-tests).
+/// Khi đó không ghi mốc "lần xanh gần nhất": mốc đó chỉ dành cho gate nhanh trên SQLite.
+pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<(), String> {
     // Chụp cây file TRƯỚC khi build: xanh thì đúng cây này được ghi là đã xanh.
     let current = snapshot_tree(&workspace.root)?;
     let (base, changed) = changed_since(&workspace.root, base, &current)?;
@@ -131,7 +134,9 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
         }
         Affected::Crates(crates) if crates.is_empty() => {
             println!("test-affected: no crate changed since {base}, nothing to test");
-            git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+            if !keep_env {
+                git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+            }
             return Ok(());
         }
         Affected::Crates(crates) => {
@@ -153,15 +158,27 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
         .into_iter()
         .filter_map(|test| {
             let (name, dir) = dirs.iter().find(|(_, dir)| *dir == test.dir)?;
-            Some(Job { name: name.clone(), dir: dir.clone(), executable: test.executable })
+            Some(Job {
+                name: name.clone(),
+                dir: dir.clone(),
+                executable: test.executable,
+                threads: 0,
+            })
         })
         .collect();
     let workers = workers();
     println!("test-affected: running {} test binaries, {workers} at a time", jobs.len());
     let started = Instant::now();
-    let failed = run_parallel(&workspace.root, jobs, workers, &Mode::SqliteOnly)?;
+    let mode = if keep_env { Mode::from_env() } else { Mode::SqliteOnly };
+    let mut jobs = jobs;
+    if matches!(mode, Mode::Postgres) {
+        share_postgres(&mut jobs)?;
+    }
+    let failed = run_parallel(&workspace.root, jobs, workers, &mode)?;
     if failed.is_empty() {
-        git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        if !keep_env {
+            git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
+        }
         println!("\ntest-affected: all test binaries passed in {:.0?}", started.elapsed());
         Ok(())
     } else {
@@ -173,26 +190,26 @@ pub fn run(workspace: &Workspace, base: Option<&str>) -> Result<(), String> {
 /// SQLite), các file test chạy song song — phần test của gate đầy đủ (D-299). `--doc` chạy thêm
 /// doc-test (gate chạy một lần, ở lượt SQLite).
 pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
-    let postgres = std::env::var("TEST_DATABASE_URL")
-        .is_ok_and(|url| url.starts_with("postgres:") || url.starts_with("postgresql:"));
     let workers = workers();
-    let mode = if postgres {
-        // Mỗi test giữ tới vài kết nối; đo được 16 test cùng lúc ≈ 141 kết nối đỉnh, dưới trần
-        // 300 của gate. Chia đều trần này cho các file test chạy cùng lúc.
-        Mode::Postgres { test_threads: (POSTGRES_CONCURRENT_TESTS / workers).max(1) }
-    } else {
-        Mode::Inherit
-    };
-    let jobs: Vec<Job> = build_tests(&workspace.root)?
+    let mode = Mode::from_env();
+    let mut jobs: Vec<Job> = build_tests(&workspace.root)?
         .into_iter()
         .filter_map(|test| {
             let package = workspace
                 .packages
                 .iter()
                 .find(|package| workspace.root.join(&package.dir) == test.dir)?;
-            Some(Job { name: package.name.clone(), dir: test.dir, executable: test.executable })
+            Some(Job {
+                name: package.name.clone(),
+                dir: test.dir,
+                executable: test.executable,
+                threads: 0,
+            })
         })
         .collect();
+    if matches!(mode, Mode::Postgres) {
+        share_postgres(&mut jobs)?;
+    }
     println!("test-all: running {} test binaries, {workers} at a time", jobs.len());
     let started = Instant::now();
     let failed = run_parallel(&workspace.root, jobs, workers, &mode)?;
@@ -214,17 +231,60 @@ pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Số test chạy cùng lúc trên Postgres, cộng mọi file test. Xem `run_all`.
+/// Số test chạy cùng lúc trên Postgres, cộng mọi chương trình test. Xem [`share_postgres`].
 const POSTGRES_CONCURRENT_TESTS: usize = 16;
 
-/// Cách chạy một file test.
+/// Cách chạy một chương trình test.
 enum Mode {
     /// Gate nhanh: luôn SQLite, bỏ biến database và S3 người chạy lỡ đặt.
     SqliteOnly,
     /// Giữ nguyên môi trường (gate đầy đủ, lượt SQLite).
     Inherit,
-    /// Giữ nguyên môi trường, giới hạn số test mỗi file chạy cùng lúc.
-    Postgres { test_threads: usize },
+    /// Giữ nguyên môi trường; mỗi chương trình chỉ chạy số test cùng lúc đã chia (`Job::threads`).
+    Postgres,
+}
+
+impl Mode {
+    /// Theo database của `TEST_DATABASE_URL`.
+    fn from_env() -> Mode {
+        let postgres = std::env::var("TEST_DATABASE_URL")
+            .is_ok_and(|url| url.starts_with("postgres:") || url.starts_with("postgresql:"));
+        if postgres { Mode::Postgres } else { Mode::Inherit }
+    }
+}
+
+/// Chia [`POSTGRES_CONCURRENT_TESTS`] suất cho các chương trình test theo số test của từng chương
+/// trình (D-20261118-build-size). Mỗi test giữ tới vài kết nối; đo được 16 test cùng lúc ≈ 141 kết nối đỉnh, dưới
+/// trần 300 của gate. Trước đây mỗi file test là một chương trình và suất chia đều; nay test tích
+/// hợp của một crate gộp thành một chương trình hàng trăm test, chia đều thì nó chỉ được một hai
+/// suất và chạy gần như tuần tự. [`run_parallel`] chỉ cho chạy cùng lúc các chương trình có tổng
+/// suất không vượt trần, nên số test chạy cùng lúc vẫn không vượt trần.
+fn share_postgres(jobs: &mut [Job]) -> Result<(), String> {
+    let counts: Vec<usize> = jobs.iter().map(count_tests).collect::<Result<_, _>>()?;
+    let total: usize = counts.iter().sum::<usize>().max(1);
+    for (job, count) in jobs.iter_mut().zip(counts) {
+        job.threads =
+            (POSTGRES_CONCURRENT_TESTS * count).div_ceil(total).clamp(1, POSTGRES_CONCURRENT_TESTS);
+    }
+    // Chương trình lớn chạy trước: nó quyết định tổng thời gian.
+    jobs.sort_by_key(|job| std::cmp::Reverse(job.threads));
+    Ok(())
+}
+
+/// Số test của một chương trình test (`--list`, không chạy gì).
+fn count_tests(job: &Job) -> Result<usize, String> {
+    let output = without_cargo_run_env(&mut Command::new(&job.executable))
+        .args(["--list", "--format", "terse"])
+        .current_dir(&job.dir)
+        .stdin(Stdio::null())
+        .output()
+        .map_err(|error| {
+            format!("cannot list the tests of {}: {error}", job.executable.display())
+        })?;
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| line.ends_with(": test"))
+        .count())
 }
 
 fn workers() -> usize {
@@ -239,6 +299,8 @@ struct Job {
     name: String,
     dir: PathBuf,
     executable: PathBuf,
+    /// Trên Postgres: số test chạy cùng lúc của chương trình này (`--test-threads`); 0: mặc định.
+    threads: usize,
 }
 
 /// Chạy các file test, `workers` file cùng lúc; trả tên các file đỏ.
@@ -250,8 +312,9 @@ fn run_parallel(
     workers: usize,
     mode: &Mode,
 ) -> Result<Vec<String>, String> {
-    // `Mutex<Iter>`: hàng đợi chung, mỗi thread lấy việc kế tiếp tới khi hết.
-    let queue = Mutex::new(jobs.into_iter());
+    // Hàng đợi chung kèm tổng suất Postgres đang dùng; `Condvar` đánh thức thread đang chờ suất.
+    let queue = Mutex::new(Queue { jobs: jobs.into(), used: 0 });
+    let freed = Condvar::new();
     let failed = Mutex::new(Vec::new());
     let errors = Mutex::new(Vec::new());
     // `thread::scope`: các thread mượn được `queue`, `failed`… vì scope chờ chúng xong mới
@@ -261,7 +324,7 @@ fn run_parallel(
             scope.spawn(|| {
                 // Guard của `lock()` bị huỷ ngay trong closure: lấy việc xong là nhả hàng đợi,
                 // không giữ nó suốt lúc chạy test.
-                while let Some(job) = queue.lock().ok().and_then(|mut queue| queue.next()) {
+                while let Some(job) = next_job(&queue, &freed) {
                     let display = job
                         .executable
                         .strip_prefix(root)
@@ -297,6 +360,10 @@ fn run_parallel(
                             }
                         }
                     }
+                    if let Ok(mut queue) = queue.lock() {
+                        queue.used -= job.threads;
+                    }
+                    freed.notify_all();
                 }
             });
         }
@@ -306,6 +373,31 @@ fn run_parallel(
         return Err(errors.join("; "));
     }
     Ok(failed.into_inner().unwrap_or_default())
+}
+
+struct Queue {
+    jobs: VecDeque<Job>,
+    /// Tổng `threads` của các chương trình đang chạy.
+    used: usize,
+}
+
+/// Lấy chương trình kế tiếp còn vừa suất (đang không chạy gì thì luôn vừa); hết việc thì `None`.
+fn next_job(queue: &Mutex<Queue>, freed: &Condvar) -> Option<Job> {
+    let mut queue = queue.lock().ok()?;
+    loop {
+        if queue.jobs.is_empty() {
+            return None;
+        }
+        let used = queue.used;
+        let fits = |job: &Job| used == 0 || used + job.threads <= POSTGRES_CONCURRENT_TESTS;
+        if let Some(index) = queue.jobs.iter().position(fits) {
+            let job = queue.jobs.remove(index)?;
+            queue.used += job.threads;
+            return Some(job);
+        }
+        // `wait` nhả lock trong lúc chờ và lấy lại khi được đánh thức.
+        queue = freed.wait(queue).ok()?;
+    }
 }
 
 fn run_one(job: &Job, mode: &Mode) -> std::io::Result<Output> {
@@ -320,8 +412,8 @@ fn run_one(job: &Job, mode: &Mode) -> std::io::Result<Output> {
             command.env_remove("TEST_DATABASE_URL").env_remove("TEST_S3_ENDPOINT");
         }
         Mode::Inherit => {}
-        Mode::Postgres { test_threads } => {
-            command.arg(format!("--test-threads={test_threads}"));
+        Mode::Postgres => {
+            command.arg(format!("--test-threads={}", job.threads.max(1)));
         }
     }
     command.output()
