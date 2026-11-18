@@ -5,4 +5,5 @@ pub mod decimal;
 pub mod email;
 pub mod money;
 pub mod public_url;
+pub mod slug;
 pub mod template;

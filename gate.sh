@@ -11,6 +11,9 @@
 #                       vào chúng, trên cả SQLite và Postgres, không chạy doc-test. Push lên main
 #                       vẫn chạy gate đầy đủ.
 #
+# CI trên GitHub (.github/workflows/ci.yml): pull request chạy `--pr`, push lên main chạy gate đầy
+# đủ (D-175, D-197); gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
+#
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
 # Theo thứ tự (dừng ở bước đỏ đầu tiên):
@@ -156,9 +159,9 @@ gitleaks_run() {
 }
 
 step "secrets (gitleaks)"
-# Thay cho bước quét trong CI (CI trên GitHub đã tắt, D-107; repo riêng tư nên không có
-# secret scanning miễn phí của GitHub — D-108). Quét toàn bộ lịch sử (secret đã commit rồi
-# xoá vẫn nằm trong git), rồi thay đổi đã stage và chưa stage (bắt trước khi commit).
+# Giữ trong gate dù CI cũng quét (job `secrets` của ci.yml, D-108): gate bắt secret trên máy,
+# trước khi nó rời máy. Quét toàn bộ lịch sử (secret đã commit rồi xoá vẫn nằm trong git), rồi
+# thay đổi đã stage và chưa stage (bắt trước khi commit).
 leaks=(--no-banner --redact --config .gitleaks.toml)
 gitleaks_run git . "${leaks[@]}"
 gitleaks_run git . "${leaks[@]}" --pre-commit --staged

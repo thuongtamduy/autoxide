@@ -32,9 +32,8 @@ async fn world(test: &TestDatabase) -> World {
     let shared_api: Arc<dyn Storage> = shared.clone();
     let opener_api: Arc<dyn StorageOpener> = Arc::new(opener.clone());
     let app = TestApp::builder(test)
-        // Dời chờ TTL cache + thời gian tối đa của request: rút ngắn cho test.
+        // Dời chờ TTL cache + thời gian tối đa của request: test bỏ qua bằng `skip_move_wait`.
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-        .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
         .provide::<dyn Storage>(shared_api)
         .provide::<dyn StorageOpener>(opener_api)
         .tenant("a")
@@ -68,6 +67,7 @@ impl World {
     async fn move_to(&self, to: &str, keep_source: bool) {
         let moves = self.moves();
         let started = moves.start(Actor::system(), "a", to, keep_source, false).await.unwrap();
+        self.app.skip_move_wait().await.unwrap();
         assert_eq!(moves.run(started.id, "test").await.unwrap().state, "done");
     }
 }

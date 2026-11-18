@@ -6,7 +6,7 @@ thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/
 
 Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
-phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
+phát hành mới nhất `v0.14.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
@@ -282,7 +282,7 @@ Nhóm A — vận hành:
 - [ ] Xoay khoá không gián đoạn: `AUTOXIDE_AUTH_TOKEN_SECRET` (và các khoá ký khác) nhận thêm khoá
       cũ trong một khoảng chuyển tiếp — ký bằng khoá mới, kiểm bằng cả hai — để đổi khoá (định kỳ
       hay khi bị lộ) không đăng xuất mọi người; test; quy trình trong `docs/DEPLOY.md`
-- [ ] Sổ tay xử lý sự cố trong `docs/DEPLOY.md` (EN + VI): hàng đợi kẹt, job trong dead-letter
+- [x] Sổ tay xử lý sự cố trong `docs/DEPLOY.md` (EN + VI): hàng đợi kẹt, job trong dead-letter
       (`autoxide jobs retry`), database đầy, lộ khoá, mất admin cuối cùng (`autoxide user …`),
       nâng cấp khi nhiều máy chủ chạy hai phiên bản code cùng lúc (migration theo kiểu mở rộng
       trước, thu hẹp sau). Mỗi tình huống: dấu hiệu, lệnh kiểm, cách sửa
@@ -466,7 +466,7 @@ Module nghiệp vụ, không phải core: khái niệm sản phẩm, đơn hàng
 Bắt đầu SAU bước 35 và 36. Khai hạn mức (số sản phẩm) và tính năng (nhiều biến thể, bảng giá) theo
 bước 35.
 
-- [ ] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
+- [x] Chuẩn bị chung cho bước 42–49 (commit đầu tiên): `Subscription::optional` (nhận event của module có thể
       chưa cài), bộ CSV của `forms` thành `autoxide_kernel::csv`, slug của `content` thành
       `autoxide_kernel::slug` — để ba bước song song 42–44 không cùng sửa kernel
 - [ ] Sản phẩm và biến thể: tuỳ chọn (màu, cỡ…), SKU và mã vạch duy nhất trong khách, trạng thái (nháp, đang
@@ -840,7 +840,7 @@ Bắt đầu SAU bước 45 và 47. Bán cho doanh nghiệp trên cùng hệ th�
 
 Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, phòng khám, lớp học, sân thể thao.
 
-- [ ] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
+- [x] Dịch vụ (thời lượng, đệm, sức chứa, cọc), nhân viên và phòng / thiết bị, lịch làm việc lặp và ngày nghỉ
       theo múi giờ của nút; tính giờ trống công khai
 - [ ] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
       database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách

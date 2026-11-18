@@ -719,6 +719,130 @@ hai giai đoạn:
 Chỉ một máy chủ, không có bộ cân bằng tải thì để khoảng rút là `0`: không có nơi nào khác
 để gửi request, rút chỉ làm việc dừng chậm thêm.
 
+## Theo dõi (monitoring)
+
+Bật `AUTOXIDE_HTTP_METRICS=true` và để Prometheus đọc `/metrics` ngay trên máy (chặn `/metrics` ở
+reverse proxy). Ngoài số đo request (`http_requests_total`, `http_request_duration_seconds`), mọi tiến
+trình chạy việc nền (`AUTOXIDE_PROCESS_ROLE` là `all` hay `worker`) cập nhật các gauge tồn đọng mỗi
+`AUTOXIDE_METRICS_BACKLOG_SECONDS` giây (mặc định 30), gắn nhãn `database` và `module`:
+
+| Gauge | Nghĩa |
+|---|---|
+| `jobs_pending` | Job chưa xong, kể cả job hẹn giờ |
+| `jobs_oldest_pending_seconds` | Job tới hạn chờ lâu nhất đã chờ bao lâu (0 khi không có) |
+| `jobs_dead` | Job trong dead-letter queue (`autoxide jobs failed`) |
+| `events_pending`, `events_oldest_pending_seconds`, `events_dead` | Như trên, cho event đang chờ giao tới bên nhận |
+| `database_connections{pool,state}`, `database_connections_max{pool}` | Kết nối của pool `read` và `write`, `in_use` hay `idle`, và số tối đa |
+
+Nhãn `database` là tên database (`main`, hay placement của khách có database riêng); quá
+`AUTOXIDE_METRICS_MAX_DATABASE_LABELS` (mặc định 50) database thì phần còn lại cộng chung dưới
+`database="other"`. Không có nhãn theo khách: tra một khách bằng log và trace.
+
+Repo có sẵn hai file:
+
+- [`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml): luật cảnh báo —
+  lỗi máy chủ trên 2%, p95 chậm, job chờ quá 10 phút, job vào dead-letter queue, event chưa giao quá 5
+  phút, pool kết nối dùng 90%. Mỗi luật có chú thích `action` nói phải làm gì; các bước nằm trong sổ
+  tay bên dưới. Thêm file vào `rule_files` trong `prometheus.yml` và chuyển cảnh báo qua Alertmanager.
+- [`deploy/grafana/autoxide-dashboard.json`](../deploy/grafana/autoxide-dashboard.json): dashboard
+  Grafana (Dashboards › New › Import) có request, lỗi, p95 theo route, tồn đọng, dead-letter queue và kết
+  nối, lọc theo database.
+
+Có nhiều tiến trình worker thì mỗi tiến trình đặt cùng gauge (mỗi `instance` một chuỗi); luật cảnh báo
+và dashboard lấy giá trị lớn nhất, không cộng.
+
+## Sổ tay xử lý sự cố
+
+Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
+
+### Lỗi máy chủ
+
+- **Dấu hiệu:** cảnh báo `AutoxideHigh5xxRate`; client nhận lỗi `500`.
+- **Kiểm:** mọi response lỗi có `request_id`; tìm nó trong log. `autoxide doctor` kiểm một lượt cấu
+  hình, database, migration, nơi lưu file và mail.
+- **Sửa:** theo log (database mất kết nối, đầy đĩa, dịch vụ ngoài hỏng). Lỗi bên trong code là bug: báo
+  kèm dòng log, không kèm secret hay dữ liệu cá nhân.
+
+### Request chậm
+
+- **Dấu hiệu:** cảnh báo `AutoxideSlowP95` nêu tên route.
+- **Kiểm:** `database_connections` có gần mức tối đa không (request đứng chờ kết nối), và kế hoạch
+  truy vấn của route đó (`EXPLAIN ANALYZE` trên PostgreSQL, `EXPLAIN QUERY PLAN` trên SQLite).
+- **Sửa:** thiếu index thì thêm bằng migration mới của module sở hữu bảng; pool quá nhỏ thì xem mục "Kết
+  nối database".
+
+### Hàng đợi kẹt
+
+- **Dấu hiệu:** cảnh báo `AutoxideJobsStuck` hay `AutoxideEventsBacklog`; mail, webhook, báo cáo tới
+  muộn.
+- **Kiểm:** có ít nhất một tiến trình chạy với `AUTOXIDE_PROCESS_ROLE` là `all` hay `worker` không
+  (`/health/ready` của tiến trình đó, log của nó); `jobs_pending` theo module cho thấy module nào đang
+  chậm; ở chế độ nhiều khách, database còn đang migration (`503 tenant_maintenance`) thì chờ tới khi
+  `autoxide migrate up --all` xong.
+- **Sửa:** chạy (hay khởi động lại) worker; tăng `AUTOXIDE_JOBS_CONCURRENCY` hay thêm tiến trình worker
+  khi một module luôn có hàng đợi dài. Event đứng chờ một bên nhận cứ lỗi: lỗi của nó nằm trong log
+  (`event delivery failed`).
+
+### Dead-letter queue
+
+- **Dấu hiệu:** cảnh báo `AutoxideDeadLetterGrowing`; `jobs_dead` tăng.
+- **Kiểm:** `autoxide jobs failed` liệt kê job đã bỏ cuộc, mới nhất trước, kèm lỗi cuối (`--module` để
+  lọc).
+- **Sửa:** sửa nguyên nhân trước (sai mật khẩu SMTP, dịch vụ ngoài hỏng), rồi
+  `autoxide jobs retry <module> <id>` cho từng job. Chạy lại trước khi sửa thì job chỉ vào hàng đợi để
+  lỗi lần nữa.
+
+### Kết nối database
+
+- **Dấu hiệu:** cảnh báo `AutoxideDbPoolExhausted`; request chậm vì chờ kết nối.
+- **Kiểm:** `database_connections{state="in_use"}` theo pool; trên PostgreSQL, truy vấn chạy lâu trong
+  `pg_stat_activity`.
+- **Sửa:** dừng thứ đang giữ kết nối (truy vấn chậm, job kẹt), rồi tăng
+  `AUTOXIDE_DATABASE_READ_CONNECTIONS` / `AUTOXIDE_DATABASE_WRITE_CONNECTIONS` — mỗi tiến trình mở chừng
+  ấy kết nối, nên giữ tổng dưới `max_connections` của máy chủ database. SQLite theo thiết kế chỉ có một
+  kết nối ghi.
+
+### Database đầy
+
+- **Dấu hiệu:** lệnh ghi lỗi, log có "disk full" hay "no space left on device".
+- **Kiểm:** SQLite: cỡ file database và file `-wal` của nó (một lần đọc kéo dài, như backup, làm file
+  `-wal` lớn dần tới khi xong). PostgreSQL: các bảng lớn nhất,
+  `SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) FROM pg_statio_user_tables ORDER BY
+  pg_total_relation_size(relid) DESC LIMIT 10;`.
+- **Sửa:** giải phóng hay thêm dung lượng đĩa trước. Job đã xong và event đã giao tự bị xoá sau 7 ngày;
+  trên PostgreSQL chạy `VACUUM` cho bảng lớn sau khi xoá nhiều dòng.
+
+### Lộ khoá
+
+- `AUTOXIDE_AUTH_TOKEN_SECRET`: đặt giá trị mới trên mọi máy chủ rồi khởi động lại. Mọi access token
+  hết dùng được; client đăng nhập lại bằng refresh token, vẫn còn hiệu lực.
+- `AUTOXIDE_SECRET_KEY`: xoay như mục "Lấy mã nguồn và đặt secret" (giá trị mới, giá trị cũ vào
+  `AUTOXIDE_SECRET_KEY_PREVIOUS`, `autoxide secrets reseal`). Bản backup lấy trước đó vẫn mở được bằng
+  khoá cũ: xoá chúng, hay giữ chúng an toàn như chính khoá. Bộ đếm theo địa chỉ của người xem bắt đầu
+  lại với khoá mới.
+- API key hay secret của webhook: thu hồi key, xoay secret của webhook qua API.
+
+### Mất quản trị viên cuối cùng
+
+- **Dấu hiệu:** không ai đăng nhập được với role `admin` (tài khoản bị xoá, bị khoá, hay người đó đã
+  nghỉ). `autoxide doctor` cảnh báo khi không còn quản trị viên nào đang hoạt động.
+- **Sửa:** trên máy chủ, `autoxide user create --email … --name … --admin` tạo quản trị viên mới và in
+  mật khẩu. Quản trị viên chỉ mất bước xác thực thứ hai hay passkey:
+  `autoxide user reset-mfa` / `autoxide user remove-passkeys`.
+
+### Cập nhật khi hai phiên bản cùng chạy
+
+Lúc cập nhật cuốn chiếu, máy chủ cũ và mới cùng chạy trên một database, nên một bản phát hành đổi
+database theo hai bước ("mở rộng trước, thu hẹp sau"):
+
+1. **Mở rộng:** bản mới thêm thứ nó cần (cột mới cho phép trống hay có giá trị mặc định; bảng mới) và ghi
+   cả dạng cũ lẫn dạng mới. Bản cũ vẫn chạy: nó không biết cột mới.
+2. **Thu hẹp:** một bản phát hành sau, khi không còn máy chủ nào chạy bản cũ, thôi ghi dạng cũ và bỏ nó.
+
+`autoxide serve` không khởi động khi còn thiếu migration, nên chạy `autoxide migrate up` (thêm `--all` ở
+chế độ nhiều khách) trước khi bật máy chủ mới, rồi thay máy chủ cũ như mục "Cập nhật không làm rơi
+request".
+
 ## Kiểm trước khi chạy thật
 
 - [ ] `AUTOXIDE_AUTH_TOKEN_SECRET` và `AUTOXIDE_SECRET_KEY` là chuỗi ngẫu nhiên dài, giữ bí mật

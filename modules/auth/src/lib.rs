@@ -434,13 +434,24 @@ impl Module for AuthModule {
     }
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
-        self.administrator.clone().map_or_else(Vec::new, |probe| {
-            vec![autoxide_kernel::doctor::Check::new(
+        let Some(administrator) = self.administrator.clone() else {
+            return Vec::new();
+        };
+        // `administrator` chỉ có sau `start`, mà `start` cần `config`: có cái này là có cái kia.
+        let configured = self.config.as_ref().is_some_and(|config| config.token_secret.is_some());
+        vec![
+            autoxide_kernel::doctor::Check::new(
                 "administrator",
                 "An active account with the `admin` role exists, so someone can manage the server.",
-                probe,
-            )]
-        })
+                administrator,
+            ),
+            autoxide_kernel::doctor::Check::new(
+                "token_secret",
+                "AUTOXIDE_AUTH_TOKEN_SECRET is set, so access tokens survive a restart and work \
+                 on every server.",
+                Arc::new(doctor::TokenSecret { configured }),
+            ),
+        ]
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

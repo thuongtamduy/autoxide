@@ -11,6 +11,22 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
+  equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
+  (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
+- Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
+  that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
+  with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
+  `catalog`).
+- `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
+  `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
+  requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,
+  updating while two versions run). `cargo xtask check` keeps the metric names in those files in line with the code.
+- Queue backlog gauges at `/metrics` (step 39): `jobs_pending`, `jobs_oldest_pending_seconds`, `jobs_dead`,
+  `events_pending`, `events_oldest_pending_seconds`, `events_dead` (by `database` and `module`) and
+  `database_connections` / `database_connections_max` (by `pool`), updated every `AUTOXIDE_METRICS_BACKLOG_SECONDS` by
+  processes that run background work; past `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` databases the rest are added up
+  under `database="other"`.
 - New module `reporting` (step 38): reports across a customer tree. Modules declare the figures their events
   produce (`Module::facts`; first ones: `invoices.issued_total`, `invoices.issued_count`, `ledger.revenue`,
   `ledger.tax_output`); facts of every tenant — also tenants on other databases — reach a store at the root tenant
@@ -30,6 +46,9 @@ endpoints are marked deprecated with a sunset date first.
   written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
   `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
   `kernel.relocation_finished`, `kernel.relocation_failed`.
+- `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
+  deployment guide already said; the README's installation steps now include importing the reference data
+  (`autoxide task address.import`, `autoxide task tax.import_pack`).
 - `ledger`: `POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview` makes a sample VietQR code to scan before taking
   real payments (nothing is stored); `GET /api/v1/ledger/books/{id}/integrity` checks a book's hash chain on demand.
 - `invoices`: `POST /api/v1/invoices/documents/{id}/refresh` asks the e-invoice provider about a document now;

@@ -79,6 +79,27 @@ where
         background.spawn(worker.run(async move {
             let _ = stopped.wait_for(|stop| *stop).await;
         }));
+        // Gauge tồn đọng (bước 39): chỉ khi có `/metrics`, và chỉ ở tiến trình chạy việc nền —
+        // tiến trình chỉ phục vụ API không đặt cùng gauge lần nữa (Prometheus sẽ thấy chuỗi trùng).
+        if config.http.metrics {
+            match modules.backlog_monitor() {
+                Ok(monitor) => {
+                    let monitor = monitor
+                        .every(std::time::Duration::from_secs(
+                            config.process.metrics_backlog_seconds,
+                        ))
+                        .max_database_labels(
+                            usize::try_from(config.process.metrics_max_database_labels)
+                                .unwrap_or(usize::MAX),
+                        );
+                    let mut stopped = background_stopped.clone();
+                    background.spawn(monitor.run(async move {
+                        let _ = stopped.wait_for(|stop| *stop).await;
+                    }));
+                }
+                Err(error) => tracing::error!(error = %error, "cannot watch the queue backlog"),
+            }
+        }
         // Chế độ nhiều khách: kiểm migration của các placement mỗi phút (đặc tả 33).
         if let Some(registry) = modules.tenancy()
             && registry.mode() == TenancyMode::Multi
