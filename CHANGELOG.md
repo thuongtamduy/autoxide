@@ -17,10 +17,18 @@ endpoints are marked deprecated with a sunset date first.
   edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
   machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
+  equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
+  (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and
   `catalog`).
+- Jobs: `JobRegistration::timeout` lets a job kind run longer than 4.5 minutes; the worker extends its claim while
+  the job runs and stops the job if it loses the claim.
+- `autoxide_kernel::backup` (`write_backup`, `BackupSink`, `DirectorySink`, `StorageSink`): the core of `autoxide
+  backup`, shared with the scheduled backups of step 39. A backup never copies files under `kernel/backups/` (the
+  scheduled backups themselves).
 - `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
   `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
   requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,
