@@ -177,6 +177,54 @@ impl ContentService {
         self.take_down(tenant, principal, id, expected, Status::Archived).await
     }
 
+    /// Đưa mục đã lưu trữ `id` về nháp — "Hoàn tác" của lưu trữ (bước 52). Đường dẫn cũ vẫn trả
+    /// 410 cho tới khi đăng lại (đăng thẳng từ lưu trữ cũng được). Cần `content.publish`, như lưu trữ.
+    pub(crate) async fn unarchive(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+        expected: Option<DateTime<Utc>>,
+    ) -> Result<Entry, Error> {
+        principal.require(&CONTENT_PUBLISH)?;
+        let entry = self.load_checked(tenant, id, None).await?;
+        permissions::require_org(principal, tenant, &entry, permissions::Need::Publish).await?;
+        check_version(&entry, expected)?;
+        if Status::of(&entry) != Status::Archived {
+            return Err(Error::conflict("content.not_archived", "The entry is not archived."));
+        }
+        let now = now();
+        let transaction = tenant.database().begin_write().await?;
+        let current =
+            self.reload(tenant, &transaction, id, expected.unwrap_or(entry.updated_at)).await?;
+        if Status::of(&current) != Status::Archived {
+            transaction.rollback().await?;
+            return Err(Error::conflict("content.not_archived", "The entry is not archived."));
+        }
+        let mut after = current.clone();
+        after.status = Status::Draft.as_str().to_owned();
+        after.updated_at = now;
+        let after = self.save_state(tenant, &transaction, &current, &after).await?;
+        let change = Change {
+            before: Some(summary(&current)),
+            after: Some(summary(&after)),
+            published: None,
+        };
+        self.enqueue_index(tenant, &transaction, id).await?;
+        self.outbox
+            .record(
+                &transaction,
+                tenant,
+                Actor::from(principal),
+                events::entry_subject(id),
+                &events::EntryUnarchived(change),
+            )
+            .await?;
+        transaction.commit().await?;
+        tracing::info!(entry_id = %id, "content entry unarchived");
+        Ok(after)
+    }
+
     async fn take_down(
         &self,
         tenant: &TenantContext,

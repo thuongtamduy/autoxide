@@ -20659,6 +20659,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/entries/{id}/unarchive": {
+    /** Bring an archived post or page back. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_EntryResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/entries/{id}/unpublish": {
     /** Take a post or page down. */
     post: {

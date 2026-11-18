@@ -172,6 +172,39 @@ pub(crate) async fn archive_entry(
     tagged(&service, &tenant, service.archive(&tenant, &principal, id, expected).await?).await
 }
 
+/// Bring an archived post or page back.
+///
+/// Requires `content.publish`. The undo of archiving: the entry becomes a draft again, unchanged.
+/// Its old address keeps answering 410 until it is published again (an archived entry may also be
+/// published directly). `If-Match` is required.
+#[utoipa::path(
+    post,
+    path = "/entries/{id}/unarchive",
+    extensions(("x-permissions" = json!(["content.publish"]))),
+    operation_id = "unarchive_content_entry",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the entry."), ("If-Match" = String, Header, description = IF_MATCH)),
+    responses(
+        (status = 200, description = "A draft again.", body = Data<EntryResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `content.publish`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No entry has this id; code `content.not_found`.", body = Problem),
+        (status = 409, description = "The entry is not archived; code `content.not_archived`.", body = Problem),
+        (status = 412, description = "The entry changed since you read it; code `precondition_failed`.", body = Problem),
+        (status = 428, description = "`If-Match` is missing; code `precondition_required`.", body = Problem),
+    )
+)]
+pub(crate) async fn unarchive_entry(
+    State(service): State<Arc<ContentService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    if_match: IfMatch,
+) -> Result<Tagged<EntryResponse>, Error> {
+    let expected = if_match.required()?;
+    tagged(&service, &tenant, service.unarchive(&tenant, &principal, id, expected).await?).await
+}
+
 /// Move a page under another parent.
 ///
 /// Requires `content.write` (or `content.write_own` for a page you created, under a parent you
