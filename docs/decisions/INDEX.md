@@ -437,6 +437,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
 - **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
+- **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 
 ## Vận hành và hiệu năng

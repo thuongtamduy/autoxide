@@ -36,6 +36,8 @@ endpoints are marked deprecated with a sunset date first.
   edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
   machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
+  channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
