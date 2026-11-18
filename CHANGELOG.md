@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 51 P19: list exports take `cf.<key>` columns for the tenant's active custom fields (by default every one is
+  exported); custom fields of visibility `public` on posts and pages are copied into the published version and returned
+  by the public reads (`custom_fields`); the plan limit `kernel.custom_fields` counts active fields (deleting one gives its
+  slot back); MCP tool `kernel.list_custom_fields`.
 - Step 51 P20: `POST /api/v1/kernel/tags/{id}/apply {kind, add, remove}` tags or untags up to 500 records at once, one
   `kernel.record_tags_changed` event per changed record; records already in the wanted state are `skipped`.
 - Step 51 P12: pending approval requests show in the work inbox of the people who may decide them (source

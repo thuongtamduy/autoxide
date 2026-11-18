@@ -168,6 +168,10 @@ pub(crate) struct PublicEntryResponse {
     /// (any more) is left out: skip its node. Prices and stock are not here — read them from the
     /// owning module's public API, so they are always current.
     embeds: std::collections::BTreeMap<String, PublicEmbed>,
+    /// The tenant's custom fields shown to readers (those of visibility `public`), by key, as they
+    /// were when the entry was published.
+    #[schema(value_type = Object)]
+    custom_fields: serde_json::Map<String, Value>,
 }
 
 /// A record of another module embedded in an entry.
@@ -185,8 +189,19 @@ pub(crate) struct PublicEmbed {
 }
 
 pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
-    let PublicView { row, featured, og, body_media, translations, terms, authors, embeds } = view;
+    let PublicView {
+        row,
+        featured,
+        og,
+        body_media,
+        translations,
+        terms,
+        authors,
+        embeds,
+        custom_fields,
+    } = view;
     PublicEntryResponse {
+        custom_fields,
         embeds: embeds
             .into_iter()
             .map(|(key, resource)| {

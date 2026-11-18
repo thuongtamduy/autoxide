@@ -1854,3 +1854,72 @@ async fn gan_nhan_hang_loat() {
     .await
     .unwrap();
 }
+
+/// Trường tự định nghĩa (bước 51 P19, phần còn lại): trường mức `public` vào bản công khai lúc đăng,
+/// trường nội bộ không lộ; file xuất có cột `cf.<khoá>`; cột `cf.` lạ là 422.
+#[tokio::test]
+async fn truong_cong_khai_va_cot_xuat() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
+        let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
+        let storage: Arc<dyn autoxide_kernel::storage::Storage> =
+            Arc::new(autoxide_testkit::MemoryStorage::new());
+        let app = TestApp::builder(test)
+            .user(
+                "admin",
+                1,
+                &["content.read", "content.write", "content.publish", "kernel.custom_fields.manage"],
+            )
+            .provide::<dyn Media>(media)
+            .provide::<dyn TextModel>(text)
+            .provide::<dyn Embedder>(embedder)
+            .provide::<dyn autoxide_kernel::storage::Storage>(storage)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let define = |body: Value| app.post("/api/v1/kernel/custom-fields").token("admin").json(body).send();
+        let teaser = define(json!({"target": "content.entry", "key": "teaser", "data_type": "text", "labels": {"en": "Teaser"}, "visibility": "public"})).await.unwrap();
+        assert_eq!(teaser.status(), StatusCode::CREATED, "{}", teaser.json());
+        let owner = define(json!({"target": "content.entry", "key": "owner", "data_type": "text", "labels": {"en": "Owner"}})).await.unwrap();
+        assert_eq!(owner.status(), StatusCode::CREATED);
+        let created = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Truong cong khai", "custom_fields": {"teaser": "Đọc ngay", "owner": "Ann"}})),
+        )
+        .await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let id = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let etag = send(&app, "GET", &format!("/entries/{id}"), Some("admin"), &[], None).await.header(header::ETAG).to_owned();
+        let published = send(&app, "POST", &format!("/entries/{id}/publish"), Some("admin"), &[("if-match", &etag)], None).await;
+        assert_eq!(published.status(), StatusCode::OK, "{}", published.json());
+        let found = send(&app, "GET", "/public/resolve?locale=en&path=/blog/truong-cong-khai", None, &[], None).await;
+        assert_eq!(found.status(), StatusCode::OK, "{}", found.json());
+        assert_eq!(found.json()["data"]["entry"]["custom_fields"], json!({"teaser": "Đọc ngay"}), "trường nội bộ không lộ");
+
+        let export = |body: Value| app.request(Method::POST, "/api/v1/kernel/exports").token("admin").json(body).send();
+        let resource = "content.list_content_entries";
+        let bad = export(json!({"resource": resource, "columns": ["title", "cf.nothing"]})).await.unwrap();
+        assert_eq!(bad.status(), StatusCode::UNPROCESSABLE_ENTITY);
+        let queued = export(json!({"resource": resource, "columns": ["title", "cf.owner", "cf.teaser"]})).await.unwrap();
+        assert_eq!(queued.status(), StatusCode::CREATED, "{}", queued.json());
+        let job_id = queued.json()["data"]["id"].as_str().unwrap().to_owned();
+        let worker = app.modules().worker(2).unwrap();
+        while worker.run_once().await.unwrap() > 0 {}
+        let job = app.get(&format!("/api/v1/kernel/jobs/{job_id}")).token("admin").send().await.unwrap().json();
+        assert_eq!(job["data"]["status"], "succeeded", "{job}");
+        let url = job["data"]["file"]["url"].as_str().unwrap().to_owned();
+        let csv = app.get(&url).token("admin").send().await.unwrap().text();
+        assert_eq!(
+            csv,
+            "\u{feff}\"title\",\"cf.owner\",\"cf.teaser\"\r\n\"Truong cong khai\",\"Ann\",\"Đọc ngay\"\r\n"
+        );
+    })
+    .await
+    .unwrap();
+}

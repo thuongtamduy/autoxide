@@ -73,12 +73,16 @@ struct ContentModule {
 
 impl Module for ContentModule {
     fn custom_field_targets(&self) -> Vec<autoxide_kernel::custom_fields::CustomFieldTarget> {
-        // Trường tự định nghĩa của khách trên bài viết / trang (bước 51 P19): chỉ nội bộ.
-        vec![autoxide_kernel::custom_fields::CustomFieldTarget::new(
-            resource::ENTRY,
-            permissions::CONTENT_READ,
-            permissions::CONTENT_WRITE,
-        )]
+        // Trường tự định nghĩa của khách trên bài viết / trang (bước 51 P19): nội bộ, hay công khai
+        // (chép vào bản công khai lúc đăng, đọc công khai trả trường mức `public`).
+        vec![
+            autoxide_kernel::custom_fields::CustomFieldTarget::new(
+                resource::ENTRY,
+                permissions::CONTENT_READ,
+                permissions::CONTENT_WRITE,
+            )
+            .visibilities(&["internal", "public"]),
+        ]
     }
 
     fn overridable_texts(&self) -> Vec<autoxide_kernel::texts::OverridableText> {

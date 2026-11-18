@@ -163,8 +163,9 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
       mức hiện `internal` / `public` / `buyer_input`), giá trị nằm trên bản ghi, lọc qua bảng index của module ghi
       cùng transaction, dùng chung cho xuất / nhập / tự động hoá; hạn mức theo gói; test trên cả hai database
       — xong phần lõi (17/11): `kernel_custom_fields`, `/kernel/custom-fields`, `CustomFields::validate` / `write_index` /
-      `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`). Còn: cột `cf.<khoá>` trong xuất (P16) / nhập (56),
-      đọc công khai mức `public`, đưa trường `personal_data` vào xuất / xoá dữ liệu cá nhân, hạn mức theo gói, tool MCP
+      `condition`, `content.entry` (giá trị, lọc `cf.<khoá>`); (18/11, D-373) cột `cf.<khoá>` trong xuất, mức `public` chép vào
+      bản công khai của bài, hạn mức `kernel.custom_fields` theo gói, tool `kernel.list_custom_fields`. Cột `cf.` khi nhập
+      thuộc bước 56; trường `personal_data` áp khi có loại bản ghi gắn với một người (khách hàng, đơn — bước 41–49)
 - [x] Nhãn gắn bản ghi (P20, D-235): nhãn nội bộ dùng chung mọi loại bản ghi, lọc `tags_any` / `tags_all`, gắn
       hàng loạt, gộp nhãn, event cho tự động hoá — xong (17/11); gắn / gỡ hàng loạt (18/11): `POST /kernel/tags/{id}/apply`
       (tối đa 500 bản ghi, chọn theo bộ lọc thì lấy id bằng `dry_run` của thao tác hàng loạt)

@@ -173,6 +173,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.get_tenant_export` | `kernel.data.export` | read-only |
 | `kernel.get_tenant_move` | `kernel.tenants.read` | read-only |
 | `kernel.list_approvals` | — | read-only |
+| `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |

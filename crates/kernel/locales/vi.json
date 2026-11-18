@@ -139,6 +139,7 @@
   "field:must be the id of a record": "phải là ID của một bản ghi",
   "field:must be the slug of the tenant": "phải là slug của khách",
   "field:must hold 1 to {max} ids": "phải có 1 đến {max} id",
+  "field:must hold 1 to {max} ids together with `remove`": "phải có từ 1 đến {max} ID, tính cả `remove`",
   "field:must hold 1 to {max} questions": "phải có 1 đến {max} câu hỏi",
   "field:must list every one of your pins exactly once": "phải liệt kê mọi ghim của bạn, mỗi ghim đúng một lần",
   "field:must match `{other}`": "phải khớp với `{other}`",
