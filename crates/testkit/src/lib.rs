@@ -188,7 +188,7 @@ impl TestDatabase {
         // để sót. `swap` trả giá trị CŨ, nên chỉ lần gọi đầu tiên thấy `false`.
         // Dọn hỏng thì thôi — không vì thế mà làm đỏ bài test.
         if !STALE_REMOVED.swap(true, Ordering::Relaxed) {
-            let _ = remove_stale(target, SystemTime::now()).await;
+            let _ = remove_stale(target, &std::env::temp_dir(), SystemTime::now()).await;
         }
 
         match target {
@@ -278,10 +278,15 @@ impl TestDatabase {
     }
 }
 
-/// Xoá database test đã quá cũ (xem module `stale`). Trả về số database đã xoá.
-async fn remove_stale(target: Target<'_>, now: SystemTime) -> Result<usize, TestDatabaseError> {
+/// Xoá database test đã quá cũ (xem module `stale`). Trả về số database đã xoá. SQLite: tìm
+/// dưới `sqlite_parent` (thư mục tạm của hệ thống; test của chính hàm này dùng thư mục riêng).
+async fn remove_stale(
+    target: Target<'_>,
+    sqlite_parent: &std::path::Path,
+    now: SystemTime,
+) -> Result<usize, TestDatabaseError> {
     match target {
-        Target::Sqlite => Ok(sqlite::remove_stale_directories(&std::env::temp_dir(), now)),
+        Target::Sqlite => Ok(sqlite::remove_stale_directories(sqlite_parent, now)),
         Target::Postgres(admin_url) => {
             let admin = postgres::connect_admin(admin_url).await?;
             let removed = postgres::remove_stale_databases(&admin, now).await;
@@ -333,10 +338,13 @@ mod tests {
         let now = SystemTime::now();
         let old = uuid_created_at(now - STALE_AFTER - Duration::from_secs(60));
 
+        // SQLite: thư mục cha riêng cho bài test này. Đặt database "cũ" thẳng vào thư mục tạm
+        // chung thì tiến trình test khác (chạy song song) dọn rác đúng lúc và xoá mất nó giữa
+        // chừng — bài test đỏ ngẫu nhiên.
+        let (parent, _) = sqlite::create_directory(&std::env::temp_dir()).unwrap();
         let stale_url = match target {
             Target::Sqlite => {
-                let directory =
-                    std::env::temp_dir().join(format!("{}{old}", sqlite::DIRECTORY_PREFIX));
+                let directory = parent.join(format!("{}{old}", sqlite::DIRECTORY_PREFIX));
                 std::fs::create_dir_all(&directory).unwrap();
                 let file = directory.join("test.sqlite");
                 std::fs::write(&file, b"").unwrap();
@@ -351,14 +359,18 @@ mod tests {
             }
         };
         let live = TestDatabase::create(target).await.unwrap();
+        // SQLite: một database đang dùng nữa trong thư mục cha riêng, phải được giữ.
+        let (fresh, _) = sqlite::create_directory(&parent).unwrap();
 
-        remove_stale(target, now).await.unwrap();
+        remove_stale(target, &parent, now).await.unwrap();
 
         assert!(Database::connect(stale_url).await.is_err());
+        assert!(fresh.exists());
         let connection = live.connect().await.unwrap();
         connection.ping().await.unwrap();
         connection.close().await.unwrap();
         live.destroy().await.unwrap();
+        std::fs::remove_dir_all(&parent).unwrap();
     }
 
     #[tokio::test]

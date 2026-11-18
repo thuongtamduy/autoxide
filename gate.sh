@@ -5,7 +5,10 @@
 #                       nhưng chỉ chạy test của crate bị sửa (kể từ lần gate nhanh xanh gần
 #                       nhất, chưa có thì so với origin/main) và crate phụ thuộc vào chúng, chỉ
 #                       trên SQLite, không cần Docker.
-#   ./gate.sh           gate đầy đủ: bắt buộc trước khi merge vào main và trước khi phát hành.
+#   ./gate.sh           gate đầy đủ (cả SQLite và Postgres): bắt buộc trước khi phát hành (D-300).
+#
+# CI trên GitHub (.github/workflows/ci.yml) chạy gate đầy đủ trên mỗi pull request và mỗi lần
+# push lên main (D-175, D-197); gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
@@ -129,9 +132,9 @@ gitleaks_run() {
 }
 
 step "secrets (gitleaks)"
-# Thay cho bước quét trong CI (CI trên GitHub đã tắt, D-107; repo riêng tư nên không có
-# secret scanning miễn phí của GitHub — D-108). Quét toàn bộ lịch sử (secret đã commit rồi
-# xoá vẫn nằm trong git), rồi thay đổi đã stage và chưa stage (bắt trước khi commit).
+# Giữ trong gate dù CI cũng quét (job `secrets` của ci.yml, D-108): gate bắt secret trên máy,
+# trước khi nó rời máy. Quét toàn bộ lịch sử (secret đã commit rồi xoá vẫn nằm trong git), rồi
+# thay đổi đã stage và chưa stage (bắt trước khi commit).
 leaks=(--no-banner --redact --config .gitleaks.toml)
 gitleaks_run git . "${leaks[@]}"
 gitleaks_run git . "${leaks[@]}" --pre-commit --staged

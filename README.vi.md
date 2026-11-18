@@ -150,8 +150,22 @@ muốn tự chọn mật khẩu thì đưa nó vào standard input và thêm `--
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
-Kiểm bản cài đặt. `doctor` đi qua cấu hình, database, migration, nơi lưu file, máy chủ
-SMTP và tài khoản quản trị, và nói cách sửa từng lỗi (`--json` cho script và AI agent;
+Nhập dữ liệu tham chiếu đi kèm máy chủ. Hai bước này không đổi dữ liệu của bạn, và chạy
+lại thì không đổi gì:
+
+```bash
+# Danh mục đơn vị hành chính Việt Nam (tỉnh, xã), dùng để kiểm địa chỉ.
+# Không có gì tự nhập thay bạn: chạy một lần cho mỗi bản cài, và chạy lại khi bản cập nhật
+# mang danh mục mới hơn (`doctor` sẽ nhắc). Xem docs/ADDRESS.vi.md.
+cargo run -p autoxide -- task address.import
+
+# Gói dữ liệu thuế (thuế suất, quy tắc khấu trừ). Máy chủ đang chạy tự nhập trong vòng
+# một giờ; chạy lệnh này để có ngay. Xem docs/TAX.vi.md.
+cargo run -p autoxide -- task tax.import_pack
+```
+
+Kiểm bản cài đặt. `doctor` đi qua cấu hình, database, migration, khoá ký, nơi lưu file,
+máy chủ SMTP, tài khoản quản trị và dữ liệu tham chiếu đã nhập, và nói cách sửa từng lỗi (`--json` cho script và AI agent;
 thoát với mã 1 khi có bước kiểm hỏng):
 
 ```bash
