@@ -1923,3 +1923,52 @@ async fn truong_cong_khai_va_cot_xuat() {
     .await
     .unwrap();
 }
+
+/// "Đang dùng ở đâu" (bước 51, D-267): bài nhúng bài khác thì bài kia biết mình được dùng ở đâu;
+/// người không đọc được bản ghi được hỏi thì 404.
+#[tokio::test]
+async fn dang_dung_o_dau() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let target = send(&app, "POST", "/entries", Some("admin"), &[], Some(json!({"kind": "post", "title": "Được nhúng"}))).await;
+        let target = target.json()["data"]["id"].as_str().unwrap().to_owned();
+        let user = send(
+            &app,
+            "POST",
+            "/entries",
+            Some("admin"),
+            &[],
+            Some(json!({"kind": "post", "title": "Bài nhúng", "body": embed_body(&[("content.entry", target.as_str())])})),
+        )
+        .await;
+        assert_eq!(user.status(), StatusCode::CREATED, "{}", user.json());
+        let user = user.json()["data"]["id"].as_str().unwrap().to_owned();
+        let usages = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{target}/usages"))
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(usages.status(), StatusCode::OK, "{}", usages.json());
+        assert_eq!(
+            usages.json()["data"],
+            json!([{"kind": "content.entry", "id": user, "title": "Bài nhúng", "field": "body"}])
+        );
+        let none = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{user}/usages"))
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(none.json()["data"], json!([]), "không ai dùng bài nhúng");
+        let missing = app
+            .get(&format!("/api/v1/kernel/records/content.entry/{}/usages", Uuid::now_v7()))
+            .token("admin")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}

@@ -15,9 +15,15 @@ use super::{Categories, FakeMedia, Items};
 /// Module giả cung cấp `shop.item` và `shop.category` cho sổ đối tượng.
 struct Shop;
 
+// `#[cfg(test)]` (file đã chỉ có trong test): bộ kiểm bản dịch bỏ qua câu mô tả permission giả.
+#[cfg(test)]
 impl Module for Shop {
     fn name(&self) -> &'static str {
         "shop"
+    }
+
+    fn permissions(&self) -> Vec<autoxide_kernel::access::Permission> {
+        vec![autoxide_kernel::access::Permission::new("shop.read", "See the shop.")]
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
@@ -436,6 +442,48 @@ async fn doc_menu_kem_tinh_trang_dich_va_nhap_menu_cu() {
             (missing.status(), missing.json()["code"].as_str()),
             (StatusCode::BAD_REQUEST, Some("menus.import_source_missing"))
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// "Đang dùng ở đâu" (bước 51, D-267): menu có mục trỏ tới một bản ghi hiện ra ở bản ghi đó, chỉ
+/// cho người đọc được menu.
+#[tokio::test]
+async fn menu_tro_toi_ban_ghi_hien_o_dang_dung_o_dau() {
+    TestDatabase::run(async |test| {
+        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let app = TestApp::builder(test)
+            .user("admin", 1, &["menus.read", "menus.manage", "shop.read"])
+            .user("seller", 2, &["shop.read"])
+            .provide::<dyn Media>(media)
+            .module(Shop)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let body = json!({"key": "main", "locale": "vi", "items": [
+            {"label": "Ấm", "ref": {"kind": "shop.item", "id": "h1"}}
+        ]});
+        let created = send(&app, "POST", "", Some("admin"), &[], Some(body)).await;
+        assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
+        let menu = created.json()["data"]["id"].as_str().unwrap().to_owned();
+        let usages = |who: &'static str| {
+            let app = &app;
+            async move {
+                app.get("/api/v1/kernel/records/shop.item/h1/usages")
+                    .token(who)
+                    .send()
+                    .await
+                    .unwrap()
+                    .json()
+            }
+        };
+        let found = usages("admin").await;
+        assert_eq!(found["data"][0]["kind"], "menus.menu", "{found}");
+        assert_eq!(found["data"][0]["id"], menu);
+        assert_eq!(found["data"][0]["field"], "menu_item");
+        assert_eq!(usages("seller").await["data"], json!([]), "không đọc được menu thì không thấy");
     })
     .await
     .unwrap();

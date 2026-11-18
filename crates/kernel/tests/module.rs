@@ -321,6 +321,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/records/{kind}/{id}/notes".to_owned(),
                     "/records/{kind}/{id}/notes/{note_id}".to_owned(),
                     "/records/{kind}/{id}/tags".to_owned(),
+                    "/records/{kind}/{id}/usages".to_owned(),
                     "/resolve".to_owned(),
                     "/settings".to_owned(),
                     "/settings/{name}".to_owned(),

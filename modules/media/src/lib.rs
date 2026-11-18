@@ -21,6 +21,7 @@ mod jobs;
 mod library;
 mod migration;
 mod permissions;
+mod resource;
 mod service;
 mod summary;
 mod tools;
@@ -161,6 +162,7 @@ impl Module for MediaModule {
         self.databases = Some(context.tenancy());
         context.personal_data(service.clone())?;
         context.finder_source(Arc::new(find::Items))?;
+        context.resource_type(resource::ITEM, Arc::new(resource::ItemResolver))?;
         context.summary_metric(Arc::new(summary::Items))?;
         context.provide::<dyn api::Media>(service)
     }

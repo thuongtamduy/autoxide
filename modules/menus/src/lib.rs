@@ -24,6 +24,7 @@ mod tools;
 
 #[cfg(test)]
 mod tests;
+mod usages;
 
 use std::sync::Arc;
 
@@ -111,6 +112,7 @@ impl Module for MenusModule {
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
         };
         let service = Arc::new(MenuService::new(context.outbox()?, dependencies, config));
+        context.reference_source(Arc::new(usages::Menus));
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

@@ -11,6 +11,12 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 51 P11: `POST /api/v1/me/can` takes `feature` and `limit` per question and answers `feature_not_in_plan` and
+  `quota_exceeded` (with the real usage), each with `upgrade_to`: the plans on sale that would allow it
+  (`Entitlements::plans_offering`, answered by `plans`).
+- Step 51: `GET /api/v1/kernel/records/{kind}/{id}/usages` lists the records using a record — posts using an image or
+  embedding a record, menus linking to it — from modules whose `<module>.read` you hold (`ReferenceSource`). Media items
+  are now a record type (`media.item`) of the resource directory.
 - Step 51 P19: list exports take `cf.<key>` columns for the tenant's active custom fields (by default every one is
   exported); custom fields of visibility `public` on posts and pages are copied into the published version and returned
   by the public reads (`custom_fields`); the plan limit `kernel.custom_fields` counts active fields (deleting one gives its
