@@ -22,8 +22,8 @@ pub use contracts::{
     storage, zns,
 };
 pub use data::{
-    database, migration, numbering, pagination, reference, rows, search, tenancy, transfer, upload,
-    version,
+    backup, database, migration, numbering, pagination, reference, rows, search, tenancy, transfer,
+    upload, version,
 };
 pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use ops::{
