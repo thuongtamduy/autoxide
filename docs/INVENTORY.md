@@ -78,6 +78,10 @@ unit get exactly one success.
 Admins see reservations with `GET /reservations` (`inventory.reservations.read`) and release a stuck one with
 `POST /reservations/{id}/release` (`inventory.adjust`; recorded with their user id).
 
+Module `inventory` also listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
+(when module `orders` is installed) and runs the same functions, so an event arriving before or after the direct call,
+or twice, changes stock once.
+
 ## Choosing warehouses
 
 `PUT /sources/{store}` lists the warehouses serving a store or channel, by `priority`; without rows the store sells
