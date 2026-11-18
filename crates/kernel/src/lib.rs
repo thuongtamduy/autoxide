@@ -33,7 +33,7 @@ pub(crate) use ops::{builtin, module_catalog, user_flags};
 pub use security::{
     access, antispam, entitlement, idempotency, ip_hash, net, secret, throttle, tls, tokens,
 };
-pub use values::{csv, decimal, email, money, public_url, template};
+pub use values::{csv, decimal, email, money, public_url, slug, template};
 
 pub mod config;
 pub mod error;

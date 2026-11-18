@@ -27,9 +27,11 @@ mod affected;
 mod api_diff;
 mod boundaries;
 mod decisions;
+mod deploy_metrics;
 mod docs;
 mod i18n;
 mod lengths;
+mod metric_labels;
 mod scaffold;
 mod sdk;
 mod semver;
@@ -186,6 +188,8 @@ fn check() -> ExitCode {
         violations.extend(docs::check_docs(&workspace.root)?);
         violations.extend(tenancy::check_entities(&workspace)?);
         violations.extend(decisions::check(&workspace.root)?);
+        violations.extend(metric_labels::check(&workspace.root)?);
+        violations.extend(deploy_metrics::check(&workspace.root)?);
         let lengths = lengths::check(&workspace.root)?;
         if let Some(warning) = lengths.warning {
             eprintln!("{warning}");

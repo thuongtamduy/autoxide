@@ -126,7 +126,7 @@ impl ContentConfig {
         });
         let post_path_prefix = reader.get_with(&POST_PATH_PREFIX, |raw| {
             let prefix = raw.trim().trim_matches('/');
-            if crate::entries::slug::is_valid(prefix) {
+            if autoxide_kernel::slug::is_valid(prefix) {
                 Ok(prefix.to_owned())
             } else {
                 Err("must be lower-case letters, digits and `-`, like `blog`".to_owned())

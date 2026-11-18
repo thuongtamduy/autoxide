@@ -715,6 +715,19 @@ impl Modules {
             .with_entitlements(self.entitlements.clone()))
     }
 
+    /// Bộ cập nhật gauge tồn đọng (bước 39): bảng job và bảng event của mọi module, trên mọi
+    /// database của sổ database. Gọi sau [`start`](Self::start).
+    pub fn backlog_monitor(&self) -> Result<crate::job::backlog::BacklogMonitor, ModuleError> {
+        let databases = self.started()?;
+        let jobs = self
+            .modules
+            .iter()
+            .filter(|module| !module.jobs().is_empty())
+            .map(|module| module.name())
+            .collect();
+        Ok(crate::job::backlog::BacklogMonitor::new(databases, jobs, self.events.modules()))
+    }
+
     /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
     /// database, giao cho các đăng ký nhận của mọi module. Gọi sau [`start`](Self::start). Đăng
     /// ký nhận một event không ai khai là lỗi khởi động.
@@ -733,7 +746,14 @@ impl Modules {
                     || event == crate::moderation::TARGET_RESTRICTED
                     || event == crate::moderation::TARGET_RESTORED
                     || self.events.contains(event);
-                if !known {
+                if !known && subscription.is_optional() {
+                    // Module phát event chưa cài: không lỗi, chỉ ghi lại để người vận hành biết.
+                    tracing::info!(
+                        module = module.name(),
+                        event,
+                        "optional subscription to an event no installed module declares"
+                    );
+                } else if !known {
                     problems.push(format!(
                         "module `{}` subscribes to event `{event}`, which no module declares",
                         module.name()
