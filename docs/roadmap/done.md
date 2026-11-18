@@ -788,7 +788,7 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       — D-360: `/purposes`, `/retention` (`Module::retention` + `RetentionCatalog` ở kernel), `/processing-register`,
       `/residency` (cột kernel, `autoxide placement country`, `tenant_residency_violation` khi đặt / dời), `/incidents`
       (nhắc 15 phút, bản nháp), `/subject-requests` (+ `/fulfil`); xoá tài khoản xoá số điện thoại, bản xuất có phần
-      `compliance`; còn: `Module::retention` cho `audit`, `webhooks`, `newsletter`
+      `compliance`; `audit`, `webhooks`, `newsletter` cũng khai `Module::retention` (18/11)
 - [x] Văn bản pháp lý có phiên bản (D-190; Luật Giao dịch điện tử 20/2023): điều khoản, chính sách dữ liệu cá
       nhân, quy chế sàn, hợp đồng người bán, điều kiện giao dịch chung — số phiên bản, ngày hiệu lực; ai chấp
       nhận bản nào, lúc nào, kênh nào; chấp nhận lại khi cần; số người chấp nhận theo phiên bản — `compliance`

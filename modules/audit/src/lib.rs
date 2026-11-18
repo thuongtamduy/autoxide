@@ -53,6 +53,20 @@ impl Module for AuditModule {
         "audit"
     }
 
+    // Audit log nối chuỗi băm (D-183) nên không cắt bớt từng dòng theo tuổi: giữ tới khi xoá hẳn
+    // khách. Phần dữ liệu cá nhân (`before` / `after` / `details`) bị xoá khi tài khoản bị xoá.
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        vec![RetentionPolicy::new(
+            "audit.entries",
+            "Who did what and when. The personal details of an entry (before / after values) are \
+             erased when the account they describe is deleted; the entry itself stays until the \
+             tenant is deleted.",
+            DataCategory::Security,
+            Keep::UntilDeleted,
+        )]
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true
