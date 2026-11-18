@@ -167,6 +167,9 @@ pub(crate) async fn get_team(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<TeamDetail>, Error> {
+    if !principal.has(&SETTINGS_MANAGE) {
+        principal.require(&TICKETS_REPLY)?;
+    }
     let (team, members) = service.team(&tenant, &principal, id).await?;
     let data = TeamDetail {
         team: team.into(),
@@ -241,6 +244,9 @@ pub(crate) async fn set_member(
     Path((id, user)): Path<(Uuid, Uuid)>,
     ValidJson(input): ValidJson<MemberRequest>,
 ) -> Result<Data<MemberResponse>, Error> {
+    if !principal.has(&SETTINGS_MANAGE) {
+        principal.require(&TICKETS_REPLY)?;
+    }
     let member = service.set_member(&tenant, &principal, id, user, input.accepting).await?;
     Ok(Data { data: member.into() })
 }
