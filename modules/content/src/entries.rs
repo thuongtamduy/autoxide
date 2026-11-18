@@ -4,7 +4,6 @@
 pub(crate) mod body;
 pub(crate) mod review;
 pub(crate) mod revisions;
-pub(crate) mod slug;
 
 use std::collections::BTreeSet;
 
@@ -719,10 +718,10 @@ impl ContentService {
         }
         match trim(fields.slug) {
             Some(slug) if slug.is_empty() => {
-                candidate.slug = crate::entries::slug::from_title(&candidate.title, candidate.id);
+                candidate.slug = autoxide_kernel::slug::from_title(&candidate.title, candidate.id);
             }
             Some(slug) => {
-                if !crate::entries::slug::is_valid(&slug) {
+                if !autoxide_kernel::slug::is_valid(&slug) {
                     problems.push(FieldError::new(
                         "slug",
                         "invalid",
@@ -732,7 +731,7 @@ impl ContentService {
                 candidate.slug = slug;
             }
             None if candidate.slug.is_empty() => {
-                candidate.slug = crate::entries::slug::from_title(&candidate.title, candidate.id);
+                candidate.slug = autoxide_kernel::slug::from_title(&candidate.title, candidate.id);
             }
             None => {}
         }
@@ -1316,7 +1315,7 @@ async fn free_slug<C: ConnectionTrait>(
     }
     let mut n = 2;
     loop {
-        let next = crate::entries::slug::with_suffix(base, n);
+        let next = autoxide_kernel::slug::with_suffix(base, n);
         if !taken.contains(&next) {
             return Ok(next);
         }
