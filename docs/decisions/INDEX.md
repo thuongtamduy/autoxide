@@ -261,6 +261,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step38-groups](D-20261118-step38-groups.md)** Nhóm nút ngoài cây cho báo cáo: số nút bị bỏ ở chi tiết nhóm, `group_by=group` cần `group_ids` — 2026-11-18
 - **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
+- **[D-20261118-step38-sandbox](D-20261118-step38-sandbox.md)** Khách thử nghiệm, phần nền: cột của `kernel_tenants`, cùng placement, hạn mức mặc định 1, uỷ quyền vào bằng event — 2026-11-18
 
 ## Hợp đồng cho giao diện
 

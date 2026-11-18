@@ -6207,6 +6207,52 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a sandbox of your tenant: a test copy with its configuration and no personal data, where partners are simulated and mail and webhooks do not leave. Enter it with the header `Autoxide-Tenant: <id>` once it is active.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new sandbox of your tenant.",
+        "properties": {
+          "name": {
+            "description": "1 to 200 characters.",
+            "type": "string"
+          },
+          "products": {
+            "description": "Products to copy (0 by default).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "role_id": {
+            "description": "Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.create_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -6289,6 +6335,36 @@
       "output_schema": null,
       "permissions": [
         "kernel.data.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Extend a sandbox of your tenant: it is then deleted `AUTOXIDE_TENANCY_SANDBOX_DAYS` days from now.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A sandbox to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.extend_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
       ]
     },
     {
@@ -6575,6 +6651,51 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the sandboxes (test copies) of your tenant, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which sandboxes to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_sandboxes",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.read"
       ]
     },
     {

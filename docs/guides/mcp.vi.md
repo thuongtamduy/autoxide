@@ -192,9 +192,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `invoices.issue` | `invoices.issue` | writes |
 | `invoices.print` | `invoices.read` | read-only |
 | `kernel.add_domain` | `kernel.domains.manage` | writes |
+| `kernel.create_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.decide_approval` | — | writes |
 | `kernel.export_tenant` | `kernel.data.export` | writes |
+| `kernel.extend_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.get_migration_run` | `kernel.tenants.operate` | read-only |
 | `kernel.get_module` | `kernel.modules.read` | read-only |
 | `kernel.get_tenant` | `kernel.tenants.read` | read-only |
@@ -204,6 +206,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |

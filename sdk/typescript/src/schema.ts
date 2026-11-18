@@ -3730,6 +3730,11 @@ export type CurrencyTotalResponse = {
 /** The tenant of the caller. */
 export type CurrentTenant = {
   id: string;
+  /**
+   * `production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and
+   * webhooks do not leave, nothing done here counts in the real tenant).
+   */
+  kind?: string;
   /** `single` (one tenant) or `multi` (many tenants on one installation). */
   mode: string;
   name: string;
@@ -3740,6 +3745,10 @@ export type CurrentTenant = {
    * Always present.
    */
   read_only: boolean;
+  /** Sandbox only: when it is deleted unless extended. */
+  sandbox_expires_at?: string | null;
+  /** Sandbox only: the real tenant it was made from. */
+  sandbox_of?: string | null;
   slug: string;
   status: string;
 };
@@ -5539,6 +5548,11 @@ export type Data_CurrentTenant = {
   /** The tenant of the caller. */
   data: {
     id: string;
+    /**
+     * `production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and
+     * webhooks do not leave, nothing done here counts in the real tenant).
+     */
+    kind?: string;
     /** `single` (one tenant) or `multi` (many tenants on one installation). */
     mode: string;
     name: string;
@@ -5549,6 +5563,10 @@ export type Data_CurrentTenant = {
      * Always present.
      */
     read_only: boolean;
+    /** Sandbox only: when it is deleted unless extended. */
+    sandbox_expires_at?: string | null;
+    /** Sandbox only: the real tenant it was made from. */
+    sandbox_of?: string | null;
     slug: string;
     status: string;
   };
@@ -8204,6 +8222,43 @@ export type Data_RunResponse = {
     /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
     trigger_key: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Sandbox = {
+  /**
+   * A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are
+   * always simulated there and mail and webhooks do not leave it.
+   */
+  data: {
+    created_at: string;
+    /** When it is deleted unless extended. */
+    expires_at?: string | null;
+    /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+    id: string;
+    name: string;
+    /** Products asked to copy. */
+    products: number;
+    /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+    role_id?: string | null;
+    /** The real tenant it was made from. */
+    sandbox_of: string;
+    slug: string;
+    /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SandboxCreated = {
+  /** A new sandbox and the job copying the configuration into it. */
+  data: Sandbox & {
+    /**
+     * The background job copying the configuration; follow it at
+     * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
+     */
+    job_id?: string | null;
   };
 };
 
@@ -13846,6 +13901,16 @@ export type NewRecordNote = {
   mentions?: string[];
 };
 
+/** A new sandbox. */
+export type NewSandbox = {
+  /** 1 to 200 characters. */
+  name: string;
+  /** Products to copy (0 by default), at most `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`. */
+  products?: number | null;
+  /** Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted. */
+  role_id?: string | null;
+};
+
 /** A tag to create. */
 export type NewTag = {
   /** A color of the fixed palette; `gray` by default. */
@@ -16699,6 +16764,29 @@ export type Page_RunResponse = {
 };
 
 /** One page of a list. */
+export type Page_Sandbox = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** When it is deleted unless extended. */
+    expires_at?: string | null;
+    /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+    id: string;
+    name: string;
+    /** Products asked to copy. */
+    products: number;
+    /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+    role_id?: string | null;
+    /** The real tenant it was made from. */
+    sandbox_of: string;
+    slug: string;
+    /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScheduleResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -19075,6 +19163,37 @@ export type RunResponse = {
 export type RunRuleRequest = {
   /** What the templates see as `event` (e.g. `{"order": {"id": "…"}}`); default `{}`. */
   input?: Record<string, unknown> | null;
+};
+
+/**
+ * A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are
+ * always simulated there and mail and webhooks do not leave it.
+ */
+export type Sandbox = {
+  created_at: string;
+  /** When it is deleted unless extended. */
+  expires_at?: string | null;
+  /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+  id: string;
+  name: string;
+  /** Products asked to copy. */
+  products: number;
+  /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+  role_id?: string | null;
+  /** The real tenant it was made from. */
+  sandbox_of: string;
+  slug: string;
+  /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+  status: string;
+};
+
+/** A new sandbox and the job copying the configuration into it. */
+export type SandboxCreated = Sandbox & {
+  /**
+   * The background job copying the configuration; follow it at
+   * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
+   */
+  job_id?: string | null;
 };
 
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
@@ -27731,6 +27850,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandboxes/{id}": {
+    /** Delete a sandbox. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandboxes/{id}/extend": {
+    /** Extend a sandbox. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Sandbox;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
@@ -28084,6 +28229,33 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/sandboxes": {
+    /** List the sandboxes of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_Sandbox;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a sandbox of a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: NewSandbox;
+      responses: {
+        201: Data_SandboxCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

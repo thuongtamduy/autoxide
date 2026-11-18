@@ -194,6 +194,10 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
         slot.note_tenant(&tenant);
     }
+    // Sandbox (D-232): lớp HTTP thêm `Autoxide-Sandbox` và `X-Robots-Tag` vào response.
+    if let Some(slot) = parts.extensions.get::<super::sandbox::headers::SandboxSlot>() {
+        slot.note(&tenant);
+    }
     Ok(tenant)
 }
 

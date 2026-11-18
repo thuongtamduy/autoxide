@@ -68,6 +68,8 @@ pub(crate) struct KernelModule {
     moves: Option<Arc<crate::tenancy::TenantMoves>>,
     /// Tách / gộp khách (bước 38): cấu hình, service, route, job.
     relocations: crate::tenancy::relocate::Wiring,
+    /// Khách thử nghiệm (sandbox, bước 38, D-232).
+    sandboxes: crate::tenancy::sandbox::Wiring,
     /// Xuất dữ liệu khách (bước 35, D-328); có sau `start`.
     exports: Option<Arc<crate::tenancy::TenantExports>>,
     /// Migrate placement bằng API (D-334); có sau `start`.
@@ -112,6 +114,7 @@ impl KernelModule {
             move_setup,
             moves: None,
             relocations: Default::default(),
+            sandboxes: Default::default(),
             exports: None,
             migration_runs: None,
             export_days: 30,
@@ -285,6 +288,8 @@ impl Module for KernelModule {
             Box::new(crate::search::database::CreateSearchDocs),
             // Lượt tách / gộp khách (bước 38, mặt điều khiển).
             Box::new(crate::tenancy::relocate::CreateRelocations),
+            // Khách thử nghiệm (bước 38, D-232): cột sandbox của `kernel_tenants`.
+            Box::new(crate::tenancy::sandbox::AddSandbox),
         ]
     }
 
@@ -330,6 +335,7 @@ impl Module for KernelModule {
         });
         let stream_config = crate::event::stream::StreamConfig::read(reader);
         let relocation_drain = crate::tenancy::relocate::Wiring::read(reader);
+        let sandbox = crate::tenancy::sandbox::Wiring::read(reader);
         let search_backend = reader.get_with(&crate::search::SEARCH_BACKEND, |raw| {
             let name = raw.trim();
             let valid = !name.is_empty()
@@ -359,6 +365,7 @@ impl Module for KernelModule {
         self.stream_config = stream_config?;
         self.search_backend = search_backend?;
         self.relocations.set(relocation_drain?);
+        self.sandboxes.set(sandbox?);
         self.catalog.text_overrides().set_ui_max(ui_texts?);
         Ok(())
     }
@@ -375,6 +382,8 @@ impl Module for KernelModule {
             crate::tenancy::TENANTS_MOVE,
             crate::tenancy::TENANTS_RELOCATE,
             crate::tenancy::RELOCATIONS_REQUEST,
+            crate::tenancy::SANDBOXES_READ,
+            crate::tenancy::SANDBOXES_MANAGE,
             crate::tenancy::DATA_EXPORT,
             crate::tenancy::TENANTS_DELETE,
             crate::job::runs::JOBS_READ,
@@ -409,11 +418,18 @@ impl Module for KernelModule {
             crate::tenancy::relocate::RELOCATION_FINISHED,
             crate::tenancy::relocate::RELOCATION_FAILED,
             crate::tenancy::erasure::TENANT_DELETED,
+            crate::tenancy::sandbox::SANDBOX_CREATED,
+            crate::tenancy::sandbox::SANDBOX_EXTENDED,
+            crate::tenancy::sandbox::SANDBOX_DELETED,
         ]
     }
 
     fn limits(&self) -> Vec<crate::entitlement::Limit> {
-        vec![crate::entitlement::API_REQUESTS, crate::ops::custom_fields::CUSTOM_FIELDS_LIMIT]
+        vec![
+            crate::entitlement::API_REQUESTS,
+            crate::ops::custom_fields::CUSTOM_FIELDS_LIMIT,
+            crate::tenancy::SANDBOXES_LIMIT,
+        ]
     }
 
     fn tenant_settings(&self) -> Vec<crate::tenancy::TenantSetting> {
@@ -566,6 +582,7 @@ impl Module for KernelModule {
             routes = routes.merge(crate::tenancy::migration_runs::routes(runs.clone()));
         }
         routes = routes.merge(self.relocations.routes());
+        routes = routes.merge(self.sandboxes.routes());
         routes
     }
 
@@ -617,6 +634,7 @@ impl Module for KernelModule {
             tools.extend(crate::tenancy::migration_runs::tools(runs.clone()));
         }
         tools.extend(crate::ops::request_log::tools());
+        tools.extend(self.sandboxes.tools());
         tools.extend(crate::ops::custom_fields::tools(self.catalog.custom_fields()));
         if let Some(outbox) = &self.outbox {
             tools.extend(crate::ops::approvals::tools(crate::ops::approvals::ApprovalsState {
@@ -681,6 +699,7 @@ impl Module for KernelModule {
             ));
         }
         jobs.extend(self.relocations.jobs());
+        jobs.extend(self.sandboxes.jobs());
         jobs
     }
 
@@ -705,6 +724,8 @@ impl Module for KernelModule {
         if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
             schedules.push(crate::ops::list_exports::schedule());
         }
+        let multi = self.domains.as_ref().is_some_and(|domains| domains.multi_tenant());
+        schedules.extend(self.sandboxes.schedules(multi));
         schedules
     }
 
@@ -749,6 +770,7 @@ impl Module for KernelModule {
             .with_setup(self.move_setup.clone()),
         );
         self.admin = Some(admin.clone());
+        self.sandboxes.start(context, admin.clone())?;
         context.provide::<crate::tenancy::TenantAdmin>(admin)?;
         let platform_host =
             self.public_url.base().ok().and_then(crate::tenancy::domains::host_of_url);
