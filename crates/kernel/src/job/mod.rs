@@ -17,6 +17,7 @@
 //! Chạy **ít nhất một lần**: tiến trình chết giữa lúc chạy thì job được chạy lại khi
 //! hết hạn giữ. Bộ chạy phải chịu được việc chạy lại.
 
+pub mod backlog;
 mod claim;
 mod migration;
 pub(crate) mod queue;

@@ -26,6 +26,23 @@ pub const JOB_BLOCKED_DELAY_SECONDS: Setting = Setting::new(
 )
 .with_default("3600");
 
+pub const METRICS_BACKLOG_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_METRICS_BACKLOG_SECONDS",
+    "How often a process that runs background work updates the queue backlog gauges \
+     (`jobs_pending`, `jobs_oldest_pending_seconds`, `jobs_dead`, `events_*`, \
+     `database_connections`) at `/metrics`, in seconds (5 to 3600). Only used when \
+     AUTOXIDE_HTTP_METRICS is on.",
+)
+.with_default("30");
+
+pub const METRICS_MAX_DATABASE_LABELS: Setting = Setting::new(
+    "AUTOXIDE_METRICS_MAX_DATABASE_LABELS",
+    "Most databases the backlog gauges name in their `database` label (1 to 10000); the others \
+     are added up under `database=\"other\"`, so tenants with their own database cannot make the \
+     metrics grow without end.",
+)
+.with_default("50");
+
 /// Tiến trình `serve` làm việc gì.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -57,6 +74,10 @@ pub struct ProcessConfig {
     pub job_concurrency: u64,
     /// Hoãn job bị gói chặn chừng này giây (bước 35).
     pub job_blocked_delay: u64,
+    /// Chu kỳ cập nhật gauge tồn đọng, giây (bước 39).
+    pub metrics_backlog_seconds: u64,
+    /// Số nhãn `database` tối đa của gauge tồn đọng.
+    pub metrics_max_database_labels: u64,
 }
 
 impl ProcessConfig {
@@ -71,10 +92,16 @@ impl ProcessConfig {
             reader.get_with(&JOB_CONCURRENCY, |raw| parse_in_range(raw, 1u64, 256));
         let job_blocked_delay =
             reader.get_with(&JOB_BLOCKED_DELAY_SECONDS, |raw| parse_in_range(raw, 60u64, 86_400));
+        let metrics_backlog_seconds =
+            reader.get_with(&METRICS_BACKLOG_SECONDS, |raw| parse_in_range(raw, 5u64, 3600));
+        let metrics_max_database_labels =
+            reader.get_with(&METRICS_MAX_DATABASE_LABELS, |raw| parse_in_range(raw, 1u64, 10_000));
         Ok(ProcessConfig {
             role: role?,
             job_concurrency: job_concurrency?,
             job_blocked_delay: job_blocked_delay?,
+            metrics_backlog_seconds: metrics_backlog_seconds?,
+            metrics_max_database_labels: metrics_max_database_labels?,
         })
     }
 }
@@ -97,7 +124,13 @@ mod tests {
 
         assert_eq!(
             config,
-            ProcessConfig { role: ProcessRole::All, job_concurrency: 4, job_blocked_delay: 3600 }
+            ProcessConfig {
+                role: ProcessRole::All,
+                job_concurrency: 4,
+                job_blocked_delay: 3600,
+                metrics_backlog_seconds: 30,
+                metrics_max_database_labels: 50,
+            }
         );
         assert!(config.role.serves_api() && config.role.runs_background_work());
         let api = read(&[("AUTOXIDE_PROCESS_ROLE", "api")]).unwrap().role;

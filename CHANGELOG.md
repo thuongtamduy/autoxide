@@ -17,6 +17,15 @@ endpoints are marked deprecated with a sunset date first.
   edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
   machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- `deploy/prometheus/autoxide-alerts.yml` (alerting rules, each with an `action` saying what to do) and
+  `deploy/grafana/autoxide-dashboard.json`; `docs/DEPLOY.md` gains "Monitoring" and a "Runbook" (server errors, slow
+  requests, stuck queue, dead-letter queue, connections, full database, leaked keys, lost last administrator,
+  updating while two versions run). `cargo xtask check` keeps the metric names in those files in line with the code.
+- Queue backlog gauges at `/metrics` (step 39): `jobs_pending`, `jobs_oldest_pending_seconds`, `jobs_dead`,
+  `events_pending`, `events_oldest_pending_seconds`, `events_dead` (by `database` and `module`) and
+  `database_connections` / `database_connections_max` (by `pool`), updated every `AUTOXIDE_METRICS_BACKLOG_SECONDS` by
+  processes that run background work; past `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` databases the rest are added up
+  under `database="other"`.
 - New module `reporting` (step 38): reports across a customer tree. Modules declare the figures their events
   produce (`Module::facts`; first ones: `invoices.issued_total`, `invoices.issued_count`, `ledger.revenue`,
   `ledger.tax_output`); facts of every tenant — also tenants on other databases — reach a store at the root tenant
