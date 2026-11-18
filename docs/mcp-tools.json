@@ -274,6 +274,220 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Sessions reaching each step of a declared funnel on a website over a range of days; steps are counted on their own.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A funnel over a website and a range of days.",
+        "properties": {
+          "from": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "The funnel, e.g. `orders.checkout`; see `GET /api/v1/analytics/funnels`.",
+            "type": "string"
+          },
+          "site": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "name": "analytics.funnel",
+      "output_schema": null,
+      "permissions": [
+        "analytics.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Visitors, page views, bounce rate, top sources and daily counts of a website over a range of days (from the daily totals).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A website and a range of days.",
+        "properties": {
+          "from": {
+            "description": "First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "site": {
+            "description": "The website (organization unit); omitted: the website of the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "analytics.overview",
+      "output_schema": null,
+      "permissions": [
+        "analytics.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The most viewed objects (`<kind>:<id>`, e.g. products) of a website over a range of days; `kind` keeps one kind.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A ranking over a website and a range of days.",
+        "properties": {
+          "from": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "For objects only: just this kind, e.g. `catalog.product`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "site": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "analytics.top_objects",
+      "output_schema": null,
+      "permissions": [
+        "analytics.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "The most viewed pages of a website over a range of days.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A ranking over a website and a range of days.",
+        "properties": {
+          "from": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "For objects only: just this kind, e.g. `catalog.product`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Rows to return, 1 to 100; defaults to 10.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "site": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "analytics.top_pages",
+      "output_schema": null,
+      "permissions": [
+        "analytics.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Get one audit log entry.",
       "input_schema": {
         "additionalProperties": false,
