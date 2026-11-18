@@ -9126,3 +9126,15 @@ liệu cá nhân.
 7. `GET /api/v1/kernel/devtools/requests` và tool MCP `kernel.request_log` (`kernel.devtools.read`, chỉ đọc), lọc `actor_kind`
    (nhiều giá trị), `api_key_id`, `path` (chính xác), `status`, `from` / `to`. Khai luôn `kernel.devtools.manage` cho các thao tác
    ghi của bàn kỹ thuật (gửi lại webhook, chạy lại job).
+
+## D-371 · Gửi lại lần giao webhook và event theo bản ghi trên bàn kỹ thuật (bước 52 mục 1) — 2026-11-18 — agent quyết
+
+1. `POST /api/v1/webhooks/deliveries/{id}/redeliver` mở lại lần giao đã xong hay đã hỏng hẳn và xếp job gửi, cùng transaction với
+   event `webhooks.delivery_redelivered` (vào audit). Giữ nguyên thân và `webhook-id` (Standard Webhooks: bên nhận lọc trùng theo
+   ID). Lần giao đang chờ thì 409 `webhooks.delivery_in_progress`; cập nhật có điều kiện nên hai lần bấm cùng lúc chỉ một lần qua.
+2. Quyền là `webhooks.manage` của module, không phải `kernel.devtools.manage`: module sở hữu dữ liệu của mình (luật kiến trúc 1, 7).
+   Tool `webhooks.list_deliveries` chỉ đọc mà cần `webhooks.manage` — thêm vào danh sách ngoại lệ của test phân quyền (như
+   `kernel.list_domains`), vì lần giao chứa dữ liệu event gửi ra ngoài, kể cả dữ liệu cá nhân.
+3. `GET /api/v1/kernel/devtools/events?object=<kind>:<id>` đọc từ audit qua `RecordHistory` (outbox bị dọn sau khi giao); chưa
+   cài audit thì trả rỗng. Chạy lại job trong dead-letter queue đã có từ bước 51 P15 (`POST /kernel/jobs/{id}/retry`, event
+   `kernel.job_retried`).
