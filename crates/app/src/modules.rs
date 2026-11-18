@@ -243,8 +243,9 @@ mod tests {
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
-            // một của `catalog` (tính lại readiness theo giấy tờ — bước 41)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 47);
+            // một của `catalog` (tính lại readiness theo giấy tờ — bước 41), một của `inventory` (trả chỗ
+            // giữ hàng quá hạn — bước 42)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 48);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

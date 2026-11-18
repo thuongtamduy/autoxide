@@ -241,7 +241,7 @@ impl MigrationTrait for CreateReservations {
         )
         .await?;
         // Job hết hạn quét cả database (mọi khách): index không bắt đầu bằng `tenant_id`.
-        index(manager, t, "inventory_reservations_expiry_idx", &["status", "expires_at"], false)
+        index(manager, t, "inventory_reservations_sweep_idx", &["status", "expires_at"], false)
             .await?;
 
         // Phần đã giữ của từng dòng đơn ở một kho. `per_unit`: số đơn vị của biến thể này trong
