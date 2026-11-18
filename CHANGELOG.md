@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Step 40, real-time events: `GET /api/v1/kernel/events/stream?names=…` streams, as Server-Sent Events, the events modules
+  declare streamable — `content.entry_published` (`content.read`), `comments.comment_created` (`comments.moderate`),
+  `media.item_uploaded` (`media.read`) — to signed-in callers with that permission, in their tenant only (a permission
+  narrower than the tenant receives only the caller's own events). Never raw table changes. Resume with `Last-Event-ID`
+  (or `last_event_id`) without losing events kept in the last 7 days (`event: reset` beyond), at-least-once; correct on
+  several servers (each reads the outbox tables, one shared query per database for every stream); limits per user,
+  tenant and server (`429 kernel.stream_too_many`); streams close after 30 minutes and on shutdown. Off by default:
+  `AUTOXIDE_EVENTS_STREAM`, `…_POLL_MS`, `…_MAX_CONNECTIONS`, `…_MAX_PER_TENANT`, `…_MAX_PER_USER`. The module catalog
+  gives each event's `stream_permission`. Guide: `docs/guides/realtime-events.md`. For module authors:
+  `EventInfo::streamable(permission)`.
 - Step 40, rate limits on several servers: `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` shares the limit per API key between
   every server through the database (`kernel_throttle`, key per tenant and API key), taking requests in lots of
   max(1, burst / 4), so a key gets at most one lot per server more than its limit each minute. `memory` stays the

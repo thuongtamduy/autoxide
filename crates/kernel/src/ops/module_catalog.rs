@@ -356,6 +356,9 @@ impl ModuleInfo {
                 .map(|event| ModuleEvent {
                     name: event.name().to_owned(),
                     description: event.description().to_owned(),
+                    stream_permission: event
+                        .stream_permission()
+                        .map(|permission| permission.name().to_owned()),
                 })
                 .collect(),
             subscriptions: module
@@ -503,6 +506,11 @@ pub(crate) struct ModuleEvent {
     #[schema(example = "notes.note_created")]
     name: String,
     description: String,
+    /// Permission needed to receive this event on `GET /api/v1/kernel/events/stream`; absent when
+    /// the event is not streamed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schema(example = "notes.read")]
+    stream_permission: Option<String>,
 }
 
 /// A recurring job.

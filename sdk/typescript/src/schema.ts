@@ -11030,6 +11030,11 @@ export type ModuleDeprecation = {
 export type ModuleEvent = {
   description: string;
   name: string;
+  /**
+   * Permission needed to receive this event on `GET /api/v1/kernel/events/stream`; absent when
+   * the event is not streamed.
+   */
+  stream_permission?: string | null;
 };
 
 /** A feature a plan can turn on or off. */
@@ -22193,6 +22198,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/events/stream": {
+    /** Stream events in real time (Server-Sent Events). */
+    get: {
+      parameters: { header: { "Last-Event-ID"?: string | null; "Accept-Language"?: string }; query: { names: string; last_event_id?: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };

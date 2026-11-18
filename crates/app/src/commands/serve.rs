@@ -123,9 +123,15 @@ where
     // phục vụ thêm `drain` để bộ cân bằng tải kịp chuyển request sang tiến trình khác. Hết khoảng
     // đó future này mới xong, và `http::serve` mới bắt đầu tắt (đếm `shutdown_grace` từ lúc ấy).
     let drain = config.http.drain;
+    // Stream event (SSE) không tự kết thúc: đóng chúng ngay khi bắt đầu tắt, client nối lại sang
+    // máy chủ khác bằng `Last-Event-ID` (bước 40 P5).
+    let streams = modules.api::<autoxide_kernel::event::StreamHub>();
     let shutdown = async move {
         shutdown.await;
         draining.start();
+        if let Some(streams) = &streams {
+            streams.close();
+        }
         if !drain.is_zero() {
             tracing::info!(drain_seconds = drain.as_secs(), "shutting down: draining");
             tokio::time::sleep(drain).await;

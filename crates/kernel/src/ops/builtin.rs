@@ -76,6 +76,10 @@ pub(crate) struct KernelModule {
     job_file_days: u32,
     /// Hàng đợi job của kernel (xuất danh sách); có sau `start`.
     jobs: Option<crate::job::JobQueue>,
+    /// Cấu hình stream event (bước 40 P5); điền lúc `configure`.
+    stream_config: crate::event::stream::StreamConfig,
+    /// Hub stream event SSE; có sau `start`.
+    stream: Option<crate::event::StreamHub>,
     /// Sổ đối tượng và sổ permission (ghi chú trên bản ghi, bước 51 P13); có sau `start`.
     resources: Option<(crate::resource::ResourceDirectory, crate::access::PermissionCatalog)>,
     /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS` (đọc ở cấu hình kernel): dời khách chờ request đang
@@ -106,6 +110,8 @@ impl KernelModule {
             export_days: 30,
             job_file_days: 7,
             jobs: None,
+            stream_config: Default::default(),
+            stream: None,
             resources: None,
             request_timeout: std::time::Duration::from_secs(30),
             keys,
@@ -304,6 +310,7 @@ impl Module for KernelModule {
         let ui_texts = reader.get_with(&crate::ops::texts::UI_MAX, |raw| {
             crate::config::parse_in_range(raw, 1u64, 100_000)
         });
+        let stream_config = crate::event::stream::StreamConfig::read(reader);
         let job_file_days = reader
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
@@ -317,6 +324,7 @@ impl Module for KernelModule {
         self.templates = crate::template::TemplateEngine::new(template_bytes?);
         self.export_days = export_days?;
         self.job_file_days = job_file_days?;
+        self.stream_config = stream_config?;
         self.catalog.text_overrides().set_ui_max(ui_texts?);
         Ok(())
     }
@@ -396,6 +404,9 @@ impl Module for KernelModule {
             ));
         }
         routes = routes.merge(crate::ops::request_log::routes());
+        if let Some(hub) = &self.stream {
+            routes = routes.merge(crate::http::stream::routes(hub.clone()));
+        }
         routes = routes.merge(crate::ops::filter_parse::routes(
             crate::ops::filter_parse::FilterParseState {
                 lists: self.catalog.lists(),
@@ -646,6 +657,10 @@ impl Module for KernelModule {
         self.translations = context.translations().clone();
         self.entitlements = Some(context.entitlements());
         self.outbox = Some(context.outbox()?);
+        // Stream event SSE (bước 40 P5): một hub mỗi tiến trình; `serve` đóng nó khi tắt.
+        let hub = crate::event::StreamHub::new(self.stream_config.clone(), context.events());
+        self.stream = Some(hub.clone());
+        context.provide::<crate::event::StreamHub>(Arc::new(hub))?;
         // Yêu cầu duyệt của agent vào hộp việc của người quyết được (bước 51 P12).
         context.work_source(Arc::new(crate::ops::approvals::ApprovalsWork))?;
         let flags = Arc::new(UserFlags::new(self.max_flags));

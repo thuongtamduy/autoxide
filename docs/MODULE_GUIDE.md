@@ -301,6 +301,12 @@ Declare events in `src/events.rs` and return them from `Module::events`. The pay
 `audit` module records every event; other modules subscribe through
 `Module::subscriptions` and must accept receiving the same event twice.
 
+An event a client screen should see at once can be pushed over the real-time stream
+(`GET /api/v1/kernel/events/stream`): declare it with
+`EventInfo::new(…).streamable(NOTES_READ)`, naming the permission that reads the record over
+REST — the payload goes to everyone with that permission in the tenant. Events are not
+streamed unless declared.
+
 ### 7. MCP tools
 
 `Module::tools` returns `autoxide_kernel::mcp::Tool`s. Each tool takes an input type

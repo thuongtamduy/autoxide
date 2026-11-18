@@ -9224,3 +9224,35 @@ liệu cá nhân.
    −1% req/s, p95 +4%; SQLite MCP −11%, p95 +22%; PostgreSQL `GET /auth/me` −8%, p95 +9%; PostgreSQL MCP −4%, p95 +3%. Một bài
    vượt ngưỡng 10% của đặc tả → **giữ `memory` làm mặc định**. `autoxide doctor` cảnh báo khi `database` + SQLite.
 6. `scripts/loadtest.sh` thêm `LOADTEST_RATE_LIMIT_STORE` / `LOADTEST_RATE_LIMIT_BURST` / `LOADTEST_ONLY=api_key` để đo lại.
+
+## D-377 · Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18 — agent quyết
+
+1. **Khác "realtime theo bảng"** (TrailBase, PocketBase — `docs/research/frameworks.md` đã không mượn): realtime theo bảng đẩy
+   mọi thay đổi dòng, nên lộ cấu trúc bảng (hợp đồng mới không ai thiết kế), bỏ qua luật service layer (quyền đọc tính lại ở
+   tầng dòng, khác REST) và phá luật "module sở hữu bảng". Ở đây chỉ stream **event module chủ động khai**
+   (`EventInfo::streamable(permission)`, mặc định không) — payload là hợp đồng event đã có (audit, webhook dùng chung), quyền là
+   permission đọc bản ghi như REST. Ban đầu: `content.entry_published` (`content.read`), `comments.comment_created`
+   (`comments.moderate`, payload không có chữ / tên / email), `media.item_uploaded` (`media.read`). `Modules` từ chối event
+   stream với permission không ai khai; sổ module ghi `stream_permission`.
+2. **Đọc từ bảng outbox, đúng khi nhiều máy chủ:** mỗi tiến trình một `StreamHub` (kernel công bố, `serve` đóng khi tắt), một
+   vòng hỏi chung mỗi `AUTOXIDE_EVENTS_STREAM_POLL_MS` (1000) cho mọi kết nối, chỉ hỏi database (placement) đang có người nghe,
+   phát qua `tokio::sync::broadcast`. Mỗi lượt hỏi theo khoá chính `id >= UUIDv7 nhỏ nhất của (lượt trước − GRACE)` — UUIDv7 xếp
+   theo thời điểm trên cả hai database và có index sẵn, không cần migration thêm index cho mọi module — **lùi `GRACE` = 5 s**
+   rồi khử trùng theo ID đã phát: ID gán lúc ghi, transaction commit muộn mang thời điểm sớm hơn event đã phát (test
+   `event_commit_muon_van_toi`). Không dùng LISTEN/NOTIFY: chỉ Postgres có, hỏi vòng đủ rẻ (một câu theo khoá chính mỗi
+   database, module) và chạy giống nhau trên hai database; nếu sau này đo thấy cần thì thêm sau một trait với nhánh hỏi vòng
+   làm mặc định. Hỏi qua kết nối ghi (dòng vừa commit chưa tới read replica vẫn thấy).
+3. **Nối lại:** `Last-Event-ID` (header, hay `last_event_id`) → đọc bù thẳng từ database của khách từ `thời điểm(id) − GRACE`,
+   bỏ chính `id` đó; giao **ít nhất một lần**, client khử trùng theo `id` (ghi trong OpenAPI). Kết nối tụt hậu (`Lagged`) đọc bù
+   cùng cách. ID cũ hơn 7 ngày (bộ phát dọn event đã giao sau 7 ngày) hay bù quá 10 000 event → `event: reset`.
+4. **Quyền:** cùng khách; permission của event; độ sâu: `tenant` không hàng rào nút → mọi event của khách, hẹp hơn → **chỉ event
+   do chính người gọi gây ra** (lệch đặc tả "lọc theo nhánh"): bảng `<module>_events` chưa có `org_id`, thêm cột cần migration
+   ở mọi module có event và `Outbox::record` nhận nút — việc lớn hơn bước này; cách hiện tại không bao giờ lộ bản ghi của nhánh
+   khác. Khi event mang nút thì thêm nhánh `Unit` / `Subtree` vào `Reach`. Quyền xét lúc mở; kết nối sống tối đa 30 phút rồi
+   đóng để quyền bị thu hồi có hiệu lực.
+5. **Giới hạn mỗi tiến trình:** `…_MAX_PER_USER` (5), `…_MAX_PER_TENANT` (200), `…_MAX_CONNECTIONS` (1000) → 429
+   `kernel.stream_too_many`. Tắt mặc định (`AUTOXIDE_EVENTS_STREAM=false` → 404 `kernel.stream_disabled`). Lớp timeout chung
+   không cắt stream (chỉ chờ header); graceful shutdown gọi `StreamHub::close` ngay khi bắt đầu rút. `X-Accel-Buffering: no`,
+   `: ping` mỗi 15 s, `retry: 3000`.
+6. **Không có tool MCP tương ứng** (lệch đặc tả `kernel.list_events`): MCP không giữ stream; agent cần "có gì mới" dùng webhook
+   hay đọc danh sách của module. Thêm khi có agent cần thật.

@@ -87,12 +87,13 @@ cả SQLite và Postgres.
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
       có test; hai endpoint trả file đang tự đặt header thì dùng chung lớp này
-- [ ] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
+- [x] Đẩy event theo thời gian thực bằng Server-Sent Events — stream event do module phát, KHÔNG
       tự đẩy mọi thay đổi của bảng ("realtime theo bảng" mà `docs/research/frameworks.md` đã không
       mượn); ghi quyết định nêu khác biệt đó. Một endpoint stream các event mà người
       gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
       `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
-      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình)
+      máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình) — `GET /api/v1/kernel/events/stream`, `EventInfo::streamable`, `StreamHub` hỏi bảng
+      event lùi `GRACE` 5 s; quyền hẹp hơn khách chỉ nhận việc của mình (event chưa có `org_id`); không có tool MCP (D-377)
 - [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
       việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
       mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
