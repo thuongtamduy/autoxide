@@ -226,8 +226,9 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 40);
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38) và hai của `analytics` (gộp mỗi
+            // giờ, dọn theo hạn lưu — bước 57)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 42);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

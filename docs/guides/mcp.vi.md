@@ -75,6 +75,10 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `address.search_units` | — | read-only |
 | `address.validate_address` | — | read-only |
 | `ai.status` | `ai.view` | read-only |
+| `analytics.funnel` | `analytics.read` | read-only |
+| `analytics.overview` | `analytics.read` | read-only |
+| `analytics.top_objects` | `analytics.read` | read-only |
+| `analytics.top_pages` | `analytics.read` | read-only |
 | `audit.get_entry` | `audit.read` | read-only |
 | `audit.list_entries` | `audit.read` | read-only |
 | `auth.count_memberships` | `auth.users.read` | read-only |
