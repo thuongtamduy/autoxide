@@ -157,8 +157,11 @@ impl TaskRun for Verify {
         };
         let org = match args.get("org_id") {
             Some(raw) => Some(raw.trim().parse::<Uuid>().map_err(|_| {
-                Error::bad_request("inventory.invalid_org_id", "`{value}` is not a unit id (a UUID).")
-                    .with_param("value", raw.to_owned())
+                Error::bad_request(
+                    "inventory.invalid_org_id",
+                    "`{value}` is not a unit id (a UUID).",
+                )
+                .with_param("value", raw.to_owned())
             })?),
             None => None,
         };

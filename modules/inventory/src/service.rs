@@ -31,8 +31,10 @@ pub(crate) const WAREHOUSES_LIMIT: Limit =
 /// Tính năng theo gói (bước 35).
 pub(crate) const MULTI_WAREHOUSE_FEATURE: Feature =
     Feature::new("inventory.multi_warehouse", "Stock in more than one warehouse or store.");
-pub(crate) const TRANSFERS_FEATURE: Feature =
-    Feature::new("inventory.transfers", "Stock transfers between warehouses, with goods in transit.");
+pub(crate) const TRANSFERS_FEATURE: Feature = Feature::new(
+    "inventory.transfers",
+    "Stock transfers between warehouses, with goods in transit.",
+);
 pub(crate) const LOTS_FEATURE: Feature =
     Feature::new("inventory.lots", "Lots with expiry dates; first expired, first out.");
 pub(crate) const SERIALS_FEATURE: Feature =

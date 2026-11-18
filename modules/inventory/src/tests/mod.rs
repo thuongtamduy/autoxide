@@ -315,13 +315,21 @@ fn so_chi_them_va_ton_chi_doi_bang_adjust() {
     sources(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
     assert!(files.len() > 5);
     for (path, text) in &files {
-        for banned in ["movement::Entity::update", "movement::Entity::delete", "movement::ActiveModel::update"] {
-            assert!(!text.contains(banned), "{path}: `{banned}` — the movement ledger is append-only");
+        for banned in [
+            "movement::Entity::update",
+            "movement::Entity::delete",
+            "movement::ActiveModel::update",
+        ] {
+            assert!(
+                !text.contains(banned),
+                "{path}: `{banned}` — the movement ledger is append-only"
+            );
         }
         if path.ends_with("stock.rs") {
             continue;
         }
-        for banned in ["Column::OnHand,", "Column::Available,", "on_hand: Set(", "available: Set("] {
+        for banned in ["Column::OnHand,", "Column::Available,", "on_hand: Set(", "available: Set("]
+        {
             assert!(
                 !text.contains(banned),
                 "{path}: `{banned}` — change on hand / available only through `stock.rs` (`rows::adjust`)"
