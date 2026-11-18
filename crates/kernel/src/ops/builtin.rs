@@ -98,9 +98,17 @@ pub(crate) struct KernelModule {
     /// Backup theo lịch (bước 39): cấu hình, và bộ chạy có sau `start`.
     backup_config: crate::backup::scheduled::BackupConfig,
     backups: Option<Arc<crate::backup::scheduled::ScheduledBackups>>,
+    /// Module có bảng job / event, cho `GET /kernel/ops/backlog` (bước 39).
+    backlog: crate::job::backlog::BacklogModules,
 }
 
 impl KernelModule {
+    /// Thứ `GET /kernel/ops/backlog` cần; có sau `start`.
+    fn backlog_state(&self) -> Option<crate::job::backlog_api::BacklogState> {
+        let registry = self.registry.clone()?;
+        Some(crate::job::backlog_api::BacklogState { registry, modules: self.backlog.clone() })
+    }
+
     pub(crate) fn new(
         catalog: ModuleCatalog,
         client_configs: crate::ops::client_config::ClientConfigs,
@@ -108,6 +116,7 @@ impl KernelModule {
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
         slots: crate::tenancy::Slots,
+        backlog: crate::job::backlog::BacklogModules,
     ) -> Self {
         let crate::tenancy::Slots { seeds, dns, orgs, moves: move_setup } = slots;
         KernelModule {
@@ -148,6 +157,7 @@ impl KernelModule {
             translations: crate::i18n::Translations::default(),
             backup_config: crate::backup::scheduled::BackupConfig::default(),
             backups: None,
+            backlog,
         }
     }
 
@@ -405,6 +415,7 @@ impl Module for KernelModule {
             crate::job::runs::JOBS_MANAGE,
             crate::ops::request_log::DEVTOOLS_READ,
             crate::ops::request_log::DEVTOOLS_MANAGE,
+            crate::job::backlog_api::OPS_READ,
         ]
     }
 
@@ -456,6 +467,9 @@ impl Module for KernelModule {
             .merge(crate::ops::client_config::routes(self.client_configs.clone()))
             .merge(crate::ops::whats_new::routes())
             .merge(crate::ops::alerts::routes(self.alerts.clone()));
+        if let Some(state) = self.backlog_state() {
+            routes = routes.merge(crate::job::backlog_api::routes(state));
+        }
         if let Some(state) = self.navigation_state() {
             routes = routes.merge(crate::ops::navigation::routes(state));
         }
@@ -622,6 +636,9 @@ impl Module for KernelModule {
 
     fn tools(&self) -> Vec<crate::mcp::Tool> {
         let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
+        if let Some(state) = self.backlog_state() {
+            tools.extend(crate::job::backlog_api::tools(state));
+        }
         if let Some(state) = self.navigation_state() {
             tools.extend(crate::ops::navigation::tools(state));
         }

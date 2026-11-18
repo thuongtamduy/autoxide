@@ -11,6 +11,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory` listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
+  (optional subscriptions) and confirms, releases or restocks once even when an event arrives again.
 - Module `inventory` (step 42): stock reservations for orders through `autoxide_inventory::api::Inventory`
   (`reserve` / `confirm` / `fulfil` / `release` / `restock`, `availability`, `in_stock_at`) that never oversell under
   concurrent requests; bundles take stock from components; warehouse choice per store (`PUT /sources/{store}`,
@@ -19,6 +21,9 @@ endpoints are marked deprecated with a sunset date first.
 - `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
   (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
   temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
+- `GET /api/v1/kernel/ops/backlog` and MCP tool `kernel.ops_backlog` (permission `kernel.ops.read`, platform staff
+  only): job and event backlogs by module, the dead-letter queue, database connections and the newest backup of every
+  database (step 39).
 - Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
   (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
   signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".

@@ -7501,6 +7501,26 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "See the job and event backlogs, the dead-letter queue, the database connections and the newest backup of every database (platform staff only). Use it to find out why mail, webhooks or reports are late.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.ops_backlog",
+      "output_schema": null,
+      "permissions": [
+        "kernel.ops.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the recent API and MCP calls made in this tenant (who, which route or tool, status, error code), newest first. Filter by `actor_kind` (e.g. `agent`), `api_key_id`, exact `path` (e.g. `mcp:content.publish_entry`), `status` or `status_class` (e.g. `5xx`).",
       "input_schema": {
         "additionalProperties": false,

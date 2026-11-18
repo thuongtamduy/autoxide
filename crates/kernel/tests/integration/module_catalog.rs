@@ -242,6 +242,7 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
             [
                 "kernel.list_modules",
                 "kernel.get_module",
+                "kernel.ops_backlog",
                 "kernel.navigation",
                 "kernel.list_settings",
                 "kernel.current_tenant",
