@@ -10,8 +10,7 @@ use super::{
 };
 use crate::api::GiftChoice;
 use crate::model::{
-    ConditionKind, Kind, Operator, Program, RewardSelection, Scope, Status, TargetSet,
-    ThresholdKind,
+    ConditionKind, Kind, Program, RewardSelection, Scope, Status, TargetSet, ThresholdKind,
 };
 
 /// Kết quả tính một chương trình.
@@ -669,6 +668,6 @@ mod tests {
 
     #[test]
     fn toan_tu_khong_dung_cho_chu() {
-        assert!(!super::matches_text(super::Operator::Gte, &[], Some("x")));
+        assert!(!super::matches_text(crate::model::Operator::Gte, &[], Some("x")));
     }
 }
