@@ -25,11 +25,7 @@ pub(crate) fn range_too_long(max: i64) -> Error {
 
 /// `analytics.range_reversed` (422).
 pub(crate) fn range_reversed() -> Error {
-    Error::new(
-        ErrorKind::Validation,
-        "analytics.range_reversed",
-        "`from` must not be after `to`.",
-    )
+    Error::new(ErrorKind::Validation, "analytics.range_reversed", "`from` must not be after `to`.")
 }
 
 /// `analytics.funnel_unknown` (404).

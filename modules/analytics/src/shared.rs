@@ -1,8 +1,6 @@
 //! Phần module `analytics` cho module khác và cho trang tổng quan: cài đặt trait [`Analytics`] của
 //! `api` ("thịnh hành", "vừa xem") và số liệu tóm tắt `analytics.visitors` (bước 51 P4).
 
-
-
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::summary::{MetricInfo, MetricValue, SummaryMetric};

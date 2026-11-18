@@ -24,7 +24,9 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::module::Module;
 use autoxide_kernel::report::org_field;
 use autoxide_kernel::secret::SecretKey;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId, root_of};
+use autoxide_kernel::tenancy::{
+    DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId, root_of,
+};
 use autoxide_testkit::{TestApp, TestDatabase};
 use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Value, json};

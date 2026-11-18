@@ -91,8 +91,9 @@ pub(crate) fn all(service: &Arc<AnalyticsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: RangeInput| {
                 let service = overview.clone();
                 async move {
-                    let range =
-                        service.range(&tenant, &principal, input.site, input.from, input.to).await?;
+                    let range = service
+                        .range(&tenant, &principal, input.site, input.from, input.to)
+                        .await?;
                     service.overview(&tenant, &range).await
                 }
             },
@@ -127,8 +128,9 @@ pub(crate) fn all(service: &Arc<AnalyticsService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: FunnelInput| {
                 let service = funnel.clone();
                 async move {
-                    let range =
-                        service.range(&tenant, &principal, input.site, input.from, input.to).await?;
+                    let range = service
+                        .range(&tenant, &principal, input.site, input.from, input.to)
+                        .await?;
                     service.funnel(&tenant, &range, &input.key).await
                 }
             },

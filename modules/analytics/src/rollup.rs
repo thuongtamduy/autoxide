@@ -23,9 +23,7 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, Query, SimpleExpr};
-use sea_orm::{
-    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
-};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use uuid::Uuid;
 
 use crate::entity::{daily, event, funnel_daily, rollup};

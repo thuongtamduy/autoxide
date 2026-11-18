@@ -117,8 +117,8 @@ mod tests {
         ])
         .unwrap_err();
         assert!(error.contains("RAW_RETENTION_DAYS") && error.contains("ENABLED"), "{error}");
-        let config = read(&[("AUTOXIDE_ANALYTICS_ALLOWED_HOSTS", " Shop.Example., b.example ")])
-            .unwrap();
+        let config =
+            read(&[("AUTOXIDE_ANALYTICS_ALLOWED_HOSTS", " Shop.Example., b.example ")]).unwrap();
         assert_eq!(config.allowed_hosts, ["shop.example", "b.example"]);
     }
 }

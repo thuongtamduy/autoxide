@@ -118,13 +118,11 @@ async fn bao_cao_chi_doc_bang_gop() {
         assert_eq!(pages, json!([{"value": "/", "views": 2, "visitors": 2, "events": 0}]));
         let campaigns = get(format!("/campaigns?{range}")).await;
         assert_eq!(campaigns[0]["value"], "tet");
-        let objects =
-            get(format!("/objects?{range}&kind=shop.product")).await;
+        let objects = get(format!("/objects?{range}&kind=shop.product")).await;
         assert_eq!(objects[0]["value"], "shop.product:p-1");
         let types = get(format!("/types?{range}")).await;
         assert_eq!(types[0]["value"], "analytics.page_view");
-        let funnel =
-            get(format!("/funnels/shop.checkout?{range}")).await;
+        let funnel = get(format!("/funnels/shop.checkout?{range}")).await;
         let sessions: Vec<Value> = funnel["steps"]
             .as_array()
             .unwrap()

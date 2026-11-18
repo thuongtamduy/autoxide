@@ -127,10 +127,9 @@ impl Module for AnalyticsModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let config = self
-            .config
-            .clone()
-            .ok_or_else(|| Error::internal("module `analytics` started before it was configured"))?;
+        let config = self.config.clone().ok_or_else(|| {
+            Error::internal("module `analytics` started before it was configured")
+        })?;
         let service = Arc::new(AnalyticsService {
             config,
             catalog: context.analytics_catalog(),

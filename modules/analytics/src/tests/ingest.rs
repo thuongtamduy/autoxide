@@ -154,7 +154,8 @@ async fn bot_bi_loai() {
         };
         let client = super::browser("192.0.2.9", SAFARI);
         let site = h.site(None).await;
-        let visitor = || crate::ingest::Visitor { client: &client, host: Some(HOST), user_id: None };
+        let visitor =
+            || crate::ingest::Visitor { client: &client, host: Some(HOST), user_id: None };
         let events = || (0..2).map(|_| page("/")).collect::<Vec<_>>();
         let first = limited.ingest(&h.tenant, &site, visitor(), events(), at(10, 9)).await;
         let second = limited.ingest(&h.tenant, &site, visitor(), events(), at(10, 9)).await;

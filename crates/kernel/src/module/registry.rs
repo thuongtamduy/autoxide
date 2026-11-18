@@ -190,8 +190,8 @@ impl Modules {
             .iter()
             .map(|module| (module.name(), module.analytics_events(), module.funnels()))
             .collect();
-        let analytics = crate::analytics::AnalyticsCatalog::new(declared, &events)
-            .unwrap_or_else(|errors| {
+        let analytics =
+            crate::analytics::AnalyticsCatalog::new(declared, &events).unwrap_or_else(|errors| {
                 problems.extend(errors);
                 crate::analytics::AnalyticsCatalog::default()
             });
