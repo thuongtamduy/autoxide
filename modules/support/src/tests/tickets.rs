@@ -333,6 +333,7 @@ fn support_service(app: &autoxide_testkit::TestApp) -> std::sync::Arc<dyn EventH
         notifier: None,
         media: None,
         accounts: None,
+        authenticator: None,
     };
     std::sync::Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }

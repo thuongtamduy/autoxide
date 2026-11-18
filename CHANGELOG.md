@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
+  conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
+  product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
+  checked against the tax engine on going on sale, and the public `path` of each product translation.
 - `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` — while changing `AUTOXIDE_AUTH_TOKEN_SECRET`, access tokens signed with
   an old key are still accepted, so nobody is signed out (step 39). `docs/DEPLOY.md` has the steps.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
@@ -34,6 +38,8 @@ endpoints are marked deprecated with a sunset date first.
   edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
   machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
+  channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
