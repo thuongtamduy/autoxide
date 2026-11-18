@@ -81,6 +81,8 @@ pub struct Modules {
     /// Thứ việc dời khách cần (module, bảng mặt điều khiển, migration); điền sau khi mọi module
     /// khởi động.
     moves: crate::tenancy::moves::MoveSetup,
+    /// Module có bảng job / event, cho số đo tồn đọng qua REST (bước 39); điền sau khi khởi động.
+    backlog: crate::job::backlog::BacklogModules,
     /// Sổ database (bước 33); có sau [`start`](Self::start).
     tenancy: Option<crate::tenancy::DatabaseRegistry>,
     /// Nguồn số liệu báo cáo của mọi module (bước 38), đã kiểm.
@@ -136,6 +138,7 @@ impl Modules {
         let dns = crate::tenancy::domains::DnsSlot::default();
         let orgs = crate::tenancy::domains::OrgSlot::default();
         let moves = crate::tenancy::moves::MoveSetup::default();
+        let backlog = crate::job::backlog::BacklogModules::default();
         let mut all: Vec<Box<dyn Module>> = vec![
             Box::new(crate::builtin::KernelModule::new(
                 catalog.clone(),
@@ -149,6 +152,7 @@ impl Modules {
                     orgs: orgs.clone(),
                     moves: moves.clone(),
                 },
+                backlog.clone(),
             )),
             Box::new(crate::antispam::module::AntispamModule::default()),
         ];
@@ -266,6 +270,7 @@ impl Modules {
                 dns,
                 orgs,
                 moves,
+                backlog,
                 tenancy: None,
                 facts,
                 analytics,
@@ -449,6 +454,7 @@ impl Modules {
             retained,
             policies,
         );
+        self.backlog.fill(self.job_modules(), self.events.modules());
         Ok(())
     }
 
@@ -751,13 +757,14 @@ impl Modules {
     /// database của sổ database. Gọi sau [`start`](Self::start).
     pub fn backlog_monitor(&self) -> Result<crate::job::backlog::BacklogMonitor, ModuleError> {
         let databases = self.started()?;
-        let jobs = self
-            .modules
-            .iter()
-            .filter(|module| !module.jobs().is_empty())
-            .map(|module| module.name())
-            .collect();
-        Ok(crate::job::backlog::BacklogMonitor::new(databases, jobs, self.events.modules()))
+        let (jobs, events) = (self.job_modules(), self.events.modules());
+        Ok(crate::job::backlog::BacklogMonitor::new(databases, jobs, events))
+    }
+
+    /// Module có job (và bảng job), theo thứ tự đăng ký.
+    fn job_modules(&self) -> Vec<&'static str> {
+        let with_jobs = self.modules.iter().filter(|module| !module.jobs().is_empty());
+        with_jobs.map(|module| module.name()).collect()
     }
 
     /// Bộ phát event: đọc bảng event của mọi module phát event trên mọi database của sổ
