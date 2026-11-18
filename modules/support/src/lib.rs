@@ -20,6 +20,7 @@ mod service;
 mod status;
 mod tickets;
 
+mod relocation;
 #[cfg(test)]
 mod tests;
 
@@ -124,5 +125,9 @@ impl Module for SupportModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }

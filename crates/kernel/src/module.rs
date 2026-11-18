@@ -328,6 +328,16 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Cách từng bảng cấp khách của module đi theo khi tách một nhánh tổ chức thành khách riêng
+    /// hay gộp hai khách (bước 38, D-20261118-step38-relocation): theo nút, theo dòng cha, chép
+    /// theo dòng trỏ tới, cả khách, phải rỗng hay module tự làm
+    /// ([`TablePolicy`](crate::tenancy::TablePolicy)); kèm cột secret mã hoá theo khách. Mặc định:
+    /// suy từ cột (có `org_id` → theo nút; hàng đợi → phải rỗng; còn lại → ở lại, cảnh báo trong kế
+    /// hoạch) — test của binary chặn bảng không khai.
+    fn relocation(&self) -> crate::tenancy::Relocation {
+        crate::tenancy::Relocation::inferred()
+    }
+
     /// Loại sự kiện phân tích truy cập của module (bước 57, D-220): website gửi loại `browser`, loại
     /// `server` rút từ event của chính module. Module `analytics` chỉ nhận loại đã khai. Kernel kiểm
     /// khai báo lúc khởi động. Mặc định: không có.

@@ -7947,6 +7947,36 @@ export type Data_RedirectResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_RelocationPlan = {
+  /** What a split or merge would do (dry run). Nothing is changed. */
+  data: {
+    blocking: RelocationBlocker[];
+    conflicts: RelocationConflict[];
+    kind: RelocationKind;
+    /**
+     * Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged
+     * tenant goes under.
+     */
+    org_id: string;
+    /** Placement (database) of the target. */
+    placement: string;
+    /** `true` when nothing blocks and there is no conflict. */
+    ready: boolean;
+    /** Rows that move or are copied. */
+    rows: number;
+    source: string;
+    /** Tenant whose rows go. */
+    source_tenant_id: string;
+    /** Every tenant-level table, in copy order. */
+    tables: RelocationTable[];
+    target: string;
+    /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
+    target_tenant_id: string;
+    warnings: RelocationWarning[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Resolution = {
   /** What lives at an address. */
   data: {
@@ -8820,6 +8850,33 @@ export type Data_TenantMovePlan = {
     tenant_id: string;
     /** Placement the data would move to. */
     to: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_TenantRelocation = {
+  /** A split or merge of tenants. */
+  data: {
+    created_at: string;
+    /** Why the last run stopped; running it again resumes it. */
+    error?: string | null;
+    finished_at?: string | null;
+    id: string;
+    kind: RelocationKind;
+    org_id?: string | null;
+    placement?: string | null;
+    plan?: RelocationPlan | null;
+    reason: string;
+    source_tenant_id: string;
+    /**
+     * `requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`
+     * (the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.
+     */
+    state: string;
+    /** Rows written to the target per table (after `copied`). */
+    tables: TenantTableRows[];
+    target_tenant_id?: string | null;
+    updated_at: string;
   };
 };
 
@@ -18494,6 +18551,153 @@ export type ReleaseSection = {
   kind: string;
 };
 
+/** What a tenant asks the platform staff to do. */
+export type RelocationAsk = {
+  /** Merge: id or slug of the tenant to join. */
+  into?: string | null;
+  /**
+   * `split`: a branch of your tenant becomes a tenant of its own. `merge`: your tenant joins
+   * `into`.
+   */
+  kind: RelocationKind;
+  /** Split: wished name of the new tenant. */
+  name?: string | null;
+  /** Split: the root unit of the branch. */
+  org_id?: string | null;
+  /** Split: wished placement (database), if the platform offers a choice. */
+  placement?: string | null;
+  /** Why (contract, consent of the people whose data moves). */
+  reason: string;
+  /** Split: wished slug of the new tenant. */
+  slug?: string | null;
+  /** Merge: the unit of `into` to go under. */
+  under_org?: string | null;
+};
+
+/** Something that blocks a split or merge. */
+export type RelocationBlocker = {
+  /** Stable code, the same as the error a real run would answer. */
+  code: string;
+  message: string;
+};
+
+/**
+ * Rows that cannot move as they are: a reference across the boundary or a unique value taken in
+ * the target.
+ */
+export type RelocationConflict = {
+  /**
+   * `reference` (a row that stays points to a row that goes, or the other way), `unique` (the
+   * target tenant already has the value) or a code of the module.
+   */
+  code: string;
+  /** Rows in conflict. */
+  count: number;
+  message: string;
+  /** Keys of the first rows in conflict (at most 20). */
+  rows: string[];
+  table: string;
+};
+
+/** Split or merge. */
+export type RelocationKind = "split" | "merge";
+
+/** What a split or merge would do (dry run). Nothing is changed. */
+export type RelocationPlan = {
+  blocking: RelocationBlocker[];
+  conflicts: RelocationConflict[];
+  kind: RelocationKind;
+  /**
+   * Split: the root unit of the branch. Merge: the unit of the receiving tenant the merged
+   * tenant goes under.
+   */
+  org_id: string;
+  /** Placement (database) of the target. */
+  placement: string;
+  /** `true` when nothing blocks and there is no conflict. */
+  ready: boolean;
+  /** Rows that move or are copied. */
+  rows: number;
+  source: string;
+  /** Tenant whose rows go. */
+  source_tenant_id: string;
+  /** Every tenant-level table, in copy order. */
+  tables: RelocationTable[];
+  target: string;
+  /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
+  target_tenant_id: string;
+  warnings: RelocationWarning[];
+};
+
+/** A split or merge of tenants to run (platform staff). */
+export type RelocationRequest = {
+  /** Only report what would happen, changing nothing. Defaults to `true`: send `false` to run. */
+  dry_run?: boolean;
+  /** Merge: id or slug of the tenant that receives the rows. */
+  into?: string | null;
+  /** Split: the new tenant is a child of the source tenant. Defaults to `true`. */
+  keep_parent?: boolean;
+  /** `split`: a branch of `tenant` becomes a tenant of its own. `merge`: `tenant` joins `into`. */
+  kind: RelocationKind;
+  /** Split: name of the new tenant. */
+  name?: string | null;
+  /** Split: the root unit of the branch. The new tenant gets this id. */
+  org_id?: string | null;
+  /**
+   * Split: placement (database) of the new tenant; it must be another database than the
+   * source tenant's.
+   */
+  placement?: string | null;
+  /**
+   * Why the data moves between tenants (contract, consent); kept with the run and in the audit
+   * log.
+   */
+  reason: string;
+  /**
+   * Carry out this request of a tenant (from `POST /tenant/relocation-requests`); the other
+   * fields still apply.
+   */
+  request_id?: string | null;
+  /** Split: slug of the new tenant. */
+  slug?: string | null;
+  /**
+   * Id or slug of the tenant whose rows go (split: the tenant with the branch; merge: the
+   * tenant that is merged).
+   */
+  tenant: string;
+  /** Merge: the unit of `into` that the root of the merged tenant goes under. */
+  under_org?: string | null;
+};
+
+/** What happens to one table. */
+export type RelocationTable = {
+  /**
+   * `move` (copied to the target, then deleted from the source), `copy` (the source keeps
+   * them too), `stay`, `drain` (due queue rows that must run first) or `custom`.
+   */
+  action: string;
+  /**
+   * Merge: rows whose key the target already has (the copy made when the tenant was split);
+   * they are skipped as the same rows.
+   */
+  existing: number;
+  /**
+   * The policy of the table: `by_org`, `org_tree`, `follow_parent`, `referenced`,
+   * `tenant_wide`, `must_be_empty`, `handled_by` or `custom`.
+   */
+  policy: string;
+  /** Rows concerned. */
+  rows: number;
+  table: string;
+};
+
+/** Something the operator should know; it does not block. */
+export type RelocationWarning = {
+  code: string;
+  message: string;
+  table: string;
+};
+
 /** A new name for a tag. */
 export type RenameTagRequest = {
   /** 1 to 50 characters, without `,`; unique, ignoring case. */
@@ -20220,6 +20424,30 @@ export type TenantMoveRequest = {
   keep_source?: boolean;
   /** Name of the placement (database) to move the data to. */
   to: string;
+};
+
+/** A split or merge of tenants. */
+export type TenantRelocation = {
+  created_at: string;
+  /** Why the last run stopped; running it again resumes it. */
+  error?: string | null;
+  finished_at?: string | null;
+  id: string;
+  kind: RelocationKind;
+  org_id?: string | null;
+  placement?: string | null;
+  plan?: RelocationPlan | null;
+  reason: string;
+  source_tenant_id: string;
+  /**
+   * `requested` (asked by the tenant, waiting for the platform staff), `planned`, `frozen`
+   * (the tenants answer 503), `copied`, `verified`, `switched`, `cleaned`, `done` or `failed`.
+   */
+  state: string;
+  /** Rows written to the target per table (after `copied`). */
+  tables: TenantTableRows[];
+  target_tenant_id?: string | null;
+  updated_at: string;
 };
 
 /** A setting the installed modules take per tenant, and its state in the current tenant. */
@@ -27334,6 +27562,37 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/relocations": {
+    /** Split a tenant or merge tenants. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RelocationRequest;
+      responses: {
+        200: Data_RelocationPlan;
+        201: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/relocations/{id}": {
+    /** Get a split or merge of tenants. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/resolve": {
     /** Open a record by its code. */
     get: {
@@ -27507,6 +27766,33 @@ export interface paths {
       responses: {
         200: Data_CurrentTenant;
         401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant/relocation-requests": {
+    /** Ask for a split or merge of your tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RelocationAsk;
+      responses: {
+        201: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenant/relocation-requests/{id}": {
+    /** Get a request of your tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_TenantRelocation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

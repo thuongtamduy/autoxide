@@ -90,6 +90,42 @@ impl Module for LedgerModule {
         "ledger"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new()
+            // Sổ đi theo nút của sổ; mọi thứ của sổ đi theo sổ — kể cả tài khoản đối tượng là nút
+            // ngoài nhánh (sổ của nút giữ nghĩa vụ đó). Chuỗi niêm phong không băm `tenant_id`.
+            .by_org(&["ledger_books", "ledger_flow_settings", "ledger_bank_accounts"])
+            .follow("ledger_accounts", "book_id", "ledger_books")
+            .table(
+                "ledger_account_balances",
+                autoxide_kernel::tenancy::TablePolicy::FollowParent {
+                    parent_table: "ledger_accounts",
+                    column: "account_id",
+                    parent_column: "id",
+                },
+            )
+            .follow("ledger_periods", "book_id", "ledger_books")
+            .follow("ledger_entries", "book_id", "ledger_books")
+            .follow("ledger_lines", "entry_id", "ledger_entries")
+            .follow("ledger_period_balances", "period_id", "ledger_periods")
+            .follow("ledger_chain_heads", "book_id", "ledger_books")
+            .follow("ledger_entry_seals", "book_id", "ledger_books")
+            .follow("ledger_payments", "book_id", "ledger_books")
+            .follow("ledger_refunds", "payment_id", "ledger_payments")
+            .follow("ledger_holds", "book_id", "ledger_books")
+            .follow("ledger_payouts", "book_id", "ledger_books")
+            .follow("ledger_bank_transactions", "bank_account_id", "ledger_bank_accounts")
+            .copy_on_split(&["ledger_fx_rates"])
+            .stay(&[
+                "ledger_gateway_events",
+                "ledger_reconciliations",
+                "ledger_statement_lines",
+                "ledger_exceptions",
+            ])
+    }
+
     fn description(&self) -> &'static str {
         "Double-entry ledger per organization unit: accounts, append-only entries, balances, \
          holds, payouts and payments through licensed partners."

@@ -28,6 +28,10 @@ use uuid::Uuid;
 use crate::database::Database;
 use crate::tenancy::TenantId;
 
+mod filtered;
+
+pub(crate) use filtered::{Row, canonical, foreign_keys, primary_key, tenant_is, unique_indexes};
+
 /// Số dòng mỗi câu `INSERT` (SQLite giới hạn số tham số mỗi câu).
 const BATCH_ROWS: usize = 100;
 
@@ -42,6 +46,13 @@ impl std::fmt::Display for TransferError {
 }
 
 impl std::error::Error for TransferError {}
+
+impl TransferError {
+    /// Lỗi với câu `message`.
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        TransferError(message.into())
+    }
+}
 
 impl From<sea_orm::DbErr> for TransferError {
     fn from(error: sea_orm::DbErr) -> Self {
