@@ -399,6 +399,7 @@ impl BookingsService {
         principal: &Principal,
         input: NewService,
     ) -> Result<ServiceView, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let mut problems = Vec::new();
         check_text(&mut problems, "name", &input.name, 1, 200);
         check_names(&mut problems, &input.names);
@@ -467,6 +468,7 @@ impl BookingsService {
         id: Uuid,
         changes: ServiceChanges,
     ) -> Result<ServiceView, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let transaction = tenant.database().begin_write().await?;
         let before = Self::service_view(&transaction, tenant, id).await?;
         hidden(
@@ -567,6 +569,7 @@ impl BookingsService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<ServiceView, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let read = tenant.database().read();
         let view = Self::service_view(read, tenant, id).await?;
         hidden(principal.require_at(read, &SERVICES_MANAGE, at(view.row.org_id)).await, || {
@@ -625,6 +628,7 @@ impl BookingsService {
         principal: &Principal,
         input: NewResource,
     ) -> Result<resource::Model, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let mut problems = Vec::new();
         check_text(&mut problems, "name", &input.name, 1, 200);
         if !RESOURCE_KINDS.contains(&input.kind.as_str()) {
@@ -684,6 +688,7 @@ impl BookingsService {
         id: Uuid,
         changes: ResourceChanges,
     ) -> Result<resource::Model, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let mut problems = Vec::new();
         if let Some(name) = &changes.name {
             check_text(&mut problems, "name", name, 1, 200);
@@ -739,6 +744,7 @@ impl BookingsService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<resource::Model, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let read = tenant.database().read();
         let row = Self::resource_row(read, tenant, id).await?;
         hidden(principal.require_at(read, &SERVICES_MANAGE, at(row.org_id)).await, || {
@@ -792,6 +798,7 @@ impl BookingsService {
         resource_id: Uuid,
         ranges: Vec<WeeklyInput>,
     ) -> Result<Vec<schedule::Model>, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let mut problems = Vec::new();
         if ranges.len() > 70 {
             problems.push(FieldError::new("ranges", "length", "must list at most 70 ranges"));
@@ -893,6 +900,7 @@ impl BookingsService {
         principal: &Principal,
         input: NewException,
     ) -> Result<exception::Model, Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let mut problems = Vec::new();
         if !["closed", "open"].contains(&input.kind.as_str()) {
             problems.push(FieldError::new(
@@ -954,6 +962,7 @@ impl BookingsService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
+        principal.require(&SERVICES_MANAGE)?;
         let transaction = tenant.database().begin_write().await?;
         let row = exception::Entity::find_by_id(id)
             .scoped(tenant)
