@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
+  (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
+  temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category

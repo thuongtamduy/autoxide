@@ -547,3 +547,59 @@ pub(crate) mod product_document {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod rounding_rule {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_rounding_rules")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub name: String,
+        pub step_minor: i64,
+        /// `up`, `down`, `nearest`.
+        pub mode: String,
+        pub ending_minor: Option<i64>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod price_change {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_price_changes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub price_list_id: Uuid,
+        /// JSON: danh mục, sản phẩm, biến thể.
+        pub filter: String,
+        /// `set`, `percent`, `amount`.
+        pub operation: String,
+        pub value: i64,
+        pub rounding_rule_id: Option<Uuid>,
+        pub valid_from: DateTimeUtc,
+        pub valid_to: Option<DateTimeUtc>,
+        /// `draft`, `previewed`, `approved`, `applied`, `cancelled`.
+        pub status: String,
+        pub affected: i64,
+        /// JSON của bản xem trước.
+        pub preview: Option<String>,
+        pub created_by: Option<Uuid>,
+        pub approved_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

@@ -598,6 +598,7 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-media",
+ "autoxide-organizations",
  "autoxide-tax",
  "autoxide-testkit",
  "axum",
