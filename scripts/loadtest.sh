@@ -126,7 +126,9 @@ if [ -n "${LOADTEST_DATASET:-}" ]; then
 fi
 "$BINARY" serve >serve.log 2>&1 &
 SERVER=$!
-for _ in $(seq 1 100); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
+# Chờ sẵn sàng tới 2 phút: trên bộ dữ liệu `full`, SQLite lập thống kê lúc mở (vài giây).
+for _ in $(seq 1 1200); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
+curl -sf "$BASE/health/ready" >/dev/null || { echo "loadtest: server not ready; log:" >&2; tail -20 serve.log >&2; exit 1; }
 
 json() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 post() { curl -sf "$BASE$1" -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d "$2"; }
