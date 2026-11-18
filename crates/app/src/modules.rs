@@ -87,6 +87,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // dùng `dyn OrgDirectory` (loại nút) và `dyn Ledger` (công nợ nhà cung cấp) nếu có. `orders`
         // (bước 45) giữ chỗ qua `dyn Inventory`, nên đăng ký SAU nó.
         Box::new(autoxide_inventory::module()),
+        // Vận chuyển (bước 44): cần `dyn AdministrativeUnits` (kiểm địa chỉ), đứng sau `catalog`
+        // (cạnh `inventory`, `promotions`) và trước `orders`. Bộ nối hãng đăng ký SAU nó.
+        Box::new(autoxide_shipping::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.

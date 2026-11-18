@@ -399,6 +399,7 @@ dependencies = [
  "autoxide-organizations",
  "autoxide-plans",
  "autoxide-reporting",
+ "autoxide-shipping",
  "autoxide-support",
  "autoxide-tax",
  "autoxide-testkit",
@@ -1092,6 +1093,29 @@ dependencies = [
  "sea-orm",
  "serde",
  "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-shipping"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-address",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "hmac 0.13.0",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
  "tokio",
  "tracing",
  "utoipa",
