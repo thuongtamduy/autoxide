@@ -13,6 +13,7 @@ mod can_plan;
 mod client_config;
 mod custom_fields_limit;
 mod database;
+mod distribution;
 mod event;
 mod event_stream;
 mod filter_parse;

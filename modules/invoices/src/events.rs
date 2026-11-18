@@ -64,3 +64,54 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EXPORT_READY,
     ]
 }
+
+/// Số liệu cho báo cáo gộp (bước 38): tổng tiền và số chứng từ đã lập, theo loại chứng từ.
+pub(crate) const ISSUED_TOTAL: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "invoices.issued_total",
+        "Total of the documents issued, in the currency of each document; dimension `kind` is \
+         the kind of document (e.g. `vat_invoice`).",
+        autoxide_kernel::report::Measure::Amount,
+        &["kind"],
+    );
+
+pub(crate) const ISSUED_COUNT: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "invoices.issued_count",
+        "Number of documents issued; dimension `kind` is the kind of document.",
+        autoxide_kernel::report::Measure::Quantity,
+        &["kind"],
+    );
+
+pub(crate) fn facts() -> Vec<autoxide_kernel::report::FactSource> {
+    vec![autoxide_kernel::report::FactSource::new(
+        DOCUMENT_ISSUED.name(),
+        vec![ISSUED_TOTAL, ISSUED_COUNT],
+        issued_facts,
+    )]
+}
+
+/// `invoices.document_issued` → tổng tiền và một chứng từ, theo loại.
+fn issued_facts(
+    event: &autoxide_kernel::event::Delivered,
+) -> Result<Vec<autoxide_kernel::report::Fact>, autoxide_kernel::error::Error> {
+    use autoxide_kernel::report::{Fact, money_field, org_field};
+    let org = org_field(&event.payload);
+    let kind = event.payload.get("kind").and_then(Value::as_str).unwrap_or("unknown").to_owned();
+    let mut facts = Vec::new();
+    if let Some(total) = money_field(&event.payload, "total")? {
+        facts.push(
+            Fact::new(ISSUED_TOTAL.kind, event.occurred_at)
+                .org(org)
+                .amount(total)
+                .dimension("kind", kind.clone()),
+        );
+    }
+    facts.push(
+        Fact::new(ISSUED_COUNT.kind, event.occurred_at)
+            .org(org)
+            .quantity(1)
+            .dimension("kind", kind),
+    );
+    Ok(facts)
+}

@@ -318,6 +318,15 @@ pub trait Module: Send + Sync {
     fn routes(&self) -> OpenApiRouter {
         OpenApiRouter::new()
     }
+
+    /// Số liệu báo cáo các event của module sinh ra (bước 38, D-20261118-step38-report-facts):
+    /// mỗi [`FactSource`](crate::report::FactSource) nói một event của CHÍNH module (`<module>.…`,
+    /// đã khai ở [`events`](Self::events)) cho ra số liệu nào. Module `reporting` nghe các event đó
+    /// và đổ số liệu về kho báo cáo gộp của cây khách hàng. Kernel kiểm khai báo lúc khởi động.
+    /// Mặc định: không có.
+    fn facts(&self) -> Vec<crate::report::FactSource> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -352,6 +361,7 @@ pub struct StartContext<'a> {
     entitlements: &'a crate::entitlement::EntitlementsHandle,
     counters:
         &'a mut std::collections::BTreeMap<&'static str, Arc<dyn crate::entitlement::UsageCounter>>,
+    facts: &'a crate::report::FactCatalog,
 }
 
 impl StartContext<'_> {
@@ -661,6 +671,24 @@ impl StartContext<'_> {
         T: ?Sized + Send + Sync + 'static,
     {
         self.apis.contributions()
+    }
+
+    /// Mọi nguồn số liệu báo cáo (`Module::facts`) của mọi module đã đăng ký — kể cả module đăng ký
+    /// sau — kèm tên module, theo thứ tự đăng ký (bước 38). Module `reporting` đọc để nghe đúng các
+    /// event đó.
+    pub fn fact_sources(&self) -> Vec<(&'static str, crate::report::FactSource)> {
+        self.facts.sources()
+    }
+
+    /// Bộ phân phối dữ liệu khách cha → khách con của module này (bước 38): ghi bản phân phối
+    /// trong transaction của khách cha, job `<module>.distribute` áp vào từng khách con. Xem
+    /// [`crate::tenancy::distribution`].
+    pub fn distributor(&self) -> crate::tenancy::distribution::Distributor {
+        crate::tenancy::distribution::Distributor::new(
+            self.module,
+            self.tenancy.clone(),
+            self.entitlements.clone(),
+        )
     }
 }
 

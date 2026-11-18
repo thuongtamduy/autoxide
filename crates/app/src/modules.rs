@@ -71,6 +71,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // `content` để nhập sang, nên đứng sau cả hai. Đối tượng đích tra qua sổ đối tượng của
         // kernel, nên module đăng ký sau vẫn được menu trỏ tới.
         Box::new(autoxide_menus::module()),
+        // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
+        // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
+        // CUỐI CÙNG.
+        Box::new(autoxide_reporting::module()),
     ]
 }
 
@@ -217,8 +221,9 @@ mod tests {
             // hạn — D-360, D-361, D-363;
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
-            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367) và một của `comments`) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 38);
+            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 40);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

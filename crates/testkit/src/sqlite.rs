@@ -75,7 +75,9 @@ mod tests {
 
     #[test]
     fn thu_muc_cha_khong_ton_tai_thi_khong_loi() {
-        let missing = std::env::temp_dir().join("autoxide-missing-parent-directory");
+        // Tên riêng cho mỗi lần chạy: tên cố định thì lần chạy khác (hay ai đó) có thể đã tạo nó.
+        let missing = std::env::temp_dir()
+            .join(format!("autoxide-missing-parent-directory-{}", Uuid::now_v7()));
         assert_eq!(remove_stale_directories(&missing, SystemTime::now()), 0);
     }
 }

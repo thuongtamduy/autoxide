@@ -51,6 +51,7 @@ autoxide-forms = { path = "modules/forms" }
 autoxide-newsletter = { path = "modules/newsletter" }
 autoxide-comments = { path = "modules/comments" }
 autoxide-menus = { path = "modules/menus" }
+autoxide-reporting = { path = "modules/reporting" }
 autoxide-address = { path = "modules/address" }
 autoxide-organizations = { path = "modules/organizations" }
 autoxide-plans = { path = "modules/plans" }

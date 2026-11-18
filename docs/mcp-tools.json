@@ -8837,6 +8837,184 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List report facts (newest first) with the same visibility as `reporting.summary`; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which report facts to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dimensions": {
+            "description": "Comma-separated `name:value` pairs, e.g. `kind:vat_invoice` (needs `kind`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "First day (inclusive), `YYYY-MM-DD`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "The fact kind, e.g. `invoices.issued_total`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of facts, 1 to 200 (default 50).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_ids": {
+            "description": "Only these organization units, comma-separated ids.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_ids": {
+            "description": "Only these tenants of your customer tree, comma-separated ids.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Last day (inclusive), `YYYY-MM-DD`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "reporting.facts",
+      "output_schema": null,
+      "permissions": [
+        "reporting.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the kinds of report figures modules declare (kind, unit, dimensions).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "No input.",
+        "type": "object"
+      },
+      "name": "reporting.kinds",
+      "output_schema": null,
+      "permissions": [
+        "reporting.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Sum a report figure over a period, per day, week, month, tenant or unit, for your tenant and the tenants below it (as far as your scope reaches). Money is summed per currency; ask `currency` to also get a converted total.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which report figures to sum, and how.",
+        "properties": {
+          "currency": {
+            "description": "Also convert every sum to this ISO 4217 currency with your tenant's exchange rates.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "First day (inclusive), `YYYY-MM-DD`; defaults to 29 days before `to`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_by": {
+            "description": "`day` (default, at most 366 days), `week`, `month`, `tenant` or `org`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "The fact kind, e.g. `invoices.issued_total` (see `reporting.kinds`).",
+            "type": "string"
+          },
+          "org_ids": {
+            "description": "Only these organization units, comma-separated ids.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tenant_ids": {
+            "description": "Only these tenants of your customer tree, comma-separated ids.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Last day (inclusive), `YYYY-MM-DD`; defaults to today (UTC).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "name": "reporting.summary",
+      "output_schema": null,
+      "permissions": [
+        "reporting.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Compute the taxes of a document (per line and per rate) without saving anything. Taxes are rounded once per rate on the whole document, then shared between lines.",
       "input_schema": {
         "additionalProperties": false,

@@ -6,7 +6,7 @@ thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/
 
 Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
-phát hành mới nhất `v0.14.0`. CI trên GitHub chỉ chạy khi repo công khai (D-197, D-199): `./gate.sh` cục bộ là gate duy nhất.
+phát hành mới nhất `v0.14.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
@@ -234,11 +234,16 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
 
 Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
 
-- [ ] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
+- [x] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
       gian thực, mang `tenant_id`, `org_id`; báo cáo gộp nhiều cửa hàng, nhiều tiền tệ; người có quyền
-      ở cha mới xem
-- [ ] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
-      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng
+      ở cha mới xem — xong (18/11, D-20261118-step38-report-facts): kernel `report` + `Module::facts`, module
+      `reporting` (rút ở database nguồn, lịch đẩy lên kho ở database của khách gốc, cộng dồn ngày, dọn),
+      `invoices` / `ledger` khai số liệu, `/api/v1/reporting/*` + tool MCP, phạm vi theo cây khách và cây tổ chức,
+      quy đổi theo tỉ giá của người xem; test cha / con khác database trên cả hai database
+- [x] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
+      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng — xong (18/11,
+      D-20261118-step38-distribution): test đầu-cuối uỷ quyền vào con có database riêng (audit hai phía, thu hồi);
+      kernel `tenancy::distribution` (`Distributor`, `DistributionApply`, `distribution_migration`) với module mẫu
 - [ ] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
       test trên cả hai database
 - [ ] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu
