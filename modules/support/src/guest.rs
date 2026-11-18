@@ -88,6 +88,10 @@ impl SupportService {
             let actor = Actor::from(principal);
             return self.open_ticket(tenant, actor, Some(principal.user_id()), opening, None).await;
         }
+        let org = input.org_id.unwrap_or_else(|| tenant.id().as_uuid());
+        if !self.policy(tenant, org).await?.policy.guest_tickets {
+            return Err(guest_tickets_disabled());
+        }
         let requester = contact(input.email.as_deref(), input.phone.as_deref())?;
         if !input.media_ids.is_empty() {
             return Err(crate::messages::attachment_not_owned());
@@ -429,6 +433,7 @@ fn phantom(tenant: &TenantContext, opening: &Opening) -> Ticket {
         resolve_due_at: None,
         first_responded_at: None,
         sla_paused_at: None,
+        sla_paused_minutes: 0,
         solved_at: None,
         closed_at: None,
         breached: false,
@@ -491,5 +496,13 @@ fn verification_required_for_claim() -> Error {
         "support.verification_required",
         "Confirm the email or phone number of this ticket first: \
          `POST /api/v1/support/public/tickets/{id}/verify`.",
+    )
+}
+
+fn guest_tickets_disabled() -> Error {
+    Error::new(
+        ErrorKind::Forbidden,
+        "support.guest_tickets_disabled",
+        "This shop takes support tickets from signed-in customers only: sign in first.",
     )
 }

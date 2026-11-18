@@ -14,7 +14,8 @@ giá có đủ lịch sử giá. Kho, khuyến mại, vận chuyển, đơn hàn
   (giao hàng, có tồn kho), `digital`, `service` hay `bundle`. `tax_category` là mã nhóm thuế của engine
   thuế (`GET /api/v1/tax/categories`), vd `vat.standard`.
 - Nội dung theo ngôn ngữ (`PUT /products/{id}/translations/{locale}`); ngôn ngữ được phép là
-  `AUTOXIDE_CATALOG_LOCALES`. `slug` trống thì sinh từ tên, trùng thì thêm `-2`, `-3`… Mô tả là chữ
+  `AUTOXIDE_CATALOG_LOCALES`. Mỗi bản dịch có đường dẫn công khai `path`,
+  `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`. `slug` trống thì sinh từ tên, trùng thì thêm `-2`, `-3`… Mô tả là chữ
   thuần (dòng trống ngăn đoạn); HTML không được hiểu.
 - Tuỳ chọn (màu, cỡ…) đặt bằng `PUT /products/{id}/options`: tối đa 3 tuỳ chọn, mỗi tuỳ chọn tối đa
   100 giá trị. Thêm tuỳ chọn thì mọi biến thể đang có nhận giá trị đầu của tuỳ chọn đó. Mỗi biến thể
@@ -42,6 +43,27 @@ Mỗi khách một cây, sâu tối đa 7 tầng (`/categories`, permission `cat
 `POST /categories/{id}/move` dời danh mục cùng mọi thứ bên dưới; dời vào chính nó bị từ chối
 (`catalog.category_cycle`). Lọc sản phẩm theo một danh mục gồm cả danh mục con.
 
+## Thuộc tính, hàng cấm và readiness
+
+- **Thuộc tính** (`/attributes`, permission `catalog.categories.manage`) có kiểu: `text`, `integer`,
+  `decimal` (kèm `scale`), `boolean`, `date`, `option`, `options`. Sản phẩm đặt giá trị bằng
+  `PUT /products/{id}/attributes`.
+- Danh mục khai thuộc tính bằng `PUT /categories/{id}/attributes`; thuộc tính có thể **bắt buộc**, từ
+  `effective_from` tới `effective_to`, cho danh mục và (mặc định) các danh mục con. Thuộc tính bắt buộc là
+  dữ liệu: quy định nhãn mới được thêm kèm ngày bắt đầu.
+- **Hàng cấm và hàng có điều kiện** là quy tắc dùng chung kèm căn cứ pháp lý (`GET /restriction-rules`).
+  Người vận hành nạp bằng `autoxide task catalog.load_restrictions` (gói `vn` phát hành kèm máy chủ; cùng
+  lệnh tạo thuộc tính nhãn hàng hoá mẫu như xuất xứ, hạn sử dụng cho một khách). Gắn quy tắc vào danh mục
+  bằng `PUT /categories/{id}/restrictions`. Quy tắc tổng hợp từ nguồn thứ cấp — cần đối chiếu văn bản gốc
+  với người có chuyên môn pháp lý.
+- Hàng có điều kiện cần giấy tờ còn hạn (`/products/{id}/documents`, permission
+  `catalog.documents.manage`), vd giấy phép bán lẻ rượu.
+- Mỗi sản phẩm có **readiness**: `restricted` (hàng cấm), `missing_attributes`, `missing_documents` hay
+  `ready`. Chỉ sản phẩm `ready` mới mở bán được. Lọc bằng `?readiness=`, đếm bằng
+  `GET /products/counts?group_by=readiness`. Giấy tờ hết hạn được một job hằng ngày phát hiện.
+- Mở bán còn kiểm nhóm thuế có trong engine thuế theo hồ sơ thuế của nút
+  (`catalog.tax_category_unknown`).
+
 ## Giá
 
 **Bảng giá** thuộc một nút tổ chức (chuỗi hay cửa hàng) và áp ở đó cùng các nút bên dưới. Bảng có tiền
@@ -60,6 +82,19 @@ hơn, rồi id. Mỗi biến thể lấy giá từ bảng đầu tiên theo th�
 
 **Giá bán cho người tiêu dùng ở Việt Nam** phải bằng VND và gồm thuế khi nút có hồ sơ thuế Việt Nam
 (Luật Giá 16/2023/QH15 — cần đối chiếu văn bản gốc với người có chuyên môn pháp lý).
+
+**Bảng giá suy ra** lấy giá từ một bảng gốc (`derived_from`; chỉ một tầng, `catalog.derived_chain`),
+điều chỉnh theo `adjust_bp` (phần vạn, có dấu: `-1000` = giảm 10%) và `adjust_minor`, rồi làm tròn theo
+**quy tắc làm tròn** (`/rounding-rules`: bội số của `step_minor`, hay dạng `k × step_minor +
+ending_minor`, vd bước 10.000 và đuôi 9.000 cho 129.000, 199.000). Một job ghi dòng giá thật vào bảng suy
+ra mỗi khi bảng gốc có giá mới, nên đọc giá không bao giờ tính công thức. Dòng tay trong bảng suy ra ghim
+giá biến thể đó khi còn hiệu lực.
+
+**Đổi giá hàng loạt** (`/price-lists/{id}/changes`): tạo (`set`, `percent` hay `amount`, cho danh mục,
+sản phẩm hay biến thể, có thể tạm thời với `valid_to`) → xem trước (số biến thể, 20 dòng mẫu, vi phạm sàn
+giá; không ghi gì) → duyệt (`catalog.prices.approve`; cài đặt nút
+`catalog.price_change_requires_second_person` bật thì người duyệt phải khác người tạo) → job ghi dòng giá
+(`source = bulk`). Hoàn tác bằng một lần đổi mới về giá cũ.
 
 **Sàn giá** (`/price-guards`): giá tối thiểu và / hoặc biên lợi nhuận tối thiểu trên giá vốn, theo nút
 và (nếu muốn) theo danh mục, tác dụng `warn` (giá vẫn ghi, kèm cảnh báo) hay `block`

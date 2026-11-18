@@ -66,6 +66,8 @@ struct Header {
 #[derive(Clone)]
 pub(crate) struct AccessTokens {
     key: Vec<u8>,
+    /// Khoá cũ (`AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS`): chỉ để KIỂM token ký trước khi đổi khoá.
+    previous: Vec<Vec<u8>>,
     ttl: Duration,
 }
 
@@ -78,7 +80,15 @@ impl std::fmt::Debug for AccessTokens {
 
 impl AccessTokens {
     pub(crate) fn new(key: Vec<u8>, ttl: Duration) -> Self {
-        AccessTokens { key, ttl }
+        AccessTokens { key, previous: Vec::new(), ttl }
+    }
+
+    /// Nhận thêm token ký bằng các khoá cũ `previous` trong lúc đổi khoá (bước 39): token mới vẫn
+    /// ký bằng khoá hiện tại, nên đổi khoá không đăng xuất ai. Định dạng token không đổi (không
+    /// thêm `kid`): token đang nằm ở client vẫn đọc được.
+    pub(crate) fn with_previous(mut self, previous: Vec<Vec<u8>>) -> Self {
+        self.previous = previous;
+        self
     }
 
     /// Thời gian sống của một token.
@@ -105,7 +115,7 @@ impl AccessTokens {
         let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(Error::internal)?);
         let signing_input = format!("{HEADER}.{payload}");
         let signature =
-            URL_SAFE_NO_PAD.encode(self.mac(tenant, &signing_input)?.finalize().into_bytes());
+            URL_SAFE_NO_PAD.encode(mac(&self.key, tenant, &signing_input)?.finalize().into_bytes());
         Ok(format!("{signing_input}.{signature}"))
     }
 
@@ -133,8 +143,17 @@ impl AccessTokens {
         let claims: Claims = decode_json(payload)?;
         let tenant = claims.tid.map_or(DEFAULT_TENANT, TenantId::from_uuid);
         // `verify_slice` so sánh trong thời gian không đổi: không lộ dần chữ ký đúng
-        // qua thời gian trả lời.
-        self.mac(tenant, signing_input)?.verify_slice(&signature).map_err(|_| invalid_token())?;
+        // qua thời gian trả lời. Thử khoá hiện tại rồi từng khoá cũ (đang đổi khoá).
+        let mut valid = false;
+        for key in std::iter::once(&self.key).chain(&self.previous) {
+            if mac(key, tenant, signing_input)?.verify_slice(&signature).is_ok() {
+                valid = true;
+                break;
+            }
+        }
+        if !valid {
+            return Err(invalid_token());
+        }
 
         if claims.iss != ISSUER {
             return Err(invalid_token());
@@ -147,20 +166,20 @@ impl AccessTokens {
         }
         Ok((tenant, claims.sub))
     }
+}
 
-    /// HMAC đã nạp `signing_input`, với khoá ký của khách `tenant` (xem đầu file).
-    fn mac(&self, tenant: TenantId, signing_input: &str) -> Result<HmacSha256, Error> {
-        let mut mac = if tenant == DEFAULT_TENANT {
-            hmac(&self.key)?
-        } else {
-            // Byte 0 ngăn cách: không ghép (mục đích, khách) khác nhau thành cùng một nhãn.
-            let mut derive = hmac(&self.key)?;
-            derive.update(format!("{PURPOSE}\0tenant\0{tenant}").as_bytes());
-            hmac(&derive.finalize().into_bytes())?
-        };
-        mac.update(signing_input.as_bytes());
-        Ok(mac)
-    }
+/// HMAC đã nạp `signing_input`, với khoá ký của khách `tenant` dẫn từ `key` (xem đầu file).
+fn mac(key: &[u8], tenant: TenantId, signing_input: &str) -> Result<HmacSha256, Error> {
+    let mut mac = if tenant == DEFAULT_TENANT {
+        hmac(key)?
+    } else {
+        // Byte 0 ngăn cách: không ghép (mục đích, khách) khác nhau thành cùng một nhãn.
+        let mut derive = hmac(key)?;
+        derive.update(format!("{PURPOSE}\0tenant\0{tenant}").as_bytes());
+        hmac(&derive.finalize().into_bytes())?
+    };
+    mac.update(signing_input.as_bytes());
+    Ok(mac)
 }
 
 fn hmac(key: &[u8]) -> Result<HmacSha256, Error> {
@@ -286,6 +305,47 @@ mod tests {
 
         assert!(still_valid.is_ok());
         assert_eq!(expired.unwrap_err().code(), "auth.token_expired");
+    }
+
+    fn keyed(key: &[u8]) -> AccessTokens {
+        AccessTokens::new(key.to_vec(), Duration::from_secs(900))
+    }
+
+    const OLD: &[u8] = b"old-key-old-key-old-key-old-key!";
+    const NEW: &[u8] = b"new-key-new-key-new-key-new-key!";
+
+    /// Đổi khoá: token ký bằng khoá cũ vẫn hợp lệ khi khoá cũ nằm trong danh sách chuyển tiếp — ở
+    /// khách mặc định lẫn khách khác (khoá dẫn theo khách).
+    #[test]
+    fn token_ky_bang_khoa_cu_van_hop_le_trong_chuyen_tiep() {
+        let user = Uuid::now_v7();
+        let other = TenantId::from_uuid(Uuid::now_v7());
+        let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
+        for tenant in [DEFAULT_TENANT, other] {
+            let old = keyed(OLD).issue(tenant, user, now()).unwrap();
+            assert_eq!(rotated.verify(&old, now()).unwrap(), (tenant, user));
+            // Bỏ khoá cũ khỏi danh sách thì token cũ hết hiệu lực.
+            assert_eq!(keyed(NEW).verify(&old, now()).unwrap_err().code(), "auth.invalid_token");
+        }
+    }
+
+    #[test]
+    fn token_ky_bang_khoa_la_bi_tu_choi() {
+        let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
+        let stranger =
+            keyed(b"someone-elses-key-someone-elses!").issue(DEFAULT_TENANT, Uuid::now_v7(), now());
+        assert_eq!(
+            rotated.verify(&stranger.unwrap(), now()).unwrap_err().code(),
+            "auth.invalid_token"
+        );
+    }
+
+    #[test]
+    fn token_moi_ky_bang_khoa_moi() {
+        let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
+        let token = rotated.issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
+        assert!(keyed(NEW).verify(&token, now()).is_ok());
+        assert!(keyed(OLD).verify(&token, now()).is_err());
     }
 
     #[test]

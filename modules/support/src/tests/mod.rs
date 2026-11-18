@@ -2,6 +2,8 @@
 //! `TestApp` dựng module như binary: migration → start → route → lớp HTTP của kernel.
 
 mod guests;
+mod scope;
+mod sla;
 mod tickets;
 
 use std::sync::{Arc, Mutex};
@@ -22,10 +24,11 @@ pub(crate) const AGENT: u128 = 0xa1;
 pub(crate) const BUYER: u128 = 0xb1;
 pub(crate) const OTHER_BUYER: u128 = 0xb2;
 
-pub(crate) const STAFF: [(&str, Scope); 3] = [
+pub(crate) const STAFF: [(&str, Scope); 4] = [
     ("support.tickets.read", Scope::Tenant),
     ("support.tickets.reply", Scope::Tenant),
     ("support.tickets.manage", Scope::Tenant),
+    ("support.settings.manage", Scope::Tenant),
 ];
 
 /// Thông báo đã gửi (giữ lại để test đọc).
@@ -161,4 +164,18 @@ pub(crate) async fn form_token(app: &TestApp) -> String {
 pub(crate) async fn deliver(app: &TestApp) {
     let dispatcher = app.modules().dispatcher().unwrap();
     while dispatcher.run_once().await.unwrap() > 0 {}
+}
+
+/// Service của module trên database của `app` (gọi thẳng job, handler event; không cần `auth`).
+pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::SupportService> {
+    let parts = crate::service::Parts {
+        outbox: autoxide_kernel::event::Outbox::standalone("support"),
+        guard: app.api::<autoxide_kernel::antispam::SpamGuard>().unwrap(),
+        secret: (*app.api::<autoxide_kernel::secret::SecretKey>().unwrap()).clone(),
+        notifier: None,
+        media: None,
+        accounts: None,
+        authenticator: None,
+    };
+    Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }

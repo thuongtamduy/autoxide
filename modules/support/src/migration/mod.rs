@@ -2,6 +2,8 @@
 //! và một dòng vào cuối [`all`].
 
 mod m0001_create_support;
+mod m0008_create_teams;
+mod m0009_policies;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -24,5 +26,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             ],
         ),
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "support"),
+        // Nhóm nhân viên, thành viên, quy tắc tự phân công (mục 2).
+        Box::new(m0008_create_teams::Migration),
+        // Chính sách hỗ trợ theo nút, phút đã chờ người mua (mục 3).
+        Box::new(m0009_policies::Migration),
     ]
 }

@@ -211,7 +211,8 @@ impl Module for AuthModule {
                 random_secret()?
             }
         };
-        let access_tokens = AccessTokens::new(secret, config.access_token_ttl);
+        let access_tokens = AccessTokens::new(secret, config.access_token_ttl)
+            .with_previous(config.token_secret_previous.clone());
         let throttle = LoginThrottle::new(config.login_max_failures, config.login_lock)?;
         let mailer = context.require::<dyn Mailer>()?;
         let secrets = context.require::<autoxide_kernel::secret::SecretKey>()?;

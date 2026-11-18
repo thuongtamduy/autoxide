@@ -118,6 +118,13 @@ impl std::fmt::Debug for Placements {
     }
 }
 
+impl Placements {
+    /// Migrator của mọi module (backup theo lịch, bước 39).
+    pub(crate) fn migrator(&self) -> &Migrator {
+        &self.migrator
+    }
+}
+
 fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }

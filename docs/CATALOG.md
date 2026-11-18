@@ -14,7 +14,8 @@ sales channels read products and prices through `autoxide_catalog::api::Catalog`
   `physical` (shipped, stocked), `digital`, `service` or `bundle`. `tax_category` is a code of the tax
   engine (`GET /api/v1/tax/categories`), e.g. `vat.standard`.
 - Texts are per language (`PUT /products/{id}/translations/{locale}`); the languages allowed are
-  `AUTOXIDE_CATALOG_LOCALES`. An empty `slug` is made from the name, with `-2`, `-3`… when taken. The
+  `AUTOXIDE_CATALOG_LOCALES`. Each translation has its public `path`,
+  `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`. An empty `slug` is made from the name, with `-2`, `-3`… when taken. The
   description is plain text (blank lines separate paragraphs); HTML is not interpreted.
 - Options (colour, size…) are set with `PUT /products/{id}/options`: up to 3 options of up to 100
   values. Adding an option gives every existing variant the option's first value. Each variant holds
@@ -43,6 +44,28 @@ One tree per tenant, at most 7 levels deep (`/categories`, permission `catalog.c
 `POST /categories/{id}/move` moves a category with everything below it; moving it under itself is
 refused (`catalog.category_cycle`). Filtering products by a category includes its subcategories.
 
+## Attributes, restricted goods and readiness
+
+- **Attributes** (`/attributes`, permission `catalog.categories.manage`) are typed: `text`, `integer`,
+  `decimal` (with `scale`), `boolean`, `date`, `option`, `options`. Products set their values with
+  `PUT /products/{id}/attributes`.
+- A category lists its attributes with `PUT /categories/{id}/attributes`; an attribute can be
+  **required**, from `effective_from` until `effective_to`, for the category and (by default) its
+  subcategories. Required attributes are data: new labelling rules are added with their start date.
+- **Prohibited and conditional goods** are shared rules with their legal basis
+  (`GET /restriction-rules`). The operator loads them with
+  `autoxide task catalog.load_restrictions` (the `vn` pack ships with the server; the same command
+  creates sample product-label attributes such as origin and use-by date for a tenant). Link rules to a
+  category with `PUT /categories/{id}/restrictions`. The rules were compiled from secondary sources —
+  check them against the source texts with a legal professional.
+- A conditional product needs valid documents (`/products/{id}/documents`, permission
+  `catalog.documents.manage`), e.g. an alcohol retail licence.
+- Every product has a **readiness**: `restricted` (prohibited goods), `missing_attributes`,
+  `missing_documents` or `ready`. Only `ready` products go on sale. Filter with `?readiness=` and count
+  with `GET /products/counts?group_by=readiness`. Expired documents are noticed by a daily job.
+- Going on sale also checks that the tax category exists in the tax engine for the unit's tax
+  profile (`catalog.tax_category_unknown`).
+
 ## Prices
 
 A **price list** belongs to an organization unit (a chain or a store) and applies there and below.
@@ -65,6 +88,21 @@ price and the ordered candidate lists.
 **Consumer prices in Viet Nam** must be in VND and include tax when the unit has a Vietnamese tax
 profile (Price Law 16/2023/QH15 — check the source text with a legal professional before relying on
 it).
+
+**Derived price lists** take their prices from a source list (`derived_from`; one level only,
+`catalog.derived_chain`), adjusted by `adjust_bp` (basis points, signed: `-1000` = 10% off) and
+`adjust_minor`, then rounded by a **rounding rule** (`/rounding-rules`: multiples of `step_minor`, or
+`k × step_minor + ending_minor`, e.g. step 10,000 and ending 9,000 give 129,000 and 199,000). A job
+writes real price rows into the derived list whenever the source gets prices, so reading a price
+never computes a formula. A manual row in the derived list pins that variant's price while it is in
+effect.
+
+**Bulk price changes** (`/price-lists/{id}/changes`): create (`set`, `percent` or `amount`, for
+categories, products or variants, optionally temporary with `valid_to`) → preview (counts, 20
+sample rows, price-floor violations; nothing is written) → approve (`catalog.prices.approve`; with the
+unit setting `catalog.price_change_requires_second_person` on, someone other than the maker must
+approve) → a job writes the rows (`source = bulk`). Undo a change with a new change back to the old
+prices.
 
 **Price floors** (`/price-guards`): a minimum price and / or a minimum margin over unit cost, per unit
 and optionally per category, acting as `warn` (the price is saved with a warning) or `block`

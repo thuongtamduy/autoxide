@@ -11,6 +11,27 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
+  (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
+  temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
+- Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
+  (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
+  signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".
+- Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
+  `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
+  `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
+  `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
+  tools `inventory.*`.
+- New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
+  against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
+  with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
+  (`ShippingRates`, `AddressBook`, `CarrierRegistry`, `ShippingCarrier`, an in-memory `FakeCarrier`).
+- `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
+  conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
+  product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
+  checked against the tax engine on going on sale, and the public `path` of each product translation.
+- `auth`: `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` — while changing `AUTOXIDE_AUTH_TOKEN_SECRET`, access tokens signed with
+  an old key are still accepted, so nobody is signed out (step 39). `docs/DEPLOY.md` has the steps.
 - New module `analytics` (step 57): cookieless website analytics kept in your own database. Pages send events to
   `POST /api/v1/analytics/public/events` (up to 20, unknown or malformed ones dropped, bots and foreign pages
   dropped, `AUTOXIDE_ANALYTICS_EVENTS_PER_MINUTE` per network block); anonymous sessions use a random key per day
@@ -32,6 +53,12 @@ endpoints are marked deprecated with a sunset date first.
   edited); internal notes notify mentioned colleagues; signed-in customers attach media they uploaded. One state
   machine (`open`, `pending_agent`, `pending_customer`, `solved`, `closed`). `POST /me/claim` attaches verified guest
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
+- `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
+  channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
+- `support`: support policies per organization unit (`/policies/{org_id}`, inherited down the tree: categories,
+  response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
+  Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
+  event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
@@ -46,6 +73,11 @@ endpoints are marked deprecated with a sunset date first.
 - Kernel: `automation::AutomationDirectory` (every module's MCP tools, called with the same checks as `/mcp`),
   `Module::automation_templates`, `AccessPath::Automation` (changes made by a rule's run carry it in the audit log),
   `StartContext::summary_metrics()`.
+- Scheduled backups (step 39): every `AUTOXIDE_BACKUP_INTERVAL_HOURS` (default 24, `0` off) a background process backs up
+  each database into the file storage under `kernel/backups/<database>/<id>/`, keeping the newest
+  `AUTOXIDE_BACKUP_KEEP` (default 7); files are copied too only with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`. Runs are
+  recorded in `kernel_backups`; `autoxide doctor` warns (`kernel.backup_age`) when backups are off or too old;
+  metrics `backup_*` and alerts `AutoxideBackupTooOld`, `AutoxideBackupFailed`. `docs/DEPLOY.md`: "Scheduled backups".
 - Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
   equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
   (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
@@ -55,6 +87,10 @@ endpoints are marked deprecated with a sunset date first.
   the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
   no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
   `bookings.read`.
+- Booking reminders through `notifications` 24 hours and 2 hours before the start, never sent twice; guests book
+  and cancel with a one-time SMS code (`POST /api/v1/bookings/public/phone-codes`); customers list their bookings at
+  `GET /api/v1/bookings/me/bookings`; `.ics` calendar files; MCP tools `bookings.availability`,
+  `bookings.list_bookings`, `bookings.create_booking`, `bookings.reschedule_booking`, `bookings.cancel_booking`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and

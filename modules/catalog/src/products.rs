@@ -95,6 +95,8 @@ pub(crate) struct ProductDetail {
     pub variants: Vec<variant::Model>,
     pub category_ids: Vec<Uuid>,
     pub media: Vec<product_media::Model>,
+    /// Đoạn đầu của đường dẫn công khai (`AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX`).
+    pub path_prefix: String,
 }
 
 /// Một dòng của danh sách: sản phẩm và nội dung bằng ngôn ngữ mặc định của nó.
@@ -411,6 +413,7 @@ impl CatalogService {
             .insert(&transaction)
             .await?;
         }
+        self.refresh_readiness(&transaction, tenant, &[id]).await?;
         let event = events::ProductCreated(Change { before: None, after: Some(snapshot(&row)) });
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
@@ -424,7 +427,7 @@ impl CatalogService {
             .await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, "catalog product created");
-        self.detail(tenant, row).await
+        self.get_row(tenant, id).await
     }
 
     /// Một trang sản phẩm trong phạm vi `catalog.products.read`, mới tạo trước (mặc định).
@@ -523,6 +526,20 @@ impl CatalogService {
         self.detail(tenant, row).await
     }
 
+    /// Sản phẩm `id` đầy đủ, không kiểm quyền (dùng ngay sau khi chính service đã ghi).
+    pub(crate) async fn get_row(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<ProductDetail, Error> {
+        let row = product::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?
+            .ok_or_else(|| errors::product_not_found(id))?;
+        self.detail(tenant, row).await
+    }
+
     /// Đọc đủ phần của sản phẩm `row` (nội dung, tuỳ chọn, biến thể, danh mục, ảnh).
     pub(crate) async fn detail(
         &self,
@@ -560,7 +577,15 @@ impl CatalogService {
             .all(read)
             .await?;
         let options = crate::variants::options_of(read, tenant, id).await?;
-        Ok(ProductDetail { product: row, translations, options, variants, category_ids, media })
+        Ok(ProductDetail {
+            product: row,
+            translations,
+            options,
+            variants,
+            category_ids,
+            media,
+            path_prefix: self.config.product_path_prefix.clone(),
+        })
     }
 
     /// Đọc sản phẩm `id` trong transaction ghi và kiểm quyền ghi `permission` của người gọi.
@@ -805,7 +830,47 @@ impl CatalogService {
             problems.push(FieldError::new("variants", "required", "turn on at least one variant"));
         }
         fail_if_any(problems)?;
-        crate::readiness::require_ready(product)
+        self.check_tax_category_known(tenant, product).await?;
+        // Tính lại tại chỗ (không tin cột dẫn xuất): báo đúng thuộc tính / giấy tờ còn thiếu.
+        self.readiness_of(connection, tenant, product).await?.require()
+    }
+
+    /// Nhóm thuế của sản phẩm phải có trong engine thuế (bước 36) ở vùng thuế của nút bán. Chưa
+    /// cài `tax` hay nút chưa có hồ sơ thuế thì không kiểm được — bỏ qua (D-20261118-step41-readiness).
+    async fn check_tax_category_known(
+        &self,
+        tenant: &TenantContext,
+        product: &product::Model,
+    ) -> Result<(), Error> {
+        use autoxide_tax::api::{PriceMode, TaxQuoteRequest, TaxableLine};
+        let Some(tax) = &self.tax else { return Ok(()) };
+        let org = OrgId::from_uuid(product.org_id);
+        let Some(profile) = tax.profile(tenant, org).await? else { return Ok(()) };
+        let currency = autoxide_kernel::money::Currency::VND;
+        let line = TaxableLine::new(
+            "catalog-check",
+            product.tax_category.clone(),
+            autoxide_kernel::money::Money::zero(currency),
+        );
+        let request = TaxQuoteRequest::new(
+            profile.jurisdiction,
+            chrono::Utc::now().date_naive(),
+            org,
+            PriceMode::Inclusive,
+            currency,
+            vec![line],
+        );
+        match tax.quote(tenant, request).await {
+            Err(error) if error.code() == "tax.category_unknown" => Err(Error::new(
+                autoxide_kernel::error::ErrorKind::Validation,
+                "catalog.tax_category_unknown",
+                "The tax category `{code}` is not in the tax engine.",
+            )
+            .with_param("code", &product.tax_category)),
+            // Thiếu thuế suất hay lỗi khác của engine không chặn việc mở bán ở đây: chứng từ sẽ
+            // báo khi tính thuế thật.
+            _ => Ok(()),
+        }
     }
 
     /// Đặt (thêm hay thay) nội dung bằng ngôn ngữ `locale`.
@@ -915,9 +980,10 @@ impl CatalogService {
         }
         let mut row = before.clone().into_active_model();
         row.primary_category_id = Set(categories.first().copied());
-        let after = self.save_product(&transaction, tenant, actor, &before, row, None).await?;
+        self.save_product(&transaction, tenant, actor, &before, row, None).await?;
+        self.refresh_readiness(&transaction, tenant, &[id]).await?;
         transaction.commit().await?;
-        self.detail(tenant, after).await
+        self.get_row(tenant, id).await
     }
 
     /// Thay cả tập ảnh của sản phẩm. Ảnh phải là media công khai của khách

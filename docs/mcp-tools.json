@@ -2109,6 +2109,293 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Find free start times of a service between `from` and `to` (at most 31 days), with the price, deposit and cancellation terms to tell the customer before booking.",
+      "input_schema": {
+        "description": "Which free times to find.",
+        "properties": {
+          "from": {
+            "description": "Start of the range.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Only staff of this unit, and its time zone; omitted: the service's unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "description": "Only this staff member (or court, room…); omitted: anyone who gives the service.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "service_id": {
+            "description": "The service.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "description": "End of the range, at most 31 days after `from`.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.availability",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Cancel a booking for the shop: the place is freed and any deposit paid is refunded in full through the payment partner.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A booking to cancel.",
+        "properties": {
+          "id": {
+            "description": "Id of the booking.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.cancel_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Book a free time for a customer (phone call, walk-in). Confirmed at once, no deposit. Fails with `bookings.slot_taken` if the time was just taken.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A booking made for a customer (phone call, walk-in): confirmed at once, no deposit.",
+        "properties": {
+          "customer_email": {
+            "description": "Customer's email.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "customer_name": {
+            "description": "Customer's name, 1 to 200 characters.",
+            "type": "string"
+          },
+          "customer_phone": {
+            "description": "Customer's phone, e.g. `0912345678`; give a phone or an email.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "description": "Up to 500 characters; no health information.",
+            "type": "string"
+          },
+          "resource_id": {
+            "description": "Omitted: the first free staff member who gives the service.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seats": {
+            "description": "Places (classes); default 1.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "service_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "starts_at": {
+            "description": "A `starts_at` from `bookings.availability`.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "starts_at",
+          "customer_name"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.create_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the bookings of your units, newest first; filter by status, staff member and start time.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which bookings to list.",
+        "properties": {
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Starting at or after this moment.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "description": "Only this staff member (or court, room…).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only this status: `held`, `pending`, `confirmed`, `checked_in`, `completed`, `cancelled`,\n`no_show` or `expired`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Starting before this moment.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "bookings.list_bookings",
+      "output_schema": null,
+      "permissions": [
+        "bookings.read",
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a booking to another free time (and optionally another staff member). If the new time was just taken, the booking keeps its old time.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The new time of a booking.",
+        "properties": {
+          "id": {
+            "description": "Id of the booking.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "resource_id": {
+            "description": "Another staff member who gives the service; omitted: the same one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "description": "The new start, on a 5-minute mark.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "starts_at"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.reschedule_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -5805,6 +6092,289 @@
       "output_schema": null,
       "permissions": [
         "forms.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Adjust stock in one warehouse; every line needs a reason code from the list `inventory.adjustment`. Sending the same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A stock adjustment in one warehouse.",
+        "properties": {
+          "lines": {
+            "description": "1 to 500 lines.",
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a stock adjustment.",
+              "properties": {
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "description": "Units to add (positive) or remove (negative); not 0.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason_code": {
+                  "description": "Code from the reason list `inventory.adjustment`, e.g. `damaged`.",
+                  "type": "string"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost of added units, integer minor units as a string, e.g. `\"150000\"`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_cost_currency": {
+                  "description": "Currency of `unit_cost_amount`, e.g. `VND`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "reason_code"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse or store.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this adjustment; the same reference and content again changes nothing.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.adjust_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels (variant × warehouse) in your scope with on hand, available, reserved and average cost; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.get_levels",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels whose available stock is at or below their reorder point.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_low_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the append-only stock movement ledger in your scope, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Ledger lines to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Lines written at or after this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of a movement ledger line.",
+                "enum": [
+                  "receipt",
+                  "sale",
+                  "return",
+                  "adjustment",
+                  "count",
+                  "transfer_out",
+                  "transfer_in",
+                  "expiry",
+                  "supplier_return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of lines, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Lines written before this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_movements",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
       ]
     },
     {
