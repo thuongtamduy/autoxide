@@ -339,7 +339,7 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
       tài khoản sau khi đăng ký
 - [x] Phạm vi theo nút tổ chức (bước 34): nhân viên thấy phiếu của nút mình và nhánh dưới; người bán trên
       sàn chỉ thấy phiếu gian hàng mình; nhóm nhân viên, quy tắc tự phân công là dữ liệu, chia vòng
-- [ ] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
+- [x] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
       mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
       hạn, mức hài lòng
 - [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
@@ -475,10 +475,10 @@ bước 35.
 - [x] Danh mục dạng cây, thuộc tính theo danh mục; **thuộc tính bắt buộc là dữ liệu** (xuất xứ, hạn dùng, nhãn
       hàng hoá theo NĐ 43/2017, NĐ 111/2021 — cần đối chiếu); hàng cấm / có điều kiện là dữ liệu kèm giấy tờ
       phải có; `readiness` để lọc và đếm sản phẩm chưa mở bán được (D-223…D-227)
-- [ ] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày
+- [x] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày
       hiệu lực, **lịch sử giá** (khuyến mại cần "giá ngay trước khuyến mại"); giá niêm yết bằng Đồng Việt Nam,
       gồm thuế khi bán cho người tiêu dùng (Luật Giá 16/2023 — cần đối chiếu)
-- [ ] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
+- [x] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
       kênh → thị trường → ưu tiên); bảng giá suy ra ghi thành dòng giá thật; làm tròn giá đẹp; sàn giá (giá tối
       thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt, hẹn giờ, giá tạm thời
 - [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm

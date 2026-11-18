@@ -52,6 +52,13 @@ pub(crate) struct NewPriceList {
     pub audience: String,
     pub customer_group: Option<String>,
     pub priority: i32,
+    /// Bảng gốc của bảng suy ra (D-222); bảng gốc không được là bảng suy ra.
+    pub derived_from: Option<Uuid>,
+    /// Điều chỉnh theo phần vạn, có dấu (−1500 = −15%).
+    pub adjust_bp: i64,
+    /// Cộng thêm sau khi nhân, đơn vị nhỏ nhất, có dấu.
+    pub adjust_minor: Option<i64>,
+    pub rounding_rule_id: Option<Uuid>,
 }
 
 /// Thay đổi cho bảng giá; trường `None` giữ nguyên.
@@ -352,6 +359,36 @@ impl CatalogService {
         principal
             .require_write_at(&transaction, &PRICES_WRITE, crate::service::at(org.as_uuid()))
             .await?;
+        if let Some(source) = input.derived_from {
+            let source = price_list::Entity::find_by_id(source)
+                .scoped(tenant)
+                .one(&transaction)
+                .await?
+                .ok_or_else(|| errors::price_list_not_found(source))?;
+            if source.derived_from.is_some() {
+                return Err(Error::new(
+                    autoxide_kernel::error::ErrorKind::Validation,
+                    "catalog.derived_chain",
+                    "The source price list of a derived price list cannot itself be derived.",
+                ));
+            }
+            if source.currency != input.currency.code() {
+                return Err(errors::currency_mismatch());
+            }
+        }
+        if let Some(rule) = input.rounding_rule_id {
+            crate::entity::rounding_rule::Entity::find_by_id(rule)
+                .scoped(tenant)
+                .one(&transaction)
+                .await?
+                .ok_or_else(|| {
+                    Error::not_found(
+                        "catalog.rounding_rule_not_found",
+                        "There is no rounding rule `{id}`.",
+                    )
+                    .with_param("id", rule)
+                })?;
+        }
         let now = now();
         let row = price_list::ActiveModel {
             id: Set(Uuid::now_v7()),
@@ -365,10 +402,10 @@ impl CatalogService {
             customer_group: Set(input.customer_group),
             channel: Set(None),
             market: Set(None),
-            derived_from: Set(None),
-            adjust_bp: Set(0),
-            adjust_minor: Set(None),
-            rounding_rule_id: Set(None),
+            derived_from: Set(input.derived_from),
+            adjust_bp: Set(input.adjust_bp),
+            adjust_minor: Set(input.adjust_minor),
+            rounding_rule_id: Set(input.rounding_rule_id),
             priority: Set(input.priority),
             active: Set(true),
             created_by: Set(actor.user_id),
@@ -382,6 +419,10 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::price_list_subject(row.id), &event)
             .await?;
+        if let Some(source) = row.derived_from {
+            // Bảng suy ra mới: ghi giá từ mọi dòng hiện có của bảng gốc.
+            self.queue_derivation(&transaction, tenant, source, Some(row.id)).await?;
+        }
         transaction.commit().await?;
         Ok(row)
     }
@@ -670,6 +711,8 @@ impl CatalogService {
             self.outbox
                 .record(&transaction, tenant, actor, events::price_list_subject(id), &event)
                 .await?;
+            // Bảng suy ra từ bảng này nhận dòng giá mới qua job, cùng transaction.
+            self.queue_derivation(&transaction, tenant, id, None).await?;
             transaction.commit().await?;
             Ok(Submitted::Created(rows))
         })
