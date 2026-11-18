@@ -41,9 +41,10 @@ struct OneField(Mutex<Vec<String>>);
 #[async_trait::async_trait]
 impl Entitlements for OneField {
     async fn snapshot(&self, _: TenantId) -> Result<Arc<TenantEntitlements>, Error> {
-        let mut all = TenantEntitlements::default();
-        all.modules = ["shop".to_owned()].into();
-        Ok(Arc::new(all))
+        Ok(Arc::new(TenantEntitlements {
+            modules: ["shop".to_owned()].into(),
+            ..TenantEntitlements::default()
+        }))
     }
 
     async fn reserve(
@@ -55,7 +56,7 @@ impl Entitlements for OneField {
     ) -> Result<(), Error> {
         assert_eq!(limit.key(), "kernel.custom_fields");
         let mut used = self.0.lock().unwrap();
-        if used.len() >= 1 {
+        if !used.is_empty() {
             return Err(Error::conflict("plans.limit_reached", "The plan allows one field."));
         }
         used.push(reference.to_owned());
