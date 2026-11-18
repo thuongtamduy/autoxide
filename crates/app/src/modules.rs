@@ -242,12 +242,12 @@ mod tests {
             // `compliance` (hết hạn định danh, nhắc hạn sự cố 72 giờ, dọn bằng chứng đồng ý cookie, nhắc vụ việc quá
             // hạn — D-360, D-361, D-363;
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
-            // của `notifications` (dọn nhật ký gửi), một của `bookings` (trả chỗ giữ tạm quá hạn), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
+            // của `notifications` (dọn nhật ký gửi), hai của `bookings` (trả chỗ giữ tạm quá hạn, nhắc lịch), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
             // một của `catalog` (tính lại readiness theo giấy tờ — bước 41)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 47);
+            assert_eq!(a.unwrap() + b.unwrap(), 48);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

@@ -77,6 +77,10 @@ endpoints are marked deprecated with a sunset date first.
   the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
   no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
   `bookings.read`.
+- Booking reminders through `notifications` 24 hours and 2 hours before the start, never sent twice; guests book
+  and cancel with a one-time SMS code (`POST /api/v1/bookings/public/phone-codes`); customers list their bookings at
+  `GET /api/v1/bookings/me/bookings`; `.ics` calendar files; MCP tools `bookings.availability`,
+  `bookings.list_bookings`, `bookings.create_booking`, `bookings.reschedule_booking`, `bookings.cancel_booking`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and

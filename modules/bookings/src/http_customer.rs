@@ -1,5 +1,6 @@
 //! Khách tự đặt lịch (`/api/v1/bookings/public/bookings`): khách có tài khoản đặt bằng phiên đăng
-//! nhập; có cọc thì lịch được giữ tạm và câu trả lời mang trang trả cọc của đối tác.
+//! nhập, khách vãng lai bằng mã một lần gửi tới số điện thoại; có cọc thì lịch được giữ tạm và câu
+//! trả lời mang trang trả cọc của đối tác.
 
 use std::sync::Arc;
 
@@ -19,6 +20,7 @@ use validator::Validate;
 
 use crate::booking::{Customer, NewBooking, Origin};
 use crate::http_bookings::{BookingCreated, BookingCustomerInput};
+use crate::http_me::BookingPhoneCode;
 use crate::service::BookingsService;
 
 pub(crate) fn routes(service: Arc<BookingsService>) -> OpenApiRouter {
@@ -47,6 +49,9 @@ pub(crate) struct CustomerBookingRequest {
     payment_method: Option<String>,
     /// Page of the shop to open after paying the deposit.
     return_url: Option<String>,
+    /// Guests (not signed in) only: a code sent to `customer.phone` by
+    /// `POST /api/v1/bookings/public/phone-codes`. The booking takes the verified number.
+    phone_code: Option<BookingPhoneCode>,
 }
 
 fn one() -> i32 {
@@ -55,7 +60,7 @@ fn one() -> i32 {
 
 /// Book a service (customer).
 ///
-/// Sign in, then book a free time from `GET /api/v1/bookings/public/availability`. Read the terms
+/// Signed-in customers book with their account; guests send a `phone_code` instead. Book a free time from `GET /api/v1/bookings/public/availability`. Read the terms
 /// there first: price, deposit, cancellation. Without a deposit the booking is `confirmed` (or
 /// `pending` when the shop approves bookings); with a deposit it is `held` for a few minutes and the
 /// answer has a `checkout` to pay through the shop's licensed payment partner — unpaid holds are
@@ -65,29 +70,31 @@ fn one() -> i32 {
     path = "/public/bookings",
     extensions(("x-public" = json!(true))),
     operation_id = "book_service",
-    security(("bearer" = [])),
+    security((), ("bearer" = [])),
     request_body = CustomerBookingRequest,
     responses(
         (status = 201, description = "Booked; `Location` is the booking.", body = Data<BookingCreated>),
-        (status = 401, description = "Not signed in.", body = Problem),
         (status = 404, description = "No active service has this id; code `bookings.service_not_found`.", body = Problem),
         (status = 409, description = "The time was just taken (`bookings.slot_taken`) or the class is full (`bookings.capacity_full`).", body = Problem),
-        (status = 422, description = "Invalid values (see `errors`), outside working hours (`bookings.outside_hours`) or a resource that does not give the service (`bookings.resource_not_offered`).", body = Problem),
+        (status = 422, description = "Invalid values (see `errors`), outside working hours (`bookings.outside_hours`), a resource that does not give the service (`bookings.resource_not_offered`), or a guest without a valid `phone_code` (`bookings.code_invalid`).", body = Problem),
         (status = 503, description = "The service asks for a deposit but payments are not set up; code `bookings.payments_unavailable`.", body = Problem),
     )
 )]
 async fn book(
     State(service): State<Arc<BookingsService>>,
     tenant: TenantContext,
-    principal: Principal,
+    principal: Option<Principal>,
     ValidJson(input): ValidJson<CustomerBookingRequest>,
 ) -> Result<Created<BookingCreated>, Error> {
-    let customer = Customer {
-        user_id: Some(principal.user_id()),
-        name: input.customer.name,
-        phone: input.customer.phone,
-        email: input.customer.email,
+    let (user_id, phone) = match (&principal, input.phone_code) {
+        (Some(principal), _) => (Some(principal.user_id()), input.customer.phone),
+        (None, Some(code)) => {
+            (None, Some(service.verify_code(&tenant, code.challenge_id, &code.code).await?))
+        }
+        (None, None) => return Err(crate::guests::code_invalid()),
     };
+    let customer =
+        Customer { user_id, name: input.customer.name, phone, email: input.customer.email };
     let new = NewBooking {
         service_id: input.service_id,
         resource_id: input.resource_id,
@@ -99,7 +106,7 @@ async fn book(
         payment_method: input.payment_method.unwrap_or_else(|| "card".to_owned()),
         return_url: input.return_url,
     };
-    let booked = service.book(&tenant, Some(&principal), Origin::Customer, new).await?;
+    let booked = service.book(&tenant, principal.as_ref(), Origin::Customer, new).await?;
     let id = booked.booking.id;
     Ok(Created::new(format!("/bookings/bookings/{id}"), BookingCreated::new(booked)?))
 }
