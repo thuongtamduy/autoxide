@@ -39,6 +39,7 @@ mod placements;
 mod public_paths;
 mod rate_limit_shared;
 mod reasons;
+mod relocation;
 mod request_log;
 mod seal;
 mod search_index;

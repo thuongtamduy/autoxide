@@ -25,6 +25,7 @@ mod migration;
 mod permissions;
 mod privacy;
 mod publishing;
+mod relocation;
 mod resource;
 mod restriction;
 mod service;
@@ -303,6 +304,11 @@ impl Module for ContentModule {
     fn description(&self) -> &'static str {
         "Posts and pages of a website in several languages: drafts, revisions, scheduling, \
          categories, tags, authors and redirects."
+    }
+
+    // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }
 

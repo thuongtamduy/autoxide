@@ -161,15 +161,9 @@ async fn write_store(store: &TenantContext, batch: &[local_fact::Model]) -> Resu
             dimensions: Set(row.dimensions.clone()),
             received_at: Set(received),
         })
-        .on_conflict(
-            OnConflict::columns([
-                fact::Column::TenantId,
-                fact::Column::SourceTenantId,
-                fact::Column::Id,
-            ])
-            .do_nothing()
-            .to_owned(),
-        )
+        // Không nêu cột: khoá chính `id` và unique `(tenant_id, source_tenant_id, id)` đều có thể đụng
+        // khi hai lần đẩy chạy cùng lúc; Postgres chỉ bỏ qua đúng ràng buộc đã nêu.
+        .on_conflict(OnConflict::new().do_nothing().to_owned())
         .exec_without_returning(&transaction)
         .await?;
         if inserted != 1 {

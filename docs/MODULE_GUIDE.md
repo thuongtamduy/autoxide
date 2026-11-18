@@ -227,6 +227,31 @@ has the id of the tenant. `modules/notes` is the full example.
 
   See `modules/notes/src/branch_tests.rs`.
 
+### Splitting and merging tenants
+
+Platform staff can split a branch of a tenant into a tenant of its own, or merge tenants
+(`autoxide tenant split|merge`, [DEPLOY.md](DEPLOY.md#splitting-a-branch-into-its-own-tenant-and-merging-tenants)).
+Declare how each of your tenant-level tables moves in `Module::relocation`; a table you forget is
+treated by its columns (with `org_id`: by unit; otherwise it stays) and the end-to-end test of the
+binary fails until you declare it.
+
+```rust
+fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+    autoxide_kernel::tenancy::Relocation::new()
+        .by_org(&["shop_orders"])                          // goes with the unit in `org_id`
+        .follow("shop_order_lines", "order_id", "shop_orders") // goes with its parent row
+        .copy_on_split(&["shop_settings"])                 // settings: the new tenant gets a copy
+        .stay(&["shop_customers"])                         // personal data stays with the source
+        .ephemeral(&["shop_throttle"])                     // counters, sessions: never move
+        .sealed("shop_settings", "api_key", "shop.api_key", "id") // sealed with `Sealer`
+}
+```
+
+Rows keep their primary keys and only `tenant_id` changes, so keep references inside your module
+on ids. Your queue tables (`<module>_jobs`, `<module>_events`) need nothing: due rows run before the
+copy. A table that needs its own handling (a hash chain, a counter keyed by text) implements
+`RelocateTable` (`TablePolicy::Custom`), as `audit` does.
+
 ### 3. Permissions
 
 Declare them in `src/permissions.rs` as `<module>.<action>` and return them from

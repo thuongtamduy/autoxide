@@ -20,6 +20,16 @@ endpoints are marked deprecated with a sunset date first.
   `reporting.read` (scoped) and `reporting.manage`. `ledger.entry_posted` / `ledger.entry_reversed` carry `lines`.
 - Kernel: `tenancy::distribution` lets a module send records from a parent tenant to its child tenants (also on
   other databases) through a job that can run again without making copies.
+- Split a branch of a tenant into a tenant of its own on another database, and merge tenants back, keeping every id
+  and the history (step 38): `autoxide tenant split|merge|relocation-status` (`--dry-run`, `--resume`), and for
+  platform staff `POST /api/v1/kernel/relocations` (dry run by default, runs as a job) and
+  `GET /api/v1/kernel/relocations/{id}` (permission `kernel.tenants.relocate`). Tenants send a request with
+  `POST /api/v1/kernel/tenant/relocation-requests` (permission `kernel.relocations.request`); it lands in the work
+  inbox of the platform staff. Modules declare how their tables move (`Module::relocation`); the plan lists rows,
+  references across the boundary and unique conflicts before anything changes. The audit log of what moves is
+  written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
+  `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
+  `kernel.relocation_finished`, `kernel.relocation_failed`.
 - `ledger`: `POST /api/v1/ledger/bank-accounts/{id}/vietqr-preview` makes a sample VietQR code to scan before taking
   real payments (nothing is stored); `GET /api/v1/ledger/books/{id}/integrity` checks a book's hash chain on demand.
 - `invoices`: `POST /api/v1/invoices/documents/{id}/refresh` asks the e-invoice provider about a document now;
