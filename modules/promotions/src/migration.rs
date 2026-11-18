@@ -185,6 +185,8 @@ async fn create_programs(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
     let t = "promotions_promotions";
     index(manager, t, "promotions_status_idx", &["tenant_id", "status", "starts_at"], false)
         .await?;
+    // Job `promotions.tick` quét cả database (mọi khách) theo trạng thái và giờ.
+    index(manager, t, "promotions_promotions_sweep_idx", &["status", "starts_at"], false).await?;
     index(manager, t, "promotions_org_idx", &["tenant_id", "org_id", "status", "id"], false)
         .await?;
 
@@ -420,6 +422,7 @@ async fn create_access(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
         false,
     )
     .await?;
+    index(manager, t, "promotions_vouchers_sweep_idx", &["status", "expires_at"], false).await?;
     index(
         manager,
         t,
@@ -482,6 +485,7 @@ async fn create_counters(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
         .col(schema::timestamp_with_time_zone("updated_at"));
     manager.create_table(redemptions).await?;
     let t = "promotions_redemptions";
+    index(manager, t, "promotions_redemptions_sweep_idx", &["status", "expires_at"], false).await?;
     index(manager, t, "promotions_redemptions_order_unique", &["tenant_id", "order_id"], true)
         .await?;
     index(

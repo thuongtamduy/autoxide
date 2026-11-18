@@ -772,6 +772,7 @@ dependencies = [
  "autoxide-testkit",
  "axum",
  "chrono",
+ "futures-util",
  "rmcp",
  "sea-orm",
  "serde",

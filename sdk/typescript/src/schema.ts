@@ -6519,6 +6519,43 @@ export type Data_InventoryLevel = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryReservation = {
+  /** Stock held for one order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventorySources = {
+  /** Warehouses serving a store. */
+  data: {
+    sources: InventorySource[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryStoreSettings = {
+  /** How a store picks warehouses. */
+  data: {
+    /**
+     * Split an order over several warehouses when no single one has every line. Default
+     * `false`: one order, one warehouse.
+     */
+    allow_split: boolean;
+    /** Try warehouses in the buyer's province first (province from the units' public profile). */
+    prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InvitationResponse = {
   /** An invitation to work in this tenant. */
   data: {
@@ -12671,6 +12708,68 @@ export type InventoryMovement = {
   variant_id: string;
 };
 
+/** Stock held for one order. */
+export type InventoryReservation = {
+  expires_at?: string | null;
+  id: string;
+  lines: InventoryReservedLine[];
+  order_id: string;
+  /** The store or channel that sold. */
+  selling_org_id: string;
+  /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+  status: string;
+};
+
+/** Part of an order line reserved in one warehouse. */
+export type InventoryReservedLine = {
+  /** Reserved beyond the available stock (the product may be sold out of stock). */
+  backordered: boolean;
+  /** The bundle variant of the order line, when it is a bundle. */
+  bundle_variant_id?: string | null;
+  fulfilled_quantity: number;
+  /** The order's line key. */
+  line_key: string;
+  /** Pre-order line. */
+  preordered: boolean;
+  quantity: number;
+  released_quantity: number;
+  /** The variant taken from stock (a component when the line is a bundle). */
+  variant_id: string;
+  warehouse_org_id: string;
+};
+
+/** One warehouse serving a store or channel. */
+export type InventorySource = {
+  /** `false` keeps the row but stops using the warehouse. */
+  active: boolean;
+  /** Lower is tried first. */
+  priority: number;
+  /** The warehouse or store whose stock is sold. */
+  warehouse_org_id: string;
+};
+
+/** Warehouses serving a store. */
+export type InventorySources = {
+  sources: InventorySource[];
+};
+
+/** The warehouses serving a store, replacing the current list. */
+export type InventorySourcesRequest = {
+  /** Up to 100 warehouses; empty: the store sells only its own stock. */
+  sources: InventorySource[];
+};
+
+/** How a store picks warehouses. */
+export type InventoryStoreSettings = {
+  /**
+   * Split an order over several warehouses when no single one has every line. Default
+   * `false`: one order, one warehouse.
+   */
+  allow_split: boolean;
+  /** Try warehouses in the buyer's province first (province from the units' public profile). */
+  prefer_nearby: boolean;
+};
+
 /** A new invitation. */
 export type InvitationRequest = {
   email: string;
@@ -16425,6 +16524,22 @@ export type Page_InventoryMovement = {
     source_type: string;
     unit_cost?: Money | null;
     variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryReservation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -28804,6 +28919,79 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; kind?: "receipt" | "sale" | "return" | "adjustment" | "count" | "transfer_out" | "transfer_in" | "expiry" | "supplier_return" | null; from?: string | null; to?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_InventoryMovement;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reservations": {
+    /** List stock reservations of orders sold by units in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string | null; status?: "held" | "confirmed" | "fulfilled" | "released" | "expired" | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reservations/{id}/release": {
+    /** Release a stuck reservation by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/settings/{org_id}": {
+    /** Get how a store picks warehouses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change how a store picks warehouses. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: InventoryStoreSettings;
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/sources/{selling_org_id}": {
+    /** List the warehouses serving a store or channel, in the order they are tried. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { selling_org_id: string }; };
+      responses: {
+        200: Data_InventorySources;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the warehouses serving a store or channel. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { selling_org_id: string }; };
+      requestBody: InventorySourcesRequest;
+      responses: {
+        200: Data_InventorySources;
         401: Problem;
         403: Problem;
         422: Problem;

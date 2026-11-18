@@ -17,6 +17,7 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::http::dto::{AdjustmentResponse, KindDto, LevelResponse, MovementResponse};
+use crate::http::reservations::ReservationResponse;
 use crate::levels::{AdjustInput, AdjustLine, LevelFilter, MovementFilter};
 use crate::permissions::{ADJUST, READ};
 use crate::service::InventoryService;
@@ -113,7 +114,7 @@ impl AdjustStockLine {
 pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
-    let (levels, movements, adjust, low) = (s(), s(), s(), s());
+    let (levels, movements, adjust, low, release) = (s(), s(), s(), s(), s());
     vec![
         Tool::new(
             "get_levels",
@@ -195,5 +196,28 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
             },
         )
         .requires(ADJUST),
+        Tool::new(
+            "release_reservation",
+            "Release a stuck stock reservation by its id: units not shipped yet go back to the \
+             available stock. Releasing again changes nothing.",
+            move |tenant: TenantContext, principal: Principal, input: ReservationId| {
+                let service = release.clone();
+                async move {
+                    let done = service.release_by_hand(&tenant, &principal, input.id).await?;
+                    Ok::<_, Error>(ReservationResponse::from(done))
+                }
+            },
+        )
+        .requires(ADJUST)
+        .destructive(),
     ]
+}
+
+/// A reservation to act on.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = InventoryReservationId)]
+pub(crate) struct ReservationId {
+    /// Id of the reservation.
+    pub id: Uuid,
 }
