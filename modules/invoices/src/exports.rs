@@ -74,6 +74,13 @@ impl Job for BuildExport {
     const KIND: &'static str = BUILD_EXPORT;
 }
 
+fn export_not_retryable() -> Error {
+    Error::conflict(
+        "invoices.export_not_retryable",
+        "Only a failed export can be made again; ask for a new export instead.",
+    )
+}
+
 pub(crate) fn export_not_found() -> Error {
     Error::not_found("invoices.export_not_found", "There is no such export.")
 }
@@ -449,6 +456,51 @@ impl InvoicesService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(export_not_found)
+    }
+
+    /// Lập lại bản xuất `failed` (`invoices.export`): đưa về `pending`, xoá lỗi cũ, xếp lại job — cùng
+    /// một transaction. Bản đang chờ / đang chạy thì trả nguyên (gọi lại an toàn); bản `ready` thì
+    /// không lập lại (yêu cầu bản mới).
+    pub(crate) async fn retry_export(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<export::Model, Error> {
+        let found = self.get_export(tenant, principal, id).await?;
+        match found.status.as_str() {
+            "pending" | "running" => return Ok(found),
+            "failed" => {}
+            _ => return Err(export_not_retryable()),
+        }
+        // Còn kiểm nơi lưu như lúc yêu cầu: không có thì lập lại cũng hỏng.
+        self.store(tenant)?;
+        let transaction = tenant.database().begin_write().await?;
+        // Chỉ đổi khi còn `failed`: hai lần gọi cùng lúc chỉ một lần xếp job.
+        let changed = export::Entity::update_many()
+            .col_expr(export::Column::Status, "pending".into())
+            .col_expr(export::Column::Error, None::<String>.into())
+            .col_expr(export::Column::UpdatedAt, now().into())
+            .filter(export::Column::Id.eq(id))
+            .filter(export::Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(export::Column::Status.eq("failed"))
+            .exec(&transaction)
+            .await?
+            .rows_affected;
+        if changed == 1 {
+            self.jobs
+                .enqueue(
+                    &transaction,
+                    tenant,
+                    &BuildExport { export_id: id },
+                    EnqueueOptions::default(),
+                )
+                .await?;
+        }
+        let saved =
+            export::Entity::find_by_id(id).one(&transaction).await?.ok_or_else(export_not_found)?;
+        transaction.commit().await?;
+        Ok(saved)
     }
 
     pub(crate) async fn list_exports(

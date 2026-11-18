@@ -15,7 +15,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use chrono::NaiveDate;
-use sea_orm::sea_query::{Expr, SimpleExpr};
+use sea_orm::sea_query::{Expr, Query, SimpleExpr};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
@@ -23,7 +23,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::Side;
-use crate::entity::{account, book, line, period, period_balance};
+use crate::entity::{account, book, entry, line, period, period_balance, seal};
 use crate::events;
 use crate::permissions::{PERIODS_CLOSE, READ};
 use crate::service::{LedgerService, money, now};
@@ -160,11 +160,29 @@ impl LedgerService {
         principal: &Principal,
         book_id: Uuid,
         page: &PageRequest,
-    ) -> Result<Page<period::Model>, Error> {
+    ) -> Result<Page<PeriodView>, Error> {
         let book = self.book_for(tenant, principal, &READ, book_id).await?;
         let select =
             period::Entity::find().scoped(tenant).filter(period::Column::BookId.eq(book.id));
-        fetch_page(select, period::Column::Id, |row| row.id, page, tenant.database().read()).await
+        let read = tenant.database().read();
+        let rows = fetch_page(select, period::Column::Id, |row| row.id, page, read).await?;
+        let ids: Vec<Uuid> = rows.data.iter().map(|row| row.id).collect();
+        let counts = period_counts(read, tenant, book.id, &ids).await?;
+        Ok(rows.map(|row| {
+            let (entries, sealed) = counts.get(&row.id).copied().unwrap_or_default();
+            PeriodView { period: row, entries, sealed }
+        }))
+    }
+
+    /// Một kỳ kèm số bút toán (dùng sau khi khoá kỳ).
+    pub(crate) async fn period_view(
+        tenant: &TenantContext,
+        row: period::Model,
+    ) -> Result<PeriodView, Error> {
+        let counts =
+            period_counts(tenant.database().read(), tenant, row.book_id, &[row.id]).await?;
+        let (entries, sealed) = counts.get(&row.id).copied().unwrap_or_default();
+        Ok(PeriodView { period: row, entries, sealed })
     }
 
     /// Số dư (theo bên thường) của tài khoản: hiện tại, hay cuối ngày `as_of`.
@@ -458,4 +476,54 @@ impl LedgerService {
         }
         Ok(drifted)
     }
+}
+
+/// Một kỳ kèm số bút toán ghi vào kỳ và số đã niêm phong vào chuỗi băm.
+#[derive(Debug, Clone)]
+pub(crate) struct PeriodView {
+    pub period: period::Model,
+    pub entries: i64,
+    pub sealed: i64,
+}
+
+/// Số bút toán và số đã niêm phong của từng kỳ trong `periods` (cùng sổ `book_id`): hai câu đếm
+/// gộp theo kỳ cho cả trang, không đếm từng kỳ một.
+async fn period_counts<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    book_id: Uuid,
+    periods: &[Uuid],
+) -> Result<HashMap<Uuid, (i64, i64)>, Error> {
+    if periods.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let count = |sealed_only: bool| {
+        let mut select = entry::Entity::find()
+            .scoped(tenant)
+            .select_only()
+            .column(entry::Column::PeriodId)
+            .column_as(entry::Column::Id.count(), "count")
+            .filter(entry::Column::BookId.eq(book_id))
+            .filter(entry::Column::PeriodId.is_in(periods.to_vec()))
+            .group_by(entry::Column::PeriodId);
+        if sealed_only {
+            // Câu con lọc theo khách và sổ để đi theo khoá chính của bảng niêm phong.
+            let sealed = Query::select()
+                .column(seal::Column::EntryId)
+                .from(seal::Entity)
+                .and_where(seal::Column::TenantId.eq(tenant.id().as_uuid()))
+                .and_where(seal::Column::BookId.eq(book_id))
+                .to_owned();
+            select = select.filter(entry::Column::Id.in_subquery(sealed));
+        }
+        select.into_tuple::<(Uuid, i64)>()
+    };
+    let mut counts: HashMap<Uuid, (i64, i64)> = HashMap::new();
+    for (period, total) in count(false).all(connection).await? {
+        counts.entry(period).or_default().0 = total;
+    }
+    for (period, sealed) in count(true).all(connection).await? {
+        counts.entry(period).or_default().1 = sealed;
+    }
+    Ok(counts)
 }

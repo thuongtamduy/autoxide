@@ -185,6 +185,12 @@ pub(crate) struct PaymentFilter {
     pub status: Option<String>,
     pub source_module: Option<String>,
     pub source_id: Option<String>,
+    /// Số tiền (đơn vị nhỏ nhất), đã kiểm ở handler.
+    pub amount_minor: Option<i64>,
+    /// Mã tiền tệ ISO 4217, đã kiểm.
+    pub currency: Option<String>,
+    /// Đúng nút nhận tiền (không gồm nhánh dưới).
+    pub org_id: Option<Uuid>,
 }
 
 impl LedgerService {
@@ -428,6 +434,15 @@ impl LedgerService {
         }
         if let Some(id) = filter.source_id {
             select = select.filter(payment::Column::SourceId.eq(id));
+        }
+        if let Some(minor) = filter.amount_minor {
+            select = select.filter(payment::Column::AmountMinor.eq(minor));
+        }
+        if let Some(currency) = filter.currency {
+            select = select.filter(payment::Column::AmountCurrency.eq(currency));
+        }
+        if let Some(org) = filter.org_id {
+            select = select.filter(payment::Column::OrgId.eq(org));
         }
         fetch_page(select, payment::Column::Id, |row| row.id, page, tenant.database().read()).await
     }

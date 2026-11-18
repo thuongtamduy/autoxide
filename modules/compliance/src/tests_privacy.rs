@@ -335,3 +335,76 @@ async fn so_yeu_cau_chu_the_han_la_du_lieu_va_xoa_gia_tri() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn muc_dich_kem_so_nguoi_dong_y_va_da_rut() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let ledger = app.api::<dyn ConsentLedger>().unwrap();
+        let tenant = autoxide_kernel::tenancy::DEFAULT_TENANT;
+        let evidence = || ConsentEvidence {
+            text: "Send me news".to_owned(),
+            text_version: "1".to_owned(),
+            source: "web_form".to_owned(),
+            ip_fingerprint: None,
+        };
+        // Ada đồng ý qua hai kênh (vẫn là một người); Bob đồng ý rồi rút; Chi chỉ đồng ý phân tích.
+        let subject = |email: &str| ConsentSubject::Email(email.to_owned());
+        for (index, (email, channel)) in
+            [("ada@example.com", "email"), ("ada@example.com", "sms"), ("bob@example.com", "email")]
+                .into_iter()
+                .enumerate()
+        {
+            ledger
+                .grant(
+                    tenant,
+                    subject(email),
+                    ConsentKey::new("marketing", "", channel),
+                    evidence(),
+                    &format!("test:{index}"),
+                )
+                .await
+                .unwrap();
+        }
+        ledger
+            .withdraw(
+                tenant,
+                subject("bob@example.com"),
+                ConsentKey::new("marketing", "", "email"),
+                "web_form",
+                "test:withdraw",
+            )
+            .await
+            .unwrap();
+        ledger
+            .grant(
+                tenant,
+                subject("chi@example.com"),
+                ConsentKey::new("analytics", "", ""),
+                evidence(),
+                "test:chi",
+            )
+            .await
+            .unwrap();
+
+        let (status, listed) = call(&app, "GET", "/purposes", "admin", None).await;
+        assert_eq!(status, StatusCode::OK, "{listed}");
+        let counts = |key: &str| {
+            let item = listed["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|item| item["key"] == key)
+                .unwrap_or_else(|| panic!("no purpose {key}: {listed}"));
+            (item["consented"].as_i64().unwrap(), item["withdrawn"].as_i64().unwrap())
+        };
+        assert_eq!(counts("marketing"), (1, 1));
+        assert_eq!(counts("analytics"), (1, 0));
+        // Trang công khai không lộ số đếm.
+        let public = app.get("/api/v1/compliance/public/purposes").send().await.unwrap();
+        let public: serde_json::Value = public.json();
+        assert!(public["data"][0].get("consented").is_none(), "{public}");
+    })
+    .await
+    .unwrap();
+}

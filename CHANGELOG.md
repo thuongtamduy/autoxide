@@ -11,6 +11,16 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Every list endpoint takes `count=true` and answers `pagination.total`, the number of items matching the filters, on
+  the first page (one extra query, only when asked). MCP list tools take `count` too.
+- `ledger`: `PATCH /api/v1/ledger/bank-accounts/{id}` (account name, bank feed, `active` / `disabled`); accounting
+  periods carry `entries` and `sealed_entries`; `GET /api/v1/ledger/payments` filters by `amount`, `currency` and
+  `org_id`.
+- `invoices`: `POST /api/v1/invoices/exports/{id}/retry` makes a failed accounting export again
+  (`invoices.export_not_retryable` for one already `ready`).
+- `compliance`: `GET /api/v1/compliance/purposes` counts the people who consented and who withdrew per purpose;
+  `GET /api/v1/compliance/rules` takes `as_of` (the version of each rule in effect then), `jurisdiction` and `key`.
+- `GET /api/v1/kernel/devtools/requests` (and the `request_log` tool) filter by `status_class` (`2xx` … `5xx`).
 - Step 51: a tracked background job someone asked for (list export, bulk action…) emits `kernel.job_finished` when it
   finishes or fails for good; `notifications` turns it into an in-app message for that person, and turns
   `kernel.record_note_added` into an in-app message for each person mentioned in a note.

@@ -54,7 +54,9 @@ impl CommentsService {
     ) -> Result<Page<ThreadRoot>, Error> {
         let target = self.target(tenant, kind, id).await?;
         if target.hidden {
-            return Ok(Page { data: Vec::new(), pagination: Pagination::new(page.limit(), None) });
+            let pagination =
+                Pagination::new(page.limit(), None).with_total(page.wants_total().then_some(0));
+            return Ok(Page { data: Vec::new(), pagination });
         }
         let select = comment::Entity::find()
             .scoped(tenant)

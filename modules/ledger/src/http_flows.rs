@@ -24,9 +24,10 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::{FlowSettings, Hold, NewPayout, NewTransferPayment, Payment, Payout};
-use crate::bank::NewBankAccount;
+use crate::bank::{BankAccountChange, NewBankAccount};
 use crate::entity::bank_account;
 use crate::flows::{FlowSettingsInput, HoldFilter, describe_hold};
+use crate::http::present;
 use crate::payouts::{PayoutFilter, describe_payout};
 use crate::service::LedgerService;
 
@@ -38,6 +39,7 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
         .routes(routes!(list_payouts, create_payout))
         .routes(routes!(get_payout))
         .routes(routes!(list_bank_accounts, create_bank_account))
+        .routes(routes!(update_bank_account))
         .routes(routes!(create_vietqr_payment))
         .routes(routes!(receive_bank_feed))
         .routes(routes!(seal_status))
@@ -467,6 +469,59 @@ async fn create_bank_account(
     };
     let row = service.create_bank_account(&tenant, &principal, account).await?;
     Ok(Created::new("/ledger/bank-accounts".to_owned(), row.into()))
+}
+
+/// Changes to a bank account. Fields left out stay as they are.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = LedgerBankAccountChangeRequest)]
+pub(crate) struct BankAccountChangeRequest {
+    /// Name on the account, 1 to 50 characters.
+    account_name: Option<String>,
+    /// Bank feed that reports transfers into this account; `null` stops reading a feed. Changing
+    /// it reads the new feed from its start.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<String>, nullable)]
+    feed_provider: Option<Option<String>>,
+    /// `active`, or `disabled`: new VietQR payments no longer go to it and its feed is not read;
+    /// payments already created are still matched.
+    status: Option<String>,
+}
+
+/// Change a bank account: name, bank feed, status.
+///
+/// Requires `ledger.settings_manage` on the account's unit. The bank and the account number never
+/// change: register the other account instead, then disable this one.
+#[utoipa::path(
+    patch,
+    path = "/bank-accounts/{id}",
+    extensions(("x-permissions" = json!(["ledger.settings_manage"]))),
+    operation_id = "update_ledger_bank_account",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the bank account.")),
+    request_body = BankAccountChangeRequest,
+    responses(
+        (status = 200, description = "The bank account after the change.", body = Data<BankAccountResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `ledger.settings_manage` (`permission_denied`) or not on the account's unit (`org_out_of_scope`).", body = Problem),
+        (status = 404, description = "No such bank account in your scope; code `ledger.bank_account_not_found`.", body = Problem),
+        (status = 422, description = "A value is invalid (unknown bank feed, unknown status…); every problem in `errors`.", body = Problem),
+    )
+)]
+async fn update_bank_account(
+    State(service): State<Arc<LedgerService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<BankAccountChangeRequest>,
+) -> Result<Data<BankAccountResponse>, Error> {
+    let change = BankAccountChange {
+        account_name: input.account_name,
+        feed_provider: input.feed_provider,
+        status: input.status,
+    };
+    let row = service.update_bank_account(&tenant, &principal, id, change).await?;
+    Ok(Data { data: row.into() })
 }
 
 /// A VietQR payment to create.
