@@ -423,6 +423,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-361** Mã theo dõi quảng cáo và đồng ý cookie trong `compliance` (bước 37, D-235) — 2026-11-17
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
+- **[D-20261118-step43-legal-data](D-20261118-step43-legal-data.md)** Khuyến mại: hạn mức pháp luật là dữ liệu, chặn khi chưa thông báo — 2026-11-18
 
 ## Thương mại
 
@@ -441,6 +442,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step42-order-events](D-20261118-step42-order-events.md)** `inventory` nhận event của `orders` qua `Subscription::optional`, lỗi nghiệp vụ chỉ ghi log — 2026-11-18
 - **[D-20261118-step42-reservations](D-20261118-step42-reservations.md)** Giữ chỗ tồn của `inventory`: chọn kho bằng số đọc rồi `adjust` làm trọng tài, khoá dòng chỗ giữ cho mọi chuyển trạng thái — 2026-11-18
 - **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
+- **[D-20261118-step43-calculation](D-20261118-step43-calculation.md)** Khuyến mại: thứ tự tính, cộng dồn, làm tròn và chia tiền — 2026-11-18
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
