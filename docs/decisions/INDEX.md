@@ -4,7 +4,7 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-382 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+383 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
 ## Phạm vi và mục tiêu (12)
 
@@ -136,7 +136,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 
-## MCP, AI, agent dùng API (19)
+## MCP, AI, agent dùng API (20)
 
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
@@ -157,6 +157,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-362** Nhãn nội dung viết với gợi ý của AI: `ai_assisted` / `alt_ai_assisted` (bước 37) — 2026-11-17
 - **D-372** Lời thường thành bộ lọc ở kernel, `POST /api/v1/kernel/filters/parse`; khôi phục bài đã lưu trữ (bước 52 mục 2, 3) — 2026-11-18
 - **D-374** MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18
+- **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
 
 ## Xác thực, phân quyền, bảo mật (50)
 

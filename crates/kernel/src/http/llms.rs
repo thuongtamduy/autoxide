@@ -17,7 +17,7 @@ use axum::response::IntoResponse;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
-use crate::mcp::{McpResource, Prompt};
+use crate::mcp::{McpResource, Prompt, Tool};
 
 /// Đường dẫn của trang.
 pub const LLMS_PATH: &str = "/llms.txt";
@@ -35,6 +35,10 @@ pub(super) struct LlmsInputs<'a> {
     pub(super) catalog: bool,
     /// Tên và mô tả của mọi module, theo thứ tự đăng ký.
     pub(super) modules: &'a [(&'static str, &'static str)],
+    /// Module có đường dẫn REST, tức có tài liệu OpenAPI riêng.
+    pub(super) documented: &'a [&'static str],
+    /// Tool MCP của mọi module, tên đầy đủ `<module>.<tên>`.
+    pub(super) tools: &'a [Tool],
     pub(super) resources: &'a [McpResource],
     pub(super) prompts: &'a [Prompt],
 }
@@ -76,6 +80,10 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
          endpoint needs",
         super::OPENAPI_PATH
     );
+    let _ = writeln!(
+        text,
+        "- OpenAPI document of one module: `{api}/openapi/<module>.json`, linked under Modules below"
+    );
     if inputs.api_docs {
         let _ = writeln!(
             text,
@@ -97,6 +105,17 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
     let _ = writeln!(text);
 
     let _ = writeln!(text, "## Modules\n");
+    let _ = writeln!(
+        text,
+        "Load only what the task needs: each module has its own OpenAPI document (its endpoints and \
+         the schemas they use){}.\n",
+        if inputs.mcp {
+            " and its own MCP endpoint (only its tools, resources and prompts; same authentication \
+             as `/mcp`)"
+        } else {
+            ""
+        }
+    );
     for (name, description) in inputs.modules {
         let description = if description.is_empty() { "No description." } else { description };
         if inputs.catalog {
@@ -104,6 +123,7 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
         } else {
             let _ = writeln!(text, "- {name}: {description}");
         }
+        let _ = module_links(&mut text, inputs, name);
     }
 
     if !inputs.prompts.is_empty() {
@@ -129,6 +149,41 @@ pub(super) fn render(inputs: &LlmsInputs<'_>) -> String {
         }
     }
     text
+}
+
+/// Dòng con dưới một module: link tới tài liệu OpenAPI và endpoint MCP riêng, và tên các tool.
+fn module_links(text: &mut String, inputs: &LlmsInputs<'_>, name: &str) -> std::fmt::Result {
+    let base = inputs.base;
+    let prefix = format!("{name}.");
+    let tools: Vec<String> = inputs
+        .tools
+        .iter()
+        .filter(|tool| tool.name().starts_with(&prefix))
+        .map(|tool| format!("`{}`", tool.name()))
+        .collect();
+    let has_mcp = inputs.mcp
+        && (!tools.is_empty()
+            || inputs.resources.iter().any(|resource| resource.module() == name)
+            || inputs.prompts.iter().any(|prompt| prompt.name().starts_with(&prefix)));
+    let mut links = Vec::new();
+    if inputs.documented.contains(&name) {
+        links.push(format!(
+            "[OpenAPI]({base}{})",
+            super::openapi_modules::module_openapi_path(name)
+        ));
+    }
+    if has_mcp {
+        links.push(format!("[MCP]({base}{})", super::mcp::module_path(name)));
+    }
+    if links.is_empty() && tools.is_empty() {
+        return Ok(());
+    }
+    write!(text, "  - {}", links.join(" · "))?;
+    if !tools.is_empty() {
+        let separator = if links.is_empty() { "" } else { " · " };
+        write!(text, "{separator}tools: {}", tools.join(", "))?;
+    }
+    writeln!(text)
 }
 
 /// Nội dung đã dựng; `Bytes` clone chỉ tăng bộ đếm tham chiếu.

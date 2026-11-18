@@ -55,6 +55,14 @@ async fn llms_txt_co_moi_module_va_link() {
             let line = format!("- [{name}](/api/v1/kernel/modules/{name}): {description}");
             assert!(text.contains(&line), "missing `{line}` in:\n{text}");
         }
+        // Mỗi module: link tới tài liệu OpenAPI và endpoint MCP riêng, cùng tên tool.
+        for expected in [
+            "  - [OpenAPI](/api/v1/openapi/content.json) · [MCP](/mcp/content) · tools: ",
+            "`content.create_draft`",
+            "/api/v1/openapi/<module>.json",
+        ] {
+            assert!(text.contains(expected), "missing {expected} in:\n{text}");
+        }
         for expected in [
             "`content.draft_post`",
             "`comments.moderate_queue`",
@@ -95,6 +103,86 @@ async fn moi_link_trong_llms_txt_khong_404() {
     })
     .await
     .unwrap();
+}
+
+#[tokio::test]
+async fn openapi_rieng_cua_module_khop_ban_chung_va_mcp_rieng() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let full = serde_json::to_value(app.openapi()).unwrap();
+        let mut documented = 0;
+        for (name, _) in app.modules().descriptions() {
+            let prefix = format!("/api/v1/{name}");
+            let expected: Vec<&String> = full["paths"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .filter(|path| *path == &prefix || path.starts_with(&format!("{prefix}/")))
+                .collect();
+            let response = app.get(&format!("/api/v1/openapi/{name}.json")).send().await.unwrap();
+            if expected.is_empty() {
+                assert_eq!(response.status(), StatusCode::NOT_FOUND, "{name}");
+                continue;
+            }
+            assert_eq!(response.status(), StatusCode::OK, "{name}");
+            let document = response.json();
+            let paths: Vec<&String> = document["paths"].as_object().unwrap().keys().collect();
+            assert_eq!(paths, expected, "{name}");
+            for path in paths {
+                assert_eq!(document["paths"][path], full["paths"][path], "{name} {path}");
+            }
+            // Mọi `$ref` trỏ tới schema có trong chính tài liệu, cùng nội dung như bản chung.
+            let schemas = document["components"]["schemas"].as_object().unwrap();
+            for (schema, value) in schemas {
+                assert_eq!(value, &full["components"]["schemas"][schema], "{name} {schema}");
+            }
+            let mut refs = Vec::new();
+            collect_refs(&document, &mut refs);
+            for reference in refs {
+                let target = reference.trim_start_matches("#/components/schemas/");
+                assert!(schemas.contains_key(target), "{name}: dangling {reference}");
+            }
+            documented += 1;
+        }
+        assert!(documented > 15, "only {documented} modules have a document");
+
+        let missing = app.get("/api/v1/openapi/orders.json").send().await.unwrap();
+        assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+        assert_eq!(missing.json()["code"], "openapi_module_not_found");
+        let no_suffix = app.get("/api/v1/openapi/content").send().await.unwrap();
+        assert_eq!(no_suffix.status(), StatusCode::NOT_FOUND);
+
+        // Endpoint MCP riêng: chỉ tool, resource, prompt của module đó, vẫn theo permission.
+        let agent = app.mcp_at("agent", "/mcp/content").await.unwrap();
+        let tools = agent.list_all_tools().await.unwrap();
+        assert!(!tools.is_empty());
+        assert!(tools.iter().all(|tool| tool.name.starts_with("content.")), "{tools:?}");
+        let resources = agent.list_all_resources().await.unwrap();
+        assert!(resources.iter().all(|resource| resource.uri.starts_with("autoxide://content/")));
+        let prompts = agent.list_all_prompts().await.unwrap();
+        assert_eq!(
+            prompts.iter().map(|prompt| prompt.name.as_str()).collect::<Vec<_>>(),
+            ["content.draft_post"]
+        );
+        agent.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+fn collect_refs(node: &Value, refs: &mut Vec<String>) {
+    match node {
+        Value::Object(map) => {
+            for (key, value) in map {
+                match value {
+                    Value::String(reference) if key == "$ref" => refs.push(reference.clone()),
+                    _ => collect_refs(value, refs),
+                }
+            }
+        }
+        Value::Array(items) => items.iter().for_each(|item| collect_refs(item, refs)),
+        _ => {}
+    }
 }
 
 #[tokio::test]

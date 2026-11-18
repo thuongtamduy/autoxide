@@ -25701,6 +25701,17 @@ export interface paths {
       };
     };
   };
+  "/api/v1/openapi/{file}": {
+    /** OpenAPI document of one module. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { file: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/public/site": {
     /** Get the profile of the website being visited. */
     get: {
