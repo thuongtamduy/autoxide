@@ -32,6 +32,39 @@ Signed-in buyers keep up to `AUTOXIDE_SHIPPING_MAX_ADDRESSES_PER_BUYER` (default
 
 Other modules read it through `dyn AddressBook` (`get`, `default_for`).
 
+## Shipping rates
+
+Each shop sets its own rates under `/api/v1/shipping` (permission `shipping.settings.manage` at the unit):
+
+| Method | Path | What |
+|---|---|---|
+| `GET`, `POST` | `/zones` | zones: groups of provinces (or whole countries) |
+| `GET`, `PATCH`, `DELETE` | `/zones/{id}` | one zone (deleting it removes its tiers) |
+| `PUT` | `/zones/{id}/regions` | replace the provinces of a zone |
+| `GET`, `POST` | `/methods` | shipping methods: `table_rate`, `carrier`, `pickup` |
+| `GET`, `PATCH`, `DELETE` | `/methods/{id}` | one method with its tiers and pickup points |
+| `PUT` | `/methods/{id}/rates` | replace the weight tiers of a method |
+| `PUT` | `/methods/{id}/pickup-points` | replace the stores of a `pickup` method |
+| `POST` | `/quote` | quote a cart (`shipping.read` at the store) — the same computation orders use |
+
+- **Inheritance:** a store uses the active methods of its own unit and of every unit above it; a method of a
+  nearer unit replaces one with the same `code` higher up (a store can override the chain's `standard`).
+- **Zones:** a zone listing the destination province wins over a zone for the whole country.
+- **Weight:** chargeable weight = max(actual weight, volumetric weight); volumetric weight of an item =
+  length × width × height (mm³) / `volumetric_divisor` (default 6000) grams, rounded up. Items that do not need
+  shipping (digital goods, services) weigh nothing; a cart with none to ship gets no options. An item without
+  weight uses the method's `default_item_weight_grams`; without one, the method is listed in `unavailable`
+  with `shipping.weight_missing`.
+- **Tiers:** `min_weight_grams ≤ weight < max_weight_grams` (no maximum = no limit) and longest side ≤
+  `max_side_mm`; each `step_grams` (or part) above the minimum adds `step_amount`. Overlapping tiers are refused.
+- **Free shipping:** `free_over` compared with the order value after discounts; the option shows `free_over` so
+  a cart can say how much more to buy.
+- **VAT:** fees are VAT-inclusive; each option carries the method's `tax_category` so the order puts the VAT
+  line of the shipping fee on the invoice.
+- **Store pickup:** one option per store, fee = the method's `handling_fee`, no destination or weight needed.
+- Every option has an `option_key`. Send it back when placing the order: `ShippingRates::confirm_option`
+  answers `shipping.option_changed` when the fee or destination changed.
+
 ## Contract for other modules
 
 ```rust
@@ -73,9 +106,9 @@ Rules every connector follows (see `autoxide_shipping::api::fake::FakeCarrier` f
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` registers the fake carrier `fake` for trying everything on a development
 machine. `autoxide doctor` warns while it is on; never turn it on in production.
 
-## Rates, shipments, COD, delivery dates *(coming)*
+## Shipments, COD, delivery dates *(coming)*
 
-Zones by province, weight tiers, free shipping, store pickup, carrier accounts, webhooks, shipments with
+Carrier accounts, webhooks, shipments with
 parcels, COD reconciliation, delivery calendars and the public estimate are documented here as they land.
 
 ## Configuration

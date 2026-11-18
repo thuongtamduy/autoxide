@@ -9,12 +9,15 @@ mod config;
 mod entity;
 mod errors;
 mod http;
+mod methods;
 mod migration;
 mod permissions;
 mod privacy;
+mod quote;
 mod registry;
 mod relocation;
 mod service;
+mod settings;
 
 #[cfg(test)]
 mod tests;
@@ -88,6 +91,7 @@ impl Module for ShippingModule {
         context.personal_data(service.clone())?;
         // `Arc<ShippingService>` tự đổi thành `Arc<dyn …>`: module khác chỉ thấy trait.
         context.provide::<dyn api::AddressBook>(service.clone())?;
+        context.provide::<dyn api::ShippingRates>(service.clone())?;
         context.provide::<dyn api::CarrierRegistry>(registry)?;
         self.service = Some(service);
         Ok(())

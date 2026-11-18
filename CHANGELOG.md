@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `shipping`: shipping rates set by each shop (zones by province, weight tiers with volumetric weight, free
+  shipping from an order value, store pickup, methods inherited down the organization tree) and `POST /quote`,
+  the same computation as `ShippingRates::quote` / `confirm_option` for orders.
 - New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
   against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
   with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`

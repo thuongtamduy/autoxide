@@ -10,6 +10,7 @@ use std::sync::Arc;
 use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::error::FieldError;
 use chrono::{DateTime, SubsecRound, Utc};
+use sea_orm::{DbErr, SqlErr};
 
 use crate::config::ShippingConfig;
 
@@ -48,5 +49,13 @@ pub(crate) fn check_length(
                 .with_param("min", min)
                 .with_param("max", max),
         );
+    }
+}
+
+/// Lỗi vi phạm unique: thông báo của database.
+pub(crate) fn unique_violation(error: &DbErr) -> Option<String> {
+    match error.sql_err() {
+        Some(SqlErr::UniqueConstraintViolation(message)) => Some(message),
+        _ => None,
     }
 }

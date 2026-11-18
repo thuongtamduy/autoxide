@@ -215,9 +215,11 @@ impl QuoteItem {
     }
 }
 
-/// Kiểu phương thức giao.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+/// Kind of shipping method: `table_rate` (the shop's own weight tiers per zone), `carrier` (the fee
+/// a carrier account quotes), `pickup` (collect in store).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "snake_case")]
+#[schema(as = ShippingMethodKind)]
 pub enum MethodKind {
     /// Bảng phí khách tự đặt (vùng × bậc cân).
     TableRate,
@@ -256,6 +258,17 @@ pub struct Eta {
     pub order_by: Option<DateTime<Utc>>,
     /// Múi giờ IANA của hai ngày trên, vd `Asia/Ho_Chi_Minh`.
     pub time_zone: String,
+}
+
+impl Eta {
+    pub fn new(
+        earliest_date: NaiveDate,
+        latest_date: NaiveDate,
+        order_by: Option<DateTime<Utc>>,
+        time_zone: impl Into<String>,
+    ) -> Self {
+        Eta { earliest_date, latest_date, order_by, time_zone: time_zone.into() }
+    }
 }
 
 /// Một cách giao hợp lệ.

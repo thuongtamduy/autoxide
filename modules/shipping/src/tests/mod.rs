@@ -2,6 +2,7 @@
 //! như binary bằng `TestApp` của testkit; gọi qua REST và qua trait trong `api`.
 
 mod addresses;
+mod rates;
 
 use std::sync::Arc;
 
