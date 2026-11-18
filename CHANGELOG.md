@@ -21,11 +21,21 @@ endpoints are marked deprecated with a sunset date first.
   vouchers) in one transaction; legal limits (50% of the price before the promotion, discount days per year) and notice
   rules as dated data loaded with `autoxide task promotions.load_legal_data`, checked before turning on;
   `autoxide_promotions::api::Promotions` for `orders`; MCP tools `promotions.*`.
+- `catalog` (step 41, D-222): derived price lists written as real price rows by a job, price rounding rules
+  (`/api/v1/catalog/rounding-rules`), bulk price changes with preview, approval (optionally by a second person) and
+  temporary prices (`/api/v1/catalog/price-lists/{id}/changes`).
+- Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
+  (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
+  signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".
 - Module `inventory` (step 42, first part; `docs/INVENTORY.md`): stock per variant and warehouse (`on_hand`,
   `available`), an append-only movement ledger, adjustments with a reason from the tenant's list
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
   `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
   tools `inventory.*`.
+- New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
+  against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
+  with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
+  (`ShippingRates`, `AddressBook`, `CarrierRegistry`, `ShippingCarrier`, an in-memory `FakeCarrier`).
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
@@ -55,6 +65,10 @@ endpoints are marked deprecated with a sunset date first.
   tickets to the account. `media::api::Media::uploaders` tells who uploaded items.
 - `support`: support teams of an organization unit (`/teams`, members who take tickets), routing rules by category and
   channel (`/routing-rules`, inherited down the tree) and round-robin assignment to members who can answer the ticket.
+- `support`: support policies per organization unit (`/policies/{org_id}`, inherited down the tree: categories,
+  response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
+  Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
+  event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
@@ -83,6 +97,10 @@ endpoints are marked deprecated with a sunset date first.
   the booking while the customer pays through `ledger`; unpaid holds are released. Confirm, check in, complete,
   no-show, cancel and reschedule follow the unit's policy, with refunds through the payment partner. New permission
   `bookings.read`.
+- Booking reminders through `notifications` 24 hours and 2 hours before the start, never sent twice; guests book
+  and cancel with a one-time SMS code (`POST /api/v1/bookings/public/phone-codes`); customers list their bookings at
+  `GET /api/v1/bookings/me/bookings`; `.ics` calendar files; MCP tools `bookings.availability`,
+  `bookings.list_bookings`, `bookings.create_booking`, `bookings.reschedule_booking`, `bookings.cancel_booking`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and

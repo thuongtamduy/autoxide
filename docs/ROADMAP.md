@@ -269,7 +269,7 @@ Nhóm A — vận hành:
       S3), giữ N bản gần nhất, lịch và số bản cấu hình qua `Setting` (sinh lại `.env.example`);
       bản hỏng thì ghi log lỗi và đếm bằng metric. `autoxide doctor` cảnh báo khi bản mới nhất cũ
       hơn ngưỡng. Không giữ transaction ghi trong lúc backup (dùng `Database::begin_snapshot`)
-- [ ] Diễn tập restore: test đầu-cuối backup → restore vào database trống → chương trình khởi
+- [x] Diễn tập restore: test đầu-cuối backup → restore vào database trống → chương trình khởi
       động, dữ liệu và file khớp, trên cả hai database (cả chép chéo SQLite ↔ Postgres nếu
       `autoxide copy` hỗ trợ); `docs/DEPLOY.md` (EN + VI) có quy trình restore từng bước
 - [ ] Số đo tồn đọng (gauge, cập nhật định kỳ, tên có tiền tố như luật code): job đang chờ và tuổi
@@ -339,7 +339,7 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
       tài khoản sau khi đăng ký
 - [x] Phạm vi theo nút tổ chức (bước 34): nhân viên thấy phiếu của nút mình và nhánh dưới; người bán trên
       sàn chỉ thấy phiếu gian hàng mình; nhóm nhân viên, quy tắc tự phân công là dữ liệu, chia vòng
-- [ ] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
+- [x] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
       mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
       hạn, mức hài lòng
 - [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
@@ -475,10 +475,10 @@ bước 35.
 - [x] Danh mục dạng cây, thuộc tính theo danh mục; **thuộc tính bắt buộc là dữ liệu** (xuất xứ, hạn dùng, nhãn
       hàng hoá theo NĐ 43/2017, NĐ 111/2021 — cần đối chiếu); hàng cấm / có điều kiện là dữ liệu kèm giấy tờ
       phải có; `readiness` để lọc và đếm sản phẩm chưa mở bán được (D-223…D-227)
-- [ ] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày
+- [x] Bảng giá: theo cửa hàng / nhóm khách (B2B), kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè — bước 34), ngày
       hiệu lực, **lịch sử giá** (khuyến mại cần "giá ngay trước khuyến mại"); giá niêm yết bằng Đồng Việt Nam,
       gồm thuế khi bán cho người tiêu dùng (Luật Giá 16/2023 — cần đối chiếu)
-- [ ] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
+- [x] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
       kênh → thị trường → ưu tiên); bảng giá suy ra ghi thành dòng giá thật; làm tròn giá đẹp; sàn giá (giá tối
       thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt, hẹn giờ, giá tạm thời
 - [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm
@@ -588,7 +588,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 
 Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua event, báo trạng thái qua event.
 
-- [ ] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ nước ngoài
+- [x] Sổ địa chỉ của người mua dùng `Address` của module nền `address` (bước 34, D-193); địa chỉ nước ngoài
       dạng chung
 - [ ] Phí vận chuyển khách tự đặt: vùng theo tỉnh, bậc cân nặng / kích thước, miễn phí từ một giá trị đơn,
       nhận tại cửa hàng (chuỗi); API báo giá cho `orders`; thuế GTGT trên phí giao (Luật 48/2024 — cần đối
@@ -844,7 +844,7 @@ Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, 
       theo múi giờ của nút; tính giờ trống công khai
 - [x] Đặt chỗ không bao giờ chồng giờ khi nhiều người đặt cùng lúc (ô giờ có khoá duy nhất, chạy trên cả hai
       database); giữ tạm khi trả cọc qua đối tác; huỷ, đổi giờ, vắng mặt theo chính sách
-- [ ] Nhắc lịch qua `notifications`, khách vãng lai đặt bằng OTP, `/me/bookings`, tool MCP; test trên cả hai
+- [x] Nhắc lịch qua `notifications`, khách vãng lai đặt bằng OTP, `/me/bookings`, tool MCP; test trên cả hai
       database
 
 ## 61. Chat chăm sóc khách (`conversations`) (chủ dự án giao ngày 14/11/2026, D-221)

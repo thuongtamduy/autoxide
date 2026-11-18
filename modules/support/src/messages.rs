@@ -15,7 +15,7 @@ use crate::events::{self, Change};
 use crate::permissions::{TICKETS_MANAGE, TICKETS_REPLY};
 use crate::service::{Message, SupportService, Ticket, Viewer, finish, not_found, now, target};
 use crate::status::{self, AuthorKind, MessageKind, Status};
-use crate::tickets::{apply_status, message_snapshot, parse_status};
+use crate::tickets::{message_snapshot, parse_status};
 
 /// Số tệp đính kèm tối đa của một tin.
 pub(crate) const ATTACHMENTS_MAX: usize = 5;
@@ -74,7 +74,8 @@ impl SupportService {
         let owner = if viewer.is_staff() { None } else { uploader };
         self.check_attachments_for(tenant, viewer, owner, &input.media_ids).await?;
         // Phiếu có thật và người gọi thấy được (404 nếu không).
-        self.get(tenant, viewer, ticket_id).await?;
+        let seen = self.get(tenant, viewer, ticket_id).await?;
+        let policy = self.policy(tenant, seen.org_id).await?.policy;
 
         let at = now();
         let transaction = tenant.database().begin_write().await?;
@@ -98,7 +99,7 @@ impl SupportService {
         if kind == MessageKind::Public {
             let to = status::after_message(from, author);
             if to != from {
-                apply_status(&mut row, &before, to, None, at);
+                crate::sla::transition(&mut row, &before, to, None, &policy, at);
             }
             if author == AuthorKind::Agent && before.first_responded_at.is_none() {
                 row.first_responded_at = Set(Some(at));

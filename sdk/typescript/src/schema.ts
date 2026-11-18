@@ -539,6 +539,14 @@ export type BookingCheckout = {
   qr_payload?: string | null;
 };
 
+/** A code was sent. */
+export type BookingCodeSent = {
+  /** Send it back with the code. */
+  challenge_id: string;
+  /** The code works until this moment, once. */
+  expires_at: string;
+};
+
 /** A booking just made, with the deposit checkout when one is due. */
 export type BookingCreated = {
   booking: BookingRecord;
@@ -607,6 +615,14 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A one-time code sent by SMS, to prove a guest owns the phone number. */
+export type BookingPhoneCode = {
+  /** The `challenge_id` from `POST /api/v1/bookings/public/phone-codes`. */
+  challenge_id: string;
+  /** The 6 digits received by SMS. */
+  code: string;
 };
 
 /** A booking. */
@@ -1024,6 +1040,22 @@ export type CatalogCreateDocument = {
   number: string;
 };
 
+/** A new bulk price change. */
+export type CatalogCreatePriceChange = {
+  filter?: CatalogPriceChangeFilter;
+  /**
+   * `set` (the new price is `value`), `percent` (`value` in basis points, signed: `-1000` =
+   * 10% off) or `amount` (`value` minor units added, signed).
+   */
+  operation: string;
+  rounding_rule_id?: string | null;
+  /** When the new prices start; omitted: now. A future time schedules them. */
+  valid_from?: string | null;
+  /** End of a temporary change. */
+  valid_to?: string | null;
+  value: number;
+};
+
 /** A new price floor. */
 export type CatalogCreatePriceGuard = {
   action: CatalogFloorAction;
@@ -1040,17 +1072,28 @@ export type CatalogCreatePriceGuard = {
 
 /** A new price list. */
 export type CatalogCreatePriceList = {
+  /** Adjustment of a derived list in basis points, signed (`-1500` = 15% off), -10000 to 100000. */
+  adjust_bp?: number;
+  /** Amount added after the percentage, in minor units, signed. */
+  adjust_minor?: number | null;
   /** `consumer` (default) or `business`. */
   audience?: string;
   /** ISO 4217 code. Consumer prices in Viet Nam must be `VND`. */
   currency: string;
   /** Only for this customer group (a free code until customer groups exist, step 47). */
   customer_group?: string | null;
+  /**
+   * Make a derived list: its prices are written from this source list (which cannot itself be
+   * derived; `catalog.derived_chain`), adjusted and rounded. Same currency as the source.
+   */
+  derived_from?: string | null;
   name: string;
   /** The store or chain unit; prices apply there and below. Omit when you work in one unit. */
   org_id?: string | null;
   /** Higher wins among lists that tie on unit and filters. Default 0. */
   priority?: number;
+  /** Rounding rule of a derived list (`GET /rounding-rules`). */
+  rounding_rule_id?: string | null;
   /** Prices include tax; consumer prices in Viet Nam must. */
   tax_inclusive: boolean;
 };
@@ -1137,6 +1180,17 @@ export type CatalogCreateProduct = {
   warranty_months?: number | null;
 };
 
+/** A new rounding rule. */
+export type CatalogCreateRoundingRule = {
+  /** Ending in minor units, 0 or more and below `step_minor`, e.g. `9000`. */
+  ending_minor?: number | null;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  /** Step in minor units, above 0, e.g. `10000`. */
+  step_minor: number;
+};
+
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
 export type CatalogFloorAction = "warn" | "block";
 
@@ -1194,6 +1248,44 @@ export type CatalogPrice = {
   variant_id: string;
 };
 
+/** A bulk price change. */
+export type CatalogPriceChange = {
+  /** Variants changed (known after the preview). */
+  affected: number;
+  approved_by?: string | null;
+  created_at: string;
+  created_by?: string | null;
+  filter: CatalogPriceChangeFilter;
+  id: string;
+  /** `set`, `percent` or `amount`. */
+  operation: string;
+  /**
+   * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+   * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+   */
+  preview?: Record<string, unknown> | null;
+  price_list_id: string;
+  rounding_rule_id?: string | null;
+  /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+  status: string;
+  updated_at: string;
+  valid_from: string;
+  /** End of a temporary change; the earlier prices apply again after it. */
+  valid_to?: string | null;
+  /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+  value: number;
+};
+
+/**
+ * Which variants a bulk change covers: the union of the categories (with their subcategories),
+ * products and variants listed. All empty: every variant with a price in the list.
+ */
+export type CatalogPriceChangeFilter = {
+  category_ids?: string[];
+  product_ids?: string[];
+  variant_ids?: string[];
+};
+
 /** A price floor rule. */
 export type CatalogPriceGuard = {
   action: CatalogFloorAction;
@@ -1239,6 +1331,9 @@ export type CatalogPriceInput = {
 /** A price list. */
 export type CatalogPriceList = {
   active: boolean;
+  /** Adjustment of a derived list, basis points. */
+  adjust_bp: number;
+  adjust_minor?: number | null;
   /** `consumer` or `business`. */
   audience: string;
   /** Only for this sales channel (step 48). */
@@ -1249,6 +1344,8 @@ export type CatalogPriceList = {
   currency: string;
   /** Only for this customer group. */
   customer_group?: string | null;
+  /** Source list of a derived list. */
+  derived_from?: string | null;
   id: string;
   /** Only for this market (step 63). */
   market?: string | null;
@@ -1257,6 +1354,7 @@ export type CatalogPriceList = {
   org_id: string;
   /** Higher wins among lists that tie on unit and filters. */
   priority: number;
+  rounding_rule_id?: string | null;
   tax_inclusive: boolean;
   updated_at: string;
 };
@@ -1404,6 +1502,20 @@ export type CatalogRestrictionRule = {
   /** Document types a conditional product needs, valid on the day. */
   required_documents: string[];
   source_url: string;
+};
+
+/**
+ * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+ * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+ */
+export type CatalogRoundingRule = {
+  created_at: string;
+  ending_minor?: number | null;
+  id: string;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  step_minor: number;
 };
 
 /**
@@ -3972,6 +4084,7 @@ export type CustomerBookingRequest = {
   note?: string;
   /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
   payment_method?: string | null;
+  phone_code?: BookingPhoneCode | null;
   /** A staff member (or court, room…) from the availability; omitted: the first one free. */
   resource_id?: string | null;
   /** Page of the shop to open after paying the deposit. */
@@ -4271,6 +4384,17 @@ export type Data_BookingAvailability = {
 };
 
 /** Envelope of a single result. */
+export type Data_BookingCodeSent = {
+  /** A code was sent. */
+  data: {
+    /** Send it back with the code. */
+    challenge_id: string;
+    /** The code works until this moment, once. */
+    expires_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BookingCreated = {
   /** A booking just made, with the deposit checkout when one is due. */
   data: {
@@ -4522,6 +4646,37 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogPriceChange = {
+  /** A bulk price change. */
+  data: {
+    /** Variants changed (known after the preview). */
+    affected: number;
+    approved_by?: string | null;
+    created_at: string;
+    created_by?: string | null;
+    filter: CatalogPriceChangeFilter;
+    id: string;
+    /** `set`, `percent` or `amount`. */
+    operation: string;
+    /**
+     * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+     * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+     */
+    preview?: Record<string, unknown> | null;
+    price_list_id: string;
+    rounding_rule_id?: string | null;
+    /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+    status: string;
+    updated_at: string;
+    valid_from: string;
+    /** End of a temporary change; the earlier prices apply again after it. */
+    valid_to?: string | null;
+    /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+    value: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogPriceGuard = {
   /** A price floor rule. */
   data: {
@@ -4543,6 +4698,9 @@ export type Data_CatalogPriceList = {
   /** A price list. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -4553,6 +4711,8 @@ export type Data_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -4561,6 +4721,7 @@ export type Data_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   };
@@ -4628,6 +4789,23 @@ export type Data_CatalogResolvedPrice = {
     candidates: CatalogPriceList[];
     price?: CatalogPriceSnapshot | null;
     variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogRoundingRule = {
+  /**
+   * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+   * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+   */
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
   };
 };
 
@@ -8648,6 +8826,27 @@ export type Data_SetupView = {
 };
 
 /** Envelope of a single result. */
+export type Data_ShippingAddress = {
+  /** An address of a buyer's address book. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SignupAccepted = {
   /** The answer to a sign-up: always the same. */
   data: {
@@ -8929,6 +9128,40 @@ export type Data_SupportOpenedTicket = {
   data: SupportTicket & {
     /** Guests only, shown only here: send it as `token` to the `/public/tickets/{id}` endpoints. */
     access_token?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportPolicyInForce = {
+  /** The policy in force at a unit, and where it comes from. */
+  data: SupportPolicy & {
+    /** The unit whose own policy applies; empty: the defaults. */
+    defined_at?: string | null;
+    /** The unit asked about. */
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportReport = {
+  /** Support figures for tickets created in a period. */
+  data: {
+    /** `breached` per 10000 tickets. */
+    breach_rate_bp: number;
+    /** Of those, that missed a response-time target. */
+    breached: number;
+    /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+    median_first_response_minutes?: number | null;
+    /** Median minutes from opening to solved (wall clock), of solved tickets. */
+    median_resolve_minutes?: number | null;
+    /** Average rating × 100 (e.g. 450 = 4.5). */
+    satisfaction_avg_x100?: number | null;
+    /** Ratings given (1 to 5). */
+    satisfaction_count: number;
+    /** Of those, solved or closed. */
+    solved: number;
+    /** Tickets created in the period. */
+    tickets: number;
   };
 };
 
@@ -9867,6 +10100,19 @@ export type Data_Vec_CatalogRestrictionRule = {
     /** Document types a conditional product needs, valid on the day. */
     required_documents: string[];
     source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRoundingRule = {
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
   }[];
 };
 
@@ -12206,6 +12452,14 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A guest cancels a booking. */
+export type GuestCancelRequest = {
+  /** A fresh code sent to the phone number of the booking. */
+  phone_code: BookingPhoneCode;
+  /** Up to 200 characters. */
+  reason?: string | null;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -14462,6 +14716,19 @@ export type NewRecordNote = {
   mentions?: string[];
 };
 
+/** A new address in the address book. */
+export type NewShippingAddress = {
+  address: ShippingPostalAddress;
+  /** Make it the default address. The first address is always the default. */
+  is_default?: boolean;
+  /** Your name for it, e.g. `Home` (up to 100 characters). */
+  label?: string;
+  /** Phone number of the recipient, for the carrier. */
+  phone: string;
+  /** Who receives the parcel (1 to 200 characters). */
+  recipient_name: string;
+};
+
 /** A tag to create. */
 export type NewTag = {
   /** A color of the fixed palette; `gray` by default. */
@@ -15338,6 +15605,9 @@ export type Page_CatalogPriceList = {
   /** The items of this page, in the requested order. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -15348,6 +15618,8 @@ export type Page_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -15356,6 +15628,7 @@ export type Page_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   }[];
@@ -17484,6 +17757,28 @@ export type Page_SessionResponse = {
      * none was sent.
      */
     user_agent?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingAddress = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -20488,6 +20783,12 @@ export type SecretResponse = {
   secret: string;
 };
 
+/** The phone number to send a code to. */
+export type SendBookingCodeRequest = {
+  /** E.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
 /** Something to fix or review. */
 export type SeoFinding = {
   /**
@@ -20560,6 +20861,9 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A policy to set on a unit (every field; units below without their own policy inherit it). */
+export type SetSupportPolicyRequest = SupportPolicy;
+
 /** A member's setting. */
 export type SetSupportTeamMemberRequest = {
   /** Takes new tickets in round-robin assignment. */
@@ -20614,6 +20918,52 @@ export type SetupView = {
 
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
+
+/** An address of a buyer's address book. */
+export type ShippingAddress = {
+  /**
+   * The address, with the names of the province and commune when it was saved. Outside
+   * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+   * `commune_code` is empty.
+   */
+  address: Address;
+  buyer_id: string;
+  id: string;
+  is_default: boolean;
+  label: string;
+  phone: string;
+  postal_code?: string | null;
+  recipient_name: string;
+  updated_at: string;
+};
+
+/** Fields to change; leave out what stays. */
+export type ShippingAddressChanges = {
+  address?: ShippingPostalAddress | null;
+  label?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+};
+
+/**
+ * A postal address. In Vietnam: `province_code` and `commune_code` from the official list of
+ * administrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the
+ * region (state, province…), `city` the city, with an optional `postal_code`.
+ */
+export type ShippingPostalAddress = {
+  /** Outside Vietnam: the city (required). */
+  city?: string | null;
+  /** Vietnam: code of the commune, ward or special zone (required). */
+  commune_code?: string | null;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  /** Postal code, mostly for addresses outside Vietnam. */
+  postal_code?: string | null;
+  /** Vietnam: code of the province. Elsewhere: the region. */
+  province_code: string;
+};
 
 /** The answer to a sign-up: always the same. */
 export type SignupAccepted = {
@@ -21221,8 +21571,72 @@ export type SupportOpenedTicket = SupportTicket & {
   access_token?: string | null;
 };
 
+/**
+ * Support policy of an organization unit. Units without their own policy use the nearest unit
+ * above that has one, else the defaults.
+ */
+export type SupportPolicy = {
+  /** A solved ticket closes after this many days without a new message (1 to 90). */
+  auto_close_days: number;
+  /** Automatic answers to simple questions (off by default). */
+  auto_reply: boolean;
+  /** Words that always stop an automatic answer. */
+  auto_reply_blocked_terms: string[];
+  /** At most this many automatic answers in a row on one ticket, then a person takes over. */
+  auto_reply_max_per_thread: number;
+  /** Lowest confidence (basis points, 0 to 10000) of the classification to answer automatically. */
+  auto_reply_min_confidence_bp: number;
+  /** When staff work. */
+  business_hours: SupportWorkingHours[];
+  /** Ticket categories customers choose from (codes; labels are translated by the website). */
+  categories: string[];
+  /** Business minutes to the first answer, per priority (`low`, `normal`, `high`, `urgent`). */
+  first_response_minutes: Record<string, unknown>;
+  /** Guests (no account) may open tickets. */
+  guest_tickets: boolean;
+  /** Days off (`YYYY-MM-DD`, local date). */
+  holidays: string[];
+  /** Email replies to ticket notifications go back into the ticket (needs an inbound mail module). */
+  inbound_email: boolean;
+  /**
+   * Business minutes to solve the ticket, per priority; time waiting for the customer does not
+   * count.
+   */
+  resolve_minutes: Record<string, unknown>;
+  /** Offset of the unit's local time from UTC, in minutes (Vietnam: 420). */
+  utc_offset_minutes: number;
+};
+
+/** The policy in force at a unit, and where it comes from. */
+export type SupportPolicyInForce = SupportPolicy & {
+  /** The unit whose own policy applies; empty: the defaults. */
+  defined_at?: string | null;
+  /** The unit asked about. */
+  org_id: string;
+};
+
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** Support figures for tickets created in a period. */
+export type SupportReport = {
+  /** `breached` per 10000 tickets. */
+  breach_rate_bp: number;
+  /** Of those, that missed a response-time target. */
+  breached: number;
+  /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+  median_first_response_minutes?: number | null;
+  /** Median minutes from opening to solved (wall clock), of solved tickets. */
+  median_resolve_minutes?: number | null;
+  /** Average rating × 100 (e.g. 450 = 4.5). */
+  satisfaction_avg_x100?: number | null;
+  /** Ratings given (1 to 5). */
+  satisfaction_count: number;
+  /** Of those, solved or closed. */
+  solved: number;
+  /** Tickets created in the period. */
+  tickets: number;
+};
 
 /** Who asked. Customers and guests see their own email or phone number masked. */
 export type SupportRequester = {
@@ -21326,6 +21740,16 @@ export type SupportTicketDetail = SupportTicket & {
 
 /** Where a ticket stands. */
 export type SupportTicketStatus = "open" | "pending_agent" | "pending_customer" | "solved" | "closed";
+
+/** One range of working time on a day of the week. */
+export type SupportWorkingHours = {
+  /** Local time `HH:MM`, after `opens`. */
+  closes: string;
+  /** 1 = Monday … 7 = Sunday. */
+  day: number;
+  /** Local time `HH:MM`. */
+  opens: string;
+};
 
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
@@ -24424,6 +24848,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings/{id}/calendar.ics": {
+    /** Download a booking as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/bookings/{id}/cancel": {
     /** Cancel a booking. */
     post: {
@@ -24551,6 +24988,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/me/bookings": {
+    /** List my bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/me/bookings/{id}/calendar.ics": {
+    /** Download one of my bookings as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/public/availability": {
     /** Find free times (public). */
     get: {
@@ -24571,11 +25034,40 @@ export interface paths {
       requestBody: CustomerBookingRequest;
       responses: {
         201: Data_BookingCreated;
-        401: Problem;
         403: Problem;
         404: Problem;
         409: Problem;
         422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings/{id}/cancel": {
+    /** Cancel a guest booking (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: GuestCancelRequest;
+      responses: {
+        200: Data_BookingRecord;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/phone-codes": {
+    /** Send a booking code by SMS (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SendBookingCodeRequest;
+      responses: {
+        200: Data_BookingCodeSent;
+        403: Problem;
+        422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -24954,6 +25446,7 @@ export interface paths {
         201: Data_CatalogPriceList;
         401: Problem;
         403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -24970,6 +25463,63 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes": {
+    /** Create a bulk price change for a price list, as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreatePriceChange;
+      responses: {
+        201: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}": {
+    /** Get a bulk price change. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/approve": {
+    /** Approve a previewed bulk price change; a job writes the prices. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/preview": {
+    /** Preview a bulk price change. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
@@ -25261,6 +25811,30 @@ export interface paths {
         200: Data_Vec_CatalogRestrictionRule;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/rounding-rules": {
+    /** List the rounding rules of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a rounding rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateRoundingRule;
+      responses: {
+        201: Data_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -33228,6 +33802,95 @@ export interface paths {
       };
     };
   };
+  "/api/v1/shipping/buyers/{buyer_id}/addresses": {
+    /** List the saved addresses of a buyer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { buyer_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses": {
+    /** List your saved delivery addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a delivery address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingAddress;
+      responses: {
+        201: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}": {
+    /** Get one of your saved addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change one of your saved addresses. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingAddressChanges;
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete one of your saved addresses. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}/default": {
+    /** Make one of your saved addresses the default. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -33280,6 +33943,40 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/policies/{org_id}": {
+    /** Get the support policy in force at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the support policy of a unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: SetSupportPolicyRequest;
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the own support policy of a unit. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -33338,6 +34035,19 @@ export interface paths {
         422: Problem;
         429: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/reports/summary": {
+    /** Support figures for a period. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string }; };
+      responses: {
+        200: Data_SupportReport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

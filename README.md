@@ -398,6 +398,9 @@ never share foreign keys. These rules are checked automatically by the gate.
   website's thread and comment box, moderation, reports and bans, reply mails, legal notes
 - [`docs/MENUS.md`](docs/MENUS.md) — using the menus module: items, objects of other modules,
   badges, the public endpoint and its caching, moving from the content module's menus
+- [`docs/BOOKINGS.md`](docs/BOOKINGS.md) — bookings: services, staff and rooms, weekly schedules in
+  the unit's time zone, free times, deposits through the payment partner, cancellation policy,
+  reminders, guests with a phone code
 - [`docs/ANALYTICS.md`](docs/ANALYTICS.md) — cookieless website analytics: sending events from a
   website, reports, funnels, consent for per-person tracking, legal notes
 - [`docs/ADDRESS.md`](docs/ADDRESS.md) — administrative units and addresses: reading the list,

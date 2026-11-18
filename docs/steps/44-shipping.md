@@ -190,7 +190,7 @@ Trả lời tự động (D-230): khi có `support` (bước 53), `shipping` g�
 `shipping.tracking` (mã vận đơn hay số đơn) vào `SupportFacts`, trả mẫu câu i18n về trạng thái mới nhất; chỉ
 trả khi vận đơn thuộc đơn của người hỏi, không thì `None`.
 
-`shipping` công bố `dyn ShippingRates` và `dyn CarrierRegistry`. `fake::FakeCarrier` nằm trong `api`
+`shipping` công bố `dyn ShippingRates` (`quote`, `confirm_option`), `dyn AddressBook` (`get`, `default_for` — cho bước 45) và `dyn CarrierRegistry` (D-20261118-step44-shipping-api). `fake::FakeCarrier` nằm trong `api`
 (không tham chiếu `crate::…`) để testkit và bước 45 dùng; tự đăng ký khi
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` (mặc định tắt; `autoxide doctor` cảnh báo khi bật).
 
@@ -268,7 +268,7 @@ Dưới `/api/v1/shipping`. Dữ liệu theo cửa hàng kiểm quyền theo đ�
 
 | Method + path | Permission | Ghi chú |
 |---|---|---|
-| `GET/POST /me/addresses` · `PATCH/DELETE /me/addresses/{id}` · `POST /me/addresses/{id}/default` | `shipping.me.addresses` (người mua) | tối đa `MAX_ADDRESSES_PER_BUYER`; kiểm xã thuộc tỉnh |
+| `GET/POST /me/addresses` · `GET/PATCH/DELETE /me/addresses/{id}` · `POST /me/addresses/{id}/default` | mọi tài khoản đã đăng nhập, chỉ địa chỉ của mình (D-20261118-step44-shipping-api) | tối đa `MAX_ADDRESSES_PER_BUYER`; kiểm xã thuộc tỉnh |
 | `GET /buyers/{buyer_id}/addresses` | `shipping.addresses.read` | cho nhân viên chăm sóc khách |
 | `GET/POST /zones` · `PATCH/DELETE /zones/{id}` · `PUT /zones/{id}/regions` | `shipping.settings.manage` | |
 | `GET/POST /methods` · `GET/PATCH/DELETE /methods/{id}` · `PUT /methods/{id}/rates` · `PUT /methods/{id}/pickup-points` | `shipping.settings.manage` | |
@@ -347,7 +347,7 @@ mã mặc định `carrier_corrected`, `delivered_confirmed`, `returned_confirme
 
 ### Permission
 
-`shipping.read`, `shipping.me.addresses`, `shipping.addresses.read`, `shipping.settings.manage`,
+`shipping.read`, `shipping.addresses.read`, `shipping.settings.manage`,
 `shipping.carriers.manage`, `shipping.shipments.read`, `shipping.shipments.manage`, `shipping.cod.manage`.
 
 ### Mã lỗi (`locales/vi.json`)
