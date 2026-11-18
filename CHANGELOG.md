@@ -11,6 +11,11 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
+  unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
+  price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
+  price floors; `autoxide_catalog::api::Catalog` for inventory, promotions, shipping and orders; MCP tools
+  `catalog.*`.
 - Kernel helpers for the commerce modules (step 41): `Subscription::optional` (listen to an event of a module
   that may not be installed, without a startup error), `autoxide_kernel::csv::{write, read}` (an RFC 4180 reader
   with row numbers in errors, shared by every import) and `autoxide_kernel::slug` (one slug rule for `content` and

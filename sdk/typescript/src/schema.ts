@@ -638,6 +638,576 @@ export type CancelRequest = {
   at_period_end?: boolean;
 };
 
+/** Prices to add to a price list. */
+export type CatalogAddPrices = {
+  /** 1 to 500 prices. */
+  prices: CatalogPriceInput[];
+  /**
+   * Your code for this change (1 to 100 visible ASCII characters): the same reference and
+   * content again returns the rows written the first time instead of adding them twice.
+   */
+  reference: string;
+};
+
+/** Prices added, with warnings. */
+export type CatalogAddedPrices = {
+  prices: CatalogPrice[];
+  /** Prices below a `warn` price floor; they were saved. */
+  warnings: CatalogPriceWarning[];
+};
+
+/** A category of the tenant's tree. */
+export type CatalogCategory = {
+  /** 0 for a top category. */
+  depth: number;
+  id: string;
+  parent_id?: string | null;
+  /** Display order among siblings. */
+  position: number;
+  /** Name and slug per language. */
+  texts: {
+    [key: string]: CatalogCategoryText;
+  };
+  updated_at: string;
+  /** Shown on the storefront. */
+  visible: boolean;
+};
+
+/** Name and slug of a category in one language. */
+export type CatalogCategoryText = {
+  name: string;
+  /** Omitted: made from the name. Unique per language in the tenant. */
+  slug?: string | null;
+};
+
+/** A component of a bundle. */
+export type CatalogComponent = {
+  /** Units of the component in one bundle, 1 to 10000. */
+  quantity: number;
+  variant_id: string;
+};
+
+/** The whole set of components of a bundle variant. */
+export type CatalogComponents = {
+  /** 1 to 50 components, each variant once. */
+  components: CatalogComponent[];
+};
+
+/** A new category. */
+export type CatalogCreateCategory = {
+  /** Omitted: a top category. Categories nest at most 7 levels deep. */
+  parent_id?: string | null;
+  /** Display order among siblings; omitted: last. */
+  position?: number | null;
+  /** Name and slug per language, e.g. `{"en": {"name": "Shirts"}}`. */
+  texts: {
+    [key: string]: CatalogCategoryText;
+  };
+  /** Shown on the storefront; default `true`. */
+  visible?: boolean;
+};
+
+/** A new price floor. */
+export type CatalogCreatePriceGuard = {
+  action: CatalogFloorAction;
+  /** Only products in this category or below. */
+  category_id?: string | null;
+  /** ISO 4217 code. */
+  currency: string;
+  /** Lowest margin over unit cost, in basis points (`1500` = 15%), 0 to 100000. */
+  min_margin_bp?: number | null;
+  min_price?: Money | null;
+  /** The unit it applies to (and below); omit when you work in one unit. */
+  org_id?: string | null;
+};
+
+/** A new price list. */
+export type CatalogCreatePriceList = {
+  /** `consumer` (default) or `business`. */
+  audience?: string;
+  /** ISO 4217 code. Consumer prices in Viet Nam must be `VND`. */
+  currency: string;
+  /** Only for this customer group (a free code until customer groups exist, step 47). */
+  customer_group?: string | null;
+  name: string;
+  /** The store or chain unit; prices apply there and below. Omit when you work in one unit. */
+  org_id?: string | null;
+  /** Higher wins among lists that tie on unit and filters. Default 0. */
+  priority?: number;
+  /** Prices include tax; consumer prices in Viet Nam must. */
+  tax_inclusive: boolean;
+};
+
+/** A new product, created as a `draft` with its first variant. */
+export type CatalogCreateProduct = {
+  /** Categories of the product; the first is the main one. */
+  category_ids?: string[];
+  /**
+   * Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not
+   * shipped), `bundle` (takes stock from each component).
+   */
+  kind: "physical" | "digital" | "service" | "bundle";
+  /** Language of `text`; becomes the default language of the product. */
+  locale: string;
+  lot_tracked?: boolean;
+  /**
+   * The organization unit that owns the product; you need `catalog.products.write` there.
+   * Omit when you work in one unit only (or for the whole tenant).
+   */
+  org_id?: string | null;
+  serial_tracked?: boolean;
+  /** Tax category code of the tax engine, e.g. `vat.standard` (`GET /api/v1/tax/categories`). */
+  tax_category: string;
+  /** Texts of a product in one language. */
+  text: {
+    /**
+     * Plain text up to 50000 characters; blank lines separate paragraphs and clients may render
+     * minimal Markdown. HTML is not interpreted.
+     */
+    description?: string;
+    meta_description?: string | null;
+    meta_title?: string | null;
+    /** 1 to 200 characters. */
+    name: string;
+    /** Up to 1000 characters. */
+    short_description?: string;
+    /**
+     * Last part of the public address; omitted: made from the name. Unique per language in the
+     * tenant (`catalog.slug_taken`).
+     */
+    slug?: string | null;
+  };
+  /** A variant to create, or the first variant of a new product. */
+  variant: {
+    /** On by default. */
+    active?: boolean | null;
+    /**
+     * Barcode (GTIN or own code), up to 32 letters, digits or `-`; GTIN-8/12/13/14 must have a
+     * right check digit. Unique in the tenant (`catalog.barcode_taken`).
+     */
+    barcode?: string | null;
+    height_mm?: number | null;
+    /** Main image of the variant (public media). */
+    image_media_id?: string | null;
+    length_mm?: number | null;
+    /** One value id of each option of the product; empty when the product has no options. */
+    option_value_ids?: string[];
+    /**
+     * Expected availability date of a pre-order, after today
+     * (`catalog.preorder_date_invalid`).
+     */
+    preorder_available_on?: string | null;
+    /** Pre-orders stop being taken at this time. */
+    preorder_ends_at?: string | null;
+    /** Total pre-order units, above 0 (`catalog.preorder_limit_invalid`); omitted: no limit. */
+    preorder_limit?: number | null;
+    /** Public pre-order note per language, e.g. `{"en": "Ships from 15 December"}`. */
+    preorder_messages?: {
+      [key: string]: string;
+    };
+    /** Default `in_stock`; digital products and services are always `in_stock`. */
+    sale_mode?: "in_stock" | "backorder" | "preorder" | null;
+    /**
+     * Stock keeping unit, 1 to 64 characters; unique in the tenant ignoring case and spaces
+     * (`catalog.sku_taken`).
+     */
+    sku: string;
+    /** Shipping weight in grams (physical products and bundles). */
+    weight_grams?: number | null;
+    width_mm?: number | null;
+  };
+  /** Warranty in months, 1 to 600; omitted: no warranty. */
+  warranty_months?: number | null;
+};
+
+/** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
+export type CatalogFloorAction = "warn" | "block";
+
+/**
+ * Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not
+ * shipped), `bundle` (takes stock from each component).
+ */
+export type CatalogKind = "physical" | "digital" | "service" | "bundle";
+
+/** Where to move a category. */
+export type CatalogMoveCategory = {
+  /** New parent; `null` makes it a top category. */
+  parent_id?: string | null;
+};
+
+/** An option of a product, e.g. colour or size. */
+export type CatalogOption = {
+  /** Keep the id of an existing option; omit for a new one. */
+  id?: string | null;
+  /** Name per language, e.g. `{"en": "Colour"}`. */
+  names: {
+    [key: string]: string;
+  };
+  values: CatalogOptionValue[];
+};
+
+/** A value of an option, e.g. "Red". */
+export type CatalogOptionValue = {
+  /** Keep the id of an existing value so variants keep pointing at it; omit for a new value. */
+  id?: string | null;
+  /** Label per language, e.g. `{"en": "Red"}`. */
+  labels: {
+    [key: string]: string;
+  };
+};
+
+/** The whole set of options of a product. */
+export type CatalogOptions = {
+  /** Up to 3 options, each with 1 to 100 values. */
+  options: CatalogOption[];
+};
+
+/** A price row. Rows are never changed: a new price is a new row. */
+export type CatalogPrice = {
+  amount: Money;
+  compare_at?: Money | null;
+  created_at: string;
+  id: string;
+  price_list_id: string;
+  /** `manual`, `derived`, `bulk` or `import`. */
+  source: string;
+  valid_from: string;
+  /** End of a temporary price; the earlier price applies again after it. */
+  valid_to?: string | null;
+  variant_id: string;
+};
+
+/** A price floor rule. */
+export type CatalogPriceGuard = {
+  action: CatalogFloorAction;
+  /** Only products in this category (or below); omitted: every product. */
+  category_id?: string | null;
+  created_at: string;
+  currency: string;
+  id: string;
+  /** Minimum margin over unit cost, in basis points (`1500` = 15%). */
+  min_margin_bp?: number | null;
+  min_price?: Money | null;
+  org_id: string;
+};
+
+/** A price to add. */
+export type CatalogPriceInput = {
+  amount: {
+    /**
+     * Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above
+     * 2^53 lose precision in JavaScript). `"1999"` with `USD` is 19.99 US dollars; negative
+     * amounts start with `-`.
+     */
+    amount: string;
+    currency: Currency;
+  } & Record<string, unknown>;
+  /** Struck-through price, higher than `amount`; display only. */
+  compare_at?: {
+    /**
+     * Amount in minor units of `currency`, as a base-10 integer string (JSON numbers above
+     * 2^53 lose precision in JavaScript). `"1999"` with `USD` is 19.99 US dollars; negative
+     * amounts start with `-`.
+     */
+    amount: string;
+    currency: Currency;
+  } | null;
+  /** When the price starts; omitted: now. A future time schedules the price. */
+  valid_from?: string | null;
+  /** End of a temporary price; the earlier price applies again after it. */
+  valid_to?: string | null;
+  variant_id: string;
+};
+
+/** A price list. */
+export type CatalogPriceList = {
+  active: boolean;
+  /** `consumer` or `business`. */
+  audience: string;
+  /** Only for this sales channel (step 48). */
+  channel?: string | null;
+  /** Only for this B2B company (step 59). */
+  company_id?: string | null;
+  created_at: string;
+  currency: string;
+  /** Only for this customer group. */
+  customer_group?: string | null;
+  id: string;
+  /** Only for this market (step 63). */
+  market?: string | null;
+  name: string;
+  /** The store or chain unit the list applies to (and every unit below it). */
+  org_id: string;
+  /** Higher wins among lists that tie on unit and filters. */
+  priority: number;
+  tax_inclusive: boolean;
+  updated_at: string;
+};
+
+/** A resolved price. */
+export type CatalogPriceSnapshot = {
+  amount: Money;
+  compare_at?: Money | null;
+  price_id: string;
+  price_list_id: string;
+  tax_inclusive: boolean;
+  valid_from: string;
+  valid_to?: string | null;
+};
+
+/** A price below a `warn` price floor. */
+export type CatalogPriceWarning = {
+  /** Always `catalog.price_below_floor`. */
+  code: string;
+  floor: Money;
+  variant_id: string;
+};
+
+/** A product with everything it has. */
+export type CatalogProduct = {
+  activated_at?: string | null;
+  /** Some texts were written with AI help (Law 134/2025/QH15). */
+  ai_assisted: boolean;
+  category_ids: string[];
+  created_at: string;
+  default_locale: string;
+  /** The product was on sale once: it can only be archived, not deleted. */
+  ever_active: boolean;
+  id: string;
+  kind: CatalogKind;
+  lot_tracked: boolean;
+  media: CatalogProductMedia[];
+  options: CatalogOption[];
+  /** The organization unit that owns the product. */
+  org_id: string;
+  primary_category_id?: string | null;
+  /**
+   * Can the product go on sale: `ready`, `missing_attributes`, `missing_documents`,
+   * `restricted`.
+   */
+  readiness: string;
+  serial_tracked: boolean;
+  status: CatalogStatus;
+  tax_category: string;
+  /** `true` for physical products: stock is counted. */
+  track_inventory: boolean;
+  translations: CatalogTranslation[];
+  updated_at: string;
+  variants: CatalogVariant[];
+  warranty_months?: number | null;
+};
+
+/** The whole set of categories of a product. */
+export type CatalogProductCategories = {
+  /** The first is the main category. */
+  category_ids: string[];
+};
+
+/** The whole set of images of a product. */
+export type CatalogProductImages = {
+  /** Up to 50 images, in display order. */
+  media: CatalogProductMedia[];
+};
+
+/** A product in a list. */
+export type CatalogProductListItem = {
+  default_locale: string;
+  id: string;
+  kind: CatalogKind;
+  /** Name in the product's default language. */
+  name: string;
+  org_id: string;
+  readiness: string;
+  slug: string;
+  status: CatalogStatus;
+  updated_at: string;
+  variant_count: number;
+};
+
+/** An image of a product. */
+export type CatalogProductMedia = {
+  /** Alternative text in the product's default language; empty: the media's own `alt`. */
+  alt?: string;
+  /** Public media of the `media` module (`catalog.media_not_public` otherwise). */
+  media_id: string;
+  /** The image shows this variant. */
+  variant_id?: string | null;
+};
+
+/** The price of a variant and why. */
+export type CatalogResolvedPrice = {
+  /** The lists that apply, in selection order; the first with a price wins. */
+  candidates: CatalogPriceList[];
+  price?: CatalogPriceSnapshot | null;
+  variant_id: string;
+};
+
+/**
+ * How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),
+ * `preorder` (before it arrives, see `preorder_available_on`).
+ */
+export type CatalogSaleMode = "in_stock" | "backorder" | "preorder";
+
+/** Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`. */
+export type CatalogStatus = "draft" | "active" | "inactive" | "archived";
+
+/** The new sale status of a product. */
+export type CatalogStatusChange = {
+  /**
+   * `draft` → `active` or `archived`; `active` ↔ `inactive`; any → `archived`; `archived` →
+   * `draft`.
+   */
+  status: CatalogStatus;
+};
+
+/** Texts of a product in one language. */
+export type CatalogTextInput = {
+  /**
+   * Plain text up to 50000 characters; blank lines separate paragraphs and clients may render
+   * minimal Markdown. HTML is not interpreted.
+   */
+  description?: string;
+  meta_description?: string | null;
+  meta_title?: string | null;
+  /** 1 to 200 characters. */
+  name: string;
+  /** Up to 1000 characters. */
+  short_description?: string;
+  /**
+   * Last part of the public address; omitted: made from the name. Unique per language in the
+   * tenant (`catalog.slug_taken`).
+   */
+  slug?: string | null;
+};
+
+/** Texts of a product in one language. */
+export type CatalogTranslation = {
+  description: string;
+  locale: string;
+  meta_description?: string | null;
+  meta_title?: string | null;
+  name: string;
+  short_description: string;
+  slug: string;
+};
+
+/** Changes to a category. Omitted fields stay as they are. */
+export type CatalogUpdateCategory = {
+  position?: number | null;
+  /** Names and slugs to set, per language; languages left out stay as they are. */
+  texts?: {
+    [key: string]: CatalogCategoryText;
+  };
+  visible?: boolean | null;
+};
+
+/** Changes to a price list. Omitted fields stay as they are. */
+export type CatalogUpdatePriceList = {
+  active?: boolean | null;
+  /** `null` makes the list apply to every customer. */
+  customer_group?: string | null;
+  name?: string | null;
+  priority?: number | null;
+};
+
+/** Changes to a product. Omitted fields stay as they are. */
+export type CatalogUpdateProduct = {
+  /** A language the product already has texts in. */
+  default_locale?: string | null;
+  lot_tracked?: boolean | null;
+  serial_tracked?: boolean | null;
+  tax_category?: string | null;
+  /** `null` removes the warranty. */
+  warranty_months?: number | null;
+};
+
+/** Changes to a variant. Omitted fields stay as they are; `null` clears an optional value. */
+export type CatalogUpdateVariant = {
+  active?: boolean | null;
+  barcode?: string | null;
+  height_mm?: number | null;
+  image_media_id?: string | null;
+  length_mm?: number | null;
+  option_value_ids?: string[] | null;
+  /** Display order among the product's variants. */
+  position?: number | null;
+  preorder_available_on?: string | null;
+  preorder_ends_at?: string | null;
+  preorder_limit?: number | null;
+  preorder_messages?: {
+    [key: string]: string;
+  } | null;
+  sale_mode?: "in_stock" | "backorder" | "preorder" | null;
+  sku?: string | null;
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A variant of a product. */
+export type CatalogVariant = {
+  active: boolean;
+  barcode?: string | null;
+  created_at: string;
+  height_mm?: number | null;
+  id: string;
+  image_media_id?: string | null;
+  length_mm?: number | null;
+  option_value_ids: string[];
+  position: number;
+  preorder_available_on?: string | null;
+  preorder_ends_at?: string | null;
+  preorder_limit?: number | null;
+  preorder_messages: {
+    [key: string]: string;
+  };
+  product_id: string;
+  sale_mode: CatalogSaleMode;
+  sku: string;
+  updated_at: string;
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A variant to create, or the first variant of a new product. */
+export type CatalogVariantInput = {
+  /** On by default. */
+  active?: boolean | null;
+  /**
+   * Barcode (GTIN or own code), up to 32 letters, digits or `-`; GTIN-8/12/13/14 must have a
+   * right check digit. Unique in the tenant (`catalog.barcode_taken`).
+   */
+  barcode?: string | null;
+  height_mm?: number | null;
+  /** Main image of the variant (public media). */
+  image_media_id?: string | null;
+  length_mm?: number | null;
+  /** One value id of each option of the product; empty when the product has no options. */
+  option_value_ids?: string[];
+  /**
+   * Expected availability date of a pre-order, after today
+   * (`catalog.preorder_date_invalid`).
+   */
+  preorder_available_on?: string | null;
+  /** Pre-orders stop being taken at this time. */
+  preorder_ends_at?: string | null;
+  /** Total pre-order units, above 0 (`catalog.preorder_limit_invalid`); omitted: no limit. */
+  preorder_limit?: number | null;
+  /** Public pre-order note per language, e.g. `{"en": "Ships from 15 December"}`. */
+  preorder_messages?: {
+    [key: string]: string;
+  };
+  /** Default `in_stock`; digital products and services are always `in_stock`. */
+  sale_mode?: "in_stock" | "backorder" | "preorder" | null;
+  /**
+   * Stock keeping unit, 1 to 64 characters; unique in the tenant ignoring case and spaces
+   * (`catalog.sku_taken`).
+   */
+  sku: string;
+  /** Shipping weight in grams (physical products and bundles). */
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
 /** A passkey ceremony in progress. */
 export type CeremonyResponse = {
   /** Send this back with the authenticator's answer, within 5 minutes. Works once. */
@@ -3197,6 +3767,157 @@ export type Data_CampaignResponse = {
     status: CampaignStatus;
     subject: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogAddedPrices = {
+  /** Prices added, with warnings. */
+  data: {
+    prices: CatalogPrice[];
+    /** Prices below a `warn` price floor; they were saved. */
+    warnings: CatalogPriceWarning[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCategory = {
+  /** A category of the tenant's tree. */
+  data: {
+    /** 0 for a top category. */
+    depth: number;
+    id: string;
+    parent_id?: string | null;
+    /** Display order among siblings. */
+    position: number;
+    /** Name and slug per language. */
+    texts: {
+      [key: string]: CatalogCategoryText;
+    };
+    updated_at: string;
+    /** Shown on the storefront. */
+    visible: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPriceGuard = {
+  /** A price floor rule. */
+  data: {
+    action: CatalogFloorAction;
+    /** Only products in this category (or below); omitted: every product. */
+    category_id?: string | null;
+    created_at: string;
+    currency: string;
+    id: string;
+    /** Minimum margin over unit cost, in basis points (`1500` = 15%). */
+    min_margin_bp?: number | null;
+    min_price?: Money | null;
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPriceList = {
+  /** A price list. */
+  data: {
+    active: boolean;
+    /** `consumer` or `business`. */
+    audience: string;
+    /** Only for this sales channel (step 48). */
+    channel?: string | null;
+    /** Only for this B2B company (step 59). */
+    company_id?: string | null;
+    created_at: string;
+    currency: string;
+    /** Only for this customer group. */
+    customer_group?: string | null;
+    id: string;
+    /** Only for this market (step 63). */
+    market?: string | null;
+    name: string;
+    /** The store or chain unit the list applies to (and every unit below it). */
+    org_id: string;
+    /** Higher wins among lists that tie on unit and filters. */
+    priority: number;
+    tax_inclusive: boolean;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogProduct = {
+  /** A product with everything it has. */
+  data: {
+    activated_at?: string | null;
+    /** Some texts were written with AI help (Law 134/2025/QH15). */
+    ai_assisted: boolean;
+    category_ids: string[];
+    created_at: string;
+    default_locale: string;
+    /** The product was on sale once: it can only be archived, not deleted. */
+    ever_active: boolean;
+    id: string;
+    kind: CatalogKind;
+    lot_tracked: boolean;
+    media: CatalogProductMedia[];
+    options: CatalogOption[];
+    /** The organization unit that owns the product. */
+    org_id: string;
+    primary_category_id?: string | null;
+    /**
+     * Can the product go on sale: `ready`, `missing_attributes`, `missing_documents`,
+     * `restricted`.
+     */
+    readiness: string;
+    serial_tracked: boolean;
+    status: CatalogStatus;
+    tax_category: string;
+    /** `true` for physical products: stock is counted. */
+    track_inventory: boolean;
+    translations: CatalogTranslation[];
+    updated_at: string;
+    variants: CatalogVariant[];
+    warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogResolvedPrice = {
+  /** The price of a variant and why. */
+  data: {
+    /** The lists that apply, in selection order; the first with a price wins. */
+    candidates: CatalogPriceList[];
+    price?: CatalogPriceSnapshot | null;
+    variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogVariant = {
+  /** A variant of a product. */
+  data: {
+    active: boolean;
+    barcode?: string | null;
+    created_at: string;
+    height_mm?: number | null;
+    id: string;
+    image_media_id?: string | null;
+    length_mm?: number | null;
+    option_value_ids: string[];
+    position: number;
+    preorder_available_on?: string | null;
+    preorder_ends_at?: string | null;
+    preorder_limit?: number | null;
+    preorder_messages: {
+      [key: string]: string;
+    };
+    product_id: string;
+    sale_mode: CatalogSaleMode;
+    sku: string;
+    updated_at: string;
+    weight_grams?: number | null;
+    width_mm?: number | null;
   };
 };
 
@@ -7772,6 +8493,61 @@ export type Data_Vec_CanAnswer = {
     /** With a plan reason: codes of the plans on sale that would allow it (empty when unknown). */
     upgrade_to?: string[];
     used?: number | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogCategory = {
+  data: {
+    /** 0 for a top category. */
+    depth: number;
+    id: string;
+    parent_id?: string | null;
+    /** Display order among siblings. */
+    position: number;
+    /** Name and slug per language. */
+    texts: {
+      [key: string]: CatalogCategoryText;
+    };
+    updated_at: string;
+    /** Shown on the storefront. */
+    visible: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogComponent = {
+  data: {
+    /** Units of the component in one bundle, 1 to 10000. */
+    quantity: number;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogVariant = {
+  data: {
+    active: boolean;
+    barcode?: string | null;
+    created_at: string;
+    height_mm?: number | null;
+    id: string;
+    image_media_id?: string | null;
+    length_mm?: number | null;
+    option_value_ids: string[];
+    position: number;
+    preorder_available_on?: string | null;
+    preorder_ends_at?: string | null;
+    preorder_limit?: number | null;
+    preorder_messages: {
+      [key: string]: string;
+    };
+    product_id: string;
+    sale_mode: CatalogSaleMode;
+    sku: string;
+    updated_at: string;
+    weight_grams?: number | null;
+    width_mm?: number | null;
   }[];
 };
 
@@ -12629,6 +13405,91 @@ export type Page_CampaignResponse = {
     status: CampaignStatus;
     subject: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPrice = {
+  /** The items of this page, in the requested order. */
+  data: {
+    amount: Money;
+    compare_at?: Money | null;
+    created_at: string;
+    id: string;
+    price_list_id: string;
+    /** `manual`, `derived`, `bulk` or `import`. */
+    source: string;
+    valid_from: string;
+    /** End of a temporary price; the earlier price applies again after it. */
+    valid_to?: string | null;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPriceGuard = {
+  /** The items of this page, in the requested order. */
+  data: {
+    action: CatalogFloorAction;
+    /** Only products in this category (or below); omitted: every product. */
+    category_id?: string | null;
+    created_at: string;
+    currency: string;
+    id: string;
+    /** Minimum margin over unit cost, in basis points (`1500` = 15%). */
+    min_margin_bp?: number | null;
+    min_price?: Money | null;
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPriceList = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    /** `consumer` or `business`. */
+    audience: string;
+    /** Only for this sales channel (step 48). */
+    channel?: string | null;
+    /** Only for this B2B company (step 59). */
+    company_id?: string | null;
+    created_at: string;
+    currency: string;
+    /** Only for this customer group. */
+    customer_group?: string | null;
+    id: string;
+    /** Only for this market (step 63). */
+    market?: string | null;
+    name: string;
+    /** The store or chain unit the list applies to (and every unit below it). */
+    org_id: string;
+    /** Higher wins among lists that tie on unit and filters. */
+    priority: number;
+    tax_inclusive: boolean;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogProductListItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    default_locale: string;
+    id: string;
+    kind: CatalogKind;
+    /** Name in the product's default language. */
+    name: string;
+    org_id: string;
+    readiness: string;
+    slug: string;
+    status: CatalogStatus;
+    updated_at: string;
+    variant_count: number;
   }[];
   pagination: Pagination;
 };
@@ -19805,6 +20666,426 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories": {
+    /** List every category of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogCategory;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a category. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateCategory;
+      responses: {
+        201: Data_CatalogCategory;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories/{id}": {
+    /** Change a category. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateCategory;
+      responses: {
+        200: Data_CatalogCategory;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete an empty category. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories/{id}/move": {
+    /** Move a category with everything below it. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogMoveCategory;
+      responses: {
+        200: Data_CatalogCategory;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-guards": {
+    /** List the price floors in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogPriceGuard;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a price floor. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreatePriceGuard;
+      responses: {
+        201: Data_CatalogPriceGuard;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-guards/{id}": {
+    /** Delete a price floor. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists": {
+    /** List the price lists in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogPriceList;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a price list. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreatePriceList;
+      responses: {
+        201: Data_CatalogPriceList;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}": {
+    /** Change a price list. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdatePriceList;
+      responses: {
+        200: Data_CatalogPriceList;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/prices": {
+    /** List the price rows of a price list, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { variant_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogPrice;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add prices to a price list. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAddPrices;
+      responses: {
+        200: Data_CatalogAddedPrices;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products": {
+    /** List the products in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: CatalogStatus | null; kind?: CatalogKind | null; org_id?: string | null; category_id?: string | null; readiness?: string | null; q?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogProductListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateProduct;
+      responses: {
+        201: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}": {
+    /** Get a product with its texts, options, variants, categories and images. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the general details of a product. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateProduct;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a product that was never on sale. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/categories": {
+    /** Replace the categories of a product. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogProductCategories;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/media": {
+    /** Replace the images of a product. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogProductImages;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/options": {
+    /** Replace the options of a product (colour, size…). */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogOptions;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/status": {
+    /** Change the sale status of a product. */
+    post: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogStatusChange;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/translations/{locale}": {
+    /** Set the texts of a product in one language. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; locale: string }; };
+      requestBody: CatalogTextInput;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the texts of a product in one language. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; locale: string }; };
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/variants": {
+    /** Add a variant to a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogVariantInput;
+      responses: {
+        201: Data_CatalogVariant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants": {
+    /** Find variants by SKU or barcode. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { code: string }; };
+      responses: {
+        200: Data_Vec_CatalogVariant;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}": {
+    /** Change a variant. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateVariant;
+      responses: {
+        200: Data_CatalogVariant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a variant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}/components": {
+    /** Replace the components of a bundle variant. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogComponents;
+      responses: {
+        200: Data_Vec_CatalogComponent;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}/price": {
+    /** Resolve the price of a variant at a store, and show which list won. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { org_id: string; currency: string; customer_group?: string | null; at?: string | null }; };
+      responses: {
+        200: Data_CatalogResolvedPrice;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

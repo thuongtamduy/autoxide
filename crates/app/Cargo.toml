@@ -30,6 +30,7 @@ autoxide-ledger.workspace = true
 autoxide-invoices.workspace = true
 autoxide-compliance.workspace = true
 autoxide-notifications.workspace = true
+autoxide-catalog.workspace = true
 autoxide-reporting.workspace = true
 base64.workspace = true
 bytes.workspace = true
