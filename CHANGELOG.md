@@ -27,6 +27,10 @@ endpoints are marked deprecated with a sunset date first.
   on the record (`custom_fields`), checked by `CustomFields::validate` with every problem at once; filterable
   fields are indexed in the same transaction and lists filter on `cf.<key>=<eq|in|gte|lte|prefix>:<value>`.
   Posts and pages take custom fields.
+- Retention catalog: `audit` (`audit.entries`), `webhooks` (`webhooks.deliveries`, 30 days) and `newsletter`
+  (`newsletter.subscribers`, `newsletter.unconfirmed`) now declare how long they keep personal data, so
+  `GET /api/v1/compliance/retention` and the processing register cover every module.
+
 - Step 37, mobile push (`docs/NOTIFICATIONS.md`): `GET /api/v1/notifications/me/device-tokens` lists your registered
   devices (tokens are stored encrypted and never returned) and the MCP tool `notifications.list_my_devices`; a device token
   the provider rejects is removed at once, one that fails 10 times in a row too, and one failing device no longer blocks the
@@ -779,6 +783,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- `Throttle::hit` no longer lets extra attempts through under concurrent load: an attempt that passed the "is it
+  locked?" read just before another attempt locked the key (and reset its counter) now sees the lock returned by
+  its own counting statement and is refused. Seen on PostgreSQL under parallel load; SQLite and PostgreSQL alike.
 - `cargo build --release` failed in `autoxide-plans` ("queries overflow the depth limit"); debug builds were fine.
 - `POST /api/v1/auth/me/reauth` with a wrong authenticator code reported the error on field `code` instead of
   `totp_code`, the field that was sent.

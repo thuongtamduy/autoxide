@@ -228,3 +228,36 @@ async fn su_co_qua_moc_gui_mail_toi_nguoi_nhan_canh_bao() {
     .await
     .unwrap();
 }
+
+/// Sổ thời hạn lưu trên chương trình thật có cả `audit`, `webhooks`, `newsletter` (phần còn lại của
+/// D-360), và không mục nào vượt giới hạn mặc định của quy tắc.
+#[tokio::test]
+async fn so_thoi_han_luu_co_audit_webhooks_newsletter() {
+    TestDatabase::run(async |test| {
+        let dir = std::env::temp_dir().join(format!("autoxide-privacy-{}", Uuid::now_v7()));
+        let app = app(test, &dir).await;
+        let (status, body) = call(&app, Method::GET, "/compliance/retention", "staff", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let items = body["data"].as_array().unwrap();
+        let find = |name: &str| {
+            items.iter().find(|item| item["name"] == name).unwrap_or_else(|| panic!("{name} thiếu"))
+        };
+        assert_eq!(find("audit.entries")["keep"], "until_deleted");
+        assert_eq!(find("webhooks.deliveries")["days"], 30);
+        assert_eq!(find("newsletter.subscribers")["keep"], "until_deleted");
+        let unconfirmed = find("newsletter.unconfirmed");
+        assert_eq!(unconfirmed["days"], 30);
+        assert_eq!(unconfirmed["setting"], "AUTOXIDE_NEWSLETTER_UNCONFIRMED_DAYS");
+        for name in [
+            "audit.entries",
+            "webhooks.deliveries",
+            "newsletter.subscribers",
+            "newsletter.unconfirmed",
+        ] {
+            assert_eq!(find(name)["status"], "ok", "{name}");
+        }
+        let _ = std::fs::remove_dir_all(&dir);
+    })
+    .await
+    .unwrap();
+}

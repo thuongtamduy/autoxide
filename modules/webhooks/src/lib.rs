@@ -69,6 +69,19 @@ impl Module for WebhooksModule {
         "webhooks"
     }
 
+    fn retention(&self) -> Vec<autoxide_kernel::privacy::RetentionPolicy> {
+        use autoxide_kernel::privacy::{DataCategory, Keep, RetentionPolicy};
+        // Số ngày là hằng số của job dọn, không phải cấu hình.
+        let days = u32::try_from(delivery::KEEP_DELIVERIES_DAYS).unwrap_or(u32::MAX);
+        vec![RetentionPolicy::new(
+            "webhooks.deliveries",
+            "Each delivery attempt with the event payload sent (may hold personal data from the \
+             event).",
+            DataCategory::Basic,
+            Keep::Days(days),
+        )]
+    }
+
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn always_enabled(&self) -> bool {
         true

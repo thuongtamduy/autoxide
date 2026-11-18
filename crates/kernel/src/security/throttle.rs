@@ -116,7 +116,13 @@ impl Throttle {
         }
         let hashed = sha256(key);
         let now = now();
-        if self.count(tenant, &hashed, now).await? > i64::from(self.limit) {
+        let counted = self.count(tenant, &hashed, now).await?;
+        // Một lượt đồng thời khác vừa khoá (và đặt lại số đếm về 0) sau khi lượt này qua bước
+        // `check`: số đếm trả về lại nhỏ, nhưng khoá đang có hiệu lực — vẫn phải chặn.
+        if let Some(until) = counted.locked_until.filter(|until| *until > now) {
+            return Ok(Outcome::Limited { retry_after: seconds_up(until - now) });
+        }
+        if counted.count > i64::from(self.limit) {
             self.lock_if_exceeded(tenant, &hashed, now).await?;
             return Ok(Outcome::Limited { retry_after: seconds_up(self.lock) });
         }
@@ -127,7 +133,7 @@ impl Throttle {
     pub async fn record(&self, tenant: &TenantContext, key: &str) -> Result<(), Error> {
         let hashed = sha256(key);
         let now = now();
-        if self.count(tenant, &hashed, now).await? > i64::from(self.limit) {
+        if self.count(tenant, &hashed, now).await?.count > i64::from(self.limit) {
             self.lock_if_exceeded(tenant, &hashed, now).await?;
         }
         Ok(())
@@ -136,13 +142,13 @@ impl Throttle {
     /// Cộng một vào số đếm của khoá đã băm `hashed` bằng MỘT câu và trả số đếm sau khi cộng: chưa
     /// có dòng thì chèn với 1; cửa sổ cũ đã hết thì bắt đầu cửa sổ mới với 1. `INSERT … ON CONFLICT
     /// DO UPDATE … RETURNING` chạy trên cả SQLite (từ 3.35) và Postgres; database tự xếp hàng các
-    /// lượt cùng lúc trên dòng đó.
+    /// lượt cùng lúc trên dòng đó. Trả kèm `locked_until` của dòng (câu cộng không đổi cột này).
     async fn count(
         &self,
         tenant: &TenantContext,
         hashed: &str,
         now: DateTime<Utc>,
-    ) -> Result<i64, Error> {
+    ) -> Result<Counted, Error> {
         let table = Alias::new(&self.table);
         // Cột của dòng đang có, ghi kèm tên bảng cho rõ (không lẫn với `excluded`).
         let column = |name: &str| Expr::col((table.clone(), Alias::new(name)));
@@ -163,12 +169,15 @@ impl Throttle {
                     )
                     .to_owned(),
             )
-            .returning_col(Alias::new("count"))
+            .returning(Query::returning().columns(["count", "locked_until"].map(Alias::new)))
             .to_owned();
         let row = tenant.database().write().query_one(&upsert).await?.ok_or_else(|| {
             Error::internal(format!("counting in `{}` returned no row", self.table))
         })?;
-        Ok(i64::from(row.try_get::<i32>("", "count")?))
+        Ok(Counted {
+            count: i64::from(row.try_get::<i32>("", "count")?),
+            locked_until: row.try_get::<Option<DateTime<Utc>>>("", "locked_until")?,
+        })
     }
 
     /// Trả lại một lần đã đếm (vd lần thử hoá ra không sai): người dùng thật không bị tính oan.
@@ -237,6 +246,12 @@ impl Throttle {
         }
         Ok(())
     }
+}
+
+/// Kết quả của câu "chèn hoặc cộng": số đếm của chính lượt này và hạn khoá của dòng (nếu có).
+struct Counted {
+    count: i64,
+    locked_until: Option<DateTime<Utc>>,
 }
 
 /// Số giây (làm tròn lên, ít nhất 1) của `duration`.
