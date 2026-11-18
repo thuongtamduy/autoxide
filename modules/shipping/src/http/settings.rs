@@ -316,7 +316,7 @@ pub(crate) struct MethodRequest {
     #[schema(example = "standard")]
     code: Option<String>,
     kind: Option<MethodKind>,
-    /// Name per language, e.g. `{"vi": "Giao tiêu chuẩn", "en": "Standard"}`.
+    /// Name per language, e.g. `{"vi": "Giao tieu chuan", "en": "Standard"}`.
     names: Option<BTreeMap<String, String>>,
     active: Option<bool>,
     /// Display order, smaller first.

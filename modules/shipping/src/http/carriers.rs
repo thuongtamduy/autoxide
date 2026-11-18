@@ -249,6 +249,7 @@ pub(crate) struct WebhookReceipt {
     post,
     path = "/webhooks/{carrier_code}/{token}",
     operation_id = "receive_shipping_webhook",
+    extensions(("x-public" = json!(true))),
     security(()),
     params(
         ("carrier_code" = String, Path, description = "Code of the carrier."),
