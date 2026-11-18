@@ -240,7 +240,7 @@ mod tests {
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
             // một của `catalog` (tính lại readiness theo giấy tờ — bước 41)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 47);
+            assert_eq!(a.unwrap() + b.unwrap(), 48);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
