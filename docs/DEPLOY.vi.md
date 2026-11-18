@@ -33,8 +33,11 @@ chmod 600 .env
 ```
 
 - `POSTGRES_PASSWORD` bảo vệ database.
-- `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Giữ nguyên giá trị: đổi nó thì mọi người
-  bị đăng xuất.
+- `AUTOXIDE_AUTH_TOKEN_SECRET` ký access token. Muốn đổi mà không đăng xuất ai (định kỳ, vài
+  tháng một lần): đặt giá trị mới vào nó và giá trị cũ vào `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` trên
+  mọi máy chủ, khởi động lại, rồi bỏ `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` sau
+  `AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS` (mặc định 15 phút): token ký bằng khoá cũ vẫn được nhận tới khi
+  hết hạn. Đổi mà không giữ khoá cũ thì mọi access token hết hiệu lực.
 - `AUTOXIDE_SECRET_KEY` ký các token sống ngắn (biểu mẫu, chống spam), làm khoá băm địa chỉ
   IP của người lạ và mã hoá các secret máy chủ giữ (đăng nhập hai bước, secret ký webhook). Để
   ngoài database thì bản sao database (bản backup) không làm lộ các địa chỉ đó, cũng không làm
@@ -321,6 +324,7 @@ database mới.
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
+| `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_AUTH_TOKEN_SECRET`, cách nhau dấu phẩy, trong lúc xoay khoá; chỉ dùng để kiểm token, bỏ đi sau thời gian sống của access token |
 | `AUTOXIDE_HTTP_CLIENT_IP_HEADER` | Sau reverse proxy: header chứa địa chỉ client |
 | `AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT` | Số proxy của bạn mà một request đi qua (mặc định `1`) |
 | `AUTOXIDE_HTTP_TRUSTED_PROXIES` | Thay cho số proxy: địa chỉ và dải địa chỉ của proxy, vd `10.0.0.0/8, 192.0.2.7` |
@@ -853,8 +857,10 @@ Mỗi tình huống: dấu hiệu, cách kiểm, cách sửa.
 
 ### Lộ khoá
 
-- `AUTOXIDE_AUTH_TOKEN_SECRET`: đặt giá trị mới trên mọi máy chủ rồi khởi động lại. Mọi access token
-  hết dùng được; client đăng nhập lại bằng refresh token, vẫn còn hiệu lực.
+- `AUTOXIDE_AUTH_TOKEN_SECRET`: đặt giá trị mới trên mọi máy chủ rồi khởi động lại, KHÔNG đưa khoá bị lộ
+  vào `AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS`. Mọi access token hết dùng được; client lấy token mới bằng
+  refresh token, vẫn còn hiệu lực. (Đổi định kỳ thì giữ khoá cũ ở đó một lúc để không ai nhận ra — xem
+  "Lấy mã nguồn và đặt secret".)
 - `AUTOXIDE_SECRET_KEY`: xoay như mục "Lấy mã nguồn và đặt secret" (giá trị mới, giá trị cũ vào
   `AUTOXIDE_SECRET_KEY_PREVIOUS`, `autoxide secrets reseal`). Bản backup lấy trước đó vẫn mở được bằng
   khoá cũ: xoá chúng, hay giữ chúng an toàn như chính khoá. Bộ đếm theo địa chỉ của người xem bắt đầu
