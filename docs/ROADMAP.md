@@ -85,7 +85,7 @@ cả SQLite và Postgres.
       chung; file tải lên mà không xác nhận được dọn bằng job — `Storage::{presign_upload, head}`,
       `autoxide_kernel::upload` (`<module>_uploads`), `POST /files/uploads` + `/complete`, `/media/uploads` + `/complete`,
       4 tool MCP, job dọn mỗi giờ; ký `content-type` + checksum (không ký được `content-length`), xác nhận luôn đọc lại;
-      loại thật kiểm ở `media`, `files` giữ loại khai như tải qua máy chủ (D-378)
+      loại thật kiểm ở `media`, `files` giữ loại khai như tải qua máy chủ (D-379)
 - [x] Header bảo mật chung cho mọi response của API (`X-Content-Type-Options: nosniff`,
       `Referrer-Policy`, `X-Frame-Options` hay `frame-ancestors`, HSTS khi cấu hình chạy sau
       HTTPS, CSP chặt cho trang tài liệu API): một lớp trong `kernel/src/http/`, cấu hình được,
@@ -96,7 +96,7 @@ cả SQLite và Postgres.
       gọi có permission được xem (lọc theo tên event và theo quyền đọc bản ghi), nối lại bằng
       `Last-Event-ID` không mất event trong khoảng giữ, giới hạn số kết nối; chạy đúng khi nhiều
       máy chủ (đọc từ bảng event, không chỉ từ bộ nhớ một tiến trình) — `GET /api/v1/kernel/events/stream`, `EventInfo::streamable`, `StreamHub` hỏi bảng
-      event lùi `GRACE` 5 s; quyền hẹp hơn khách chỉ nhận việc của mình (event chưa có `org_id`); không có tool MCP (D-377)
+      event lùi `GRACE` 5 s; quyền hẹp hơn khách chỉ nhận việc của mình (event chưa có `org_id`); không có tool MCP (D-378)
 - [x] MCP đầy đủ hơn: resources (vd tài liệu của module, schema một loại bản ghi), prompts mẫu cho
       việc hay làm (viết nháp bài, kiểm duyệt bình luận) do module khai qua `Module`, kèm cài đặt
       mặc định rỗng (D-038); một trang mô tả cho agent tự khám phá API (vd `/llms.txt` trỏ tới
@@ -145,13 +145,14 @@ Bước 41–49 khai phần của module mình ngay trong bước đó nếu ph�
 - [x] Hoạt động (P5, P13): câu đọc được theo i18n key trên `EventInfo`, chỉ bản ghi người gọi đọc được ở nút
       của nó; dòng hoạt động và ghi chú nội bộ trên mọi bản ghi theo loại của sổ đối tượng (D-123), nhắc @
       có thông báo; một chỗ dùng chung thay cho mỗi module tự làm ghi chú — xong (17/11): `/kernel/records/{kind}/{id}/
-      notes|activity`; nhắc @ phát event `kernel.record_note_added` (module `notifications` đăng ký nhận để gửi)
+      notes|activity`; nhắc @ phát event `kernel.record_note_added`, `notifications` gửi tin trong ứng dụng (18/11, D-377)
 - [x] Schema bộ lọc mỗi danh sách công bố trong OpenAPI (máy, agent dựng chip lọc) và view đã lưu `/me/views`
       (P7): tham số, sắp xếp, cột, nhóm, mật độ; phạm vi cá nhân / nút / khách; bộ lọc nội dung `review`,
       `scheduled`, `ai_generated`, `missing_locale`, `missing_alt`
 - [x] Job và hàng loạt (P8, P15, P16; D-213): job API chung (danh sách, tiến độ, file, chạy lại có audit);
       module khai hành động hàng loạt, nhận `ids[]` hoặc `filter` + `expected_count`, `Idempotency-Key`, kết
-      quả từng bản ghi, tiến độ qua SSE; xuất danh sách theo bộ lọc thành CSV qua job
+      quả từng bản ghi, tiến độ qua SSE; xuất danh sách theo bộ lọc thành CSV qua job; job xong thì báo người yêu cầu
+      (`kernel.job_finished` → tin trong ứng dụng, D-377)
 - [x] Giải thích quyền (P11): `POST /me/can` nhiều cặp (permission, nút), lý do `missing_permission` /
       `module_not_enabled` / `feature_not_in_plan` / `quota_exceeded` — giao diện hiện vì sao bị khoá, ai cấp
       được, nâng gói mở gì — **một phần** (17/11): `POST /me/can` với `unknown_permission`, `module_not_enabled`

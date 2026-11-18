@@ -1,4 +1,4 @@
-//! Tải item lớn thẳng lên S3 (bước 40 P4, D-378): cấp link ký sẵn, xác nhận, dọn lượt bỏ dở —
+//! Tải item lớn thẳng lên S3 (bước 40 P4, D-379): cấp link ký sẵn, xác nhận, dọn lượt bỏ dở —
 //! cùng khung với `files` (`autoxide_kernel::upload`, bảng `media_uploads`). Nơi lưu là ổ đĩa thì
 //! không có link: tải qua `POST /api/v1/media` như cũ.
 //!

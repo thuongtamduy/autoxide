@@ -75,7 +75,7 @@ impl EventInfo {
     /// Event này được đẩy qua stream thời gian thực (`GET /api/v1/kernel/events/stream`, bước 40
     /// P5) tới người có `reader` — cùng permission đọc bản ghi qua REST, vì payload chứa dữ liệu của
     /// bản ghi. Mặc định không stream: chỉ event module chủ động khai mới ra ngoài (không có
-    /// "realtime theo bảng", D-377).
+    /// "realtime theo bảng", D-378).
     pub const fn streamable(mut self, reader: crate::access::Permission) -> Self {
         self.stream = Some(reader);
         self

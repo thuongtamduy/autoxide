@@ -839,6 +839,18 @@ async fn xuat_danh_sach_bai_theo_bo_loc() {
         );
         let other = app.get(&url).token("nobody").send().await.unwrap();
         assert_eq!(other.status(), StatusCode::NOT_FOUND, "job của người khác");
+        // Job xong thì kernel phát `kernel.job_finished` cho người yêu cầu (module thông báo gửi tin).
+        use sea_orm::ConnectionTrait;
+        let database = app.database().read();
+        let sql = "SELECT payload FROM kernel_events WHERE name = 'kernel.job_finished'";
+        let rows = database
+            .query_all_raw(sea_orm::Statement::from_string(database.get_database_backend(), sql))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+        let payload: String = rows[0].try_get("", "payload").unwrap();
+        let payload: Value = serde_json::from_str(&payload).unwrap();
+        assert_eq!((payload["status"].as_str(), payload["job_id"].as_str()), (Some("succeeded"), Some(id.as_str())));
     })
     .await
     .unwrap();

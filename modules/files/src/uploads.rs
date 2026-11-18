@@ -1,4 +1,4 @@
-//! Tải file lớn thẳng lên S3 (bước 40 P4, D-378): cấp link ký sẵn, xác nhận, dọn lượt bỏ dở.
+//! Tải file lớn thẳng lên S3 (bước 40 P4, D-379): cấp link ký sẵn, xác nhận, dọn lượt bỏ dở.
 //! Khung chung (bảng `files_uploads`, đọc lại object) ở `autoxide_kernel::upload`; nơi lưu là ổ đĩa
 //! thì không có link — client tải qua `POST /api/v1/files` như cũ.
 //!

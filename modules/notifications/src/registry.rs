@@ -15,6 +15,30 @@ pub(crate) const PLATFORM_NOTICE: NotificationKind = NotificationKind::new(
     NotificationTemplate::new("notifications.platform_notice", "{title}", "{body}", "{title}"),
 );
 
+/// Job người dùng yêu cầu (bản xuất, thao tác hàng loạt…) đã xong hay hỏng (bước 51).
+pub(crate) const JOB_FINISHED: NotificationKind = NotificationKind::new(
+    Category::Transactional,
+    &[Channel::InApp],
+    NotificationTemplate::new(
+        "notifications.job_finished",
+        "{label}: {status}",
+        "The background job you asked for ({label}) is {status}. Open the jobs list to see the result or download the file.",
+        "{label}: {status}",
+    ),
+);
+
+/// Ai đó nhắc bạn trong ghi chú nội bộ trên một bản ghi (bước 51 P13).
+pub(crate) const MENTIONED: NotificationKind = NotificationKind::new(
+    Category::Transactional,
+    &[Channel::InApp],
+    NotificationTemplate::new(
+        "notifications.mentioned",
+        "You were mentioned in a note",
+        "You were mentioned in an internal note on {kind} {id}.",
+        "Mentioned in a note",
+    ),
+);
+
 /// Thông báo bảo mật của nền tảng (không tắt được).
 pub(crate) const PLATFORM_SECURITY_NOTICE: NotificationKind = NotificationKind::new(
     Category::Security,

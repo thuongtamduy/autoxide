@@ -602,12 +602,24 @@ async fn run_job(
     }
     database.write().execute(&update).await?;
     // Job người dùng theo dõi (bước 51 P15): xong hay hỏng hẳn thì ghi lên dòng theo dõi, nếu có.
-    match &outcome {
-        Ok(()) => crate::job::runs::finish(database.write(), job.id, None).await?,
+    let finished = match &outcome {
+        Ok(()) => {
+            crate::job::runs::finish(database.write(), job.id, None).await?;
+            Some(false)
+        }
         Err(error) if job.attempts >= job.max_attempts => {
             crate::job::runs::finish(database.write(), job.id, Some(error)).await?;
+            Some(true)
         }
-        Err(_) => {}
+        Err(_) => None,
+    };
+    // Báo người yêu cầu (bước 51): lỗi khi phát event không làm job chạy lại — job đã xong.
+    if let Some(failed) = finished
+        && job.tenant != NO_TENANT
+        && let Ok(tenant) = registry.tenant(job.tenant).await
+        && let Err(error) = crate::job::runs::announce(&tenant, job.id, failed).await
+    {
+        tracing::warn!(job_id = %job.id, error = %error, "job_finished event not recorded");
     }
     Ok(())
 }

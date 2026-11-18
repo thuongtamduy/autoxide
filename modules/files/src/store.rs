@@ -205,7 +205,7 @@ impl Storage for ObjectStorage {
     /// từ chối request thiếu hay sai một trong hai, và từ chối nội dung khác hash — tức khác cả cỡ.
     /// `content-length` không ký được qua `object_store` (header do bộ ký giữ); nó vẫn được trả để
     /// client gửi. Dịch vụ tương thích S3 có thể không kiểm hash: lệnh xác nhận luôn đọc lại, đo cỡ
-    /// và băm (D-378).
+    /// và băm (D-379).
     async fn presign_upload(
         &self,
         key: &str,

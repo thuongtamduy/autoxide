@@ -1,4 +1,4 @@
-//! `GET /api/v1/kernel/events/stream` (bước 40 P5, D-377): Server-Sent Events của các event người
+//! `GET /api/v1/kernel/events/stream` (bước 40 P5, D-378): Server-Sent Events của các event người
 //! gọi được xem. Logic ở [`StreamHub`](crate::event::StreamHub); handler chỉ lấy dữ liệu vào, gọi
 //! hub và dựng response.
 //!

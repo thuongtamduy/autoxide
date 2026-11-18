@@ -9241,7 +9241,16 @@ liệu cá nhân.
    `menus`: đích và ô gợi ý của mục. `media` đăng ký loại `media.item` vào sổ đối tượng (tệp riêng tư không đưa tên ra ngoài) để
    kernel kiểm bản ghi được hỏi có thật và đọc được.
 
-## D-377 · Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18 — agent quyết
+## D-377 · Báo khi job xong và khi được nhắc trong ghi chú (bước 51 P13, P16) — 2026-11-18 — agent quyết
+
+1. Kernel phát `kernel.job_finished` (`job_id`, `kind`, `label`, `status`, `requested_by`) khi job **có người yêu cầu** (bảng
+   theo dõi P15) chạy xong hay hỏng hẳn — mọi loại job theo dõi (bản xuất, thao tác hàng loạt…), không riêng bản xuất. Ghi sau
+   khi đánh dấu xong, transaction riêng; ghi event lỗi thì chỉ ghi log, không làm job chạy lại (job đã xong).
+2. `notifications` đăng ký `kernel.job_finished` và `kernel.record_note_added` (có sẵn từ P13 nhưng chưa ai gửi tin): tin **chỉ
+   trong ứng dụng** (`notifications.job_finished`, `notifications.mentioned`, giao dịch), vì là việc vận hành hằng ngày — email
+   cho mỗi bản xuất là thừa. `dedupe_key` theo ID event (và người được nhắc), nên event giao lại không tạo tin thứ hai.
+
+## D-378 · Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18 — agent quyết
 
 1. **Khác "realtime theo bảng"** (TrailBase, PocketBase — `docs/research/frameworks.md` đã không mượn): realtime theo bảng đẩy
    mọi thay đổi dòng, nên lộ cấu trúc bảng (hợp đồng mới không ai thiết kế), bỏ qua luật service layer (quyền đọc tính lại ở
@@ -9273,7 +9282,7 @@ liệu cá nhân.
 6. **Không có tool MCP tương ứng** (lệch đặc tả `kernel.list_events`): MCP không giữ stream; agent cần "có gì mới" dùng webhook
    hay đọc danh sách của module. Thêm khi có agent cần thật.
 
-## D-378 · Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18 — agent quyết
+## D-379 · Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18 — agent quyết
 
 1. **Một trait, hai hàm mới có mặc định (D-038):** `Storage::presign_upload(key, UploadConstraints, ttl) ->
    Option<PresignedUpload>` (mặc định `None`: ổ đĩa, client tải qua máy chủ như cũ) và `Storage::head(key)` (mặc định qua

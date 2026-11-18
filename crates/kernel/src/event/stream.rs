@@ -1,4 +1,4 @@
-//! Stream event thời gian thực (bước 40 P5, D-377): đẩy tới client qua Server-Sent Events những
+//! Stream event thời gian thực (bước 40 P5, D-378): đẩy tới client qua Server-Sent Events những
 //! event module **chủ động khai** stream được ([`EventInfo::streamable`](super::EventInfo::streamable)),
 //! cùng nội dung và quyền như đọc bản ghi qua REST. KHÔNG phải "realtime theo bảng" (đẩy mọi thay đổi
 //! dòng): bảng không bao giờ lộ ra ngoài, chỉ event đã khai.

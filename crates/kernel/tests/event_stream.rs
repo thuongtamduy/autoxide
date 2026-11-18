@@ -1,4 +1,4 @@
-//! Stream event thời gian thực bằng SSE (bước 40 P5, D-377): chỉ event khai `streamable`, lọc theo
+//! Stream event thời gian thực bằng SSE (bước 40 P5, D-378): chỉ event khai `streamable`, lọc theo
 //! permission, khách và tên; nối lại bằng `Last-Event-ID` không mất event; event commit muộn vẫn tới;
 //! hai máy chủ chung một database; giới hạn kết nối; không bị lớp timeout cắt; đóng khi tắt. Chạy
 //! trên cả SQLite và Postgres.

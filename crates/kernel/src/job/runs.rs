@@ -183,6 +183,59 @@ pub(crate) async fn expired_files(
     rows.iter().map(|row| Ok((row.try_get("", "tenant_id")?, row.try_get("", "id")?))).collect()
 }
 
+/// Event: job người dùng theo dõi chạy xong hay hỏng hẳn (bước 51 P15/P16) — module thông báo báo
+/// cho người yêu cầu ("bản xuất đã xong").
+pub(crate) const JOB_FINISHED: EventInfo = EventInfo::new(
+    "kernel.job_finished",
+    "A background job someone asked for finished or failed for good.",
+);
+
+#[derive(Debug, Serialize)]
+struct JobFinished {
+    job_id: Uuid,
+    kind: String,
+    /// Câu tiếng Anh của job, vd "CSV export of content-entries".
+    label: String,
+    /// `succeeded` hay `failed`.
+    status: String,
+    requested_by: Uuid,
+}
+
+impl crate::event::Event for JobFinished {
+    const NAME: &'static str = "kernel.job_finished";
+}
+
+/// Phát `kernel.job_finished` cho job `id` của khách `tenant`, nếu đó là job có người yêu cầu.
+pub(crate) async fn announce(tenant: &TenantContext, id: Uuid, failed: bool) -> Result<(), Error> {
+    let select = SqlQuery::select()
+        .columns(["kind", "label", "requested_by"])
+        .from(Alias::new(TABLE))
+        .and_where(Expr::col(Alias::new("id")).eq(id))
+        .and_where(Expr::col(Alias::new("tenant_id")).eq(tenant.id().as_uuid()))
+        .to_owned();
+    let Some(row) = tenant.database().read().query_one(&select).await? else {
+        return Ok(());
+    };
+    let Some(requested_by) = row.try_get::<Option<Uuid>>("", "requested_by")? else {
+        return Ok(());
+    };
+    let event = JobFinished {
+        job_id: id,
+        kind: row.try_get("", "kind")?,
+        label: row.try_get("", "label")?,
+        status: if failed { "failed" } else { "succeeded" }.to_owned(),
+        requested_by,
+    };
+    // Outbox của kernel ghi thẳng vào bảng event của kernel; bộ phát đọc nó ở lượt hỏi kế tiếp.
+    let outbox = crate::event::Outbox::standalone(crate::builtin::NAME);
+    let transaction = tenant.database().begin_write().await?;
+    outbox
+        .record(&transaction, tenant, Actor::system(), Some(format!("kernel.job:{id}")), &event)
+        .await?;
+    transaction.commit().await?;
+    Ok(())
+}
+
 /// Worker gọi khi job `id` chạy xong (`error` `None`) hay hỏng hẳn; job không theo dõi thì không
 /// có dòng nào và lệnh không đổi gì.
 pub(crate) async fn finish<C: ConnectionTrait>(
