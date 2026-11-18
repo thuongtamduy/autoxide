@@ -35,6 +35,7 @@ mod permissions;
 mod privacy;
 mod reauth;
 mod recovery;
+mod relocation;
 mod reset;
 mod resource;
 mod role;
@@ -463,6 +464,11 @@ impl Module for AuthModule {
         // Clone trạng thái chỉ là clone vài `Arc`: tăng bộ đếm tham chiếu, không chép
         // service.
         self.state.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 }
 

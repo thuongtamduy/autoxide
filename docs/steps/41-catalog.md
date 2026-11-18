@@ -167,10 +167,11 @@ pub trait Catalog: Send + Sync {
     async fn reference_prices(&self, tenant: &TenantContext, query: &PriceQuery)
         -> Result<Vec<PriceSnapshot>, Error>;
     /// Sàn giá (giá tối thiểu, biên lợi nhuận tối thiểu, `warn` / `block`) đang áp cho các biến thể ở
-    /// nút `org_id` — `promotions` kiểm lúc `activate` và cắt khi tính (đặc tả 43, D-222).
-    /// Kiểu trả phác thảo; chốt khi làm, đủ cho đặc tả 43.
-    async fn price_floors(&self, tenant: &TenantContext, org_id: OrgId, variant_ids: &[Uuid])
-        -> Result<Vec<PriceFloor>, Error>;
+    /// nút `org_id`, tiền `currency` — `promotions` kiểm lúc `activate` và cắt khi tính (đặc tả 43,
+    /// D-222). `PriceFloor { variant_id, guard_id, min_price, min_margin_bp, unit_cost, floor, action }`:
+    /// `floor` là giá thấp nhất được phép (lớn hơn của `min_price` và giá vốn × (1 + biên)).
+    async fn price_floors(&self, tenant: &TenantContext, org_id: OrgId, currency: Currency,
+        variant_ids: &[Uuid]) -> Result<Vec<PriceFloor>, Error>;
     /// Thành phần của các biến thể combo (biến thể không phải combo thì vắng).
     async fn bundle_components(&self, tenant: &TenantContext, variant_ids: &[Uuid])
         -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error>;

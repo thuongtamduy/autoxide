@@ -292,7 +292,8 @@ báo cáo) · `inventory.movement_recorded` · `inventory.low_stock` (khi `avail
 `inventory.count_applied` · `inventory.goods_received` · `inventory.supplier_returned` ·
 `inventory.lot_expired` · `inventory.preorder_allocated` (từng dòng đặt trước được chia hàng — D-204) ·
 `inventory.cost_changed` (`org_id`, `variant_id`, giá vốn bình quân mới — `catalog` giữ bảng giá vốn cho sàn giá,
-D-222).
+D-222; payload `catalog` đọc: `{"after": {"org_id", "variant_id", "unit_cost": <Money>}}`, xem
+`autoxide_catalog::api::events::INVENTORY_COST_CHANGED`).
 
 Nhận event của chính module: `inventory.level_changed` từ 0 lên trên 0 → gửi báo có hàng lại (D-201).
 

@@ -33,6 +33,12 @@ impl Module for IdempotencyModule {
         "idempotency"
     }
 
+    // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        use autoxide_kernel::tenancy::Relocation;
+        Relocation::new().ephemeral(&["idempotency_record"])
+    }
+
     fn description(&self) -> &'static str {
         "Storage of `Idempotency-Key` results, so retried writes run once."
     }

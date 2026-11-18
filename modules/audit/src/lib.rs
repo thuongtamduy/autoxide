@@ -12,6 +12,7 @@ mod entity;
 mod http;
 mod migration;
 mod recorder;
+mod relocation;
 mod service;
 mod tools;
 
@@ -126,6 +127,11 @@ impl Module for AuditModule {
                 .with_timeout(chain::VERIFY_TIMEOUT),
             ]
         })
+    }
+
+    // Tách / gộp khách (bước 38): ghi lại dòng vào chuỗi băm của khách nhận, nguồn giữ nguyên.
+    fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
+        relocation::relocation()
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {
