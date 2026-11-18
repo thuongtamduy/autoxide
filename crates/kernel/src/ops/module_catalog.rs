@@ -80,6 +80,8 @@ pub(crate) struct ModuleCatalog {
     texts: crate::ops::texts::TextOverrides,
     /// Trường tự định nghĩa (bước 51 P19).
     custom_fields: crate::ops::custom_fields::CustomFields,
+    /// Nguồn "đang dùng ở đâu" (bước 51, D-267).
+    references: crate::ops::usages::ReferenceSources,
     /// Lịch sử theo bản ghi (bước 51 P13), module nhật ký công bố; điền sau khi mọi module khởi động.
     history: crate::ops::records::HistorySlot,
     /// Mô hình AI (module `ai` công bố), điền sau khi mọi module khởi động (bước 52).
@@ -184,6 +186,10 @@ impl ModuleCatalog {
 
     pub(crate) fn text_overrides(&self) -> crate::ops::texts::TextOverrides {
         self.texts.clone()
+    }
+
+    pub(crate) fn references(&self) -> crate::ops::usages::ReferenceSources {
+        self.references.clone()
     }
 
     pub(crate) fn custom_fields(&self) -> crate::ops::custom_fields::CustomFields {

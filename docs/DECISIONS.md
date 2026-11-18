@@ -9224,3 +9224,19 @@ liệu cá nhân.
    −1% req/s, p95 +4%; SQLite MCP −11%, p95 +22%; PostgreSQL `GET /auth/me` −8%, p95 +9%; PostgreSQL MCP −4%, p95 +3%. Một bài
    vượt ngưỡng 10% của đặc tả → **giữ `memory` làm mặc định**. `autoxide doctor` cảnh báo khi `database` + SQLite.
 6. `scripts/loadtest.sh` thêm `LOADTEST_RATE_LIMIT_STORE` / `LOADTEST_RATE_LIMIT_BURST` / `LOADTEST_ONLY=api_key` để đo lại.
+
+## D-376 · Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18 — agent quyết
+
+1. **`POST /me/can`** nhận thêm `feature` và `limit` cho từng câu hỏi (giao diện biết việc nào cần tính năng hay hạn mức nào — vd
+   `required_feature` của mục menu): thứ tự kiểm module → tính năng → hạn mức (lượng dùng thật từ `UsageCounter` của module; không
+   có bộ đếm thì không kết luận) → permission. Lý do `feature_not_in_plan` (kèm `required_feature`) và `quota_exceeded` (kèm
+   `limit`, `used`, `max`). Ba lý do của gói kèm `upgrade_to`: `Entitlements::plans_offering(PlanNeed)` (mặc định rỗng; `plans`
+   trả mã các gói đang bán có module / tính năng / mức lớn hơn).
+2. **`grantors` ("ai cấp được") chưa làm:** cần mô hình gán role của bước 54 (giải thích và mô phỏng quyền, "ai có quyền trên bản
+   ghi này"); làm cùng mục đó.
+3. **"Đang dùng ở đâu"** chung cho mọi loại bản ghi: `GET /api/v1/kernel/records/{kind}/{id}/usages` thay cho
+   `/media/{id}/usages` riêng. Module khai `ReferenceSource` (`StartContext::reference_source`) — chính nó đọc bảng của nó (luật
+   kiến trúc 1) và trả tiêu đề; kernel chỉ gọi nguồn của module mà người gọi có `<module>.read`. `content`: ảnh đại diện, ảnh chia
+   sẻ, ID trong thân bài (ảnh, bản ghi nhúng — tìm `LIKE` trên thân bài, không index, chỉ chạy khi người dùng hỏi, có giới hạn);
+   `menus`: đích và ô gợi ý của mục. `media` đăng ký loại `media.item` vào sổ đối tượng (tệp riêng tư không đưa tên ra ngoài) để
+   kernel kiểm bản ghi được hỏi có thật và đọc được.

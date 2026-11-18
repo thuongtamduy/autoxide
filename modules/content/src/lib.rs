@@ -32,6 +32,7 @@ mod setup;
 mod taxonomy;
 mod templates;
 mod tools;
+mod usages;
 mod work;
 
 #[cfg(test)]
@@ -227,6 +228,7 @@ impl Module for ContentModule {
         context.export_source(Arc::new(export::Entries(service.clone())))?;
         context.bulk_action(Arc::new(export::Archive(service.clone())))?;
         context.resource_type(resource::ENTRY, Arc::new(resource::EntryResolver))?;
+        context.reference_source(Arc::new(usages::Entries));
         context.resource_type(resource::TERM, Arc::new(resource::TermResolver(service.clone())))?;
         // Menu cũ cho module `menus` nhập sang (D-238).
         context.provide::<dyn api::LegacyMenus>(service.clone())?;

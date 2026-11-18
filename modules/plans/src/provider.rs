@@ -18,6 +18,33 @@ impl Entitlements for Provider {
         self.0.snapshot(tenant).await
     }
 
+    async fn plans_offering(
+        &self,
+        need: &autoxide_kernel::entitlement::PlanNeed,
+    ) -> Result<Vec<String>, Error> {
+        Ok(self
+            .0
+            .catalog()
+            .await?
+            .into_iter()
+            .filter(|row| {
+                need.module.as_ref().is_none_or(|module| row.grants.modules.contains(module))
+                    && need
+                        .feature
+                        .as_ref()
+                        .is_none_or(|feature| row.grants.features.contains(feature))
+                    && need.limit.as_ref().is_none_or(|(key, above)| {
+                        match row.grants.limits.get(key) {
+                            Some(None) => true,
+                            Some(Some(max)) => max > above,
+                            None => false,
+                        }
+                    })
+            })
+            .map(|row| row.plan.code)
+            .collect())
+    }
+
     async fn reserve(
         &self,
         tenant: TenantId,

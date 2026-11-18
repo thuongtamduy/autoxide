@@ -126,6 +126,7 @@ pub(crate) struct RecordsState {
     pub permissions: PermissionCatalog,
     pub outbox: Outbox,
     pub history: HistorySlot,
+    pub references: crate::ops::usages::ReferenceSources,
 }
 
 fn now() -> DateTime<Utc> {
@@ -569,8 +570,78 @@ async fn list_record_events(
     })
 }
 
+/// How many usages.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct UsagesQuery {
+    /// At most this many, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+}
+
+/// Get where a record is used.
+///
+/// Requires being able to read the record. The records of every module that point to it — posts
+/// using an image, menu items linking to a page… — limited to modules whose `<module>.read` you
+/// hold. Use it before deleting or making a record private.
+#[utoipa::path(
+    get,
+    path = "/records/{kind}/{id}/usages",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "get_record_usages",
+    security(("bearer" = [])),
+    params(
+        ("kind" = String, Path, description = "Type of the record, e.g. `media.item`."),
+        ("id" = String, Path, description = "Id of the record."),
+        UsagesQuery,
+    ),
+    responses(
+        (status = 200, description = "The records using it.", body = Data<Vec<crate::ops::usages::Referrer>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 404, description = "No such record you may read; code `kernel.record_not_found`.", body = Problem),
+        (status = 422, description = "`limit` is not between 1 and 200; see `errors`.", body = Problem),
+    )
+)]
+async fn get_record_usages(
+    State(state): State<Arc<RecordsState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path((kind, id)): Path<(String, String)>,
+    Query(query): Query<UsagesQuery>,
+) -> Result<Data<Vec<crate::ops::usages::Referrer>>, Error> {
+    let limit = query.limit.unwrap_or(50);
+    if !(1..=200).contains(&limit) {
+        return Err(Error::validation(vec![FieldError::new(
+            "limit",
+            "invalid",
+            "must be between 1 and 200",
+        )]));
+    }
+    state.require_read(&tenant, &principal, &kind, &id).await?;
+    let limit = usize::try_from(limit).unwrap_or(200);
+    let mut found = Vec::new();
+    for (module, source) in state.references.all() {
+        // Chỉ module người gọi đọc được: tiêu đề bản ghi của module khác không lộ.
+        let reader = format!("{module}.read");
+        let readable = state
+            .permissions
+            .iter()
+            .find(|permission| permission.name() == reader)
+            .is_some_and(|permission| principal.require(permission).is_ok());
+        if !readable {
+            continue;
+        }
+        found.extend(source.referrers(&tenant, &kind, &id, limit).await?);
+        if found.len() >= limit {
+            break;
+        }
+    }
+    found.truncate(limit);
+    Ok(Data { data: found })
+}
+
 pub(crate) fn routes(state: RecordsState) -> OpenApiRouter {
     OpenApiRouter::new()
+        .routes(routes!(get_record_usages))
         .routes(routes!(list_record_events))
         .routes(routes!(list_record_notes, create_record_note))
         .routes(routes!(delete_record_note))
