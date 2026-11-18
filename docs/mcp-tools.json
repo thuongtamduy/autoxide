@@ -2187,6 +2187,971 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Add up to 500 prices to a price list. Rows are only added, never changed; a future `valid_from` schedules a price and `valid_to` makes it temporary.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Prices to add to a price list.",
+        "properties": {
+          "price_list_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "prices": {
+            "items": {
+              "additionalProperties": false,
+              "description": "A price to add.",
+              "properties": {
+                "amount": {
+                  "description": "Integer amount in minor units of the list's currency, e.g. `\"150000\"` for 150,000 VND.",
+                  "type": "string"
+                },
+                "compare_at": {
+                  "description": "Struck-through price in minor units, higher than `amount`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_from": {
+                  "description": "When the price starts; omitted: now.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "valid_to": {
+                  "description": "End of a temporary price.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "amount"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "reference": {
+            "description": "Your code for this change; the same reference and content again adds nothing.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "price_list_id",
+          "reference",
+          "prices"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.add_prices",
+      "output_schema": null,
+      "permissions": [
+        "catalog.prices.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a product as a draft with its first variant (SKU unique in the tenant).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new product, created as a `draft` with its first variant.",
+        "properties": {
+          "category_ids": {
+            "description": "Categories of the product; the first is the main one.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "kind": {
+            "description": "Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not\nshipped), `bundle` (takes stock from each component).",
+            "enum": [
+              "physical",
+              "digital",
+              "service",
+              "bundle"
+            ],
+            "type": "string"
+          },
+          "locale": {
+            "description": "Language of `text`; becomes the default language of the product.",
+            "example": "vi",
+            "type": "string"
+          },
+          "lot_tracked": {
+            "type": "boolean"
+          },
+          "org_id": {
+            "description": "The organization unit that owns the product; you need `catalog.products.write` there.\nOmit when you work in one unit only (or for the whole tenant).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serial_tracked": {
+            "type": "boolean"
+          },
+          "tax_category": {
+            "description": "Tax category code of the tax engine, e.g. `vat.standard` (`GET /api/v1/tax/categories`).",
+            "example": "vat.standard",
+            "type": "string"
+          },
+          "text": {
+            "additionalProperties": false,
+            "description": "Texts of a product in one language.",
+            "properties": {
+              "description": {
+                "description": "Plain text up to 50000 characters; blank lines separate paragraphs and clients may render\nminimal Markdown. HTML is not interpreted.",
+                "type": "string"
+              },
+              "meta_description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "meta_title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "1 to 200 characters.",
+                "example": "Cotton T-shirt",
+                "type": "string"
+              },
+              "short_description": {
+                "description": "Up to 1000 characters.",
+                "type": "string"
+              },
+              "slug": {
+                "description": "Last part of the public address; omitted: made from the name. Unique per language in the\ntenant (`catalog.slug_taken`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "type": "object"
+          },
+          "variant": {
+            "additionalProperties": false,
+            "description": "A variant to create, or the first variant of a new product.",
+            "properties": {
+              "active": {
+                "description": "On by default.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "barcode": {
+                "description": "Barcode (GTIN or own code), up to 32 letters, digits or `-`; GTIN-8/12/13/14 must have a\nright check digit. Unique in the tenant (`catalog.barcode_taken`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "height_mm": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "image_media_id": {
+                "description": "Main image of the variant (public media).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "length_mm": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "option_value_ids": {
+                "description": "One value id of each option of the product; empty when the product has no options.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preorder_available_on": {
+                "description": "Expected availability date of a pre-order, after today\n(`catalog.preorder_date_invalid`).",
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "preorder_ends_at": {
+                "description": "Pre-orders stop being taken at this time.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "preorder_limit": {
+                "description": "Total pre-order units, above 0 (`catalog.preorder_limit_invalid`); omitted: no limit.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "preorder_messages": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Public pre-order note per language, e.g. `{\"en\": \"Ships from 15 December\"}`.",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              "sale_mode": {
+                "description": "Default `in_stock`; digital products and services are always `in_stock`.",
+                "oneOf": [
+                  {
+                    "description": "How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),\n`preorder` (before it arrives, see `preorder_available_on`).",
+                    "enum": [
+                      "in_stock",
+                      "backorder",
+                      "preorder"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "sku": {
+                "description": "Stock keeping unit, 1 to 64 characters; unique in the tenant ignoring case and spaces\n(`catalog.sku_taken`).",
+                "example": "TSHIRT-RED-M",
+                "type": "string"
+              },
+              "weight_grams": {
+                "description": "Shipping weight in grams (physical products and bundles).",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "width_mm": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "sku"
+            ],
+            "type": "object"
+          },
+          "warranty_months": {
+            "description": "Warranty in months, 1 to 600; omitted: no warranty.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "tax_category",
+          "locale",
+          "text",
+          "variant"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.create_product",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Delete a product that was never on sale, with all its variants. It cannot be restored; archive products that were on sale instead.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A product to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the product.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.delete_product",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a product with its texts, options, variants, categories and images.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A product to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the product.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.get_product",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List every category of the tenant, by depth then display order.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "No input.",
+        "type": "object"
+      },
+      "name": "catalog.list_categories",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the products in your scope, newest first; filter by status, kind, unit, category, readiness or words; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Products to list.",
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not\nshipped), `bundle` (takes stock from each component).",
+                "enum": [
+                  "physical",
+                  "digital",
+                  "service",
+                  "bundle"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of products, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the name, SKU or short description.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "readiness": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "description": "Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`.",
+                "enum": [
+                  "draft",
+                  "active",
+                  "inactive",
+                  "archived"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalog.list_products",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Resolve the price of a variant at a store (optionally for a customer group, at a time) and show which price lists applied, in selection order.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The price question.",
+        "properties": {
+          "at": {
+            "description": "Default: now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": "string"
+          },
+          "customer_group": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The store selling.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "org_id",
+          "currency"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.resolve_price",
+      "output_schema": null,
+      "permissions": [
+        "catalog.prices.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Put a product on sale (`active`), stop it (`inactive`), archive it, or reopen an archived product as a `draft`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The new sale status of a product.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`.",
+            "enum": [
+              "draft",
+              "active",
+              "inactive",
+              "archived"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.set_product_status",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change the tax category, warranty, tracking or default language of a product.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a product.",
+        "properties": {
+          "default_locale": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lot_tracked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "serial_tracked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "tax_category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warranty_months": {
+            "description": "`null` removes the warranty.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.update_product",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a variant (give `product_id` and `create`) or change one (give `id` and `update`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A variant to create (give `product_id`) or change (give `id`).",
+        "properties": {
+          "create": {
+            "description": "A new variant (with `product_id`).",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "A variant to create, or the first variant of a new product.",
+                "properties": {
+                  "active": {
+                    "description": "On by default.",
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "barcode": {
+                    "description": "Barcode (GTIN or own code), up to 32 letters, digits or `-`; GTIN-8/12/13/14 must have a\nright check digit. Unique in the tenant (`catalog.barcode_taken`).",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "height_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "image_media_id": {
+                    "description": "Main image of the variant (public media).",
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "length_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "option_value_ids": {
+                    "description": "One value id of each option of the product; empty when the product has no options.",
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "preorder_available_on": {
+                    "description": "Expected availability date of a pre-order, after today\n(`catalog.preorder_date_invalid`).",
+                    "format": "date",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "preorder_ends_at": {
+                    "description": "Pre-orders stop being taken at this time.",
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "preorder_limit": {
+                    "description": "Total pre-order units, above 0 (`catalog.preorder_limit_invalid`); omitted: no limit.",
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "preorder_messages": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "description": "Public pre-order note per language, e.g. `{\"en\": \"Ships from 15 December\"}`.",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  "sale_mode": {
+                    "description": "Default `in_stock`; digital products and services are always `in_stock`.",
+                    "oneOf": [
+                      {
+                        "description": "How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),\n`preorder` (before it arrives, see `preorder_available_on`).",
+                        "enum": [
+                          "in_stock",
+                          "backorder",
+                          "preorder"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sku": {
+                    "description": "Stock keeping unit, 1 to 64 characters; unique in the tenant ignoring case and spaces\n(`catalog.sku_taken`).",
+                    "example": "TSHIRT-RED-M",
+                    "type": "string"
+                  },
+                  "weight_grams": {
+                    "description": "Shipping weight in grams (physical products and bundles).",
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "width_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "sku"
+                ],
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "description": "Id of the variant to change.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_id": {
+            "description": "Product of a new variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "update": {
+            "description": "Changes to the variant `id`.",
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "description": "Changes to a variant. Omitted fields stay as they are; `null` clears an optional value.",
+                "properties": {
+                  "active": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  },
+                  "barcode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "height_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "image_media_id": {
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "length_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "option_value_ids": {
+                    "items": {
+                      "format": "uuid",
+                      "type": "string"
+                    },
+                    "type": [
+                      "array",
+                      "null"
+                    ]
+                  },
+                  "position": {
+                    "description": "Display order among the product's variants.",
+                    "format": "int32",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "preorder_available_on": {
+                    "format": "date",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "preorder_ends_at": {
+                    "format": "date-time",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "preorder_limit": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "preorder_messages": {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "sale_mode": {
+                    "oneOf": [
+                      {
+                        "description": "How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),\n`preorder` (before it arrives, see `preorder_available_on`).",
+                        "enum": [
+                          "in_stock",
+                          "backorder",
+                          "preorder"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "sku": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "weight_grams": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "width_mm": {
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalog.upsert_variant",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Answer a shown question (a top-level comment) as yourself, like a signed-in user on the website: the answer carries your badges on the target (e.g. `seller`), follows the same moderation and may wait for approval. Needs a display name (`PUT /api/v1/comments/profile`) and, on some kinds, a verified account.",
       "input_schema": {
         "additionalProperties": false,
