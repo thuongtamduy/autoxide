@@ -264,7 +264,7 @@ ngày, cỡ dữ liệu; mọi thay đổi chạy và có test trên cả hai da
 
 Nhóm A — vận hành:
 
-- [ ] Backup tự động theo lịch: job định kỳ (qua `Schedule` của kernel) tạo bản backup như
+- [x] Backup tự động theo lịch: job định kỳ (qua `Schedule` của kernel) tạo bản backup như
       `autoxide backup` (`crates/app/src/commands/backup.rs`) rồi ghi vào `Storage` (ổ đĩa hay
       S3), giữ N bản gần nhất, lịch và số bản cấu hình qua `Setting` (sinh lại `.env.example`);
       bản hỏng thì ghi log lỗi và đếm bằng metric. `autoxide doctor` cảnh báo khi bản mới nhất cũ
@@ -276,7 +276,7 @@ Nhóm A — vận hành:
       của job chờ lâu nhất theo module, job trong dead-letter queue, event chưa giao và tuổi của
       event cũ nhất, kết nối database đang dùng / còn rảnh. Hiện chỉ có bộ đếm cộng dồn
       (`jobs_failed_total`, `events_failed_total`…), không thấy được hàng đợi kẹt
-- [ ] Dashboard và cảnh báo có sẵn: file dashboard Grafana và luật cảnh báo Prometheus trong repo
+- [x] Dashboard và cảnh báo có sẵn: file dashboard Grafana và luật cảnh báo Prometheus trong repo
       (tỉ lệ 5xx, độ trễ p95, job chờ quá lâu, dead-letter tăng, event tồn, hết kết nối database,
       backup quá cũ), mỗi cảnh báo kèm câu "làm gì"; hướng dẫn dùng trong `docs/DEPLOY.md` (EN + VI)
 - [ ] Xoay khoá không gián đoạn: `AUTOXIDE_AUTH_TOKEN_SECRET` (và các khoá ký khác) nhận thêm khoá

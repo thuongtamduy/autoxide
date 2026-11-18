@@ -48,6 +48,11 @@ endpoints are marked deprecated with a sunset date first.
 - Kernel: `automation::AutomationDirectory` (every module's MCP tools, called with the same checks as `/mcp`),
   `Module::automation_templates`, `AccessPath::Automation` (changes made by a rule's run carry it in the audit log),
   `StartContext::summary_metrics()`.
+- Scheduled backups (step 39): every `AUTOXIDE_BACKUP_INTERVAL_HOURS` (default 24, `0` off) a background process backs up
+  each database into the file storage under `kernel/backups/<database>/<id>/`, keeping the newest
+  `AUTOXIDE_BACKUP_KEEP` (default 7); files are copied too only with `AUTOXIDE_BACKUP_INCLUDE_FILES=true`. Runs are
+  recorded in `kernel_backups`; `autoxide doctor` warns (`kernel.backup_age`) when backups are off or too old;
+  metrics `backup_*` and alerts `AutoxideBackupTooOld`, `AutoxideBackupFailed`. `docs/DEPLOY.md`: "Scheduled backups".
 - Module `bookings` (step 60): bookable services (duration, buffers, capacity, deposit), staff, rooms and
   equipment with weekly schedules in the unit's time zone, time off and extra hours, and public free times
   (`GET /api/v1/bookings/public/availability`, cached 15 seconds). Guide: `docs/BOOKINGS.md`.
