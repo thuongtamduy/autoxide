@@ -22,7 +22,7 @@
   "field:must be 1 to {max} characters, not only spaces": "phải dài 1 đến {max} ký tự, không chỉ có khoảng trắng",
   "field:must be `me`, `none` or a user id": "phải là `me`, `none` hay ID người dùng",
   "field:must be after `from`": "phải sau `from`",
-  "field:must be at most 1000 characters": "dài tối đa 1000 ký tự",
+  "field:must be at most 1000 characters": "tối đa 1000 ký tự",
   "field:must be between -720 and 840": "phải từ -720 đến 840",
   "field:must be between 0 and 10000": "phải từ 0 đến 10000",
   "field:must be between 1 and 10": "phải từ 1 đến 10",
