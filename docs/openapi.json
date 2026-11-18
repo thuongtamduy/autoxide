@@ -22935,6 +22935,35 @@
         ],
         "type": "object"
       },
+      "Data_OpsBacklog": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Backlogs of every database this server handles.",
+            "properties": {
+              "checked_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "databases": {
+                "items": {
+                  "$ref": "#/components/schemas/DatabaseBacklog"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "checked_at",
+              "databases"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OverrideResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -34728,6 +34757,44 @@
         ],
         "type": "object"
       },
+      "DatabaseBacklog": {
+        "description": "Backlog of one database.",
+        "properties": {
+          "database": {
+            "description": "`main`, or the placement of tenants with their own database.",
+            "example": "main",
+            "type": "string"
+          },
+          "last_backup_at": {
+            "description": "When the newest successful scheduled backup of this database finished; `null` when none.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "modules": {
+            "description": "Modules with a job queue or events, in start order of their names.",
+            "items": {
+              "$ref": "#/components/schemas/ModuleQueue"
+            },
+            "type": "array"
+          },
+          "pools": {
+            "description": "The `read` and `write` connection pools.",
+            "items": {
+              "$ref": "#/components/schemas/Pool"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "database",
+          "modules",
+          "pools"
+        ],
+        "type": "object"
+      },
       "DayCount": {
         "description": "One day of the overview.",
         "properties": {
@@ -42911,6 +42978,61 @@
         ],
         "type": "object"
       },
+      "ModuleQueue": {
+        "description": "Jobs and events of one module on one database.",
+        "properties": {
+          "events_dead": {
+            "description": "Events whose delivery failed for good.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "events_oldest_pending_seconds": {
+            "description": "How long the oldest undelivered event has waited, in seconds; 0 when none.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "events_pending": {
+            "description": "Events not delivered yet.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "jobs_dead": {
+            "description": "Jobs that failed for good (the dead-letter queue: `autoxide jobs failed`).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "jobs_oldest_pending_seconds": {
+            "description": "How long the oldest job that is due has waited, in seconds; 0 when none.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "jobs_pending": {
+            "description": "Jobs not done yet, scheduled ones included.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "module": {
+            "example": "mail",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module",
+          "jobs_pending",
+          "jobs_oldest_pending_seconds",
+          "jobs_dead",
+          "events_pending",
+          "events_oldest_pending_seconds",
+          "events_dead"
+        ],
+        "type": "object"
+      },
       "ModuleResource": {
         "description": "An MCP resource: a read-only document an agent reads with `resources/read`.",
         "properties": {
@@ -44914,6 +45036,26 @@
           "category",
           "subject",
           "body"
+        ],
+        "type": "object"
+      },
+      "OpsBacklog": {
+        "description": "Backlogs of every database this server handles.",
+        "properties": {
+          "checked_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "databases": {
+            "items": {
+              "$ref": "#/components/schemas/DatabaseBacklog"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "checked_at",
+          "databases"
         ],
         "type": "object"
       },
@@ -55342,6 +55484,37 @@
           "category",
           "title",
           "body"
+        ],
+        "type": "object"
+      },
+      "Pool": {
+        "description": "Connections of one pool.",
+        "properties": {
+          "idle": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "in_use": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "max": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "pool": {
+            "description": "`read` or `write`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pool",
+          "in_use",
+          "idle",
+          "max"
         ],
         "type": "object"
       },
@@ -124689,6 +124862,80 @@
         ],
         "x-permissions": [
           "kernel.tenants.read"
+        ]
+      }
+    },
+    "/api/v1/kernel/ops/backlog": {
+      "get": {
+        "description": "Requires `kernel.ops.read`, as staff of the platform tenant. Counts what waits in the job queue\nand the event outbox of each module, the dead-letter queue, the connections in use and the\nnewest scheduled backup of every database — the figures behind the alerts in\n`deploy/prometheus/autoxide-alerts.yml`. Counts cover every tenant on a database.",
+        "operationId": "kernel_get_ops_backlog",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OpsBacklog"
+                }
+              }
+            },
+            "description": "The backlog of every database."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.ops.read` (`permission_denied`), or not staff of the platform tenant (`tenant_platform_only`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "See the job and event backlogs of every database.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.ops.read"
         ]
       }
     },

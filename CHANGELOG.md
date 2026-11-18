@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `GET /api/v1/kernel/ops/backlog` and MCP tool `kernel.ops_backlog` (permission `kernel.ops.read`, platform staff
+  only): job and event backlogs by module, the dead-letter queue, database connections and the newest backup of every
+  database (step 39).
 - Restore drill (step 39): an end-to-end test backs up data made over the API, restores it into an empty database
   (across PostgreSQL and SQLite when the gate runs on PostgreSQL) and checks the server starts, the old administrator
   signs in and the data and files match; `docs/DEPLOY.md` has "Restoring, step by step".

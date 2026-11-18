@@ -7624,6 +7624,15 @@ export type Data_NotificationWebPushKey = {
 };
 
 /** Envelope of a single result. */
+export type Data_OpsBacklog = {
+  /** Backlogs of every database this server handles. */
+  data: {
+    checked_at: string;
+    databases: DatabaseBacklog[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -11373,6 +11382,18 @@ export type Data_WorkView = {
   };
 };
 
+/** Backlog of one database. */
+export type DatabaseBacklog = {
+  /** `main`, or the placement of tenants with their own database. */
+  database: string;
+  /** When the newest successful scheduled backup of this database finished; `null` when none. */
+  last_backup_at?: string | null;
+  /** Modules with a job queue or events, in start order of their names. */
+  modules: ModuleQueue[];
+  /** The `read` and `write` connection pools. */
+  pools: Pool[];
+};
+
 /** One day of the overview. */
 export type DayCount = {
   day: string;
@@ -14178,6 +14199,23 @@ export type ModulePromptArgument = {
   required: boolean;
 };
 
+/** Jobs and events of one module on one database. */
+export type ModuleQueue = {
+  /** Events whose delivery failed for good. */
+  events_dead: number;
+  /** How long the oldest undelivered event has waited, in seconds; 0 when none. */
+  events_oldest_pending_seconds: number;
+  /** Events not delivered yet. */
+  events_pending: number;
+  /** Jobs that failed for good (the dead-letter queue: `autoxide jobs failed`). */
+  jobs_dead: number;
+  /** How long the oldest job that is due has waited, in seconds; 0 when none. */
+  jobs_oldest_pending_seconds: number;
+  /** Jobs not done yet, scheduled ones included. */
+  jobs_pending: number;
+  module: string;
+};
+
 /** An MCP resource: a read-only document an agent reads with `resources/read`. */
 export type ModuleResource = {
   description: string;
@@ -14902,6 +14940,12 @@ export type OpenSupportTicketRequest = {
   subject: string;
   /** Guests: the hidden trap field of the form; leave it empty. */
   trap?: string | null;
+};
+
+/** Backlogs of every database this server handles. */
+export type OpsBacklog = {
+  checked_at: string;
+  databases: DatabaseBacklog[];
 };
 
 /** An override to set; it replaces one of the same kind and key. */
@@ -18159,6 +18203,15 @@ export type PlatformNoticeRequest = {
   category: string;
   link?: string | null;
   title: string;
+};
+
+/** Connections of one pool. */
+export type Pool = {
+  idle: number;
+  in_use: number;
+  max: number;
+  /** `read` or `write`. */
+  pool: string;
 };
 
 /** A comment just posted, for its author. */
@@ -28506,6 +28559,18 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { refresh?: boolean }; };
       responses: {
         200: Data_AlertsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/ops/backlog": {
+    /** See the job and event backlogs of every database. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_OpsBacklog;
         401: Problem;
         403: Problem;
         default: Problem;
