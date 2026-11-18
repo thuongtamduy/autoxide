@@ -161,6 +161,10 @@ impl Module for WebhooksModule {
         vec![Schedule::new(CLEANUP_KIND, CLEANUP_KIND, Duration::from_secs(24 * 3600))]
     }
 
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.running.as_ref().map_or_else(Vec::new, |running| http::tools(running.service.clone()))
+    }
+
     fn routes(&self) -> OpenApiRouter {
         self.running
             .as_ref()

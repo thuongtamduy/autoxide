@@ -248,5 +248,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `plans.update_plan` | `plans.plans.manage` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
+| `webhooks.list_deliveries` | `webhooks.manage` | read-only |
+| `webhooks.redeliver` | `webhooks.manage` | writes |
 
 <!-- tools:end -->

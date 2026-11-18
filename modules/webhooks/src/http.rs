@@ -31,6 +31,8 @@ pub(crate) fn routes(service: Arc<WebhookService>) -> OpenApiRouter {
         .routes(routes!(get_endpoint, update_endpoint, delete_endpoint))
         .routes(routes!(rotate_secret))
         .routes(routes!(list_deliveries))
+        .routes(routes!(list_all_deliveries))
+        .routes(routes!(redeliver))
         .with_state(service)
 }
 
@@ -479,4 +481,147 @@ async fn list_deliveries(
     principal.require(&WEBHOOKS_MANAGE)?;
     let page = service.deliveries(&tenant, id, &PageRequest::try_from(query)?).await?;
     Ok(page.map(DeliveryResponse::from))
+}
+
+/// Which deliveries to list.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct DeliveriesFilter {
+    /// `pending`, `succeeded` or `failed`.
+    #[param(example = "failed")]
+    status: Option<String>,
+    /// Only deliveries to this endpoint.
+    endpoint_id: Option<Uuid>,
+}
+
+/// List the deliveries of every endpoint, e.g. the failed ones.
+///
+/// Requires `webhooks.manage`. Newest first unless `order=asc`. Kept for 30 days.
+#[utoipa::path(
+    get,
+    path = "/deliveries",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
+    operation_id = "list_all_webhook_deliveries",
+    security(("bearer" = [])),
+    params(PageQuery, DeliveriesFilter),
+    responses(
+        (status = 200, description = "One page of deliveries.", body = Page<DeliveryResponse>),
+        (status = 401, description = "Not signed in.", body = Problem),
+        (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "`status` or a paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_all_deliveries(
+    State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Query(query): Query<PageQuery>,
+    Query(filter): Query<DeliveriesFilter>,
+) -> Result<Page<DeliveryResponse>, Error> {
+    principal.require(&WEBHOOKS_MANAGE)?;
+    let page = service
+        .all_deliveries(
+            &tenant,
+            filter.status.as_deref(),
+            filter.endpoint_id,
+            &PageRequest::try_from(query)?,
+        )
+        .await?;
+    Ok(page.map(DeliveryResponse::from))
+}
+
+/// Send a delivery again.
+///
+/// Requires `webhooks.manage`. Reopens a delivery that succeeded or failed for good and sends it
+/// again with the same body and `webhook-id` (receivers can drop it if they already handled it),
+/// retrying as usual. Recorded in the audit log.
+#[utoipa::path(
+    post,
+    path = "/deliveries/{id}/redeliver",
+    extensions(("x-permissions" = json!(["webhooks.manage"]))),
+    operation_id = "redeliver_webhook",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the delivery.")),
+    responses(
+        (status = 202, description = "Queued; the delivery is `pending` again.", body = Data<DeliveryResponse>),
+        (status = 401, description = "Not signed in.", body = Problem),
+        (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
+        (status = 404, description = "No delivery has this id; code `webhooks.delivery_not_found`.", body = Problem),
+        (status = 409, description = "The delivery is still being sent or retried; code `webhooks.delivery_in_progress`.", body = Problem),
+    )
+)]
+async fn redeliver(
+    State(service): State<Arc<WebhookService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<(StatusCode, Data<DeliveryResponse>), Error> {
+    principal.require(&WEBHOOKS_MANAGE)?;
+    let delivery = service.redeliver(&tenant, Actor::from(&principal), id).await?;
+    Ok((StatusCode::ACCEPTED, Data { data: DeliveryResponse::from(delivery) }))
+}
+
+/// Which deliveries to list.
+#[derive(Debug, Default, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeliveriesInput {
+    /// `pending`, `succeeded` or `failed`.
+    status: Option<String>,
+    /// Only deliveries to this endpoint.
+    endpoint_id: Option<Uuid>,
+    /// 1 to 200; 50 by default.
+    limit: Option<u32>,
+    /// `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
+/// The delivery to send again.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RedeliverInput {
+    /// Id of the delivery.
+    id: Uuid,
+}
+
+/// Tool MCP của module, gọi cùng service với REST.
+pub(crate) fn tools(service: Arc<WebhookService>) -> Vec<autoxide_kernel::mcp::Tool> {
+    use autoxide_kernel::mcp::Tool;
+    let list = service.clone();
+    vec![
+        Tool::new(
+            "list_deliveries",
+            "List webhook deliveries of every endpoint, newest first; filter by `status` \
+             (`pending`, `succeeded`, `failed`) or `endpoint_id`.",
+            move |tenant: TenantContext, _: Principal, input: DeliveriesInput| {
+                let service = list.clone();
+                async move {
+                    let page = PageRequest::try_from(PageQuery::new(
+                        input.limit.map(|limit| limit.to_string()),
+                        input.cursor,
+                        None,
+                    ))?;
+                    let page = service
+                        .all_deliveries(&tenant, input.status.as_deref(), input.endpoint_id, &page)
+                        .await?;
+                    Ok::<Page<DeliveryResponse>, Error>(page.map(DeliveryResponse::from))
+                }
+            },
+        )
+        .requires(WEBHOOKS_MANAGE)
+        .read_only(),
+        Tool::new(
+            "redeliver",
+            "Send a webhook delivery that succeeded or failed again, with the same body and \
+             `webhook-id`. Refused while it is still being sent.",
+            move |tenant: TenantContext, principal: Principal, input: RedeliverInput| {
+                let service = service.clone();
+                async move {
+                    let delivery =
+                        service.redeliver(&tenant, Actor::from(&principal), input.id).await?;
+                    Ok::<DeliveryResponse, Error>(DeliveryResponse::from(delivery))
+                }
+            },
+        )
+        .requires(WEBHOOKS_MANAGE),
+    ]
 }

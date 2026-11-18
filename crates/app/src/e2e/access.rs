@@ -284,9 +284,15 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
         // `files.list_files` — `files.upload` gồm cả xem file của chính mình, `files` không có
         // permission chỉ đọc; `kernel.list_domains` — tên miền riêng chỉ có một permission
         // `kernel.domains.manage` (đặc tả 33), xem là một phần của quản lý; `auth.list_invitations` —
-        // lời mời chỉ có một permission `auth.invitations.manage` (đặc tả 34, D-312).
-        const READ_ONLY_EXCEPTIONS: [&str; 3] =
-            ["files.list_files", "kernel.list_domains", "auth.list_invitations"];
+        // lời mời chỉ có một permission `auth.invitations.manage` (đặc tả 34, D-312);
+        // `webhooks.list_deliveries` — lần giao chứa dữ liệu event gửi ra ngoài, chỉ người quản lý
+        // webhook xem (`webhooks.manage`, như REST), D-371.
+        const READ_ONLY_EXCEPTIONS: [&str; 4] = [
+            "files.list_files",
+            "kernel.list_domains",
+            "auth.list_invitations",
+            "webhooks.list_deliveries",
+        ];
         for tool in app.modules().tools().unwrap() {
             let permissions: Vec<_> = tool.permission().into_iter().chain(tool.alternative()).collect();
             if permissions.is_empty() && !tool.is_for_any_signed_in() {

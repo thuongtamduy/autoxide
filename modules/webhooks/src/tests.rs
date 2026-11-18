@@ -618,3 +618,71 @@ async fn event_khach_a_khong_gui_toi_endpoint_khach_b() {
     .await
     .unwrap();
 }
+
+/// Bàn kỹ thuật (bước 52): lần gửi đã hỏng hẳn được gửi lại bằng tay (cùng thân, cùng
+/// `webhook-id`); lần gửi đang chờ thì không; danh sách cả khách lọc theo trạng thái.
+#[tokio::test]
+async fn gui_lai_lan_giao_da_hong() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let receiver = Receiver::default();
+        receiver.answers.lock().unwrap().push(StatusCode::BAD_GATEWAY);
+        let url = receiver.start().await;
+        let input = NewEndpoint { url, description: String::new(), events: vec!["*".to_owned()] };
+        setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap();
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
+        let id = deliveries(&setup.database).await[0].id;
+
+        // Đang chờ: không gửi lại được.
+        let busy = setup.service.redeliver(&setup.tenant, Actor::system(), id).await.unwrap_err();
+        assert_eq!(busy.code(), "webhooks.delivery_in_progress");
+
+        let last = crate::delivery::MAX_ATTEMPTS;
+        assert!(setup.sender.run(&job(&setup.database, id, last)).await.is_err());
+        let page = autoxide_kernel::pagination::PageRequest::try_from(
+            autoxide_kernel::pagination::PageQuery::default(),
+        )
+        .unwrap();
+        let failed =
+            setup.service.all_deliveries(&setup.tenant, Some("failed"), None, &page).await.unwrap();
+        assert_eq!(failed.data.len(), 1);
+        assert!(
+            setup
+                .service
+                .all_deliveries(&setup.tenant, Some("succeeded"), None, &page)
+                .await
+                .unwrap()
+                .data
+                .is_empty()
+        );
+        assert!(
+            setup.service.all_deliveries(&setup.tenant, Some("lost"), None, &page).await.is_err()
+        );
+
+        let again = setup.service.redeliver(&setup.tenant, Actor::system(), id).await.unwrap();
+        assert_eq!(again.status, "pending");
+        // Job mới đã xếp: hai job (lần đầu và lần gửi lại).
+        let backend = setup.database.read().get_database_backend();
+        let sql = "SELECT COUNT(*) AS n FROM webhooks_jobs";
+        let count = setup.database.read().query_one_raw(Statement::from_string(backend, sql));
+        let jobs: i64 = count.await.unwrap().unwrap().try_get("", "n").unwrap();
+        assert_eq!(jobs, 2);
+        setup.sender.run(&job(&setup.database, id, 1)).await.unwrap();
+        let row =
+            delivery::Entity::find_by_id(id).one(setup.database.read()).await.unwrap().unwrap();
+        assert_eq!(row.status, "succeeded");
+        let requests = receiver.requests.lock().unwrap().clone();
+        assert_eq!(requests.len(), 2);
+        assert_eq!(requests[0].0["webhook-id"], requests[1].0["webhook-id"]);
+        assert_eq!(requests[0].1, requests[1].1, "cùng thân");
+
+        let missing = setup
+            .service
+            .redeliver(&setup.tenant, Actor::system(), Uuid::now_v7())
+            .await
+            .unwrap_err();
+        assert_eq!(missing.code(), "webhooks.delivery_not_found");
+    })
+    .await
+    .unwrap();
+}

@@ -8231,6 +8231,89 @@
       "permissions": [
         "tax.read"
       ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List webhook deliveries of every endpoint, newest first; filter by `status` (`pending`, `succeeded`, `failed`) or `endpoint_id`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which deliveries to list.",
+        "properties": {
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "endpoint_id": {
+            "description": "Only deliveries to this endpoint.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; 50 by default.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `succeeded` or `failed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "webhooks.list_deliveries",
+      "output_schema": null,
+      "permissions": [
+        "webhooks.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Send a webhook delivery that succeeded or failed again, with the same body and `webhook-id`. Refused while it is still being sent.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The delivery to send again.",
+        "properties": {
+          "id": {
+            "description": "Id of the delivery.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "webhooks.redeliver",
+      "output_schema": null,
+      "permissions": [
+        "webhooks.manage"
+      ]
     }
   ]
 }

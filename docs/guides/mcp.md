@@ -248,5 +248,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `plans.update_plan` | `plans.plans.manage` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
+| `webhooks.list_deliveries` | `webhooks.manage` | read-only |
+| `webhooks.redeliver` | `webhooks.manage` | writes |
 
 <!-- tools:end -->
