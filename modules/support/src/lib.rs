@@ -8,6 +8,7 @@ pub mod api;
 mod config;
 mod entity;
 mod events;
+mod extras;
 mod guest;
 mod hours;
 mod http;
@@ -109,10 +110,14 @@ impl Module for SupportModule {
             accounts: context.require::<dyn autoxide_compliance::api::AccountVerification>().ok(),
             // Hỏi quyền của người được giao (`principal_of`); không có thì không tự giao cho ai.
             authenticator: context.require::<dyn autoxide_kernel::access::Authenticator>().ok(),
+            resources: Some(context.resources()),
+            complaints: context.require::<dyn autoxide_compliance::api::ComplaintIntake>().ok(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;
         context.provide::<dyn api::SupportIntake>(service.clone())?;
+        // Phiếu là một loại đối tượng (D-123): vụ việc khiếu nại của `compliance` trỏ tới nó.
+        context.resource_type("support.ticket", Arc::new(intake::TicketResolver))?;
         // Hộp việc (bước 51): phiếu đang chờ nhân viên.
         context.work_source(Arc::new(sla::Waiting))?;
         self.databases = Some(context.tenancy());

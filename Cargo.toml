@@ -67,6 +67,7 @@ autoxide-inventory = { path = "modules/inventory" }
 autoxide-shipping = { path = "modules/shipping" }
 autoxide-support = { path = "modules/support" }
 autoxide-bookings = { path = "modules/bookings" }
+autoxide-promotions = { path = "modules/promotions" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

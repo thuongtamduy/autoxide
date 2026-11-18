@@ -10997,6 +10997,405 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Turn a draft promotion on after the legal checks (discount limit and days in force, notices to authorities, price floors). Failed checks come back as errors.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.activate_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a promotion as a draft (rule, window with a required end, limits, title and terms). Turn it on with `activate_promotion`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to create.",
+        "properties": {
+          "promotion": {
+            "description": "The promotion, as the body of `POST /api/v1/promotions` (`PromotionsPromotionInput`).",
+            "type": "object"
+          }
+        },
+        "required": [
+          "promotion"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.create_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "End a promotion now; usage already held for orders stays valid.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.end_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Compute the promotions of a cart without holding anything: discounts per line with reasons, gifts, codes and vouchers that do not apply, and the fingerprint.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A cart to compute.",
+        "properties": {
+          "cart": {
+            "description": "The cart, as the body of `POST /api/v1/promotions/evaluate` (`PromotionsCart`).",
+            "type": "object"
+          }
+        },
+        "required": [
+          "cart"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.evaluate_cart",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add one chosen code or a batch of random codes to a promotion: `redeem` coupons for `code` promotions, `claim` codes for `voucher` promotions.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Codes to add to a promotion.",
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "enum": [
+              "redeem",
+              "claim"
+            ],
+            "type": "string"
+          },
+          "usage_limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.generate_codes",
+      "output_schema": null,
+      "permissions": [
+        "promotions.codes.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a promotion with its rule, texts, targets, flash-sale prices and counters.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.get_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Put a voucher of a `voucher` promotion into a user's wallet, with a reason. The same `reference` again returns the voucher already given.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A voucher to give by hand.",
+        "properties": {
+          "promotion_id": {
+            "description": "Id of the `voucher` promotion.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why, 3 to 500 characters (kept in the audit log).",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your reference; the same one again returns the same voucher.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promotion_id",
+          "user_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.grant_voucher",
+      "output_schema": null,
+      "permissions": [
+        "promotions.vouchers.grant"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the promotions in your scope, newest first; filter by status, kind, unit or words in the title; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Promotions to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of promotion.",
+                "enum": [
+                  "percent_off",
+                  "amount_off",
+                  "fixed_price",
+                  "buy_x_get_y",
+                  "free_shipping",
+                  "flash_sale",
+                  "tiered",
+                  "bundle_price",
+                  "add_on",
+                  "gift_choice"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of promotions, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the title.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "enum": [
+                  "draft",
+                  "scheduled",
+                  "active",
+                  "paused",
+                  "ended",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "promotions.list_promotions",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the vouchers in a user's wallet, soonest to expire first (for support staff).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Whose wallet to read.",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "description": "State of a voucher in a wallet.",
+                "enum": [
+                  "available",
+                  "held",
+                  "used",
+                  "expired",
+                  "revoked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.list_vouchers_of_user",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false

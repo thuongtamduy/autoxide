@@ -342,7 +342,7 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
 - [x] Hạn trả lời (SLA) theo ưu tiên, tính theo giờ làm việc và ngày nghỉ của nút, dừng khi chờ người
       mua; job đánh dấu quá hạn; nguồn việc cho hộp việc (bước 51); báo cáo thời gian phản hồi, tỉ lệ quá
       hạn, mức hài lòng
-- [ ] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
+- [x] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
       khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
 - [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
@@ -545,29 +545,29 @@ Bắt đầu SAU bước 41. Luật khuyến mại đổi thường xuyên: hạ
 cứng (Thông tư 39/2025/TT-BCT trần 50% giá ngay trước khuyến mại, có ngoại lệ chương trình tập trung
 quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản hiện hành).
 
-- [ ] Chương trình là luật, đến người mua bằng ba cách (D-222): giảm tự động; coupon — mã ai có cũng dùng
+- [x] Chương trình là luật, đến người mua bằng ba cách (D-222): giảm tự động; coupon — mã ai có cũng dùng
       được (mã chung hay lô mã riêng); voucher — quyền dùng một lần trong ví của một tài khoản; mã gắn với
       một người luôn là voucher; khung thời gian với ngày kết thúc bắt buộc (D-225)
-- [ ] Loại khuyến mại: giảm theo sản phẩm, danh mục, giá trị đơn, nhóm khách; mua X tặng Y (mua 2 tính 1,
+- [x] Loại khuyến mại: giảm theo sản phẩm, danh mục, giá trị đơn, nhóm khách; mua X tặng Y (mua 2 tính 1,
       món rẻ nhất); miễn phí vận chuyển; flash sale; bậc thang, combo đồng giá, mua kèm deal sốc, chọn quà
       (D-222)
-- [ ] Điều kiện: phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu,
+- [x] Điều kiện: phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu,
       người bán, khách mới, loại trừ hàng đang giảm (D-222); đơn đầu tiên (`first_order_only`); khung giờ
 - [ ] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ điều
       kiện — Luật 19/2023); tính trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình (D-222)
-- [ ] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
+- [x] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
       dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
       mỗi bên trả tiền (D-222)
 - [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
       dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày (D-222)
-- [ ] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
+- [x] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
       xác nhận → trả lại), test đồng thời; chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện
       thoại, địa chỉ — chỉ bản băm), giới hạn theo kỳ (D-222)
-- [ ] Ví voucher của người mua (D-222): lưu, nhập mã nhận, được tặng qua `grant_voucher` (gọi lại không
+- [x] Ví voucher của người mua (D-222): lưu, nhập mã nhận, được tặng qua `grant_voucher` (gọi lại không
       cấp thêm), cấp tay có lý do; có trong xuất dữ liệu cá nhân, xoá tài khoản thì thu hồi voucher chưa dùng
-- [ ] Quy tắc trả hàng và huỷ cho `orders` (D-222): hoàn theo tỉ lệ, quà khi trả món điều kiện, voucher về
+- [x] Quy tắc trả hàng và huỷ cho `orders` (D-222): hoàn theo tỉ lệ, quà khi trả món điều kiện, voucher về
       ví khi huỷ đơn
-- [ ] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực (cộng mọi khoản giảm trên một đơn vị,
+- [x] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực (cộng mọi khoản giảm trên một đơn vị,
       D-222) và sàn giá; giới hạn số ngày giảm giá là dữ liệu; kiểm trước khi bật, không ghi (D-225)
 - [ ] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
       chức, ghi nhận đã nộp từng nơi; lưu vết chương trình đã chạy

@@ -162,6 +162,8 @@ pub(crate) struct TicketDetail {
     #[serde(flatten)]
     pub ticket: TicketResponse,
     pub messages: Vec<MessageResponse>,
+    /// Linked records, as `<module>.<type>:<id>` (staff only; empty for customers).
+    pub links: Vec<String>,
 }
 
 impl TicketDetail {
@@ -169,6 +171,7 @@ impl TicketDetail {
         TicketDetail {
             ticket: TicketResponse::new(ticket, full),
             messages: messages.into_iter().map(MessageResponse::from).collect(),
+            links: Vec::new(),
         }
     }
 }

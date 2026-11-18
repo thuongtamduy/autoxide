@@ -450,3 +450,38 @@ pub trait ModerationPolicy: Send + Sync {
         reason: &str,
     ) -> Result<(), Error>;
 }
+
+/// Khiếu nại người tiêu dùng chuyển từ một phiếu hỗ trợ (bước 53): `compliance` tạo vụ việc
+/// `consumer_complaint` có hạn luật định (Luật 19/2023/QH15), đích là phiếu.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ComplaintFromTicket {
+    /// Phiếu nguồn, `support.ticket:<id>`: gọi lại cùng giá trị trả vụ việc cũ, không tạo vụ thứ hai.
+    pub source_ref: String,
+    /// Nút bị khiếu nại (cửa hàng, gian hàng của phiếu).
+    pub org_id: Uuid,
+    /// Tài khoản người mua, nếu có.
+    pub reporter_user_id: Option<Uuid>,
+    pub name: Option<String>,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    /// Nội dung khiếu nại (10 tới 5000 ký tự).
+    pub claim: String,
+}
+
+/// Vụ việc nhận khiếu nại.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CaseRef {
+    pub id: Uuid,
+    /// `false`: phiếu đã được chuyển trước đó, đây là vụ việc cũ.
+    pub created: bool,
+}
+
+/// Nhận khiếu nại từ module khác. Gọi NGOÀI transaction ghi của bên gọi.
+#[async_trait::async_trait]
+pub trait ComplaintIntake: Send + Sync {
+    async fn open(
+        &self,
+        tenant: &TenantContext,
+        complaint: ComplaintFromTicket,
+    ) -> Result<CaseRef, Error>;
+}
