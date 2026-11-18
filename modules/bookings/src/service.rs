@@ -17,6 +17,9 @@ use crate::settings::Settings;
 pub(crate) struct BookingsService {
     pub outbox: Outbox,
     pub settings: Settings,
+    pub jobs: autoxide_kernel::job::JobQueue,
+    pub databases: autoxide_kernel::tenancy::DatabaseRegistry,
+    pub ledger: Option<std::sync::Arc<dyn autoxide_ledger::api::Ledger>>,
 }
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai

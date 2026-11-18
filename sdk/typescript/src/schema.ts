@@ -84,6 +84,20 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** A message to add. */
+export type AddSupportMessageRequest = {
+  /** The text comes from an AI suggestion (shown with a label). */
+  ai_assisted?: boolean;
+  /** Plain text. */
+  body: string;
+  /** `true`: an internal note only staff see. */
+  internal?: boolean;
+  /** Attached media items (at most 5). */
+  media_ids?: string[];
+  /** Colleagues to notify, in an internal note (at most 20). */
+  mentions?: string[];
+};
+
 /** An add-on of a subscription. */
 export type AddonItem = {
   /** An active plan of kind `addon`. */
@@ -514,12 +528,62 @@ export type BookingAvailability = {
   timezone: string;
 };
 
+/** Where the customer pays the deposit. */
+export type BookingCheckout = {
+  /** Partner page where the customer pays. */
+  checkout_url?: string | null;
+  /** Pay before this moment, or the place is released. */
+  expires_at: string;
+  payment_id: string;
+  /** QR code payload, when the partner gives one. */
+  qr_payload?: string | null;
+};
+
+/** A booking just made, with the deposit checkout when one is due. */
+export type BookingCreated = {
+  booking: BookingRecord;
+  checkout?: BookingCheckout | null;
+};
+
+/** The customer of a booking. */
+export type BookingCustomer = {
+  email?: string | null;
+  name: string;
+  /** E.164, e.g. `+84912345678`. */
+  phone?: string | null;
+  /** The customer's account, for signed-in customers. */
+  user_id?: string | null;
+};
+
+/** Who the booking is for. */
+export type BookingCustomerInput = {
+  email?: string | null;
+  /** 1 to 200 characters. */
+  name: string;
+  /** Phone number, e.g. `0912345678` or `+84912345678`; stored as E.164. */
+  phone?: string | null;
+};
+
 /** How much deposit a booking asks for, paid through the shop's payment partner. */
 export type BookingDeposit = {
   /** `none`, `percent` (of the price) or `amount` (fixed, in the price's currency). */
   kind: string;
   /** Percent 1–100, or the amount in minor units; `0` for `none`. */
   value?: number;
+};
+
+/** A deposit and where it stands. */
+export type BookingDepositState = {
+  amount: Money;
+  /** The payment at the partner (`GET /api/v1/ledger/payments/{id}`). */
+  payment_id?: string | null;
+  /** The part given back (or being given back). */
+  refund: Money;
+  /**
+   * `none`, `pending` (waiting for the payment), `paid`, `refund_pending`, `refunded` or `retained`
+   * (kept by the policy).
+   */
+  status: string;
 };
 
 /** Time off or extra working hours. */
@@ -543,6 +607,36 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A booking. */
+export type BookingRecord = {
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
+  created_at: string;
+  customer: BookingCustomer;
+  deposit: BookingDepositState;
+  ends_at: string;
+  /** Until when a `held` booking waits for the deposit. */
+  hold_expires_at?: string | null;
+  id: string;
+  note: string;
+  /** The unit (shop, branch) of the staff member. */
+  org_id: string;
+  /** Price of all places. */
+  price: Money;
+  /** The staff member (or court, room…) booked. */
+  resource_id: string;
+  /** Places taken (classes). */
+  seats: number;
+  service_id: string;
+  starts_at: string;
+  /**
+   * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+   * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+   */
+  status: string;
+  updated_at: string;
 };
 
 /** A staff member, room or equipment. */
@@ -733,6 +827,12 @@ export type CanCheck = {
 export type CanRequest = {
   /** 1 to 50 questions. */
   checks: CanCheck[];
+};
+
+/** Why the booking is cancelled. */
+export type CancelBookingRequest = {
+  /** Up to 200 characters. */
+  reason?: string | null;
 };
 
 /** Cancel your tenant's subscription. */
@@ -1380,6 +1480,19 @@ export type ChildTenantResponse = {
   slug: string;
   /** `provisioning`, `active`, `suspended`, `maintenance` or `moving`. */
   status: string;
+};
+
+/** Proof that you own guest tickets: one guest ticket you verified, with its token. */
+export type ClaimSupportTicketsRequest = {
+  /** A guest ticket whose email or phone number you verified. */
+  ticket_id?: string | null;
+  /** Its `access_token`. */
+  token?: string | null;
+};
+
+/** How many guest tickets were attached. */
+export type ClaimSupportTicketsResponse = {
+  claimed: number;
 };
 
 /** Settings of the server an interface needs, by module: only values safe to show anyone. A module without such settings is absent. */
@@ -3241,6 +3354,22 @@ export type CreateBookingExceptionRequest = {
   starts_at: string;
 };
 
+/** A booking made by the shop (phone call, walk-in): confirmed at once, no deposit. */
+export type CreateBookingRequest = {
+  customer: BookingCustomerInput;
+  /** Language of messages to the customer, e.g. `vi`. */
+  locale?: string | null;
+  /** Up to 500 characters. Never put health information here. */
+  note?: string;
+  /** Omitted: the first free staff member who gives the service. */
+  resource_id?: string | null;
+  /** Places (classes); default 1. */
+  seats?: number;
+  service_id: string;
+  /** On a 5-minute mark, e.g. a `starts_at` from the availability. */
+  starts_at: string;
+};
+
 /** A new staff member, room or equipment. */
 export type CreateBookingResourceRequest = {
   /**
@@ -3479,6 +3608,21 @@ export type CreateSiteMenuRequest = {
   org_id?: string | null;
 };
 
+/** A ticket staff open for a customer (a phone call, a visit…). */
+export type CreateSupportTicketRequest = {
+  /** What the customer asked. */
+  body: string;
+  /** A ticket category of the shop (default: `order`, `product`, `payment`, `account`, `other`). */
+  category: string;
+  /** Attached media items. */
+  media_ids?: string[];
+  /** Unit of the ticket; you need `support.tickets.reply` there. Omitted: the root unit. */
+  org_id?: string | null;
+  priority?: SupportPriority | null;
+  requester: SupportRequesterInput;
+  subject: string;
+};
+
 /** An address to suppress by hand. */
 export type CreateSuppressionRequest = {
   email: string;
@@ -3621,6 +3765,26 @@ export type CustomFieldView = {
   updated_at: string;
   /** `internal` (staff only), `public` (in public reads) or `buyer_input` (end users fill it). */
   visibility: string;
+};
+
+/** A booking by the customer. */
+export type CustomerBookingRequest = {
+  customer: BookingCustomerInput;
+  /** Language of messages to the customer, e.g. `vi`. */
+  locale?: string | null;
+  /** Up to 500 characters. Never put health information here. */
+  note?: string;
+  /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
+  payment_method?: string | null;
+  /** A staff member (or court, room…) from the availability; omitted: the first one free. */
+  resource_id?: string | null;
+  /** Page of the shop to open after paying the deposit. */
+  return_url?: string | null;
+  /** Places (classes); default 1. */
+  seats?: number;
+  service_id: string;
+  /** A `starts_at` from the availability. */
+  starts_at: string;
 };
 
 /** A customer account of the tenant's shop. */
@@ -3911,6 +4075,15 @@ export type Data_BookingAvailability = {
 };
 
 /** Envelope of a single result. */
+export type Data_BookingCreated = {
+  /** A booking just made, with the deposit checkout when one is due. */
+  data: {
+    booking: BookingRecord;
+    checkout?: BookingCheckout | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BookingException = {
   /** Time off or extra working hours. */
   data: {
@@ -3921,6 +4094,39 @@ export type Data_BookingException = {
     reason: string;
     resource_id: string;
     starts_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BookingRecord = {
+  /** A booking. */
+  data: {
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    created_at: string;
+    customer: BookingCustomer;
+    deposit: BookingDepositState;
+    ends_at: string;
+    /** Until when a `held` booking waits for the deposit. */
+    hold_expires_at?: string | null;
+    id: string;
+    note: string;
+    /** The unit (shop, branch) of the staff member. */
+    org_id: string;
+    /** Price of all places. */
+    price: Money;
+    /** The staff member (or court, room…) booked. */
+    resource_id: string;
+    /** Places taken (classes). */
+    seats: number;
+    service_id: string;
+    starts_at: string;
+    /**
+     * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+     * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+     */
+    status: string;
+    updated_at: string;
   };
 };
 
@@ -4221,6 +4427,14 @@ export type Data_CeremonyResponse = {
      * `navigator.credentials.create()` / `.get()`.
      */
     options: Record<string, unknown>;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ClaimSupportTicketsResponse = {
+  /** How many guest tickets were attached. */
+  data: {
+    claimed: number;
   };
 };
 
@@ -8204,6 +8418,95 @@ export type Data_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportMessage = {
+  /**
+   * One message of a ticket. Messages are never edited; a hidden message keeps its place with
+   * `hidden: true` (staff still see its text and the reason).
+   */
+  data: {
+    /** Written from an AI suggestion (label it). */
+    ai_assisted: boolean;
+    author_kind: SupportAuthorKind;
+    /** The account that wrote it (staff or customer); empty for guests and the server. */
+    author_user_id?: string | null;
+    /** Sent automatically from an approved answer (label it "Automatic answer"). */
+    auto_reply: boolean;
+    /** Plain text as written. For `system` messages: a line key such as `status:solved`. */
+    body: string;
+    /** The same text as safe HTML (escaped, line breaks as `<br>`). */
+    body_html: string;
+    created_at: string;
+    hidden: boolean;
+    /** Why it was hidden (staff only). */
+    hidden_reason?: string | null;
+    id: string;
+    kind: SupportMessageKind;
+    /** Attached media items (module `media`). */
+    media_ids: string[];
+    /** Colleagues mentioned in an internal note. */
+    mentions: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportOpenedTicket = {
+  /** A ticket just opened. Guests get `access_token` once: keep it to see and answer the ticket. */
+  data: SupportTicket & {
+    /** Guests only, shown only here: send it as `token` to the `/public/tickets/{id}` endpoints. */
+    access_token?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTicket = {
+  /** A support ticket. */
+  data: {
+    assignee_user_id?: string | null;
+    /** A response-time target was missed. */
+    breached: boolean;
+    /** The consumer complaint this ticket became (module `compliance`). */
+    case_id?: string | null;
+    category: string;
+    channel: SupportChannel;
+    closed_at?: string | null;
+    created_at: string;
+    /** Handed over to the marketplace operator. */
+    escalated_to_platform: boolean;
+    first_responded_at?: string | null;
+    /** Answer the customer before this (business hours of the unit). */
+    first_response_due_at?: string | null;
+    /** The earlier ticket this one follows up. */
+    follow_up_of?: string | null;
+    id: string;
+    last_message_at: string;
+    /** Number shown to the customer. */
+    number: string;
+    /** The organization unit (shop, marketplace store) the ticket belongs to. */
+    org_id: string;
+    priority: SupportPriority;
+    requester: SupportRequester;
+    resolution?: SupportResolution | null;
+    /** Solve the ticket before this; the clock stops while waiting for the customer. */
+    resolve_due_at?: string | null;
+    /** Customer rating after the ticket was solved, 1 to 5. */
+    satisfaction?: number | null;
+    solved_at?: string | null;
+    status: SupportTicketStatus;
+    subject: string;
+    team_id?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTicketDetail = {
+  /** A ticket with its messages, oldest first. */
+  data: SupportTicket & {
+    messages: SupportMessage[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SuppressionResponse = {
   /** An address that gets no campaign mail. */
   data: {
@@ -11093,6 +11396,12 @@ export type Health = {
   status: string;
 };
 
+/** Why a message is hidden. */
+export type HideSupportMessageRequest = {
+  /** Kept in the audit log; 1 to 500 characters. */
+  reason: string;
+};
+
 /** A sign-in with an outside provider linked to your account. */
 export type IdentityResponse = {
   created_at: string;
@@ -13120,6 +13429,14 @@ export type MyPermission = {
   risk: string;
 };
 
+/** A message from the customer. */
+export type MySupportMessageRequest = {
+  /** Plain text. */
+  body: string;
+  /** Media items you uploaded yourself (at most 5). */
+  media_ids?: string[];
+};
+
 /** A tenant you can work in. */
 export type MyTenantResponse = {
   /**
@@ -13708,6 +14025,38 @@ export type NotificationWebPushKey = {
   public_key: string;
 };
 
+/**
+ * A ticket from the website. Signed-in customers send only the question; guests also send
+ * exactly one of `email` or `phone`, and the anti-spam fields of the form.
+ */
+export type OpenSupportTicketRequest = {
+  /** Your question, plain text. */
+  body: string;
+  /** A ticket category of the shop (default: `order`, `product`, `payment`, `account`, `other`). */
+  category: string;
+  /** Guests: the answer to the challenge, when the token came with one. */
+  challenge?: string | null;
+  /** Guests: where we answer (a code to confirm it is sent there). */
+  email?: string | null;
+  /** An earlier ticket of yours this one follows up (closed tickets do not reopen). */
+  follow_up_of?: string | null;
+  /** Guests: the token from `GET /api/v1/antispam/token?scope=support:tickets`. */
+  form_token?: string | null;
+  /** Language for our messages to you (`vi`, `en`). */
+  locale?: string | null;
+  /** Signed-in customers: media items you uploaded (at most 5). Guests cannot attach files. */
+  media_ids?: string[];
+  /** Your name. */
+  name?: string | null;
+  /** Shop or marketplace store that should answer; omitted: the root unit. */
+  org_id?: string | null;
+  /** Guests: a mobile number, instead of `email` (a code is sent by SMS). */
+  phone?: string | null;
+  subject: string;
+  /** Guests: the hidden trap field of the form; leave it empty. */
+  trap?: string | null;
+};
+
 /** An override to set; it replaces one of the same kind and key. */
 export type OverrideRequest = {
   /** Required with `module` / `feature`. */
@@ -13864,6 +14213,40 @@ export type Page_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BookingRecord = {
+  /** The items of this page, in the requested order. */
+  data: {
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    created_at: string;
+    customer: BookingCustomer;
+    deposit: BookingDepositState;
+    ends_at: string;
+    /** Until when a `held` booking waits for the deposit. */
+    hold_expires_at?: string | null;
+    id: string;
+    note: string;
+    /** The unit (shop, branch) of the staff member. */
+    org_id: string;
+    /** Price of all places. */
+    price: Money;
+    /** The staff member (or court, room…) booked. */
+    resource_id: string;
+    /** Places taken (classes). */
+    seats: number;
+    service_id: string;
+    starts_at: string;
+    /**
+     * `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
+     * `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
+     */
+    status: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -16180,6 +16563,48 @@ export type Page_SubscriberResponse = {
 };
 
 /** One page of a list. */
+export type Page_SupportTicket = {
+  /** The items of this page, in the requested order. */
+  data: {
+    assignee_user_id?: string | null;
+    /** A response-time target was missed. */
+    breached: boolean;
+    /** The consumer complaint this ticket became (module `compliance`). */
+    case_id?: string | null;
+    category: string;
+    channel: SupportChannel;
+    closed_at?: string | null;
+    created_at: string;
+    /** Handed over to the marketplace operator. */
+    escalated_to_platform: boolean;
+    first_responded_at?: string | null;
+    /** Answer the customer before this (business hours of the unit). */
+    first_response_due_at?: string | null;
+    /** The earlier ticket this one follows up. */
+    follow_up_of?: string | null;
+    id: string;
+    last_message_at: string;
+    /** Number shown to the customer. */
+    number: string;
+    /** The organization unit (shop, marketplace store) the ticket belongs to. */
+    org_id: string;
+    priority: SupportPriority;
+    requester: SupportRequester;
+    resolution?: SupportResolution | null;
+    /** Solve the ticket before this; the clock stops while waiting for the customer. */
+    resolve_due_at?: string | null;
+    /** Customer rating after the ticket was solved, 1 to 5. */
+    satisfaction?: number | null;
+    solved_at?: string | null;
+    status: SupportTicketStatus;
+    subject: string;
+    team_id?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SuppressionResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17542,6 +17967,14 @@ export type PublicSiteMenuItem = {
   ref?: PublicMenuTarget | null;
 };
 
+/** A message from a guest. */
+export type PublicSupportMessageRequest = {
+  /** Plain text. */
+  body: string;
+  /** The ticket token. */
+  token: string;
+};
+
 /** A category or tag of an entry. */
 export type PublicTerm = {
   id: string;
@@ -17856,6 +18289,14 @@ export type ReportRequest = {
   /** What is wrong, for the moderators (at most 500 characters). */
   note?: string | null;
   reason: CommentReportReason;
+};
+
+/** The new time of a booking. */
+export type RescheduleBookingRequest = {
+  /** Another staff member who gives the service; omitted: the same one. */
+  resource_id?: string | null;
+  /** On a 5-minute mark. */
+  starts_at: string;
 };
 
 /** A new password, with the token from the reset mail. */
@@ -18823,6 +19264,12 @@ export type SupportAllowedResponse = {
   tenant_id: string;
 };
 
+/** Who wrote a message. */
+export type SupportAuthorKind = "customer" | "agent" | "system";
+
+/** Where a ticket came from. */
+export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -18876,6 +19323,116 @@ export type SupportGrantResponse = {
   /** The tenant the staff may enter. */
   tenant_id: string;
 };
+
+/**
+ * One message of a ticket. Messages are never edited; a hidden message keeps its place with
+ * `hidden: true` (staff still see its text and the reason).
+ */
+export type SupportMessage = {
+  /** Written from an AI suggestion (label it). */
+  ai_assisted: boolean;
+  author_kind: SupportAuthorKind;
+  /** The account that wrote it (staff or customer); empty for guests and the server. */
+  author_user_id?: string | null;
+  /** Sent automatically from an approved answer (label it "Automatic answer"). */
+  auto_reply: boolean;
+  /** Plain text as written. For `system` messages: a line key such as `status:solved`. */
+  body: string;
+  /** The same text as safe HTML (escaped, line breaks as `<br>`). */
+  body_html: string;
+  created_at: string;
+  hidden: boolean;
+  /** Why it was hidden (staff only). */
+  hidden_reason?: string | null;
+  id: string;
+  kind: SupportMessageKind;
+  /** Attached media items (module `media`). */
+  media_ids: string[];
+  /** Colleagues mentioned in an internal note. */
+  mentions: string[];
+};
+
+/** Who sees a message. */
+export type SupportMessageKind = "public" | "internal" | "system";
+
+/** A ticket just opened. Guests get `access_token` once: keep it to see and answer the ticket. */
+export type SupportOpenedTicket = SupportTicket & {
+  /** Guests only, shown only here: send it as `token` to the `/public/tickets/{id}` endpoints. */
+  access_token?: string | null;
+};
+
+/** How urgent a ticket is. */
+export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** Who asked. Customers and guests see their own email or phone number masked. */
+export type SupportRequester = {
+  email?: string | null;
+  name: string;
+  phone?: string | null;
+  /** The customer account, when the ticket belongs to one. */
+  user_id?: string | null;
+  /** The guest proved the email or phone number (accounts always count as verified). */
+  verified: boolean;
+};
+
+/** Who asked, for a ticket staff open on behalf of a customer: exactly one of the three. */
+export type SupportRequesterInput = {
+  email?: string | null;
+  /** Name to show. */
+  name?: string;
+  phone?: string | null;
+  /** A customer account. */
+  user_id?: string | null;
+};
+
+/** How a ticket ended. */
+export type SupportResolution = "answered" | "escalated" | "duplicate" | "spam" | "no_reply";
+
+/** A support ticket. */
+export type SupportTicket = {
+  assignee_user_id?: string | null;
+  /** A response-time target was missed. */
+  breached: boolean;
+  /** The consumer complaint this ticket became (module `compliance`). */
+  case_id?: string | null;
+  category: string;
+  channel: SupportChannel;
+  closed_at?: string | null;
+  created_at: string;
+  /** Handed over to the marketplace operator. */
+  escalated_to_platform: boolean;
+  first_responded_at?: string | null;
+  /** Answer the customer before this (business hours of the unit). */
+  first_response_due_at?: string | null;
+  /** The earlier ticket this one follows up. */
+  follow_up_of?: string | null;
+  id: string;
+  last_message_at: string;
+  /** Number shown to the customer. */
+  number: string;
+  /** The organization unit (shop, marketplace store) the ticket belongs to. */
+  org_id: string;
+  priority: SupportPriority;
+  requester: SupportRequester;
+  resolution?: SupportResolution | null;
+  /** Solve the ticket before this; the clock stops while waiting for the customer. */
+  resolve_due_at?: string | null;
+  /** Customer rating after the ticket was solved, 1 to 5. */
+  satisfaction?: number | null;
+  solved_at?: string | null;
+  status: SupportTicketStatus;
+  subject: string;
+  team_id?: string | null;
+  updated_at: string;
+};
+
+/** A ticket with its messages, oldest first. */
+export type SupportTicketDetail = SupportTicket & {
+  messages: SupportMessage[];
+};
+
+/** Where a ticket stands. */
+export type SupportTicketStatus = "open" | "pending_agent" | "pending_customer" | "solved" | "closed";
 
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
@@ -19894,6 +20451,18 @@ export type UpdateSubscriberRequest = {
   unsubscribe_list_ids?: string[];
 };
 
+/** Changes to a ticket. Omitted fields stay as they are. */
+export type UpdateSupportTicketRequest = {
+  /** Assign to this user (yourself, or a member of a support team of the unit); `null`: nobody. */
+  assignee_user_id?: string | null;
+  category?: string | null;
+  priority?: SupportPriority | null;
+  resolution?: SupportResolution | null;
+  status?: SupportTicketStatus | null;
+  /** Assign to this support team of the unit; `null`: no team. */
+  team_id?: string | null;
+};
+
 /** Changes to a unit; omitted fields stay as they are. */
 export type UpdateUnitRequest = {
   /** New internal code, 1 to 64 characters; an empty string removes the code. */
@@ -20042,6 +20611,14 @@ export type VerificationConfirmation = {
 /** The answer to an address confirmation. */
 export type VerifiedResponse = {
   verified: boolean;
+};
+
+/** Confirm the contact of a guest ticket. */
+export type VerifySupportTicketRequest = {
+  /** The code we sent. Omit it to get a new code. */
+  code?: string | null;
+  /** The ticket token. */
+  token: string;
 };
 
 /** Changes to a saved view; omitted fields stay as they are. */
@@ -21741,6 +22318,134 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings": {
+    /** List bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Book for a customer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBookingRequest;
+      responses: {
+        201: Data_BookingCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}": {
+    /** Get a booking. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/cancel": {
+    /** Cancel a booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CancelBookingRequest;
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/check-in": {
+    /** Check the customer in. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/complete": {
+    /** Mark a booking done. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/confirm": {
+    /** Confirm a pending booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/no-show": {
+    /** Mark a no-show. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/bookings/{id}/reschedule": {
+    /** Move a booking. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RescheduleBookingRequest;
+      responses: {
+        200: Data_BookingRecord;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/exceptions": {
     /** List time off and extra hours of a resource. */
     get: {
@@ -21789,6 +22494,23 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings": {
+    /** Book a service (customer). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CustomerBookingRequest;
+      responses: {
+        201: Data_BookingCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -29711,6 +30433,204 @@ export interface paths {
         404: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/claim": {
+    /** Attach your guest tickets to your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ClaimSupportTicketsRequest;
+      responses: {
+        200: Data_ClaimSupportTicketsResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets": {
+    /** List your own support tickets. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportTicket;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}": {
+    /** Get one of your support tickets with its messages. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportTicketDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/messages": {
+    /** Write on one of your support tickets. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: MySupportMessageRequest;
+      responses: {
+        201: Data_SupportMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets": {
+    /** Open a support ticket from the website. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: OpenSupportTicketRequest;
+      responses: {
+        201: Data_SupportOpenedTicket;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}": {
+    /** See a guest ticket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { token: string }; };
+      responses: {
+        200: Data_SupportTicketDetail;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/messages": {
+    /** Write on a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PublicSupportMessageRequest;
+      responses: {
+        201: Data_SupportMessage;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/verify": {
+    /** Confirm the email or phone number of a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: VerifySupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets": {
+    /** List the support tickets in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: SupportTicketStatus; assignee?: string; team_id?: string; org_id?: string; category?: string; priority?: SupportPriority; breached?: boolean; link?: string; q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportTicket;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open a ticket for a customer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportTicketRequest;
+      responses: {
+        201: Data_SupportOpenedTicket;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}": {
+    /** Get a support ticket with all its messages and internal notes. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportTicketDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change status, priority, category or assignee of a ticket. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/messages": {
+    /** Answer a ticket, or add an internal note. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddSupportMessageRequest;
+      responses: {
+        201: Data_SupportMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/messages/{message_id}/hide": {
+    /** Hide a message of a ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; message_id: string }; };
+      requestBody: HideSupportMessageRequest;
+      responses: {
+        200: Data_SupportMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

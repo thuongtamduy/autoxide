@@ -196,7 +196,7 @@ pub enum AutoSource { Macro(Uuid), Fact { intent: String } }
 
 | Bảng | Cột chính | Index / ràng buộc |
 |---|---|---|
-| `support_tickets` | `id`, `tenant_id`, `org_id`, `number` (đánh số của kernel, tiền tố theo nút), `requester_user_id` NULL, `requester_email` NULL, `requester_phone_hash` NULL, `requester_name`, `verified_at` NULL, `token_hash` NULL, `category`, `priority`, `status`, `resolution` NULL, `subject`, `channel` (`web/guest/order_lookup/staff/email`), `assignee_user_id` NULL, `team_id` NULL, `first_response_due_at` NULL, `resolve_due_at` NULL, `first_responded_at` NULL, `solved_at` NULL, `closed_at` NULL, `breached` BOOL, `case_id` NULL, `dispute_id` NULL, `follow_up_of` NULL, `escalated_to_platform` BOOL, `satisfaction` SMALLINT NULL (1–5), `satisfaction_note` NULL, `last_message_at`, `reference` NULL, `search_key`, `created_at`, `updated_at` | unique (`tenant_id`, `number`); unique (`tenant_id`, `reference`); index (`tenant_id`, `org_id`, `status`, `id`), (`tenant_id`, `assignee_user_id`, `status`, `id`), (`tenant_id`, `requester_user_id`, `id`), (`tenant_id`, `status`, `resolve_due_at`) |
+| `support_tickets` | `id`, `tenant_id`, `org_id`, `number` (đánh số của kernel, tiền tố theo nút), `requester_user_id` NULL, `requester_email` NULL, `requester_phone` NULL (E.164, D-20261118-step53-support), `requester_name`, `verified_at` NULL, `token_hash` NULL, `category`, `priority`, `status`, `resolution` NULL, `subject`, `channel` (`web/guest/order_lookup/staff/email`), `assignee_user_id` NULL, `team_id` NULL, `first_response_due_at` NULL, `resolve_due_at` NULL, `first_responded_at` NULL, `solved_at` NULL, `closed_at` NULL, `breached` BOOL, `case_id` NULL, `dispute_id` NULL, `follow_up_of` NULL, `escalated_to_platform` BOOL, `satisfaction` SMALLINT NULL (1–5), `satisfaction_note` NULL, `last_message_at`, `reference` NULL, `search_key`, `created_at`, `updated_at` | unique (`tenant_id`, `number`); unique (`tenant_id`, `reference`); index (`tenant_id`, `org_id`, `status`, `id`), (`tenant_id`, `assignee_user_id`, `status`, `id`), (`tenant_id`, `requester_user_id`, `id`), (`tenant_id`, `status`, `resolve_due_at`) |
 | `support_messages` | `id`, `tenant_id`, `ticket_id`, `kind` (`public/internal/system`), `author_kind` (`customer/agent/system`), `author_user_id` NULL, `body`, `media_ids` text, `hidden_at` NULL, `hidden_by` NULL, `hidden_reason` NULL, `ai_assisted` BOOL, `created_at` | index (`tenant_id`, `ticket_id`, `id`) — chỉ thêm |
 | `support_links` | `tenant_id`, `ticket_id`, `target` (`<kind>:<id>`), `created_at` | pk (`tenant_id`, `ticket_id`, `target`); index (`tenant_id`, `target`) |
 | `support_teams` · `support_team_members` | nhóm theo nút; thành viên, cờ `accepting` | unique (`tenant_id`, `org_id`, `name`) |
@@ -215,7 +215,7 @@ Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `su
 | `POST /public/tickets` | công khai (chống spam) hay đăng nhập | 201; vãng lai trả `access_token` một lần |
 | `POST /public/tickets/{id}/verify` | token phiếu | OTP email / SMS |
 | `GET /public/tickets/{id}` · `POST /public/tickets/{id}/messages` · `POST /public/tickets/{id}/satisfaction` | token phiếu | không thấy ghi chú nội bộ; email / số che như D-202 |
-| `GET /me/tickets` · `GET /me/tickets/{id}` · `POST /me/tickets/{id}/messages` · `POST /me/claim` | `support.request` (người mua) | |
+| `GET /me/tickets` · `GET /me/tickets/{id}` · `POST /me/tickets/{id}/messages` · `POST /me/claim` | đăng nhập (tài khoản người mua không có permission — D-20261118-step53-support) | chỉ phiếu của chính người gọi |
 | `GET /tickets` | `support.tickets.read` | lọc `status`, `assignee=me/none/<id>`, `team_id`, `org_id`, `category`, `priority`, `breached`, `link`, `q` (không dấu, D-202); `fetch_page` / `fetch_page_by` (`sort=due`) |
 | `GET /tickets/{id}` · `POST /tickets/{id}/messages` | `…read` / `…reply` | `kind=internal` cho ghi chú; `Idempotency-Key` |
 | `PATCH /tickets/{id}` | `support.tickets.reply` | trạng thái, ưu tiên, loại, phân công; `If-Match` |
@@ -223,7 +223,7 @@ Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `su
 | `POST /tickets/{id}/escalate` | `support.tickets.manage` | thành khiếu nại / lên sàn |
 | `POST /tickets/{id}/reply-suggestions` · `GET /tickets/{id}/reply-drafts` | `…reply` | AI, bản nháp |
 | `PUT /macros/{id}/auto-reply` `{enabled, questions, review_due_on}` · `POST /auto-reply/preview` · `GET /auto-replies` | `support.auto_reply.manage` | duyệt câu trả lời cho tự động; thử quyết định không gửi; nhật ký và phản hồi |
-| `POST /public/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST /me/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST …/handoff` | token phiếu / `support.request` | "hữu ích / không đúng"; "gặp nhân viên" |
+| `POST /public/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST /me/tickets/{id}/auto-replies/{reply_id}/feedback` · `POST …/handoff` | token phiếu / đăng nhập | "hữu ích / không đúng"; "gặp nhân viên" |
 | `GET/PUT /policies/{org_id}` · `/teams` · `/macros` · `/routing-rules` | `support.settings.manage` | |
 | `GET /reports/summary` | `support.tickets.read` | số phiếu, thời gian phản hồi / giải quyết trung vị, tỉ lệ quá hạn, hài lòng — theo nút, khoảng thời gian |
 
@@ -259,7 +259,7 @@ doanh (loại, SLA, giờ làm, tự đóng) là dữ liệu theo nút, không p
 
 ### Permission
 
-`support.request` (người mua), `support.tickets.read`, `support.tickets.reply`, `support.tickets.manage`,
+`support.tickets.read`, `support.tickets.reply`, `support.tickets.manage`,
 `support.settings.manage`, `support.auto_reply.manage`. Tính năng gói (bước 35): `support`, `support.sla`,
 `support.ai`, `support.auto_reply`.
 

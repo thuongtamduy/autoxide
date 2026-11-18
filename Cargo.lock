@@ -397,6 +397,7 @@ dependencies = [
  "autoxide-organizations",
  "autoxide-plans",
  "autoxide-reporting",
+ "autoxide-support",
  "autoxide-tax",
  "autoxide-testkit",
  "autoxide-webhooks",
@@ -546,6 +547,7 @@ version = "0.14.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
+ "autoxide-ledger",
  "autoxide-organizations",
  "autoxide-testkit",
  "axum",
@@ -1037,6 +1039,31 @@ dependencies = [
  "futures-util",
  "rmcp",
  "rust_decimal",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-support"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-compliance",
+ "autoxide-kernel",
+ "autoxide-media",
+ "autoxide-notifications",
+ "autoxide-organizations",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "rmcp",
  "sea-orm",
  "serde",
  "serde_json",
