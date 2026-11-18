@@ -272,6 +272,9 @@ sẵn lệnh.
 ## Luật code
 
 - `unsafe` bị cấm. Không `unwrap()` / `expect()` / `panic!` ngoài test — trả lỗi.
+- File `.rs` trên 800 dòng: gate cảnh báo; trên 1200: chặn, trừ file trong
+  `xtask/file-length-baseline.txt` (không được dài thêm). Tách theo trách nhiệm thành module con,
+  chỉ di chuyển code (D-20261118-file-length).
 - Một kiểu lỗi chung cho mọi layer: `autoxide_kernel::error::Error`. Mã lỗi
   (`code`) là hợp đồng với client, đổi mã là thay đổi phá vỡ. Mã viết `snake_case`;
   lỗi của module mang tiền tố `<module>.` (vd `notes.title_taken`).

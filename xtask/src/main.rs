@@ -9,7 +9,8 @@
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
-//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`) và mục lục quyết định (`decisions.rs`).
+//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`) và độ dài
+//!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
 //!   `decisions.rs`).
@@ -27,6 +28,7 @@ mod boundaries;
 mod decisions;
 mod docs;
 mod i18n;
+mod lengths;
 mod scaffold;
 mod sdk;
 mod semver;
@@ -181,6 +183,11 @@ fn check() -> ExitCode {
         violations.extend(docs::check_docs(&workspace.root)?);
         violations.extend(tenancy::check_entities(&workspace)?);
         violations.extend(decisions::check(&workspace.root)?);
+        let lengths = lengths::check(&workspace.root)?;
+        if let Some(warning) = lengths.warning {
+            eprintln!("{warning}");
+        }
+        violations.extend(lengths.violations);
         Ok(violations)
     }) {
         Ok(violations) => violations,
