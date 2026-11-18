@@ -19,6 +19,10 @@ endpoints are marked deprecated with a sunset date first.
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
   `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
   tools `inventory.*`.
+- New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
+  against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
+  with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
+  (`ShippingRates`, `AddressBook`, `CarrierRegistry`, `ShippingCarrier`, an in-memory `FakeCarrier`).
 - `catalog` (step 41): typed attributes, required category attributes with effective dates, prohibited and
   conditional goods as shared rules with their legal basis (`autoxide task catalog.load_restrictions`, Vietnam pack),
   product documents, product `readiness` with filter and counts (`GET /api/v1/catalog/products/counts`), tax category
