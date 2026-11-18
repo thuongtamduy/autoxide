@@ -53,6 +53,10 @@ endpoints are marked deprecated with a sunset date first.
   response-time targets per priority in business minutes, business hours, days off, auto-close days, guest tickets).
   Deadlines count business time and stop while waiting for the customer; jobs `support.sla_check` (marks late tickets,
   event `support.ticket_breached`) and `support.auto_close`; work source `support.tickets`; `GET /reports/summary`.
+- `support`: link tickets to records of any module (`/tickets/{id}/links`, checked in the record registry), saved
+  replies with variables (`/macros`, `/tickets/{id}/macros/{macro_id}/render`), hand-over as a consumer complaint or to the
+  platform (`/tickets/{id}/escalate`; never two complaint cases), customer ratings (`…/satisfaction`).
+- `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

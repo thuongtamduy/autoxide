@@ -7,7 +7,13 @@ use autoxide_kernel::tenancy::Relocation;
 
 pub(crate) fn relocation() -> Relocation {
     Relocation::new()
-        .by_org(&["support_tickets", "support_teams", "support_routing_rules", "support_policies"])
+        .by_org(&[
+            "support_tickets",
+            "support_teams",
+            "support_routing_rules",
+            "support_policies",
+            "support_macros",
+        ])
         .follow("support_messages", "ticket_id", "support_tickets")
         .follow("support_team_members", "team_id", "support_teams")
         .follow("support_links", "ticket_id", "support_tickets")

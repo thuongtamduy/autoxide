@@ -235,7 +235,10 @@ pub(crate) async fn get_ticket(
     let viewer = Viewer::Staff(&principal);
     let ticket = service.get(&tenant, viewer, id).await?;
     let messages = service.messages(&tenant, viewer, &ticket).await?;
-    Ok(Tagged { version: ticket.updated_at, data: TicketDetail::new(ticket, messages, true) })
+    let links = service.links(&tenant, ticket.id).await?;
+    let mut data = TicketDetail::new(ticket.clone(), messages, true);
+    data.links = links;
+    Ok(Tagged { version: ticket.updated_at, data })
 }
 
 /// Changes to a ticket. Omitted fields stay as they are.
