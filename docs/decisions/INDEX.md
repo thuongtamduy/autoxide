@@ -219,6 +219,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-375** Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
+- **[D-20261118-step39-key-rotation](D-20261118-step39-key-rotation.md)** Đổi khoá ký access token không đăng xuất ai — 2026-11-18
 
 ## Đa khách, tổ chức, gói
 
