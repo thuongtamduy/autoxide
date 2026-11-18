@@ -8173,6 +8173,27 @@ export type Data_SetupView = {
 };
 
 /** Envelope of a single result. */
+export type Data_ShippingAddress = {
+  /** An address of a buyer's address book. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SignupAccepted = {
   /** The answer to a sign-up: always the same. */
   data: {
@@ -13522,6 +13543,19 @@ export type NewRecordNote = {
   mentions?: string[];
 };
 
+/** A new address in the address book. */
+export type NewShippingAddress = {
+  address: ShippingPostalAddress;
+  /** Make it the default address. The first address is always the default. */
+  is_default?: boolean;
+  /** Your name for it, e.g. `Home` (up to 100 characters). */
+  label?: string;
+  /** Phone number of the recipient, for the carrier. */
+  phone: string;
+  /** Who receives the parcel (1 to 200 characters). */
+  recipient_name: string;
+};
+
 /** A tag to create. */
 export type NewTag = {
   /** A color of the fixed palette; `gray` by default. */
@@ -16407,6 +16441,28 @@ export type Page_SessionResponse = {
 };
 
 /** One page of a list. */
+export type Page_ShippingAddress = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SignupResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -18754,6 +18810,52 @@ export type SetupView = {
 
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
+
+/** An address of a buyer's address book. */
+export type ShippingAddress = {
+  /**
+   * The address, with the names of the province and commune when it was saved. Outside
+   * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+   * `commune_code` is empty.
+   */
+  address: Address;
+  buyer_id: string;
+  id: string;
+  is_default: boolean;
+  label: string;
+  phone: string;
+  postal_code?: string | null;
+  recipient_name: string;
+  updated_at: string;
+};
+
+/** Fields to change; leave out what stays. */
+export type ShippingAddressChanges = {
+  address?: ShippingPostalAddress | null;
+  label?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+};
+
+/**
+ * A postal address. In Vietnam: `province_code` and `commune_code` from the official list of
+ * administrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the
+ * region (state, province…), `city` the city, with an optional `postal_code`.
+ */
+export type ShippingPostalAddress = {
+  /** Outside Vietnam: the city (required). */
+  city?: string | null;
+  /** Vietnam: code of the commune, ward or special zone (required). */
+  commune_code?: string | null;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  /** Postal code, mostly for addresses outside Vietnam. */
+  postal_code?: string | null;
+  /** Vietnam: code of the province. Elsewhere: the region. */
+  province_code: string;
+};
 
 /** The answer to a sign-up: always the same. */
 export type SignupAccepted = {
@@ -30433,6 +30535,95 @@ export interface paths {
         404: Problem;
         422: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/buyers/{buyer_id}/addresses": {
+    /** List the saved addresses of a buyer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { buyer_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses": {
+    /** List your saved delivery addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a delivery address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingAddress;
+      responses: {
+        201: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}": {
+    /** Get one of your saved addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change one of your saved addresses. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingAddressChanges;
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete one of your saved addresses. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}/default": {
+    /** Make one of your saved addresses the default. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

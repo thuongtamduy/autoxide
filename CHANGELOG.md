@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- New module `shipping` (step 44, first part; `docs/SHIPPING.md`): buyer address books (Vietnamese addresses checked
+  against the administrative units of `address`, generic foreign addresses, exactly one default, export and erasure
+  with the account) and the contract for `orders` and carrier connectors in `autoxide_shipping::api`
+  (`ShippingRates`, `AddressBook`, `CarrierRegistry`, `ShippingCarrier`, an in-memory `FakeCarrier`).
 - Module `catalog` (step 41, first part; `docs/CATALOG.md`): products with variants, options, SKU and barcode
   unique per tenant, sale modes (in stock, backorder, pre-order), bundles, images from `media`; a category tree;
   price lists per store, chain and customer group with append-only price history, scheduled and temporary prices,
