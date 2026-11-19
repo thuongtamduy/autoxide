@@ -27,7 +27,12 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_price_changes", "price_list_id", "catalog_price_lists")
         .follow("catalog_product_attributes", "product_id", "catalog_products")
         .follow("catalog_product_documents", "product_id", "catalog_products")
-        .copy_on_split(&["catalog_categories", "catalog_rounding_rules", "catalog_attributes"])
+        .copy_on_split(&[
+            "catalog_categories",
+            "catalog_rounding_rules",
+            "catalog_attributes",
+            "catalog_synonyms",
+        ])
         .follow("catalog_attribute_options", "attribute_id", "catalog_attributes")
         .follow("catalog_category_attributes", "category_id", "catalog_categories")
         .follow("catalog_category_restrictions", "category_id", "catalog_categories")

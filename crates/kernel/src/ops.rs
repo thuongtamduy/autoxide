@@ -26,6 +26,7 @@ pub(crate) mod records;
 pub(crate) mod request_log;
 pub mod resolve;
 pub mod setup;
+pub mod suggest;
 pub mod summary;
 pub mod tags;
 pub mod task;

@@ -3,6 +3,7 @@
 
 mod m0005_carts;
 mod m0006_orders;
+mod m0007_returns;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -24,6 +25,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0005_carts::Migration),
         // Lượt đặt, đơn, dòng, thuế, lịch sử, khoản thanh toán, hoãn hoàn tất (mục 3).
         Box::new(m0006_orders::Migration),
+        // Hoàn tiền và đổi trả (mục 6).
+        Box::new(m0007_returns::Migration),
     ]
 }
 

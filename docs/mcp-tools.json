@@ -4980,6 +4980,82 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List banners of display placements (home hero, top strip…) within your reach, newest first, each with its `version`. Filter by placement key, unit, status or language.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters and paging of the banner list; omitted fields do not filter.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; defaults to 50.",
+            "format": "int32",
+            "maximum": 200,
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Only this language, e.g. `vi`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only banners of this organization unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Key of a placement, e.g. `home_hero`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `active` or `archived`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "content.list_banners",
+      "output_schema": null,
+      "permissions": [
+        "content.banners",
+        "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the saved revisions of an entry, newest first (without their fields).",
       "input_schema": {
         "additionalProperties": false,
@@ -5017,6 +5093,49 @@
       "output_schema": null,
       "permissions": [
         "content.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Set the order of the banners of a placement at once (first listed shown first).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The new order of a placement's banners.",
+        "properties": {
+          "banner_ids": {
+            "description": "Banners first shown first; others keep their order after them.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "key": {
+            "description": "Key of the placement.",
+            "type": "string"
+          },
+          "version": {
+            "description": "The placement's `version` (from `save_banner` / `order_placement`, or the `ETag` of\n`GET /api/v1/content/placements/{key}`), or `*`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "banner_ids",
+          "version"
+        ],
+        "type": "object"
+      },
+      "name": "content.order_placement",
+      "output_schema": null,
+      "permissions": [
+        "content.banners"
       ]
     },
     {
@@ -5173,6 +5292,193 @@
       "permissions": [
         "content.write",
         "content.write_own"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Draft a banner, or change one (with `id` and `version`). Pictures must be public and fit the placement's ratio and size; links point to an address or to an object such as `catalog.product`. A tool never turns a banner on: a person sets it `active`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A banner to draft. Without `id`: a new draft in `placement`. With `id` and `version`: change\nthat banner (fields left out stay as they are).",
+        "properties": {
+          "ai_assisted": {
+            "description": "The text came from AI; defaults to `true` for a tool.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "alt": {
+            "description": "Text alternative of the picture.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cta_label": {
+            "description": "Text of the button, at most 60 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_at": {
+            "description": "Shown until (RFC 3339).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The banner to change; omit to create one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`image` (needs `media_id`) or `text`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link_kind": {
+            "description": "Link to an object instead: its kind (e.g. `catalog.product`) and `link_id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link_url": {
+            "description": "Link to an address (`https://…` or a path `/…`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language (to create); omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_id": {
+            "description": "A public picture (media item id) with the placement's ratio and size.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mobile_media_id": {
+            "description": "Picture for phones.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The organization unit (store) it belongs to (to create); omit for every store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "page_kinds": {
+            "description": "Only on these kinds of pages (e.g. `category`).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "page_targets": {
+            "description": "Only on these pages, each `<kind>:<id>` of the object directory (e.g.\n`catalog.category:0190…`).",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "placement": {
+            "description": "Key of the placement (to create), e.g. `home_hero`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "description": "Shown from (RFC 3339).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft` or `archived`; a tool never makes a banner `active`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subtitle": {
+            "description": "At most 300 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "description": "At most 120 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tone": {
+            "description": "Text banners: `primary`, `secondary`, `accent` or `neutral`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "Required with `id`: the `version` from `list_banners` or the previous save.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "content.save_banner",
+      "output_schema": null,
+      "permissions": [
+        "content.banners"
       ]
     },
     {
@@ -7767,6 +8073,26 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the kinds of records that can be promoted from a sandbox to your tenant.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "No input.",
+        "type": "object"
+      },
+      "name": "kernel.list_promotable",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Inside a sandbox: list what it kept instead of sending out — simulated partner calls (payments, e-invoices, identity checks), SMS, Zalo and push messages, mail to people who cannot enter the sandbox and webhooks to URLs not allowed. Newest first.",
       "input_schema": {
         "additionalProperties": false,
@@ -8069,6 +8395,44 @@
       "output_schema": null,
       "permissions": [
         "kernel.ops.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Promote records tried in a sandbox to your tenant as drafts (nothing is published or enabled; what is live is never overwritten). Call it in the real tenant. Each record gets `created_draft`, `updated_draft`, `unchanged` or `conflict`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Records of a sandbox to promote.",
+        "properties": {
+          "id": {
+            "description": "Id of the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "description": "1 to 100 records of the sandbox, each `<kind>:<id>` with a kind from\n`kernel.list_promotable`, e.g. `content.page:0190…`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "items"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.promote_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
       ]
     },
     {
@@ -10441,6 +10805,87 @@
     },
     {
       "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a return forward: `approve` or `reject` (with a reason code of `orders.return_rejected`) the request, `receive` the items, `refund` the computed amount, or `close` it. Returns the return with its photos (`media_ids`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A step of a return.",
+        "properties": {
+          "action": {
+            "description": "`approve`, `reject`, `receive`, `refund` or `close`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "description": "`receive`: what arrived (`line_id`, `quantity`, `condition` = `restock` / `damaged`);\nlines left out count as received in full and sellable.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A line received back.",
+              "properties": {
+                "condition": {
+                  "description": "`restock` (sellable again) or `damaged`.",
+                  "type": "string"
+                },
+                "line_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Units received (0 when missing).",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "line_id",
+                "quantity",
+                "condition"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "`reject`: a code of the `orders.return_rejected` list.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warehouse_org_id": {
+            "description": "`receive`: warehouse that received the items.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ],
+        "type": "object"
+      },
+      "name": "orders.decide_return",
+      "output_schema": null,
+      "permissions": [
+        "orders.returns.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
@@ -10526,6 +10971,114 @@
       "output_schema": null,
       "permissions": [
         "orders.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List return requests of shops in your scope, newest first, with lines, photos (`media_ids`) and the refund once computed; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Returns to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of returns, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "orders.list_returns",
+      "output_schema": null,
+      "permissions": [
+        "orders.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Refund part or all of an order: through the payment partner when the payment came through it, otherwise recorded as paid back by the shop (cash). Never more than was paid; the same `reference` returns the same refund.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A refund of an order.",
+        "properties": {
+          "amount": {
+            "description": "Integer amount in minor units, e.g. `\"150000\"` for 150,000 VND.",
+            "type": "string"
+          },
+          "currency": {
+            "description": "Currency of the order, e.g. `VND`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why (no personal data; sent to the payment partner).",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your unique key of this refund: sending it again returns the same refund.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "currency",
+          "reason",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "orders.refund_order",
+      "output_schema": null,
+      "permissions": [
+        "orders.refund"
       ]
     },
     {

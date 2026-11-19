@@ -189,3 +189,41 @@ pub(crate) fn cod_not_allowed() -> Error {
         "This order must be paid in advance; cash on delivery is not accepted.",
     )
 }
+
+pub(crate) fn refund_exceeds_paid(remaining: autoxide_kernel::money::Money) -> Error {
+    Error::conflict(
+        "orders.refund_exceeds_paid",
+        "The refund is more than what is left to refund ({remaining}); one refund comes from one \
+         payment of the order.",
+    )
+    .with_param("remaining", remaining.to_string())
+}
+
+pub(crate) fn return_not_found() -> Error {
+    Error::not_found("orders.return_not_found", "No return with this id.")
+}
+
+pub(crate) fn return_not_allowed(status: crate::api::OrderStatus) -> Error {
+    Error::conflict(
+        "orders.return_not_allowed",
+        "Items can be returned only from a delivered order; this order is {status}.",
+    )
+    .with_param("status", status)
+}
+
+pub(crate) fn return_window_closed(days: i64) -> Error {
+    Error::conflict(
+        "orders.return_window_closed",
+        "The return window of the order ({days} days after delivery) has ended.",
+    )
+    .with_param("days", days)
+}
+
+pub(crate) fn return_invalid_transition(from: &str, to: &str) -> Error {
+    Error::conflict(
+        "orders.return_invalid_transition",
+        "The return is {from}; it cannot move to {to}.",
+    )
+    .with_param("from", from.to_owned())
+    .with_param("to", to.to_owned())
+}

@@ -515,6 +515,12 @@ impl Module for AuthModule {
         subscriptions.extend(guardrail::subscriptions(guardrails));
         subscriptions
     }
+
+    // Sao role vào sandbox mới (bước 38, D-232).
+    fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+        let roles = self.state.as_ref()?.roles.clone();
+        Some(Arc::new(sandbox::RoleCopy { roles }))
+    }
 }
 
 /// Khoá ký token ngẫu nhiên 256 bit, khi người cài chưa đặt khoá.

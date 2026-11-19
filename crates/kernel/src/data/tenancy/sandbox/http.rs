@@ -10,6 +10,7 @@ use utoipa_axum::routes;
 use uuid::Uuid;
 
 use super::mailbox::SandboxMessage;
+use super::promote::{PromotableKind, PromoteInput, PromoteResult};
 use super::service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 use crate::access::Principal;
 use crate::error::Error;
@@ -24,6 +25,8 @@ pub(crate) fn routes(service: Arc<TenantSandboxes>) -> OpenApiRouter {
         .routes(routes!(extend_sandbox))
         .routes(routes!(delete_sandbox))
         .routes(routes!(list_sandbox_messages))
+        .routes(routes!(list_promotable))
+        .routes(routes!(promote_sandbox))
         .with_state(service)
 }
 
@@ -188,4 +191,62 @@ async fn list_sandbox_messages(
 ) -> Result<Page<SandboxMessage>, Error> {
     let page = PageRequest::try_from(page)?;
     super::mailbox::list(&tenant, &principal, filter.channel.as_deref(), &page).await
+}
+
+/// List the kinds of records that can be promoted from a sandbox.
+///
+/// Requires `kernel.sandboxes.read`. Each module declares its own kinds (pages, mail templates…).
+#[utoipa::path(
+    get,
+    path = "/sandboxes/promotable",
+    extensions(("x-permissions" = json!(["kernel.sandboxes.read"]))),
+    operation_id = "list_sandbox_promotable",
+    security(("bearer" = [])),
+    responses(
+        (status = 200, description = "Every kind that can be promoted.", body = Data<Vec<PromotableKind>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.sandboxes.read`; code `permission_denied`.", body = Problem),
+    )
+)]
+async fn list_promotable(
+    State(service): State<Arc<TenantSandboxes>>,
+    principal: Principal,
+) -> Result<Data<Vec<PromotableKind>>, Error> {
+    Ok(Data { data: service.promotable(&principal)? })
+}
+
+/// Promote records tried in a sandbox to the real tenant, as drafts.
+///
+/// Requires `kernel.sandboxes.manage`, called in the real tenant of the sandbox, plus the
+/// permission each module needs to write the record (e.g. `content.write` for a page): you cannot
+/// promote what you could not write by hand. Up to 100 records. Each one becomes a **draft** in the
+/// real tenant — nothing is published or enabled, and what is live is never overwritten. A record
+/// copied from the real tenant updates the draft of its original; a record made in the sandbox
+/// becomes a new draft. Promoting again with the same content gives `unchanged`. A name, path or
+/// code already taken in the real tenant gives `conflict` for that record while the others go on.
+/// Send an `Idempotency-Key` to retry safely.
+#[utoipa::path(
+    post,
+    path = "/sandboxes/{id}/promote",
+    extensions(("x-permissions" = json!(["kernel.sandboxes.manage"]))),
+    operation_id = "promote_sandbox",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the sandbox.")),
+    request_body = PromoteInput,
+    responses(
+        (status = 200, description = "One outcome per record, in the order sent.", body = Data<PromoteResult>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.sandboxes.manage` or the permission of a module (`permission_denied`), or called outside the real tenant of the sandbox (`tenancy.sandbox_forbidden`).", body = Problem),
+        (status = 404, description = "No such sandbox of your tenant (`tenancy.sandbox_not_found`), or no such record in it (`tenancy.promote_record_not_found`).", body = Problem),
+        (status = 422, description = "No records, more than 100, or a kind that cannot be promoted (`validation_failed`, see `errors`: `tenancy.promote_kind_unknown`).", body = Problem),
+    )
+)]
+async fn promote_sandbox(
+    State(service): State<Arc<TenantSandboxes>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(input): ValidJson<PromoteInput>,
+) -> Result<Data<PromoteResult>, Error> {
+    Ok(Data { data: service.promote(&tenant, &principal, id, input).await? })
 }

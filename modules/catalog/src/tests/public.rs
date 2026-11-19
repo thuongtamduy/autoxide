@@ -9,13 +9,17 @@ use serde_json::{Value, json};
 use super::{app, call, create_product};
 
 /// Chạy hết job đang chờ (dựng lại storefront).
-async fn drain(app: &TestApp) {
+pub(super) async fn drain(app: &TestApp) {
     let worker = app.modules().worker(4).unwrap();
     while worker.run_once().await.unwrap() > 0 {}
 }
 
 /// `GET /api/v1/catalog/public{uri}` không đăng nhập; trả trạng thái, thân, `ETag`.
-async fn public(app: &TestApp, uri: &str, etag: Option<&str>) -> (StatusCode, Value, String) {
+pub(super) async fn public(
+    app: &TestApp,
+    uri: &str,
+    etag: Option<&str>,
+) -> (StatusCode, Value, String) {
     let mut request = app.request(Method::GET, &format!("/api/v1/catalog/public{uri}"));
     if let Some(etag) = etag {
         request = request.header("if-none-match", etag);
@@ -32,7 +36,7 @@ fn vnd(amount: i64) -> Value {
 }
 
 /// Bảng giá VND ở `org`; trả ID.
-async fn price_list(app: &TestApp, org: OrgId) -> String {
+pub(super) async fn price_list(app: &TestApp, org: OrgId) -> String {
     let body = json!({"org_id": org.as_uuid(), "name": "Giá bán", "currency": "VND", "tax_inclusive": true});
     let (status, made) = call(app, "POST", "/price-lists", "boss", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED, "{made}");
@@ -55,7 +59,7 @@ async fn activate(app: &TestApp, product: &str) {
 }
 
 /// Sản phẩm đang bán ở `org`, giá `amount`; trả (ID sản phẩm, ID biến thể).
-async fn on_sale(
+pub(super) async fn on_sale(
     app: &TestApp,
     list: &str,
     org: OrgId,
@@ -69,7 +73,7 @@ async fn on_sale(
     (product, variant)
 }
 
-fn names(listed: &Value) -> Vec<String> {
+pub(super) fn names(listed: &Value) -> Vec<String> {
     listed["data"]
         .as_array()
         .unwrap()

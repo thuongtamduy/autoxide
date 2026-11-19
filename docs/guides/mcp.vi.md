@@ -165,11 +165,14 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |
 | `content.legal_templates` | `content.read` | read-only |
 | `content.list` | `content.read` | read-only |
+| `content.list_banners` | `content.banners` or `content.read` | read-only |
 | `content.list_revisions` | `content.read` | read-only |
+| `content.order_placement` | `content.banners` | writes |
 | `content.publish` | `content.publish` or `content.publish_own` | writes |
 | `content.request_review` | `content.write` or `content.write_own` | writes |
 | `content.resolve` | `content.read` | read-only |
 | `content.restore_revision` | `content.write` or `content.write_own` | writes |
+| `content.save_banner` | `content.banners` | writes |
 | `content.search` | `content.read` | read-only |
 | `content.seo_check` | `content.read` | read-only |
 | `content.suggest_seo` | `content.write` or `content.write_own` | writes |
@@ -224,6 +227,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_promotable` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandbox_messages` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
@@ -232,6 +236,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.navigation` | — | read-only |
 | `kernel.ops_backlog` | `kernel.ops.read` | read-only |
+| `kernel.promote_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.request_log` | `kernel.devtools.read` | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
@@ -280,8 +285,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |
 | `notifications.send_notification` | `notifications.send` | writes |
 | `notifications.update_template_draft` | `notifications.templates.manage` | writes |
+| `orders.decide_return` | `orders.returns.manage` | destructive |
 | `orders.get_order` | `orders.read` | read-only |
 | `orders.list_orders` | `orders.read` | read-only |
+| `orders.list_returns` | `orders.read` | read-only |
+| `orders.refund_order` | `orders.refund` | destructive |
 | `orders.request_shipment` | `orders.manage` | writes |
 | `orders.transition_order` | `orders.manage` | destructive |
 | `organizations.add_group_members` | `organizations.groups.manage` | writes |

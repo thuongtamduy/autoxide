@@ -60,6 +60,8 @@ events! {
     (AuthorChanged, "content.author_changed", "An author profile was created, changed or deleted."),
     (MenuChanged, "content.menu_changed", "A navigation menu was replaced."),
     (RedirectChanged, "content.redirect_changed", "A redirect was created, changed or deleted by hand."),
+    (PlacementChanged, "content.placement_changed", "A display placement for banners was created, changed or deleted."),
+    (BannerChanged, "content.banner_changed", "A banner was created, changed, reordered, archived (also when the promotion it links to ended) or deleted."),
 }
 
 /// Chủ thể (subject) của event về mục `id`.

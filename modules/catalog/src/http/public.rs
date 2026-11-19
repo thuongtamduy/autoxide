@@ -65,7 +65,7 @@ fn fingerprint<T: Serialize>(tenant: &TenantContext, value: &T) -> Result<String
 }
 
 /// Trả `value` kèm `ETag` và `Cache-Control` công khai.
-fn cached<T: Serialize + IntoResponse>(
+pub(crate) fn cached<T: Serialize + IntoResponse>(
     tenant: &TenantContext,
     value: T,
 ) -> Result<Response, Error> {
@@ -323,6 +323,21 @@ async fn list_public_products(
     Query(mut paging): Query<PageQuery>,
     Query(raw): Query<Vec<(String, String)>>,
 ) -> Result<Response, Error> {
+    let filter = parse_filter(&service, query, raw, &mut paging)?;
+    let page = PageRequest::try_from(paging)?;
+    let Page { data, pagination } = service.public_products(&tenant, &site, &filter, &page).await?;
+    let data = cards(&service, &tenant, &site, &data).await?;
+    cached(&tenant, Page { data, pagination })
+}
+
+/// Đọc và kiểm bộ lọc của danh sách công khai (dùng chung cho danh sách và số đếm facet); gom
+/// lỗi một lần. `sort=price_asc|price_desc` đặt luôn `order` của `paging`.
+pub(crate) fn parse_filter(
+    service: &CatalogService,
+    query: PublicProductsQuery,
+    raw: Vec<(String, String)>,
+    paging: &mut PageQuery,
+) -> Result<PublicFilter, Error> {
     let locale = service.locale(&query.locale)?;
     let mut problems = Vec::new();
     if query.q.as_deref().is_some_and(|q| q.trim().chars().count() > QUERY_MAX) {
@@ -369,7 +384,6 @@ async fn list_public_products(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    let page = PageRequest::try_from(paging)?;
     let filter = PublicFilter {
         locale,
         category: query.category,
@@ -386,9 +400,7 @@ async fn list_public_products(
         }),
         min_rating: query.min_rating.map(|rating| i32::from(rating) * 100),
     };
-    let Page { data, pagination } = service.public_products(&tenant, &site, &filter, &page).await?;
-    let data = cards(&service, &tenant, &site, &data).await?;
-    cached(&tenant, Page { data, pagination })
+    Ok(filter)
 }
 
 /// A choice of a product option, in the language asked.
