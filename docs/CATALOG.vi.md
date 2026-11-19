@@ -114,6 +114,15 @@ lại trong `If-None-Match` để nhận 304) và `Cache-Control: public, no-cac
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | danh mục đang hiện (danh mục nằm dưới danh mục ẩn cũng ẩn) |
 | `GET /public/sitemap` | mọi đường dẫn sản phẩm ở mọi ngôn ngữ, tối đa 200 mỗi trang |
 
+Hỗ trợ tìm:
+
+- `GET /public/search/suggest?q=…&locale=vi` — gợi ý khi người mua gõ (sản phẩm, danh mục, và thứ
+  module khác góp), khớp đúng dấu trước, tối đa 10.
+- `GET /public/products/facets` — nhận bộ lọc của `/public/products` và đếm số sản phẩm theo từng giá
+  trị thuộc tính và theo người bán (số đếm của một bộ lọc không lọc theo chính nó).
+- `GET` / `PUT /synonyms` — nhóm từ đồng nghĩa của khách (`[["áo thun", "áo phông", "tee"]]`); tìm và
+  gợi ý dùng chúng (`catalog.categories.manage`).
+
 Website hiện sản phẩm nào: của chính nút đó, của các nút cấp trên, và của người bán bên dưới nó
 (`seller.own = false` trên thẻ). Cửa hàng ẩn một sản phẩm của chuỗi bằng
 `PUT /stores/{org_id}/overrides/{product_id}` `{"hidden": true}` (`catalog.products.write` ở cửa hàng).

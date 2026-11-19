@@ -2853,6 +2853,31 @@
         ],
         "type": "object"
       },
+      "CatalogAttributeFacet": {
+        "description": "Counts of one filterable attribute.",
+        "properties": {
+          "code": {
+            "description": "Filter with `attr.<code>=<value>`.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "values": {
+            "description": "At most 50, most products first.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogFacetValue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "values"
+        ],
+        "type": "object"
+      },
       "CatalogAttributeOption": {
         "additionalProperties": false,
         "description": "A choosable value of an `option` / `options` attribute.",
@@ -3669,6 +3694,60 @@
           "name",
           "step_minor",
           "mode"
+        ],
+        "type": "object"
+      },
+      "CatalogFacetValue": {
+        "description": "A filter value and how many products match it.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "description": "Value to send back in the filter: an option code, `true` / `false`, or a seller unit id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label",
+          "count"
+        ],
+        "type": "object"
+      },
+      "CatalogFacets": {
+        "description": "Filter counts of a public product list.",
+        "properties": {
+          "attributes": {
+            "description": "Filterable attributes of type option, options or boolean.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeFacet"
+            },
+            "type": "array"
+          },
+          "sellers": {
+            "description": "Sellers (filter with `seller=<value>`), at most 50, most products first.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogFacetValue"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Products matching every filter.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "attributes",
+          "sellers"
         ],
         "type": "object"
       },
@@ -5420,6 +5499,68 @@
         },
         "required": [
           "attribute_id"
+        ],
+        "type": "object"
+      },
+      "CatalogSuggestion": {
+        "description": "A search suggestion.",
+        "properties": {
+          "context": {
+            "description": "Short context, e.g. the parent category; may be empty.",
+            "type": "string"
+          },
+          "exact": {
+            "description": "Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents\nare ignored.",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,\n`organizations.unit`… (any module may add its own).",
+            "type": "string"
+          },
+          "label": {
+            "description": "Text to show.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Address on the website (no domain, no language prefix); `null`: open the record by `id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "exact",
+          "context"
+        ],
+        "type": "object"
+      },
+      "CatalogSynonyms": {
+        "additionalProperties": false,
+        "description": "The tenant's search synonyms.",
+        "properties": {
+          "groups": {
+            "description": "Groups of words meaning the same thing, e.g. `[[\"áo thun\", \"áo phông\", \"tee\"]]`: searching\nany word of a group also finds the others. At most 500 groups of 2 to 20 words; words are\nstored without accents, in lower case.",
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
         ],
         "type": "object"
       },
@@ -14910,6 +15051,46 @@
         ],
         "type": "object"
       },
+      "Data_CatalogFacets": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Filter counts of a public product list.",
+            "properties": {
+              "attributes": {
+                "description": "Filterable attributes of type option, options or boolean.",
+                "items": {
+                  "$ref": "#/components/schemas/CatalogAttributeFacet"
+                },
+                "type": "array"
+              },
+              "sellers": {
+                "description": "Sellers (filter with `seller=<value>`), at most 50, most products first.",
+                "items": {
+                  "$ref": "#/components/schemas/CatalogFacetValue"
+                },
+                "type": "array"
+              },
+              "total": {
+                "description": "Products matching every filter.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "attributes",
+              "sellers"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogPriceChange": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -15656,6 +15837,35 @@
               "product_id",
               "hidden",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogSynonyms": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The tenant's search synonyms.",
+            "properties": {
+              "groups": {
+                "description": "Groups of words meaning the same thing, e.g. `[[\"áo thun\", \"áo phông\", \"tee\"]]`: searching\nany word of a group also finds the others. At most 500 groups of 2 to 20 words; words are\nstored without accents, in lower case.",
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "groups"
             ],
             "type": "object"
           }
@@ -34519,6 +34729,60 @@
               },
               "required": [
                 "attribute_id"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogSuggestion": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A search suggestion.",
+              "properties": {
+                "context": {
+                  "description": "Short context, e.g. the parent category; may be empty.",
+                  "type": "string"
+                },
+                "exact": {
+                  "description": "Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents\nare ignored.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "description": "Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,\n`organizations.unit`… (any module may add its own).",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Text to show.",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Address on the website (no domain, no language prefix); `null`: open the record by `id`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "exact",
+                "context"
               ],
               "type": "object"
             },
@@ -107918,6 +108182,328 @@
         "x-public": true
       }
     },
+    "/api/v1/catalog/public/products/facets": {
+      "get": {
+        "description": "No sign-in needed. Takes the same filters as `GET /public/products`. The counts of one filter\nare taken with every other filter applied but not that one, so choosing another value of it\nwidens the list as the count says.",
+        "operationId": "catalog_count_public_catalog_facets",
+        "parameters": [
+          {
+            "description": "Language of the texts; only products written in it are listed.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only products in the category with this slug (in `locale`) or one below it.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lowest `price_from`, in the currency's smallest unit.",
+            "in": "query",
+            "name": "price_min",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Highest `price_from`, in the currency's smallest unit.",
+            "in": "query",
+            "name": "price_max",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only products whose name, SKU or short description contains this text, with or without\nVietnamese accents. At most 200 characters.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Order of the list; keep it while following `next_cursor`.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "description": "Order of the public product list.",
+              "enum": [
+                "newest",
+                "price_asc",
+                "price_desc",
+                "best_selling",
+                "rating"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true`: only products with an automatic discount running now.",
+            "in": "query",
+            "name": "on_sale",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only products of this seller (organization unit) or of the units below it.",
+            "in": "query",
+            "name": "seller",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the website's own products, or only marketplace sellers' products.",
+            "in": "query",
+            "name": "sold_by",
+            "required": false,
+            "schema": {
+              "description": "Whose products to list.",
+              "enum": [
+                "own",
+                "marketplace"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lowest average rating, 1 to 5.",
+            "in": "query",
+            "name": "min_rating",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogFacets"
+                }
+              }
+            },
+            "description": "The counts.",
+            "headers": {
+              "ETag": {
+                "description": "Fingerprint of the whole answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count products per filter value (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/catalog/public/search/suggest": {
+      "get": {
+        "description": "No sign-in needed. Products on sale on the website asking, categories, and what other modules\nadd (posts, stores…), gathered in one list: matches with the exact accents first, then matches\nignoring accents; the tenant's synonyms count. A module that fails is left out of the answer.",
+        "operationId": "catalog_suggest_public_catalog_search",
+        "parameters": [
+          {
+            "description": "What the shopper has typed so far, at most 200 characters.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the suggestions.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many suggestions, 1 to 10 (default 10; 8 suits a phone).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogSuggestion"
+                }
+              }
+            },
+            "description": "Suggestions, best first.",
+            "headers": {
+              "ETag": {
+                "description": "Fingerprint of the whole answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`q` is empty or too long, `limit` is out of range, or the language is not supported; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suggest as the shopper types (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/catalog/public/sitemap": {
       "get": {
         "description": "No sign-in needed. Every product on sale on the website asking, with its address in each\nlanguage; follow `next_cursor` (at most 200 per page).",
@@ -108480,6 +109066,185 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/synonyms": {
+      "get": {
+        "description": "Requires `catalog.categories.manage`.",
+        "operationId": "catalog_get_catalog_synonyms",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogSynonyms"
+                }
+              }
+            },
+            "description": "Every synonym group."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List search synonyms.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Replaces every group; send the whole set. Public search\nand suggestions use them at once.",
+        "operationId": "catalog_put_catalog_synonyms",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogSynonyms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogSynonyms"
+                }
+              }
+            },
+            "description": "The groups as stored (without accents, lower case)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many groups, or a group with fewer than 2 or more than 20 words, or a word that is empty or too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace search synonyms.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
         ]
       }
     },

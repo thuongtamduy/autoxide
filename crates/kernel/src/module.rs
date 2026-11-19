@@ -393,6 +393,7 @@ pub struct StartContext<'a> {
     resources: &'a crate::resource::ResourceDirectory,
     work: &'a crate::ops::work::WorkSources,
     finders: &'a crate::ops::find::FinderSources,
+    suggestions: &'a crate::ops::suggest::SuggestSources,
     metrics: &'a crate::ops::summary::SummaryMetrics,
     exports: &'a crate::ops::list_exports::ExportSources,
     bulk: &'a crate::ops::bulk::BulkActions,
@@ -554,6 +555,20 @@ impl StartContext<'_> {
         source: Arc<dyn crate::ops::find::FinderSource>,
     ) -> Result<(), Error> {
         self.finders.register(self.module, source)
+    }
+
+    /// Góp nguồn gợi ý tìm cho website (D-201); loại phải là `<module>.<loại>`.
+    pub fn suggest_source(
+        &mut self,
+        source: Arc<dyn crate::ops::suggest::SuggestSource>,
+    ) -> Result<(), Error> {
+        self.suggestions.register(self.module, source)
+    }
+
+    /// Sổ nguồn gợi ý (dùng chung): module phục vụ endpoint gợi ý giữ nó. Nguồn của module đăng
+    /// ký sau vẫn có mặt lúc hỏi.
+    pub fn suggest_sources(&self) -> crate::ops::suggest::SuggestSources {
+        self.suggestions.clone()
     }
 
     /// Khai loại tài liệu tìm được của module (bước 40 P7): `kind.kind` là `<module>.<loại>`,

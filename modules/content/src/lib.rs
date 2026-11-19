@@ -33,6 +33,7 @@ mod restriction;
 mod sandbox;
 mod service;
 mod setup;
+mod suggest;
 mod taxonomy;
 mod templates;
 mod tools;
@@ -225,6 +226,8 @@ impl Module for ContentModule {
         context.work_source(Arc::new(work::Review))?;
         context.summary_metric(Arc::new(work::Review))?;
         context.finder_source(Arc::new(find::Entries))?;
+        // Gợi ý tìm của website (D-201): bài viết và trang đang công khai.
+        context.suggest_source(Arc::new(suggest::Entries))?;
         context.code_resolver(Arc::new(find::BySlug))?;
         context.setup_step(Arc::new(setup::FirstPage))?;
         // Nhãn nội bộ (bước 51 P20): gắn / gỡ cần quyền sửa bài.
