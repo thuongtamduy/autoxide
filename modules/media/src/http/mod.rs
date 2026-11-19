@@ -143,12 +143,23 @@ pub(crate) struct VariantResponse {
     webp_url: Option<String>,
     /// Size of the WebP copy in bytes; `null` like `webp_url`.
     webp_size: Option<u64>,
+    /// The same copy as AVIF, usually a third smaller than WebP: `url` with `&format=avif`. Offer
+    /// it in a `<source type="image/avif">` before the WebP one. Made in the background only when
+    /// the server sets `AUTOXIDE_MEDIA_AVIF=true`; `null` until then.
+    #[schema(
+        example = "/api/v1/media/0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7a/content?v=0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7b&w=640&format=avif"
+    )]
+    avif_url: Option<String>,
+    /// Size of the AVIF copy in bytes; `null` like `avif_url`.
+    avif_size: Option<u64>,
 }
 
 impl VariantResponse {
     fn new(item_url: &str, copy: VariantPair) -> Self {
-        let VariantPair { main, webp } = copy;
+        let VariantPair { main, webp, avif } = copy;
         VariantResponse {
+            avif_url: avif.as_ref().map(|avif| format!("{item_url}&w={}&format=avif", avif.width)),
+            avif_size: avif.map(|avif| u64::try_from(avif.size).unwrap_or_default()),
             url: format!("{item_url}&w={}", main.width),
             webp_url: webp.as_ref().map(|webp| format!("{item_url}&w={}&format=webp", webp.width)),
             webp_size: webp.map(|webp| u64::try_from(webp.size).unwrap_or_default()),
@@ -298,6 +309,8 @@ where
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod avif_tests;
 
 impl MediaItemResponse {
     /// Người tải lên (để tra tên theo lô).

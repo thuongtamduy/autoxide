@@ -51,6 +51,10 @@ pub(crate) struct PublicVariant {
     /// The same copy as WebP, usually far smaller: offer it in a `<picture>`
     /// `<source type="image/webp">`. `null` while it is not made yet.
     webp_url: Option<String>,
+    /// URL of the AVIF copy, usually a third smaller than WebP: offer it in a
+    /// `<source type="image/avif">` before the WebP one. `null` until it is made (the server makes
+    /// them only when `AUTOXIDE_MEDIA_AVIF` is on).
+    avif_url: Option<String>,
 }
 
 fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<PublicMedia> {
@@ -69,6 +73,7 @@ fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<Publi
                 height: copy.height,
                 url: copy.url,
                 webp_url: copy.webp_url,
+                avif_url: copy.avif_url,
             })
             .collect(),
     })
@@ -1078,12 +1083,14 @@ mod tests {
                     height: 213,
                     url: "/u?v=1&w=320".to_owned(),
                     webp_url: Some("/u?v=1&w=320&format=webp".to_owned()),
+                    avif_url: Some("/u?v=1&w=320&format=avif".to_owned()),
                 },
                 MediaVariant {
                     width: 640,
                     height: 427,
                     url: "/u?v=1&w=640".to_owned(),
                     webp_url: None,
+                    avif_url: None,
                 },
             ],
         };
@@ -1092,8 +1099,8 @@ mod tests {
         assert_eq!(
             public["variants"],
             serde_json::json!([
-                {"width": 320, "height": 213, "url": "/u?v=1&w=320", "webp_url": "/u?v=1&w=320&format=webp"},
-                {"width": 640, "height": 427, "url": "/u?v=1&w=640", "webp_url": null},
+                {"width": 320, "height": 213, "url": "/u?v=1&w=320", "webp_url": "/u?v=1&w=320&format=webp", "avif_url": "/u?v=1&w=320&format=avif"},
+                {"width": 640, "height": 427, "url": "/u?v=1&w=640", "webp_url": null, "avif_url": null},
             ])
         );
         assert!(media(None, "x").is_none());

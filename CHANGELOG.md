@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- AVIF copies of images (step 39): with `AUTOXIDE_MEDIA_AVIF=true` (off by default) a background job makes an AVIF
+  copy of every smaller copy of an image, about a third lighter than the WebP copy at the same quality. Each variant
+  gains `avif_url` and `avif_size` (`null` until made); `…/content?…&w=…&format=avif` serves it, falling back to the
+  WebP copy until then. `autoxide task media.refresh_variants` queues copies for older images.
 - Looking into one tenant (step 39): request log lines and the spans of background jobs, event deliveries and
   MCP tools carry `tenant_id` (also as a trace attribute with OpenTelemetry). Metrics still have no tenant label.
   `docs/DEPLOY.md` (Monitoring) shows how to filter by it.

@@ -215,7 +215,11 @@ impl Module for MediaModule {
                     library::direct::PURGE_UPLOADS,
                     Arc::new(library::direct::PurgeUploads { service: service.clone(), databases }),
                 ),
-                JobRegistration::new(MAKE_VARIANTS, Arc::new(Generator(service))),
+                JobRegistration::new(MAKE_VARIANTS, Arc::new(Generator(service.clone()))),
+                JobRegistration::new(
+                    images::avif::MAKE_AVIF,
+                    Arc::new(images::avif::AvifGenerator(service)),
+                ),
             ],
             _ => Vec::new(),
         }
@@ -327,6 +331,22 @@ pub(crate) mod testing {
         ai: Arc<dyn autoxide_kernel::ai::TextModel>,
         send_private: bool,
     ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
+        build(test, limits, ai, send_private, false).await
+    }
+
+    /// Như [`service`], bật bản AVIF (`AUTOXIDE_MEDIA_AVIF=true`, bước 39 B8).
+    pub async fn service_avif(test: &TestDatabase) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
+        let ai = Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
+        build(test, limits(), ai, false, true).await
+    }
+
+    async fn build(
+        test: &TestDatabase,
+        limits: Limits,
+        ai: Arc<dyn autoxide_kernel::ai::TextModel>,
+        send_private: bool,
+        avif: bool,
+    ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
         let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
         let mut reader = ConfigReader::new(&source);
         let config = Config::read(&mut reader);
@@ -351,6 +371,7 @@ pub(crate) mod testing {
             trash_days: 30,
             image_widths: vec![100, 200],
             ai_send_private: send_private,
+            avif,
             alt_locales: vec!["en".to_owned(), "vi".to_owned()],
             direct: crate::config::Direct::default(),
         };
