@@ -51,7 +51,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: lint
-          save-if: ${{ github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster' }}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
@@ -114,7 +114,7 @@ jobs:
         with:
           shared-key: test
           # Một job ghi là đủ: các job test build ra cùng một bộ file.
-          save-if: ${{ (github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster') && matrix.target.name == 'sqlite 1/2' }}
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.target.name == 'sqlite 1/2' }}
       # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
       # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
       # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
