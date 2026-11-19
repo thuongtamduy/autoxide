@@ -134,9 +134,8 @@ impl TenantSandboxes {
         let principal = Principal::with_all_permissions(Uuid::nil());
         let context = CopyContext { source, sandbox, options, principal: &principal };
         for (module, copy) in self.catalog.copies() {
-            let count = copy.copy(&context).await.map_err(|error| {
-                tracing::warn!(module, sandbox_id = %sandbox.id(), "sandbox copy failed");
-                error
+            let count = copy.copy(&context).await.inspect_err(|error| {
+                tracing::warn!(module, sandbox_id = %sandbox.id(), code = error.code(), "sandbox copy failed");
             })?;
             copied += count;
         }
