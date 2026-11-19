@@ -961,7 +961,7 @@ thiếu. Các bước nền đã xong: bắt đầu được ngay, song song v�
 
 - [ ] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
       sinh lại; gate kiểm khớp OpenAPI, CI biên dịch; đăng lên kho gói cần tài khoản — dừng hỏi chủ dự án
-- [ ] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
+- [x] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
       (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
 - [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất

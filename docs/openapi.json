@@ -1242,6 +1242,112 @@
         ],
         "type": "object"
       },
+      "BatchMethod": {
+        "description": "HTTP method of a write.",
+        "enum": [
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "type": "string"
+      },
+      "BatchOperation": {
+        "additionalProperties": false,
+        "description": "One write, as you would send it to the REST endpoint.",
+        "properties": {
+          "body": {
+            "description": "The JSON body of the write, if it has one."
+          },
+          "id": {
+            "description": "Your id for this write, 1 to 100 characters; its result carries it back.",
+            "example": "op-1",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "Sent as the `Idempotency-Key` header. Keep it with the queued write and send the same key\nwhen you send the batch again: a write already done answers what it answered the first time.",
+            "example": "8b2f6a3e-5c1d-4e7f-9a0b-1c2d3e4f5a6b",
+            "type": "string"
+          },
+          "if_match": {
+            "description": "Sent as the `If-Match` header: the `ETag` (`version`) of the record you changed. If someone\nchanged it since, the result is `412` with the current record in the body's `current`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method": {
+            "$ref": "#/components/schemas/BatchMethod"
+          },
+          "path": {
+            "description": "Path of the REST endpoint, under the `path` of a sync resource\n(`GET /api/v1/kernel/sync/resources`).",
+            "example": "/api/v1/notes/0190f5c2-7b1a-7cde-8f00-123456789abc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "method",
+          "path",
+          "idempotency_key"
+        ],
+        "type": "object"
+      },
+      "BatchRequest": {
+        "additionalProperties": false,
+        "description": "Writes queued on a device while it was offline.",
+        "properties": {
+          "operations": {
+            "description": "1 to 100 writes, run one after the other in this order.",
+            "items": {
+              "$ref": "#/components/schemas/BatchOperation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "type": "object"
+      },
+      "BatchResult": {
+        "description": "What one write answered.",
+        "properties": {
+          "body": {
+            "description": "The JSON body of the answer: `{\"data\": …}`, or a problem (`code`, `detail`…) when the write\nfailed; `null` when the answer has no body."
+          },
+          "etag": {
+            "description": "The `ETag` header of the answer (version of the record after the write), if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The `id` you gave the write.",
+            "type": "string"
+          },
+          "location": {
+            "description": "The `Location` header of the answer (the record created), if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`.",
+            "example": 200,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
       "BillingPeriodResponse": {
         "description": "A billing period of a subscription: what is charged for which time, and whether it is paid.",
         "properties": {
@@ -33116,6 +33222,56 @@
         ],
         "type": "object"
       },
+      "Data_Vec_BatchResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "What one write answered.",
+              "properties": {
+                "body": {
+                  "description": "The JSON body of the answer: `{\"data\": …}`, or a problem (`code`, `detail`…) when the write\nfailed; `null` when the answer has no body."
+                },
+                "etag": {
+                  "description": "The `ETag` header of the answer (version of the record after the write), if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "description": "The `id` you gave the write.",
+                  "type": "string"
+                },
+                "location": {
+                  "description": "The `Location` header of the answer (the record created), if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`.",
+                  "example": 200,
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_BillingPeriodResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -38331,6 +38487,54 @@
                 "org_id",
                 "team_id",
                 "position"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_SyncResourceView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of record an offline app can keep in sync.",
+              "properties": {
+                "changes": {
+                  "description": "The change feed: `GET` it with the `cursor` of the last change you applied.",
+                  "example": "/api/v1/notes/changes",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "description": "`<module>.<name>`.",
+                  "example": "notes.notes",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "The list endpoint of these records; writes in a batch go under this path.",
+                  "example": "/api/v1/notes",
+                  "type": "string"
+                },
+                "read_permission": {
+                  "description": "The permission needed to read them; its scope decides which records you get.",
+                  "example": "notes.read",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "path",
+                "changes",
+                "read_permission",
+                "description"
               ],
               "type": "object"
             },
@@ -65792,6 +65996,9 @@
             "example": "validation_failed",
             "type": "string"
           },
+          "current": {
+            "description": "For `precondition_failed` on endpoints that say so: the record as it is now on the server,\nin the same shape as reading it. Its version is in the `ETag` header: merge your change\ninto it and send that `ETag` in `If-Match`."
+          },
           "detail": {
             "description": "Human-readable explanation of what went wrong and how to fix it.",
             "type": "string"
@@ -77676,6 +77883,42 @@
         },
         "required": [
           "reason"
+        ],
+        "type": "object"
+      },
+      "SyncResourceView": {
+        "description": "A kind of record an offline app can keep in sync.",
+        "properties": {
+          "changes": {
+            "description": "The change feed: `GET` it with the `cursor` of the last change you applied.",
+            "example": "/api/v1/notes/changes",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "`<module>.<name>`.",
+            "example": "notes.notes",
+            "type": "string"
+          },
+          "path": {
+            "description": "The list endpoint of these records; writes in a batch go under this path.",
+            "example": "/api/v1/notes",
+            "type": "string"
+          },
+          "read_permission": {
+            "description": "The permission needed to read them; its scope decides which records you get.",
+            "example": "notes.read",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "changes",
+          "read_permission",
+          "description"
         ],
         "type": "object"
       },
@@ -149977,6 +150220,163 @@
           }
         ],
         "summary": "Get the summary figures.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/sync/batch": {
+      "post": {
+        "description": "Runs each write, in order, exactly as its REST endpoint would (same permissions, checks and\nanswers), and answers one result per write; a failed write does not stop the others. Give each\nwrite an `idempotency_key` and keep it: sending the batch again does not repeat what was done.\nSend the record's `ETag` in `if_match`: a write over someone else's change answers `412` with\nthe current record. Each write needs the permission of its endpoint.",
+        "operationId": "kernel_sync_batch",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_BatchResult"
+                }
+              }
+            },
+            "description": "One result per write, in the order sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The batch is invalid (no writes, more than 100, a path outside the sync resources…); see `errors`. Nothing was run."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send writes queued while offline.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/sync/resources": {
+      "get": {
+        "description": "Each kind of record has a change feed (`changes`): load the list endpoint once, then ask the\nfeed for what changed, keeping the `cursor` of the last change. Queue your writes on the device\nand send them with `POST /api/v1/kernel/sync/batch`. Needs only to be signed in.",
+        "operationId": "kernel_list_sync_resources",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SyncResourceView"
+                }
+              }
+            },
+            "description": "The kinds of records that can be kept in sync."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List what an offline app can keep in sync.",
         "tags": [
           "kernel"
         ],

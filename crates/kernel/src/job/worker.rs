@@ -70,6 +70,8 @@ pub struct Worker {
     /// chèn mỗi giây.
     last_slots: Mutex<HashMap<(PlacementId, &'static str), i64>>,
     last_cleanup: Mutex<Option<Instant>>,
+    /// Luồng thay đổi đồng bộ của các module (bước 69 P2): dọn dòng quá hạn cùng lượt dọn job.
+    sync: Vec<crate::sync::SyncLog>,
     /// Điểm bắt đầu xoay vòng giữa các khách; tăng mỗi lượt chia chỗ.
     turn: AtomicUsize,
     /// Quyền dùng theo khách (bước 35): job của module mà gói của khách không có bị hoãn.
@@ -121,9 +123,16 @@ impl Worker {
             concurrency: std::cmp::max(concurrency, 1),
             last_slots: Mutex::new(HashMap::new()),
             last_cleanup: Mutex::new(None),
+            sync: Vec::new(),
             turn: AtomicUsize::new(0),
             gate: Gate::default(),
         }
+    }
+
+    /// Luồng thay đổi đồng bộ cần dọn (bước 69 P2).
+    pub(crate) fn with_sync(mut self, sync: Vec<crate::sync::SyncLog>) -> Self {
+        self.sync = sync;
+        self
     }
 
     pub(crate) fn with_timeouts(mut self, timeouts: HashMap<&'static str, Duration>) -> Self {
@@ -442,6 +451,9 @@ impl Worker {
         for (_, _, database) in databases {
             for module in &self.modules {
                 cleanup_table(database, module).await?;
+            }
+            for log in &self.sync {
+                log.purge(database).await?;
             }
         }
         Ok(())

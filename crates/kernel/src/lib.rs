@@ -22,8 +22,8 @@ pub use contracts::{
     sms, storage, zns,
 };
 pub use data::{
-    backup, database, migration, numbering, pagination, reference, rows, search, tenancy, transfer,
-    upload, version,
+    backup, database, migration, numbering, pagination, reference, rows, search, sync, tenancy,
+    transfer, upload, version,
 };
 pub use ops::{
     automation, bench_seed, bulk, connections, custom_fields, doctor, find, list_exports, logging,

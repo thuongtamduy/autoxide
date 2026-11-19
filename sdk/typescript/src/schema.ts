@@ -460,6 +460,56 @@ export type BanRequest = {
   value: string;
 };
 
+/** HTTP method of a write. */
+export type BatchMethod = "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** One write, as you would send it to the REST endpoint. */
+export type BatchOperation = {
+  /** The JSON body of the write, if it has one. */
+  body?: unknown;
+  /** Your id for this write, 1 to 100 characters; its result carries it back. */
+  id: string;
+  /**
+   * Sent as the `Idempotency-Key` header. Keep it with the queued write and send the same key
+   * when you send the batch again: a write already done answers what it answered the first time.
+   */
+  idempotency_key: string;
+  /**
+   * Sent as the `If-Match` header: the `ETag` (`version`) of the record you changed. If someone
+   * changed it since, the result is `412` with the current record in the body's `current`.
+   */
+  if_match?: string | null;
+  method: BatchMethod;
+  /**
+   * Path of the REST endpoint, under the `path` of a sync resource
+   * (`GET /api/v1/kernel/sync/resources`).
+   */
+  path: string;
+};
+
+/** Writes queued on a device while it was offline. */
+export type BatchRequest = {
+  /** 1 to 100 writes, run one after the other in this order. */
+  operations: BatchOperation[];
+};
+
+/** What one write answered. */
+export type BatchResult = {
+  /**
+   * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+   * failed; `null` when the answer has no body.
+   */
+  body?: unknown;
+  /** The `ETag` header of the answer (version of the record after the write), if any. */
+  etag?: string | null;
+  /** The `id` you gave the write. */
+  id: string;
+  /** The `Location` header of the answer (the record created), if any. */
+  location?: string | null;
+  /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+  status: number;
+};
+
 /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
 export type BillingPeriodResponse = {
   amount: Money;
@@ -10871,6 +10921,25 @@ export type Data_Vec_ApprovalRequest = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BatchResult = {
+  data: {
+    /**
+     * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+     * failed; `null` when the answer has no body.
+     */
+    body?: unknown;
+    /** The `ETag` header of the answer (version of the record after the write), if any. */
+    etag?: string | null;
+    /** The `id` you gave the write. */
+    id: string;
+    /** The `Location` header of the answer (the record created), if any. */
+    location?: string | null;
+    /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+    status: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_BillingPeriodResponse = {
   data: {
     amount: Money;
@@ -12451,6 +12520,21 @@ export type Data_Vec_SupportRoutingRule = {
     /** Rules of one unit are tried in this order; rules of nearer units first. */
     position: number;
     team_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SyncResourceView = {
+  data: {
+    /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+    changes: string;
+    description: string;
+    /** `<module>.<name>`. */
+    name: string;
+    /** The list endpoint of these records; writes in a batch go under this path. */
+    path: string;
+    /** The permission needed to read them; its scope decides which records you get. */
+    read_permission: string;
   }[];
 };
 
@@ -21229,6 +21313,12 @@ export type Problem = {
    * on `detail`.
    */
   code: string;
+  /**
+   * For `precondition_failed` on endpoints that say so: the record as it is now on the server,
+   * in the same shape as reading it. Its version is in the `ETag` header: merge your change
+   * into it and send that `ETag` in `If-Match`.
+   */
+  current?: unknown;
   /** Human-readable explanation of what went wrong and how to fix it. */
   detail: string;
   /** One entry per invalid input field. Present only for validation problems. */
@@ -25117,6 +25207,19 @@ export type SuppressionResponse = {
 export type SuspendRequest = {
   /** Why, 1 to 500 characters (kept in the audit trail). */
   reason: string;
+};
+
+/** A kind of record an offline app can keep in sync. */
+export type SyncResourceView = {
+  /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+  changes: string;
+  description: string;
+  /** `<module>.<name>`. */
+  name: string;
+  /** The list endpoint of these records; writes in a batch go under this path. */
+  path: string;
+  /** The permission needed to read them; its scope decides which records you get. */
+  read_permission: string;
 };
 
 /** Changes to a tag; omitted fields stay. */
@@ -34086,6 +34189,30 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { group?: string; org_id?: string }; };
       responses: {
         200: Data_SummaryView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sync/batch": {
+    /** Send writes queued while offline. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: BatchRequest;
+      responses: {
+        200: Data_Vec_BatchResult;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sync/resources": {
+    /** List what an offline app can keep in sync. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SyncResourceView;
         401: Problem;
         default: Problem;
       };

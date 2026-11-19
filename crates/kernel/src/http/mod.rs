@@ -52,6 +52,7 @@ mod request_id;
 mod security_headers;
 mod server;
 pub(crate) mod stream;
+mod sync;
 
 use std::time::Duration;
 
@@ -153,6 +154,9 @@ pub struct Extras {
     /// Quyền dùng theo khách (bước 35): route và tool MCP của module mà gói của khách không có bị
     /// chặn. Mặc định: không có bên cung cấp, không chặn gì.
     pub entitlements: crate::entitlement::EntitlementsHandle,
+    /// Loại bản ghi đồng bộ được của các module (`Modules::sync_resources`, bước 69 P2): có thì
+    /// kernel phục vụ `/api/v1/kernel/sync/…` (lô ghi chạy lệnh qua route của các module này).
+    pub sync: Vec<(&'static str, crate::sync::SyncResource)>,
 }
 
 impl Extras {
@@ -222,6 +226,12 @@ impl Extras {
         self
     }
 
+    /// Sets the kinds of records offline apps can keep in sync: `(module name, declaration)`.
+    pub fn sync(mut self, sync: Vec<(&'static str, crate::sync::SyncResource)>) -> Self {
+        self.sync = sync;
+        self
+    }
+
     /// Sets the translations of error messages.
     pub fn translations(mut self, translations: Translations) -> Self {
         self.translations = translations;
@@ -272,7 +282,17 @@ pub fn build(
             .chain(modules.iter().map(|(name, routes)| (*name, routes.get_openapi()))),
     );
     let mut api = OpenApiRouter::new();
+    // Đồng bộ ngoại tuyến (bước 69 P2): endpoint của kernel và route của module có bản ghi đồng bộ
+    // được, để lô ghi chạy lệnh qua đúng route đó.
+    let sync_state = Arc::new(sync::SyncState {
+        resources: std::mem::take(&mut extras.sync),
+        router: std::sync::OnceLock::new(),
+    });
+    let mut sync_routes = Vec::new();
     for (name, mut routes) in modules {
+        if name == crate::builtin::NAME {
+            routes = routes.merge(sync::routes(sync_state.clone()));
+        }
         openapi::label_module(name, routes.get_openapi_mut());
         // Gói của khách (bước 35): đếm request ở mọi module; chặn ở module bị gói chi phối.
         if name != crate::user_flags::ME {
@@ -292,6 +312,9 @@ pub fn build(
             routes = routes.layer(middleware::from_fn(move |request: Request, next: Next| {
                 crate::ops::approvals::gate(approvals.clone(), request, next)
             }));
+        }
+        if sync_state.resources.iter().any(|(module, _)| *module == name) {
+            sync_routes.push((name, routes.clone()));
         }
         api = api.nest(&format!("/{name}"), routes);
     }
@@ -374,6 +397,12 @@ pub fn build(
             databases: databases.clone(),
         })
     });
+    let _ = sync_state.router.set(sync_router(
+        sync_routes,
+        body_limits.clone(),
+        translations.clone(),
+        idempotency.clone(),
+    ));
     let limiter = rate_limit::RateLimiter::new(config.rate_limit).map(Arc::new);
     let client_address = Arc::new(client::ClientAddress::new(
         config.client_ip_header.clone(),
@@ -486,6 +515,35 @@ fn kernel_resources(
         .for_any_signed_in()
         .qualify(crate::builtin::NAME),
     ]
+}
+
+/// Router con của lô ghi đồng bộ (bước 69 P2): route của các module có bản ghi đồng bộ được dưới
+/// `/api/v1/<module>`, bọc các lớp một lệnh cần như request REST thật — idempotency, ngôn ngữ, chuẩn
+/// hoá lỗi, bắt panic, giới hạn thân. Bộ xác thực và sổ database đi theo phần mở rộng của request
+/// lô; rate limiting, timeout đã tính cho request lô.
+fn sync_router(
+    routes: Vec<(&'static str, OpenApiRouter)>,
+    body_limits: Arc<body_limit::BodyLimits>,
+    translations: Arc<Translations>,
+    idempotency: Option<Arc<idempotency::Settings>>,
+) -> Router {
+    let mut router = Router::new();
+    for (name, routes) in routes {
+        router = router.nest(&format!("{API_PREFIX}/{name}"), Router::from(routes));
+    }
+    router
+        .layer(DefaultBodyLimit::disable())
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            body_limit::limit(body_limits.clone(), request, next)
+        }))
+        .layer(CatchPanicLayer::custom(problem::PanicToProblem))
+        .layer(middleware::map_response(problem::normalize))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            language::localize(translations.clone(), request, next)
+        }))
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            idempotency::idempotency(idempotency.clone(), request, next)
+        }))
 }
 
 /// Từ chối request có ký tự NUL (`%00`) trong đường dẫn hay query: giá trị đó tới database thì

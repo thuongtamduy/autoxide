@@ -53,6 +53,7 @@ pub(super) async fn normalize(response: Response) -> Response {
         detail: detail.clone(),
         errors: Vec::new(),
         reason: None,
+        current: None,
     };
     // Gắn lỗi tương ứng vào extensions, như mọi lỗi khác: lớp chọn ngôn ngữ dịch theo
     // `code` của nó. (Loại lỗi ở đây không quyết định gì: trạng thái giữ như response.)

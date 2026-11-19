@@ -150,6 +150,17 @@ pub fn changed() -> Error {
     )
 }
 
+/// Lỗi 412 như [`changed`], kèm bản ghi hiện tại `current` (dạng như khi đọc nó) và phiên bản
+/// `version` của nó (bước 69 P2): app ngoại tuyến tự gộp thay đổi của mình vào bản trên máy chủ
+/// rồi gửi lại với `ETag` mới, không phải đọc lại. Không đổi được `current` thành JSON thì vẫn trả
+/// 412, không kèm bản.
+pub fn changed_with<T: Serialize>(current: &T, version: DateTime<Utc>) -> Error {
+    match serde_json::to_value(current) {
+        Ok(record) => changed().with_current(record, version),
+        Err(_) => changed(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use chrono::SubsecRound;
