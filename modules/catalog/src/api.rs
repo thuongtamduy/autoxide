@@ -359,9 +359,64 @@ pub trait SalePriceSource: Send + Sync {
     ) -> Result<Vec<SalePrice>, Error>;
 }
 
+/// Sản phẩm sắp mở bán, đưa cho [`ListingGate`] xét.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ListingCandidate {
+    pub product_id: Uuid,
+    /// Nút sở hữu sản phẩm (người bán khi là sàn).
+    pub org_id: OrgId,
+    /// Danh mục của sản phẩm (không kèm tổ tiên).
+    pub category_ids: Vec<Uuid>,
+    pub kind: ProductKind,
+}
+
+impl ListingCandidate {
+    pub fn new(
+        product_id: Uuid,
+        org_id: OrgId,
+        category_ids: Vec<Uuid>,
+        kind: ProductKind,
+    ) -> Self {
+        ListingCandidate { product_id, org_id, category_ids, kind }
+    }
+}
+
+/// Kết quả xét mở bán.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ListingDecision {
+    Allow,
+    /// Không cho mở bán. `code` là mã lỗi ổn định của module cắm vào (vd
+    /// `marketplace.seller_not_verified`, có bản dịch ở module đó), `message` nói rõ phải làm gì.
+    Deny {
+        code: String,
+        message: String,
+    },
+}
+
+/// Điều kiện mở bán do module khác đặt (bước 46: người bán đã xác thực, sản phẩm đã duyệt, đủ giấy
+/// tờ ngành hàng). `catalog` hỏi trước khi chuyển sản phẩm sang `active`, ngoài transaction.
+#[async_trait::async_trait]
+pub trait ListingGate: Send + Sync {
+    async fn can_publish(
+        &self,
+        tenant: &TenantContext,
+        candidate: &ListingCandidate,
+    ) -> Result<ListingDecision, Error>;
+}
+
 /// Điểm cắm của module đăng ký sau `catalog`: lấy bằng
 /// `context.require::<dyn CatalogExtensions>()` trong `Module::start`.
 pub trait CatalogExtensions: Send + Sync {
     /// Cắm nguồn giá sau giảm tự động (một nguồn; cắm lần hai thì giữ nguồn đầu và trả `false`).
     fn set_sale_price_source(&self, source: std::sync::Arc<dyn SalePriceSource>) -> bool;
+
+    /// Cắm điều kiện mở bán (một điều kiện; cắm lần hai thì giữ cái đầu và trả `false`). Có cài
+    /// đặt mặc định (không nhận, trả `false`) để bản cài đặt sẵn có — vd bản giả trong test của
+    /// module khác — không phải sửa khi trait có thêm hàm.
+    fn set_listing_gate(&self, gate: std::sync::Arc<dyn ListingGate>) -> bool {
+        let _ = gate;
+        false
+    }
 }
