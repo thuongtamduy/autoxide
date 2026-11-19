@@ -1,5 +1,5 @@
 //! Bản AVIF của ảnh thu nhỏ ở mức service (bước 39 B8, D-20261119-step39-avif): chạy lại job, ảnh
-//! hỏng, hai worker cùng lúc. Đường thật qua HTTP và worker: `http/avif_tests.rs`.
+//! hỏng, hai worker cùng lúc. Đường thật qua HTTP và worker: `avif_http.rs`.
 
 use image::ImageFormat;
 
