@@ -167,6 +167,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
 - **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 - **[D-20261119-step53-ai-mail](D-20261119-step53-ai-mail.md)** `support`: bản nháp AI lưu riêng, khoá trả lời email là HMAC theo phiếu, tool MCP dùng trường phẳng — 2026-11-19
+- **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
 
 ## Xác thực, phân quyền, bảo mật
 

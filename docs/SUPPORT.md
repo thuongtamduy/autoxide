@@ -96,10 +96,33 @@ staff show in the work inbox (`GET /api/v1/kernel/work`, source `support.tickets
   `InboundMail::reply_address_key`. Mail from anyone but the customer, to an unknown key or a closed ticket is dropped;
   mail never opens a new ticket. Quoted earlier mail is cut.
 
+## Automatic answers (off by default)
+
+Turn on `auto_reply` in a unit's policy. When a customer writes, the AI only **classifies** the question; rules in the
+server decide, and only two kinds of text ever reach the customer:
+
+1. **An approved saved reply**, word for word with its variables filled in. Approve one with
+   `PUT /api/v1/support/macros/{id}/auto-reply {"enabled": true, "questions": {...}, "review_due_on": "YYYY-MM-DD"}`
+   (`support.auto_reply.manage`); after the review day it is no longer used, and editing its text withdraws the
+   approval.
+2. **A sentence built from exact data** by a module that attached a `FactSource` (e.g. the status of the customer's
+   own order); it answers nothing when it is not sure the customer owns the data.
+
+An answer is sent only when the classification is confident enough (`auto_reply_min_confidence_bp`, default 9000),
+carries no risk flag, the question has no blocked word (built-in: complaints, refunds, returns, cancellations, payment
+problems, personal data, legal words, asking for a person — plus the unit's `auto_reply_blocked_terms`), and fewer than
+`auto_reply_max_per_thread` (default 2) automatic answers came in a row. Otherwise staff answer as usual, with an AI
+draft prepared. Automatic messages have `auto_reply: true`: label them "Automatic answer" and show a "Talk to a person"
+button (`POST /me/tickets/{id}/handoff`, or the public one with the token), which stops automatic answers on that
+ticket. Customers rate an answer (`…/auto-replies/{reply_id}/feedback`); a saved reply reported wrong
+`AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT` (3) times in 7 days stops being used. Try a question with
+`POST /api/v1/support/auto-reply/preview` (nothing is sent) and read the log at `GET /api/v1/support/auto-replies`.
+
 ## For AI agents (MCP)
 
 Tools, with the same permissions as REST: `support.list_tickets`, `support.get_ticket`, `support.reply_ticket`,
-`support.add_internal_note`, `support.update_ticket`, `support.link_ticket`, `support.suggest_reply` (a draft only).
+`support.add_internal_note`, `support.update_ticket`, `support.link_ticket`, `support.suggest_reply` (a draft only),
+`support.preview_auto_reply`.
 
 ## Settings
 
@@ -109,6 +132,7 @@ Tools, with the same permissions as REST: `support.list_tickets`, `support.get_t
 | `AUTOXIDE_SUPPORT_MAX_BODY_CHARS`         | 10000   | Longest message                                            |
 | `AUTOXIDE_SUPPORT_TOKEN_DAYS_AFTER_CLOSE` | 30      | Days a guest's ticket token works after the ticket closes |
 | `AUTOXIDE_SUPPORT_GUEST_URL`              | —       | Page showing a ticket to a guest (`{id}`, `{token}`)       |
+| `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT`  | 3       | Wrong reports in 7 days that retire an automatic answer    |
 
 ## Personal data
 

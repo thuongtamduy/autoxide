@@ -1,6 +1,7 @@
 //! Test của module `support`, trên database gate đang chọn (gate chạy cả SQLite và Postgres).
 //! `TestApp` dựng module như binary: migration → start → route → lớp HTTP của kernel.
 
+mod auto;
 mod extras;
 mod guests;
 mod scope;
@@ -26,11 +27,12 @@ pub(crate) const AGENT: u128 = 0xa1;
 pub(crate) const BUYER: u128 = 0xb1;
 pub(crate) const OTHER_BUYER: u128 = 0xb2;
 
-pub(crate) const STAFF: [(&str, Scope); 4] = [
+pub(crate) const STAFF: [(&str, Scope); 5] = [
     ("support.tickets.read", Scope::Tenant),
     ("support.tickets.reply", Scope::Tenant),
     ("support.tickets.manage", Scope::Tenant),
     ("support.settings.manage", Scope::Tenant),
+    ("support.auto_reply.manage", Scope::Tenant),
 ];
 
 /// Thông báo đã gửi (giữ lại để test đọc).
@@ -181,6 +183,8 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::SupportService> {
         resources: None,
         complaints: None,
         ai: None,
+        facts: crate::facts::FactRegistry::default(),
+        jobs: autoxide_kernel::job::JobQueue::new("support"),
     };
     Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }
