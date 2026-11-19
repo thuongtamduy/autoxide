@@ -357,6 +357,19 @@ pub trait Module: Send + Sync {
         Vec::new()
     }
 
+    /// Sao cấu hình của module vào sandbox mới (bước 38, D-232): job `kernel.sandbox_copy` gọi theo
+    /// thứ tự đăng ký. Chỉ cấu hình, không bao giờ dữ liệu cá nhân, giao dịch hay secret. Gọi sau
+    /// `start`. Mặc định: không sao gì.
+    fn sandbox_copy(&self) -> Option<Arc<dyn crate::tenancy::sandbox::SandboxCopy>> {
+        None
+    }
+
+    /// Loại bản ghi của module đẩy được từ sandbox sang khách thật thành bản nháp (bước 38, D-232):
+    /// `kind` là `<module>.<loại>`. Gọi sau `start`. Mặc định: không có.
+    fn promotable(&self) -> Vec<crate::tenancy::sandbox::Promotable> {
+        Vec::new()
+    }
+
     /// Loại bản ghi app ngoại tuyến đồng bộ được (bước 69 P2, D-20261119-step69-sync): module có
     /// thì thêm `sync::changes_migration` vào migration, ghi thay đổi bằng `StartContext::sync_log`
     /// trong transaction ghi, và phục vụ `GET <đường dẫn>/changes`. Kernel kiểm khai báo lúc khởi
@@ -404,6 +417,8 @@ pub struct StartContext<'a> {
     sync_keep: chrono::Duration,
     /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
     partners: &'a crate::tenancy::sandbox::PartnerGuard,
+    /// Sổ sao / đẩy sandbox của mọi module, điền sau khi mọi module khởi động.
+    sandbox: &'a crate::tenancy::sandbox::SandboxCatalog,
 }
 
 impl StartContext<'_> {
@@ -747,6 +762,11 @@ impl StartContext<'_> {
     /// khởi động: giữ tay cầm lúc `start`, chỉ đọc khi phục vụ.
     pub fn automation_directory(&self) -> crate::automation::AutomationDirectory {
         self.automations.clone()
+    }
+
+    /// Sổ sao / đẩy sandbox của mọi module (chỉ kernel dùng); đọc khi phục vụ, không lúc `start`.
+    pub(crate) fn sandbox_catalog(&self) -> crate::tenancy::sandbox::SandboxCatalog {
+        self.sandbox.clone()
     }
 
     /// Bộ phân phối dữ liệu khách cha → khách con của module này (bước 38): ghi bản phân phối

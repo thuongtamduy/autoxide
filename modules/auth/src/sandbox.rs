@@ -17,7 +17,8 @@
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
-use autoxide_kernel::event::{Delivered, EventHandler, Subscription};
+use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
+use autoxide_kernel::pagination::PageRequest;
 use autoxide_kernel::tenancy::sandbox::SandboxRecipients;
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, root_of};
 use chrono::{DateTime, SubsecRound, Utc};
@@ -163,5 +164,58 @@ impl SandboxRecipients for StaffRecipients {
             .await?;
         let Some(user) = user else { return Ok(false) };
         crate::role::holds_any_role(&source, user.id, &roles).await
+    }
+}
+
+/// Sao role của khách gốc vào sandbox (D-232): tên, mô tả, permission, độ sâu, cấm, MFA. Không sao
+/// người dùng, membership hay API key. Role `admin` đã được gieo khi tạo khách nên bỏ qua; role trùng
+/// tên đã có ở sandbox (chạy lại) cũng bỏ qua.
+pub(crate) struct RoleCopy {
+    pub(crate) roles: Arc<crate::role::RoleService>,
+}
+
+/// Loại bản ghi của bảng nối sandbox.
+const ROLE_KIND: &str = "auth.role";
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::sandbox::SandboxCopy for RoleCopy {
+    async fn copy(
+        &self,
+        context: &autoxide_kernel::tenancy::sandbox::CopyContext<'_>,
+    ) -> Result<u64, Error> {
+        use autoxide_kernel::tenancy::sandbox::{copied, link_copy};
+
+        let mut count = 0;
+        let first = PageRequest::first(200, autoxide_kernel::pagination::Order::Asc);
+        let mut cursor = first.clone();
+        loop {
+            let page = self.roles.list(context.source, &cursor).await?;
+            for role in &page.data {
+                if role.all_permissions
+                    || copied(context.sandbox, ROLE_KIND, role.id).await?.is_some()
+                {
+                    continue;
+                }
+                if crate::role::role_by_name(context.sandbox, &role.name).await?.is_some() {
+                    continue;
+                }
+                let input = crate::role::RoleInput {
+                    name: role.name.clone(),
+                    description: role.description.clone(),
+                    permissions: Vec::new(),
+                    grants: role.grants.clone(),
+                    requires_mfa: role.requires_mfa,
+                    denies: role.denies.clone(),
+                };
+                let made = self.roles.create(context.sandbox, Actor::system(), input).await?;
+                link_copy(context.sandbox, ROLE_KIND, made.id, role.id).await?;
+                count += 1;
+            }
+            match page.data.last() {
+                Some(last) if page.data.len() == 200 => cursor = first.clone().after(last.id),
+                _ => break,
+            }
+        }
+        Ok(count)
     }
 }

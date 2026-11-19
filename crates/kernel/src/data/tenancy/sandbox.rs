@@ -10,12 +10,14 @@
 //! Mọi response của sandbox mang `Autoxide-Sandbox: true` và `X-Robots-Tag: noindex, nofollow`
 //! (`headers.rs`).
 
+mod copy;
 pub(crate) mod entity;
 pub(crate) mod headers;
 mod http;
 pub(crate) mod mailbox;
 mod migration;
 mod partners;
+mod promote;
 mod service;
 mod tools;
 
@@ -27,11 +29,20 @@ use crate::entitlement::Limit;
 use crate::error::{Error, ErrorKind};
 use crate::event::EventInfo;
 
+pub(crate) use copy::SandboxCatalog;
+pub use copy::{
+    CopyContext, Promotable, PromoteApply, PromoteRequest, Promoted, SandboxCopy, SandboxOptions,
+    copied, link_copy, promoted_target,
+};
 pub(crate) use mailbox::CreateSandboxMessages;
 pub use mailbox::{HeldChannel, HeldMessage, HeldReason, SandboxMessage, hold_back, sandbox_only};
 pub(crate) use migration::AddSandbox;
 pub(crate) use partners::PartnerGuard;
 pub use partners::{SANDBOX_PREFIX, SandboxRecipients};
+pub use promote::{
+    MAX_PROMOTE_ITEMS, PromotableKind, PromoteInput, PromoteItem, PromoteOutcome, PromoteResult,
+    promote_record_not_found,
+};
 pub(crate) use service::Wiring;
 pub use service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 
@@ -95,6 +106,12 @@ pub(crate) const SANDBOX_EXTENDED: EventInfo = EventInfo::new(
 pub(crate) const SANDBOX_DELETED: EventInfo = EventInfo::new(
     "kernel.sandbox_deleted",
     "A sandbox of the tenant was deleted, by hand or because it expired (`sandbox_id`).",
+);
+
+pub(crate) const SANDBOX_PROMOTED: EventInfo = EventInfo::new(
+    "kernel.sandbox_promoted",
+    "Records tried in a sandbox were promoted to the tenant as drafts (`sandbox_id` and how many \
+     were `created_draft`, `updated_draft`, `unchanged`, `conflict`).",
 );
 
 /// Số ngày một sandbox sống nếu không gia hạn.

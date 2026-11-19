@@ -30,7 +30,7 @@ use crate::tenancy::{
     TenantStatus, errors, require_platform,
 };
 
-fn now() -> DateTime<Utc> {
+pub(super) fn now() -> DateTime<Utc> {
     Utc::now().trunc_subsecs(6)
 }
 
@@ -145,13 +145,15 @@ fn changed(row: &entity::Model) -> SandboxChanged {
 
 /// Sandbox của khách: tạo, gia hạn, xoá, hết hạn.
 pub struct TenantSandboxes {
-    registry: DatabaseRegistry,
+    pub(super) registry: DatabaseRegistry,
     admin: Arc<TenantAdmin>,
-    outbox: Outbox,
+    pub(super) outbox: Outbox,
     jobs: JobQueue,
     entitlements: EntitlementsHandle,
     days: i64,
     max_products: u32,
+    /// Sao / đẩy của mọi module (điền sau khi mọi module khởi động).
+    pub(super) catalog: super::copy::SandboxCatalog,
 }
 
 impl TenantSandboxes {
@@ -177,7 +179,7 @@ impl TenantSandboxes {
     }
 
     /// Dòng sandbox `id` của khách người gọi (hay nhân sự nền tảng); khác → `tenancy.sandbox_not_found`.
-    async fn owned(
+    pub(super) async fn owned(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
@@ -347,13 +349,19 @@ impl TenantSandboxes {
         let source_id = row.sandbox_of.ok_or_else(|| Error::internal("a sandbox has no source"))?;
         let source = self.registry.tenant(TenantId::from_uuid(source_id)).await?;
         self.admin.provision(Actor::system(), &sandbox_id.to_string()).await?;
+        // Sao cấu hình trước khi ghi `kernel.sandbox_created`: nhân viên chỉ vào được (uỷ quyền tạo
+        // khi nghe event) khi bản sao đã đủ. Chạy lại được: bản đã sao bị bỏ qua.
+        self.registry.invalidate(TenantId::from_uuid(sandbox_id));
+        let sandbox = self.registry.tenant(TenantId::from_uuid(sandbox_id)).await?;
+        let options = super::copy::SandboxOptions { products: options_of(&row).products };
+        self.copy_configuration(&source, &sandbox, options).await?;
         let event = SandboxCreatedEvent(changed(&row));
         self.record(&source, Actor::system(), row.id, &event).await?;
         tracing::info!(sandbox_id = %sandbox_id, "sandbox ready");
         Ok(())
     }
 
-    async fn record<E: Event>(
+    pub(super) async fn record<E: Event>(
         &self,
         source: &TenantContext,
         actor: Actor,
@@ -526,6 +534,7 @@ impl Wiring {
             entitlements: context.entitlements(),
             days: self.days,
             max_products: self.max_products,
+            catalog: context.sandbox_catalog(),
         });
         context.provide::<TenantSandboxes>(service.clone())?;
         self.service = Some(service);
