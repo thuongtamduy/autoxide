@@ -259,6 +259,9 @@ impl SupportService {
             .insert(&transaction)
             .await?;
         }
+        if policy.auto_reply && opening.channel != Channel::Staff {
+            self.enqueue_auto_reply(&transaction, tenant, id, first.id).await?;
+        }
         let outbox = &self.parts.outbox;
         let subject = events::ticket_subject(id);
         let created =
@@ -447,7 +450,7 @@ impl SupportService {
             Viewer::Customer(user) if row.requester_user_id == Some(user) => {}
             Viewer::Customer(_) => return Err(not_found(id)),
             // Token đã kiểm ở `guest::by_token`.
-            Viewer::Guest => {}
+            Viewer::Guest | Viewer::Internal => {}
         }
         Ok(row)
     }

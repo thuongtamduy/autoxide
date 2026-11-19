@@ -12350,6 +12350,47 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Try the automatic answer on a question without sending anything: tells whether it would send an approved answer (and its exact text), leave it to staff, or hand over.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A question to try against the automatic answer.",
+        "properties": {
+          "locale": {
+            "description": "`vi` (default) or `en`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The unit whose policy and approved answers apply.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "text"
+        ],
+        "type": "object"
+      },
+      "name": "support.preview_auto_reply",
+      "output_schema": null,
+      "permissions": [
+        "support.auto_reply.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Answer the customer on a support ticket (they are notified; the ticket waits for them).",
       "input_schema": {
         "additionalProperties": false,

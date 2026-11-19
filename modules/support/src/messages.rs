@@ -50,6 +50,7 @@ impl SupportService {
             Viewer::Staff(principal) => (Actor::from(principal), AuthorKind::Agent, None),
             Viewer::Customer(user) => (Actor::user(user), AuthorKind::Customer, Some(user)),
             Viewer::Guest => (Actor::public(), AuthorKind::Customer, None),
+            Viewer::Internal => (Actor::system(), AuthorKind::System, None),
         };
         let mut problems = Vec::new();
         let body = self.check_body("body", &input.body, &mut problems);
@@ -104,8 +105,8 @@ impl SupportService {
             if author == AuthorKind::Agent && before.first_responded_at.is_none() {
                 row.first_responded_at = Set(Some(at));
             }
-            if author == AuthorKind::Customer {
-                // Người mua viết: lượt trả lời tự động liên tiếp đếm lại từ đầu (D-230).
+            if author == AuthorKind::Agent {
+                // Nhân viên trả lời: lượt trả lời tự động liên tiếp đếm lại từ đầu (D-230).
                 row.auto_replies_in_row = Set(0);
             }
             row.last_message_at = Set(at);
@@ -116,7 +117,7 @@ impl SupportService {
         let author_user = match viewer {
             Viewer::Staff(principal) => Some(principal.user_id()),
             Viewer::Customer(user) => Some(user),
-            Viewer::Guest => None,
+            Viewer::Guest | Viewer::Internal => None,
         };
         let message = message::ActiveModel {
             id: Set(Uuid::now_v7()),
@@ -142,6 +143,9 @@ impl SupportService {
         added["mentions"] = json!(input.mentions);
         let event = events::MessageAdded(Change { before: None, after: Some(added) });
         self.parts.outbox.record(&transaction, tenant, actor, subject, &event).await?;
+        if kind == MessageKind::Public && author == AuthorKind::Customer && policy.auto_reply {
+            self.enqueue_auto_reply(&transaction, tenant, ticket_id, message.id).await?;
+        }
         self.record_changes(&transaction, tenant, actor, &before, &after, false).await?;
         transaction.commit().await?;
         Ok((after, message))

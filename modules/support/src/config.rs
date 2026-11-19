@@ -23,6 +23,13 @@ pub(crate) const TOKEN_DAYS_AFTER_CLOSE: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const AUTO_REPLY_FLAG_LIMIT: Setting = Setting::new(
+    "AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT",
+    "A saved reply reported wrong by customers this many times in 7 days stops being used for \
+     automatic answers (1 to 100).",
+)
+.with_default("3");
+
 pub(crate) const GUEST_URL: Setting = Setting::new(
     "AUTOXIDE_SUPPORT_GUEST_URL",
     "Page of your website that shows one ticket to a guest, with `{id}` and `{token}` where the \
@@ -38,6 +45,7 @@ pub(crate) struct SupportConfig {
     pub max_body_chars: usize,
     pub token_days_after_close: i64,
     pub guest_url: Option<String>,
+    pub auto_reply_flag_limit: u32,
 }
 
 impl Default for SupportConfig {
@@ -47,6 +55,7 @@ impl Default for SupportConfig {
             max_body_chars: 10_000,
             token_days_after_close: 30,
             guest_url: None,
+            auto_reply_flag_limit: 3,
         }
     }
 }
@@ -56,11 +65,13 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<SupportConfig, Inval
     let body = reader.get_with(&MAX_BODY_CHARS, |raw| parse_in_range(raw, 100usize, 100_000));
     let days = reader.get_with(&TOKEN_DAYS_AFTER_CLOSE, |raw| parse_in_range(raw, 0i64, 365));
     let url = reader.optional_with(&GUEST_URL, guest_url);
+    let flags = reader.get_with(&AUTO_REPLY_FLAG_LIMIT, |raw| parse_in_range(raw, 1u32, 100));
     Ok(SupportConfig {
         guest_per_hour: guest?,
         max_body_chars: body?,
         token_days_after_close: days?,
         guest_url: url?,
+        auto_reply_flag_limit: flags?,
     })
 }
 
