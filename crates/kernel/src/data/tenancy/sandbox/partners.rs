@@ -2,7 +2,7 @@
 //!
 //! Kernel bọc MỌI bộ cài đặt hợp đồng đối tác ngay khi module công bố (`StartContext::provide` /
 //! `contribute`): thanh toán, chi trả, biến động số dư, SMS, ZNS, đẩy thông báo, hoá đơn điện tử,
-//! eKYC và mail. Lời gọi cho một khách sandbox không tới đối tác: bộ bọc trả kết quả giả xác định
+//! eKYC, mail và nhà cung cấp thoại (bước 61, D-232). Lời gọi cho một khách sandbox không tới đối tác: bộ bọc trả kết quả giả xác định
 //! (thanh toán thành công, hoá đơn số `SANDBOX-…`, eKYC duyệt) và ghi vào hộp thư giả
 //! ([`super::mailbox`]); khách thật đi thẳng tới bộ cài đặt gốc. Module nghiệp vụ không rẽ nhánh.
 //!
@@ -46,6 +46,10 @@ use crate::push::{
 };
 use crate::sms::{SmsMessage, SmsReceipt, SmsSender};
 use crate::tenancy::{DatabaseRegistry, TenancyMode, TenantContext, TenantId};
+use crate::voice::{
+    BrowserSession, BrowserSessionRequest, CallStatus, OutboundCall, ProviderCall,
+    VoiceCapabilities, VoiceNotification, VoiceProvider,
+};
 use crate::zns::{ZnsMessage, ZnsSender};
 
 /// Tiền tố của mọi mã do bộ giả cấp: không bao giờ là căn cứ pháp lý ở khách thật.
@@ -133,6 +137,7 @@ impl PartnerGuard {
         guard!(EInvoiceProvider, GuardedEInvoices);
         guard!(IdentityVerifier, GuardedIdentity);
         guard!(Mailer, GuardedMailer);
+        guard!(VoiceProvider, GuardedVoice);
         api
     }
 }
@@ -666,6 +671,106 @@ impl Mailer for GuardedMailer {
             .subject(mail.subject.clone())
             .body(json!({"text": mail.text, "html": mail.html.is_some()}));
         hold_back(tenant, message).await
+    }
+}
+
+// ---- Thoại ----------------------------------------------------------------------------------
+
+/// Sandbox không gọi điện thật: phiên WebRTC và cuộc gọi ra là giả (mã `SANDBOX-…`), ghi vào hộp thư
+/// giả với số đã che; không có bản ghi âm.
+struct GuardedVoice {
+    inner: Arc<dyn VoiceProvider>,
+    guard: PartnerGuard,
+}
+
+#[async_trait::async_trait]
+impl VoiceProvider for GuardedVoice {
+    fn provider(&self) -> &'static str {
+        self.inner.provider()
+    }
+
+    fn capabilities(&self) -> VoiceCapabilities {
+        self.inner.capabilities()
+    }
+
+    async fn browser_session(
+        &self,
+        tenant: TenantId,
+        request: &BrowserSessionRequest,
+    ) -> Result<BrowserSession, Error> {
+        let Some(sandbox) = self.guard.sandbox(tenant).await? else {
+            return self.inner.browser_session(tenant, request).await;
+        };
+        let body = json!({"identity": request.identity, "call_id": request.call_id});
+        let hotline = request.hotline.masked();
+        simulated(
+            &sandbox,
+            HeldChannel::Partner,
+            self.provider(),
+            Some(&hotline),
+            "voice.session",
+            body,
+        )
+        .await?;
+        Ok(BrowserSession {
+            token: format!("{SANDBOX_PREFIX}VOICE-{}", uuid::Uuid::now_v7()),
+            expires_at: Utc::now() + Duration::minutes(10),
+        })
+    }
+
+    async fn place_call(
+        &self,
+        tenant: TenantId,
+        call: &OutboundCall,
+    ) -> Result<ProviderCall, Error> {
+        let Some(sandbox) = self.guard.sandbox(tenant).await? else {
+            return self.inner.place_call(tenant, call).await;
+        };
+        let body = json!({"call_id": call.call_id, "record": call.record});
+        let to = call.to.masked();
+        simulated(&sandbox, HeldChannel::Partner, self.provider(), Some(&to), "voice.call", body)
+            .await?;
+        Ok(ProviderCall {
+            provider_call_id: format!("{SANDBOX_PREFIX}CALL-{}", call.call_id),
+            status: CallStatus::Queued,
+        })
+    }
+
+    fn verify_webhook(
+        &self,
+        tenant: TenantId,
+        headers: &HeaderMap,
+        body: &[u8],
+    ) -> Result<Vec<VoiceNotification>, Error> {
+        // Nhà cung cấp thật không biết cuộc gọi giả nên không gửi webhook cho sandbox; kiểm chữ ký thật.
+        self.inner.verify_webhook(tenant, headers, body)
+    }
+
+    async fn fetch_recording(
+        &self,
+        tenant: TenantId,
+        provider_recording_id: &str,
+    ) -> Result<crate::storage::ByteStream, Error> {
+        if self.guard.sandbox(tenant).await?.is_none() {
+            return self.inner.fetch_recording(tenant, provider_recording_id).await;
+        }
+        // Sandbox không có cuộc gọi thật nên không có bản ghi.
+        Err(Error::not_found(
+            "voice.recording_not_found",
+            "The voice provider has no recording `{id}`.",
+        )
+        .with_param("id", provider_recording_id))
+    }
+
+    async fn delete_recording(
+        &self,
+        tenant: TenantId,
+        provider_recording_id: &str,
+    ) -> Result<(), Error> {
+        if self.guard.sandbox(tenant).await?.is_none() {
+            return self.inner.delete_recording(tenant, provider_recording_id).await;
+        }
+        Ok(())
     }
 }
 

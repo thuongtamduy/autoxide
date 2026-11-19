@@ -5808,6 +5808,81 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List call-back requests in your scope (phone numbers masked); calling back needs a person at the phone, so there is no tool for it.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters of the call-back list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of requests, 1 to 200 (default 50).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "conversations.list_callbacks",
+      "output_schema": null,
+      "permissions": [
+        "conversations.call"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A conversation to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the conversation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "conversations.list_calls",
+      "output_schema": null,
+      "permissions": [
+        "conversations.call"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List customer conversations in your scope, latest activity first; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,

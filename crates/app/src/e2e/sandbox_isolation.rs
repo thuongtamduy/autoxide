@@ -22,12 +22,16 @@ const PASSWORD: &str = "correct horse battery staple";
 struct Fakes {
     sms: Arc<FakeSmsSender>,
     gateway: Arc<FakePaymentGateway>,
+    voice: Arc<autoxide_testkit::FakeVoiceProvider>,
 }
 
 async fn app(test: &TestDatabase, dedicated: bool) -> (TestApp, Fakes) {
     let dir = std::env::temp_dir().join(format!("autoxide-sandbox-iso-{}", uuid::Uuid::now_v7()));
-    let fakes =
-        Fakes { sms: Arc::new(FakeSmsSender::new()), gateway: Arc::new(FakePaymentGateway::new()) };
+    let fakes = Fakes {
+        sms: Arc::new(FakeSmsSender::new()),
+        gateway: Arc::new(FakePaymentGateway::new()),
+        voice: Arc::new(autoxide_testkit::FakeVoiceProvider::default()),
+    };
     let builder = TestApp::builder(test)
         .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string());
     let builder = if dedicated { builder.tenant_dedicated("shop") } else { builder.tenant("shop") };
@@ -36,6 +40,7 @@ async fn app(test: &TestDatabase, dedicated: bool) -> (TestApp, Fakes) {
         .module(autoxide_auth::module())
         .provide::<dyn SmsSender>(fakes.sms.clone())
         .contribute::<dyn PaymentGateway>(fakes.gateway.clone())
+        .contribute::<dyn autoxide_kernel::voice::VoiceProvider>(fakes.voice.clone())
         .build()
         .await
         .unwrap();
@@ -251,6 +256,46 @@ async fn sandbox_dung_quyen_cua_khach_goc_va_huy_hieu_ban_thu() {
         assert_eq!(badge["data"]["link_url"], "");
         assert_eq!(badge["data"]["image_url"], "");
         assert!(badge["data"]["alt"].as_str().unwrap().contains("Test copy"));
+    })
+    .await
+    .unwrap();
+}
+
+/// Gọi điện (bước 61, D-232): sandbox không gọi nhà cung cấp thoại thật; khách thật vẫn gọi.
+#[tokio::test]
+async fn thoai_trong_sandbox_la_gia() {
+    use autoxide_kernel::voice::{OutboundCall, VoiceProvider};
+    TestDatabase::run(async |test| {
+        let (app, fakes) = app(test, false).await;
+        let shop = app.tenant("shop").await.unwrap();
+        let token = owner(&app, &shop).await;
+        let path = format!("/kernel/tenants/{}/sandboxes", shop.id());
+        let (status, created) =
+            call(&app, Method::POST, &path, &token, "shop", Some(json!({"name": "Try"}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let id = created["data"]["id"].as_str().unwrap().to_owned();
+        settle(&app).await;
+        let sandbox =
+            app.registry().tenant(TenantId::from_uuid(id.parse().unwrap())).await.unwrap();
+        let providers = app.modules().contributions::<dyn VoiceProvider>();
+        assert_eq!(providers.len(), 1);
+        let outbound = OutboundCall {
+            call_id: uuid::Uuid::now_v7(),
+            from: PhoneNumber::parse("02838221234", "84").unwrap(),
+            to: PhoneNumber::parse("+84901234567", "84").unwrap(),
+            agent_identity: "agent".to_owned(),
+            record: false,
+            recording_notice: None,
+        };
+        let placed = providers[0].place_call(sandbox.id(), &outbound).await.unwrap();
+        assert!(placed.provider_call_id.starts_with("SANDBOX-"), "{placed:?}");
+        assert!(fakes.voice.calls().is_empty(), "không gọi nhà cung cấp thật");
+        let (_, held) =
+            call(&app, Method::GET, "/kernel/sandbox/messages", &token, &id, None).await;
+        let text = held.to_string();
+        assert!(text.contains("voice.call") && !text.contains("901234567"), "{text}");
+        providers[0].place_call(shop.id(), &outbound).await.unwrap();
+        assert_eq!(fakes.voice.calls().len(), 1, "khách thật gọi nhà cung cấp thật");
     })
     .await
     .unwrap();

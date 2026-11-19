@@ -15,10 +15,12 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::http::views::{MessageResponse, ThreadResponse};
+use crate::http::voice::{CallResponse, CallbackResponse};
 use crate::messages::NewMessage;
-use crate::permissions::{READ, REPLY};
+use crate::permissions::{CALL, READ, REPLY};
 use crate::service::{ConversationsService, Viewer};
 use crate::threads::ThreadFilter;
+use crate::voice::callbacks::CallbackFilter;
 
 /// Filters of the conversation list.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
@@ -72,6 +74,19 @@ pub(crate) struct ThreadWithMessages {
     messages: Vec<MessageResponse>,
 }
 
+/// Filters of the call-back list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(as = ListConversationCallbacksInput)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CallbacksInput {
+    /// `open`, `calling`, `done`, `cancelled` or `expired`.
+    status: Option<String>,
+    /// Maximum number of requests, 1 to 200 (default 50).
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+}
+
 /// The draft for an agent.
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(as = ConversationDraft)]
@@ -84,6 +99,7 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let (list, get, reply, suggest) =
         (service.clone(), service.clone(), service.clone(), service.clone());
+    let (callbacks, calls) = (service.clone(), service.clone());
     vec![
         Tool::new(
             "list_threads",
@@ -160,5 +176,33 @@ pub(crate) fn all(service: &Arc<ConversationsService>) -> Vec<Tool> {
             },
         )
         .requires(REPLY),
+        Tool::new(
+            "list_callbacks",
+            "List call-back requests in your scope (phone numbers masked); calling back needs a person at the phone, so there is no tool for it.",
+            move |tenant: TenantContext, principal: Principal, input: CallbacksInput| {
+                let service = callbacks.clone();
+                async move {
+                    let filter = CallbackFilter { status: input.status, ..CallbackFilter::default() };
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let page = service.callbacks(&tenant, &principal, &filter, &page).await?;
+                    Ok::<Page<CallbackResponse>, Error>(page.map(CallbackResponse::from))
+                }
+            },
+        )
+        .requires(CALL)
+        .read_only(),
+        Tool::new(
+            "list_calls",
+            "List the calls of a conversation in your scope, newest first (no phone numbers, no recordings).",
+            move |tenant: TenantContext, principal: Principal, input: ThreadId| {
+                let service = calls.clone();
+                async move {
+                    let rows = service.calls_of(&tenant, &principal, input.id).await?;
+                    Ok::<Vec<CallResponse>, Error>(rows.into_iter().map(CallResponse::from).collect())
+                }
+            },
+        )
+        .requires(CALL)
+        .read_only(),
     ]
 }

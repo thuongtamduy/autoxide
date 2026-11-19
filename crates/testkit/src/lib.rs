@@ -48,6 +48,7 @@ mod stale;
 mod storage;
 mod store;
 mod tenancy;
+mod voice;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
 pub use dns::FakeDns;
@@ -67,6 +68,7 @@ pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, s
 pub use storage::{MemoryStorage, MemoryStorageOpener};
 pub use store::FakeStorePurchases;
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
+pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
 use std::fmt;
 use std::path::PathBuf;

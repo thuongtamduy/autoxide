@@ -45,9 +45,20 @@ pub(crate) const STAFF_UNREAD: NotificationKind = NotificationKind::new(
     ),
 );
 
+pub(crate) const CALLBACK_EXPIRED: NotificationKind = NotificationKind::new(
+    Category::Transactional,
+    &[Channel::Email, Channel::InApp, Channel::MobilePush],
+    NotificationTemplate::new(
+        "conversations.callback_expired",
+        "We could not call you back",
+        "The shop could not call you back in the time you chose. Open the chat to choose another time.",
+        "Choose another time for your call-back",
+    ),
+);
+
 /// Khai các loại thông báo của `conversations`.
 pub(crate) fn declare(notifier: &dyn Notifier) -> Result<(), Error> {
-    for kind in [CUSTOMER_UNREAD, STAFF_UNREAD] {
+    for kind in [CUSTOMER_UNREAD, STAFF_UNREAD, CALLBACK_EXPIRED] {
         notifier.declare(kind)?;
     }
     Ok(())

@@ -948,6 +948,16 @@ export type BulkRequest = {
   ids?: string[] | null;
 };
 
+/** A range of call-back hours, in the local time of the line. */
+export type CallbackHoursRange = {
+  /** Day of the week, 1 (Monday) to 7 (Sunday). */
+  day: number;
+  /** Opening time, `HH:MM`. */
+  from: string;
+  /** Closing time, `HH:MM`, after `from`. */
+  to: string;
+};
+
 /** What the provider sent back to `redirect_uri`. */
 export type CallbackRequest = {
   /** The `code` query parameter. */
@@ -4068,9 +4078,52 @@ export type Conversation = {
   updated_at: string;
 };
 
+/** A WebRTC session for an agent. */
+export type ConversationAgentSession = {
+  expires_at: string;
+  token: string;
+};
+
 /** Whether the customer of a conversation is blocked. */
 export type ConversationBlock = {
   blocked: boolean;
+};
+
+/** A call. Phone numbers are never included. */
+export type ConversationCall = {
+  agent_user_id?: string | null;
+  answered_at?: string | null;
+  callback_id?: string | null;
+  created_at: string;
+  /** `inbound` (the customer called) or `outbound` (the shop called back). */
+  direction: string;
+  duration_seconds?: number | null;
+  ended_at?: string | null;
+  id: string;
+  /** A recording is stored; listen at `GET /calls/{id}/recording`. */
+  recorded: boolean;
+  recording_enabled: boolean;
+  recording_expires_at?: string | null;
+  /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
+  status: string;
+  thread_id: string;
+};
+
+/** A call-back request. The phone number is masked (`090•••567`). */
+export type ConversationCallback = {
+  assigned_user_id?: string | null;
+  attempts: number;
+  client_id: string;
+  created_at: string;
+  id: string;
+  last_call_id?: string | null;
+  org_id: string;
+  phone_masked: string;
+  /** `open`, `calling`, `done`, `cancelled` or `expired`. */
+  status: string;
+  thread_id: string;
+  window_end: string;
+  window_start: string;
 };
 
 /** A conversation with how far each person has read it. */
@@ -4145,6 +4198,45 @@ export type ConversationReport = {
   /** `open` or `resolved`. */
   status: string;
   thread_id: string;
+};
+
+/** What the customer sees before calling. */
+export type ConversationVoiceInfo = {
+  /** The shop takes calls; otherwise hide every call button. */
+  available: boolean;
+  /** Calling from the browser or app works. */
+  browser_calls: boolean;
+  /** When the shop calls back (local time of the shop). */
+  callback_hours: CallbackHoursRange[];
+  /** "Call me back" works. */
+  callbacks: boolean;
+  /** Calls are recorded: show `recording_notice` and send `recording_ack: true`. */
+  recording: boolean;
+  recording_notice?: string | null;
+  utc_offset_minutes?: number | null;
+};
+
+/** The phone line of a unit. */
+export type ConversationVoiceLine = {
+  active: boolean;
+  callback_hours: CallbackHoursRange[];
+  hotline: string;
+  org_id: string;
+  provider: string;
+  recording_enabled: boolean;
+  updated_at: string;
+  utc_offset_minutes: number;
+  /**
+   * Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a
+   * new token was made — keep it, it is not shown again.
+   */
+  webhook_path?: string | null;
+};
+
+/** How many notifications were stored. */
+export type ConversationVoiceWebhookReceipt = {
+  /** New notifications stored (repeats are not counted). */
+  stored: number;
 };
 
 /** A key to create. */
@@ -6782,10 +6874,62 @@ export type Data_Conversation = {
 };
 
 /** Envelope of a single result. */
+export type Data_ConversationAgentSession = {
+  /** A WebRTC session for an agent. */
+  data: {
+    expires_at: string;
+    token: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ConversationBlock = {
   /** Whether the customer of a conversation is blocked. */
   data: {
     blocked: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationCall = {
+  /** A call. Phone numbers are never included. */
+  data: {
+    agent_user_id?: string | null;
+    answered_at?: string | null;
+    callback_id?: string | null;
+    created_at: string;
+    /** `inbound` (the customer called) or `outbound` (the shop called back). */
+    direction: string;
+    duration_seconds?: number | null;
+    ended_at?: string | null;
+    id: string;
+    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
+    recorded: boolean;
+    recording_enabled: boolean;
+    recording_expires_at?: string | null;
+    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
+    status: string;
+    thread_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationCallback = {
+  /** A call-back request. The phone number is masked (`090•••567`). */
+  data: {
+    assigned_user_id?: string | null;
+    attempts: number;
+    client_id: string;
+    created_at: string;
+    id: string;
+    last_call_id?: string | null;
+    org_id: string;
+    phone_masked: string;
+    /** `open`, `calling`, `done`, `cancelled` or `expired`. */
+    status: string;
+    thread_id: string;
+    window_end: string;
+    window_start: string;
   };
 };
 
@@ -6851,6 +6995,54 @@ export type Data_ConversationReport = {
     /** `open` or `resolved`. */
     status: string;
     thread_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationVoiceInfo = {
+  /** What the customer sees before calling. */
+  data: {
+    /** The shop takes calls; otherwise hide every call button. */
+    available: boolean;
+    /** Calling from the browser or app works. */
+    browser_calls: boolean;
+    /** When the shop calls back (local time of the shop). */
+    callback_hours: CallbackHoursRange[];
+    /** "Call me back" works. */
+    callbacks: boolean;
+    /** Calls are recorded: show `recording_notice` and send `recording_ack: true`. */
+    recording: boolean;
+    recording_notice?: string | null;
+    utc_offset_minutes?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationVoiceLine = {
+  /** The phone line of a unit. */
+  data: {
+    active: boolean;
+    callback_hours: CallbackHoursRange[];
+    hotline: string;
+    org_id: string;
+    provider: string;
+    recording_enabled: boolean;
+    updated_at: string;
+    utc_offset_minutes: number;
+    /**
+     * Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a
+     * new token was made — keep it, it is not shown again.
+     */
+    webhook_path?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationVoiceWebhookReceipt = {
+  /** How many notifications were stored. */
+  data: {
+    /** New notifications stored (repeats are not counted). */
+    stored: number;
   };
 };
 
@@ -10725,6 +10917,17 @@ export type Data_StartedConversation = {
 };
 
 /** Envelope of a single result. */
+export type Data_StartedConversationCall = {
+  /** A call just started from the browser, with the token for the provider's WebRTC SDK. */
+  data: {
+    call: ConversationCall;
+    expires_at: string;
+    /** Short-lived token for the voice provider's SDK; do not store it. */
+    token: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_StoreProductResponse = {
   /** A store product linked to a plan. */
   data: {
@@ -12311,6 +12514,28 @@ export type Data_Vec_ContentTemplate = {
     /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
     titles: Record<string, unknown>;
     variables: ContentTemplateVariable[];
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ConversationCall = {
+  data: {
+    agent_user_id?: string | null;
+    answered_at?: string | null;
+    callback_id?: string | null;
+    created_at: string;
+    /** `inbound` (the customer called) or `outbound` (the shop called back). */
+    direction: string;
+    duration_seconds?: number | null;
+    ended_at?: string | null;
+    id: string;
+    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
+    recorded: boolean;
+    recording_enabled: boolean;
+    recording_expires_at?: string | null;
+    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
+    status: string;
+    thread_id: string;
   }[];
 };
 
@@ -19618,6 +19843,27 @@ export type Page_Conversation = {
 };
 
 /** One page of a list. */
+export type Page_ConversationCallback = {
+  /** The items of this page, in the requested order. */
+  data: {
+    assigned_user_id?: string | null;
+    attempts: number;
+    client_id: string;
+    created_at: string;
+    id: string;
+    last_call_id?: string | null;
+    org_id: string;
+    phone_masked: string;
+    /** `open`, `calling`, `done`, `cancelled` or `expired`. */
+    status: string;
+    thread_id: string;
+    window_end: string;
+    window_start: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ConversationMessage = {
   /** The items of this page, in the requested order. */
   data: {
@@ -25129,6 +25375,20 @@ export type ReportRequest = {
   reason: CommentReportReason;
 };
 
+/** When to call the customer back. */
+export type RequestConversationCallbackRequest = {
+  /** An id your app makes up (1 to 100 characters): sending again returns the same request. */
+  client_id: string;
+  /** `account`: the verified phone number of your account. */
+  phone_source: string;
+  /** Required (`true`) when calls are recorded. */
+  recording_ack?: boolean;
+  /** End of the window, the same day. */
+  window_end: string;
+  /** Start of the window, within the shop's call-back hours. */
+  window_start: string;
+};
+
 /** A shipment to request. */
 export type RequestOrderShipmentRequest = {
   /** Note for the carrier. */
@@ -25712,6 +25972,23 @@ export type SessionResponse = {
    * none was sent.
    */
   user_agent?: string | null;
+};
+
+/** The phone line of a unit. */
+export type SetConversationVoiceLineRequest = {
+  active?: boolean;
+  /** Call-back hours (default 08:00–20:00 every day). */
+  callback_hours?: CallbackHoursRange[] | null;
+  /** Public number of the shop; customers see it when called back. */
+  hotline: string;
+  /** A voice provider installed on this server (`provider()` of its connector, e.g. `stringee`). */
+  provider: string;
+  /** Record calls (off by default). Only when the provider plays a recording notice. */
+  recording_enabled?: boolean;
+  /** Make a new webhook token (the old one stops working). */
+  rotate_token?: boolean;
+  /** Minutes from UTC of the hours (default 420, Vietnam). */
+  utc_offset_minutes?: number | null;
 };
 
 /** Referral of the cart. */
@@ -26582,6 +26859,12 @@ export type SitemapItem = {
   translations: PublicTranslation[];
 };
 
+/** Confirmation that the customer knows the call is recorded. */
+export type StartConversationCallRequest = {
+  /** Required (`true`) when `GET …/voice` says `recording`. */
+  recording_ack?: boolean;
+};
+
 /** The first message of a conversation. */
 export type StartConversationRequest = {
   /** Plain text; may be empty when you send images. */
@@ -26680,6 +26963,14 @@ export type StartUploadRequest = {
 export type StartedConversation = {
   message: ConversationMessage;
   thread: Conversation;
+};
+
+/** A call just started from the browser, with the token for the provider's WebRTC SDK. */
+export type StartedConversationCall = {
+  call: ConversationCall;
+  expires_at: string;
+  /** Short-lived token for the voice provider's SDK; do not store it. */
+  token: string;
 };
 
 /** Where an entry is in its life. */
@@ -34390,6 +34681,72 @@ export interface paths {
       };
     };
   };
+  "/api/v1/conversations/callbacks": {
+    /** List call-back requests in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ConversationCallback;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/callbacks/{id}/call": {
+    /** Call a customer back. */
+    post: {
+      parameters: { header: { "Idempotency-Key": string; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        201: Data_ConversationCall;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/callbacks/{id}/close": {
+    /** Close a call-back request. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationCallback;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/calls/{id}/recording": {
+    /** Listen to a call recording. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a call recording. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationCall;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/conversations/me/threads": {
     /** List your conversations. */
     get: {
@@ -34426,6 +34783,56 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/callbacks": {
+    /** Ask the shop to call you back. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RequestConversationCallbackRequest;
+      responses: {
+        200: Data_ConversationCallback;
+        201: Data_ConversationCallback;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/callbacks/{callback_id}": {
+    /** Cancel your call-back request. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; callback_id: string }; };
+      responses: {
+        200: Data_ConversationCallback;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/calls": {
+    /** Call the shop from the browser. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: StartConversationCallRequest;
+      responses: {
+        201: Data_StartedConversationCall;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
         default: Problem;
       };
     };
@@ -34545,6 +34952,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/conversations/me/threads/{id}/voice": {
+    /** Get what is needed before calling the shop. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationVoiceInfo;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/conversations/reports": {
     /** List reports of abuse in your scope. */
     get: {
@@ -34631,6 +35051,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_ConversationBlock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/calls": {
+    /** List the calls of a conversation. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_ConversationCall;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -34764,6 +35197,60 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/voice/agent-session": {
+    /** Get a WebRTC session to answer calls. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
+      responses: {
+        200: Data_ConversationAgentSession;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/voice/lines/{org_id}": {
+    /** Get the phone line of a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_ConversationVoiceLine;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the phone line of a unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: SetConversationVoiceLineRequest;
+      responses: {
+        200: Data_ConversationVoiceLine;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/voice/webhooks/{provider}/{line_token}": {
+    /** Receive a call status notification from the voice provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { provider: string; line_token: string }; };
+      requestBody: string;
+      responses: {
+        200: Data_ConversationVoiceWebhookReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        413: Problem;
         default: Problem;
       };
     };

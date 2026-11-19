@@ -51,6 +51,16 @@ pub(crate) struct Parts {
     pub authenticator: Option<Arc<dyn autoxide_kernel::access::Authenticator>>,
     /// Sổ đối tượng: kiểm bản ghi được hỏi (D-123); `None` trong test dựng tay.
     pub resources: Option<autoxide_kernel::resource::ResourceDirectory>,
+    /// Nhà cung cấp thoại các bộ nối đã góp (D-232); rỗng thì không gọi điện được.
+    pub voice: Vec<Arc<dyn autoxide_kernel::voice::VoiceProvider>>,
+    /// Số điện thoại đã xác thực của tài khoản (gọi lại); `None` khi không cài `compliance`.
+    pub accounts: Option<Arc<dyn autoxide_compliance::api::AccountVerification>>,
+    /// Nơi lưu bản ghi âm (`files`); `None` thì không lưu được bản ghi.
+    pub storage: Option<Arc<dyn autoxide_kernel::storage::Storage>>,
+    /// Khoá gốc: mã hoá số điện thoại của yêu cầu gọi lại theo khách.
+    pub secret: Option<autoxide_kernel::secret::SecretKey>,
+    /// Bản dịch (câu thông báo ghi âm, tóm tắt cuộc gọi).
+    pub translations: autoxide_kernel::i18n::Translations,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.

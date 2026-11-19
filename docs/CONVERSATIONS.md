@@ -6,8 +6,8 @@ organization unit, so chains and marketplaces split the work by branch like ever
 
 Vietnamese: [`CONVERSATIONS.vi.md`](CONVERSATIONS.vi.md).
 
-Calls (talking to the shop from the browser, "call me back") are planned on top of this module; they need a voice
-provider account and are not part of it yet.
+Calls (talking to the shop from the browser, "call me back") go through a voice provider connector — a separate
+module that needs an account with the provider; none ships yet (tests use `FakeVoiceProvider`).
 
 ## Permissions
 
@@ -16,6 +16,9 @@ provider account and are not part of it yet.
 | `conversations.read`    | Seeing the conversations of the units in your scope and receiving their events in real time |
 | `conversations.reply`   | Answering, taking a conversation, closing it, AI drafts, handing it over as a support ticket |
 | `conversations.manage`  | Assigning colleagues, blocking customers, reviewing reports of abuse                       |
+| `conversations.call`    | Call-back requests, calling customers back, the calls of a conversation (numbers masked)   |
+| `conversations.recordings.read` | Listening to call recordings (every listen is recorded)                            |
+| `conversations.voice.manage` | The phone line of a unit, recording on or off, deleting recordings on request          |
 
 With scope `own`, staff see the conversations assigned to them. Customers need no permission: any signed-in account
 uses `/api/v1/conversations/me/threads`.
@@ -64,3 +67,22 @@ customer, or for the assigned agent — one notice per conversation and window, 
 - Personal data (Law 91/2025/QH15): conversations are deleted `AUTOXIDE_CONVERSATIONS_RETENTION_DAYS` (default 365) after
   the last message; deleting an account erases that customer's messages and unlinks their conversations; the personal
   data export includes them.
+
+## Calls
+
+- `PUT /voice/lines/{org_id}` sets the unit's line: provider, hotline, call-back hours (default 08:00–20:00 every day,
+  UTC+7), recording (off by default). The first response carries `webhook_path` for the provider — keep it.
+- Customers read `GET /me/threads/{id}/voice` first (hide call buttons when `available` is false). `POST
+  /me/threads/{id}/calls` starts a browser call and returns a token for the provider's WebRTC SDK. `POST
+  /me/threads/{id}/callbacks` asks to be called back at the account's verified phone number, in a window within the
+  call-back hours and the next `AUTOXIDE_CONVERSATIONS_CALLBACK_DAYS_AHEAD` (7) days; one open request per conversation;
+  `AUTOXIDE_CONVERSATIONS_CALLS_PER_DAY` (5) calls and requests per day.
+- Agents see open requests in the work inbox and at `GET /callbacks` (numbers masked), and call with `POST
+  /callbacks/{id}/call` (with an `Idempotency-Key`); the customer sees the shop's hotline. When a call ends, one summary
+  line is added to the conversation. Unanswered calls reopen the request; requests 2 hours past their window expire and
+  the customer is told once.
+- Recording: switch it on only with a provider that plays a recording notice; customers must then send
+  `recording_ack: true`. Recordings move from the provider to your file storage, are kept
+  `AUTOXIDE_CONVERSATIONS_RECORDING_RETENTION_DAYS` (90) days, deleted with `DELETE /calls/{id}/recording` or with the
+  customer's account. Personal data law (Law 91/2025/QH15): tell customers before recording — check with a legal expert
+  whether consent is also needed.

@@ -19,7 +19,7 @@ mod values;
 
 pub use contracts::{
     ai, analytics, einvoice, identity, mail, moderation, payment, privacy, push, report, resource,
-    sms, storage, store, zns,
+    sms, storage, store, voice, zns,
 };
 pub use data::{
     backup, database, migration, numbering, pagination, reference, rows, search, sync, tenancy,

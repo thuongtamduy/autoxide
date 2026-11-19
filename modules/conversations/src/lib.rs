@@ -25,6 +25,7 @@ mod service;
 mod settings;
 mod threads;
 mod tools;
+mod voice;
 
 #[cfg(test)]
 mod tests;
@@ -55,6 +56,8 @@ struct ConversationsModule {
     config: Option<ConversationsConfig>,
     /// Có sau `start`.
     service: Option<Arc<ConversationsService>>,
+    /// Sổ database: job theo lịch tra ngữ cảnh từng khách.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for ConversationsModule {
@@ -108,6 +111,22 @@ impl Module for ConversationsModule {
                 Keep::Days(config.retention_days),
             )
             .setting(config::RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "conversations.recordings",
+                "Call recordings (off unless the shop switches them on), kept this many days after \
+                 the call; deleted on request and with the customer's account.",
+                DataCategory::Sensitive,
+                Keep::Days(config.recording_retention_days),
+            )
+            .setting(config::RECORDING_RETENTION_DAYS.name),
+            RetentionPolicy::new(
+                "conversations.callback_requests",
+                "Call-back requests with the customer's verified phone number (encrypted); the \
+                 number is erased with the account, the request goes with its conversation.",
+                DataCategory::Basic,
+                Keep::Days(config.retention_days),
+            )
+            .setting(config::RETENTION_DAYS.name),
         ]
     }
 
@@ -136,11 +155,23 @@ impl Module for ConversationsModule {
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
             authenticator: context.require::<dyn autoxide_kernel::access::Authenticator>().ok(),
             resources: Some(context.resources()),
+            // Bộ nối nhà cung cấp thoại đăng ký TRƯỚC module này (D-232); không có thì không gọi điện.
+            voice: context.contributions::<dyn autoxide_kernel::voice::VoiceProvider>(),
+            accounts: context.require::<dyn autoxide_compliance::api::AccountVerification>().ok(),
+            storage: context.require::<dyn autoxide_kernel::storage::Storage>().ok(),
+            secret: context
+                .require::<autoxide_kernel::secret::SecretKey>()
+                .ok()
+                .map(|key| (*key).clone()),
+            translations: context.translations().clone(),
         };
         let service = Arc::new(ConversationsService::new(parts, config));
         context.personal_data(service.clone())?;
         // Cuộc trò chuyện là một loại đối tượng (D-123): phiếu hỗ trợ chuyển từ chat trỏ về nó.
         context.resource_type("conversations.thread", Arc::new(resource::ThreadResolver))?;
+        // Hộp việc (bước 51): yêu cầu gọi lại đang mở.
+        context.work_source(Arc::new(voice::work::Callbacks))?;
+        self.databases = Some(context.tenancy());
         self.service = Some(service);
         Ok(())
     }
@@ -154,22 +185,52 @@ impl Module for ConversationsModule {
     }
 
     fn jobs(&self) -> Vec<JobRegistration> {
-        let Some(service) = self.service.clone() else {
+        let (Some(service), Some(databases)) = (self.service.clone(), self.databases.clone())
+        else {
             return Vec::new();
         };
+        use voice::{callbacks, calls, recordings};
         vec![
             JobRegistration::new(
                 assist::AUTO_REPLY,
                 Arc::new(assist::AutoReplies(service.clone())),
             ),
             JobRegistration::new(notify::NOTIFY_UNREAD, Arc::new(notify::Unread(service.clone()))),
-            JobRegistration::new(privacy::PURGE, Arc::new(privacy::Purge(service))),
+            JobRegistration::new(privacy::PURGE, Arc::new(privacy::Purge(service.clone()))),
+            JobRegistration::new(
+                calls::PROCESS_VOICE_EVENT,
+                Arc::new(calls::ProcessEvents(service.clone())),
+            ),
+            JobRegistration::new(
+                recordings::FETCH_RECORDING,
+                Arc::new(recordings::Fetcher(service.clone())),
+            ),
+            JobRegistration::new(
+                recordings::PURGE_RECORDINGS,
+                Arc::new(recordings::Purger(service.clone(), databases.clone())),
+            ),
+            JobRegistration::new(
+                callbacks::EXPIRE_CALLBACKS,
+                Arc::new(callbacks::ExpireCallbacks(service, databases)),
+            ),
         ]
     }
 
     fn schedules(&self) -> Vec<Schedule> {
-        // Mỗi ngày: xoá cuộc trò chuyện quá hạn lưu (hạn tính theo ngày).
-        vec![Schedule::new(privacy::PURGE, privacy::PURGE, Duration::from_secs(24 * 3600))]
+        use voice::{callbacks, recordings};
+        let day = Duration::from_secs(24 * 3600);
+        vec![
+            // Mỗi ngày: xoá cuộc trò chuyện quá hạn lưu (hạn tính theo ngày).
+            Schedule::new(privacy::PURGE, privacy::PURGE, day),
+            // Mỗi ngày: xoá bản ghi âm quá hạn lưu.
+            Schedule::new(recordings::PURGE_RECORDINGS, recordings::PURGE_RECORDINGS, day),
+            // Mỗi 15 phút: yêu cầu gọi lại quá hạn.
+            Schedule::new(
+                callbacks::EXPIRE_CALLBACKS,
+                callbacks::EXPIRE_CALLBACKS,
+                Duration::from_secs(15 * 60),
+            ),
+        ]
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
@@ -178,6 +239,15 @@ impl Module for ConversationsModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn body_limits(&self) -> Vec<autoxide_kernel::http::BodyLimit> {
+        let max = self.config.as_ref().map_or(65536, |config| config.voice_webhook_max_bytes);
+        vec![autoxide_kernel::http::BodyLimit::new(
+            axum::http::Method::POST,
+            "/voice/webhooks/{provider}/{line_token}",
+            max,
+        )]
     }
 
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
