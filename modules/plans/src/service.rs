@@ -172,6 +172,8 @@ pub(crate) struct PlansService {
     pub guard: Arc<autoxide_kernel::antispam::SpamGuard>,
     /// `AUTOXIDE_PLANS_SIGNUP*`.
     pub signup: crate::config::SignupConfig,
+    /// Kết nối tới cửa hàng ứng dụng (bước 69 P4), module kết nối góp; rỗng: không mua trong app.
+    pub stores: Vec<std::sync::Arc<dyn autoxide_kernel::store::StorePurchases>>,
 }
 
 /// Bộ nhớ đệm quyền dùng theo khách trong tiến trình (`AUTOXIDE_PLANS_CACHE_SECONDS`): quyền dùng

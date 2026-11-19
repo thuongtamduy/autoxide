@@ -66,6 +66,7 @@ pub(crate) fn routes(service: Arc<PlansService>) -> OpenApiRouter {
         .merge(crate::billing_profile::routes())
         .merge(crate::provisioning::routes())
         .merge(crate::signup_http::routes())
+        .merge(crate::store_http::routes())
         .with_state(service)
 }
 

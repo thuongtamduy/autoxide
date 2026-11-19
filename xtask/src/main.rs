@@ -25,6 +25,8 @@
 //!   (chưa có thì so với `main`) và crate phụ thuộc vào chúng, trên SQLite; phần test của
 //!   `./gate.sh --quick` (xem `affected.rs`). `--base <ref> --keep-env`: trên database của
 //!   `TEST_DATABASE_URL` thay vì SQLite; phần test của `./gate.sh --pr` (CI cho pull request).
+//! - Hai lệnh test trên nhận thêm `--shard <k>/<n>` ở cuối: chỉ chạy phần thứ k trong n phần của
+//!   mọi test, để CI chạy n phần trên n máy cùng lúc (`./gate.sh --shard`, D-20261119-ci-faster).
 
 mod affected;
 mod api_diff;
@@ -55,11 +57,28 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask new-module <module> <entity>   e.g. new-module bookmarks bookmark
        cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
-       cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)";
+       cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
+       ... test-all | test-affected ... --shard <k>/<n>   only part k of n of the tests";
 
 fn main() -> ExitCode {
     // `skip(1)`: phần tử đầu của args là tên chương trình.
-    let args: Vec<String> = std::env::args().skip(1).collect();
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    // `--shard k/n` ở cuối lệnh test: tách ra trước, phần còn lại so khớp như bình thường.
+    let mut shard = affected::Shard::WHOLE;
+    if args.len() >= 2 && args[args.len() - 2] == "--shard" {
+        match affected::Shard::parse(&args[args.len() - 1]) {
+            Some(parsed) => shard = parsed,
+            None => {
+                eprintln!("{USAGE}");
+                return ExitCode::FAILURE;
+            }
+        }
+        args.truncate(args.len() - 2);
+        if !matches!(args.first().map(String::as_str), Some("test-all" | "test-affected")) {
+            eprintln!("{USAGE}");
+            return ExitCode::FAILURE;
+        }
+    }
     // `as_slice()` + pattern trên slice: so khớp theo số lượng và nội dung tham
     // số mà không phải tự kiểm độ dài.
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
@@ -74,11 +93,11 @@ fn main() -> ExitCode {
         ["sdk", "--extract-examples", dir] => sdk_examples(dir),
         ["upgrade-test", rest @ ..] => upgrade_test(rest),
         ["new-module", module, entity] => new_module(module, entity),
-        ["test-all"] => test_all(false),
-        ["test-all", "--doc"] => test_all(true),
-        ["test-affected"] => test_affected(None, false),
-        ["test-affected", "--base", base] => test_affected(Some(base), false),
-        ["test-affected", "--base", base, "--keep-env"] => test_affected(Some(base), true),
+        ["test-all"] => test_all(false, shard),
+        ["test-all", "--doc"] => test_all(true, shard),
+        ["test-affected"] => test_affected(None, false, shard),
+        ["test-affected", "--base", base] => test_affected(Some(base), false, shard),
+        ["test-affected", "--base", base, "--keep-env"] => test_affected(Some(base), true, shard),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::FAILURE
@@ -295,8 +314,8 @@ fn new_module(module: &str, entity: &str) -> ExitCode {
     }
 }
 
-fn test_all(doc: bool) -> ExitCode {
-    match workspace::load().and_then(|workspace| affected::run_all(&workspace, doc)) {
+fn test_all(doc: bool, shard: affected::Shard) -> ExitCode {
+    match workspace::load().and_then(|workspace| affected::run_all(&workspace, doc, shard)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("xtask test-all: {error}");
@@ -305,8 +324,9 @@ fn test_all(doc: bool) -> ExitCode {
     }
 }
 
-fn test_affected(base: Option<&str>, keep_env: bool) -> ExitCode {
-    let result = workspace::load().and_then(|workspace| affected::run(&workspace, base, keep_env));
+fn test_affected(base: Option<&str>, keep_env: bool, shard: affected::Shard) -> ExitCode {
+    let result =
+        workspace::load().and_then(|workspace| affected::run(&workspace, base, keep_env, shard));
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {

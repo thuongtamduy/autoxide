@@ -7,6 +7,7 @@ mod enforcement;
 mod lifecycle;
 mod provisioning;
 mod signup;
+mod store;
 
 use std::sync::Arc;
 
