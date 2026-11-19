@@ -7,6 +7,7 @@ mod pricing;
 mod products;
 mod public;
 mod readiness;
+mod search;
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
