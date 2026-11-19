@@ -390,6 +390,7 @@ impl Modules {
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
         self.catalog.history().fill(apis.get::<dyn crate::resource::RecordHistory>());
         self.catalog.text_model().fill(apis.get::<dyn crate::ai::TextModel>());
+        self.catalog.signal_topics().fill(apis.contributions::<dyn crate::event::SignalTopics>());
         self.entitlements.fill(apis.get::<dyn crate::entitlement::Entitlements>());
         self.entitlements.catalog().fill(apis.required(), counters);
         // Nơi lưu chung và bộ mở nơi lưu riêng của placement (module `files` công bố).

@@ -390,5 +390,10 @@
   "field:must be 1 to 100 characters": "phải dài 1 đến 100 ký tự",
   "field:must be a path under a sync resource (`GET /api/v1/kernel/sync/resources`)": "phải là đường dẫn dưới một loại bản ghi đồng bộ được (`GET /api/v1/kernel/sync/resources`)",
   "field:is required: keep one key per queued write": "là bắt buộc: giữ một key cho mỗi lệnh ghi đang chờ",
-  "field:must be visible ASCII characters": "chỉ gồm ký tự ASCII nhìn thấy được"
+  "field:must be visible ASCII characters": "chỉ gồm ký tự ASCII nhìn thấy được",
+  "kernel.ws_unknown_command": "Thông điệp không hiểu được. Gửi JSON có `type`: `subscribe`, `unsubscribe`, `ack`, `join`, `leave`, `typing` hay `ping`. Dữ liệu ghi qua REST, không qua socket này.",
+  "kernel.ws_unknown_topic": "Không module nào mở tín hiệu cho `{topic}`. Chủ đề có dạng `<loại>:<id>`.",
+  "kernel.ws_topic_denied": "Bạn không được vào `{topic}`.",
+  "kernel.ws_not_joined": "Hãy vào `{topic}` (thông điệp `join`) trước khi gửi tín hiệu ở đó.",
+  "kernel.ws_too_many_topics": "Một kết nối vào tối đa {max} chủ đề. Hãy rời một chủ đề trước."
 }

@@ -19,6 +19,7 @@ mod database;
 mod distribution;
 mod event;
 mod event_stream;
+mod event_ws;
 mod filter_parse;
 mod health;
 mod http;

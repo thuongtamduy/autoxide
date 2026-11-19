@@ -51,6 +51,7 @@ mod security_headers;
 mod server;
 pub(crate) mod stream;
 mod sync;
+pub(crate) mod ws;
 
 use std::time::Duration;
 
