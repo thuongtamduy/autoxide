@@ -581,3 +581,42 @@ pub(crate) mod preorder_counter {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod restock_alert {
+    use sea_orm::entity::prelude::*;
+
+    /// Đăng ký báo khi có hàng lại (D-201). `store_key` = nút cửa hàng, hay `Uuid::nil()` cho kho bán
+    /// online (cột không NULL để khoá duy nhất chặn được trùng trên cả hai database).
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_restock_alerts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub variant_id: Uuid,
+        pub store_key: Uuid,
+        /// `email`, `phone` hay `user`.
+        pub contact_kind: String,
+        /// Email chuẩn hoá, số E.164, hay ID người dùng.
+        pub contact: String,
+        pub user_id: Option<Uuid>,
+        /// `pending`, `confirmed`, `stopped`.
+        pub status: String,
+        /// SHA-256 của phần thô của token xác nhận / dừng; chỉ giữ bản băm.
+        pub token_hash: Option<String>,
+        /// Bằng chứng đồng ý (JSON: chữ, phiên bản, lúc, nguồn).
+        pub consent: String,
+        pub locale: Option<String>,
+        /// Đang chờ đợt có hàng kế tiếp; tắt khi đã gửi, bật lại khi cửa hàng hết hàng.
+        pub armed: bool,
+        /// Số lần đã báo; khoá chống trùng của tin là `id` + số này.
+        pub sent_count: i64,
+        pub confirmed_at: Option<DateTimeUtc>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

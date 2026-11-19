@@ -8,6 +8,7 @@ use utoipa_axum::router::OpenApiRouter;
 
 use crate::service::InventoryService;
 
+pub(crate) mod alerts;
 pub(crate) mod documents;
 pub(crate) mod dto;
 pub(crate) mod levels;
@@ -21,5 +22,6 @@ pub(crate) fn routes(service: Arc<InventoryService>) -> OpenApiRouter {
         .merge(reservations::routes(service.clone()))
         .merge(documents::routes(service.clone()))
         .merge(purchasing::routes(service.clone()))
-        .merge(public::routes(service))
+        .merge(public::routes(service.clone()))
+        .merge(alerts::routes(service))
 }

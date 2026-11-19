@@ -9207,6 +9207,24 @@ export type Data_ResolvedView = {
 };
 
 /** Envelope of a single result. */
+export type Data_RestockAlertAccepted = {
+  /** The answer to an alert request: always the same. */
+  data: {
+    /** Always `true`. Visitors who are not signed in get a link to confirm. */
+    accepted: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RestockAlertState = {
+  /** The state of an alert after a link was used. */
+  data: {
+    /** `confirmed` or `stopped`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RevisionResponse = {
   /** A revision: a full copy of the editable fields of an entry at one moment. */
   data: {
@@ -22933,6 +22951,55 @@ export type ResolvedView = {
   title: string;
 };
 
+/** The answer to an alert request: always the same. */
+export type RestockAlertAccepted = {
+  /** Always `true`. Visitors who are not signed in get a link to confirm. */
+  accepted: boolean;
+};
+
+/** A request for a back-in-stock alert. */
+export type RestockAlertBody = {
+  /** The value of the `altcha` widget, when the server uses a challenge. */
+  challenge?: string | null;
+  /** Must be `true`: the visitor agrees to get a message for this purpose only. */
+  consent: boolean;
+  /** The exact consent text shown next to the form (kept as proof), up to 2000 characters. */
+  consent_text?: string | null;
+  /** Version of that text, if you keep versions. */
+  consent_version?: string | null;
+  /**
+   * Email to alert. Give this or `phone`; a signed-in buyer may give neither (alerted on their
+   * account).
+   */
+  email?: string | null;
+  /**
+   * Token from `GET /api/v1/antispam/token?scope=inventory:restock_alerts`; needed when not
+   * signed in.
+   */
+  form_token?: string | null;
+  /** Language of the messages: `en` or `vi`. */
+  locale?: string | null;
+  /** Phone number to alert by SMS (`0912345678` or `+84912345678`). */
+  phone?: string | null;
+  /** The store (organization unit) to watch; omit it for the online shop. */
+  store_id?: string | null;
+  /** The hidden trap field: people leave it empty. */
+  trap?: string | null;
+  variant_id: string;
+};
+
+/** The state of an alert after a link was used. */
+export type RestockAlertState = {
+  /** `confirmed` or `stopped`. */
+  status: string;
+};
+
+/** The token of a link in an alert message. */
+export type RestockTokenBody = {
+  /** The `{token}` of the link, exactly as received (it may contain a `.`). */
+  token: string;
+};
+
 /** A revision: a full copy of the editable fields of an entry at one moment. */
 export type RevisionResponse = {
   created_at: string;
@@ -32141,6 +32208,50 @@ export interface paths {
       responses: {
         200: Data_Vec_InventoryPublicAvailability;
         304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts": {
+    /** Ask for a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockAlertBody;
+      responses: {
+        202: Data_RestockAlertAccepted;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts/confirm": {
+    /** Confirm a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockTokenBody;
+      responses: {
+        200: Data_RestockAlertState;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts/stop": {
+    /** Stop a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockTokenBody;
+      responses: {
+        200: Data_RestockAlertState;
+        400: Problem;
         403: Problem;
         422: Problem;
         default: Problem;

@@ -167,6 +167,23 @@ listed. The answer changes as soon as stock is reserved; it carries an `ETag` (s
 and `Cache-Control: public, max-age=5`. Module `catalog` filters "available at store X" with the same rule
 (`Inventory::in_stock_at`).
 
+## Back-in-stock alerts
+
+Shoppers ask to be told when an item is back at a store (needs module `notifications`):
+
+1. `POST /api/v1/inventory/public/restock-alerts` with `variant_id`, `store_id` (omit for the online shop), `email` or
+   `phone`, and `consent: true` (plus the `consent_text` shown, kept as proof). Visitors who are not signed in send a
+   `form_token` from `GET /api/v1/antispam/token?scope=inventory:restock_alerts`. A signed-in buyer may give no
+   contact: alerts go to their account at once. The answer is always the same `202`.
+2. Visitors get a message with a link to your page `AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL` (`{token}` is replaced);
+   the page sends the token to `POST /api/v1/inventory/public/restock-alerts/confirm`.
+3. When the store can sell the item again, each confirmed alert gets **one** message (`inventory.back_in_stock`) per
+   time the item comes back, never twice for the same wave. Every message links to the page again; sending its token
+   to `POST /api/v1/inventory/public/restock-alerts/stop` stops the alerts.
+
+The messages are transactional (asked for and confirmed by the person, no advertising). Module `customers` asks
+`Inventory::restock_alerts_of` so a buyer is not told twice about the same item.
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and
@@ -201,3 +218,4 @@ Limit `inventory.warehouses` (units holding stock); features `inventory.multi_wa
 | `AUTOXIDE_INVENTORY_EXPIRE_BATCH` | `200` | Expired reservations released per job run |
 | `AUTOXIDE_INVENTORY_MAX_LINES_PER_RESERVATION` | `200` | Lines per reservation |
 | `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD` | `5` | Below it the public availability says `low` |
+| `AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL` | — | Website page for back-in-stock alert links, with `{token}` |

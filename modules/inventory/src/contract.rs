@@ -128,12 +128,12 @@ impl Inventory for InventoryService {
 
     async fn restock_alerts_of(
         &self,
-        _tenant: &TenantContext,
-        _user_id: Uuid,
-        _variant_ids: &[Uuid],
+        tenant: &TenantContext,
+        user_id: Uuid,
+        variant_ids: &[Uuid],
     ) -> Result<Vec<Uuid>, Error> {
-        // Đăng ký báo có hàng lại là mục 9 của bước 42; tới lúc đó chưa ai đăng ký.
-        Ok(Vec::new())
+        too_many(variant_ids.len())?;
+        self.restock_alerts_for(tenant, user_id, variant_ids).await
     }
 }
 
