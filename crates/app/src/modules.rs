@@ -257,10 +257,11 @@ mod tests {
             // hai của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
             // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), ba của
-            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43), bốn
+            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43), sáu
             // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
-            // đặt treo — bước 45), thêm một của `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 63);
+            // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận — bước 45), thêm một của
+            // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 65);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

@@ -164,10 +164,8 @@ impl Module for Shop {
 const PLATFORM: [&str; 2] = ["kernel.tenants.relocate", "kernel.tenants.read"];
 
 async fn app(test: &TestDatabase) -> TestApp {
-    TestApp::builder(test)
-        // Chờ TTL cache + thời gian tối đa của request: rút ngắn cho test.
+    let app = TestApp::builder(test)
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-        .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
         .setting("AUTOXIDE_RELOCATION_DRAIN_SECONDS", "5")
         .module(Shop)
         .tenant("a")
@@ -178,7 +176,10 @@ async fn app(test: &TestDatabase) -> TestApp {
         .user_in("b", "token-b", 3, &["kernel.relocations.request"])
         .build()
         .await
-        .unwrap()
+        .unwrap();
+    // Bước đóng băng không chờ TTL cache + thời gian tối đa của request (không hạ timeout HTTP).
+    app.skip_relocation_wait().unwrap();
+    app
 }
 
 async fn tenant(app: &TestApp, slug: &str) -> TenantContext {

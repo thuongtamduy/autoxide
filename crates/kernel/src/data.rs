@@ -11,6 +11,7 @@ pub mod pagination;
 pub mod reference;
 pub mod rows;
 pub mod search;
+pub mod sync;
 pub mod tenancy;
 pub mod transfer;
 pub mod upload;

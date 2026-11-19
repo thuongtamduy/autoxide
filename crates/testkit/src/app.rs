@@ -182,6 +182,17 @@ impl TestApp {
         Ok(())
     }
 
+    /// Như [`skip_move_wait`](Self::skip_move_wait), cho lượt tách / gộp khách: bước đóng băng không
+    /// chờ TTL cache + thời gian tối đa của request. Gọi sau `build`; không cần hạ
+    /// `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`.
+    pub fn skip_relocation_wait(&self) -> Result<(), TestAppError> {
+        let relocations = self
+            .api::<autoxide_kernel::tenancy::TenantRelocations>()
+            .ok_or_else(|| fail("skip_relocation_wait", "the kernel has no relocation service"))?;
+        relocations.skip_settle();
+        Ok(())
+    }
+
     /// Bộ tra DNS giả của app: tên miền riêng được xác minh theo bản ghi TXT đặt ở đây
     /// ([`FakeDns::set_challenge`]); app không bao giờ hỏi DNS thật.
     pub fn dns(&self) -> &FakeDns {
@@ -535,6 +546,7 @@ impl<'a> TestAppBuilder<'a> {
                     .and_then(|url| url.base().ok().map(str::to_owned)),
             )
             .entitlements(modules.entitlements())
+            .sync(modules.sync_resources())
             .translations(modules.translations().clone());
         if let Some(registry) = modules.tenancy() {
             extras = extras.tenancy(registry);

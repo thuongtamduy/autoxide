@@ -56,14 +56,18 @@ pub(crate) fn allowed(from: OrderStatus, to: OrderStatus) -> bool {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Cause {
     Buyer,
+    Staff,
     System,
     Payment,
+    Shipping,
 }
 
 impl Cause {
     pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Cause::Buyer => "buyer",
+            Cause::Staff => "staff",
+            Cause::Shipping => "shipping",
             Cause::System => "system",
             Cause::Payment => "payment",
         }
@@ -132,7 +136,7 @@ pub(crate) async fn apply(
     if !allowed(from, transition.to) {
         return Err(errors::invalid_transition(from, transition.to));
     }
-    let now = Utc::now();
+    let now = crate::service::now();
     let mut row: order::ActiveModel = current.clone().into();
     // Chỗ DUY NHẤT gán cột `status` của đơn.
     row.status = Set(transition.to.as_str().to_owned());
@@ -156,7 +160,7 @@ pub(crate) async fn create(
     mut row: order::ActiveModel,
     transition: &Transition,
 ) -> Result<order::Model, Error> {
-    let now = Utc::now();
+    let now = crate::service::now();
     row.status = Set(transition.to.as_str().to_owned());
     stamp(&mut row, transition.to, now);
     let created = row.insert(transaction).await?;

@@ -181,7 +181,7 @@ impl TenantRelocations {
         // Ghi SAU khi hàng đợi đã rỗng (event này không phải chờ chính nó): giao khi khách mở lại.
         let event = Started(RelocationEvent::of(row, spec.kind, &options));
         self.record(row.source_tenant_id, actor, row.id, &event).await?;
-        tokio::time::sleep(self.settle).await;
+        tokio::time::sleep(self.settle()).await;
         crate::tenancy::moves::wait_claims(
             &source,
             &tables,

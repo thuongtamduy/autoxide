@@ -18,6 +18,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
+use autoxide_kernel::sync::{ChangesQuery, SyncChange, SyncLog, SyncResource};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
@@ -56,7 +57,14 @@ pub(crate) struct NoteService {
     outbox: Outbox,
     /// Quyền dùng theo gói (bước 35): hạn mức số ghi chú.
     entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+    /// Luồng thay đổi cho app ngoại tuyến (bước 69 P2): mỗi lệnh ghi thêm một dòng trong CÙNG
+    /// transaction, như event.
+    sync: SyncLog,
 }
+
+/// Ghi chú đồng bộ được với app ngoại tuyến (bước 69 P2): danh sách ở `/api/v1/notes`.
+pub(crate) const NOTES_SYNC: SyncResource =
+    SyncResource::new("notes", "", NOTES_READ, "Your notes, in your scope of `notes.read`.");
 
 /// Hạn mức số ghi chú của một khách (bước 35). Mẫu cho module khác: khai trong `Module::limits`,
 /// giữ chỗ trước transaction, xác nhận khi xong, trả lại khi lỗi hay khi xoá.
@@ -71,8 +79,9 @@ impl NoteService {
     pub(crate) fn new(
         outbox: Outbox,
         entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
+        sync: SyncLog,
     ) -> Self {
-        NoteService { outbox, entitlements }
+        NoteService { outbox, entitlements, sync }
     }
 
     /// Tạo ghi chú của `actor` trong khách `tenant`. Tên trùng với ghi chú khác của cùng người
@@ -131,6 +140,9 @@ impl NoteService {
         self.outbox
             .record(&transaction, tenant, actor, events::note_subject(note.id), &event)
             .await?;
+        self.sync
+            .changed(&transaction, tenant, &NOTES_SYNC, note.id, target(tenant, &note))
+            .await?;
         transaction.commit().await?;
         tracing::info!(note_id = %note.id, "note created");
         Ok(note)
@@ -146,6 +158,28 @@ impl NoteService {
         let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
         let select = Entity::find().filter(scope).scoped(tenant);
         fetch_page(select, Column::Id, |row| row.id, page, tenant.database().read()).await
+    }
+
+    /// Ghi chú đã đổi (hay bị xoá) sau con trỏ của `query`, trong phạm vi `notes.read` của người
+    /// gọi (bước 69 P2). Ghi chú nay ngoài phạm vi thành dấu xoá.
+    pub(crate) async fn changes(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        query: &ChangesQuery,
+    ) -> Result<Page<SyncChange<Note>>, Error> {
+        let scope = principal.scope_condition(&NOTES_READ, Column::OrgId, Some(Column::OwnerId))?;
+        self.sync
+            .changes(tenant, principal, &NOTES_SYNC, query, |ids| async move {
+                let notes = Entity::find()
+                    .filter(Column::Id.is_in(ids))
+                    .filter(scope)
+                    .scoped(tenant)
+                    .all(tenant.database().read())
+                    .await?;
+                Ok(notes.into_iter().map(|note| (note.id, note.updated_at, note)).collect())
+            })
+            .await
     }
 
     /// Ghi chú `id`. Ngoài phạm vi `notes.read` (hay của khách khác) báo như không có.
@@ -193,13 +227,21 @@ impl NoteService {
             // Kiểm phiên bản ngay trong câu `UPDATE`: người khác vừa sửa thì 0 dòng (D-084).
             update = update.filter(Column::UpdatedAt.eq(expected));
         }
-        let after = update.exec(&transaction).await.map_err(|error| match error {
-            sea_orm::DbErr::RecordNotUpdated => autoxide_kernel::version::changed(),
-            error => title_conflict(error, title.as_deref().unwrap_or_default()),
-        })?;
+        let after = match update.exec(&transaction).await {
+            Ok(after) => after,
+            // Người khác vừa sửa: 412 kèm bản hiện tại, để app ngoại tuyến tự gộp (bước 69 P2).
+            Err(sea_orm::DbErr::RecordNotUpdated) => {
+                return Err(autoxide_kernel::version::changed_with(
+                    &crate::http::NoteResponse::from(before.clone()),
+                    before.updated_at,
+                ));
+            }
+            Err(error) => return Err(title_conflict(error, title.as_deref().unwrap_or_default())),
+        };
         let change = Change { before: Some(snapshot(&before)), after: Some(snapshot(&after)) };
         let event = events::NoteUpdated(change);
         self.outbox.record(&transaction, tenant, actor, events::note_subject(id), &event).await?;
+        self.sync.changed(&transaction, tenant, &NOTES_SYNC, id, target(tenant, &after)).await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -231,6 +273,7 @@ impl NoteService {
         }
         let event = events::NoteDeleted(Change { before: Some(snapshot(&note)), after: None });
         self.outbox.record(&transaction, tenant, actor, events::note_subject(id), &event).await?;
+        self.sync.deleted(&transaction, tenant, &NOTES_SYNC, id, target(tenant, &note)).await?;
         transaction.commit().await?;
         self.entitlements.release(tenant.id(), &NOTES_LIMIT, &note_reference(id)).await?;
         Ok(())
@@ -272,11 +315,24 @@ impl EventHandler for NoteService {
             return Ok(());
         };
         let tenant = &event.tenant;
+        let transaction = tenant.database().begin_write().await?;
+        let notes = Entity::find()
+            .filter(Column::OwnerId.eq(user_id))
+            .scoped(tenant)
+            .all(&transaction)
+            .await?;
         let deleted = Entity::delete_many()
             .filter(Column::OwnerId.eq(user_id))
             .scoped(tenant)
-            .exec(tenant.database().write())
+            .exec(&transaction)
             .await?;
+        // App ngoại tuyến của người khác (vd quản lý thấy ghi chú cả nút) nhận dấu xoá.
+        for note in &notes {
+            self.sync
+                .deleted(&transaction, tenant, &NOTES_SYNC, note.id, target(tenant, note))
+                .await?;
+        }
+        transaction.commit().await?;
         tracing::info!(user_id = %user_id, notes = deleted.rows_affected, "notes of a deleted user removed");
         Ok(())
     }

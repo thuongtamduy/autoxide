@@ -130,6 +130,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .deprecations(modules.deprecations())
         .body_limits(modules.body_limits())
         .entitlements(modules.entitlements())
+        .sync(modules.sync_resources())
         .tools(tools)
         .resources(resources)
         .prompts(prompts)

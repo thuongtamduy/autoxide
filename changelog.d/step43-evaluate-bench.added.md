@@ -1,0 +1,1 @@
+- `cargo bench -p autoxide-promotions`: benchmark of cart evaluation (50 lines, 500 running promotions); numbers in `docs/BENCHMARKS.md`.

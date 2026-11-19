@@ -14,7 +14,10 @@ use std::time::Duration;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
-use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::tenancy::sandbox::{
+    HeldChannel, HeldMessage, HeldReason, hold_back, webhook_allowed,
+};
+use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantSettings};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
@@ -142,6 +145,8 @@ fn body(event: &Delivered) -> serde_json::Value {
 pub(crate) const STATUS_PENDING: &str = "pending";
 pub(crate) const STATUS_SUCCEEDED: &str = "succeeded";
 pub(crate) const STATUS_FAILED: &str = "failed";
+/// Sandbox (D-232): URL không có trong `kernel.sandbox.webhook_urls` — giữ ở hộp thư giả, không gửi.
+pub(crate) const STATUS_SANDBOXED: &str = "sandboxed";
 
 /// Chạy job gửi (job theo khách: database và secret của khách mang job).
 pub(crate) struct Sender {
@@ -149,6 +154,8 @@ pub(crate) struct Sender {
     pub client: reqwest::Client,
     /// `AUTOXIDE_WEBHOOKS_ALLOW_PRIVATE_NETWORKS`.
     pub allow_private_networks: bool,
+    /// Cài đặt theo khách: danh sách URL sandbox được gửi thật (`kernel.sandbox.webhook_urls`).
+    pub settings: Arc<dyn TenantSettings>,
 }
 
 impl Sender {
@@ -216,6 +223,20 @@ impl JobHandler for Sender {
         if !self.allow_private_networks && !public {
             let problem = format!("the address {}", crate::network::PRIVATE_ADDRESS);
             self.finish(tenant, &row, STATUS_FAILED, None, Some(&problem)).await?;
+            return Ok(());
+        }
+
+        // Sandbox (D-232): chỉ gửi tới URL có tiền tố khách cho phép; còn lại vào hộp thư giả.
+        if !webhook_allowed(self.settings.as_ref(), tenant, &target.url).await? {
+            let body = serde_json::from_str(&row.body).unwrap_or(serde_json::Value::Null);
+            let held =
+                HeldMessage::new(HeldChannel::Webhook, "webhooks", HeldReason::UrlNotAllowed)
+                    .recipient(target.url.clone())
+                    .subject(row.event_name.clone())
+                    .body(body);
+            hold_back(tenant, held).await?;
+            let problem = "sandbox: the URL is not listed in kernel.sandbox.webhook_urls";
+            self.finish(tenant, &row, STATUS_SANDBOXED, None, Some(problem)).await?;
             return Ok(());
         }
 

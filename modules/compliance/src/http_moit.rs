@@ -784,11 +784,12 @@ pub(crate) struct BadgeQuery {
 pub(crate) struct BadgeResponse {
     pub website_id: Uuid,
     pub domain: String,
-    /// `sales` or `platform`.
+    /// `sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,
+    /// `link_url` and `image_url` are empty and `snippet` is a "test copy" label.
     pub kind: String,
-    /// `notified` (blue logo) or `registered` (red logo).
+    /// `notified` (blue logo), `registered` (red logo) or `sandbox`.
     pub status: String,
-    /// `blue` or `red`.
+    /// `blue`, `red`, or `none` on a sandbox.
     pub color: String,
     pub link_url: String,
     pub image_url: String,
@@ -800,7 +801,8 @@ pub(crate) struct BadgeResponse {
 /// Get the Ministry of Industry and Trade logo of a website.
 ///
 /// No sign-in (the tenant and website come from the domain, `?domain=` or `?site=`). Only a
-/// website `notified` / `registered` has a logo; otherwise 404.
+/// website `notified` / `registered` has a logo; otherwise 404. A sandbox (test copy) never shows
+/// the ministry's logo: it gets `kind = "sandbox"` and a "test copy" label instead.
 #[utoipa::path(
     get,
     path = "/public/badge",
@@ -823,6 +825,10 @@ async fn public_badge(
     if let Some(host) = TenantHint::from_headers(&headers).host() {
         domains.push(host.to_owned());
     }
+    if tenant.is_sandbox() {
+        let locale = query.locale.as_deref().unwrap_or("vi");
+        return Ok(sandbox_badge(&tenant, domains.into_iter().next(), locale));
+    }
     let row = service.public_website(&tenant, &domains, site.org()).await?;
     let rule = service.logo_rule(&tenant, &row.website_kind).await?;
     let locale = query.locale.as_deref().unwrap_or("vi");
@@ -843,6 +849,34 @@ async fn public_badge(
     })
 }
 
+/// Nhãn "bản thử" thay logo của Bộ Công Thương ở sandbox (D-232): sandbox không phải website đã
+/// thông báo / đăng ký, không bao giờ mang logo hay link xác nhận.
+fn sandbox_badge(
+    tenant: &TenantContext,
+    domain: Option<String>,
+    locale: &str,
+) -> Tagged<BadgeResponse> {
+    let alt = if locale == "en" {
+        "Test copy — not a real shop"
+    } else {
+        "Bản thử — không phải cửa hàng thật"
+    };
+    Tagged {
+        version: tenant.sandbox_expires_at().unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
+        data: BadgeResponse {
+            website_id: Uuid::nil(),
+            domain: domain.unwrap_or_default(),
+            kind: "sandbox".to_owned(),
+            status: "sandbox".to_owned(),
+            color: "none".to_owned(),
+            link_url: String::new(),
+            image_url: String::new(),
+            alt: alt.to_owned(),
+            snippet: format!("<span class=\"autoxide-sandbox-badge\">{alt}</span>"),
+        },
+    }
+}
+
 /// The website owner's information for a footer (what the law requires a commerce website to show).
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[schema(as = CompliancePublicOwner)]
@@ -859,6 +893,8 @@ pub(crate) struct OwnerResponse {
     pub representative_name: Option<String>,
     pub phone: Option<String>,
     pub email: Option<String>,
+    /// `true` on a sandbox (test copy): the footer should say it is a test copy.
+    pub sandbox: bool,
 }
 
 /// Get the owner of the website being viewed.
@@ -896,6 +932,7 @@ async fn public_owner(
             representative_name: row.representative_name,
             phone: row.phone,
             email: row.email,
+            sandbox: tenant.is_sandbox(),
         },
     })
 }
