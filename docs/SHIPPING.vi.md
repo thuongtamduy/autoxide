@@ -115,7 +115,8 @@ bao giờ giữ tiền). Khi có module `ledger`:
 - Dòng lệch (số tiền, mã vận đơn lạ, chưa giao) và khoản COD quá `AUTOXIDE_SHIPPING_COD_SETTLEMENT_DAYS` ngày chưa có
   trong bảng kê thành chênh lệch (`GET /cod/discrepancies`, event `shipping.cod_mismatch`). Giải quyết bằng một mã của
   danh sách lý do `shipping.cod_resolution` kèm ghi chú; `written_off` xoá sổ phần thiếu. `refresh-tracking` hỏi lại
-  hành trình từ hãng trước.
+  hành trình từ hãng trước. Xem bảng kê và chênh lệch bằng `shipping.cod.read` (kế toán, kiểm toán) hay
+  `shipping.cod.manage`.
 
 ## Hợp đồng cho module khác
 

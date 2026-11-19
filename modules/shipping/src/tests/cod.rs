@@ -37,6 +37,7 @@ async fn cod_shop(
     let store = OrgId::from_uuid(Uuid::now_v7());
     let mut builder = TestApp::builder(test)
         .member("boss", 1, root_of(DEFAULT_TENANT), &ALL.map(|name| (name, Scope::Tenant)))
+        .member("auditor", 2, root_of(DEFAULT_TENANT), &[("shipping.cod.read", Scope::Tenant)])
         .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
         .provide::<dyn Ledger>(Arc::new(FakeLedger::default()))
         .module(crate::module());
@@ -203,6 +204,15 @@ async fn bang_ke_lech_tien_sinh_chenh_lech() {
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
         let resolve = json!({"resolution_code": "written_off", "note": "Hang khong tra du"});
+        // `shipping.cod.read` chỉ xem: thấy chênh lệch và bảng kê, không giải quyết được.
+        let (status, seen) =
+            call(&app, "GET", "/cod/discrepancies?status=open", "auditor", None).await;
+        assert_eq!(status, StatusCode::OK, "{seen}");
+        assert_eq!(seen["data"], list["data"]);
+        let (status, _) = call(&app, "GET", "/cod/statements", "auditor", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(&app, "POST", &path, "auditor", Some(resolve.clone())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
         let (status, resolved) = call(&app, "POST", &path, "boss", Some(resolve.clone())).await;
         assert_eq!(status, StatusCode::OK, "{resolved}");
         assert_eq!(resolved["data"]["resolved_by"], json!(Uuid::from_u128(1)));

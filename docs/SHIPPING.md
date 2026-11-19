@@ -121,6 +121,7 @@ reconciles (it never holds the money). With the `ledger` module installed:
   `AUTOXIDE_SHIPPING_COD_SETTLEMENT_DAYS` become discrepancies (`GET /cod/discrepancies`, event
   `shipping.cod_mismatch`). Resolve one with a code of the reason list `shipping.cod_resolution` and a note;
   `written_off` writes the missing amount off. `refresh-tracking` asks the carrier for the latest tracking first.
+  Statements and discrepancies can be read with `shipping.cod.read` (accounting, audit) or `shipping.cod.manage`.
 
 ## Contract for other modules
 

@@ -19,7 +19,9 @@ use crate::http::addresses::PostalAddressRequest;
 use crate::http::cod::{DiscrepancyBody, discrepancy};
 use crate::http::quote::{ItemBody, QuoteBody, QuoteResponse, request_of};
 use crate::http::shipments::{SummaryBody, detail, summary};
-use crate::permissions::{COD_MANAGE, READ, SHIPMENTS_MANAGE, SHIPMENTS_READ};
+use crate::permissions::{
+    COD_MANAGE, COD_READ, READ, SHIPMENTS_MANAGE, SHIPMENTS_READ, require_cod_read,
+};
 use crate::service::ShippingService;
 use crate::shipments::ShipmentFilter;
 
@@ -208,14 +210,15 @@ pub(crate) fn all(service: &Arc<ShippingService>) -> Vec<Tool> {
             move |tenant: TenantContext, principal: Principal, input: ListDiscrepanciesInput| {
                 let service = cod.clone();
                 async move {
-                    principal.require(&COD_MANAGE)?;
+                    require_cod_read(&principal)?;
                     let page = PageInput::new(input.limit, input.cursor, None).page()?;
                     let found = service.list_discrepancies(&tenant, input.status, &page).await?;
                     Ok::<Page<DiscrepancyBody>, Error>(found.map(discrepancy))
                 }
             },
         )
-        .requires(COD_MANAGE)
+        .requires(COD_READ)
+        .or_requires(COD_MANAGE)
         .read_only(),
     ]
 }

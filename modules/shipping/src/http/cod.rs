@@ -19,7 +19,7 @@ use validator::Validate;
 
 use crate::api::CodStatement;
 use crate::entity::{cod_discrepancy, cod_statement, cod_statement_line};
-use crate::permissions::COD_MANAGE;
+use crate::permissions::{COD_MANAGE, require_cod_read};
 use crate::service::ShippingService;
 
 /// A carrier statement to import: either the CSV file (columns `tracking_number`, `cod_amount`,
@@ -173,14 +173,14 @@ pub(crate) async fn import_statement(
 #[utoipa::path(
     get,
     path = "/cod/statements",
-    extensions(("x-permissions" = json!(["shipping.cod.manage"]))),
+    extensions(("x-permissions" = json!(["shipping.cod.read", "shipping.cod.manage"]))),
     operation_id = "list_shipping_cod_statements",
     security(("bearer" = [])),
     params(PageQuery),
     responses(
         (status = 200, description = "One page of statements.", body = Page<StatementBody>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `shipping.cod.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -190,7 +190,7 @@ pub(crate) async fn list_statements(
     principal: Principal,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<StatementBody>, Error> {
-    principal.require(&COD_MANAGE)?;
+    require_cod_read(&principal)?;
     let page = PageRequest::try_from(page)?;
     Ok(service.list_statements(&tenant, &page).await?.map(statement))
 }
@@ -199,14 +199,14 @@ pub(crate) async fn list_statements(
 #[utoipa::path(
     get,
     path = "/cod/statements/{id}",
-    extensions(("x-permissions" = json!(["shipping.cod.manage"]))),
+    extensions(("x-permissions" = json!(["shipping.cod.read", "shipping.cod.manage"]))),
     operation_id = "get_shipping_cod_statement",
     security(("bearer" = [])),
     params(("id" = Uuid, Path, description = "Id of the statement.")),
     responses(
         (status = 200, description = "The statement.", body = Data<StatementDetail>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `shipping.cod.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No statement with this id; code `shipping.statement_not_found`.", body = Problem),
     )
 )]
@@ -216,7 +216,7 @@ pub(crate) async fn get_statement(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<StatementDetail>, Error> {
-    principal.require(&COD_MANAGE)?;
+    require_cod_read(&principal)?;
     let (row, lines) = service.get_statement(&tenant, id).await?;
     let currency = row.currency.clone();
     Ok(Data {
@@ -278,14 +278,14 @@ pub(crate) fn discrepancy(row: cod_discrepancy::Model) -> DiscrepancyBody {
 #[utoipa::path(
     get,
     path = "/cod/discrepancies",
-    extensions(("x-permissions" = json!(["shipping.cod.manage"]))),
+    extensions(("x-permissions" = json!(["shipping.cod.read", "shipping.cod.manage"]))),
     operation_id = "list_shipping_cod_discrepancies",
     security(("bearer" = [])),
     params(DiscrepancyQuery, PageQuery),
     responses(
         (status = 200, description = "One page of discrepancies.", body = Page<DiscrepancyBody>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `shipping.cod.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`.", body = Problem),
         (status = 422, description = "A paging parameter is invalid; see `errors`.", body = Problem),
     )
 )]
@@ -296,7 +296,7 @@ pub(crate) async fn list_discrepancies(
     Query(query): Query<DiscrepancyQuery>,
     Query(page): Query<PageQuery>,
 ) -> Result<Page<DiscrepancyBody>, Error> {
-    principal.require(&COD_MANAGE)?;
+    require_cod_read(&principal)?;
     let page = PageRequest::try_from(page)?;
     Ok(service.list_discrepancies(&tenant, query.status, &page).await?.map(discrepancy))
 }

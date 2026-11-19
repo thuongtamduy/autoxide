@@ -11577,6 +11577,7 @@
       "name": "shipping.list_cod_discrepancies",
       "output_schema": null,
       "permissions": [
+        "shipping.cod.read",
         "shipping.cod.manage"
       ]
     },

@@ -172873,7 +172873,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -172921,6 +172921,7 @@
         ],
         "x-autoxide-list": "shipping.list_shipping_cod_discrepancies",
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       }
@@ -173271,7 +173272,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -173313,6 +173314,7 @@
         ],
         "x-autoxide-list": "shipping.list_shipping_cod_statements",
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       },
@@ -173526,7 +173528,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -173559,6 +173561,7 @@
           "shipping"
         ],
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       }
