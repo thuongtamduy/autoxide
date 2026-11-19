@@ -31,6 +31,18 @@ pub(crate) const UNIT_TYPE_CHANGED: EventInfo = EventInfo::new(
     "organizations.unit_type_changed",
     "A unit type was created, renamed or deleted.",
 );
+pub(crate) const GROUP_CREATED: EventInfo =
+    EventInfo::new("organizations.group_created", "A unit group for reports was created.");
+pub(crate) const GROUP_UPDATED: EventInfo = EventInfo::new(
+    "organizations.group_updated",
+    "A unit group was renamed or its description changed.",
+);
+pub(crate) const GROUP_DELETED: EventInfo =
+    EventInfo::new("organizations.group_deleted", "A unit group was deleted (report facts stay).");
+pub(crate) const GROUP_MEMBERS_CHANGED: EventInfo = EventInfo::new(
+    "organizations.group_members_changed",
+    "Units were added to or removed from a unit group (`added`, `removed`).",
+);
 
 /// Dữ liệu chung của mọi event của module.
 #[derive(Debug, Default, Serialize)]
@@ -60,6 +72,10 @@ event!(UnitStatusChanged, "organizations.unit_status_changed");
 event!(UnitTypeChanged, "organizations.unit_type_changed");
 event!(SettingChanged, "organizations.setting_changed");
 event!(PublicProfileUpdated, "organizations.public_profile_updated");
+event!(GroupCreated, "organizations.group_created");
+event!(GroupUpdated, "organizations.group_updated");
+event!(GroupDeleted, "organizations.group_deleted");
+event!(GroupMembersChanged, "organizations.group_members_changed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -70,6 +86,10 @@ pub(crate) fn all() -> Vec<EventInfo> {
         UNIT_TYPE_CHANGED,
         SETTING_CHANGED,
         PUBLIC_PROFILE_UPDATED,
+        GROUP_CREATED,
+        GROUP_UPDATED,
+        GROUP_DELETED,
+        GROUP_MEMBERS_CHANGED,
     ]
 }
 

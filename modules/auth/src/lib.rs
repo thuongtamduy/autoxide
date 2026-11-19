@@ -41,6 +41,7 @@ mod relocation;
 mod reset;
 mod resource;
 mod role;
+mod sandbox;
 mod session;
 mod settings;
 mod support;
@@ -484,6 +485,11 @@ impl Module for AuthModule {
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         relocation::relocation()
+    }
+
+    // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        sandbox::subscriptions()
     }
 }
 

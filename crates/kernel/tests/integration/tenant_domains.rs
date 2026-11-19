@@ -343,7 +343,7 @@ async fn job_xac_minh_va_het_han() {
         assert_eq!(app.database().write().execute(&backdate).await.unwrap().rows_affected(), 1);
 
         // Lịch của kernel đưa `kernel.verify_domains` vào hàng đợi; worker chạy nó.
-        let worker = app.modules().worker(1).unwrap();
+        let worker = app.modules().worker(2).unwrap();
         assert!(worker.run_once().await.unwrap() >= 1);
         let list =
             app.get("/api/v1/kernel/domains?order=asc").token("admin-a").send().await.unwrap();
@@ -459,7 +459,7 @@ async fn kiem_lai_hang_ngay_ten_mien_da_xac_minh() {
         }
         assert_eq!(allowed(&app, "daily.test").await, StatusCode::OK);
         backdate_check(&app, "daily.test").await;
-        let worker = app.modules().worker(1).unwrap();
+        let worker = app.modules().worker(2).unwrap();
         assert!(worker.run_once().await.unwrap() >= 1);
         let row = domain_of(&app, "daily.test").await;
         assert_eq!(
