@@ -12,6 +12,7 @@ mod errors;
 mod events;
 mod http;
 mod levels;
+mod lots;
 mod migration;
 mod orders_events;
 mod permissions;
@@ -96,6 +97,10 @@ impl Module for InventoryModule {
 
     fn relocation(&self) -> Relocation {
         relocation::relocation()
+    }
+
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        vec![lots::EXPIRING_DAYS]
     }
 
     fn reason_lists(&self) -> Vec<ReasonList> {

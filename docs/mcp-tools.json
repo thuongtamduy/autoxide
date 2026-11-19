@@ -6113,6 +6113,21 @@
               "additionalProperties": false,
               "description": "One line of a stock adjustment.",
               "properties": {
+                "expires_on": {
+                  "description": "Expiry date of the lot, `YYYY-MM-DD`, when adding.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lot_code": {
+                  "description": "Lot of the units (required when adding units of a lot-tracked variant).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "note": {
                   "type": [
                     "string",
@@ -6127,6 +6142,13 @@
                 "reason_code": {
                   "description": "Code from the reason list `inventory.adjustment`, e.g. `damaged`.",
                   "type": "string"
+                },
+                "serials": {
+                  "description": "Serial numbers when the variant tracks serials.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
                 },
                 "unit_cost_amount": {
                   "description": "Unit cost of added units, integer minor units as a string, e.g. `\"150000\"`.",
@@ -6199,12 +6221,19 @@
           "lines": {
             "items": {
               "additionalProperties": false,
-              "description": "A variant and a quantity.",
+              "description": "One line of a transfer to create.",
               "properties": {
                 "quantity": {
                   "description": "1 to 1 000 000.",
                   "format": "int64",
                   "type": "integer"
+                },
+                "serials": {
+                  "description": "Exactly `quantity` serial numbers when the variant tracks serials.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
                 },
                 "variant_id": {
                   "format": "uuid",

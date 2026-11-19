@@ -49,6 +49,8 @@ pub(crate) mod status {
 pub(crate) struct TransferLineInput {
     pub variant_id: Uuid,
     pub quantity: i64,
+    /// Bắt buộc, đủ `quantity` số, khi biến thể theo dõi serial.
+    pub serials: Vec<String>,
 }
 
 /// Phiếu chuyển mới.
@@ -209,6 +211,18 @@ impl InventoryService {
         {
             return Err(errors::not_tracked(line.variant_id));
         }
+        let mut problems = Vec::new();
+        for (index, line) in input.lines.iter().enumerate() {
+            if variants.get(&line.variant_id).is_some_and(|v| v.serial_tracked) {
+                crate::lots::check_serials(
+                    &mut problems,
+                    &format!("lines[{index}].serials"),
+                    &line.serials,
+                    line.quantity,
+                );
+            }
+        }
+        fail_if_any(problems)?;
         self.check_stock_unit(tenant, input.from_org_id).await?;
         self.ensure_warehouse(tenant, input.to_org_id).await?;
         let transaction = tenant.database().begin_write().await?;
@@ -239,6 +253,8 @@ impl InventoryService {
                 received_quantity: Set(0),
                 unit_cost_minor: Set(None),
                 unit_cost_currency: Set(None),
+                lots: Set("[]".to_owned()),
+                serials: Set(serde_json::to_string(&line.serials).map_err(Error::internal)?),
             })
             .exec_without_returning(&transaction)
             .await?;
@@ -328,6 +344,8 @@ impl InventoryService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<Transfer, Error> {
+        let variants = self.transfer_variants(tenant, id).await?;
+        let variants = &variants;
         let database = tenant.database();
         database
             .write_with_retry(move || async move {
@@ -375,7 +393,19 @@ impl InventoryService {
                                 Money::from_columns(level.average_cost_minor, currency).ok()
                             })
                         });
-                    stock::record(
+                    let flags = variants.get(&line.variant_id);
+                    let serial_list: Vec<String> =
+                        serde_json::from_str(&line.serials).unwrap_or_default();
+                    let tracking = crate::lots::Tracking {
+                        lot_tracked: flags.is_some_and(|v| v.lot_tracked),
+                        lot_code: None,
+                        serials: flags
+                            .is_some_and(|v| v.serial_tracked)
+                            .then_some(serial_list.as_slice()),
+                        serial_status: "in_transit",
+                        order: None,
+                    };
+                    let (_, picks) = crate::lots::record_out(
                         &transaction,
                         tenant,
                         &mut touched,
@@ -393,10 +423,13 @@ impl InventoryService {
                             source_id: row.id,
                             actor: Some(principal.user_id()),
                         },
+                        &tracking,
                     )
                     .await?;
+                    let lots_json = pieces_json(&transaction, tenant, &picks).await?;
                     stock::move_incoming(&transaction, tenant, *to, line.quantity).await?;
                     transfer_line::Entity::update_many()
+                        .col_expr(transfer_line::Column::Lots, Expr::value(lots_json))
                         .col_expr(
                             transfer_line::Column::UnitCostMinor,
                             Expr::value(cost.map(Money::minor)),
@@ -503,26 +536,45 @@ impl InventoryService {
                         _ => None,
                     };
                     stock::move_incoming(&transaction, tenant, *to, -quantity).await?;
-                    stock::record(
-                        &transaction,
-                        tenant,
-                        &mut touched,
-                        NewMovement {
-                            org: row.to_org_id,
-                            variant: line.variant_id,
-                            kind: MovementKind::TransferIn,
-                            quantity: *quantity,
-                            touches_available: true,
-                            unit_cost: cost,
-                            lot_id: None,
-                            reason_code: None,
-                            note: row.number.clone(),
-                            source_type: "transfer",
-                            source_id: row.id,
-                            actor: Some(principal.user_id()),
-                        },
-                    )
-                    .await?;
+                    let base = NewMovement {
+                        org: row.to_org_id,
+                        variant: line.variant_id,
+                        kind: MovementKind::TransferIn,
+                        quantity: *quantity,
+                        touches_available: true,
+                        unit_cost: cost,
+                        lot_id: None,
+                        reason_code: None,
+                        note: row.number.clone(),
+                        source_type: "transfer",
+                        source_id: row.id,
+                        actor: Some(principal.user_id()),
+                    };
+                    let pieces: Vec<LotPiece> =
+                        serde_json::from_str(&line.lots).unwrap_or_default();
+                    let serial_list: Vec<String> =
+                        serde_json::from_str(&line.serials).unwrap_or_default();
+                    let from = usize::try_from(line.received_quantity).unwrap_or(0);
+                    let count = usize::try_from(*quantity).unwrap_or(0);
+                    if let Some(arrived) = serial_list.get(from..from + count) {
+                        crate::lots::serials_in(
+                            &transaction,
+                            tenant,
+                            line.variant_id,
+                            row.to_org_id,
+                            arrived,
+                        )
+                        .await?;
+                    }
+                    for (code, expires_on, part) in
+                        slice_pieces(&pieces, line.received_quantity, *quantity)
+                    {
+                        let mut new = base.clone();
+                        new.quantity = part;
+                        let lot = code.as_deref().map(|code| (code, expires_on));
+                        crate::lots::record_in(&transaction, tenant, &mut touched, new, lot, &[])
+                            .await?;
+                    }
                     transfer_line::Entity::update_many()
                         .col_expr(
                             transfer_line::Column::ReceivedQuantity,
@@ -619,5 +671,110 @@ impl InventoryService {
                 Ok(transfer)
             })
             .await
+    }
+}
+
+/// Một phần lô của dòng chuyển (JSON trong `inventory_transfer_lines.lots`).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct LotPiece {
+    lot_code: Option<String>,
+    expires_on: Option<chrono::NaiveDate>,
+    quantity: i64,
+}
+
+/// JSON các phần lô đã lấy ở kho gửi (mã và hạn dùng của từng lô).
+async fn pieces_json<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    picks: &[(Option<Uuid>, i64)],
+) -> Result<String, Error> {
+    let mut pieces = Vec::with_capacity(picks.len());
+    for (lot, quantity) in picks {
+        let found = match lot {
+            Some(id) => {
+                crate::entity::lot::Entity::find_by_id(*id).scoped(tenant).one(connection).await?
+            }
+            None => None,
+        };
+        pieces.push(LotPiece {
+            lot_code: found.as_ref().map(|row| row.lot_code.clone()),
+            expires_on: found.and_then(|row| row.expires_on),
+            quantity: *quantity,
+        });
+    }
+    serde_json::to_string(&pieces).map_err(Error::internal)
+}
+
+/// Các phần lô của `take` đơn vị sau khi bỏ `skip` đơn vị đầu (đã nhận ở lần trước), theo thứ tự
+/// lúc gửi. Dòng không có phần lô nào (biến thể không theo dõi lô): một phần không lô.
+fn slice_pieces(
+    pieces: &[LotPiece],
+    skip: i64,
+    take: i64,
+) -> Vec<(Option<String>, Option<chrono::NaiveDate>, i64)> {
+    if pieces.is_empty() {
+        return vec![(None, None, take)];
+    }
+    let (mut skip, mut take) = (skip, take);
+    let mut out = Vec::new();
+    for piece in pieces {
+        let mut available = piece.quantity;
+        let skipped = skip.min(available);
+        skip -= skipped;
+        available -= skipped;
+        let part = take.min(available);
+        if part > 0 {
+            out.push((piece.lot_code.clone(), piece.expires_on, part));
+            take -= part;
+        }
+    }
+    if take > 0 {
+        out.push((None, None, take));
+    }
+    out
+}
+
+impl InventoryService {
+    /// Biến thể (cờ lô / serial) của các dòng phiếu chuyển `id`, hỏi `Catalog` trước transaction.
+    async fn transfer_variants(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<std::collections::HashMap<Uuid, autoxide_catalog::api::VariantSnapshot>, Error>
+    {
+        let ids: Vec<Uuid> = transfer_line::Entity::find()
+            .filter(transfer_line::Column::TransferId.eq(id))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?
+            .into_iter()
+            .map(|line| line.variant_id)
+            .collect();
+        if ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+        self.variants(tenant, &ids).await
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{LotPiece, slice_pieces};
+
+    #[test]
+    fn chia_lo_khi_nhan_tung_phan() {
+        let piece = |code: &str, quantity| LotPiece {
+            lot_code: Some(code.to_owned()),
+            expires_on: None,
+            quantity,
+        };
+        let pieces = [piece("A", 3), piece("B", 4)];
+        let codes = |parts: Vec<(Option<String>, Option<chrono::NaiveDate>, i64)>| {
+            parts.into_iter().map(|(code, _, q)| (code.unwrap_or_default(), q)).collect::<Vec<_>>()
+        };
+        assert_eq!(codes(slice_pieces(&pieces, 0, 2)), [("A".to_owned(), 2)]);
+        assert_eq!(codes(slice_pieces(&pieces, 2, 3)), [("A".to_owned(), 1), ("B".to_owned(), 2)]);
+        assert_eq!(codes(slice_pieces(&pieces, 5, 2)), [("B".to_owned(), 2)]);
+        assert_eq!(codes(slice_pieces(&[], 0, 2)), [(String::new(), 2)]);
     }
 }

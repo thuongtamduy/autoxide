@@ -339,3 +339,30 @@ impl Promotions for Provider {
         self.0.automatic_prices(tenant, org_id, at, prices).await
     }
 }
+
+/// Nguồn giá sau giảm tự động cắm vào `catalog` (danh sách sản phẩm công khai): cùng phép tính với
+/// [`Promotions::automatic_prices`](crate::api::Promotions::automatic_prices).
+pub(crate) struct SalePrices(pub Arc<PromotionsService>);
+
+#[async_trait::async_trait]
+impl autoxide_catalog::api::SalePriceSource for SalePrices {
+    async fn sale_prices(
+        &self,
+        tenant: &TenantContext,
+        org_id: OrgId,
+        at: DateTime<Utc>,
+        prices: &[(Uuid, Money)],
+    ) -> Result<Vec<autoxide_catalog::api::SalePrice>, Error> {
+        let found = self.0.automatic_prices(tenant, org_id, at, prices).await?;
+        Ok(found
+            .into_iter()
+            .map(|price| {
+                autoxide_catalog::api::SalePrice::new(
+                    price.variant_id,
+                    price.sale_price,
+                    price.ends_at,
+                )
+            })
+            .collect())
+    }
+}

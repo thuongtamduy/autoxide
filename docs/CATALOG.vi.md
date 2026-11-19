@@ -135,6 +135,10 @@ lực ngay trước một thời điểm — "giá trước khuyến mại"), `p
 gọi nhận tối đa 500 ID và chạy số câu query cố định. Danh sách event ở
 `autoxide_catalog::api::events`.
 
+Module đăng ký sau `catalog` cắm vào qua `dyn CatalogExtensions`: module khuyến mại đưa giá giảm tự động
+vào danh sách công khai bằng `set_sale_price_source` (một `SalePriceSource`), và phát
+`promotions.automatic_prices_changed` (`after.variant_ids`) khi giá giảm đổi.
+
 ## Cấu hình
 
 | Biến | Mặc định | Ý nghĩa |
