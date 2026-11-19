@@ -713,6 +713,7 @@ impl CatalogService {
             });
             self.outbox.record(&transaction, tenant, actor, subject, &event).await?;
         }
+        self.queue_products(&transaction, tenant, vec![product.id]).await?;
         transaction.commit().await?;
         Ok(after)
     }
