@@ -92,10 +92,31 @@ bình.
   không phải của người mua, sai khoá hay vào phiếu đã đóng thì bỏ; thư không bao giờ mở phiếu mới. Phần trích dẫn thư cũ
   bị cắt.
 
+## Trả lời tự động (tắt mặc định)
+
+Bật `auto_reply` trong chính sách của nút. Khi người mua viết, AI chỉ **phân loại** câu hỏi; luật trong máy chủ quyết
+định, và chỉ hai loại chữ tới được người mua:
+
+1. **Câu trả lời mẫu đã duyệt**, nguyên văn và đã điền biến. Duyệt bằng
+   `PUT /api/v1/support/macros/{id}/auto-reply {"enabled": true, "questions": {...}, "review_due_on": "YYYY-MM-DD"}`
+   (`support.auto_reply.manage`); quá ngày rà lại thì thôi dùng, sửa nội dung thì mất dấu duyệt.
+2. **Câu dựng từ dữ liệu chính xác** của module đã gắn `FactSource` (vd trạng thái đơn của chính người mua); không chắc
+   người hỏi là chủ dữ liệu thì không trả lời.
+
+Chỉ gửi khi phân loại đủ tin cậy (`auto_reply_min_confidence_bp`, mặc định 9000), không có cờ rủi ro, câu hỏi không có
+từ khoá chặn (có sẵn: khiếu nại, hoàn tiền, trả hàng, huỷ đơn, lỗi thanh toán, dữ liệu cá nhân, từ pháp lý, đòi gặp người
+— cộng `auto_reply_blocked_terms` của nút), và chưa quá `auto_reply_max_per_thread` (mặc định 2) lần tự động liên tiếp.
+Còn lại nhân viên trả lời như thường, có sẵn bản nháp AI. Tin tự động có `auto_reply: true`: gắn nhãn "Trả lời tự động"
+và hiện nút "Gặp nhân viên" (`POST /me/tickets/{id}/handoff`, hay endpoint công khai kèm token) — bấm là dừng tự động
+trong phiếu đó. Người mua chấm câu trả lời (`…/auto-replies/{reply_id}/feedback`); câu trả lời mẫu bị báo sai
+`AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT` (3) lần trong 7 ngày thì thôi dùng. Thử một câu hỏi bằng
+`POST /api/v1/support/auto-reply/preview` (không gửi gì) và xem nhật ký ở `GET /api/v1/support/auto-replies`.
+
 ## Cho AI agent (MCP)
 
 Tool, cùng permission như REST: `support.list_tickets`, `support.get_ticket`, `support.reply_ticket`,
-`support.add_internal_note`, `support.update_ticket`, `support.link_ticket`, `support.suggest_reply` (chỉ bản nháp).
+`support.add_internal_note`, `support.update_ticket`, `support.link_ticket`, `support.suggest_reply` (chỉ bản nháp),
+`support.preview_auto_reply`.
 
 ## Cấu hình
 
@@ -105,6 +126,7 @@ Tool, cùng permission như REST: `support.list_tickets`, `support.get_ticket`, 
 | `AUTOXIDE_SUPPORT_MAX_BODY_CHARS`         | 10000    | Tin nhắn dài nhất                                               |
 | `AUTOXIDE_SUPPORT_TOKEN_DAYS_AFTER_CLOSE` | 30       | Số ngày token phiếu của khách còn dùng được sau khi phiếu đóng  |
 | `AUTOXIDE_SUPPORT_GUEST_URL`              | —        | Trang hiện phiếu cho khách vãng lai (`{id}`, `{token}`)         |
+| `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT`  | 3        | Số lần bị báo sai trong 7 ngày thì thôi dùng câu trả lời tự động |
 
 ## Dữ liệu cá nhân
 

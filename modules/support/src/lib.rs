@@ -6,6 +6,8 @@
 
 mod ai;
 pub mod api;
+mod autoreply;
+mod autoreply_admin;
 mod config;
 mod entity;
 mod events;
@@ -117,6 +119,8 @@ impl Module for SupportModule {
             resources: Some(context.resources()),
             complaints: context.require::<dyn autoxide_compliance::api::ComplaintIntake>().ok(),
             ai: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
+            facts: facts::FactRegistry::default(),
+            jobs: context.jobs(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;
@@ -124,7 +128,9 @@ impl Module for SupportModule {
         // Email trả lời vào lại phiếu (module nhận thư gọi vào; tắt theo chính sách).
         context.provide::<dyn api::InboundMail>(service.clone())?;
         // Điểm cắm cho module đăng ký sau (`shipping`, `orders`): nguồn câu trả lời từ dữ liệu (D-230).
-        context.provide::<dyn api::SupportFacts>(Arc::new(facts::FactRegistry::default()))?;
+        context.provide::<dyn api::SupportFacts>(Arc::new(service.parts.facts.clone()))?;
+        // Bộ trả lời tự động cho chat (bước 61).
+        context.provide::<dyn api::AutoResponder>(service.clone())?;
         // Phiếu là một loại đối tượng (D-123): vụ việc khiếu nại của `compliance` trỏ tới nó.
         context.resource_type("support.ticket", Arc::new(intake::TicketResolver))?;
         // Hộp việc (bước 51): phiếu đang chờ nhân viên.
@@ -162,6 +168,10 @@ impl Module for SupportModule {
                     sla::Sweep { service: service.clone(), databases: databases.clone(), kind };
                 JobRegistration::new(kind, Arc::new(sweep))
             })
+            .chain(std::iter::once(JobRegistration::new(
+                autoreply::AUTO_REPLY,
+                Arc::new(autoreply::Runner(service.clone())),
+            )))
             .collect()
     }
 
