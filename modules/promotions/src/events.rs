@@ -51,6 +51,41 @@ event!(VoucherIssued, names::VOUCHER_ISSUED);
 event!(VoucherUsed, names::VOUCHER_USED);
 event!(BudgetExhausted, names::BUDGET_EXHAUSTED);
 event!(LegalDataImported, "promotions.legal_data_imported");
+event!(AutomaticPricesChanged, names::AUTOMATIC_PRICES_CHANGED);
+
+/// Event báo giá giảm tự động của chương trình `view` đổi (bắt đầu, dừng, hết hạn, đổi hạn) — để
+/// danh sách sản phẩm công khai (catalog) tính lại giá. `None` khi chương trình không tạo giá tự
+/// động (có điều kiện theo giỏ, mã, người mua…: giá chỉ biết lúc tính giỏ).
+///
+/// `variant_ids`: biến thể được nêu thẳng (mục tiêu và giá flash sale). Mục tiêu theo sản phẩm /
+/// danh mục nằm ở `product_ids` / `category_ids`; không có mục tiêu nào thì `whole_store` (áp
+/// mọi sản phẩm của đơn vị).
+pub(crate) fn automatic_prices_changed(
+    view: &crate::programs::PromotionView,
+) -> Option<AutomaticPricesChanged> {
+    let program = crate::compiled::program_of(view);
+    if !crate::evaluate::unconditional(&program) {
+        return None;
+    }
+    let mut variants = std::collections::BTreeSet::new();
+    let mut products = std::collections::BTreeSet::new();
+    let mut categories = std::collections::BTreeSet::new();
+    for set in [&program.conditions_targets, &program.reward_targets] {
+        variants.extend(set.variants.iter().copied());
+        products.extend(set.products.iter().copied());
+        categories.extend(set.categories.iter().copied());
+    }
+    variants.extend(view.flash.iter().map(|item| item.variant_id));
+    let whole_store = variants.is_empty() && products.is_empty() && categories.is_empty();
+    Some(AutomaticPricesChanged(Change::after(serde_json::json!({
+        "promotion_id": view.row.id,
+        "org_id": view.row.org_id,
+        "variant_ids": variants,
+        "product_ids": products,
+        "category_ids": categories,
+        "whole_store": whole_store,
+    }))))
+}
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![

@@ -7,6 +7,16 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Lệnh `autoxide task <module>.bench_seed` sinh dữ liệu đo cỡ thật (bước 39 B1, `scripts/bench-seed.sh`).
+# Bản phát hành không bật: dữ liệu giả không bao giờ được ghi vào database thật.
+bench-seed = [
+  "autoxide-auth/bench-seed",
+  "autoxide-media/bench-seed",
+  "autoxide-content/bench-seed",
+  "autoxide-comments/bench-seed",
+]
+
 [dependencies]
 autoxide-audit.workspace = true
 autoxide-auth.workspace = true
@@ -35,6 +45,7 @@ autoxide-catalog.workspace = true
 autoxide-inventory.workspace = true
 autoxide-shipping.workspace = true
 autoxide-promotions.workspace = true
+autoxide-orders.workspace = true
 autoxide-support.workspace = true
 autoxide-bookings.workspace = true
 autoxide-reporting.workspace = true

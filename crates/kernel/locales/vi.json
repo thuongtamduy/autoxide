@@ -272,6 +272,7 @@
   "shutting_down": "Máy chủ đang tắt: hãy gửi request tới một máy chủ khác.",
   "site_not_found": "Khách hàng này không có website (nút tổ chức) `{site}`. Bỏ `site` đi để lấy website của cả khách hàng.",
   "sms_disabled": "Máy chủ chưa cấu hình gửi SMS.",
+  "bench_seed_refused": "Lệnh sinh dữ liệu đo từ chối chạy: {reason}.",
   "task_argument_invalid": "Tham số `{name}` của lệnh phải là `true` hoặc `false`, không phải `{value}`.",
   "template.limit_exceeded": "Mẫu vượt giới hạn ({what}, tối đa {limit}). Hãy viết mẫu ngắn hoặc đơn giản hơn.",
   "template.render_failed": "Không dựng được mẫu ở dòng {line}: {reason}",

@@ -19,6 +19,20 @@ endpoints are marked deprecated with a sunset date first.
   other roles, even the built-in `admin` role; `permission_denied` answers `reason: denied_by_role` (or `missing`).
 - Kernel: `Principal::check` decides one record (`Decision::Allow` / `Missing` / `OutOfScope`) from the same rule
   that builds the list filter (`scope_condition`); a randomized test proves both agree on SQLite and Postgres.
+- Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
+  its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
+  prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,
+  `shipping` and `tax` (`quote_token` for checkout, `free_shipping_remaining`); coupon codes and wallet vouchers kept
+  apart, rejected codes listed with the reason; abandoned carts (`orders.cart_abandoned`, `GET /carts?status=abandoned`)
+  and expired carts purged; the contract `autoxide_orders::api` for steps 46–49 with the extension point
+  `OrderExtensions`.
+- Benchmark dataset (step 39): `scripts/bench-seed.sh small|full` fills a fresh benchmark database with
+  made-up data of real size (full: 5,000 users, 50,000 images with their smaller copies, 100,000 posts in two
+  languages with categories, tags and authors, 1,000,000 comments in reply threads) through the tasks
+  `auth.bench_seed`, `media.bench_seed`, `content.bench_seed`, `comments.bench_seed`. The tasks exist only in a
+  binary built with the cargo feature `bench-seed` (release builds do not have it) and refuse to run without
+  `confirm=yes-this-is-a-benchmark-database` or on a customer that already has data. `scripts/loadtest.sh` takes
+  `LOADTEST_DATASET=small|full` to measure the public read paths of a website on that data.
 - `catalog` (step 41): automatic sale prices on the public product lists through the plug-in point
   `autoxide_catalog::api::CatalogExtensions::set_sale_price_source`; `catalog` listens to
   `promotions.automatic_prices_changed` and rebuilds the storefront of those variants.
@@ -1018,6 +1032,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- SQLite: the write connection runs `PRAGMA optimize` when it opens and closes, so the query planner has
+  statistics for large tables (step 39). Without them a comment thread on a database with a million comments
+  scanned most of the table (3.7 s a request); now 0.4 ms for the query. PostgreSQL is unchanged (autovacuum).
 - Counting failed attempts (sign-in lockout and other throttles) takes one SQL statement instead of up to four:
   60–75% more attempts per second, except many attempts on one email at once on PostgreSQL, which still queue on
   that email's counter.

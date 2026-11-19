@@ -11,6 +11,8 @@
 mod access;
 pub mod api;
 mod api_key;
+#[cfg(any(test, feature = "bench-seed"))]
+mod bench_seed;
 mod cleanup;
 mod client_config;
 mod config;
@@ -458,6 +460,15 @@ impl Module for AuthModule {
                 Arc::new(doctor::TokenSecret { configured }),
             ),
         ]
+    }
+
+    // Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
+    #[cfg(feature = "bench-seed")]
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.administrator
+            .as_ref()
+            .map(|administrator| vec![bench_seed::task(administrator.databases.clone())])
+            .unwrap_or_default()
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

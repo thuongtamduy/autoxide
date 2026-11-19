@@ -146,7 +146,7 @@ async fn openapi_rieng_cua_module_khop_ban_chung_va_mcp_rieng() {
         }
         assert!(documented > 15, "only {documented} modules have a document");
 
-        let missing = app.get("/api/v1/openapi/orders.json").send().await.unwrap();
+        let missing = app.get("/api/v1/openapi/marketplace.json").send().await.unwrap();
         assert_eq!(missing.status(), StatusCode::NOT_FOUND);
         assert_eq!(missing.json()["code"], "openapi_module_not_found");
         let no_suffix = app.get("/api/v1/openapi/content").send().await.unwrap();

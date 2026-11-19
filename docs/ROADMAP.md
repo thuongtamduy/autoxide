@@ -293,14 +293,15 @@ Nhóm A — vận hành:
 Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên database gần như trống, chỉ đi qua
 `notes` và `auth`):
 
-- [ ] Bộ dữ liệu lớn để đo: một lệnh (vd trong `xtask` hay `scripts/`) sinh nhanh dữ liệu cỡ thật
+- [x] Bộ dữ liệu lớn để đo: một lệnh (vd trong `xtask` hay `scripts/`) sinh nhanh dữ liệu cỡ thật
       trên cả hai database — vd 100 nghìn bài nhiều ngôn ngữ có danh mục, thẻ, tác giả; 50 nghìn
       ảnh kèm bản nhỏ; 1 triệu bình luận; vài nghìn người dùng — chỉ ghi qua service hay đúng định
       dạng bảng của module, không dùng cho dữ liệu thật
-- [ ] Đo tải đường đọc công khai trên bộ dữ liệu đó, mở rộng `scripts/loadtest.sh`: một bài
+- [x] Đo tải đường đọc công khai trên bộ dữ liệu đó, mở rộng `scripts/loadtest.sh`: một bài
       (`/public/resolve`), danh sách bài và theo danh mục (`/public/posts`, `/public/terms/…`),
       `/public/sitemap`, `/public/feed`, `/public/search`, ảnh và bản nhỏ, bình luận của bài
-      (`/public/threads`, `/public/comments`). Đặt ngưỡng p95 mỗi đường, ghi vào `docs/BENCHMARKS.md`
+      (`/public/threads`, `/public/comments`). Đặt ngưỡng p95 mỗi đường, ghi vào `docs/BENCHMARKS.md` — đo 19/11/2026: lỗi thống kê SQLite đã sửa (D-20261118-step39-sqlite-optimize); đường còn đỏ (lọc
+      theo danh mục, tìm theo từ của `content`; danh sách đầy đủ trên SQLite) ghi ở BENCHMARKS, báo phiên giữ `content`
 - [ ] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
       truy vấn danh sách, lọc, đếm của các module trên bộ dữ liệu lớn; index thiếu thêm bằng
       migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau
@@ -621,7 +622,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202, chuyển từ bước 34 — D-316):
       `POST /api/v1/auth/phone-signups` khi `orders` có token xem đơn, đăng nhập bằng passkey hay OTP, không bắt
       buộc mật khẩu (đặc tả 34 mục "Tạo tài khoản từ số đã xác thực")
-- [ ] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
+- [x] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
       chủ, không tin số từ client; `free_shipping_remaining` (D-201); coupon và voucher tách nhau, điền dữ liệu
       điều kiện cho `promotions`, chụp khoản giảm kèm ai trả tiền vào đơn (D-222); danh sách giỏ bỏ dở
 - [ ] Đặt hàng: báo giá cuối → giữ tồn, lượt khuyến mại → số đơn tuần tự (bước 36) → thanh toán theo chế độ
