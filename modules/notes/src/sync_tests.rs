@@ -3,9 +3,13 @@
 //! không thấy ghi chú ngoài phạm vi, hai máy cùng sửa một ghi chú — một bên thắng. Chạy trên cả
 //! SQLite và Postgres.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::Scope;
+use autoxide_kernel::error::Error;
+use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
+use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
@@ -20,8 +24,9 @@ async fn app(test: &TestDatabase) -> TestApp {
         .member("ada", 0xada, root, &own)
         .member("cid", 0xc1d, root, &own)
         .member("mia", 0x313, root, &[("notes.read", Scope::Tenant)])
-        // Lưu idempotency key thật: lô gửi lại không làm lại lệnh đã làm.
-        .module(autoxide_idempotency::module())
+        // Nơi lưu idempotency key (module `idempotency` cung cấp trong chương trình thật): lô gửi
+        // lại không làm lại lệnh đã làm.
+        .provide::<dyn IdempotencyStore>(Arc::new(MemoryStore::default()))
         .module(crate::module())
         .build()
         .await
@@ -349,4 +354,50 @@ async fn lo_ghi_chi_nhan_duong_dan_dong_bo_va_quyen_nhu_rest() {
     })
     .await
     .unwrap();
+}
+
+/// Nơi lưu idempotency key trong bộ nhớ, cùng giao kèo với module `idempotency`.
+#[derive(Default)]
+struct MemoryStore(Mutex<HashMap<String, (Uuid, Option<StoredResponse>)>>);
+
+#[async_trait::async_trait]
+impl IdempotencyStore for MemoryStore {
+    async fn begin(
+        &self,
+        _: &TenantContext,
+        scope: &str,
+        key: &str,
+        _: &str,
+        _: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Begin, Error> {
+        let mut keys = self.0.lock().unwrap();
+        match keys.get(&format!("{scope}|{key}")) {
+            Some((_, Some(stored))) => Ok(Begin::Replay(stored.clone())),
+            Some((_, None)) => Ok(Begin::InProgress),
+            None => {
+                let id = Uuid::now_v7();
+                keys.insert(format!("{scope}|{key}"), (id, None));
+                Ok(Begin::Started { id })
+            }
+        }
+    }
+
+    async fn complete(
+        &self,
+        _: &TenantContext,
+        id: Uuid,
+        response: StoredResponse,
+    ) -> Result<(), Error> {
+        for value in self.0.lock().unwrap().values_mut() {
+            if value.0 == id {
+                value.1 = Some(response.clone());
+            }
+        }
+        Ok(())
+    }
+
+    async fn abandon(&self, _: &TenantContext, id: Uuid) -> Result<(), Error> {
+        self.0.lock().unwrap().retain(|_, value| value.0 != id);
+        Ok(())
+    }
 }

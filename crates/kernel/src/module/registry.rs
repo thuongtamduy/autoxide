@@ -249,21 +249,7 @@ impl Modules {
             Translations::default()
         });
         let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
-        // Loại bản ghi đồng bộ được (bước 69 P2): permission đọc phải có thật.
-        for module in &modules {
-            let declared = module.sync_resources();
-            problems.extend(crate::sync::declaration_problems(module.name(), &declared));
-            for resource in declared {
-                if !permissions.contains(resource.read.name()) {
-                    problems.push(format!(
-                        "sync resource `{}.{}` reads with permission `{}`, which no module declares",
-                        module.name(),
-                        resource.name,
-                        resource.read.name()
-                    ));
-                }
-            }
-        }
+        problems.extend(crate::sync::module_problems(&modules, &permissions));
         if problems.is_empty() {
             Ok(Modules {
                 modules,
@@ -312,13 +298,7 @@ impl Modules {
     /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
     /// khác đọc — để mọi lỗi được báo cùng lúc.
     pub fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
-        let mut result = match crate::sync::read_retention(reader) {
-            Ok(keep) => {
-                self.sync_keep = keep;
-                Ok(())
-            }
-            Err(invalid) => Err(invalid),
-        };
+        let mut result = crate::sync::read_retention(reader).map(|keep| self.sync_keep = keep);
         for module in &mut self.modules {
             if module.configure(reader).is_err() {
                 result = Err(Invalid);
@@ -773,14 +753,8 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
-        let sync = self
-            .modules
-            .iter()
-            .filter(|module| !module.sync_resources().is_empty())
-            .map(|module| crate::sync::SyncLog::new(module.name(), self.sync_keep))
-            .collect();
         Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
-            .with_sync(sync)
+            .with_sync(crate::sync::logs(&self.modules, self.sync_keep))
             .with_timeouts(timeouts)
             .with_entitlements(self.entitlements.clone()))
     }
@@ -890,13 +864,7 @@ impl Modules {
     /// Loại bản ghi đồng bộ được của mọi module (bước 69 P2): `(tên module, khai báo)`, theo thứ
     /// tự đăng ký.
     pub fn sync_resources(&self) -> Vec<(&'static str, crate::sync::SyncResource)> {
-        self.modules
-            .iter()
-            .flat_map(|module| {
-                let name = module.name();
-                module.sync_resources().into_iter().map(move |resource| (name, resource))
-            })
-            .collect()
+        crate::sync::declared(&self.modules)
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

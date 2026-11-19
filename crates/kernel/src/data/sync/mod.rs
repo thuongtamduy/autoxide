@@ -133,6 +133,51 @@ pub(crate) fn declaration_problems(module: &str, resources: &[SyncResource]) -> 
     problems
 }
 
+/// Vấn đề trong khai báo `sync_resources` của mọi module, kể cả permission đọc không ai khai.
+pub(crate) fn module_problems(
+    modules: &[Box<dyn crate::module::Module>],
+    permissions: &crate::access::PermissionCatalog,
+) -> Vec<String> {
+    let mut problems = Vec::new();
+    for module in modules {
+        let declared = module.sync_resources();
+        problems.extend(declaration_problems(module.name(), &declared));
+        for resource in declared {
+            if !permissions.contains(resource.read.name()) {
+                problems.push(format!(
+                    "sync resource `{}.{}` reads with permission `{}`, which no module declares",
+                    module.name(),
+                    resource.name,
+                    resource.read.name()
+                ));
+            }
+        }
+    }
+    problems
+}
+
+/// `(tên module, khai báo)` của mọi module, theo thứ tự đăng ký.
+pub(crate) fn declared(
+    modules: &[Box<dyn crate::module::Module>],
+) -> Vec<(&'static str, SyncResource)> {
+    modules
+        .iter()
+        .flat_map(|module| {
+            let name = module.name();
+            module.sync_resources().into_iter().map(move |resource| (name, resource))
+        })
+        .collect()
+}
+
+/// Luồng thay đổi của các module có khai `sync_resources`, để worker dọn dòng quá hạn.
+pub(crate) fn logs(modules: &[Box<dyn crate::module::Module>], keep: Duration) -> Vec<SyncLog> {
+    modules
+        .iter()
+        .filter(|module| !module.sync_resources().is_empty())
+        .map(|module| SyncLog::new(module.name(), keep))
+        .collect()
+}
+
 // Tham số của endpoint thay đổi.
 /// Where to start reading a change feed.
 #[derive(Debug, Clone, Default, Deserialize, IntoParams)]

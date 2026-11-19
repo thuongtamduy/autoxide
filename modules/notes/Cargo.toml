@@ -22,8 +22,6 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
-# Lưu idempotency key thật cho test lô ghi đồng bộ (bước 69 P2).
-autoxide-idempotency.workspace = true
 autoxide-testkit.workspace = true
 # MCP client thật cho test tool của module.
 rmcp = { workspace = true, features = [
