@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
+  `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
+  sold only once; transfers keep lots and serial numbers.
 - Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
   its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
   prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,

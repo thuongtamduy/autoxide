@@ -292,6 +292,31 @@ pub(crate) async fn move_incoming<C: ConnectionTrait>(
     Ok(())
 }
 
+/// Đổi tồn của lô `lot` thêm `delta`, không xuống dưới 0. Lỗi `inventory.lot_unavailable` khi
+/// lô không đủ.
+pub(crate) async fn move_lot<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    lot: Uuid,
+    delta: i64,
+) -> Result<(), Error> {
+    let filter = Condition::all()
+        .add(crate::entity::lot::Column::Id.eq(lot))
+        .add(crate::entity::lot::Column::TenantId.eq(tenant.id().as_uuid()));
+    let changed = rows::adjust::<crate::entity::lot::Entity, _>(
+        transaction,
+        crate::entity::lot::Column::OnHand,
+        filter,
+        delta,
+        Bounds::NON_NEGATIVE,
+    )
+    .await?;
+    if changed == 0 {
+        return Err(crate::lots::lot_unavailable(&lot.to_string()));
+    }
+    Ok(())
+}
+
 /// Giá vốn bình quân gia quyền sau khi nhập `quantity` đơn vị giá `cost`: `(tồn × giá cũ + nhập ×
 /// giá nhập) / (tồn + nhập)`, làm tròn nửa lên xa số 0 về đơn vị nhỏ nhất. Tồn ≤ 0 (hay chưa có giá)
 /// thì giá vốn = giá nhập. Tính bằng `i128`: không tràn với mọi số `i64`.
