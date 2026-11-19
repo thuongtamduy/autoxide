@@ -165,11 +165,14 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `content.get_translation_request` | `content.read` or `content.write_own` | read-only |
 | `content.legal_templates` | `content.read` | read-only |
 | `content.list` | `content.read` | read-only |
+| `content.list_banners` | `content.banners` or `content.read` | read-only |
 | `content.list_revisions` | `content.read` | read-only |
+| `content.order_placement` | `content.banners` | writes |
 | `content.publish` | `content.publish` or `content.publish_own` | writes |
 | `content.request_review` | `content.write` or `content.write_own` | writes |
 | `content.resolve` | `content.read` | read-only |
 | `content.restore_revision` | `content.write` or `content.write_own` | writes |
+| `content.save_banner` | `content.banners` | writes |
 | `content.search` | `content.read` | read-only |
 | `content.seo_check` | `content.read` | read-only |
 | `content.suggest_seo` | `content.write` or `content.write_own` | writes |

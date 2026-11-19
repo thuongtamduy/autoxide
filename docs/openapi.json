@@ -1292,6 +1292,202 @@
         ],
         "type": "object"
       },
+      "BannerLink": {
+        "additionalProperties": false,
+        "description": "Where a banner links to: give `url`, or `kind` and `id`.",
+        "properties": {
+          "id": {
+            "description": "Id of that object.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "A type of the object directory, e.g. `content.entry`, `content.term`,\n`catalog.product`, `catalog.collection`, `promotions.promotion` — whatever the installed\nmodules provide (`GET /api/v1/kernel/resources` lists them). A banner pointing to a\npromotion is archived when the promotion ends.",
+            "example": "catalog.product",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "url": {
+            "description": "An `https://` or `http://` address, or a path on the website starting with `/`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "BannerPage": {
+        "additionalProperties": false,
+        "description": "A page the banner shows on: an object of the object directory (e.g. a product category).",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "example": "catalog.category",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "BannerResponse": {
+        "description": "A banner of a display placement.",
+        "properties": {
+          "ai_assisted": {
+            "description": "The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence\n134/2025/QH15): label it.",
+            "type": "boolean"
+          },
+          "alt": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cta_label": {
+            "description": "Text of the button.",
+            "type": "string"
+          },
+          "ends_at": {
+            "description": "Shown until (excluded); `null`: no end.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`image` or `text`.",
+            "type": "string"
+          },
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BannerLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "type": "string"
+          },
+          "media_id": {
+            "description": "Picture (media item id).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mobile_media_id": {
+            "description": "Picture for phones; `null`: the same picture.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Organization unit it belongs to; the tenant's id means every store of the tenant.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "page_kinds": {
+            "description": "Only on these kinds of pages; empty: every kind of its placement.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "page_targets": {
+            "description": "Only on these pages; empty: every page.",
+            "items": {
+              "$ref": "#/components/schemas/BannerPage"
+            },
+            "type": "array"
+          },
+          "placement": {
+            "description": "Key of its placement.",
+            "example": "home_hero",
+            "type": "string"
+          },
+          "position": {
+            "description": "Order in the placement, smallest first.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "starts_at": {
+            "description": "Shown from (included); `null`: at once.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `active` or `archived`.",
+            "type": "string"
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tone": {
+            "description": "Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "placement",
+          "org_id",
+          "locale",
+          "kind",
+          "title",
+          "subtitle",
+          "cta_label",
+          "alt",
+          "page_kinds",
+          "page_targets",
+          "position",
+          "status",
+          "ai_assisted",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "BatchMethod": {
         "description": "HTTP method of a write.",
         "enum": [
@@ -11755,6 +11951,130 @@
         ],
         "type": "object"
       },
+      "CreateBannerRequest": {
+        "additionalProperties": false,
+        "description": "A new banner.",
+        "properties": {
+          "ai_assisted": {
+            "description": "Set when the text came from an AI suggestion.",
+            "type": "boolean"
+          },
+          "alt": {
+            "description": "At most 300 characters; empty: the picture's own `alt`.",
+            "type": "string"
+          },
+          "cta_label": {
+            "description": "Text of the button, at most 60 characters.",
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`image` (default) or `text`; the placement must take it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BannerLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "locale": {
+            "description": "Omitted: the default language.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_id": {
+            "description": "Image banners: a public picture with the placement's ratio and size.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mobile_media_id": {
+            "description": "Optional picture for phones (the placement's `mobile_ratio`).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Organization unit (store) it belongs to; omitted: every store of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "page_kinds": {
+            "description": "Only on these kinds of pages (within those of the placement).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "page_targets": {
+            "description": "Only on these pages, at most 50; each must exist.",
+            "items": {
+              "$ref": "#/components/schemas/BannerPage"
+            },
+            "type": "array"
+          },
+          "placement": {
+            "description": "Key of the placement, e.g. `home_hero`.",
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft` (default) or `active`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subtitle": {
+            "description": "At most 300 characters.",
+            "type": "string"
+          },
+          "title": {
+            "description": "At most 120 characters; required for a text banner.",
+            "type": "string"
+          },
+          "tone": {
+            "description": "Text banners only: `primary`, `secondary`, `accent` or `neutral` (default) — never a\ncolour code, so a new theme recolours it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "placement"
+        ],
+        "type": "object"
+      },
       "CreateBookingExceptionRequest": {
         "additionalProperties": false,
         "description": "Time off or extra working hours of a resource.",
@@ -12468,6 +12788,26 @@
           }
         },
         "type": "object"
+      },
+      "CreatePlacementRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/PlacementFields"
+          },
+          {
+            "properties": {
+              "key": {
+                "description": "1 to 64 lower-case letters, digits or `_`, e.g. `home_hero`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "key"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A new placement."
       },
       "CreateRuleRequest": {
         "additionalProperties": false,
@@ -13984,6 +14324,164 @@
             "propertyNames": {
               "type": "string"
             },
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_BannerResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A banner of a display placement.",
+            "properties": {
+              "ai_assisted": {
+                "description": "The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence\n134/2025/QH15): label it.",
+                "type": "boolean"
+              },
+              "alt": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cta_label": {
+                "description": "Text of the button.",
+                "type": "string"
+              },
+              "ends_at": {
+                "description": "Shown until (excluded); `null`: no end.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`image` or `text`.",
+                "type": "string"
+              },
+              "link": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/BannerLink"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "locale": {
+                "type": "string"
+              },
+              "media_id": {
+                "description": "Picture (media item id).",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "mobile_media_id": {
+                "description": "Picture for phones; `null`: the same picture.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "description": "Organization unit it belongs to; the tenant's id means every store of the tenant.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "page_kinds": {
+                "description": "Only on these kinds of pages; empty: every kind of its placement.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "page_targets": {
+                "description": "Only on these pages; empty: every page.",
+                "items": {
+                  "$ref": "#/components/schemas/BannerPage"
+                },
+                "type": "array"
+              },
+              "placement": {
+                "description": "Key of its placement.",
+                "example": "home_hero",
+                "type": "string"
+              },
+              "position": {
+                "description": "Order in the placement, smallest first.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "starts_at": {
+                "description": "Shown from (included); `null`: at once.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`draft`, `active` or `archived`.",
+                "type": "string"
+              },
+              "subtitle": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "tone": {
+                "description": "Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`).",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "placement",
+              "org_id",
+              "locale",
+              "kind",
+              "title",
+              "subtitle",
+              "cta_label",
+              "alt",
+              "page_kinds",
+              "page_targets",
+              "position",
+              "status",
+              "ai_assisted",
+              "created_at",
+              "updated_at"
+            ],
             "type": "object"
           }
         },
@@ -26770,6 +27268,139 @@
         ],
         "type": "object"
       },
+      "Data_PlacementResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A display placement: where banners go on the website and how the website draws them.",
+            "properties": {
+              "accepts": {
+                "description": "Banners it takes: `image`, `text` or `any`.",
+                "type": "string"
+              },
+              "active": {
+                "description": "Off: public reads leave it out.",
+                "type": "boolean"
+              },
+              "audience": {
+                "description": "`site` (the website of the tenant).",
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "devices": {
+                "description": "`all`, `desktop` or `mobile`: call the placement only on these devices.",
+                "type": "string"
+              },
+              "display": {
+                "description": "How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or\n`popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close\nbutton and never shows on cart, checkout, sign-in or account pages).",
+                "type": "string"
+              },
+              "display_settings": {
+                "description": "Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);\n`grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,\n`once_per_week`) and `delay_seconds` (0–60). Other displays have none.",
+                "type": "object"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "key": {
+                "example": "home_hero",
+                "type": "string"
+              },
+              "max_items": {
+                "description": "Most banners shown at once (per organization unit and language).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "min_height": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "min_width": {
+                "description": "Smallest picture accepted, in pixels.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "mobile_ratio": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Ratio",
+                    "description": "Required ratio of the phone picture; `null`: same as `ratio`."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "name": {
+                "type": "string"
+              },
+              "page_kinds": {
+                "description": "Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,\n`cart`, `content_entry`, `content_type`, `landing`, or `any`.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "preset_key": {
+                "description": "Key in the standard set of placements, when the row came from it.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ratio": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Ratio",
+                    "description": "Required picture ratio (2% leeway), when set."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "key",
+              "name",
+              "description",
+              "max_items",
+              "audience",
+              "display",
+              "display_settings",
+              "accepts",
+              "devices",
+              "page_kinds",
+              "active",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PlanResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28456,6 +29087,105 @@
               "key",
               "locale",
               "items"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PublicPlacement": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A placement ready to draw, with its banners for the page asked about.",
+            "properties": {
+              "accepts": {
+                "description": "`image`, `text` or `any`.",
+                "type": "string"
+              },
+              "banners": {
+                "description": "Banners to show, in this order (never shuffle them).",
+                "items": {
+                  "$ref": "#/components/schemas/PublicBanner"
+                },
+                "type": "array"
+              },
+              "devices": {
+                "description": "`all`, `desktop` or `mobile`.",
+                "type": "string"
+              },
+              "display": {
+                "description": "`single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`\nsays (a popup always has a close button; no autoplay when the viewer asks for reduced\nmotion).",
+                "type": "string"
+              },
+              "display_settings": {
+                "type": "object"
+              },
+              "key": {
+                "example": "home_hero",
+                "type": "string"
+              },
+              "mobile_ratio": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Ratio"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ratio": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Ratio"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "key",
+              "display",
+              "display_settings",
+              "accepts",
+              "devices",
+              "banners"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PublicPlacementsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Several placements of one page.",
+            "properties": {
+              "locale": {
+                "description": "The language returned.",
+                "type": "string"
+              },
+              "placements": {
+                "description": "The placements asked for that exist and are on, in the order asked.",
+                "items": {
+                  "$ref": "#/components/schemas/PublicPlacement"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "locale",
+              "placements"
             ],
             "type": "object"
           }
@@ -37767,6 +38497,142 @@
                 "backend",
                 "schema_state",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PlacementResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A display placement: where banners go on the website and how the website draws them.",
+              "properties": {
+                "accepts": {
+                  "description": "Banners it takes: `image`, `text` or `any`.",
+                  "type": "string"
+                },
+                "active": {
+                  "description": "Off: public reads leave it out.",
+                  "type": "boolean"
+                },
+                "audience": {
+                  "description": "`site` (the website of the tenant).",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "devices": {
+                  "description": "`all`, `desktop` or `mobile`: call the placement only on these devices.",
+                  "type": "string"
+                },
+                "display": {
+                  "description": "How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or\n`popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close\nbutton and never shows on cart, checkout, sign-in or account pages).",
+                  "type": "string"
+                },
+                "display_settings": {
+                  "description": "Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);\n`grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,\n`once_per_week`) and `delay_seconds` (0–60). Other displays have none.",
+                  "type": "object"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "key": {
+                  "example": "home_hero",
+                  "type": "string"
+                },
+                "max_items": {
+                  "description": "Most banners shown at once (per organization unit and language).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "min_height": {
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "min_width": {
+                  "description": "Smallest picture accepted, in pixels.",
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "mobile_ratio": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ratio",
+                      "description": "Required ratio of the phone picture; `null`: same as `ratio`."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "page_kinds": {
+                  "description": "Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,\n`cart`, `content_entry`, `content_type`, `landing`, or `any`.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "preset_key": {
+                  "description": "Key in the standard set of placements, when the row came from it.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ratio": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Ratio",
+                      "description": "Required picture ratio (2% leeway), when set."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "key",
+                "name",
+                "description",
+                "max_items",
+                "audience",
+                "display",
+                "display_settings",
+                "accepts",
+                "devices",
+                "page_kinds",
+                "active",
+                "created_at",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -52950,6 +53816,24 @@
         ],
         "type": "object"
       },
+      "OrderRequest": {
+        "additionalProperties": false,
+        "description": "The new order of the banners of a placement.",
+        "properties": {
+          "banner_ids": {
+            "description": "Banners of the placement, first shown first. Banners left out keep their order after\nthem.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "banner_ids"
+        ],
+        "type": "object"
+      },
       "OrdersAttribution": {
         "description": "Referral of the cart.",
         "properties": {
@@ -55055,6 +55939,172 @@
                 "slug",
                 "bio",
                 "website_url",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_BannerResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A banner of a display placement.",
+              "properties": {
+                "ai_assisted": {
+                  "description": "The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence\n134/2025/QH15): label it.",
+                  "type": "boolean"
+                },
+                "alt": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "cta_label": {
+                  "description": "Text of the button.",
+                  "type": "string"
+                },
+                "ends_at": {
+                  "description": "Shown until (excluded); `null`: no end.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`image` or `text`.",
+                  "type": "string"
+                },
+                "link": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/BannerLink"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "locale": {
+                  "type": "string"
+                },
+                "media_id": {
+                  "description": "Picture (media item id).",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "mobile_media_id": {
+                  "description": "Picture for phones; `null`: the same picture.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "org_id": {
+                  "description": "Organization unit it belongs to; the tenant's id means every store of the tenant.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "page_kinds": {
+                  "description": "Only on these kinds of pages; empty: every kind of its placement.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "page_targets": {
+                  "description": "Only on these pages; empty: every page.",
+                  "items": {
+                    "$ref": "#/components/schemas/BannerPage"
+                  },
+                  "type": "array"
+                },
+                "placement": {
+                  "description": "Key of its placement.",
+                  "example": "home_hero",
+                  "type": "string"
+                },
+                "position": {
+                  "description": "Order in the placement, smallest first.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "starts_at": {
+                  "description": "Shown from (included); `null`: at once.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`draft`, `active` or `archived`.",
+                  "type": "string"
+                },
+                "subtitle": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "tone": {
+                  "description": "Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`).",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "placement",
+                "org_id",
+                "locale",
+                "kind",
+                "title",
+                "subtitle",
+                "cta_label",
+                "alt",
+                "page_kinds",
+                "page_targets",
+                "position",
+                "status",
+                "ai_assisted",
                 "created_at",
                 "updated_at"
               ],
@@ -67035,6 +68085,105 @@
         ],
         "type": "object"
       },
+      "PlacementFields": {
+        "additionalProperties": false,
+        "description": "The fields of a placement. `PUT` sends the whole placement; the key never changes.",
+        "properties": {
+          "accepts": {
+            "description": "`image`, `text` or `any`; omitted: `text` for a `strip`, else `image`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "active": {
+            "description": "Omitted: `true`.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "description": {
+            "description": "At most 500 characters.",
+            "type": "string"
+          },
+          "devices": {
+            "description": "`all` (default), `desktop` or `mobile`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "display": {
+            "description": "`single`, `carousel`, `grid`, `stack`, `strip` or `popup`.",
+            "type": "string"
+          },
+          "display_settings": {
+            "description": "See the placement schema; omitted: the defaults of the display.",
+            "type": "object"
+          },
+          "max_items": {
+            "description": "1 to 50; omitted: 10.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "min_height": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "min_width": {
+            "description": "1 to 10000 pixels.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mobile_ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "description": "1 to 120 characters.",
+            "type": "string"
+          },
+          "page_kinds": {
+            "description": "Omitted: `[\"any\"]`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio",
+                "description": "Picture ratio, each side 1 to 100."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "display"
+        ],
+        "type": "object"
+      },
       "PlacementMigrationList": {
         "description": "Migrations of one placement.",
         "properties": {
@@ -67056,6 +68205,130 @@
         "required": [
           "placement",
           "migrations"
+        ],
+        "type": "object"
+      },
+      "PlacementResponse": {
+        "description": "A display placement: where banners go on the website and how the website draws them.",
+        "properties": {
+          "accepts": {
+            "description": "Banners it takes: `image`, `text` or `any`.",
+            "type": "string"
+          },
+          "active": {
+            "description": "Off: public reads leave it out.",
+            "type": "boolean"
+          },
+          "audience": {
+            "description": "`site` (the website of the tenant).",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "devices": {
+            "description": "`all`, `desktop` or `mobile`: call the placement only on these devices.",
+            "type": "string"
+          },
+          "display": {
+            "description": "How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or\n`popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close\nbutton and never shows on cart, checkout, sign-in or account pages).",
+            "type": "string"
+          },
+          "display_settings": {
+            "description": "Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);\n`grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,\n`once_per_week`) and `delay_seconds` (0–60). Other displays have none.",
+            "type": "object"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "key": {
+            "example": "home_hero",
+            "type": "string"
+          },
+          "max_items": {
+            "description": "Most banners shown at once (per organization unit and language).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "min_height": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "min_width": {
+            "description": "Smallest picture accepted, in pixels.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mobile_ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio",
+                "description": "Required ratio of the phone picture; `null`: same as `ratio`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "page_kinds": {
+            "description": "Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,\n`cart`, `content_entry`, `content_type`, `landing`, or `any`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "preset_key": {
+            "description": "Key in the standard set of placements, when the row came from it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio",
+                "description": "Required picture ratio (2% leeway), when set."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "key",
+          "name",
+          "description",
+          "max_items",
+          "audience",
+          "display",
+          "display_settings",
+          "accepts",
+          "devices",
+          "page_kinds",
+          "active",
+          "created_at",
+          "updated_at"
         ],
         "type": "object"
       },
@@ -71342,6 +72615,77 @@
         ],
         "type": "object"
       },
+      "PublicBanner": {
+        "description": "A banner to show.",
+        "properties": {
+          "ai_assisted": {
+            "description": "The text was written from an AI suggestion: label it.",
+            "type": "boolean"
+          },
+          "cta_label": {
+            "type": "string"
+          },
+          "href": {
+            "description": "Where it links to: a path on the website or an address; `null`: no link.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "image": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMedia",
+                "description": "Image banners: the picture, with smaller copies and WebP for `srcset`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "description": "`image` or `text`.",
+            "type": "string"
+          },
+          "mobile_image": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PublicMedia",
+                "description": "Picture for phones, when it has one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "subtitle": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "tone": {
+            "description": "Text banners: a colour token of the theme.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "subtitle",
+          "cta_label",
+          "ai_assisted"
+        ],
+        "type": "object"
+      },
       "PublicBookingService": {
         "description": "A service customers can book.",
         "properties": {
@@ -72155,6 +73499,87 @@
         ],
         "type": "object"
       },
+      "PublicPlacement": {
+        "description": "A placement ready to draw, with its banners for the page asked about.",
+        "properties": {
+          "accepts": {
+            "description": "`image`, `text` or `any`.",
+            "type": "string"
+          },
+          "banners": {
+            "description": "Banners to show, in this order (never shuffle them).",
+            "items": {
+              "$ref": "#/components/schemas/PublicBanner"
+            },
+            "type": "array"
+          },
+          "devices": {
+            "description": "`all`, `desktop` or `mobile`.",
+            "type": "string"
+          },
+          "display": {
+            "description": "`single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`\nsays (a popup always has a close button; no autoplay when the viewer asks for reduced\nmotion).",
+            "type": "string"
+          },
+          "display_settings": {
+            "type": "object"
+          },
+          "key": {
+            "example": "home_hero",
+            "type": "string"
+          },
+          "mobile_ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ratio": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Ratio"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "display",
+          "display_settings",
+          "accepts",
+          "devices",
+          "banners"
+        ],
+        "type": "object"
+      },
+      "PublicPlacementsResponse": {
+        "description": "Several placements of one page.",
+        "properties": {
+          "locale": {
+            "description": "The language returned.",
+            "type": "string"
+          },
+          "placements": {
+            "description": "The placements asked for that exist and are on, in the order asked.",
+            "items": {
+              "$ref": "#/components/schemas/PublicPlacement"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "locale",
+          "placements"
+        ],
+        "type": "object"
+      },
       "PublicProfileRequest": {
         "additionalProperties": false,
         "description": "Changes to a public profile. Omitted fields stay as they are; `null` clears.",
@@ -72848,6 +74273,27 @@
         },
         "required": [
           "rating"
+        ],
+        "type": "object"
+      },
+      "Ratio": {
+        "additionalProperties": false,
+        "description": "A picture ratio, width to height (e.g. 3:1).",
+        "properties": {
+          "h": {
+            "example": 1,
+            "format": "int32",
+            "type": "integer"
+          },
+          "w": {
+            "example": 3,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "w",
+          "h"
         ],
         "type": "object"
       },
@@ -82651,6 +84097,119 @@
         "required": [
           "unsubscribed"
         ],
+        "type": "object"
+      },
+      "UpdateBannerRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a banner: fields left out stay; `null` clears a field that may be empty.",
+        "properties": {
+          "ai_assisted": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "alt": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cta_label": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "link": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BannerLink",
+                "description": "`null` removes the link."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "media_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mobile_media_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "page_kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "page_targets": {
+            "items": {
+              "$ref": "#/components/schemas/BannerPage"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `active` or `archived`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subtitle": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "UpdateBookingResourceRequest": {
@@ -126005,6 +127564,727 @@
         ]
       }
     },
+    "/api/v1/content/banners": {
+      "get": {
+        "description": "Requires `content.banners` (or `content.read`); only banners of units within reach are listed.",
+        "operationId": "content_list_content_banners",
+        "parameters": [
+          {
+            "description": "Only this placement (key).",
+            "in": "query",
+            "name": "placement",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this organization unit.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only `draft`, `active` or `archived`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this language.",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_BannerResponse"
+                }
+              }
+            },
+            "description": "One page of banners, by id."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has the key in `placement`; code `content.placement_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List banners.",
+        "tags": [
+          "content"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this placement (key).",
+            "kind": "string",
+            "name": "placement",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this organization unit.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only `draft`, `active` or `archived`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only this language.",
+            "kind": "string",
+            "name": "locale",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "content.list_content_banners",
+        "x-permissions": [
+          "content.banners"
+        ]
+      },
+      "post": {
+        "description": "Requires `content.banners` for its organization unit. It goes last in its placement. Retry\nsafely with an `Idempotency-Key` header.",
+        "operationId": "content_create_content_banner",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBannerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_BannerResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the banner.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` for the unit; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has this key; code `content.placement_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The placement is full for this unit and language; code `content.placement_full`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid. When every problem is of one kind the code says which: `content.banner_kind_not_allowed`, `content.banner_image_size_invalid`, `content.media_not_found`, `content.media_not_public`, `content.page_kind_not_allowed`, `content.page_target_not_found`, `content.link_kind_unavailable`, `content.link_target_missing`, `content.banner_window_invalid`; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a banner.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      }
+    },
+    "/api/v1/content/banners/{id}": {
+      "delete": {
+        "description": "Requires `content.banners` for its organization unit. To keep its history, archive it\ninstead (`PATCH` with `status` = `archived`).",
+        "operationId": "content_delete_content_banner",
+        "parameters": [
+          {
+            "description": "Id of the banner.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` for the unit; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No banner has this id within reach; code `content.banner_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a banner.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      },
+      "get": {
+        "description": "Requires `content.banners` for its organization unit.",
+        "operationId": "content_get_content_banner",
+        "parameters": [
+          {
+            "description": "Id of the banner.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_BannerResponse"
+                }
+              }
+            },
+            "description": "The banner.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the banner: send it in `If-Match` to change it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No banner has this id within reach; code `content.banner_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a banner.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      },
+      "patch": {
+        "description": "Requires `content.banners` for its organization unit. Fields left out stay as they are.\n`If-Match` is required. Set `status` to `active` to show it, `archived` to retire it.",
+        "operationId": "content_update_content_banner",
+        "parameters": [
+          {
+            "description": "Id of the banner.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: the `ETag` you read (or `*`).",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBannerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_BannerResponse"
+                }
+              }
+            },
+            "description": "The banner after the change.",
+            "headers": {
+              "ETag": {
+                "description": "New version of the banner.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` for the unit; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No banner has this id within reach; code `content.banner_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bringing it back would overfill the placement; code `content.placement_full`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The banner changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; same codes as creating; see `errors`."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a banner.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      }
+    },
     "/api/v1/content/entries": {
       "get": {
         "description": "Requires `content.read`. Newest first unless `order=asc`. Filter on the tenant's filterable\ncustom fields with `cf.<key>=<eq|in|gte|lte|prefix>:<value>`, e.g. `cf.owner=eq:ada`.",
@@ -130145,6 +132425,828 @@
         "x-sunset": "2027-05-14"
       }
     },
+    "/api/v1/content/placements": {
+      "get": {
+        "description": "Requires `content.manage` or `content.banners`. Every placement of the tenant, by key.",
+        "operationId": "content_list_content_placements",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PlacementResponse"
+                }
+              }
+            },
+            "description": "The placements."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` or `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List display placements.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      },
+      "post": {
+        "description": "Requires `content.manage`. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "content_create_content_placement",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlacementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlacementResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the placement.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A placement with this key exists; code `content.placement_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (display settings alone: code `content.placement_settings_invalid`); see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a display placement.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.manage"
+        ]
+      }
+    },
+    "/api/v1/content/placements/presets": {
+      "post": {
+        "description": "Requires `content.manage`. Adds the placements of the standard set (top strip, home hero,\nhome middle, top of category, left and right columns, within content, above footer, popup)\nwhose key the tenant does not have yet; new tenants get them already. Running it again adds\nnothing.",
+        "operationId": "content_install_content_placement_presets",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PlacementResponse"
+                }
+              }
+            },
+            "description": "The placements just added (empty when none was missing)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add the standard placements.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.manage"
+        ]
+      }
+    },
+    "/api/v1/content/placements/{key}": {
+      "delete": {
+        "description": "Requires `content.manage`. Refused while it has banners (archived ones too).",
+        "operationId": "content_delete_content_placement",
+        "parameters": [
+          {
+            "description": "Key of the placement.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has this key; code `content.placement_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The placement still has banners; code `content.placement_in_use`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a display placement.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `content.manage` or `content.banners`.",
+        "operationId": "content_get_content_placement",
+        "parameters": [
+          {
+            "description": "Key of the placement, e.g. `home_hero`.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlacementResponse"
+                }
+              }
+            },
+            "description": "The placement.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the placement: send it in `If-Match` to replace it or to order its banners.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` or `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has this key; code `content.placement_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a display placement.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      },
+      "put": {
+        "description": "Requires `content.manage`. Sends the whole placement; the key stays. `If-Match` is required.\nBanners already saved keep their pictures even when the new size rules would refuse them;\nthe rules apply to the next save of each banner.",
+        "operationId": "content_put_content_placement",
+        "parameters": [
+          {
+            "description": "Key of the placement.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: the `ETag` you read (or `*`).",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlacementFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlacementResponse"
+                }
+              }
+            },
+            "description": "The placement as saved.",
+            "headers": {
+              "ETag": {
+                "description": "New version of the placement.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has this key; code `content.placement_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The placement changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a display placement.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.manage"
+        ]
+      }
+    },
+    "/api/v1/content/placements/{key}/order": {
+      "put": {
+        "description": "Requires `content.banners` for the organization units of the banners listed. Sets the order\nof the whole placement at once. `If-Match` is required: the placement's `ETag`; two people\nordering at the same time get one `412`.",
+        "operationId": "content_order_content_placement",
+        "parameters": [
+          {
+            "description": "Key of the placement.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: the placement's `ETag` (or `*`).",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PlacementResponse"
+                }
+              }
+            },
+            "description": "The placement, with its new version.",
+            "headers": {
+              "ETag": {
+                "description": "New version of the placement.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `content.banners` for a unit of a listed banner; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No placement has this key; code `content.placement_not_found`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The placement changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "An id is not a banner of this placement, or is listed twice; see `errors`."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Order the banners of a placement.",
+        "tags": [
+          "content"
+        ],
+        "x-permissions": [
+          "content.banners"
+        ]
+      }
+    },
     "/api/v1/content/public/authors/{slug}": {
       "get": {
         "description": "No sign-in needed. The account behind the profile is not shown.",
@@ -130432,6 +133534,293 @@
         ],
         "x-public": true,
         "x-sunset": "2027-05-14"
+      }
+    },
+    "/api/v1/content/public/placements": {
+      "get": {
+        "description": "No sign-in needed. One call for every placement of the page (at most 10 keys). Each\nplacement comes with how to draw it and its banners for this page: `active`, in their time\nwindow now, of the website and the units above it, in the page's language, in a fixed order.\nBanners whose picture or link target is no longer public are left out. Keys that do not exist\nor are switched off are left out. `Cache-Control` lets the answer be reused only until the\nnext banner starts or ends (at most 60 seconds).",
+        "operationId": "content_list_public_content_placements",
+        "parameters": [
+          {
+            "description": "Keys of the placements, comma-separated, at most 10.",
+            "example": "top_strip,home_hero,home_middle",
+            "in": "query",
+            "name": "keys",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Omitted: the website's default language.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Kind of the page: `home`, `category`, `collection`, `product`, `search`, `cart`,\n`content_entry`, `content_type` or `landing`. Omitted: only banners not limited to some\npages.",
+            "example": "category",
+            "in": "query",
+            "name": "page_kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The page itself, as `<kind>:<id>` of the object directory (e.g.\n`catalog.category:0190…`): banners chosen for that page show too.",
+            "in": "query",
+            "name": "page_ref",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicPlacementsResponse"
+                }
+              }
+            },
+            "description": "The placements.",
+            "headers": {
+              "Cache-Control": {
+                "description": "`public, max-age=<seconds>` until the next banner starts or ends, at most 60.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Fingerprint of the answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "More than 10 keys (code `content.placement_keys_too_many`), or a language or page kind that is not supported; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read several placements of a page (public).",
+        "tags": [
+          "content"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/content/public/placements/{key}": {
+      "get": {
+        "description": "No sign-in needed. Same rules as `GET /api/v1/content/public/placements`, for one key; prefer\nthat endpoint to read every placement of a page in one call.",
+        "operationId": "content_get_public_content_placement",
+        "parameters": [
+          {
+            "description": "Key of the placement, e.g. `home_hero`.",
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Omitted: the website's default language.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Kind of the page: `home`, `category`, `collection`, `product`, `search`, `cart`,\n`content_entry`, `content_type` or `landing`. Omitted: only banners not limited to some\npages.",
+            "example": "category",
+            "in": "query",
+            "name": "page_kind",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The page itself, as `<kind>:<id>` of the object directory (e.g.\n`catalog.category:0190…`): banners chosen for that page show too.",
+            "in": "query",
+            "name": "page_ref",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PublicPlacement"
+                }
+              }
+            },
+            "description": "The placement.",
+            "headers": {
+              "Cache-Control": {
+                "description": "`public, max-age=<seconds>` until the next banner starts or ends, at most 60.",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "ETag": {
+                "description": "Fingerprint of the answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not changed since the `ETag` sent in `If-None-Match`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No active placement has this key; code `content.placement_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A language or page kind that is not supported; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read one placement (public).",
+        "tags": [
+          "content"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/content/public/posts": {
