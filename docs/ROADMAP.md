@@ -481,7 +481,7 @@ bước 35.
 - [x] Bảng giá theo các nền tảng lớn (D-222): một thứ tự chọn bảng (nút gần nhất → công ty B2B → nhóm khách →
       kênh → thị trường → ưu tiên); bảng giá suy ra ghi thành dòng giá thật; làm tròn giá đẹp; sàn giá (giá tối
       thiểu, biên lợi nhuận trên giá vốn); đổi giá hàng loạt có xem trước, duyệt, hẹn giờ, giá tạm thời
-- [ ] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm
+- [x] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm
       của kernel), ETag và cache như `content`, sitemap; giá sau giảm tự động và lọc `on_sale`; sản phẩm của
       người bán trên website của chuỗi (`seller`, `sold_by`, facet, `ProductCard.seller`)
 - [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm gom sản phẩm, danh mục, bài viết, cửa hàng qua một

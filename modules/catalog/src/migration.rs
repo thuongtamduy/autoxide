@@ -24,6 +24,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         Box::new(CreateAttributes),
         Box::new(CreatePriceChanges),
+        Box::new(CreateStorefront),
     ]
 }
 
@@ -715,6 +716,80 @@ impl MigrationTrait for CreatePriceChanges {
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
             .drop_table(Table::drop().table(Alias::new("catalog_price_changes")).to_owned())
+            .await
+    }
+}
+
+struct CreateStorefront;
+
+impl MigrationName for CreateStorefront {
+    fn name(&self) -> &str {
+        "m0009_storefront"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateStorefront {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Bảng dẫn xuất cho đọc công khai: một dòng mỗi (nút bán có giá riêng, sản phẩm). Giá,
+        // hiện / ẩn và cột sắp xếp ghi sẵn để lọc và sắp có index; job dựng lại (chạy lại được).
+        let mut entries = table("catalog_storefront_entries");
+        entries
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid("product_id"))
+            .col(schema::uuid("owner_org_id"))
+            .col(schema::boolean("visible"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::big_integer("min_price_minor"))
+            .col(schema::big_integer("max_price_minor"))
+            .col(schema::big_integer_null("compare_at_minor"))
+            .col(schema::big_integer_null("sale_price_minor"))
+            .col(schema::timestamp_with_time_zone_null("sale_ends_at"))
+            .col(schema::big_integer("best_selling"))
+            .col(schema::integer("rating_x100"))
+            .col(schema::big_integer("rating_count"))
+            .col(schema::integer("variant_count"))
+            .col(schema::timestamp_with_time_zone("published_at"))
+            .col(schema::timestamp_with_time_zone("refreshed_at"));
+        manager.create_table(entries).await?;
+        let t = "catalog_storefront_entries";
+        index(
+            manager,
+            t,
+            "catalog_storefront_unique",
+            &["tenant_id", "org_id", "product_id"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_price_idx",
+            &["tenant_id", "org_id", "visible", "min_price_minor", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_newest_idx",
+            &["tenant_id", "org_id", "visible", "published_at", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_selling_idx",
+            &["tenant_id", "org_id", "visible", "best_selling", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Alias::new("catalog_storefront_entries")).to_owned())
             .await
     }
 }

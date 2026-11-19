@@ -485,6 +485,8 @@ impl CatalogService {
                     )
                     .await?;
                 self.queue_derivation(&transaction, tenant, list.id, None).await?;
+                let variants = chunk.iter().map(|row| row.variant_id).collect();
+                self.queue_variants(&transaction, tenant, variants).await?;
             }
             transaction.commit().await?;
         }

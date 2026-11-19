@@ -101,6 +101,29 @@ và (nếu muốn) theo danh mục, tác dụng `warn` (giá vẫn ghi, kèm c�
 (`catalog.price_below_floor`). Quy tắc của nút gần nhất thắng; trong một nút, quy tắc của danh mục gần
 nhất thắng. Giá vốn đến từ event `inventory.cost_changed`.
 
+## Đọc công khai cho website
+
+Không cần đăng nhập (`/api/v1/catalog/public/…`). Chỉ sản phẩm `active`, có giá ở website đang hỏi và có
+nội dung bằng ngôn ngữ hỏi; website lấy theo tên miền hay `?site=<nút>`. Mọi câu trả lời có `ETag` (gửi
+lại trong `If-None-Match` để nhận 304) và `Cache-Control: public, no-cache`.
+
+| Endpoint | Việc |
+| --- | --- |
+| `GET /public/products?locale=vi` | thẻ sản phẩm; lọc `category=<slug>` (gồm danh mục con), `attr.<mã>=<giá trị>[,<giá trị>]` (thuộc tính lọc được), `price_min` / `price_max`, `q` (có dấu hay không đều được), `on_sale`, `seller=<nút>`, `sold_by=own\|marketplace`, `min_rating`; `sort=newest\|price_asc\|price_desc\|best_selling\|rating` |
+| `GET /public/products/by-slug/{slug}?locale=vi` | trang sản phẩm: biến thể kèm giá hiện tại, ảnh, thuộc tính, danh mục, ngôn ngữ khác |
+| `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | danh mục đang hiện (danh mục nằm dưới danh mục ẩn cũng ẩn) |
+| `GET /public/sitemap` | mọi đường dẫn sản phẩm ở mọi ngôn ngữ, tối đa 200 mỗi trang |
+
+Website hiện sản phẩm nào: của chính nút đó, của các nút cấp trên, và của người bán bên dưới nó
+(`seller.own = false` trên thẻ). Cửa hàng ẩn một sản phẩm của chuỗi bằng
+`PUT /stores/{org_id}/overrides/{product_id}` `{"hidden": true}` (`catalog.products.write` ở cửa hàng).
+
+Giá trên các trang này là giá hiện tại của bảng giá của website (nút gần nhất có bảng giá đang bật),
+không theo nhóm khách. Giá được tính sẵn vào một bảng dẫn xuất, dựng lại bằng job sau mỗi lần đổi giá,
+trạng thái, bảng giá hay lựa chọn của cửa hàng, và mỗi phút cho giá hẹn giờ vừa bắt đầu hay vừa hết
+(event `catalog.price_effective`). Nếu danh sách công khai có vẻ chưa cập nhật, chạy
+`autoxide task catalog.rebuild_storefront [tenant=<slug>]`.
+
 ## Cho module khác
 
 ```rust
