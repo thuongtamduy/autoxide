@@ -267,6 +267,9 @@ export type ApiKeyResponse = {
    * from elsewhere gets 403 `network_not_allowed`.
    */
   allowed_ips: string[];
+  approved_at?: string | null;
+  /** Who approved the key and when; `null` when it needed no approval. */
+  approved_by?: string | null;
   created_at: string;
   /**
    * When the key stops working. Every new key has one; `null` only for data that was never
@@ -304,6 +307,11 @@ export type ApiKeyResponse = {
    * created from scratch.
    */
   rotated_from?: string | null;
+  /**
+   * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+   * 401 `auth.api_key_pending`).
+   */
+  status: string;
 };
 
 /** Records to tag or untag in one call. */
@@ -4465,6 +4473,63 @@ export type Data_AltSuggestionResponse = {
     decorative: boolean;
     /** The model that answered. */
     model: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ApiKeyResponse = {
+  /** An API key, without its secret. */
+  data: {
+    /**
+     * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+     * from elsewhere gets 403 `network_not_allowed`.
+     */
+    allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
+    created_at: string;
+    /**
+     * When the key stops working. Every new key has one; `null` only for data that was never
+     * upgraded.
+     */
+    expires_at?: string | null;
+    id: string;
+    /**
+     * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+     * approval) or `service` (another program). The audit log records it as `actor_kind`.
+     */
+    kind: string;
+    /** Last time the key was used, to the minute; `null`: never used. */
+    last_used_at?: string | null;
+    /** What the key is for. */
+    name: string;
+    /**
+     * The organization unit the key is bound to: it acts only on data of this unit and the
+     * units below it. The root unit (the id of the tenant) means no limit.
+     */
+    org_id: string;
+    /**
+     * Permissions the key may use, sorted by name. The key never has more than its
+     * owner has at the moment of the request.
+     */
+    permissions: string[];
+    /**
+     * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+     * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+     * their first 12 characters.
+     */
+    prefix: string;
+    /**
+     * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+     * created from scratch.
+     */
+    rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
   };
 };
 
@@ -16981,6 +17046,9 @@ export type Page_ApiKeyResponse = {
      * from elsewhere gets 403 `network_not_allowed`.
      */
     allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
     created_at: string;
     /**
      * When the key stops working. Every new key has one; `null` only for data that was never
@@ -17018,6 +17086,11 @@ export type Page_ApiKeyResponse = {
      * created from scratch.
      */
     rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -26182,7 +26255,7 @@ export interface paths {
   "/api/v1/auth/all-api-keys": {
     /** List the API keys of every user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
         401: Problem;
@@ -26201,6 +26274,20 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys/{id}/approve": {
+    /** Approve an API key that waits for approval. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApiKeyResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

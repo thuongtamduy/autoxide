@@ -26,6 +26,11 @@ pub(crate) mod api_key {
         pub created_at: DateTimeUtc,
         /// `human`, `agent` hay `service` (bước 51 P12).
         pub kind: String,
+        /// `active` hay `pending` (chờ quản trị duyệt, bước 54).
+        pub status: String,
+        /// Người duyệt và lúc duyệt; NULL khi key không cần duyệt.
+        pub approved_by: Option<Uuid>,
+        pub approved_at: Option<DateTimeUtc>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

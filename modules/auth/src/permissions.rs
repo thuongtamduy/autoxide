@@ -37,6 +37,14 @@ pub(crate) const API_KEYS_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const API_KEYS_APPROVE: Permission = Permission::new(
+    "auth.api_keys.approve",
+    "Approve API keys that wait for approval (when the tenant setting \
+     `auth.api_keys.require_approval` is on). Keys created by holders of this permission need no \
+     approval.",
+)
+.with_risk(Risk::SensitiveData);
+
 pub(crate) const CUSTOMERS_READ: Permission = Permission::new(
     "auth.customers.read",
     "See the customer accounts of the tenant's shop (email, name, status), never their passwords.",
@@ -106,6 +114,7 @@ pub(crate) fn all() -> Vec<Permission> {
         USERS_MANAGE,
         PASSKEYS_MANAGE,
         API_KEYS_MANAGE,
+        API_KEYS_APPROVE,
         CUSTOMERS_READ,
         CUSTOMERS_MANAGE,
         DELEGATIONS_READ,
