@@ -69,6 +69,8 @@ pub(crate) struct Parts {
     /// `dyn OrgDirectory` của `organizations` khi đã cài: kiểm loại nút kho.
     pub orgs: Option<Arc<dyn OrgDirectory>>,
     pub reasons: ReasonCodes,
+    /// `dyn Ledger` của `ledger` khi đã cài: ghi công nợ nhà cung cấp và giá trị nhập.
+    pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
 }
 
 /// Mọi việc của module. Không giữ database: database là của khách, đi theo `TenantContext` của
@@ -80,6 +82,7 @@ pub(crate) struct InventoryService {
     pub(crate) catalog: Arc<dyn Catalog>,
     pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
     pub(crate) reasons: ReasonCodes,
+    pub(crate) ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
     pub(crate) config: InventoryConfig,
 }
 
@@ -92,6 +95,7 @@ impl InventoryService {
             catalog: parts.catalog,
             orgs: parts.orgs,
             reasons: parts.reasons,
+            ledger: parts.ledger,
             config,
         }
     }
@@ -241,4 +245,9 @@ pub(crate) fn check_quantity(
         FieldError::new(field, "range", "must be a whole number from 1 to {max}")
     };
     problems.push(problem.with_param("max", MAX_QUANTITY));
+}
+
+/// Lỗi vi phạm unique của database.
+pub(crate) fn unique_violation(error: &sea_orm::DbErr) -> bool {
+    matches!(error.sql_err(), Some(sea_orm::SqlErr::UniqueConstraintViolation(_)))
 }

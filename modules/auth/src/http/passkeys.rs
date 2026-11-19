@@ -560,6 +560,7 @@ mod tests {
                     .unwrap();
             }
             let helpdesk = crate::role::RoleInput {
+                denies: Vec::new(),
                 requires_mfa: false,
                 grants: Vec::new(),
                 name: "helpdesk".to_owned(),

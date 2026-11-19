@@ -45,6 +45,8 @@ pub(crate) mod role_permission {
         pub permission: String,
         /// Độ sâu: `own`, `unit`, `subtree`, `tenant` (bước 34).
         pub scope: String,
+        /// `allow` (cấp) hay `deny` (cấm, bước 54: thắng mọi `allow`; độ sâu luôn `tenant`).
+        pub effect: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

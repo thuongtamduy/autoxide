@@ -122,6 +122,9 @@ pub(crate) async fn authenticate(
     let authorization =
         parts.headers.get(header::AUTHORIZATION).and_then(|value| value.to_str().ok());
     let principal = authenticator.authenticate(authorization, &hint).await?;
+    // API key giới hạn dải IP (bước 54): kiểm ở một chỗ cho mọi endpoint REST và MCP.
+    let client = parts.extensions.get::<crate::http::ClientIp>().and_then(|ip| ip.0);
+    principal.admits(client)?;
     let principal = match parts.extensions.get::<DatabaseRegistry>() {
         Some(registry) if registry.mode() == TenancyMode::Multi => {
             check(registry, authenticator.as_ref(), principal, &hint).await?

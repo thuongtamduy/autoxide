@@ -20,7 +20,7 @@ use crate::http::documents::TransferResponse;
 use crate::http::dto::{AdjustmentResponse, KindDto, LevelResponse, MovementResponse};
 use crate::http::reservations::ReservationResponse;
 use crate::levels::{AdjustInput, AdjustLine, LevelFilter, MovementFilter};
-use crate::permissions::{ADJUST, READ, TRANSFER};
+use crate::permissions::{ADJUST, READ, RECEIVE, TRANSFER};
 use crate::service::InventoryService;
 use crate::transfers::{NewTransfer, ReceiveLine, TransferLineInput};
 
@@ -127,7 +127,7 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (levels, movements, adjust, low, release) = (s(), s(), s(), s(), s());
-    let (create_transfer, receive_transfer) = (s(), s());
+    let (create_transfer, receive_transfer, create_receipt) = (s(), s(), s());
     vec![
         Tool::new(
             "get_levels",
@@ -272,7 +272,76 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
             },
         )
         .requires(TRANSFER),
+        Tool::new(
+            "create_receipt",
+            "Receive goods into a warehouse, against a purchase order or directly from a \
+             supplier; each line updates the average cost. The same `reference` and content \
+             again changes nothing.",
+            move |tenant: TenantContext, principal: Principal, input: CreateReceiptInput| {
+                let service = create_receipt.clone();
+                async move {
+                    let mut lines = Vec::with_capacity(input.lines.len());
+                    for line in input.lines {
+                        lines.push(crate::receipts::ReceiptLineInput {
+                            variant_id: line.variant_id,
+                            quantity: line.quantity,
+                            unit_cost: Money::parse(
+                                line.unit_cost_amount.trim(),
+                                line.unit_cost_currency.trim(),
+                            )?,
+                            lot_code: line.lot_code,
+                            expires_on: line.expires_on,
+                            serials: line.serials,
+                        });
+                    }
+                    let input = crate::receipts::ReceiptInput {
+                        org_id: input.org_id,
+                        supplier_id: input.supplier_id,
+                        purchase_order_id: input.purchase_order_id,
+                        reference: input.reference,
+                        lines,
+                    };
+                    let done = service.create_receipt(&tenant, &principal, input).await?;
+                    crate::http::purchasing::ReceiptResponse::try_from(done.into_inner())
+                }
+            },
+        )
+        .requires(RECEIVE),
     ]
+}
+
+/// A goods receipt.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = InventoryCreateReceiptInput)]
+pub(crate) struct CreateReceiptInput {
+    /// The receiving warehouse.
+    pub org_id: Uuid,
+    pub supplier_id: Option<Uuid>,
+    pub purchase_order_id: Option<Uuid>,
+    /// Your id of this receipt, e.g. the delivery note number.
+    pub reference: String,
+    #[schema(inline)]
+    pub lines: Vec<ToolReceiptLine>,
+}
+
+// Trường phẳng (client MCP không đọc `$ref`): giá là số nguyên đơn vị nhỏ nhất dạng chuỗi.
+/// One line of a goods receipt.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = InventoryToolReceiptLine)]
+pub(crate) struct ToolReceiptLine {
+    pub variant_id: Uuid,
+    pub quantity: i64,
+    /// Unit cost in minor units as a string, e.g. `"150000"`.
+    pub unit_cost_amount: String,
+    /// e.g. `VND`.
+    pub unit_cost_currency: String,
+    pub lot_code: Option<String>,
+    /// `YYYY-MM-DD`.
+    pub expires_on: Option<chrono::NaiveDate>,
+    #[serde(default)]
+    pub serials: Vec<String>,
 }
 
 /// A variant and a quantity.

@@ -141,8 +141,13 @@ pub(crate) struct ApiKeyResponse {
     /// The organization unit the key is bound to: it acts only on data of this unit and the
     /// units below it. The root unit (the id of the tenant) means no limit.
     org_id: Uuid,
-    /// When the key stops working; `null`: never.
+    /// When the key stops working. Every new key has one; `null` only for data that was never
+    /// upgraded.
     expires_at: Option<DateTime<Utc>>,
+    /// IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+    /// from elsewhere gets 403 `network_not_allowed`.
+    #[schema(example = json!(["203.0.113.0/24"]))]
+    allowed_ips: Vec<String>,
     /// Last time the key was used, to the minute; `null`: never used.
     last_used_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
@@ -161,6 +166,7 @@ impl From<ApiKey> for ApiKeyResponse {
             permissions: key.permissions,
             org_id: key.org_id,
             expires_at: key.expires_at,
+            allowed_ips: key.allowed_ips,
             last_used_at: key.last_used_at,
             created_at: key.created_at,
             kind: crate::api_key::KeyKind::key_name(key.kind).to_owned(),
@@ -199,9 +205,15 @@ pub(crate) struct CreateApiKeyRequest {
     /// Bind the key to an organization unit you work in: it then acts only on data of that unit
     /// and the units below it. Omit for the whole tenant.
     org_id: Option<Uuid>,
-    /// When the key stops working (RFC 3339, in the future). Omit for a key that does
-    /// not expire.
+    /// When the key stops working (RFC 3339, in the future, at most
+    /// `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest
+    /// lifetime: every key expires.
     expires_at: Option<DateTime<Utc>>,
+    /// IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be
+    /// used from, at most 50. Omit for any address.
+    #[serde(default)]
+    #[schema(example = json!(["203.0.113.0/24"]))]
+    allowed_ips: Vec<String>,
     /// Your current password: a stolen access token alone must not create a key that
     /// outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
     /// `passkey_credential`) or a `reauth_token` instead — exactly one of them.
@@ -231,6 +243,7 @@ impl From<CreateApiKeyRequest> for NewApiKey {
             permissions: input.permissions,
             org_id: input.org_id,
             expires_at: input.expires_at,
+            allowed_ips: input.allowed_ips,
             current_password: input.current_password,
             second_factor: match (input.totp_code, input.passkey_ceremony_id) {
                 _ if input.reauth_token.is_some() => input.reauth_token.map(Reauth::Token),
@@ -398,6 +411,21 @@ mod tests {
                 call(&app, "POST", "/api-keys", Some(&with_key), Some(body)).await;
             assert_eq!(status, StatusCode::FORBIDDEN);
             assert_eq!(nested["code"], "auth.api_key_cannot_create_keys");
+
+            // Key khai dải IP: kernel kiểm địa chỉ của request trước mọi handler (bước 54). Request
+            // trong test không có địa chỉ client, nên bị từ chối.
+            let fenced = json!({"name": "office", "permissions": ["auth.users.read"], "current_password": PASSWORD, "allowed_ips": ["203.0.113.0/24"]});
+            let (status, _, made) = call(&app, "POST", "/api-keys", Some(&session), Some(fenced)).await;
+            assert_eq!(status, StatusCode::CREATED, "{made}");
+            assert_eq!(made["data"]["allowed_ips"], json!(["203.0.113.0/24"]));
+            assert!(made["data"]["expires_at"].is_string(), "mọi key có hạn");
+            let office = format!("Bearer {}", made["data"]["key"].as_str().unwrap());
+            let (status, _, refused) = call(&app, "GET", "/users", Some(&office), None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+            assert_eq!(refused["code"], "network_not_allowed");
+            let office_path = format!("/api-keys/{}", made["data"]["id"].as_str().unwrap());
+            let (status, _, _) = call(&app, "DELETE", &office_path, Some(&session), None).await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
 
             let (status, _, list) = call(&app, "GET", "/api-keys", Some(&session), None).await;
             assert_eq!(status, StatusCode::OK, "{list}");

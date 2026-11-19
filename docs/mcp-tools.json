@@ -637,12 +637,22 @@
       "input_schema": {
         "description": "A key to create.",
         "properties": {
+          "allowed_ips": {
+            "description": "IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be\nused from, at most 50. Omit for any address.",
+            "example": [
+              "203.0.113.0/24"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "current_password": {
             "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) or a `reauth_token` instead — exactly one of them.",
             "type": "string"
           },
           "expires_at": {
-            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
+            "description": "When the key stops working (RFC 3339, in the future, at most\n`AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest\nlifetime: every key expires.",
             "format": "date-time",
             "type": [
               "string",
@@ -919,6 +929,14 @@
       "input_schema": {
         "description": "The full content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "example": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
@@ -1456,6 +1474,13 @@
         "additionalProperties": false,
         "description": "The full new content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for.",
             "type": "string"
@@ -6199,6 +6224,108 @@
       "output_schema": null,
       "permissions": [
         "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Receive goods into a warehouse, against a purchase order or directly from a supplier; each line updates the average cost. The same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A goods receipt.",
+        "properties": {
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a goods receipt.",
+              "properties": {
+                "expires_on": {
+                  "description": "`YYYY-MM-DD`.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lot_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "serials": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost in minor units as a string, e.g. `\"150000\"`.",
+                  "type": "string"
+                },
+                "unit_cost_currency": {
+                  "description": "e.g. `VND`.",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "unit_cost_amount",
+                "unit_cost_currency"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "purchase_order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this receipt, e.g. the delivery note number.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.create_receipt",
+      "output_schema": null,
+      "permissions": [
+        "inventory.receive"
       ]
     },
     {
