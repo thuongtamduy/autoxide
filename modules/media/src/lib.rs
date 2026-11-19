@@ -335,7 +335,9 @@ pub(crate) mod testing {
     }
 
     /// Như [`service`], bật bản AVIF (`AUTOXIDE_MEDIA_AVIF=true`, bước 39 B8).
-    pub async fn service_avif(test: &TestDatabase) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
+    pub async fn service_avif(
+        test: &TestDatabase,
+    ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {
         let ai = Arc::new(autoxide_testkit::ai::FakeTextModel::disabled());
         build(test, limits(), ai, false, true).await
     }
