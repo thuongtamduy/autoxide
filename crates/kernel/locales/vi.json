@@ -284,6 +284,7 @@
   "site_not_found": "Khách hàng này không có website (nút tổ chức) `{site}`. Bỏ `site` đi để lấy website của cả khách hàng.",
   "sms_disabled": "Máy chủ chưa cấu hình gửi SMS.",
   "step_up_required": "`{permission}` là permission nhạy cảm: hãy xác nhận lại là bạn (passkey, mã ứng dụng xác thực hoặc mật khẩu) bằng `POST /api/v1/auth/me/reauth`, rồi thử lại với access token nó trả về. Một lần xác nhận có hiệu lực {minutes} phút.",
+  "store_signature_invalid": "Thông báo không có chữ ký của cửa hàng.",
   "sync_cursor_expired": "Con trỏ này cũ hơn các thay đổi máy chủ còn giữ. Hãy tải lại danh sách, rồi hỏi thay đổi không kèm `cursor`.",
   "task_argument_invalid": "Tham số `{name}` của lệnh phải là `true` hoặc `false`, không phải `{value}`.",
   "template.limit_exceeded": "Mẫu vượt giới hạn ({what}, tối đa {limit}). Hãy viết mẫu ngắn hoặc đơn giản hơn.",

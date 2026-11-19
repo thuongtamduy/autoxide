@@ -84,7 +84,8 @@ impl SessionService {
         }
         new_row.insert(&transaction).await?;
         transaction.commit().await?;
-        self.tokens(tenant, user.id, row.family_id, &new_token, expires_at, now, authenticated_at)
+        let session = Stamp { id: row.family_id, authenticated_at };
+        self.tokens(tenant, user.id, session, &new_token, expires_at, now)
     }
 
     /// Thu hồi cả họ của `row` và trả lỗi báo token bị dùng lại.

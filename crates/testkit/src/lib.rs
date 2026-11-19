@@ -46,6 +46,7 @@ mod schema;
 mod sqlite;
 mod stale;
 mod storage;
+mod store;
 mod tenancy;
 mod voice;
 
@@ -65,6 +66,7 @@ pub use s3::{
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
+pub use store::FakeStorePurchases;
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
 pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 

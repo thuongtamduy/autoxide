@@ -41,7 +41,7 @@ use super::{LoginThrottle, challenge};
 use crate::events;
 use crate::mfa::MfaService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, link_token};
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, link_token};
 use serde_json::json;
 
 mod devices;
@@ -483,7 +483,8 @@ impl SessionService {
         self.outbox.record(&transaction, tenant, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
-        self.tokens(tenant, user_id, family_id, &refresh_token, expires_at, now, now)
+        let session = Stamp { id: family_id, authenticated_at: now };
+        self.tokens(tenant, user_id, session, &refresh_token, expires_at, now)
     }
 
     /// Kiểm access token `token` (không có chữ `Bearer`): khách ghi trong token, người dùng, phiên,
@@ -530,12 +531,12 @@ impl SessionService {
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        session_id: Uuid,
+        session: Stamp,
         refresh_token: &str,
         refresh_token_expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
-        authenticated_at: DateTime<Utc>,
     ) -> Result<Tokens, Error> {
+        let Stamp { id: session_id, authenticated_at } = session;
         let access_token =
             self.access_tokens.issue(tenant.id(), user_id, now, session_id, authenticated_at)?;
         Ok(Tokens {
@@ -630,6 +631,13 @@ fn live_tokens(
 }
 
 /// Thông tin của một phiên, chép sang mỗi refresh token của nó.
+/// Phiên (họ refresh token) và lần xác thực gần nhất của nó, cho access token sắp cấp.
+#[derive(Clone, Copy)]
+struct Stamp {
+    id: Uuid,
+    authenticated_at: DateTime<Utc>,
+}
+
 struct SessionDetails {
     started_at: DateTime<Utc>,
     /// Lần xác thực gần nhất (đăng nhập, xác nhận lại).

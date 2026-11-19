@@ -937,7 +937,7 @@ thiếu. Các bước nền đã xong: bắt đầu được ngay, song song v�
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
 - [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
       event, chỉ nhận lệnh điều khiển (đăng ký, đang gõ, online) — ghi dữ liệu vẫn qua REST
-- [ ] Mua trong ứng dụng: trait `StorePurchases` (App Store Server API, Google Play Developer API, thông báo máy chủ
+- [x] Mua trong ứng dụng: trait `StorePurchases` (App Store Server API, Google Play Developer API, thông báo máy chủ
       có kiểm chữ ký) + bộ giả, `plans` nối vào thuê bao và quyền dùng, gọi lại không cấp trùng; tiền do Apple /
       Google giữ (D-187); căn cứ thuế ghi trong quyết định; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
 - [ ] Hướng dẫn `docs/guides/mobile.md` + `.vi.md`: đăng nhập và làm mới token, PKCE cho app, thông báo đẩy, tải ảnh

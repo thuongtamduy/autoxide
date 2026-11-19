@@ -40,8 +40,7 @@ impl Principal {
         if !matches!(permission.risk(), Risk::Destructive | Risk::Money | Risk::SensitiveData) {
             return Ok(());
         }
-        let fresh =
-            step_up.authenticated_at.is_some_and(|at| Utc::now() - at <= step_up.window);
+        let fresh = step_up.authenticated_at.is_some_and(|at| Utc::now() - at <= step_up.window);
         if fresh {
             return Ok(());
         }

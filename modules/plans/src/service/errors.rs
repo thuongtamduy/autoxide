@@ -56,7 +56,7 @@ pub(crate) fn invalid_transition(status: &str) -> Error {
     .with_param("status", status.to_owned())
 }
 
-pub(super) fn addon_not_allowed(code: &str) -> Error {
+pub(crate) fn addon_not_allowed(code: &str) -> Error {
     Error::new(
         ErrorKind::Validation,
         "plans.addon_not_allowed",
@@ -70,7 +70,7 @@ pub(super) fn override_not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
-pub(super) fn platform_exempt() -> Error {
+pub(crate) fn platform_exempt() -> Error {
     Error::new(
         ErrorKind::Validation,
         "plans.platform_exempt",

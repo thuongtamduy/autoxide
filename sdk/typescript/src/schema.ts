@@ -2221,6 +2221,17 @@ export type ChildTenantResponse = {
   status: string;
 };
 
+/** A purchase made in an app store. */
+export type ClaimRequest = {
+  /**
+   * What the store gave the app for the purchase: the signed transaction of StoreKit 2
+   * (App Store) or the `purchaseToken` (Google Play), as is.
+   */
+  proof: string;
+  /** `app_store` or `google_play`. */
+  store: string;
+};
+
 /** Proof that you own guest tickets: one guest ticket you verified, with its token. */
 export type ClaimSupportTicketsRequest = {
   /** A guest ticket whose email or phone number you verified. */
@@ -10173,6 +10184,13 @@ export type Data_PublicTermPage = {
 export type Data_ReauthResponse = {
   /** A confirmation token. */
   data: {
+    /**
+     * A new access token for this session, confirmed just now: use it to retry an action that
+     * answered 401 `step_up_required`. Sensitive actions then work for
+     * `AUTOXIDE_AUTH_STEP_UP_MINUTES` minutes (refreshing keeps the confirmation). `null` with
+     * `email_link`, and for access tokens issued before this version.
+     */
+    access_token?: string | null;
     /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
     expires_at: string;
     /**
@@ -10913,6 +10931,20 @@ export type Data_StartedConversationCall = {
     expires_at: string;
     /** Short-lived token for the voice provider's SDK; do not store it. */
     token: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_StoreProductResponse = {
+  /** A store product linked to a plan. */
+  data: {
+    /** The base plan a purchase of this product gives. */
+    plan_id: string;
+    /** The product id set up in the store. */
+    product_id: string;
+    /** `app_store` or `google_play`. */
+    store: string;
+    updated_at: string;
   };
 };
 
@@ -13740,6 +13772,36 @@ export type Data_Vec_SettingResponse = {
      * right input; `null` when the module does not say. The server checks every value anyway.
      */
     schema?: Record<string, unknown> | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_StoreProductResponse = {
+  data: {
+    /** The base plan a purchase of this product gives. */
+    plan_id: string;
+    /** The product id set up in the store. */
+    product_id: string;
+    /** `app_store` or `google_play`. */
+    store: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_StorePurchaseResponse = {
+  data: {
+    /** When the store period ends. */
+    expires_at?: string | null;
+    id: string;
+    product_id: string;
+    /** Made in the store's test environment. */
+    sandbox: boolean;
+    /** `active`, `expired`, `refunded` or `revoked`. */
+    state: string;
+    /** `app_store` or `google_play`. */
+    store: string;
+    updated_at: string;
   }[];
 };
 
@@ -16823,6 +16885,12 @@ export type LimitUse = {
   over_limit: boolean;
   /** In use now (for `metered`: this month). */
   used: number;
+};
+
+/** Which plan a store product gives. */
+export type LinkProductRequest = {
+  /** A base plan. */
+  plan_id: string;
 };
 
 /** Start linking a provider to your account; proves it is you first. */
@@ -24956,6 +25024,13 @@ export type ReauthRequest = {
 
 /** A confirmation token. */
 export type ReauthResponse = {
+  /**
+   * A new access token for this session, confirmed just now: use it to retry an action that
+   * answered 401 `step_up_required`. Sensitive actions then work for
+   * `AUTOXIDE_AUTH_STEP_UP_MINUTES` minutes (refreshing keeps the confirmation). `null` with
+   * `email_link`, and for access tokens issued before this version.
+   */
+  access_token?: string | null;
   /** When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`). */
   expires_at: string;
   /**
@@ -26936,6 +27011,32 @@ export type StepLog = {
    * that held) or `rejected`.
    */
   status: string;
+};
+
+/** A store product linked to a plan. */
+export type StoreProductResponse = {
+  /** The base plan a purchase of this product gives. */
+  plan_id: string;
+  /** The product id set up in the store. */
+  product_id: string;
+  /** `app_store` or `google_play`. */
+  store: string;
+  updated_at: string;
+};
+
+/** An app store purchase that pays (or paid) for your subscription. */
+export type StorePurchaseResponse = {
+  /** When the store period ends. */
+  expires_at?: string | null;
+  id: string;
+  product_id: string;
+  /** Made in the store's test environment. */
+  sandbox: boolean;
+  /** `active`, `expired`, `refunded` or `revoked`. */
+  state: string;
+  /** `app_store` or `google_play`. */
+  store: string;
+  updated_at: string;
 };
 
 /** What a website shows about its store: the brand and the location. */
@@ -41158,6 +41259,85 @@ export interface paths {
       responses: {
         200: Data_SignupResponse;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/store/notifications/{store}": {
+    /** Receive a server notification from an app store. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { store: string }; };
+      requestBody: string;
+      responses: {
+        204: void;
+        401: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/store/products": {
+    /** List the app store products linked to plans. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_StoreProductResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/store/products/{store}/{product_id}": {
+    /** Link an app store product to a plan. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { store: string; product_id: string }; };
+      requestBody: LinkProductRequest;
+      responses: {
+        200: Data_StoreProductResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Unlink an app store product. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { store: string; product_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/plans/store/purchases": {
+    /** List the app store purchases of your tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_StorePurchaseResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Pay your subscription with an in-app purchase. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ClaimRequest;
+      responses: {
+        200: Data_PlanSubscription;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

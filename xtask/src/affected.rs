@@ -118,7 +118,12 @@ fn changed_since(
 /// `keep_env`: chạy trên database và S3 của môi trường (`TEST_DATABASE_URL`, `TEST_S3_ENDPOINT`)
 /// như `test-all`, thay vì luôn SQLite — gate của pull request trên CI (`./gate.sh --pr`, D-20261118-ci-pr-affected-tests).
 /// Khi đó không ghi mốc "lần xanh gần nhất": mốc đó chỉ dành cho gate nhanh trên SQLite.
-pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<(), String> {
+pub fn run(
+    workspace: &Workspace,
+    base: Option<&str>,
+    keep_env: bool,
+    shard: Shard,
+) -> Result<(), String> {
     // Chụp cây file TRƯỚC khi build: xanh thì đúng cây này được ghi là đã xanh.
     let current = snapshot_tree(&workspace.root)?;
     let (base, changed) = changed_since(&workspace.root, base, &current)?;
@@ -134,7 +139,7 @@ pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<
         }
         Affected::Crates(crates) if crates.is_empty() => {
             println!("test-affected: no crate changed since {base}, nothing to test");
-            if !keep_env {
+            if !keep_env && shard.is_whole() {
                 git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
             }
             return Ok(());
@@ -163,9 +168,11 @@ pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<
                 dir: dir.clone(),
                 executable: test.executable,
                 threads: 0,
+                tests: None,
             })
         })
         .collect();
+    let jobs = shard.apply(jobs)?;
     let workers = workers();
     println!("test-affected: running {} test binaries, {workers} at a time", jobs.len());
     let started = Instant::now();
@@ -176,7 +183,8 @@ pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<
     }
     let failed = run_parallel(&workspace.root, jobs, workers, &mode)?;
     if failed.is_empty() {
-        if !keep_env {
+        // Mốc "lần xanh gần nhất" chỉ ghi khi đã chạy hết, không chỉ một phần.
+        if !keep_env && shard.is_whole() {
             git(&workspace.root, &["update-ref", GREEN_REF, &current])?;
         }
         println!("\ntest-affected: all test binaries passed in {:.0?}", started.elapsed());
@@ -188,11 +196,11 @@ pub fn run(workspace: &Workspace, base: Option<&str>, keep_env: bool) -> Result<
 
 /// `cargo xtask test-all`: mọi test của workspace trên database của `TEST_DATABASE_URL` (trống là
 /// SQLite), các file test chạy song song — phần test của gate đầy đủ (D-299). `--doc` chạy thêm
-/// doc-test (gate chạy một lần, ở lượt SQLite).
-pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
+/// doc-test (gate chạy một lần, ở lượt SQLite; chia phần thì chỉ phần đầu chạy).
+pub fn run_all(workspace: &Workspace, doc: bool, shard: Shard) -> Result<(), String> {
     let workers = workers();
     let mode = Mode::from_env();
-    let mut jobs: Vec<Job> = build_tests(&workspace.root)?
+    let jobs: Vec<Job> = build_tests(&workspace.root)?
         .into_iter()
         .filter_map(|test| {
             let package = workspace
@@ -204,9 +212,11 @@ pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
                 dir: test.dir,
                 executable: test.executable,
                 threads: 0,
+                tests: None,
             })
         })
         .collect();
+    let mut jobs = shard.apply(jobs)?;
     if matches!(mode, Mode::Postgres) {
         share_postgres(&mut jobs)?;
     }
@@ -217,7 +227,7 @@ pub fn run_all(workspace: &Workspace, doc: bool) -> Result<(), String> {
         return Err(format!("{} test binaries failed: {}", failed.len(), failed.join(", ")));
     }
     println!("\ntest-all: all test binaries passed in {:.0?}", started.elapsed());
-    if doc {
+    if doc && shard.index == 1 {
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".to_owned());
         let status = without_cargo_run_env(&mut Command::new(&cargo))
             .args(["test", "--workspace", "--locked", "--doc"])
@@ -261,18 +271,40 @@ impl Mode {
 /// suất không vượt trần, nên số test chạy cùng lúc vẫn không vượt trần.
 fn share_postgres(jobs: &mut [Job]) -> Result<(), String> {
     let counts: Vec<usize> = jobs.iter().map(count_tests).collect::<Result<_, _>>()?;
-    let total: usize = counts.iter().sum::<usize>().max(1);
+    let total: usize = counts.iter().sum();
     for (job, count) in jobs.iter_mut().zip(counts) {
-        job.threads =
-            (POSTGRES_CONCURRENT_TESTS * count).div_ceil(total).clamp(1, POSTGRES_CONCURRENT_TESTS);
+        job.threads = postgres_threads(count, total);
     }
     // Chương trình lớn chạy trước: nó quyết định tổng thời gian.
     jobs.sort_by_key(|job| std::cmp::Reverse(job.threads));
     Ok(())
 }
 
+/// Suất ít nhất của một chương trình test trên Postgres (hoặc số test của nó, nếu ít hơn).
+///
+/// Chia theo số test thì chương trình ít test mà mỗi test nặng chỉ được một suất và chạy tuần tự:
+/// test đầu-cuối của `autoxide` (125 test, mỗi test dựng mọi module) được 1/16 suất, chạy 10 phút
+/// rưỡi, sáu phút cuối chạy một mình khi các chương trình khác đã xong (D-20261119-ci-faster).
+const POSTGRES_MIN_THREADS: usize = 4;
+
+/// Số suất của một chương trình có `count` test, trong tổng `total` test: theo tỉ lệ, nhưng không
+/// dưới [`POSTGRES_MIN_THREADS`] (trừ khi nó có ít test hơn) và không quá trần.
+fn postgres_threads(count: usize, total: usize) -> usize {
+    let share = (POSTGRES_CONCURRENT_TESTS * count).div_ceil(total.max(1));
+    let floor = count.min(POSTGRES_MIN_THREADS);
+    share.max(floor).clamp(1, POSTGRES_CONCURRENT_TESTS)
+}
+
 /// Số test của một chương trình test (`--list`, không chạy gì).
 fn count_tests(job: &Job) -> Result<usize, String> {
+    if let Some(tests) = &job.tests {
+        return Ok(tests.len());
+    }
+    Ok(list_tests(job)?.len())
+}
+
+/// Tên mọi test của một chương trình test (`--list`, không chạy gì), theo thứ tự nó in ra.
+fn list_tests(job: &Job) -> Result<Vec<String>, String> {
     let output = without_cargo_run_env(&mut Command::new(&job.executable))
         .args(["--list", "--format", "terse"])
         .current_dir(&job.dir)
@@ -281,10 +313,71 @@ fn count_tests(job: &Job) -> Result<usize, String> {
         .map_err(|error| {
             format!("cannot list the tests of {}: {error}", job.executable.display())
         })?;
+    if !output.status.success() {
+        return Err(format!("cannot list the tests of {}", job.executable.display()));
+    }
     Ok(String::from_utf8_lossy(&output.stdout)
         .lines()
-        .filter(|line| line.ends_with(": test"))
-        .count())
+        .filter_map(|line| line.strip_suffix(": test"))
+        .map(str::to_owned)
+        .collect())
+}
+
+/// Phần thứ `index` (từ 1) trong `count` phần của mọi test: CI chạy các phần trên nhiều máy cùng lúc
+/// (`./gate.sh --shard`, D-20261119-ci-faster). Mỗi chương trình test chia đều theo kiểu chia bài
+/// (test thứ i vào phần i mod n), nên chương trình nặng cũng được chia ra, không dồn vào một máy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shard {
+    pub index: usize,
+    pub count: usize,
+}
+
+impl Shard {
+    /// Không chia: chạy mọi test.
+    pub const WHOLE: Shard = Shard { index: 1, count: 1 };
+
+    /// Đọc `k/n` với 1 ≤ k ≤ n.
+    pub fn parse(text: &str) -> Option<Shard> {
+        let (index, count) = text.split_once('/')?;
+        let (index, count) = (index.parse().ok()?, count.parse().ok()?);
+        (1..=count).contains(&index).then_some(Shard { index, count })
+    }
+
+    fn is_whole(self) -> bool {
+        self.count == 1
+    }
+
+    /// Test thứ `position` (từ 0) của một chương trình có thuộc phần này không.
+    fn holds(self, position: usize) -> bool {
+        position % self.count == self.index - 1
+    }
+
+    /// Giữ phần test của shard này trong mỗi chương trình; bỏ chương trình không còn test nào.
+    fn apply(self, jobs: Vec<Job>) -> Result<Vec<Job>, String> {
+        if self.is_whole() {
+            return Ok(jobs);
+        }
+        let mut kept = Vec::new();
+        for mut job in jobs {
+            let tests: Vec<String> = list_tests(&job)?
+                .into_iter()
+                .enumerate()
+                .filter(|(position, _)| self.holds(*position))
+                .map(|(_, name)| name)
+                .collect();
+            if !tests.is_empty() {
+                job.tests = Some(tests);
+                kept.push(job);
+            }
+        }
+        println!(
+            "shard {}/{}: {} test binaries have tests in this part",
+            self.index,
+            self.count,
+            kept.len()
+        );
+        Ok(kept)
+    }
 }
 
 fn workers() -> usize {
@@ -301,6 +394,8 @@ struct Job {
     executable: PathBuf,
     /// Trên Postgres: số test chạy cùng lúc của chương trình này (`--test-threads`); 0: mặc định.
     threads: usize,
+    /// Chỉ chạy các test này (`--shard`); `None`: mọi test.
+    tests: Option<Vec<String>>,
 }
 
 /// Chạy các file test, `workers` file cùng lúc; trả tên các file đỏ.
@@ -415,6 +510,10 @@ fn run_one(job: &Job, mode: &Mode) -> std::io::Result<Output> {
         Mode::Postgres => {
             command.arg(format!("--test-threads={}", job.threads.max(1)));
         }
+    }
+    if let Some(tests) = &job.tests {
+        // Nhiều tên sau `--exact`: chạy đúng các test có tên đó.
+        command.arg("--exact").args(tests);
     }
     command.output()
 }
@@ -558,6 +657,38 @@ fn build_tests(root: &Path) -> Result<Vec<TestBinary>, String> {
 mod tests {
     use super::*;
     use crate::workspace::{Dep, DepKind, Package, Role};
+
+    #[test]
+    fn suat_postgres_theo_ti_le_nhung_khong_qua_it() {
+        // Chương trình nhiều test lấy phần theo tỉ lệ.
+        assert_eq!(postgres_threads(1000, 2000), 8);
+        // Chương trình ít test mà nặng vẫn được vài suất, không chạy tuần tự.
+        assert_eq!(postgres_threads(125, 2000), POSTGRES_MIN_THREADS);
+        // Ít test hơn mức sàn: mỗi test một suất là đủ.
+        assert_eq!(postgres_threads(2, 2000), 2);
+        assert_eq!(postgres_threads(0, 2000), 1);
+        // Không vượt trần, kể cả khi chỉ có một chương trình.
+        assert_eq!(postgres_threads(500, 500), POSTGRES_CONCURRENT_TESTS);
+    }
+
+    #[test]
+    fn shard_doc_dung_va_chia_deu_moi_test() {
+        assert_eq!(Shard::parse("2/3"), Some(Shard { index: 2, count: 3 }));
+        assert_eq!(Shard::parse("0/2"), None);
+        assert_eq!(Shard::parse("3/2"), None);
+        assert_eq!(Shard::parse("1/0"), None);
+        assert_eq!(Shard::parse("x"), None);
+        // Mỗi test thuộc đúng một phần.
+        let shards = [
+            Shard { index: 1, count: 3 },
+            Shard { index: 2, count: 3 },
+            Shard { index: 3, count: 3 },
+        ];
+        for position in 0..10 {
+            assert_eq!(shards.iter().filter(|shard| shard.holds(position)).count(), 1);
+        }
+        assert!(Shard::WHOLE.holds(7));
+    }
 
     fn package(name: &str, dir: &str, deps: &[(&str, DepKind)]) -> Package {
         Package {

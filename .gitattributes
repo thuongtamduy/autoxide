@@ -7,3 +7,13 @@ sdk/typescript/src/schema.ts linguist-generated=true
 docs/openapi.json linguist-generated=true
 docs/mcp-tools.json linguist-generated=true
 sdk/typescript/package-lock.json linguist-generated=true
+
+# Ghép lô (D-20261119-merge-batches): khi gộp nhiều PR trên máy, file sinh tự động không cần gộp tay.
+# Bật một lần trên máy: `git config merge.generated.driver true` (giữ bản của nhánh đang đứng),
+# rồi sinh lại các file này sau khi gộp xong. Nút merge của GitHub bỏ qua driver này.
+docs/openapi.json merge=generated
+docs/mcp-tools.json merge=generated
+sdk/typescript/src/schema.ts merge=generated
+sdk/swift/Sources/Autoxide/openapi.json merge=generated
+docs/decisions/INDEX.md merge=generated
+.env.example merge=generated
