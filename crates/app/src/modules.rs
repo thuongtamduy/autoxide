@@ -266,7 +266,7 @@ mod tests {
             // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
             // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận — bước 45), thêm một của
             // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 66);
+            assert_eq!(a.unwrap() + b.unwrap(), 67);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
