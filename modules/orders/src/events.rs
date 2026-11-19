@@ -46,6 +46,10 @@ event!(OrderCompleted, names::ORDER_COMPLETED);
 event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
+event!(ReturnRequested, names::RETURN_REQUESTED);
+event!(ReturnPickupRequested, names::RETURN_PICKUP_REQUESTED);
+event!(ReturnReceived, names::RETURN_RECEIVED);
+event!(ReturnStatusChanged, names::RETURN_STATUS_CHANGED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -80,6 +84,10 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::RETURN_RECEIVED,
             "Returned items arrived back at the warehouse (restocked or damaged).",
+        ),
+        EventInfo::new(
+            names::RETURN_STATUS_CHANGED,
+            "A return changed status (approved, rejected, received, refunded or closed).",
         ),
         EventInfo::new(names::INVOICE_LINKED, "An electronic invoice was linked to an order."),
         EventInfo::new(names::CART_ABANDONED, "A buyer left a cart without placing an order."),

@@ -481,6 +481,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 - **[D-20261119-step42-restock-alerts](D-20261119-step42-restock-alerts.md)** Báo khi có hàng lại của `inventory`: tin giao dịch đã xác nhận hai bước, giành lượt bằng `armed`, ở lại khách gốc khi tách — 2026-11-19
+- **[D-20261119-step45-buyer-returns](D-20261119-step45-buyer-returns.md)** Trả hàng phía người mua: ảnh kèm qua `Media::uploaders`, xem trước không ghi, thời gian hoàn là dữ liệu có ngày hiệu lực — 2026-11-19
+- **[D-20261119-step45-returns](D-20261119-step45-returns.md)** Đổi trả và hoàn tiền của `orders`: một đường hoàn, tiền hoàn tính lúc nhận hàng, bút toán đảo — 2026-11-19
 
 ## Vận hành và hiệu năng
 

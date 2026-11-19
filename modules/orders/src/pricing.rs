@@ -434,6 +434,17 @@ async fn add_gifts(
         .into_iter()
         .map(|variant| (variant.variant_id, variant))
         .collect();
+    // Giá niêm yết của quà: ghi vào `compare_at` của dòng (giá trị quà, trừ vào tiền hoàn khi trả
+    // món điều kiện mà chương trình chọn `deduct_gift_value` — D-222).
+    let query = PriceQuery::new(input.org_id, input.currency, input.at, ids.clone());
+    let values: HashMap<Uuid, Money> = sources
+        .catalog
+        .prices(tenant, &query)
+        .await?
+        .into_iter()
+        .filter(|price| price.amount.currency() == input.currency)
+        .map(|price| (price.variant_id, price.amount))
+        .collect();
     let zero = Money::zero(input.currency);
     for gift in &evaluation.gifts {
         let variant = variants.get(&gift.variant_id).cloned();
@@ -444,7 +455,7 @@ async fn add_gifts(
             variant,
             quantity: gift.quantity,
             unit_price: zero,
-            compare_at: None,
+            compare_at: values.get(&gift.variant_id).copied(),
             tax_inclusive: true,
             subtotal: zero,
             discount: zero,
