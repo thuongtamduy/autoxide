@@ -6,6 +6,7 @@ mod guests;
 mod scope;
 mod sla;
 mod tickets;
+mod tools;
 
 use std::sync::{Arc, Mutex};
 
@@ -179,6 +180,7 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::SupportService> {
         authenticator: None,
         resources: None,
         complaints: None,
+        ai: None,
     };
     Arc::new(crate::service::SupportService::new(parts, Default::default()))
 }
