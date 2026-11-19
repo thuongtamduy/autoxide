@@ -11787,7 +11787,7 @@
     {
       "annotations": {
         "destructive": false,
-        "read_only": true,
+        "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
       },

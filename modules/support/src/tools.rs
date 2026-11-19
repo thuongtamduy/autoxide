@@ -208,8 +208,7 @@ pub(crate) fn all(service: &Arc<SupportService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(TICKETS_REPLY)
-        .read_only(),
+        .requires(TICKETS_REPLY),
     ]
 }
 
