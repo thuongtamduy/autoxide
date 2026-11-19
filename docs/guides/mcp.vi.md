@@ -220,6 +220,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_sandbox_messages` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
@@ -312,6 +313,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `promotions.create_promotion` | `promotions.write` | writes |
 | `promotions.end_promotion` | `promotions.publish` | writes |
 | `promotions.evaluate_cart` | `promotions.read` | read-only |
+| `promotions.export_notice` | `promotions.read` | read-only |
 | `promotions.generate_codes` | `promotions.codes.manage` | writes |
 | `promotions.get_promotion` | `promotions.read` | read-only |
 | `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
@@ -320,6 +322,13 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |
+| `shipping.book_shipment` | `shipping.shipments.manage` | writes |
+| `shipping.cancel_shipment` | `shipping.shipments.manage` | destructive |
+| `shipping.get_shipment` | `shipping.shipments.read` | read-only |
+| `shipping.list_cod_discrepancies` | `shipping.cod.read` or `shipping.cod.manage` | read-only |
+| `shipping.list_shipments` | `shipping.shipments.read` | read-only |
+| `shipping.quote` | `shipping.read` | read-only |
+| `shipping.update_status` | `shipping.shipments.manage` | writes |
 | `support.add_internal_note` | `support.tickets.reply` | writes |
 | `support.get_ticket` | `support.tickets.read` | read-only |
 | `support.link_ticket` | `support.tickets.reply` | writes |

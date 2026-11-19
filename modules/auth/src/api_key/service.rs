@@ -72,6 +72,10 @@ pub(crate) struct ApiKey {
     pub allowed_ips: Vec<String>,
     /// Key này thay key nào khi xoay vòng (bước 54).
     pub rotated_from: Option<Uuid>,
+    /// `active` hay `pending` (chờ quản trị duyệt).
+    pub status: String,
+    pub approved_by: Option<Uuid>,
+    pub approved_at: Option<DateTime<Utc>>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     /// `Human`, `Agent` hay `Service` (bước 51 P12).
@@ -118,11 +122,13 @@ pub(crate) enum Reauth {
 pub(crate) struct ApiKeyService {
     roles: Arc<RoleService>,
     sessions: Arc<crate::session::SessionService>,
-    outbox: Outbox,
+    pub(super) outbox: Outbox,
     mfa: Arc<crate::mfa::MfaService>,
     passkeys: Arc<crate::passkey::PasskeyService>,
     /// Hạn dài nhất của key, theo ngày (`AUTOXIDE_AUTH_API_KEY_MAX_DAYS`).
     max_days: i64,
+    /// Cấu hình theo khách (`auth.api_keys.require_approval`); `None`: không cần duyệt.
+    pub(super) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
 
 /// Mặc định của `AUTOXIDE_AUTH_API_KEY_MAX_DAYS`.
@@ -136,7 +142,24 @@ impl ApiKeyService {
         mfa: Arc<crate::mfa::MfaService>,
         passkeys: Arc<crate::passkey::PasskeyService>,
     ) -> Self {
-        ApiKeyService { roles, sessions, outbox, mfa, passkeys, max_days: DEFAULT_MAX_DAYS }
+        ApiKeyService {
+            roles,
+            sessions,
+            outbox,
+            mfa,
+            passkeys,
+            max_days: DEFAULT_MAX_DAYS,
+            settings: None,
+        }
+    }
+
+    /// Đọc cấu hình theo khách (duyệt key, bước 54).
+    pub(crate) fn with_settings(
+        mut self,
+        settings: Arc<dyn autoxide_kernel::tenancy::TenantSettings>,
+    ) -> Self {
+        self.settings = Some(settings);
+        self
     }
 
     /// Hạn dài nhất của key mới, theo ngày.
@@ -220,6 +243,11 @@ impl ApiKeyService {
         // `check` đã báo lỗi nếu hạn sai, nên tới đây luôn có hạn.
         let expires_at = expires_at.unwrap_or_else(|| now + chrono::Duration::days(self.max_days));
         let allowed_ips = super::rules::stored(&networks);
+        // Key xoay vòng giữ trạng thái của key nó thay; key mới theo cấu hình duyệt của khách.
+        let status = match &replacing {
+            Some(replacing) => replacing.status,
+            None => self.initial_status(tenant, creator).await?,
+        };
         let user_id = creator.user_id();
         let verified_hash = match &input.second_factor {
             None => {
@@ -281,6 +309,9 @@ impl ApiKeyService {
             created_at: Set(now),
             kind: Set(input.kind.key_name().to_owned()),
             rotated_from: Set(replacing.as_ref().map(|replacing| replacing.id)),
+            status: Set(status.to_owned()),
+            approved_by: Set(None),
+            approved_at: Set(None),
         }
         .insert(&transaction)
         .await?;
@@ -307,6 +338,7 @@ impl ApiKeyService {
             "allowed_ips": allowed_ips,
             "kind": input.kind.key_name(),
             "rotated_from": replacing.as_ref().map(|replacing| replacing.id),
+            "status": status,
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
         self.outbox
@@ -324,6 +356,9 @@ impl ApiKeyService {
             expires_at: Some(expires_at),
             allowed_ips: networks.iter().map(ToString::to_string).collect(),
             rotated_from: replacing.as_ref().map(|replacing| replacing.id),
+            status: status.to_owned(),
+            approved_by: None,
+            approved_at: None,
             last_used_at: None,
             created_at: now,
             kind: input.kind,
@@ -357,13 +392,26 @@ impl ApiKeyService {
         tenant: &TenantContext,
         caller: &Principal,
         owner: Option<Uuid>,
+        status: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<ApiKey>, Error> {
-        caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+        // Người duyệt (không quản lý key) chỉ thấy key đang chờ duyệt (bước 54).
+        let status = if caller.has(&crate::permissions::API_KEYS_MANAGE) {
+            status
+        } else if caller.has(&crate::permissions::API_KEYS_APPROVE) {
+            Some(super::approval::PENDING)
+        } else {
+            // Không có quyền nào: lỗi `permission_denied` nêu quyền quản lý.
+            caller.require(&crate::permissions::API_KEYS_MANAGE)?;
+            status
+        };
         let connection = tenant.database().read();
         let mut select = api_key::Entity::find().scoped(tenant);
         if let Some(owner) = owner {
             select = select.filter(api_key::Column::UserId.eq(owner));
+        }
+        if let Some(status) = status {
+            select = select.filter(api_key::Column::Status.eq(status));
         }
         let page = fetch_page(select, api_key::Column::Id, |row| row.id, page, connection).await?;
         let mut permissions =
@@ -436,6 +484,9 @@ impl ApiKeyService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(invalid_api_key)?;
+        if row.status == super::approval::PENDING {
+            return Err(super::approval::pending());
+        }
         if row.expires_at.is_some_and(|expires_at| expires_at <= now) {
             return Err(Error::unauthenticated(
                 "auth.api_key_expired",
@@ -573,7 +624,7 @@ pub(super) async fn permissions_of<C: ConnectionTrait>(
     Ok(by_key)
 }
 
-fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
+pub(super) fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
     ApiKey {
         id: row.id,
         user_id: row.user_id,
@@ -587,6 +638,9 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
             .map(ToString::to_string)
             .collect(),
         rotated_from: row.rotated_from,
+        status: row.status,
+        approved_by: row.approved_by,
+        approved_at: row.approved_at,
         last_used_at: row.last_used_at,
         created_at: row.created_at,
         kind: ActorKind::of_key(&row.kind),

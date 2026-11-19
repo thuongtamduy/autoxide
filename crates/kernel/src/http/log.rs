@@ -59,7 +59,11 @@ pub(super) async fn log_requests(
         "otel.kind" = "server",
         "http.route" = tracing::field::Empty,
         "http.response.status_code" = tracing::field::Empty,
+        // Khách của request (bước 39 B7, D-190): biết khi extractor tìm ra khách / người gọi, ghi
+        // qua `RequestSpan`. Để tra một khách bằng log và trace — KHÔNG làm nhãn số đo.
+        tenant_id = tracing::field::Empty,
     );
+    request.extensions_mut().insert(RequestSpan(span.clone()));
     // Request mang `traceparent` thì span này nối vào trace của bên gọi. Không bật
     // xuất trace thì lời gọi này không có tác dụng.
     let _ = span.set_parent(crate::telemetry::remote_context(request.headers()));
@@ -114,4 +118,20 @@ pub(super) async fn log_requests(
         _ => tracing::info!(status, elapsed_ms, route, "request completed"),
     });
     response
+}
+
+/// Span `request` của lớp log, cất trong extensions để phần tìm khách ghi `tenant_id` lên nó (bước 39 B7).
+#[derive(Clone)]
+pub(crate) struct RequestSpan(pub(crate) tracing::Span);
+
+impl RequestSpan {
+    /// Ghi khách lên span của request trong `extensions` (nếu có).
+    pub(crate) fn note_tenant(
+        extensions: &axum::http::Extensions,
+        tenant: crate::tenancy::TenantId,
+    ) {
+        if let Some(span) = extensions.get::<RequestSpan>() {
+            span.0.record("tenant_id", tracing::field::display(tenant));
+        }
+    }
 }

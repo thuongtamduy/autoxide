@@ -27,6 +27,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(revoke_api_key))
         .routes(routes!(list_all_api_keys))
         .routes(routes!(revoke_any_api_key))
+        .routes(routes!(approve_api_key))
 }
 
 /// An API key of any user, for administrators.
@@ -50,16 +51,21 @@ pub(crate) struct ManagedApiKeyResponse {
 pub(crate) struct AllApiKeysQuery {
     /// Only the keys of this user.
     user_id: Option<Uuid>,
+    /// Only keys in this state: `active` or `pending` (waiting for approval). Callers with
+    /// `auth.api_keys.approve` but not `auth.api_keys.manage` always get `pending` keys only.
+    #[param(example = "pending")]
+    status: Option<String>,
 }
 
 /// List the API keys of every user.
 ///
-/// Requires `auth.api_keys.manage`. Newest first unless `order=asc`, with the owner's name and
+/// Requires `auth.api_keys.manage`, or `auth.api_keys.approve` to list the keys waiting for
+/// approval. Newest first unless `order=asc`, with the owner's name and
 /// email; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.
 #[utoipa::path(
     get,
     path = "/all-api-keys",
-    extensions(("x-permissions" = json!(["auth.api_keys.manage"]))),
+    extensions(("x-permissions" = json!(["auth.api_keys.manage", "auth.api_keys.approve"]))),
     operation_id = "list_all_api_keys",
     security(("bearer" = [])),
     params(AllApiKeysQuery, PageQuery),
@@ -78,7 +84,15 @@ async fn list_all_api_keys(
     Query(query): Query<PageQuery>,
 ) -> Result<Page<ManagedApiKeyResponse>, Error> {
     let page = PageRequest::try_from(query)?;
-    let page = state.api_keys.list_all(&tenant, &principal, filter.user_id, &page).await?;
+    let status = filter.status.as_deref();
+    if status.is_some_and(|status| !["active", "pending"].contains(&status)) {
+        return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
+            "status",
+            "invalid",
+            "must be `active` or `pending`",
+        )]));
+    }
+    let page = state.api_keys.list_all(&tenant, &principal, filter.user_id, status, &page).await?;
     let mut owners: Vec<Uuid> = page.data.iter().map(|key| key.user_id).collect();
     owners.sort_unstable();
     owners.dedup();
@@ -151,6 +165,13 @@ pub(crate) struct ApiKeyResponse {
     /// The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
     /// created from scratch.
     rotated_from: Option<Uuid>,
+    /// `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+    /// 401 `auth.api_key_pending`).
+    #[schema(example = "active")]
+    status: String,
+    /// Who approved the key and when; `null` when it needed no approval.
+    approved_by: Option<Uuid>,
+    approved_at: Option<DateTime<Utc>>,
     /// Last time the key was used, to the minute; `null`: never used.
     last_used_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
@@ -171,11 +192,44 @@ impl From<ApiKey> for ApiKeyResponse {
             expires_at: key.expires_at,
             allowed_ips: key.allowed_ips,
             rotated_from: key.rotated_from,
+            status: key.status,
+            approved_by: key.approved_by,
+            approved_at: key.approved_at,
             last_used_at: key.last_used_at,
             created_at: key.created_at,
             kind: crate::api_key::KeyKind::key_name(key.kind).to_owned(),
         }
     }
+}
+
+/// Approve an API key that waits for approval.
+///
+/// Requires `auth.api_keys.approve`, from a signed-in session (an API key cannot approve keys).
+/// The key works from now on; the audit log records who approved it. To refuse a key, revoke it
+/// with `DELETE /api/v1/auth/all-api-keys/{id}`.
+#[utoipa::path(
+    post,
+    path = "/all-api-keys/{id}/approve",
+    extensions(("x-permissions" = json!(["auth.api_keys.approve"]))),
+    operation_id = "approve_api_key",
+    security(("bearer" = [])),
+    params(("id" = Uuid, Path, description = "Id of the key.")),
+    responses(
+        (status = 200, description = "The key, now `active`.", body = Data<ApiKeyResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `auth.api_keys.approve` (code `permission_denied`), or the request used an API key (code `auth.api_key_cannot_approve_keys`).", body = Problem),
+        (status = 404, description = "No key has this id; code `auth.api_key_not_found`.", body = Problem),
+        (status = 409, description = "The key does not wait for approval; code `auth.api_key_not_pending`.", body = Problem),
+    )
+)]
+async fn approve_api_key(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<ApiKeyResponse>, Error> {
+    let key = state.api_keys.approve(&tenant, &principal, id).await?;
+    Ok(Data { data: key.into() })
 }
 
 /// A new API key, with its secret. The secret is shown only here.
@@ -443,6 +497,90 @@ mod tests {
             let (status, _, gone) = call(&app, "GET", "/users", Some(&with_key), None).await;
             assert_eq!(status, StatusCode::UNAUTHORIZED);
             assert_eq!(gone["code"], "auth.invalid_api_key");
+        })
+        .await
+        .unwrap();
+    }
+
+    // Bước 54: khách bật duyệt key thì key của nhân viên chờ tới khi quản trị duyệt; key của người
+    // giữ quyền duyệt chạy ngay; duyệt hai lần thì 409.
+    #[tokio::test]
+    async fn key_cho_quan_tri_duyet() {
+        TestDatabase::run(async |test| {
+            use autoxide_kernel::event::Actor;
+            let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
+            let root = NewAccount {
+                email: "root@example.com".to_owned(),
+                name: "Root".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: true,
+            };
+            let root = Accounts::create(services.users.as_ref(), &tenant, root).await.unwrap();
+            let ada = NewAccount {
+                email: "eve@example.com".to_owned(),
+                name: "Eve".to_owned(),
+                password: Some(PASSWORD.to_owned()),
+                admin: false,
+            };
+            let ada = Accounts::create(services.users.as_ref(), &tenant, ada).await.unwrap();
+            let reader = crate::role::RoleInput {
+                denies: Vec::new(),
+                requires_mfa: false,
+                grants: Vec::new(),
+                name: "reader".to_owned(),
+                description: String::new(),
+                permissions: vec!["auth.users.read".to_owned()],
+            };
+            let reader = services.roles.create(&tenant, Actor::system(), reader).await.unwrap();
+            services.roles.set_user_roles(&tenant, Actor::system(), ada.id, vec![reader.id]).await.unwrap();
+            let boss = bearer(&app, "root@example.com", PASSWORD).await;
+            let staff = bearer(&app, "eve@example.com", PASSWORD).await;
+
+            let answer = app
+                .request(axum::http::Method::PUT, "/api/v1/kernel/settings/auth.api_keys.require_approval")
+                .header("authorization", &boss)
+                .json(json!({"value": "true"}))
+                .send()
+                .await
+                .unwrap();
+            assert!(answer.status().is_success(), "{answer:?}");
+
+            let body = json!({"name": "report", "permissions": ["auth.users.read"], "current_password": PASSWORD});
+            let (status, _, made) = call(&app, "POST", "/api-keys", Some(&staff), Some(body.clone())).await;
+            assert_eq!(status, StatusCode::CREATED, "{made}");
+            assert_eq!(made["data"]["status"], "pending");
+            let id = made["data"]["id"].as_str().unwrap().to_owned();
+            let key = format!("Bearer {}", made["data"]["key"].as_str().unwrap());
+            let (status, _, waiting) = call(&app, "GET", "/users", Some(&key), None).await;
+            assert_eq!((status, waiting["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("auth.api_key_pending")));
+
+            let (status, _, inbox) = call(&app, "GET", "/all-api-keys?status=pending", Some(&boss), None).await;
+            assert_eq!(status, StatusCode::OK, "{inbox}");
+            assert_eq!(inbox["data"].as_array().unwrap().len(), 1);
+            assert_eq!(inbox["data"][0]["id"], json!(id));
+            let (status, _, _) = call(&app, "GET", "/all-api-keys?status=nope", Some(&boss), None).await;
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+            // Nhân viên không duyệt được.
+            let approve = format!("/all-api-keys/{id}/approve");
+            let (status, _, _) = call(&app, "POST", &approve, Some(&staff), None).await;
+            assert_eq!(status, StatusCode::FORBIDDEN);
+
+            let (status, _, approved) = call(&app, "POST", &approve, Some(&boss), None).await;
+            assert_eq!(status, StatusCode::OK, "{approved}");
+            assert_eq!(approved["data"]["status"], "active");
+            assert_eq!(approved["data"]["approved_by"], json!(root.id));
+            assert!(approved["data"]["approved_at"].is_string());
+            let (status, _, users) = call(&app, "GET", "/users", Some(&key), None).await;
+            assert_eq!(status, StatusCode::OK, "{users}");
+            let (status, _, again) = call(&app, "POST", &approve, Some(&boss), None).await;
+            assert_eq!((status, again["code"].as_str()), (StatusCode::CONFLICT, Some("auth.api_key_not_pending")));
+
+            // Người giữ quyền duyệt: key chạy ngay.
+            let (status, _, own) = call(&app, "POST", "/api-keys", Some(&boss), Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED, "{own}");
+            assert_eq!(own["data"]["status"], "active");
+            assert!(own["data"]["approved_by"].is_null());
         })
         .await
         .unwrap();

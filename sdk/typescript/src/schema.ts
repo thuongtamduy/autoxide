@@ -267,6 +267,9 @@ export type ApiKeyResponse = {
    * from elsewhere gets 403 `network_not_allowed`.
    */
   allowed_ips: string[];
+  approved_at?: string | null;
+  /** Who approved the key and when; `null` when it needed no approval. */
+  approved_by?: string | null;
   created_at: string;
   /**
    * When the key stops working. Every new key has one; `null` only for data that was never
@@ -304,6 +307,22 @@ export type ApiKeyResponse = {
    * created from scratch.
    */
   rotated_from?: string | null;
+  /**
+   * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+   * 401 `auth.api_key_pending`).
+   */
+  status: string;
+};
+
+/** The guardrails that limit this tenant. */
+export type AppliedGuardrailsResponse = {
+  /** Every guardrail on the way from the top tenant to this one. */
+  guardrails: GuardrailResponse[];
+  /**
+   * The most permissions anyone can use in this tenant: what every guardrail allows together,
+   * sorted by name. `null` when no guardrail limits this tenant.
+   */
+  max_permissions?: string[] | null;
 };
 
 /** Records to tag or untag in one call. */
@@ -458,6 +477,56 @@ export type BanRequest = {
   until?: string | null;
   /** The user id, the email address, or the `ip_fingerprint` shown on a comment. */
   value: string;
+};
+
+/** HTTP method of a write. */
+export type BatchMethod = "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** One write, as you would send it to the REST endpoint. */
+export type BatchOperation = {
+  /** The JSON body of the write, if it has one. */
+  body?: unknown;
+  /** Your id for this write, 1 to 100 characters; its result carries it back. */
+  id: string;
+  /**
+   * Sent as the `Idempotency-Key` header. Keep it with the queued write and send the same key
+   * when you send the batch again: a write already done answers what it answered the first time.
+   */
+  idempotency_key: string;
+  /**
+   * Sent as the `If-Match` header: the `ETag` (`version`) of the record you changed. If someone
+   * changed it since, the result is `412` with the current record in the body's `current`.
+   */
+  if_match?: string | null;
+  method: BatchMethod;
+  /**
+   * Path of the REST endpoint, under the `path` of a sync resource
+   * (`GET /api/v1/kernel/sync/resources`).
+   */
+  path: string;
+};
+
+/** Writes queued on a device while it was offline. */
+export type BatchRequest = {
+  /** 1 to 100 writes, run one after the other in this order. */
+  operations: BatchOperation[];
+};
+
+/** What one write answered. */
+export type BatchResult = {
+  /**
+   * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+   * failed; `null` when the answer has no body.
+   */
+  body?: unknown;
+  /** The `ETag` header of the answer (version of the record after the write), if any. */
+  etag?: string | null;
+  /** The `id` you gave the write. */
+  id: string;
+  /** The `Location` header of the answer (the record created), if any. */
+  location?: string | null;
+  /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+  status: number;
 };
 
 /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
@@ -2388,16 +2457,19 @@ export type ComplianceAccountVerification = {
 /** The ministry's logo for a website footer. */
 export type ComplianceBadge = {
   alt: string;
-  /** `blue` or `red`. */
+  /** `blue`, `red`, or `none` on a sandbox. */
   color: string;
   domain: string;
   image_url: string;
-  /** `sales` or `platform`. */
+  /**
+   * `sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,
+   * `link_url` and `image_url` are empty and `snippet` is a "test copy" label.
+   */
   kind: string;
   link_url: string;
   /** Ready-to-insert HTML, rebuilt from the checked addresses. */
   snippet: string;
-  /** `notified` (blue logo) or `registered` (red logo). */
+  /** `notified` (blue logo), `registered` (red logo) or `sandbox`. */
   status: string;
   website_id: string;
 };
@@ -3291,6 +3363,8 @@ export type CompliancePublicOwner = {
   registration_issued_on?: string | null;
   registration_number?: string | null;
   representative_name?: string | null;
+  /** `true` on a sandbox (test copy): the footer should say it is a test copy. */
+  sandbox: boolean;
   tax_code?: string | null;
   trade_name?: string | null;
 };
@@ -4474,6 +4548,77 @@ export type Data_AltSuggestionResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ApiKeyResponse = {
+  /** An API key, without its secret. */
+  data: {
+    /**
+     * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+     * from elsewhere gets 403 `network_not_allowed`.
+     */
+    allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
+    created_at: string;
+    /**
+     * When the key stops working. Every new key has one; `null` only for data that was never
+     * upgraded.
+     */
+    expires_at?: string | null;
+    id: string;
+    /**
+     * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+     * approval) or `service` (another program). The audit log records it as `actor_kind`.
+     */
+    kind: string;
+    /** Last time the key was used, to the minute; `null`: never used. */
+    last_used_at?: string | null;
+    /** What the key is for. */
+    name: string;
+    /**
+     * The organization unit the key is bound to: it acts only on data of this unit and the
+     * units below it. The root unit (the id of the tenant) means no limit.
+     */
+    org_id: string;
+    /**
+     * Permissions the key may use, sorted by name. The key never has more than its
+     * owner has at the moment of the request.
+     */
+    permissions: string[];
+    /**
+     * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+     * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+     * their first 12 characters.
+     */
+    prefix: string;
+    /**
+     * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+     * created from scratch.
+     */
+    rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AppliedGuardrailsResponse = {
+  /** The guardrails that limit this tenant. */
+  data: {
+    /** Every guardrail on the way from the top tenant to this one. */
+    guardrails: GuardrailResponse[];
+    /**
+     * The most permissions anyone can use in this tenant: what every guardrail allows together,
+     * sorted by name. `null` when no guardrail limits this tenant.
+     */
+    max_permissions?: string[] | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ApplyTagResult = {
   /** What a bulk tagging changed. */
   data: {
@@ -5430,16 +5575,19 @@ export type Data_ComplianceBadge = {
   /** The ministry's logo for a website footer. */
   data: {
     alt: string;
-    /** `blue` or `red`. */
+    /** `blue`, `red`, or `none` on a sandbox. */
     color: string;
     domain: string;
     image_url: string;
-    /** `sales` or `platform`. */
+    /**
+     * `sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,
+     * `link_url` and `image_url` are empty and `snippet` is a "test copy" label.
+     */
     kind: string;
     link_url: string;
     /** Ready-to-insert HTML, rebuilt from the checked addresses. */
     snippet: string;
-    /** `notified` (blue logo) or `registered` (red logo). */
+    /** `notified` (blue logo), `registered` (red logo) or `sandbox`. */
     status: string;
     website_id: string;
   };
@@ -6002,6 +6150,8 @@ export type Data_CompliancePublicOwner = {
     registration_issued_on?: string | null;
     registration_number?: string | null;
     representative_name?: string | null;
+    /** `true` on a sandbox (test copy): the footer should say it is a test copy. */
+    sandbox: boolean;
     tax_code?: string | null;
     trade_name?: string | null;
   };
@@ -6367,7 +6517,11 @@ export type Data_DeliveryResponse = {
     last_error?: string | null;
     /** HTTP status of the last answer; `null` when there was none. */
     response_status?: number | null;
-    /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+    /**
+     * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+     * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+     * message box, not sent).
+     */
     status: string;
   };
 };
@@ -6747,6 +6901,25 @@ export type Data_GroupResponse = {
     member_count: number;
     name: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_GuardrailResponse = {
+  /** The most permissions a tenant below this one can use. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
   };
 };
 
@@ -8868,6 +9041,46 @@ export type Data_PromotionsNotice = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsNoticeExport = {
+  /** The data of a promotion notice, one entry per authority. */
+  data: {
+    authorities: PromotionsNoticeEntry[];
+    currency: string;
+    ends_at: string;
+    /** Number of flash-sale or add-on prices. */
+    flash_item_count: number;
+    /** Jurisdiction of the law data used. */
+    jurisdiction: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    /** Locale of `title` and `terms`. */
+    locale: string;
+    /** Unit that runs the promotion. */
+    org_id: string;
+    promotion_id: string;
+    /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+    promotion_kind: string;
+    /**
+     * `false` when no notice rule is in force for this kind of promotion on its start day
+     * (load the law data with `autoxide task promotions.load_legal_data`).
+     */
+    rules_found: boolean;
+    starts_at: string;
+    /** Status of the promotion. */
+    status: string;
+    /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+    target_count: number;
+    /** Conditions shown to buyers. */
+    terms: string;
+    title: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsPromotion = {
   /** A promotion with its rule, counters and texts. */
   data: {
@@ -9299,6 +9512,24 @@ export type Data_ResolvedView = {
 };
 
 /** Envelope of a single result. */
+export type Data_RestockAlertAccepted = {
+  /** The answer to an alert request: always the same. */
+  data: {
+    /** Always `true`. Visitors who are not signed in get a link to confirm. */
+    accepted: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RestockAlertState = {
+  /** The state of an alert after a link was used. */
+  data: {
+    /** `confirmed` or `stopped`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RevisionResponse = {
   /** A revision: a full copy of the editable fields of an entry at one moment. */
   data: {
@@ -9608,6 +9839,22 @@ export type Data_ShippingAddress = {
 };
 
 /** Envelope of a single result. */
+export type Data_ShippingCalendar = {
+  /** A delivery calendar. */
+  data: {
+    /** Holidays and special days (only in single-calendar answers). */
+    days: ShippingCalendarDayEntry[];
+    id: string;
+    name: string;
+    org_id: string;
+    time_zone: string;
+    updated_at: string;
+    /** 1 = Monday … 7 = Sunday. */
+    working_days: number[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ShippingCarrierAccount = {
   /** A carrier account. Credentials are never returned: only the names of the fields set. */
   data: {
@@ -9681,6 +9928,15 @@ export type Data_ShippingCodStatementDetail = {
   /** A carrier statement with its lines. */
   data: ShippingCodStatement & {
     lines: ShippingCodStatementLine[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingEstimate = {
+  /** A public shipping estimate. */
+  data: ShippingQuote & {
+    /** Always `true`: the fee is computed again when the order is placed. */
+    estimate: boolean;
   };
 };
 
@@ -10906,6 +11162,25 @@ export type Data_Vec_ApprovalRequest = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BatchResult = {
+  data: {
+    /**
+     * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+     * failed; `null` when the answer has no body.
+     */
+    body?: unknown;
+    /** The `ETag` header of the answer (version of the record after the write), if any. */
+    etag?: string | null;
+    /** The `id` you gave the write. */
+    id: string;
+    /** The `Location` header of the answer (the record created), if any. */
+    location?: string | null;
+    /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+    status: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_BillingPeriodResponse = {
   data: {
     amount: Money;
@@ -11479,6 +11754,18 @@ export type Data_Vec_IdentityResponse = {
     provider: string;
     provider_id: string;
     provider_name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_InventoryPublicAvailability = {
+  data: {
+    level: InventoryPublicStockLevel;
+    /** Units left, only when `level` is `low`. */
+    quantity?: number | null;
+    /** The store (organization unit) selling it. */
+    store_id: string;
+    variant_id: string;
   }[];
 };
 
@@ -12524,6 +12811,21 @@ export type Data_Vec_SupportRoutingRule = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_SyncResourceView = {
+  data: {
+    /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+    changes: string;
+    description: string;
+    /** `<module>.<name>`. */
+    name: string;
+    /** The list endpoint of these records; writes in a batch go under this path. */
+    path: string;
+    /** The permission needed to read them; its scope decides which records you get. */
+    read_permission: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_TagRef = {
   data: {
     /** One of `gray`, `red`, `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`. */
@@ -12951,7 +13253,11 @@ export type DeliveryResponse = {
   last_error?: string | null;
   /** HTTP status of the last answer; `null` when there was none. */
   response_status?: number | null;
-  /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+  /**
+   * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+   * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+   * message box, not sent).
+   */
   status: string;
 };
 
@@ -13598,6 +13904,31 @@ export type GroupResponse = {
   updated_at: string;
 };
 
+/** A guardrail to set. */
+export type GuardrailRequest = {
+  /**
+   * The permissions roles of that tenant may grant at most (see
+   * `GET /api/v1/auth/permissions`). `[]` leaves no permission.
+   */
+  max_permissions: string[];
+};
+
+/** The most permissions a tenant below this one can use. */
+export type GuardrailResponse = {
+  /**
+   * The permissions roles there may still grant, sorted by name. Any other permission is
+   * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+   */
+  max_permissions: string[];
+  /** The tenant above it that set the guardrail. */
+  set_by_tenant_id: string;
+  /** The tenant limited by the guardrail (and every tenant below it). */
+  tenant_id: string;
+  updated_at: string;
+  /** Who set it last, and when. */
+  updated_by: string;
+};
+
 /** A guest cancels a booking. */
 export type GuestCancelRequest = {
   /** A fresh code sent to the phone number of the booking. */
@@ -13926,6 +14257,19 @@ export type InventoryMovement = {
   unit_cost?: Money | null;
   variant_id: string;
 };
+
+/** Availability of one variant at one store. */
+export type InventoryPublicAvailability = {
+  level: InventoryPublicStockLevel;
+  /** Units left, only when `level` is `low`. */
+  quantity?: number | null;
+  /** The store (organization unit) selling it. */
+  store_id: string;
+  variant_id: string;
+};
+
+/** How much of a variant a store can sell, without revealing large stock numbers. */
+export type InventoryPublicStockLevel = "in_stock" | "low" | "out" | "preorder";
 
 /** A purchase order to a supplier. */
 export type InventoryPurchaseOrder = {
@@ -14763,8 +15107,8 @@ export type LastDelivery = {
   /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
   response_status?: number | null;
   /**
-   * `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
-   * as a delivery's `status`.
+   * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+   * (kept in the sandbox message box) — the same values as a delivery's `status`.
    */
   status: string;
 };
@@ -17497,6 +17841,9 @@ export type Page_ApiKeyResponse = {
      * from elsewhere gets 403 `network_not_allowed`.
      */
     allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
     created_at: string;
     /**
      * When the key stops working. Every new key has one; `null` only for data that was never
@@ -17534,6 +17881,11 @@ export type Page_ApiKeyResponse = {
      * created from scratch.
      */
     rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -18346,7 +18698,11 @@ export type Page_DeliveryResponse = {
     last_error?: string | null;
     /** HTTP status of the last answer; `null` when there was none. */
     response_status?: number | null;
-    /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+    /**
+     * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+     * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+     * message box, not sent).
+     */
     status: string;
   }[];
   pagination: Pagination;
@@ -18608,6 +18964,26 @@ export type Page_GroupResponse = {
     member_count: number;
     name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GuardrailResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
   }[];
   pagination: Pagination;
 };
@@ -20203,6 +20579,32 @@ export type Page_Sandbox = {
 };
 
 /** One page of a list. */
+export type Page_SandboxMessage = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Details of the call (amounts, text, payload). */
+    body: unknown;
+    /** `partner`, `sms`, `zns`, `push`, `mail` or `webhook`. */
+    channel: string;
+    created_at: string;
+    id: string;
+    /** The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`. */
+    provider: string;
+    /**
+     * `simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail
+     * to someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in
+     * the tenant setting `kernel.sandbox.webhook_urls`).
+     */
+    reason: string;
+    /** Address, phone number or URL it was meant for. */
+    recipient?: string | null;
+    /** Subject or short title. */
+    subject?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ScheduleResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -20305,6 +20707,23 @@ export type Page_ShippingAddress = {
     postal_code?: string | null;
     recipient_name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCalendar = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Holidays and special days (only in single-calendar answers). */
+    days: ShippingCalendarDayEntry[];
+    id: string;
+    name: string;
+    org_id: string;
+    time_zone: string;
+    updated_at: string;
+    /** 1 = Monday … 7 = Sunday. */
+    working_days: number[];
   }[];
   pagination: Pagination;
 };
@@ -21457,6 +21876,12 @@ export type Problem = {
    * on `detail`.
    */
   code: string;
+  /**
+   * For `precondition_failed` on endpoints that say so: the record as it is now on the server,
+   * in the same shape as reading it. Its version is in the `ETag` header: merge your change
+   * into it and send that `ETag` in `If-Match`.
+   */
+  current?: unknown;
   /** Human-readable explanation of what went wrong and how to fix it. */
   detail: string;
   /** One entry per invalid input field. Present only for validation problems. */
@@ -21803,6 +22228,62 @@ export type PromotionsNotice = {
   status: string;
   submitted_at?: string | null;
   submitted_by?: string | null;
+};
+
+/** The notice to one authority. */
+export type PromotionsNoticeEntry = {
+  /** Authority, e.g. `province:79` (the provincial Department of Industry and Trade). */
+  authority_code: string;
+  /** Days before the start the notice is due. */
+  days_before?: number | null;
+  /** Last day to submit (Vietnam date), when a notice is required. */
+  due_on?: string | null;
+  /** Legal basis of the rule, with its date in force. */
+  legal_basis?: string | null;
+  /** Reference given by the authority, when recorded. */
+  reference?: string | null;
+  /** Whether the rule in force asks for a notice. */
+  required: boolean;
+  /** `pending`, `submitted` or `not_required`. */
+  status: string;
+  submitted_at?: string | null;
+};
+
+/** The data of a promotion notice, one entry per authority. */
+export type PromotionsNoticeExport = {
+  authorities: PromotionsNoticeEntry[];
+  currency: string;
+  ends_at: string;
+  /** Number of flash-sale or add-on prices. */
+  flash_item_count: number;
+  /** Jurisdiction of the law data used. */
+  jurisdiction: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  /** Locale of `title` and `terms`. */
+  locale: string;
+  /** Unit that runs the promotion. */
+  org_id: string;
+  promotion_id: string;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+  promotion_kind: string;
+  /**
+   * `false` when no notice rule is in force for this kind of promotion on its start day
+   * (load the law data with `autoxide task promotions.load_legal_data`).
+   */
+  rules_found: boolean;
+  starts_at: string;
+  /** Status of the promotion. */
+  status: string;
+  /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+  target_count: number;
+  /** Conditions shown to buyers. */
+  terms: string;
+  title: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
 };
 
 /** A promotion notice recorded for one authority. */
@@ -23275,6 +23756,55 @@ export type ResolvedView = {
   title: string;
 };
 
+/** The answer to an alert request: always the same. */
+export type RestockAlertAccepted = {
+  /** Always `true`. Visitors who are not signed in get a link to confirm. */
+  accepted: boolean;
+};
+
+/** A request for a back-in-stock alert. */
+export type RestockAlertBody = {
+  /** The value of the `altcha` widget, when the server uses a challenge. */
+  challenge?: string | null;
+  /** Must be `true`: the visitor agrees to get a message for this purpose only. */
+  consent: boolean;
+  /** The exact consent text shown next to the form (kept as proof), up to 2000 characters. */
+  consent_text?: string | null;
+  /** Version of that text, if you keep versions. */
+  consent_version?: string | null;
+  /**
+   * Email to alert. Give this or `phone`; a signed-in buyer may give neither (alerted on their
+   * account).
+   */
+  email?: string | null;
+  /**
+   * Token from `GET /api/v1/antispam/token?scope=inventory:restock_alerts`; needed when not
+   * signed in.
+   */
+  form_token?: string | null;
+  /** Language of the messages: `en` or `vi`. */
+  locale?: string | null;
+  /** Phone number to alert by SMS (`0912345678` or `+84912345678`). */
+  phone?: string | null;
+  /** The store (organization unit) to watch; omit it for the online shop. */
+  store_id?: string | null;
+  /** The hidden trap field: people leave it empty. */
+  trap?: string | null;
+  variant_id: string;
+};
+
+/** The state of an alert after a link was used. */
+export type RestockAlertState = {
+  /** `confirmed` or `stopped`. */
+  status: string;
+};
+
+/** The token of a link in an alert message. */
+export type RestockTokenBody = {
+  /** The `{token}` of the link, exactly as received (it may contain a `.`). */
+  token: string;
+};
+
 /** A revision: a full copy of the editable fields of an entry at one moment. */
 export type RevisionResponse = {
   created_at: string;
@@ -23537,6 +24067,32 @@ export type SandboxCreated = Sandbox & {
    * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
    */
   job_id?: string | null;
+};
+
+/**
+ * Something the sandbox would have sent out and kept instead: a partner call (payment, payout,
+ * e-invoice, identity check), an SMS, a Zalo message, a push notification, a mail to someone who
+ * is not staff of the tenant, or a webhook to a URL not allowed.
+ */
+export type SandboxMessage = {
+  /** Details of the call (amounts, text, payload). */
+  body: unknown;
+  /** `partner`, `sms`, `zns`, `push`, `mail` or `webhook`. */
+  channel: string;
+  created_at: string;
+  id: string;
+  /** The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`. */
+  provider: string;
+  /**
+   * `simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail
+   * to someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in
+   * the tenant setting `kernel.sandbox.webhook_urls`).
+   */
+  reason: string;
+  /** Address, phone number or URL it was meant for. */
+  recipient?: string | null;
+  /** Subject or short title. */
+  subject?: string | null;
 };
 
 /** A saved reply to write. */
@@ -23855,6 +24411,48 @@ export type ShippingAddressChanges = {
   recipient_name?: string | null;
 };
 
+/** A delivery calendar. */
+export type ShippingCalendar = {
+  /** Holidays and special days (only in single-calendar answers). */
+  days: ShippingCalendarDayEntry[];
+  id: string;
+  name: string;
+  org_id: string;
+  time_zone: string;
+  updated_at: string;
+  /** 1 = Monday … 7 = Sunday. */
+  working_days: number[];
+};
+
+/** A day with other rules than usual. */
+export type ShippingCalendarDay = {
+  /** `special_hours`: orders before this minute of the day leave that day. */
+  cutoff_minute?: number | null;
+  /** `closed` (no dispatch: holiday) or `special_hours` (dispatch with its own cut-off). */
+  kind: string;
+  /** E.g. the name of the holiday. */
+  note?: string;
+};
+
+/** A special day of a calendar. */
+export type ShippingCalendarDayEntry = {
+  cutoff_minute?: number | null;
+  day: string;
+  kind: string;
+  note: string;
+};
+
+/** Fields of a delivery calendar; on create `name` is required. */
+export type ShippingCalendarFields = {
+  name?: string | null;
+  /** Organization unit owning the calendar (create only). */
+  org_id?: string | null;
+  /** IANA time zone; default `Asia/Ho_Chi_Minh`. */
+  time_zone?: string | null;
+  /** Working days of the week, 1 = Monday … 7 = Sunday; default Monday to Friday. */
+  working_days?: number[] | null;
+};
+
 /** A carrier account. Credentials are never returned: only the names of the fields set. */
 export type ShippingCarrierAccount = {
   active: boolean;
@@ -23949,6 +24547,12 @@ export type ShippingDays = {
 
 /** Direction of a shipment: `outbound` (to the buyer) or `return` (picked up from the buyer). */
 export type ShippingDirection = "outbound" | "return";
+
+/** A public shipping estimate. */
+export type ShippingEstimate = ShippingQuote & {
+  /** Always `true`: the fee is computed again when the order is placed. */
+  estimate: boolean;
+};
 
 /** Expected delivery dates. */
 export type ShippingEta = {
@@ -24151,26 +24755,37 @@ export type ShippingQuote = {
   unavailable: ShippingUnavailableMethod[];
 };
 
-/** One line of the cart, with the figures of the variant (from the catalog). */
-export type ShippingQuoteItem = {
-  height_mm?: number | null;
-  length_mm?: number | null;
-  quantity: number;
-  /** `false` for digital goods and services: not weighed, not shipped. */
-  requires_shipping?: boolean;
-  sku?: string;
-  variant_id: string;
-  /** Weight of one item, grams. */
-  weight_grams?: number | null;
-  width_mm?: number | null;
-};
-
 /** A cart to quote. */
 export type ShippingQuoteRequest = {
   /** Time of the order (default: now). */
   at?: string | null;
-  destination?: ShippingPostalAddress | null;
-  items: ShippingQuoteItem[];
+  /** Where to deliver; leave out for store pickup only. */
+  destination?: {
+    /** Outside Vietnam: the city (required). */
+    city?: string | null;
+    /** Vietnam: code of the commune, ward or special zone (required). */
+    commune_code?: string | null;
+    /** ISO 3166-1 alpha-2 country code. */
+    country: string;
+    /** House number, street, village… (1 to 300 characters). */
+    line: string;
+    /** Postal code, mostly for addresses outside Vietnam. */
+    postal_code?: string | null;
+    /** Vietnam: code of the province. Elsewhere: the region. */
+    province_code: string;
+  } | null;
+  items: {
+    height_mm?: number | null;
+    length_mm?: number | null;
+    quantity: number;
+    /** `false` for digital goods and services: not weighed, not shipped. */
+    requires_shipping?: boolean;
+    sku?: string;
+    variant_id: string;
+    /** Weight of one item, grams. */
+    weight_grams?: number | null;
+    width_mm?: number | null;
+  }[];
   /** Language of method names (default `en`). */
   locale?: string | null;
   /** Order value after discounts, for free shipping. */
@@ -25217,6 +25832,19 @@ export type SuppressionResponse = {
 export type SuspendRequest = {
   /** Why, 1 to 500 characters (kept in the audit trail). */
   reason: string;
+};
+
+/** A kind of record an offline app can keep in sync. */
+export type SyncResourceView = {
+  /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+  changes: string;
+  description: string;
+  /** `<module>.<name>`. */
+  name: string;
+  /** The list endpoint of these records; writes in a batch go under this path. */
+  path: string;
+  /** The permission needed to read them; its scope decides which records you get. */
+  read_permission: string;
 };
 
 /** Changes to a tag; omitted fields stay. */
@@ -26778,7 +27406,7 @@ export interface paths {
   "/api/v1/auth/all-api-keys": {
     /** List the API keys of every user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
         401: Problem;
@@ -26797,6 +27425,20 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys/{id}/approve": {
+    /** Approve an API key that waits for approval. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApiKeyResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -26969,6 +27611,56 @@ export interface paths {
         400: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails": {
+    /** List the guardrails this tenant set for tenants below it. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/applied": {
+    /** See the guardrails that limit this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_AppliedGuardrailsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/{tenant_id}": {
+    /** Set the most permissions a tenant below this one can use. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: GuardrailRequest;
+      responses: {
+        200: Data_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the guardrail this tenant set for a tenant below it. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -32476,6 +33168,63 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/public/availability": {
+    /** Public availability of variants at stores. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { variant_ids: string; store_id?: string }; };
+      responses: {
+        200: Data_Vec_InventoryPublicAvailability;
+        304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts": {
+    /** Ask for a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockAlertBody;
+      responses: {
+        202: Data_RestockAlertAccepted;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts/confirm": {
+    /** Confirm a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockTokenBody;
+      responses: {
+        200: Data_RestockAlertState;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/restock-alerts/stop": {
+    /** Stop a back-in-stock alert (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RestockTokenBody;
+      responses: {
+        200: Data_RestockAlertState;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/purchase-orders": {
     /** List purchase orders in your scope. */
     get: {
@@ -34022,6 +34771,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandbox/messages": {
+    /** List what this sandbox kept instead of sending out. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { channel?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SandboxMessage;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/sandboxes/{id}": {
     /** Delete a sandbox. */
     delete: {
@@ -34115,6 +34878,30 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { group?: string; org_id?: string }; };
       responses: {
         200: Data_SummaryView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sync/batch": {
+    /** Send writes queued while offline. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: BatchRequest;
+      responses: {
+        200: Data_Vec_BatchResult;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sync/resources": {
+    /** List what an offline app can keep in sync. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SyncResourceView;
         401: Problem;
         default: Problem;
       };
@@ -38268,6 +39055,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/notice-export": {
+    /** Export the data of a promotion notice, one entry per authority. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: "json" | "csv" | null }; };
+      responses: {
+        200: Data_PromotionsNoticeExport | string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/notices/{authority_code}": {
     /** Record that a promotion notice was submitted to an authority. */
     patch: {
@@ -38492,6 +39292,83 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/calendars": {
+    /** List delivery calendars. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a delivery calendar. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingCalendarFields;
+      responses: {
+        201: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/calendars/{id}": {
+    /** Get a delivery calendar with its special days. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a delivery calendar. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingCalendarFields;
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/calendars/{id}/days/{day}": {
+    /** Set a special day of a delivery calendar (holiday, other cut-off). */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; day: string }; };
+      requestBody: ShippingCalendarDay;
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a special day of a delivery calendar. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; day: string }; };
+      responses: {
+        200: Data_ShippingCalendar;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -38798,6 +39675,19 @@ export interface paths {
       responses: {
         200: Data_ShippingMethod;
         401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/public/estimate": {
+    /** Estimate shipping for a product page. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { variant_id: string; product_id?: string; quantity?: number; province_code: string; country?: string; org_id?: string; currency?: string; locale?: string }; };
+      responses: {
+        200: Data_ShippingEstimate;
         403: Problem;
         404: Problem;
         422: Problem;

@@ -99,6 +99,22 @@ impl EffectiveSetting {
     }
 }
 
+/// Giờ mở cửa của một ngày trong tuần, giờ địa phương của nút (hồ sơ công khai, bước 34).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OpeningRange {
+    /// Ngày trong tuần theo ISO: 1 thứ Hai … 7 Chủ nhật.
+    pub day: u8,
+    pub opens: chrono::NaiveTime,
+    pub closes: chrono::NaiveTime,
+}
+
+impl OpeningRange {
+    pub fn new(day: u8, opens: chrono::NaiveTime, closes: chrono::NaiveTime) -> Self {
+        OpeningRange { day, opens, closes }
+    }
+}
+
 /// Tra nút của cây tổ chức.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
@@ -125,6 +141,16 @@ pub trait OrgDirectory: Send + Sync {
         id: OrgId,
         key: &str,
     ) -> Result<Option<EffectiveSetting>, Error>;
+
+    /// Giờ mở cửa trong hồ sơ công khai của nút `id`; `None` khi nút chưa khai (bên gọi dùng giờ
+    /// mặc định của mình). Mặc định: `None`.
+    async fn opening_hours(
+        &self,
+        _tenant: &TenantContext,
+        _id: OrgId,
+    ) -> Result<Option<Vec<OpeningRange>>, Error> {
+        Ok(None)
+    }
 }
 
 /// Nhóm nút ngoài cây (bước 38, D-232): `organizations` công bố, `reporting` lấy bằng

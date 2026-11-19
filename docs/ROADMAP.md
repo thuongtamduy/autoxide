@@ -173,9 +173,10 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
       kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database (D-20261118-step54-one-decision)
 - [ ] Cache quyền theo phiên bản quyền của khách (P11): chỉ làm khi benchmark bước 39 cho thấy câu nạp quyền
       đáng kể (D-20261118-step54-one-decision)
-- [ ] Deny thắng allow trên role; rào quyền tối đa cho khách con (kể cả admin của khách con); API key chi
-      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key — đã có: deny
-      thắng allow (D-20261118-step54-role-denies); hạn bắt buộc, dải IP (D-20261119-step54-api-key-limits), xoay vòng
+- [x] Deny thắng allow trên role (D-20261118-step54-role-denies); rào quyền tối đa cho khách con, kể cả admin của
+      khách con (D-20261119-step54-guardrails); API key chi tiết: hạn bắt buộc, dải IP, lần dùng cuối, xoay vòng
+      (D-20261119-step54-api-key-limits), quản trị duyệt key (D-20261119-step54-key-approval)
+- [ ] API key chọn bản ghi cụ thể (qua `kernel_shares` với `subject_kind = api_key`): làm cùng mục chia sẻ bản ghi
 - [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
       trên gán role
 - [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
@@ -256,8 +257,10 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
 - [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
       chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
       — đang làm: phần nền xong (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
-      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); còn cách ly (`Partners`, bộ giả, chặn mail /
-      webhook, hộp thư giả) và sao / đẩy (`Module::sandbox_copy` / `promotable`, API promote)
+      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); cách ly xong (19/11,
+      D-20261119-step38-sandbox-isolation: kernel bọc hợp đồng đối tác lúc công bố → bộ giả, mail chỉ tới nhân viên,
+      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); còn sao / đẩy
+      (`Module::sandbox_copy` / `promotable`, API promote)
 - [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
       D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
       `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
@@ -311,17 +314,18 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 - [ ] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
       truy vấn danh sách, lọc, đếm của các module trên bộ dữ liệu lớn; index thiếu thêm bằng
       migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau
-- [ ] Nén response (gzip, brotli): đo cỡ và thời gian trên JSON thật (danh sách, `openapi.json`
+- [x] Nén response (gzip, brotli): đo cỡ và thời gian trên JSON thật (danh sách, `openapi.json`
       hơn 1 MB), rồi quyết nén trong app (`tower-http`) hay để reverse proxy làm; không nén lại
-      file đã nén (ảnh). Ghi quyết định; sửa `docs/DEPLOY.md` (EN + VI) theo
-- [ ] Cache cho CDN: `Cache-Control`, `ETag`, `Vary` đúng cho mọi endpoint công khai; file media có
+      file đã nén (ảnh). Ghi quyết định; sửa `docs/DEPLOY.md` (EN + VI) theo — nén trong app, mức 1, D-20261119-step39-compression
+- [x] Cache cho CDN: `Cache-Control`, `ETag`, `Vary` đúng cho mọi endpoint công khai; file media có
       địa chỉ mang phiên bản thì cache dài hạn (`immutable`); nội dung riêng tư hay xem trước không
-      bao giờ được cache chung; hướng dẫn đặt CDN trước Autoxide trong `docs/DEPLOY.md` (EN + VI)
-- [ ] Tìm theo ý nghĩa khi dữ liệu lớn: đo cách duyệt hết vector hiện tại trên bộ dữ liệu lớn so
+      bao giờ được cache chung; hướng dẫn đặt CDN trước Autoxide trong `docs/DEPLOY.md` (EN + VI) — lớp kernel `http/cache.rs`, D-20261119-step39-cdn-cache
+- [x] Tìm theo ý nghĩa khi dữ liệu lớn: đo cách duyệt hết vector hiện tại trên bộ dữ liệu lớn so
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
-      hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
-- [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
+      hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên — vượt (137 ms); `dot` SIMD + chia nhân còn
+      20 ms, D-20261119-step39-semantic-scan
+- [x] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 - [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
       lượng tương đương, không thì ghi "không làm" kèm số đo
@@ -541,10 +545,10 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
       cung cấp qua `ledger`
 - [x] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
       không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho đơn đặt trước theo thứ tự đặt
-- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
+- [x] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
       / `out` / `preorder`, không lộ số tồn lớn; `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api`; ETag,
       cache ngắn
-- [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho mục đích
+- [x] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho mục đích
       này), nghe event tồn kho rồi gửi qua `notifications`; mỗi người một lần mỗi đợt có hàng
 
 ## 43. Khuyến mại (`promotions`)
@@ -563,7 +567,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       (D-222)
 - [x] Điều kiện: phương thức thanh toán, hãng giao, tỉnh, phân khúc, hạng, app / web / quầy, thương hiệu,
       người bán, khách mới, loại trừ hàng đang giảm (D-222); đơn đầu tiên (`first_order_only`); khung giờ
-- [ ] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ điều
+- [x] API cho `orders`: tính giảm giá cho một giỏ, trả từng dòng giảm kèm lý do (người mua thấy rõ điều
       kiện — Luật 19/2023); tính trong bộ nhớ, đo p99 < 5 ms cho 50 dòng × 500 chương trình (D-222)
 - [x] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
       dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
@@ -579,7 +583,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       ví khi huỷ đơn
 - [x] Kiểm tuân thủ: chặn chương trình vượt hạn mức đang hiệu lực (cộng mọi khoản giảm trên một đơn vị,
       D-222) và sàn giá; giới hạn số ngày giảm giá là dữ liệu; kiểm trước khi bật, không ghi (D-225)
-- [ ] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
+- [x] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
       chức, ghi nhận đã nộp từng nơi; lưu vết chương trình đã chạy
 - [ ] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
       dùng"), bộ chọn thay ô nhập mã (D-201); trang sản phẩm hiện "còn X với mã …", giá niêm yết vẫn là giá
@@ -609,13 +613,13 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
 - [x] Thu hộ khi giao (COD): tiền do hãng thu và chuyển trả theo hợp đồng với hãng; sổ cái ghi phải thu từ hãng,
       đối soát với bảng kê COD; lệch thì báo, khớp dòng lệch có lý do và audit; `shipping.cod_settled` mang
       `seller_org_id` và nơi nhận tiền (D-216)
-- [ ] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt trong ngày, theo múi giờ của
+- [x] Ngày giao dự kiến là ngày cụ thể (D-201): khoảng ngày tuyệt đối kèm giờ chốt trong ngày, theo múi giờ của
       khách; lịch giao, ngày làm việc, ngày nghỉ, giờ chốt giao trong ngày là dữ liệu có ngày hiệu lực; nhận
       tại cửa hàng trả giờ sẵn sàng (chuẩn bị + giờ mở cửa của bước 34) và thời hạn giữ hàng chờ nhận
-- [ ] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
+- [x] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
       phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
-- [ ] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
-- [ ] Website bán hàng (16/11/2026): phí và ngày giao dự kiến theo tỉnh khi chưa có giỏ (trang sản phẩm), kèm giờ
+- [x] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [x] Website bán hàng (16/11/2026): phí và ngày giao dự kiến theo tỉnh khi chưa có giỏ (trang sản phẩm), kèm giờ
       chốt đơn trong ngày của nơi bán
 
 ## 45. Giỏ hàng, đặt hàng, đơn hàng (`orders`)
@@ -959,7 +963,7 @@ thiếu. Các bước nền đã xong: bắt đầu được ngay, song song v�
 
 - [ ] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
       sinh lại; gate kiểm khớp OpenAPI, CI biên dịch; đăng lên kho gói cần tài khoản — dừng hỏi chủ dự án
-- [ ] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
+- [x] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
       (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
 - [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất

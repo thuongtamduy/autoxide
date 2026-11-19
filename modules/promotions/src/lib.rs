@@ -18,6 +18,7 @@ mod jobs;
 mod legal;
 mod migration;
 mod model;
+mod notices;
 mod permissions;
 mod programs;
 mod provider;

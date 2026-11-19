@@ -6,12 +6,16 @@
 mod addresses;
 pub mod api;
 mod booking;
+mod calendars;
 mod carriers;
 mod cod;
 mod config;
 mod entity;
 mod errors;
+mod estimate;
+mod eta;
 mod events;
+mod facts;
 mod http;
 mod jobs;
 mod ledger;
@@ -28,6 +32,7 @@ mod service;
 mod settings;
 mod shipments;
 mod status;
+mod tools;
 mod webhooks;
 
 #[cfg(test)]
@@ -141,6 +146,10 @@ impl Module for ShippingModule {
             // `ledger` đăng ký trước `shipping`; chưa cài thì không ghi sổ COD.
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             reasons: context.reason_codes(),
+            // `catalog` và `organizations` đăng ký trước `shipping`; thiếu thì không có ước tính công
+            // khai / dùng giờ mở cửa mặc định.
+            catalog: context.require::<dyn autoxide_catalog::api::Catalog>().ok(),
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             units,
         };
         let service = Arc::new(ShippingService::new(parts, config));
@@ -149,6 +158,10 @@ impl Module for ShippingModule {
         context.provide::<dyn api::AddressBook>(service.clone())?;
         context.provide::<dyn api::ShippingRates>(service.clone())?;
         context.provide::<dyn api::CarrierRegistry>(registry)?;
+        // `support` đăng ký trước `shipping`; chưa cài thì không có trả lời tự động về vận đơn.
+        if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
+            facts.attach(facts::ShippingFacts::new(context.translations().clone()))?;
+        }
         self.service = Some(service);
         Ok(())
     }
@@ -165,6 +178,10 @@ impl Module for ShippingModule {
             Arc::new(privacy::Erasure(service)),
         ));
         all
+    }
+
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
     }
 
     fn routes(&self) -> OpenApiRouter {

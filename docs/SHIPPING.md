@@ -7,8 +7,6 @@ shipping carriers as connector modules, follows shipments and reconciles cash on
 depend on `orders` or `catalog`: orders quote through `autoxide_shipping::api` and send shipment requests as
 events.
 
-This guide grows with the module. Sections marked *(coming)* describe parts still being built.
-
 ## Address book
 
 Signed-in buyers keep up to `AUTOXIDE_SHIPPING_MAX_ADDRESSES_PER_BUYER` (default 20) addresses:
@@ -123,6 +121,7 @@ reconciles (it never holds the money). With the `ledger` module installed:
   `AUTOXIDE_SHIPPING_COD_SETTLEMENT_DAYS` become discrepancies (`GET /cod/discrepancies`, event
   `shipping.cod_mismatch`). Resolve one with a code of the reason list `shipping.cod_resolution` and a note;
   `written_off` writes the missing amount off. `refresh-tracking` asks the carrier for the latest tracking first.
+  Statements and discrepancies can be read with `shipping.cod.read` (accounting, audit) or `shipping.cod.manage`.
 
 ## Contract for other modules
 
@@ -165,9 +164,39 @@ Rules every connector follows (see `autoxide_shipping::api::fake::FakeCarrier` f
 `AUTOXIDE_SHIPPING_FAKE_CARRIER=true` registers the fake carrier `fake` for trying everything on a development
 machine. `autoxide doctor` warns while it is on; never turn it on in production.
 
-## Delivery dates *(coming)*
+## Delivery dates
 
-Delivery calendars and the public estimate are documented here as they land.
+Delivery calendars live under `/api/v1/shipping/calendars` (`shipping.settings.manage`): a time zone (default
+`Asia/Ho_Chi_Minh`), working days of the week, and special days set with `PUT /calendars/{id}/days/{YYYY-MM-DD}` —
+`closed` (holiday, entered when it is announced; nothing is hard-coded) or `special_hours` with its own cut-off. A
+method links a calendar (`calendar_id`), a daily cut-off (`cutoff_minute`, 660 = 11:00) and `same_day`.
+
+Every option of a quote carries `eta`: `earliest_date` and `latest_date` as calendar dates in the calendar's time
+zone (working days after the dispatch day), and `order_by`, today's cut-off when it is still ahead. Methods without a
+calendar use Monday to Saturday, Vietnam time. Store pickup options carry `ready_at` (order time + the pickup point's
+`prep_hours`, moved to the next opening time of the store from its public profile, 08:00–21:00 when the store has
+none) and `hold_days`.
+
+## Public estimate for product pages
+
+`GET /api/v1/shipping/public/estimate?variant_id=…&quantity=1&province_code=79` needs no sign-in. It runs the same
+quote as checkout for a one-line cart to a province (fees, free-shipping threshold, `eta` with today's cut-off) and
+answers `estimate: true` — the real fee is always computed again for the cart. The variant's weight, size, selling
+unit and price come from the `catalog` module. Answers are cacheable for 60 seconds.
+
+## Automatic answers in support
+
+When the `support` module is installed, `shipping` answers the question "where is my parcel?" (intent
+`shipping.tracking`, by tracking number or order number) with the real status of the shipment, in the buyer's
+language. Only the owner gets an answer: the buyer account of the shipment, or a verified phone number equal to the
+recipient's. When the shipment is not found, an order has several shipments, or the asker cannot be shown to be the
+owner, there is no automatic answer and staff reply.
+
+## MCP tools
+
+`shipping.quote` (read only), `shipping.list_shipments`, `shipping.get_shipment`, `shipping.book_shipment`,
+`shipping.cancel_shipment` (destructive), `shipping.update_status`, `shipping.list_cod_discrepancies` — with the
+same permissions as the matching REST endpoints.
 
 ## Configuration
 

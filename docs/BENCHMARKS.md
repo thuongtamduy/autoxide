@@ -550,6 +550,56 @@ ghi bên dưới — không hạ ngưỡng cho vừa.
   dựng JSON đầy đủ thân bài và các lần tra ảnh / term / tác giả theo lô. Đo lại sau mục nén (B4) và cache
   CDN (B5) — trước CDN các đường này đáng lẽ hiếm khi tới máy chủ.
 
+## Nén response (bước 39 B4) — 19/11/2026
+
+Quyết định: D-20261119-step39-compression. Cùng máy như mục trên (4 nhân Xeon 2,1 GHz dùng chung).
+
+**Cỡ và thời gian nén** — mẫu JSON thật lấy từ máy chủ chạy bộ `small`, đo bằng chính thư viện
+`tower-http` dùng (`flate2`, `brotli`; một chương trình đo tạm ngoài repo), build release, một thread,
+nhanh nhất trong 7 lần:
+
+| Mẫu | Gốc | gzip 1 | gzip 6 | brotli 1 | brotli 4 | brotli 11 |
+| --- | --: | --: | --: | --: | --: | --: |
+| `openapi.json` | 2 973 KB | 630 KB · 11,5 ms | 375 KB · 50 ms | 371 KB · 9,0 ms | 251 KB · 30 ms | 200 KB · 2 612 ms |
+| danh sách bài quản trị (50) | 306 KB | 72 KB · 1,1 ms | 52 KB · 9,1 ms | 58 KB · 1,4 ms | 59 KB · 3,7 ms | 41 KB · 463 ms |
+| `/content/public/posts` (20 bài) | 136 KB | 32 KB · 0,46 ms | 24 KB · 3,5 ms | 26 KB · 0,66 ms | 27 KB · 1,9 ms | 19 KB · 173 ms |
+| `/auth/users` (50) | 16 KB | 2,6 KB · 0,03 ms | 2,3 KB · 0,11 ms | 2,3 KB · 0,05 ms | 2,1 KB · 0,12 ms | 1,7 KB · 27 ms |
+| luồng bình luận (20) | 9,7 KB | 1,8 KB · 0,03 ms | 1,6 KB · 0,06 ms | 1,7 KB · 0,04 ms | 1,5 KB · 0,10 ms | 1,3 KB · 13 ms |
+
+(zstd 1: cỡ như brotli 1, nhanh gấp đôi — không chọn vì crate bọc thư viện C và Safari chưa nhận.)
+
+**Qua máy chủ thật** (`AUTOXIDE_HTTP_COMPRESSION=true`, mức 1, SQLite bộ `small`, `oha` 10 s, header
+`accept-encoding` cố định):
+
+| Bài đo | Không nén | gzip | brotli |
+| ------ | --------: | ---: | -----: |
+| `/content/public/posts` 20 bài, 64 kết nối | 211 req/s · p95 352 ms · 136 KB | 217 req/s · p95 337 ms · 35 KB | 211 req/s · p95 341 ms · 26 KB |
+| `/openapi.json`, 16 kết nối | 2 624 req/s · p95 11 ms · 3,4 MB | 469 req/s · p95 54 ms · 702 KB | 322 req/s · p95 79 ms · 418 KB |
+
+Đọc số: với trang JSON thường, nén mức 1 không đo được chi phí (CPU nằm ở dựng dữ liệu, không ở nén)
+mà response nhỏ đi 4–5 lần. `openapi.json` được nén lại mỗi request (11 ms gzip, 9 ms brotli cho 3 MB) —
+vẫn hơn 300 request/giây cho một tài liệu ít đổi, có `Cache-Control: max-age=300`; nếu sau này thành điểm
+nóng thì nén sẵn một lần lúc khởi động.
+
+## Tìm theo ý nghĩa trên cỡ thật (bước 39 B6) — 19/11/2026
+
+Quyết định: D-20261119-step39-semantic-scan. Cùng máy và cách như mục "Tìm theo ý nghĩa: duyệt hết vector" ở trên
+(build release, vector chuẩn hoá ngẫu nhiên, trung vị 7 lần), chương trình đo tạm ngoài repo chép đúng phép tính của
+`vector::dot` và vòng duyệt của `content` (mỗi bài 2 đoạn, giữ đoạn tốt nhất mỗi bài trong `HashMap`). Cỡ thật của bộ
+`full`: 50 000 bài một ngôn ngữ, ~500 từ mỗi bài → 2 đoạn (300 từ, chồng 50) → **100 000 đoạn mỗi ngôn ngữ**.
+
+| Đoạn × chiều | `dot` cũ, 1 nhân | `dot` 8 làn, 1 nhân | 8 làn + vòng duyệt thật, 1 nhân | 8 làn + vòng duyệt thật, 4 nhân | Bộ nhớ |
+| ------------ | ---------------: | ------------------: | ------------------------------: | ------------------------------: | -----: |
+| 100 000 × 768   | 108 ms | 38 ms  | 45 ms | **17 ms** | ~307 MB |
+| 100 000 × 1 024 | 137 ms | 52 ms  | 59 ms | **20 ms** | ~410 MB |
+| 100 000 × 1 536 | 209 ms | 78 ms  | 87 ms | **30 ms** | ~614 MB |
+| 200 000 × 1 024 | 281 ms | 105 ms | —     | 35 ms (chỉ `dot`) | ~819 MB |
+
+(`int8`: 38 ms cho 100 000 × 1 024 một nhân — chỉ nhanh hơn `dot` 8 làn ~30%, không chọn.) 50 kết quả đầu của `dot` 8
+làn giống hệt `dot` cũ ở mọi cỡ. Kết luận: dưới ngưỡng 50 ms của D-110 tới ~250 000 đoạn × 1 024 chiều mỗi ngôn ngữ
+trên máy 4 nhân; vòng duyệt không còn chạy trên thread async. Giới hạn kế tiếp là bộ nhớ (cột cuối, mỗi khách mỗi
+ngôn ngữ mỗi bản), không phải thời gian.
+
 ## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
 
 Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,
@@ -570,3 +620,19 @@ theo API key) / `memory` / `database`; khi bật: 1 000 000 request/phút (khôn
 ghi khác, và các request cùng key chờ lần lấy lô đó. Vượt ngưỡng 10% của đặc tả ở một bài, nên **`memory` vẫn là mặc
 định** và `database` là lựa chọn cho nhiều máy chủ PostgreSQL (D-375). Nhiều key khác nhau không chờ nhau (mỗi key một
 lô); lô lớn hơn (tăng burst) thì ít câu ghi hơn, đổi lại sai số `lô × số máy chủ` lớn hơn.
+
+## Tính khuyến mại cho một giỏ (bước 43, D-222) — 19/11/2026
+
+`cargo bench -p autoxide-promotions` (`modules/promotions/benches/evaluate.rs`; Postgres: đặt `TEST_DATABASE_URL`).
+500 chương trình giảm 10% đang chạy, mỗi chương trình nhắm 10 biến thể, mỗi biến thể thuộc hai chương trình; giỏ 50
+dòng xoay vòng qua các biến thể nên chạm nhiều chương trình khác nhau. Đo 2000 lần `dyn Promotions::evaluate` (sau 200
+lần chạy nóng) — đúng lời gọi của `orders`: gồm phần tính trong bộ nhớ trên `CompiledPromotions` và vài câu đọc nhỏ (bản
+sửa của chương trình, cài đặt cửa hàng); catalog là bản giả trong bộ nhớ để chỉ đo `promotions`. Build release, máy 4
+nhân dùng chung, database cùng máy.
+
+| Database | Việc / giây | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: |
+| SQLite | 661 | 1.463 ms | 1.822 ms | 3.073 ms |
+| PostgreSQL 16 | 559 | 1.673 ms | 2.231 ms | 3.826 ms |
+
+Đạt mục tiêu p99 < 5 ms của đặc tả trên cả hai database, kể cả khi tính cả các câu đọc chứ không chỉ phần tính.
