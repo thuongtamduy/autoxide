@@ -111,6 +111,19 @@ keeps the on-hand quantity at the moment it was counted, so selling goes on whil
 (`inventory.adjust`) writes each difference `counted − expected_at_count` as a `count` ledger line with its reason
 (default `count_variance`).
 
+## Lots, expiry dates and serial numbers
+
+Turned on per product in `catalog` (`lot_tracked`, `serial_tracked`).
+
+- Adding units of a lot-tracked variant needs `lot_code` (and `expires_on`). Reservations hold stock at the level;
+  the lot is chosen when goods leave: the named lot, or else the lots that expire first, then units without a lot —
+  never an expired lot (`inventory.lot_unavailable`).
+- `GET /lots?expiry_state=ok|expiring|expired`: `expiring` means within the unit setting `inventory.expiring_days`
+  (default 30). A daily job writes expired lots off the stock (`expiry` ledger lines, event `inventory.lot_expired`).
+- Serial-tracked variants need exactly one serial number per unit when added, shipped (`FulfilLine::serials`),
+  adjusted down or transferred; a serial number can be sold only once, even by two shipments at the same time.
+- Transfers carry lots and serial numbers: the destination gets the same lot codes and expiry dates.
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and

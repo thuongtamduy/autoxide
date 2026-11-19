@@ -106,6 +106,20 @@ gửi lúc gửi. `close` bỏ phần không tới; `cancel` cho phiếu nháp. 
 dòng đó, nên vẫn bán được trong lúc kiểm. `POST /counts/{id}/apply` (`inventory.adjust`) ghi mỗi chênh lệch
 `counted − expected_at_count` thành dòng sổ `count` kèm lý do (mặc định `count_variance`).
 
+## Lô, hạn dùng và số serial
+
+Bật theo sản phẩm ở `catalog` (`lot_tracked`, `serial_tracked`).
+
+- Thêm hàng của biến thể theo dõi lô cần `lot_code` (và `expires_on`). Giữ chỗ ở mức dòng tồn; lô chọn lúc hàng ra: lô
+  được nêu, không thì lô hết hạn trước, rồi tới hàng không gắn lô — không bao giờ lấy lô đã hết hạn
+  (`inventory.lot_unavailable`).
+- `GET /lots?expiry_state=ok|expiring|expired`: `expiring` là trong số ngày của cài đặt theo nút
+  `inventory.expiring_days` (mặc định 30). Job hằng ngày trừ lô quá hạn khỏi tồn (dòng sổ `expiry`, event
+  `inventory.lot_expired`).
+- Biến thể theo dõi serial cần đúng một số serial cho mỗi đơn vị khi thêm, xuất (`FulfilLine::serials`), điều chỉnh
+  giảm hay chuyển kho; một serial chỉ bán được một lần, kể cả khi hai lần xuất chạy cùng lúc.
+- Chuyển kho mang theo lô và serial: kho nhận có cùng mã lô và hạn dùng.
+
 ## Kiểm số liệu
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<nút>]` so mọi dòng tồn với sổ và chỗ giữ của nó,

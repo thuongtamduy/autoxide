@@ -271,6 +271,10 @@ pub(crate) mod transfer_line {
         pub received_quantity: i64,
         pub unit_cost_minor: Option<i64>,
         pub unit_cost_currency: Option<String>,
+        /// JSON `[{"lot_code", "expires_on", "quantity"}]`: lô lấy ở kho gửi (FEFO).
+        pub lots: String,
+        /// JSON `["…"]`: serial đang đi đường.
+        pub serials: String,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -317,6 +321,52 @@ pub(crate) mod count_line {
         pub expected_at_count: i64,
         pub counted_at: DateTimeUtc,
         pub reason_code: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod lot {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_lots")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub level_id: Uuid,
+        pub org_id: Uuid,
+        pub variant_id: Uuid,
+        pub lot_code: String,
+        pub expires_on: Option<Date>,
+        pub on_hand: i64,
+        pub received_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod serial {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_serials")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub variant_id: Uuid,
+        pub serial: String,
+        pub org_id: Option<Uuid>,
+        /// `in_stock`, `in_transit`, `sold`, `returned`, `written_off`.
+        pub status: String,
+        pub order_id: Option<Uuid>,
+        pub updated_at: DateTimeUtc,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

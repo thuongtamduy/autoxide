@@ -112,6 +112,19 @@ pub(crate) struct QuantityLine {
     pub quantity: i64,
 }
 
+/// One line of a transfer to create.
+#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = InventoryTransferLineRequest)]
+pub(crate) struct TransferLineRequest {
+    pub variant_id: Uuid,
+    /// 1 to 1 000 000.
+    pub quantity: i64,
+    /// Exactly `quantity` serial numbers when the variant tracks serials.
+    #[serde(default)]
+    pub serials: Vec<String>,
+}
+
 /// A stock transfer to create (as a draft).
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -126,7 +139,7 @@ pub(crate) struct TransferRequest {
     /// Up to 500 characters.
     pub note: Option<String>,
     /// 1 to 500 lines, one per variant.
-    pub lines: Vec<QuantityLine>,
+    pub lines: Vec<TransferLineRequest>,
 }
 
 /// Units received now; no lines receives everything still in transit.
@@ -214,7 +227,11 @@ async fn create_transfer(
         lines: input
             .lines
             .into_iter()
-            .map(|line| TransferLineInput { variant_id: line.variant_id, quantity: line.quantity })
+            .map(|line| TransferLineInput {
+                variant_id: line.variant_id,
+                quantity: line.quantity,
+                serials: line.serials,
+            })
             .collect(),
     };
     let transfer =

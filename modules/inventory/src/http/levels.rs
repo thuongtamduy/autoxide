@@ -33,6 +33,8 @@ pub(crate) fn routes(service: Arc<InventoryService>) -> OpenApiRouter {
         .routes(routes!(list_movements))
         .routes(routes!(create_adjustment))
         .routes(routes!(get_adjustment))
+        .routes(routes!(list_lots))
+        .routes(routes!(valuation))
         .with_state(service)
 }
 
@@ -284,4 +286,139 @@ async fn get_adjustment(
     principal.require(&READ)?;
     let adjustment = service.get_adjustment(&tenant, &principal, id).await?;
     Ok(Data { data: adjustment.into() })
+}
+
+/// Filters of the lot list.
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct LotsQuery {
+    /// Only lots in this warehouse or store; its setting `inventory.expiring_days` decides
+    /// `expiring` (else the tenant's root setting, default 30 days).
+    pub org_id: Option<Uuid>,
+    pub variant_id: Option<Uuid>,
+    /// `ok`, `expiring` or `expired`.
+    pub expiry_state: Option<String>,
+}
+
+/// A lot of a variant in a warehouse.
+#[derive(Debug, Clone, serde::Serialize, ToSchema)]
+#[schema(as = InventoryLot)]
+pub(crate) struct LotResponse {
+    pub id: Uuid,
+    pub level_id: Uuid,
+    pub org_id: Uuid,
+    pub variant_id: Uuid,
+    pub lot_code: String,
+    pub expires_on: Option<chrono::NaiveDate>,
+    /// Units of this lot on hand.
+    pub on_hand: i64,
+    /// `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read.
+    pub expiry_state: String,
+    pub received_at: DateTime<Utc>,
+}
+
+impl From<crate::lots::LotView> for LotResponse {
+    fn from(view: crate::lots::LotView) -> Self {
+        let row = view.row;
+        LotResponse {
+            id: row.id,
+            level_id: row.level_id,
+            org_id: row.org_id,
+            variant_id: row.variant_id,
+            lot_code: row.lot_code,
+            expires_on: row.expires_on,
+            on_hand: row.on_hand,
+            expiry_state: view.expiry_state.to_owned(),
+            received_at: row.received_at,
+        }
+    }
+}
+
+/// List lots (with expiry dates) in your scope.
+///
+/// Requires `inventory.read`. Lots that expired are written off by a daily job (ledger lines
+/// `expiry`); sales take the lots that expire first unless a lot is named.
+#[utoipa::path(
+    get,
+    path = "/lots",
+    extensions(("x-permissions" = json!(["inventory.read"]))),
+    operation_id = "list_inventory_lots",
+    security(("bearer" = [])),
+    params(LotsQuery, PageQuery),
+    responses(
+        (status = 200, description = "One page of lots.", body = Page<LotResponse>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `inventory.read`; code `permission_denied`.", body = Problem),
+        (status = 422, description = "A filter or paging parameter is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_lots(
+    State(service): State<Arc<InventoryService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Query(query): Query<LotsQuery>,
+    Query(page): Query<PageQuery>,
+) -> Result<Page<LotResponse>, Error> {
+    principal.require(&READ)?;
+    let filter = crate::lots::LotFilter {
+        org_id: query.org_id,
+        variant_id: query.variant_id,
+        expiry_state: query.expiry_state,
+    };
+    let page = PageRequest::try_from(page)?;
+    let found = service.list_lots(&tenant, &principal, &filter, &page).await?;
+    Ok(found.map(LotResponse::from))
+}
+
+/// Filter of the stock valuation.
+#[derive(Debug, Deserialize, IntoParams)]
+pub(crate) struct ValuationQuery {
+    /// Only this warehouse or store.
+    pub org_id: Option<Uuid>,
+}
+
+/// Value of the stock of one warehouse in one currency.
+#[derive(Debug, Clone, serde::Serialize, ToSchema)]
+#[schema(as = InventoryValuation)]
+pub(crate) struct ValuationResponse {
+    pub org_id: Uuid,
+    /// Units on hand that have an average cost.
+    pub units: i64,
+    /// Sum of on hand × weighted average unit cost.
+    pub value: autoxide_kernel::money::Money,
+}
+
+/// Value of the stock now: on hand × weighted average cost, per warehouse and currency.
+///
+/// Requires `inventory.read`; only warehouses in your scope. Units without a known cost are
+/// left out.
+#[utoipa::path(
+    get,
+    path = "/reports/valuation",
+    extensions(("x-permissions" = json!(["inventory.read"]))),
+    operation_id = "inventory_valuation",
+    security(("bearer" = [])),
+    params(ValuationQuery),
+    responses(
+        (status = 200, description = "The value per warehouse and currency.", body = Data<Vec<ValuationResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing `inventory.read`; code `permission_denied`.", body = Problem),
+    )
+)]
+async fn valuation(
+    State(service): State<Arc<InventoryService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Query(query): Query<ValuationQuery>,
+) -> Result<Data<Vec<ValuationResponse>>, Error> {
+    principal.require(&READ)?;
+    let rows = service.valuation(&tenant, &principal, query.org_id).await?;
+    let mut data = Vec::with_capacity(rows.len());
+    for row in rows {
+        data.push(ValuationResponse {
+            org_id: row.org_id,
+            units: row.units,
+            value: autoxide_kernel::money::Money::from_columns(row.value_minor, &row.currency)?,
+        });
+    }
+    Ok(Data { data })
 }

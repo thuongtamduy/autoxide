@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
+  `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
+  sold only once; transfers keep lots and serial numbers.
 - Module `inventory`: stock transfers between warehouses (draft, in transit with `incoming`, partial receipt carrying
   the source's average cost, close, cancel; numbers `CK-…`) and stock counts (`KK-…`, counting while selling, CSV
   import, differences applied as `count` ledger lines with a reason); MCP tools `inventory.create_transfer`,
