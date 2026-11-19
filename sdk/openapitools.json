@@ -14,7 +14,7 @@
           "artifactId": "autoxide-sdk",
           "artifactVersion": "0.14.0",
           "packageName": "dev.autoxide.sdk",
-          "serializationLibrary": "kotlinx_serialization",
+          "serializationLibrary": "moshi",
           "enumUnknownDefaultCase": true,
           "enumPropertyNaming": "UPPERCASE"
         }
