@@ -7,6 +7,7 @@ pub mod api;
 mod attributes;
 mod bulk;
 mod categories;
+mod collections;
 mod config;
 mod derived;
 mod entity;
@@ -123,6 +124,11 @@ impl Module for CatalogModule {
             sale_prices: std::sync::OnceLock::new(),
             suggestions: context.suggest_sources(),
         });
+        // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).
+        context.resource_type(
+            collections::resource::COLLECTION,
+            Arc::new(collections::resource::CollectionResolver),
+        )?;
         context.suggest_source(Arc::new(suggest::ProductSuggestions(service.clone())))?;
         context.suggest_source(Arc::new(suggest::CategorySuggestions(service.clone())))?;
         context.usage_counter(&service::PRODUCTS_LIMIT, Arc::new(service::ProductCounter))?;

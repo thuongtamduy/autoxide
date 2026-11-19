@@ -756,6 +756,8 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
 - [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
       khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
       tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
+      — xong trừ ghi số bán từ event của `orders` (kiểu sắp `best_selling` dùng cột sẵn có;
+      D-20261119-step55-collections)
 - [x] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
       hội) là cài đặt kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè); địa chỉ, giờ mở cửa, ngày nghỉ lấy từ hồ sơ
       địa điểm của bước 34, không lưu hai chỗ (D-237); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công

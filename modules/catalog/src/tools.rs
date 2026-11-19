@@ -170,7 +170,7 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
     let s = || service.clone();
     let (list, get, create, update, status, delete) = (s(), s(), s(), s(), s(), s());
     let (variant, categories, prices, resolve) = (s(), s(), s(), s());
-    vec![
+    let mut tools = vec![
         Tool::new(
             "list_products",
             "List the products in your scope, newest first; filter by status, kind, unit, \
@@ -397,7 +397,9 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
         )
         .requires(PRICES_READ)
         .read_only(),
-    ]
+    ];
+    tools.extend(crate::collections::tools::all(service));
+    tools
 }
 
 /// No input.
