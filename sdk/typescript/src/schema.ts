@@ -6715,6 +6715,23 @@ export type Data_InventoryAdjustment = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryCount = {
+  /** A stock count of one warehouse. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InventoryLevel = {
   /** The stock of one variant in one warehouse or store. */
   data: {
@@ -6774,6 +6791,26 @@ export type Data_InventoryStoreSettings = {
     allow_split: boolean;
     /** Try warehouses in the buyer's province first (province from the units' public profile). */
     prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryTransfer = {
+  /** A stock transfer between two warehouses. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
   };
 };
 
@@ -13152,6 +13189,62 @@ export type InventoryAdjustmentRequest = {
   reference: string;
 };
 
+/** A stock count of one warehouse. */
+export type InventoryCount = {
+  applied_at?: string | null;
+  created_at: string;
+  id: string;
+  lines: InventoryCountLine[];
+  note: string;
+  /** Document number, e.g. `KK-2026-000001`. */
+  number: string;
+  org_id: string;
+  /** `open`, `applied` or `cancelled`. */
+  status: string;
+};
+
+/** Counted quantities as CSV text. */
+export type InventoryCountImportRequest = {
+  /**
+   * CSV with a header row and the columns `sku` (or barcode), `counted` and optionally
+   * `reason_code`; up to 5000 rows.
+   */
+  csv: string;
+};
+
+/** One counted line of a stock count. */
+export type InventoryCountLine = {
+  counted: number;
+  counted_at: string;
+  /** On hand when this line was counted; the difference applied is `counted − expected_at_count`. */
+  expected_at_count: number;
+  reason_code?: string | null;
+  variant_id: string;
+};
+
+/** Counted quantities to record (replacing earlier counts of the same variants). */
+export type InventoryCountLinesRequest = {
+  /** 1 to 5000 lines. */
+  lines: InventoryCountedLine[];
+};
+
+/** A stock count to open. */
+export type InventoryCountRequest = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** The warehouse or store counted. */
+  org_id: string;
+};
+
+/** One counted quantity. */
+export type InventoryCountedLine = {
+  /** Units counted, 0 to 1 000 000. */
+  counted: number;
+  /** Reason for a difference, from the list `inventory.adjustment`; default `count_variance`. */
+  reason_code?: string | null;
+  variant_id: string;
+};
+
 /** The stock of one variant in one warehouse or store. */
 export type InventoryLevel = {
   /**
@@ -13204,6 +13297,18 @@ export type InventoryMovement = {
   source_type: string;
   unit_cost?: Money | null;
   variant_id: string;
+};
+
+/** A variant and a quantity. */
+export type InventoryQuantityLine = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  variant_id: string;
+};
+
+/** Units received now; no lines receives everything still in transit. */
+export type InventoryReceiveRequest = {
+  lines?: InventoryQuantityLine[];
 };
 
 /** Stock held for one order. */
@@ -13266,6 +13371,45 @@ export type InventoryStoreSettings = {
   allow_split: boolean;
   /** Try warehouses in the buyer's province first (province from the units' public profile). */
   prefer_nearby: boolean;
+};
+
+/** A stock transfer between two warehouses. */
+export type InventoryTransfer = {
+  created_at: string;
+  from_org_id: string;
+  id: string;
+  lines: InventoryTransferLine[];
+  note: string;
+  /** Document number, e.g. `CK-2026-000001`. */
+  number: string;
+  reference?: string | null;
+  shipped_at?: string | null;
+  /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+  status: string;
+  to_org_id: string;
+  updated_at: string;
+};
+
+/** One line of a stock transfer. */
+export type InventoryTransferLine = {
+  quantity: number;
+  received_quantity: number;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock transfer to create (as a draft). */
+export type InventoryTransferRequest = {
+  /** The warehouse the goods leave. */
+  from_org_id: string;
+  /** 1 to 500 lines, one per variant. */
+  lines: InventoryQuantityLine[];
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Your own reference, up to 100 characters. */
+  reference?: string | null;
+  /** The warehouse the goods go to. */
+  to_org_id: string;
 };
 
 /** A new invitation. */
@@ -17095,6 +17239,24 @@ export type Page_FormResponse = {
 };
 
 /** One page of a list. */
+export type Page_InventoryCount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InventoryLevel = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17162,6 +17324,27 @@ export type Page_InventoryReservation = {
     selling_org_id: string;
     /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryTransfer = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -30257,6 +30440,104 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/counts": {
+    /** List stock counts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open a stock count in one warehouse. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryCountRequest;
+      responses: {
+        201: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}": {
+    /** Get a stock count with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/apply": {
+    /** Apply a stock count: each difference becomes a `count` ledger line with its reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/cancel": {
+    /** Cancel an open stock count. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/import": {
+    /** Record counted quantities from a CSV file. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountImportRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/lines": {
+    /** Record counted quantities. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountLinesRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/levels": {
     /** List stock levels (variant × warehouse) in your scope. */
     get: {
@@ -30378,6 +30659,103 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers": {
+    /** List stock transfers from or to warehouses in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string | null; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a stock transfer as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryTransferRequest;
+      responses: {
+        201: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}": {
+    /** Get a stock transfer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/cancel": {
+    /** Cancel a draft transfer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/close": {
+    /** Close a transfer in transit: what has not arrived is written off from `incoming`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/receive": {
+    /** Receive goods of a transfer in transit, all or part. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryReceiveRequest;
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/ship": {
+    /** Ship a draft transfer: the goods leave the source and are in transit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

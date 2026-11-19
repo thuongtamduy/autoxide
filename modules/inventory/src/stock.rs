@@ -248,7 +248,6 @@ pub(crate) async fn record<C: ConnectionTrait>(
 
 /// Đổi `available` của dòng tồn `level` thêm `delta` trong `bounds` (giữ chỗ / trả chỗ). `false`:
 /// không đủ (không đổi gì).
-#[allow(dead_code)]
 pub(crate) async fn move_available<C: ConnectionTrait>(
     transaction: &C,
     tenant: &TenantContext,
@@ -269,6 +268,28 @@ pub(crate) async fn move_available<C: ConnectionTrait>(
         touched.add(level, 0, delta);
     }
     Ok(changed > 0)
+}
+
+/// Đổi `incoming` (hàng đang về: chuyển kho đang đi đường, đơn đặt hàng) của dòng tồn `level`
+/// thêm `delta`, không xuống dưới 0.
+pub(crate) async fn move_incoming<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    level: Uuid,
+    delta: i64,
+) -> Result<(), Error> {
+    let changed = rows::adjust::<level::Entity, _>(
+        transaction,
+        level::Column::Incoming,
+        by_id(tenant, level),
+        delta,
+        Bounds::NON_NEGATIVE,
+    )
+    .await?;
+    if changed == 0 {
+        return Err(Error::internal("incoming stock would go below zero"));
+    }
+    Ok(())
 }
 
 /// Giá vốn bình quân gia quyền sau khi nhập `quantity` đơn vị giá `cost`: `(tồn × giá cũ + nhập ×

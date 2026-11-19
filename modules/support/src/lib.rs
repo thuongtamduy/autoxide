@@ -9,6 +9,7 @@ mod config;
 mod entity;
 mod events;
 mod extras;
+mod facts;
 mod guest;
 mod hours;
 mod http;
@@ -116,6 +117,8 @@ impl Module for SupportModule {
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;
         context.provide::<dyn api::SupportIntake>(service.clone())?;
+        // Điểm cắm cho module đăng ký sau (`shipping`, `orders`): nguồn câu trả lời từ dữ liệu (D-230).
+        context.provide::<dyn api::SupportFacts>(Arc::new(facts::FactRegistry::default()))?;
         // Phiếu là một loại đối tượng (D-123): vụ việc khiếu nại của `compliance` trỏ tới nó.
         context.resource_type("support.ticket", Arc::new(intake::TicketResolver))?;
         // Hộp việc (bước 51): phiếu đang chờ nhân viên.

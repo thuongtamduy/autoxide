@@ -91,6 +91,21 @@ của chính nó. `PUT /settings/{cửa hàng}`:
 Giữ chỗ thử trước một kho đủ mọi dòng; không có kho ứng viên nào thì trả `inventory.no_source`, không đủ hàng thì
 `inventory.insufficient_stock` nêu từng dòng.
 
+## Chuyển kho
+
+`POST /transfers` (`inventory.transfer` ở kho gửi) tạo phiếu nháp có số như `CK-2026-000001`.
+`POST /transfers/{id}/ship` lấy hàng khỏi kho gửi (chỉ hàng chưa giữ cho đơn) và cộng vào `incoming` của kho nhận;
+`POST /transfers/{id}/receive` (ở kho nhận) nhận hết hay một phần — giá vốn bình quân của kho nhận dùng giá vốn của kho
+gửi lúc gửi. `close` bỏ phần không tới; `cancel` cho phiếu nháp. Tool MCP `inventory.create_transfer`,
+`inventory.receive_transfer`.
+
+## Kiểm kê
+
+`POST /counts` (`inventory.count`) mở phiếu kiểm kê (`KK-…`) cho một kho; `PUT /counts/{id}/lines` hay
+`POST /counts/{id}/import` (CSV có `sku`, `counted`, `reason_code` tuỳ chọn) ghi số đếm. Mỗi dòng giữ `on_hand` lúc đếm
+dòng đó, nên vẫn bán được trong lúc kiểm. `POST /counts/{id}/apply` (`inventory.adjust`) ghi mỗi chênh lệch
+`counted − expected_at_count` thành dòng sổ `count` kèm lý do (mặc định `count_variance`).
+
 ## Kiểm số liệu
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<nút>]` so mọi dòng tồn với sổ và chỗ giữ của nó,
