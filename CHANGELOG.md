@@ -14,6 +14,9 @@ endpoints are marked deprecated with a sunset date first.
 - `shipping`: automatic answers for `support` about where a parcel is (intent `shipping.tracking`), only for the
   owner of the order (buyer account or verified phone number); read permission `shipping.cod.read` for COD
   statements and discrepancies.
+- Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
+  limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
+  stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
 - Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
   receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
   posting; MCP tool `inventory.create_receipt`.
