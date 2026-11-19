@@ -26278,6 +26278,30 @@
         ],
         "type": "object"
       },
+      "Data_PromoteResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled\nin the real tenant: people there publish the drafts themselves.",
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/PromoteOutcome"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PromotionsActivated": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36267,6 +36291,41 @@
                 "prices",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PromotableKind": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of record that can be promoted from a sandbox to the real tenant.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`<module>.<kind>`, e.g. `content.page`.",
+                  "example": "content.page",
+                  "type": "string"
+                },
+                "module": {
+                  "description": "The module that owns it.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "module",
+                "description"
               ],
               "type": "object"
             },
@@ -64852,6 +64911,142 @@
         },
         "required": [
           "display_name"
+        ],
+        "type": "object"
+      },
+      "PromotableKind": {
+        "description": "A kind of record that can be promoted from a sandbox to the real tenant.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "`<module>.<kind>`, e.g. `content.page`.",
+            "example": "content.page",
+            "type": "string"
+          },
+          "module": {
+            "description": "The module that owns it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "module",
+          "description"
+        ],
+        "type": "object"
+      },
+      "PromoteConflict": {
+        "description": "Why a record could not be promoted.",
+        "properties": {
+          "field": {
+            "description": "The field that clashes, e.g. `slug`.",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "type": "object"
+      },
+      "PromoteInput": {
+        "additionalProperties": false,
+        "description": "What to promote.",
+        "properties": {
+          "items": {
+            "description": "1 to 100 records of the sandbox.",
+            "items": {
+              "$ref": "#/components/schemas/PromoteItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "PromoteItem": {
+        "additionalProperties": false,
+        "description": "One record of the sandbox to promote.",
+        "properties": {
+          "id": {
+            "description": "Id of the record in the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "A kind from `GET /api/v1/kernel/sandboxes/promotable`.",
+            "example": "content.page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "PromoteOutcome": {
+        "description": "Outcome of one promoted record.",
+        "properties": {
+          "conflict": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PromoteConflict",
+                "description": "Why it was not promoted, on `conflict`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "description": "Id of the record in the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "outcome": {
+            "description": "`created_draft` (a new draft in the real tenant), `updated_draft` (the draft or pending\nchange of the record in the real tenant was replaced; what is live is untouched),\n`unchanged` (already promoted with the same content) or `conflict` (a name, path or code\nis taken in the real tenant; see `conflict`).",
+            "example": "created_draft",
+            "type": "string"
+          },
+          "target_id": {
+            "description": "The record in the real tenant; `null` on `conflict`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "PromoteResult": {
+        "description": "Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled\nin the real tenant: people there publish the drafts themselves.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PromoteOutcome"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -147435,6 +147630,80 @@
         ]
       }
     },
+    "/api/v1/kernel/sandboxes/promotable": {
+      "get": {
+        "description": "Requires `kernel.sandboxes.read`. Each module declares its own kinds (pages, mail templates…).",
+        "operationId": "kernel_list_sandbox_promotable",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotableKind"
+                }
+              }
+            },
+            "description": "Every kind that can be promoted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the kinds of records that can be promoted from a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.read"
+        ]
+      }
+    },
     "/api/v1/kernel/sandboxes/{id}": {
       "delete": {
         "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is\ndeleted now and cannot be recovered; promote what you want to keep first.",
@@ -147634,6 +147903,133 @@
           }
         ],
         "summary": "Extend a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/sandboxes/{id}/promote": {
+      "post": {
+        "description": "Requires `kernel.sandboxes.manage`, called in the real tenant of the sandbox, plus the\npermission each module needs to write the record (e.g. `content.write` for a page): you cannot\npromote what you could not write by hand. Up to 100 records. Each one becomes a **draft** in the\nreal tenant — nothing is published or enabled, and what is live is never overwritten. A record\ncopied from the real tenant updates the draft of its original; a record made in the sandbox\nbecomes a new draft. Promoting again with the same content gives `unchanged`. A name, path or\ncode already taken in the real tenant gives `conflict` for that record while the others go on.\nSend an `Idempotency-Key` to retry safely.",
+        "operationId": "kernel_promote_sandbox",
+        "parameters": [
+          {
+            "description": "Id of the sandbox.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromoteResult"
+                }
+              }
+            },
+            "description": "One outcome per record, in the order sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.manage` or the permission of a module (`permission_denied`), or called outside the real tenant of the sandbox (`tenancy.sandbox_forbidden`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such sandbox of your tenant (`tenancy.sandbox_not_found`), or no such record in it (`tenancy.promote_record_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No records, more than 100, or a kind that cannot be promoted (`validation_failed`, see `errors`: `tenancy.promote_kind_unknown`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Promote records tried in a sandbox to the real tenant, as drafts.",
         "tags": [
           "kernel"
         ],

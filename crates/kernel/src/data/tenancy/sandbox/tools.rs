@@ -43,6 +43,22 @@ pub(crate) struct MessagesInput {
     order: Option<String>,
 }
 
+/// Records of a sandbox to promote.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PromoteToolInput {
+    /// Id of the sandbox.
+    id: Uuid,
+    /// 1 to 100 records of the sandbox, each `<kind>:<id>` with a kind from
+    /// `kernel.list_promotable`, e.g. `content.page:0190…`.
+    items: Vec<String>,
+}
+
+/// No input.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct NoInput {}
+
 /// A new sandbox of your tenant.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -64,7 +80,8 @@ pub(crate) struct SandboxId {
 }
 
 pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
-    let (list, create, extend) = (service.clone(), service.clone(), service);
+    let (list, create, extend) = (service.clone(), service.clone(), service.clone());
+    let (kinds, promote) = (service.clone(), service);
     vec![
         Tool::new(
             "list_sandboxes",
@@ -126,5 +143,30 @@ pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
         )
         .requires(SANDBOXES_READ)
         .read_only(),
+        Tool::new(
+            "list_promotable",
+            "List the kinds of records that can be promoted from a sandbox to your tenant.",
+            move |_: TenantContext, principal: Principal, _: NoInput| {
+                let service = kinds.clone();
+                async move { service.promotable(&principal) }
+            },
+        )
+        .requires(SANDBOXES_READ)
+        .read_only(),
+        Tool::new(
+            "promote_sandbox",
+            "Promote records tried in a sandbox to your tenant as drafts (nothing is published or \
+             enabled; what is live is never overwritten). Call it in the real tenant. Each record \
+             gets `created_draft`, `updated_draft`, `unchanged` or `conflict`.",
+            move |tenant: TenantContext, principal: Principal, input: PromoteToolInput| {
+                let service = promote.clone();
+                async move {
+                    let items = super::promote::parse_items(&input.items)?;
+                    let request = super::promote::PromoteInput { items };
+                    service.promote(&tenant, &principal, input.id, request).await
+                }
+            },
+        )
+        .requires(SANDBOXES_MANAGE),
     ]
 }

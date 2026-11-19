@@ -8670,6 +8670,17 @@ export type Data_PreviewToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromoteResult = {
+  /**
+   * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+   * in the real tenant: people there publish the drafts themselves.
+   */
+  data: {
+    items: PromoteOutcome[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsActivated = {
   /** A promotion just turned on, with the warnings of its checks. */
   data: {
@@ -11811,6 +11822,17 @@ export type Data_Vec_PlanResponse = {
     /** Days of free trial for a tenant that never had one; 0 for none. */
     trial_days: number;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotableKind = {
+  data: {
+    description: string;
+    /** `<module>.<kind>`, e.g. `content.page`. */
+    kind: string;
+    /** The module that owns it. */
+    module: string;
   }[];
 };
 
@@ -20949,6 +20971,61 @@ export type ProfileRequest = {
    * moderators; no two users share a name.
    */
   display_name: string;
+};
+
+/** A kind of record that can be promoted from a sandbox to the real tenant. */
+export type PromotableKind = {
+  description: string;
+  /** `<module>.<kind>`, e.g. `content.page`. */
+  kind: string;
+  /** The module that owns it. */
+  module: string;
+};
+
+/** Why a record could not be promoted. */
+export type PromoteConflict = {
+  /** The field that clashes, e.g. `slug`. */
+  field: string;
+  message: string;
+};
+
+/** What to promote. */
+export type PromoteInput = {
+  /** 1 to 100 records of the sandbox. */
+  items: PromoteItem[];
+};
+
+/** One record of the sandbox to promote. */
+export type PromoteItem = {
+  /** Id of the record in the sandbox. */
+  id: string;
+  /** A kind from `GET /api/v1/kernel/sandboxes/promotable`. */
+  kind: string;
+};
+
+/** Outcome of one promoted record. */
+export type PromoteOutcome = {
+  conflict?: PromoteConflict | null;
+  /** Id of the record in the sandbox. */
+  id: string;
+  kind: string;
+  /**
+   * `created_draft` (a new draft in the real tenant), `updated_draft` (the draft or pending
+   * change of the record in the real tenant was replaced; what is live is untouched),
+   * `unchanged` (already promoted with the same content) or `conflict` (a name, path or code
+   * is taken in the real tenant; see `conflict`).
+   */
+  outcome: string;
+  /** The record in the real tenant; `null` on `conflict`. */
+  target_id?: string | null;
+};
+
+/**
+ * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+ * in the real tenant: people there publish the drafts themselves.
+ */
+export type PromoteResult = {
+  items: PromoteOutcome[];
 };
 
 /** A promotion just turned on, with the warnings of its checks. */
@@ -33514,6 +33591,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandboxes/promotable": {
+    /** List the kinds of records that can be promoted from a sandbox. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PromotableKind;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/sandboxes/{id}": {
     /** Delete a sandbox. */
     delete: {
@@ -33536,6 +33625,21 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandboxes/{id}/promote": {
+    /** Promote records tried in a sandbox to the real tenant, as drafts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromoteInput;
+      responses: {
+        200: Data_PromoteResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

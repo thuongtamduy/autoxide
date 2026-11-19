@@ -422,6 +422,45 @@ pub(crate) fn declaration_problems(
     problems
 }
 
+/// Sao mọi cài đặt KHÔNG bí mật của `source` sang `target` (sandbox, D-232): secret (thông tin kết
+/// nối đối tác) không bao giờ sang — sandbox dùng bộ giả. Cài đặt `target` đã có thì giữ. Trả số dòng
+/// mới.
+pub(crate) async fn copy_plain(
+    source: &TenantContext,
+    target: &TenantContext,
+) -> Result<u64, Error> {
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+
+    let rows = entity::Entity::find()
+        .filter(entity::Column::TenantId.eq(source.id().as_uuid()))
+        .filter(entity::Column::Secret.eq(false))
+        .all(source.database().read())
+        .await?;
+    let mut copied = 0;
+    for row in rows {
+        let insert = entity::Entity::insert(entity::ActiveModel {
+            tenant_id: Set(target.id().as_uuid()),
+            name: Set(row.name),
+            value: Set(row.value),
+            secret: Set(false),
+            updated_by: Set(None),
+            updated_at: Set(row.updated_at),
+        })
+        .on_conflict(
+            sea_orm::sea_query::OnConflict::columns([
+                entity::Column::TenantId,
+                entity::Column::Name,
+            ])
+            .do_nothing()
+            .to_owned(),
+        )
+        .exec_without_returning(target.database().write())
+        .await?;
+        copied += insert;
+    }
+    Ok(copied)
+}
+
 mod entity {
     //! Bảng `kernel_tenant_settings`.
     use sea_orm::entity::prelude::*;

@@ -30,6 +30,7 @@ mod publishing;
 mod relocation;
 mod resource;
 mod restriction;
+mod sandbox;
 mod service;
 mod setup;
 mod taxonomy;
@@ -317,6 +318,16 @@ impl Module for ContentModule {
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         relocation::relocation()
+    }
+
+    // Trang trong sandbox (bước 38, D-232): sao từ khách thật, đẩy về thành bản nháp.
+    fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+        let service = self.service.clone()?;
+        Some(Arc::new(sandbox::Pages { service }))
+    }
+
+    fn promotable(&self) -> Vec<autoxide_kernel::tenancy::sandbox::Promotable> {
+        self.service.clone().map_or_else(Vec::new, sandbox::promotable)
     }
 }
 

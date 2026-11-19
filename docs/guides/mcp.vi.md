@@ -220,6 +220,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_promotable` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandbox_messages` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
@@ -228,6 +229,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.navigation` | — | read-only |
 | `kernel.ops_backlog` | `kernel.ops.read` | read-only |
+| `kernel.promote_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.request_log` | `kernel.devtools.read` | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |

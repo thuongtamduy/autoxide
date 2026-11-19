@@ -258,8 +258,9 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
       — đang làm: phần nền xong (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
       hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); cách ly xong (19/11,
       D-20261119-step38-sandbox-isolation: kernel bọc hợp đồng đối tác lúc công bố → bộ giả, mail chỉ tới nhân viên,
-      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); còn sao / đẩy
-      (`Module::sandbox_copy` / `promotable`, API promote)
+      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); sao / đẩy xong
+      (19/11, D-20261119-step38-sandbox-copy: `Module::sandbox_copy` / `promotable`, bảng nối `kernel_sandbox_links`,
+      sao cài đặt / role / trang / mẫu thông báo, `POST …/sandboxes/{id}/promote` thành bản nháp); còn tài liệu
 - [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
       D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
       `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
