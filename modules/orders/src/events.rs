@@ -44,6 +44,8 @@ event!(OrderCancelled, names::ORDER_CANCELLED);
 event!(OrderDelivered, names::ORDER_DELIVERED);
 event!(OrderCompleted, names::ORDER_COMPLETED);
 event!(PaymentRecorded, names::PAYMENT_RECORDED);
+event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
+event!(RefundCompleted, names::REFUND_COMPLETED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
