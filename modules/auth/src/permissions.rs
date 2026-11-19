@@ -45,6 +45,13 @@ pub(crate) const API_KEYS_APPROVE: Permission = Permission::new(
 )
 .with_risk(Risk::SensitiveData);
 
+pub(crate) const GUARDRAILS_MANAGE: Permission = Permission::new(
+    "auth.guardrails.manage",
+    "Set the most permissions a tenant below this one can use (a guardrail): no role there, not \
+     even its administrators, gets more. Whoever holds this can cut what child tenants can do.",
+)
+.with_risk(Risk::Destructive);
+
 pub(crate) const CUSTOMERS_READ: Permission = Permission::new(
     "auth.customers.read",
     "See the customer accounts of the tenant's shop (email, name, status), never their passwords.",
@@ -115,6 +122,7 @@ pub(crate) fn all() -> Vec<Permission> {
         PASSKEYS_MANAGE,
         API_KEYS_MANAGE,
         API_KEYS_APPROVE,
+        GUARDRAILS_MANAGE,
         CUSTOMERS_READ,
         CUSTOMERS_MANAGE,
         DELEGATIONS_READ,

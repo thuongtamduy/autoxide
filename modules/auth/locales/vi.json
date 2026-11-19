@@ -12,6 +12,8 @@
   "auth.delegation_not_found": "Không có uỷ quyền `{id}`.",
   "auth.email_already_verified": "Địa chỉ email này đã được xác minh.",
   "auth.email_taken": "Đã có người dùng với email `{email}`. Hãy dùng email khác, hoặc đăng nhập bằng email này.",
+  "auth.guardrail_not_a_child": "Chỉ khách ở trên `{tenant}` trong cây khách hàng mới đặt được rào cho nó, và phải từ tài khoản của chính khách đó (không phải khi đang làm việc ở khách khác).",
+  "auth.guardrail_not_found": "Khách này chưa đặt rào nào cho khách `{tenant}`.",
   "auth.identity_last_method": "Không gỡ được: đây là cách đăng nhập cuối cùng của bạn. Hãy đặt mật khẩu hoặc thêm passkey trước.",
   "auth.identity_not_found": "Bạn không có liên kết đăng nhập mang id `{id}`.",
   "auth.identity_taken": "Danh tính đăng nhập này đã liên kết với tài khoản khác. Hãy gỡ ở tài khoản đó trước.",
@@ -222,6 +224,7 @@
   "text:See the delegations of this tenant: given to child tenants, and received from parents.": "Xem uỷ quyền của khách này: đã cấp cho khách con và nhận từ khách cha.",
   "text:See the sign-in providers of the tenant and how they are set up (never their client secrets).": "Xem các nhà cung cấp đăng nhập của khách và cách khai (không bao giờ thấy client secret).",
   "text:See user accounts and the roles assigned to them.": "Xem tài khoản người dùng và role được gán cho họ.",
+  "text:Set the most permissions a tenant below this one can use (a guardrail): no role there, not even its administrators, gets more. Whoever holds this can cut what child tenants can do.": "Đặt số permission tối đa một khách ở dưới khách này được dùng (rào): không role nào ở đó, kể cả quản trị viên, có hơn. Ai giữ permission này cắt được việc khách con làm.",
   "text:Settings": "Cài đặt",
   "text:Several sessions of a user were ended at once: by the user (`after.kept` is the session they kept) or by an administrator; `after.count` is how many.": "Nhiều phiên đăng nhập của một người dùng bị kết thúc cùng lúc: bởi chính họ (`after.kept` là phiên họ giữ lại) hay bởi quản trị viên; `after.count` là số phiên.",
   "text:Someone was invited by email to work at a unit with given roles (`after`: email, unit, roles, expiry).": "Một người được mời qua email làm việc ở một nút với các role định sẵn (`after`: email, nút, role, hạn).",
@@ -229,6 +232,8 @@
   "text:The owner of an account reported an email change they did not make (from the mail sent to the old address): the account was signed out everywhere, its password, passkeys, API keys and two-step sign-in removed, and the old address restored when free (`before.email`, `after.email`).": "Chủ tài khoản báo một lần đổi email không phải do họ (từ thư gửi tới địa chỉ cũ): tài khoản bị đăng xuất khỏi mọi nơi, mật khẩu, passkey, API key và đăng nhập hai bước bị gỡ, địa chỉ cũ được trả lại nếu còn trống (`before.email`, `after.email`).",
   "text:The roles of a user changed.": "Role của một người dùng thay đổi.",
   "text:This tenant let holders of one of its roles work in a child tenant (`after`: child tenant, role, unit, expiry, reason).": "Khách này cho người giữ một role của mình làm việc ở một khách con (`after`: khách con, role, nút, hạn, lý do).",
+  "text:This tenant removed the guardrail it had set for a tenant below it (`before.tenant_id`).": "Khách này gỡ rào đã đặt cho một khách ở dưới nó (`before.tenant_id`).",
+  "text:This tenant set or changed the most permissions a tenant below it can use (`after`: tenant, permissions).": "Khách này đặt hay đổi số permission tối đa của một khách ở dưới nó (`after`: khách, permission).",
   "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên.",
   "text:Write notes.": "Viết ghi chú."
 }

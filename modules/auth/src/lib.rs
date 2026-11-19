@@ -23,6 +23,9 @@ mod doctor;
 mod email_report;
 mod events;
 mod find;
+mod guardrail;
+#[cfg(test)]
+mod guardrail_tests;
 mod http;
 mod invitation;
 mod login_link;
@@ -298,7 +301,13 @@ impl Module for AuthModule {
             max_hours: config.support_max_hours,
             catalog: context.permissions().clone(),
         });
+        let guardrails = Arc::new(guardrail::GuardrailService::new(
+            databases.clone(),
+            context.permissions().clone(),
+            outbox.clone(),
+        ));
         let authenticator = RequestAuthenticator {
+            guardrails: guardrails.clone(),
             support: support.clone(),
             sessions: sessions.clone(),
             roles: roles.clone(),
@@ -386,6 +395,7 @@ impl Module for AuthModule {
             invitations,
             login_links,
             delegations,
+            guardrails,
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reauth,
             personal_data: context.personal_data_export(),
@@ -496,7 +506,9 @@ impl Module for AuthModule {
 
     // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
-        sandbox::subscriptions()
+        let mut subscriptions = sandbox::subscriptions();
+        subscriptions.extend(guardrail::subscriptions());
+        subscriptions
     }
 }
 

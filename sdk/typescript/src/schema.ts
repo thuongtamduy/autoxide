@@ -314,6 +314,17 @@ export type ApiKeyResponse = {
   status: string;
 };
 
+/** The guardrails that limit this tenant. */
+export type AppliedGuardrailsResponse = {
+  /** Every guardrail on the way from the top tenant to this one. */
+  guardrails: GuardrailResponse[];
+  /**
+   * The most permissions anyone can use in this tenant: what every guardrail allows together,
+   * sorted by name. `null` when no guardrail limits this tenant.
+   */
+  max_permissions?: string[] | null;
+};
+
 /** Records to tag or untag in one call. */
 export type ApplyTagInput = {
   /** Records that get the tag (those that have it already are skipped). */
@@ -4534,6 +4545,20 @@ export type Data_ApiKeyResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_AppliedGuardrailsResponse = {
+  /** The guardrails that limit this tenant. */
+  data: {
+    /** Every guardrail on the way from the top tenant to this one. */
+    guardrails: GuardrailResponse[];
+    /**
+     * The most permissions anyone can use in this tenant: what every guardrail allows together,
+     * sorted by name. `null` when no guardrail limits this tenant.
+     */
+    max_permissions?: string[] | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ApplyTagResult = {
   /** What a bulk tagging changed. */
   data: {
@@ -6807,6 +6832,25 @@ export type Data_GroupResponse = {
     member_count: number;
     name: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_GuardrailResponse = {
+  /** The most permissions a tenant below this one can use. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
   };
 };
 
@@ -13465,6 +13509,31 @@ export type GroupResponse = {
   updated_at: string;
 };
 
+/** A guardrail to set. */
+export type GuardrailRequest = {
+  /**
+   * The permissions roles of that tenant may grant at most (see
+   * `GET /api/v1/auth/permissions`). `[]` leaves no permission.
+   */
+  max_permissions: string[];
+};
+
+/** The most permissions a tenant below this one can use. */
+export type GuardrailResponse = {
+  /**
+   * The permissions roles there may still grant, sorted by name. Any other permission is
+   * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+   */
+  max_permissions: string[];
+  /** The tenant above it that set the guardrail. */
+  set_by_tenant_id: string;
+  /** The tenant limited by the guardrail (and every tenant below it). */
+  tenant_id: string;
+  updated_at: string;
+  /** Who set it last, and when. */
+  updated_by: string;
+};
+
 /** A guest cancels a booking. */
 export type GuestCancelRequest = {
   /** A fresh code sent to the phone number of the booking. */
@@ -18165,6 +18234,26 @@ export type Page_GroupResponse = {
     member_count: number;
     name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GuardrailResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
   }[];
   pagination: Pagination;
 };
@@ -26460,6 +26549,56 @@ export interface paths {
         400: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails": {
+    /** List the guardrails this tenant set for tenants below it. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/applied": {
+    /** See the guardrails that limit this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_AppliedGuardrailsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/{tenant_id}": {
+    /** Set the most permissions a tenant below this one can use. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: GuardrailRequest;
+      responses: {
+        200: Data_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the guardrail this tenant set for a tenant below it. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
