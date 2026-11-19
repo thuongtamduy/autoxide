@@ -743,8 +743,26 @@ impl InventoryService {
         fail_if_any(problems)?;
         let Some(key) = key else { return Err(Error::internal("key checked without a problem")) };
         let fingerprint = reference::fingerprint(&request.lines)?;
+        // Cờ lô / serial của các biến thể trong chỗ giữ: hỏi `Catalog` TRƯỚC transaction.
+        let variant_ids: Vec<Uuid> =
+            match find_by_order(tenant.database().read(), tenant, request.order_id, false).await? {
+                Some(row) => reservation_line::Entity::find()
+                    .filter(reservation_line::Column::ReservationId.eq(row.id))
+                    .scoped(tenant)
+                    .all(tenant.database().read())
+                    .await?
+                    .into_iter()
+                    .map(|line| line.variant_id)
+                    .collect(),
+                None => Vec::new(),
+            };
+        let variants = if variant_ids.is_empty() {
+            HashMap::new()
+        } else {
+            self.variants(tenant, &variant_ids).await?
+        };
         let database = tenant.database();
-        let (key, fingerprint) = (&key, &fingerprint);
+        let (key, fingerprint, variants) = (&key, &fingerprint, &variants);
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -777,7 +795,30 @@ impl InventoryService {
                     takes.iter().map(|(index, quantity)| (&lines[*index], *quantity)).collect();
                 ordered.sort_by_key(|(line, _)| line.level_id);
                 let mut touched = Touched::default();
+                let mut serials_used: HashMap<&str, usize> = HashMap::new();
                 for (line, quantity) in &ordered {
+                    let wanted =
+                        request.lines.iter().find(|wanted| wanted.line_key == line.line_key);
+                    let variant = variants.get(&line.variant_id);
+                    let serials = if variant.is_some_and(|v| v.serial_tracked) {
+                        let all: &[String] = wanted.map_or(&[], |wanted| wanted.serials.as_slice());
+                        let used = serials_used.entry(line.line_key.as_str()).or_default();
+                        let count = usize::try_from(*quantity).unwrap_or(usize::MAX);
+                        let Some(part) = all.get(*used..used.saturating_add(count)) else {
+                            return Err(crate::lots::serials_required(&line.line_key, *quantity));
+                        };
+                        *used += count;
+                        Some(part)
+                    } else {
+                        None
+                    };
+                    let tracking = crate::lots::Tracking {
+                        lot_tracked: variant.is_some_and(|v| v.lot_tracked),
+                        lot_code: wanted.and_then(|wanted| wanted.lot_code.as_deref()),
+                        serials,
+                        serial_status: "sold",
+                        order: Some(order),
+                    };
                     let new = NewMovement {
                         org: line.org_id,
                         variant: line.variant_id,
@@ -792,7 +833,8 @@ impl InventoryService {
                         source_id: row.id,
                         actor: None,
                     };
-                    stock::record(&transaction, tenant, &mut touched, new).await?;
+                    crate::lots::record_out(&transaction, tenant, &mut touched, new, &tracking)
+                        .await?;
                     reservation_line::Entity::update_many()
                         .col_expr(
                             reservation_line::Column::FulfilledQuantity,
@@ -938,7 +980,16 @@ impl InventoryService {
                     source_id: row.id,
                     actor: None,
                 };
-                stock::record(&transaction, tenant, &mut touched, new).await?;
+                let variant = variants.get(&line.variant_id);
+                let lot = line
+                    .lot_code
+                    .as_deref()
+                    .filter(|_| variant.is_some_and(|v| v.lot_tracked))
+                    .map(|code| (code, None));
+                let serials: &[String] =
+                    if variant.is_some_and(|v| v.serial_tracked) { &line.serials } else { &[] };
+                crate::lots::record_in(&transaction, tenant, &mut touched, new, lot, serials)
+                    .await?;
             }
             stock::publish(&transaction, tenant, &self.outbox, &Actor::system(), touched).await?;
             transaction.commit().await?;

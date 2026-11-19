@@ -48,6 +48,7 @@ event!(ReservationExpired, names::RESERVATION_EXPIRED);
 event!(TransferShipped, "inventory.transfer_shipped");
 event!(TransferReceived, "inventory.transfer_received");
 event!(CountApplied, "inventory.count_applied");
+event!(LotExpired, "inventory.lot_expired");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -95,6 +96,10 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             "inventory.count_applied",
             "A stock count was applied: its differences were written to the ledger.",
+        ),
+        EventInfo::new(
+            "inventory.lot_expired",
+            "A lot passed its expiry date and its units were written off the stock.",
         ),
     ]
 }

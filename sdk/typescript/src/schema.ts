@@ -4030,6 +4030,16 @@ export type CreateListRequest = {
   public?: boolean | null;
 };
 
+/** A new cart. */
+export type CreateOrdersCartRequest = {
+  /** ISO 4217 code; default `VND`. */
+  currency?: string | null;
+  /** Language of product names and promotion terms; default `vi`. */
+  locale?: string | null;
+  /** The shop (or marketplace store) selling; omitted: the root unit of the tenant. */
+  org_id?: string | null;
+};
+
 /**
  * A new automation rule. Every problem (unknown event or tool, a tool you lack the permission
  * for, arguments that do not fit the tool) is reported at once.
@@ -8079,6 +8089,54 @@ export type Data_OpsBacklog = {
 };
 
 /** Envelope of a single result. */
+export type Data_Option_PromotionsEligibility = {
+  data: null | {
+    best_selection: PromotionsSelection;
+    best_total_discount: Money;
+    ineligible: PromotionsIneligibleOffer[];
+    usable: PromotionsOffer[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersCart = {
+  /** A cart with its quote, computed again by the server on every read. */
+  data: {
+    attribution?: OrdersAttribution | null;
+    buyer_user_id?: string | null;
+    /** Guests only, once, when the cart is created: send it back in the `Cart-Token` header. */
+    cart_token?: string | null;
+    /** Coupon codes entered. */
+    codes: string[];
+    currency: string;
+    free_shipping_remaining?: Money | null;
+    id: string;
+    lines: OrdersCartLine[];
+    /** The shop (or marketplace store) selling. */
+    org_id: string;
+    payment_method?: string | null;
+    /** Promotions applied, with their terms. */
+    promotions: Record<string, unknown>[];
+    quote_expires_at: string;
+    /**
+     * Send it to `POST /checkout`: checkout refuses with `orders.quote_changed` when prices,
+     * discounts or fees changed since.
+     */
+    quote_token: string;
+    /** Codes and vouchers that do not apply, with the reason. */
+    rejected_codes: Record<string, unknown>[];
+    ship_to?: OrdersCartShipTo | null;
+    shipping: OrdersCartShipping;
+    /** `active`, `abandoned`, `merged` or `converted`. */
+    status: string;
+    totals: OrdersCartTotals;
+    updated_at: string;
+    /** Vouchers of your wallet used for this cart. */
+    voucher_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -10988,6 +11046,17 @@ export type Data_Vec_IdentityResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_InventoryValuation = {
+  data: {
+    org_id: string;
+    /** Units on hand that have an average cost. */
+    units: number;
+    /** Sum of on hand × weighted average unit cost. */
+    value: Money;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_InvoicesExportProfile = {
   data: {
     description: string;
@@ -13163,6 +13232,13 @@ export type InventoryAdjustment = {
 
 /** One line of a stock adjustment. */
 export type InventoryAdjustmentLine = {
+  /** Expiry date of the lot, when adding. */
+  expires_on?: string | null;
+  /**
+   * Lot of the units: required when adding units of a variant that tracks lots; when removing,
+   * omit it to take the lots that expire first.
+   */
+  lot_code?: string | null;
   /** Up to 500 characters. */
   note?: string | null;
   /** Units to add (positive) or remove (negative); not 0. */
@@ -13172,6 +13248,8 @@ export type InventoryAdjustmentLine = {
    * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
    */
   reason_code?: string | null;
+  /** Exactly `|quantity|` serial numbers when the variant tracks serials. */
+  serials?: string[];
   unit_cost?: Money | null;
   variant_id: string;
 };
@@ -13272,6 +13350,21 @@ export type InventoryLevel = {
 export type InventoryLevelUpdate = {
   /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
   reorder_point?: number | null;
+};
+
+/** A lot of a variant in a warehouse. */
+export type InventoryLot = {
+  expires_on?: string | null;
+  /** `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read. */
+  expiry_state: string;
+  id: string;
+  level_id: string;
+  lot_code: string;
+  /** Units of this lot on hand. */
+  on_hand: number;
+  org_id: string;
+  received_at: string;
+  variant_id: string;
 };
 
 /** One line of the stock movement ledger. Lines are only ever added. */
@@ -13398,18 +13491,36 @@ export type InventoryTransferLine = {
   variant_id: string;
 };
 
+/** One line of a transfer to create. */
+export type InventoryTransferLineRequest = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  /** Exactly `quantity` serial numbers when the variant tracks serials. */
+  serials?: string[];
+  variant_id: string;
+};
+
 /** A stock transfer to create (as a draft). */
 export type InventoryTransferRequest = {
   /** The warehouse the goods leave. */
   from_org_id: string;
   /** 1 to 500 lines, one per variant. */
-  lines: InventoryQuantityLine[];
+  lines: InventoryTransferLineRequest[];
   /** Up to 500 characters. */
   note?: string | null;
   /** Your own reference, up to 100 characters. */
   reference?: string | null;
   /** The warehouse the goods go to. */
   to_org_id: string;
+};
+
+/** Value of the stock of one warehouse in one currency. */
+export type InventoryValuation = {
+  org_id: string;
+  /** Units on hand that have an average cost. */
+  units: number;
+  /** Sum of on hand × weighted average unit cost. */
+  value: Money;
 };
 
 /** A new invitation. */
@@ -16080,6 +16191,156 @@ export type OpsBacklog = {
   databases: DatabaseBacklog[];
 };
 
+/** Referral of the cart. */
+export type OrdersAttribution = {
+  click_id?: string | null;
+  code?: string | null;
+  live_session_id?: string | null;
+};
+
+/** A cart with its quote, computed again by the server on every read. */
+export type OrdersCart = {
+  attribution?: OrdersAttribution | null;
+  buyer_user_id?: string | null;
+  /** Guests only, once, when the cart is created: send it back in the `Cart-Token` header. */
+  cart_token?: string | null;
+  /** Coupon codes entered. */
+  codes: string[];
+  currency: string;
+  free_shipping_remaining?: Money | null;
+  id: string;
+  lines: OrdersCartLine[];
+  /** The shop (or marketplace store) selling. */
+  org_id: string;
+  payment_method?: string | null;
+  /** Promotions applied, with their terms. */
+  promotions: Record<string, unknown>[];
+  quote_expires_at: string;
+  /**
+   * Send it to `POST /checkout`: checkout refuses with `orders.quote_changed` when prices,
+   * discounts or fees changed since.
+   */
+  quote_token: string;
+  /** Codes and vouchers that do not apply, with the reason. */
+  rejected_codes: Record<string, unknown>[];
+  ship_to?: OrdersCartShipTo | null;
+  shipping: OrdersCartShipping;
+  /** `active`, `abandoned`, `merged` or `converted`. */
+  status: string;
+  totals: OrdersCartTotals;
+  updated_at: string;
+  /** Vouchers of your wallet used for this cart. */
+  voucher_ids: string[];
+};
+
+/** One cart line, priced again by the server. */
+export type OrdersCartLine = {
+  compare_at?: Money | null;
+  discount: Money;
+  /** The promotion that added this free gift. */
+  gift_of?: string | null;
+  image_media_id?: string | null;
+  /** Line key: the variant id, or `gift:<promotion>:<variant>` for a free gift. */
+  key: string;
+  name?: string | null;
+  preorder?: OrdersPreorderInfo | null;
+  problem?: OrdersLineProblem | null;
+  product_id?: string | null;
+  quantity: number;
+  sku?: string | null;
+  /** `unit_price × quantity`. */
+  subtotal: Money;
+  tax: Money;
+  /** Whether `unit_price` includes taxes. */
+  tax_inclusive: boolean;
+  /** What the buyer pays for the line: after discounts, taxes included. */
+  total: Money;
+  /** Unit price before discounts. */
+  unit_price: Money;
+  variant_id: string;
+  /** Option labels, like `Red / M`. */
+  variant_label?: string | null;
+};
+
+/** Where the cart goes. */
+export type OrdersCartShipTo = {
+  address?: Address | null;
+  /** An address of your address book. */
+  address_id?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+};
+
+/** Delivery part of a cart. */
+export type OrdersCartShipping = {
+  options: OrdersShippingOption[];
+  /** Some item must be delivered. */
+  required: boolean;
+  /** The chosen option, when still available. */
+  selected?: string | null;
+  /** The chosen option is no longer available: choose again. */
+  selected_unavailable: boolean;
+};
+
+/** A cart in a staff list (no quote). */
+export type OrdersCartSummary = {
+  /** When `orders.cart_abandoned` was sent. */
+  abandoned_notified_at?: string | null;
+  buyer_user_id?: string | null;
+  created_at: string;
+  currency: string;
+  id: string;
+  org_id: string;
+  status: string;
+  updated_at: string;
+};
+
+/** Money totals of a cart. */
+export type OrdersCartTotals = {
+  discount: Money;
+  shipping_discount: Money;
+  shipping_fee: Money;
+  subtotal: Money;
+  /** Taxes (already in `total` when prices include taxes). */
+  tax: Money;
+  /** What the buyer pays. */
+  total: Money;
+};
+
+/** Why a cart line cannot be ordered now. */
+export type OrdersLineProblem = {
+  /** Units left, for `orders.out_of_stock`. */
+  available?: number | null;
+  /** `orders.variant_unavailable`, `orders.out_of_stock` or `orders.preorder_closed`. */
+  code: string;
+};
+
+/** Pre-order information shown before ordering. */
+export type OrdersPreorderInfo = {
+  /** Expected date the item arrives (shop time zone). */
+  available_on?: string | null;
+  /** Pre-orders close at. */
+  ends_at?: string | null;
+};
+
+/** A way to deliver the cart. */
+export type OrdersShippingOption = {
+  amount: Money;
+  carrier_code?: string | null;
+  /** Earliest and latest expected delivery dates. */
+  eta_earliest?: string | null;
+  eta_latest?: string | null;
+  free_over?: Money | null;
+  /** `table_rate`, `carrier` or `pickup`. */
+  kind: string;
+  method_code: string;
+  name: string;
+  /** Send it back in `PUT /carts/{id}/delivery` to choose this option. */
+  option_key: string;
+  /** Store of a pickup option. */
+  pickup_org_id?: string | null;
+};
+
 /** An override to set; it replaces one of the same kind and key. */
 export type OverrideRequest = {
   /** Required with `module` / `feature`. */
@@ -17284,6 +17545,25 @@ export type Page_InventoryLevel = {
 };
 
 /** One page of a list. */
+export type Page_InventoryLot = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_on?: string | null;
+    /** `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read. */
+    expiry_state: string;
+    id: string;
+    level_id: string;
+    lot_code: string;
+    /** Units of this lot on hand. */
+    on_hand: number;
+    org_id: string;
+    received_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InventoryMovement = {
   /** The items of this page, in the requested order. */
   data: {
@@ -18052,6 +18332,23 @@ export type Page_NotificationMessage = {
      */
     status: string;
     user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersCartSummary = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** When `orders.cart_abandoned` was sent. */
+    abandoned_notified_at?: string | null;
+    buyer_user_id?: string | null;
+    created_at: string;
+    currency: string;
+    id: string;
+    org_id: string;
+    status: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -19985,6 +20282,14 @@ export type PromotionsConditionInput = {
 /** Kind of extra condition. */
 export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
 
+/** Codes and vouchers usable for a cart, those not yet, and the best combination. */
+export type PromotionsEligibility = {
+  best_selection: PromotionsSelection;
+  best_total_discount: Money;
+  ineligible: PromotionsIneligibleOffer[];
+  usable: PromotionsOffer[];
+};
+
 /** Promotions computed for a cart; orders store it as a snapshot. */
 export type PromotionsEvaluation = {
   applied: PromotionsAppliedPromotion[];
@@ -20096,6 +20401,12 @@ export type PromotionsGrantVoucherRequest = {
   user_id: string;
 };
 
+/** A code or voucher the cart does not qualify for yet, with the reason. */
+export type PromotionsIneligibleOffer = {
+  offer: PromotionsOffer;
+  reason: PromotionsReason;
+};
+
 /** Kind of promotion. */
 export type PromotionsKind = "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
 
@@ -20177,6 +20488,19 @@ export type PromotionsNoticeRule = {
   note: string;
   notice_required: boolean;
   promotion_kind: string;
+};
+
+/** A code or voucher in the promotion picker. */
+export type PromotionsOffer = {
+  class: PromotionsPromotionClass;
+  code?: string | null;
+  discount: Money;
+  ends_at: string;
+  promotion_id: string;
+  remaining_uses?: number | null;
+  terms: string;
+  title: string;
+  voucher_id?: string | null;
 };
 
 export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
@@ -20348,6 +20672,12 @@ export type PromotionsRole = "condition" | "reward";
 
 /** What the promotion discounts: `items` (product class), `order` or `shipping`. */
 export type PromotionsScope = "items" | "order" | "shipping";
+
+/** Codes and vouchers to use together. */
+export type PromotionsSelection = {
+  codes: string[];
+  voucher_ids: string[];
+};
 
 /** A discount on the shipping fee. */
 export type PromotionsShippingDiscount = {
@@ -21975,6 +22305,51 @@ export type SessionResponse = {
    * none was sent.
    */
   user_agent?: string | null;
+};
+
+/** Referral of the cart. */
+export type SetOrdersCartAttributionRequest = {
+  /** Affiliate click id. */
+  click_id?: string | null;
+  /** Affiliate or referral code. */
+  code?: string | null;
+  /** Live-selling session. */
+  live_session_id?: string | null;
+};
+
+/** Coupon codes of the cart. */
+export type SetOrdersCartCodesRequest = {
+  /** Replaces the codes of the cart; `[]` removes them all. */
+  codes: string[];
+};
+
+/** Delivery of the cart. */
+export type SetOrdersCartDeliveryRequest = {
+  address?: AddressInput | null;
+  /** An address of your address book (signed-in buyers). */
+  address_id?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+  /** `option_key` of one of the cart's `shipping.options`. */
+  shipping_option?: string | null;
+};
+
+/** The quantity of one product in the cart. */
+export type SetOrdersCartLineRequest = {
+  /** `0` removes the line. */
+  quantity: number;
+};
+
+/** Payment method of the cart. */
+export type SetOrdersCartPaymentMethodRequest = {
+  /** `gateway`, `vietqr`, `bank_transfer`, `cod`…; `null` clears it. */
+  payment_method?: string | null;
+};
+
+/** Vouchers of the cart. */
+export type SetOrdersCartVouchersRequest = {
+  /** Ids of vouchers in your wallet; replaces the list, `[]` removes them all. */
+  voucher_ids: string[];
 };
 
 /** The first password of an account. */
@@ -30577,6 +30952,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/lots": {
+    /** List lots (with expiry dates) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; expiry_state?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLot;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/movements": {
     /** List the stock movement ledger in your scope. */
     get: {
@@ -30586,6 +30974,18 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reports/valuation": {
+    /** Value of the stock now: on hand × weighted average cost, per warehouse and currency. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null }; };
+      responses: {
+        200: Data_Vec_InventoryValuation;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -34495,6 +34895,166 @@ export interface paths {
       responses: {
         200: Record<string, unknown>;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts": {
+    /** List carts, like abandoned carts. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersCartSummary;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a cart. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateOrdersCartRequest;
+      responses: {
+        200: Data_OrdersCart;
+        201: Data_OrdersCart;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}": {
+    /** Read a cart with its quote. */
+    get: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/attribution": {
+    /** Record who referred the buyer to the cart. */
+    put: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SetOrdersCartAttributionRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/codes": {
+    /** Set the coupon codes of the cart. */
+    put: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SetOrdersCartCodesRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/delivery": {
+    /** Set where and how the cart is delivered. */
+    put: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SetOrdersCartDeliveryRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/lines/{variant_id}": {
+    /** Set the quantity of a product in the cart. */
+    put: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; variant_id: string }; };
+      requestBody: SetOrdersCartLineRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/merge": {
+    /** Merge a guest cart into your cart. */
+    post: {
+      parameters: { header: { "Cart-Token": string; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/payment-method": {
+    /** Choose the payment method of the cart. */
+    put: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SetOrdersCartPaymentMethodRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/promotions": {
+    /** Codes and vouchers usable for the cart. */
+    get: {
+      parameters: { header: { "Cart-Token"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Option_PromotionsEligibility;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/carts/{id}/vouchers": {
+    /** Use vouchers of your wallet for the cart. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: SetOrdersCartVouchersRequest;
+      responses: {
+        200: Data_OrdersCart;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

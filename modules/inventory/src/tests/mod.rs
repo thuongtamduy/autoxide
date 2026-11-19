@@ -4,6 +4,7 @@
 
 mod documents;
 mod levels;
+mod lots;
 mod orders;
 mod reservations;
 
@@ -418,8 +419,12 @@ fn so_chi_them_va_ton_chi_doi_bang_adjust() {
         }
         for banned in ["Column::OnHand,", "Column::Available,", "on_hand: Set(", "available: Set("]
         {
+            // Dòng mới bắt đầu từ 0 là được; mọi giá trị khác phải đi qua `rows::adjust`.
+            let bad = text.match_indices(banned).any(|(at, _)| {
+                !banned.ends_with("Set(") || !text[at + banned.len()..].starts_with("0)")
+            });
             assert!(
-                !text.contains(banned),
+                !bad,
                 "{path}: `{banned}` — change on hand / available only through `stock.rs` (`rows::adjust`)"
             );
         }

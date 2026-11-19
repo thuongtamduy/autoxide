@@ -339,6 +339,26 @@ impl InventoryService {
         id: Uuid,
     ) -> Result<Count, Error> {
         self.reasons.ensure(tenant, ADJUSTMENT_REASONS, DEFAULT_REASON).await?;
+        // Cờ lô của các biến thể đã đếm: hỏi `Catalog` TRƯỚC transaction.
+        let ids: Vec<Uuid> = count_line::Entity::find()
+            .filter(count_line::Column::CountId.eq(id))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?
+            .into_iter()
+            .map(|line| line.variant_id)
+            .collect();
+        let lot_tracked: Vec<Uuid> = if ids.is_empty() {
+            Vec::new()
+        } else {
+            self.variants(tenant, &ids)
+                .await?
+                .into_values()
+                .filter(|variant| variant.lot_tracked)
+                .map(|variant| variant.variant_id)
+                .collect()
+        };
+        let lot_tracked = &lot_tracked;
         let database = tenant.database();
         database
             .write_with_retry(move || async move {
@@ -363,30 +383,35 @@ impl InventoryService {
                 keyed.sort_by_key(|(level, _, _)| *level);
                 let mut touched = Touched::default();
                 for (_, line, difference) in &keyed {
-                    stock::record(
-                        &transaction,
-                        tenant,
-                        &mut touched,
-                        NewMovement {
-                            org: row.org_id,
-                            variant: line.variant_id,
-                            kind: MovementKind::Count,
-                            quantity: *difference,
-                            touches_available: true,
-                            unit_cost: None,
-                            lot_id: None,
-                            reason_code: Some(
-                                line.reason_code
-                                    .clone()
-                                    .unwrap_or_else(|| DEFAULT_REASON.to_owned()),
-                            ),
-                            note: row.number.clone(),
-                            source_type: "count",
-                            source_id: row.id,
-                            actor: Some(principal.user_id()),
-                        },
-                    )
-                    .await?;
+                    let new = NewMovement {
+                        org: row.org_id,
+                        variant: line.variant_id,
+                        kind: MovementKind::Count,
+                        quantity: *difference,
+                        touches_available: true,
+                        unit_cost: None,
+                        lot_id: None,
+                        reason_code: Some(
+                            line.reason_code.clone().unwrap_or_else(|| DEFAULT_REASON.to_owned()),
+                        ),
+                        note: row.number.clone(),
+                        source_type: "count",
+                        source_id: row.id,
+                        actor: Some(principal.user_id()),
+                    };
+                    if *difference < 0 {
+                        // Thiếu: trừ lô hết hạn trước (biến thể theo dõi lô), giữ tổng lô ≤ `on_hand`.
+                        let tracking = crate::lots::Tracking {
+                            lot_tracked: lot_tracked.contains(&line.variant_id),
+                            serial_status: "written_off",
+                            ..crate::lots::Tracking::default()
+                        };
+                        crate::lots::record_out(&transaction, tenant, &mut touched, new, &tracking)
+                            .await?;
+                    } else {
+                        // Thừa: thành hàng không gắn lô (không biết lô của hàng đếm thừa).
+                        stock::record(&transaction, tenant, &mut touched, new).await?;
+                    }
                 }
                 let stamp = now();
                 count::Entity::update_many()
