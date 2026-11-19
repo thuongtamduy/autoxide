@@ -249,6 +249,33 @@ fn profile_of(unit: &unit::Model, row: Option<&entity::Model>) -> Profile {
 }
 
 impl OrgService {
+    /// Giờ mở cửa trong hồ sơ công khai của nút (không kiểm quyền: module khác đọc qua
+    /// `OrgDirectory::opening_hours`); nút chưa khai giờ → `None`.
+    pub(crate) async fn opening_ranges(
+        &self,
+        tenant: &TenantContext,
+        unit_id: Uuid,
+    ) -> Result<Option<Vec<crate::api::OpeningRange>>, Error> {
+        let row = entity::Entity::find_by_id((tenant.id().as_uuid(), unit_id))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        let hours: Vec<OpeningHours> = row
+            .map(|row| serde_json::from_str(&row.opening_hours).unwrap_or_default())
+            .unwrap_or_default();
+        let ranges: Vec<crate::api::OpeningRange> = hours
+            .iter()
+            .filter_map(|range| {
+                Some(crate::api::OpeningRange::new(
+                    range.day,
+                    time(&range.opens)?,
+                    time(&range.closes)?,
+                ))
+            })
+            .collect();
+        Ok(if ranges.is_empty() { None } else { Some(ranges) })
+    }
+
     /// Hồ sơ công khai của nút `unit_id` (cần `organizations.units.read` phủ nút).
     pub(crate) async fn profile(
         &self,

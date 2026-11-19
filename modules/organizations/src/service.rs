@@ -757,6 +757,14 @@ impl OrgDirectory for OrgService {
         }
         Ok(self.resolve_settings(tenant, id, Some(key)).await?.into_iter().next())
     }
+
+    async fn opening_hours(
+        &self,
+        tenant: &TenantContext,
+        id: OrgId,
+    ) -> Result<Option<Vec<crate::api::OpeningRange>>, Error> {
+        self.opening_ranges(tenant, id.as_uuid()).await
+    }
 }
 
 pub(crate) fn to_unit(row: &UnitRow) -> Unit {

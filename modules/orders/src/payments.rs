@@ -9,7 +9,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_ledger::api::{FlowMode, NewPayment, NewRefund, NewTransferPayment};
-use chrono::Utc;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
@@ -28,6 +27,7 @@ use crate::service::OrdersService;
 pub(crate) const PURPOSE_ORDER: &str = "order";
 pub(crate) const PENDING: &str = "pending";
 pub(crate) const SUCCEEDED: &str = "succeeded";
+pub(crate) const REFUNDED: &str = "refunded";
 pub(crate) const UNPAID: &str = "unpaid";
 pub(crate) const COD_PENDING: &str = "cod_pending";
 pub(crate) const PAID: &str = "paid";
@@ -152,7 +152,7 @@ impl OrdersService {
         updated.gateway = Set(Some(created.provider.clone()));
         updated.action = Set(Some(serde_json::to_string(&action).map_err(Error::internal)?));
         updated.expires_at = Set(Some(created.expires_at));
-        updated.updated_at = Set(Utc::now());
+        updated.updated_at = Set(crate::service::now());
         let database = tenant.database();
         let transaction = database.begin_write().await?;
         updated.update(&transaction).await?;
@@ -211,7 +211,7 @@ impl OrdersService {
                 if stored.status == SUCCEEDED {
                     return Ok(false);
                 }
-                let now = Utc::now();
+                let now = crate::service::now();
                 let mut paid: payment::ActiveModel = stored.into();
                 paid.status = Set(SUCCEEDED.to_owned());
                 paid.succeeded_at = Set(Some(now));
@@ -300,7 +300,7 @@ impl OrdersService {
             .column(order::Column::TenantId)
             .column(order::Column::Id)
             .filter(order::Column::Status.eq(OrderStatus::PendingPayment.as_str()))
-            .filter(order::Column::PaymentDueAt.lt(Utc::now()))
+            .filter(order::Column::PaymentDueAt.lt(crate::service::now()))
             .limit(crate::jobs::BATCH)
             .into_tuple()
             .all(database.read())
@@ -332,12 +332,27 @@ impl OrdersService {
         transition: &Transition,
         only_from: Option<OrderStatus>,
     ) -> Result<Applied, Error> {
+        let check = move |current: &order::Model| -> Result<bool, Error> {
+            Ok(only_from.is_none_or(|from| from.as_str() == current.status))
+        };
+        self.transition_if(tenant, id, transition, &check).await
+    }
+
+    /// Chuyển đơn `id` khi `check` (chạy trên dòng đã khoá) trả `true`; `false`: không làm gì,
+    /// lỗi: dừng với lỗi đó (chính sách huỷ, `If-Match`…).
+    pub(crate) async fn transition_if(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        transition: &Transition,
+        check: &(dyn Fn(&order::Model) -> Result<bool, Error> + Send + Sync),
+    ) -> Result<Applied, Error> {
         let (database, outbox) = (tenant.database(), &self.outbox);
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let current = lifecycle::lock(&transaction, tenant, id).await?;
-                if only_from.is_some_and(|from| from.as_str() != current.status) {
+                if !check(&current)? {
                     return Ok(Applied::Already(Box::new(current)));
                 }
                 let reason = transition.reason.clone();
@@ -384,7 +399,9 @@ impl OrdersService {
             .scoped(tenant)
             .one(tenant.database().read())
             .await?
-            .filter(|row| row.status != PENDING || row.expires_at.is_none_or(|at| at > Utc::now()))
+            .filter(|row| {
+                row.status != PENDING || row.expires_at.is_none_or(|at| at > crate::service::now())
+            })
             .ok_or_else(errors::payment_token_invalid)?;
         let order = self.order(tenant, row.order_id).await?;
         Ok((row, order))

@@ -266,6 +266,14 @@ impl Dispatcher {
             }
             Ok(())
         };
+        // Span của lượt giao mang khách của event (bước 39 B7, D-190).
+        let span = tracing::info_span!(
+            "event_delivery",
+            event_id = %event.id,
+            name = %event.name,
+            tenant_id = %event.tenant.id(),
+        );
+        let all = tracing::Instrument::instrument(all, span);
         match tokio::time::timeout(DELIVERY_TIMEOUT, all).await {
             Ok(outcome) => outcome,
             Err(_) => Err(Error::internal(format!(

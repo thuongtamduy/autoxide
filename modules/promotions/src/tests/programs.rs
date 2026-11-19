@@ -357,3 +357,55 @@ async fn gia_tu_dong_doi_khi_bat_dau_va_ket_thuc() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn xuat_thong_bao_theo_noi_nhan_json_va_csv() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let id = create(&setup, body(setup.tree.a, json!({"terms": "=HYPERLINK(\"x\")"}))).await;
+        let uri = format!("/promotions/{id}/notice-export");
+        let (status, export) = call(&setup.app, "GET", &uri, "boss", None).await;
+        assert_eq!(status, StatusCode::OK, "{export}");
+        let data = &export["data"];
+        assert_eq!(data["rules_found"], true);
+        assert_eq!(data["promotion_kind"], "price_reduction");
+        let entry = &data["authorities"][0];
+        assert_eq!(entry["authority_code"], "province:unknown");
+        assert_eq!(
+            (entry["required"].clone(), entry["status"].clone()),
+            (json!(true), json!("pending"))
+        );
+        assert!(entry["due_on"].is_string() && entry["legal_basis"].is_string(), "{entry}");
+
+        let (status, _) = call(
+            &setup.app,
+            "PATCH",
+            &format!("/promotions/{id}/notices/province:unknown"),
+            "boss",
+            Some(json!({"status": "submitted", "reference": "TB-42"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (_, export) = call(&setup.app, "GET", &uri, "boss", None).await;
+        assert_eq!(export["data"]["authorities"][0]["status"], "submitted");
+        assert_eq!(export["data"]["authorities"][0]["reference"], "TB-42");
+
+        // CSV: một dòng mỗi nơi nhận; ô bắt đầu bằng `=` bị vô hiệu (chống CSV injection).
+        let (status, csv) =
+            call(&setup.app, "GET", &format!("{uri}?format=csv"), "boss", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let csv = csv.as_str().unwrap();
+        assert!(csv.contains("\"authority_code\""), "{csv}");
+        assert!(csv.contains("\"TB-42\""));
+        assert!(csv.contains("\"'=HYPERLINK(\"\"x\"\")\""), "{csv}");
+        assert_eq!(csv.lines().count(), 2);
+
+        // Cửa hàng B không thấy chương trình của A; thiếu `promotions.compliance` thì 403.
+        let (status, _) = call(&setup.app, "GET", &uri, "store_b", None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        let (status, _) = call(&setup.app, "GET", &uri, "buyer0", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}

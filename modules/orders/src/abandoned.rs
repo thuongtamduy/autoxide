@@ -9,7 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
-use chrono::{Duration, Utc};
+use chrono::Duration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::json;
@@ -25,7 +25,7 @@ use crate::service::OrdersService;
 impl OrdersService {
     /// Một lô giỏ bỏ dở trong `database` (mọi khách); trả số giỏ đã đánh dấu.
     pub(crate) async fn mark_abandoned(&self, database: &Database) -> Result<u64, Error> {
-        let before = Utc::now() - Duration::minutes(self.config.abandoned_after_minutes);
+        let before = crate::service::now() - Duration::minutes(self.config.abandoned_after_minutes);
         let with_lines = sea_orm::sea_query::Query::select()
             .column(cart_line::Column::CartId)
             .from(cart_line::Entity)
@@ -80,7 +80,7 @@ impl OrdersService {
                 // Chỉ khi giỏ chưa đổi từ lúc đọc (người mua sửa giỏ thì thôi).
                 let changed = cart::Entity::update_many()
                     .col_expr(cart::Column::Status, Expr::value(ABANDONED))
-                    .col_expr(cart::Column::AbandonedNotifiedAt, Expr::value(Utc::now()))
+                    .col_expr(cart::Column::AbandonedNotifiedAt, Expr::value(crate::service::now()))
                     .filter(cart::Column::Id.eq(id))
                     .filter(cart::Column::Status.eq(ACTIVE))
                     .filter(cart::Column::UpdatedAt.eq(updated_at))
@@ -112,7 +112,7 @@ impl OrdersService {
             .select_only()
             .column(cart::Column::TenantId)
             .column(cart::Column::Id)
-            .filter(cart::Column::ExpiresAt.lt(Utc::now()))
+            .filter(cart::Column::ExpiresAt.lt(crate::service::now()))
             .limit(BATCH * 5)
             .into_tuple()
             .all(database.read())

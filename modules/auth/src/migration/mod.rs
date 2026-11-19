@@ -35,6 +35,8 @@ mod m0036_oidc;
 mod m0037_role_denies;
 mod m0038_api_key_networks;
 mod m0039_api_key_rotation;
+mod m0040_api_key_approval;
+mod m0041_tenant_guardrails;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -114,6 +116,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0038_api_key_networks::Migration),
         // Xoay vòng API key (bước 54).
         Box::new(m0039_api_key_rotation::Migration),
+        // Quản trị duyệt API key (bước 54).
+        Box::new(m0040_api_key_approval::Migration),
+        // Rào quyền tối đa cho khách con (bước 54).
+        Box::new(m0041_tenant_guardrails::Migration),
     ]
 }
 

@@ -372,7 +372,9 @@ pub(crate) async fn call_tool(
     if (tenant.read_only() || plan_read_only) && !tool.is_read_only() {
         return Err(crate::tenancy::errors::tenant_read_only());
     }
-    tool.call(tenant, principal, arguments).await
+    // Span của tool mang khách (bước 39 B7, D-190); tên tool là tập cố định do code khai.
+    let span = tracing::info_span!("mcp_tool", tool = tool.name(), tenant_id = %tenant.id());
+    tracing::Instrument::instrument(tool.call(tenant, principal, arguments), span).await
 }
 
 /// Module của tool (`<module>.<tên>`) có được dùng ở khách `tenant` không, và khách có chỉ đọc vì

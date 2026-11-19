@@ -356,6 +356,14 @@ pub trait Module: Send + Sync {
     fn automation_templates(&self) -> Vec<crate::automation::AutomationTemplate> {
         Vec::new()
     }
+
+    /// Loại bản ghi app ngoại tuyến đồng bộ được (bước 69 P2, D-20261119-step69-sync): module có
+    /// thì thêm `sync::changes_migration` vào migration, ghi thay đổi bằng `StartContext::sync_log`
+    /// trong transaction ghi, và phục vụ `GET <đường dẫn>/changes`. Kernel kiểm khai báo lúc khởi
+    /// động. Mặc định: không có.
+    fn sync_resources(&self) -> Vec<crate::sync::SyncResource> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -393,6 +401,9 @@ pub struct StartContext<'a> {
     facts: &'a crate::report::FactCatalog,
     analytics: &'a crate::analytics::AnalyticsCatalog,
     automations: &'a crate::automation::AutomationDirectory,
+    sync_keep: chrono::Duration,
+    /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
+    partners: &'a crate::tenancy::sandbox::PartnerGuard,
 }
 
 impl StartContext<'_> {
@@ -479,6 +490,12 @@ impl StartContext<'_> {
             )));
         }
         Ok(Outbox::with_wake(self.module, Arc::clone(self.wake)))
+    }
+
+    /// Nơi module ghi và đọc luồng thay đổi cho app ngoại tuyến (bước 69 P2): bảng
+    /// `<module>_changes`, thời hạn giữ theo `AUTOXIDE_SYNC_RETENTION_DAYS`.
+    pub fn sync_log(&self) -> crate::sync::SyncLog {
+        crate::sync::SyncLog::new(self.module, self.sync_keep)
     }
 
     /// Đăng ký phần dữ liệu cá nhân module giữ, để có trong bản xuất dữ liệu của người
@@ -671,13 +688,15 @@ impl StartContext<'_> {
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
     /// `api` của module: `context.provide::<dyn UserDirectory>(Arc::new(service))?`.
     ///
-    /// Mỗi trait chỉ có một bên công bố; công bố lần hai là lỗi.
+    /// Mỗi trait chỉ có một bên công bố; công bố lần hai là lỗi. Hợp đồng đối tác của kernel
+    /// (thanh toán, SMS, mail…) được kernel bọc để sandbox luôn dùng bộ giả (D-232).
     //
     // `T: ?Sized`: cho phép `T` là `dyn Trait` (kiểu không có kích thước cố định).
     pub fn provide<T>(&mut self, api: Arc<T>) -> Result<(), Error>
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        let api = self.partners.wrap(api);
         self.apis.provide(self.module, api)
     }
 
@@ -698,6 +717,7 @@ impl StartContext<'_> {
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        let api = self.partners.wrap(api);
         self.apis.contribute(self.module, api)
     }
 

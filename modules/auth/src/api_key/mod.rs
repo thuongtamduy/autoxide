@@ -1,10 +1,12 @@
 //! API key: cách xác thực cho máy và AI agent, không cần đăng nhập bằng mật khẩu.
 
+mod approval;
 mod entity;
 mod rotate;
 mod rules;
 mod service;
 
+pub(crate) use approval::REQUIRE_APPROVAL;
 pub(crate) use rotate::Rotation;
 pub(crate) use service::{
     ApiKey, ApiKeyService, CreatedApiKey, KeyKind, NewApiKey, Reauth, invalid_api_key,

@@ -3,6 +3,7 @@
 pub(crate) mod cart;
 pub(crate) mod cart_line;
 pub(crate) mod checkout;
+pub(crate) mod completion_hold;
 pub(crate) mod line;
 pub(crate) mod line_tax;
 pub(crate) mod order;

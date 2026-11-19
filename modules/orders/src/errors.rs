@@ -162,3 +162,30 @@ pub(crate) fn payment_token_invalid() -> Error {
         "No payment with this token, or the payment deadline passed.",
     )
 }
+
+pub(crate) fn cancel_not_allowed() -> Error {
+    Error::conflict(
+        "orders.cancel_not_allowed",
+        "The order is past the point where you can cancel it yourself; contact the shop.",
+    )
+}
+
+pub(crate) fn shipment_not_allowed(status: crate::api::OrderStatus) -> Error {
+    Error::conflict(
+        "orders.shipment_not_allowed",
+        "A shipment cannot be requested while the order is {status}.",
+    )
+    .with_param("status", status)
+}
+
+pub(crate) fn payment_expired() -> Error {
+    Error::conflict("orders.payment_expired", "The payment deadline of the order has passed.")
+}
+
+pub(crate) fn cod_not_allowed() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.cod_not_allowed",
+        "This order must be paid in advance; cash on delivery is not accepted.",
+    )
+}

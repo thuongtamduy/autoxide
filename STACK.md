@@ -44,7 +44,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ------------------ | ------------------------------- | --------- | --------------------------------------------------- |
 | Async runtime      | `tokio`                         | 1.54      | Chuẩn thực tế của Rust async                        |
 | HTTP / REST        | `axum`                          | 0.8       | Do nhóm tokio làm                                   |
-| Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id     |
+| Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id, nén response (gzip, brotli — D-20261119-step39-compression) |
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres                  |
 | Migration          | `sea-orm-migration`             | 2.0       | Viết bằng Rust, chạy được trên cả hai database      |
 | OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch |
@@ -58,7 +58,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Trait `async` qua `dyn` | `async-trait`                | 0.1       | Hợp đồng giữa các module (`api`); đã có sẵn trong cây phụ thuộc qua SeaORM |
-| Gọi router trong test | `tower` (feature `util`)     | 0.5       | Chỉ dùng trong test: gửi request thẳng vào router   |
+| Gọi router            | `tower` (feature `util`)     | 0.5       | Gửi request thẳng vào router: test, và lô ghi đồng bộ của kernel chạy từng lệnh qua router con (bước 69) |
 | Property test      | `proptest` (chỉ `std`)          | 1.12      | Chỉ dùng trong test: sinh đầu vào ngẫu nhiên cho bộ kiểm đầu vào (email, con trỏ, thân bài, slug, CSV, bình luận), thu gọn ca hỏng (đặc tả 31 B3) |
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):

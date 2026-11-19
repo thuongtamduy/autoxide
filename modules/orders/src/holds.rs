@@ -12,7 +12,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler, Subscription};
 use autoxide_kernel::tenancy::TenantId;
-use chrono::{Duration, Utc};
+use chrono::Duration;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -60,7 +60,7 @@ impl EventHandler for OwnEvents {
 impl OrdersService {
     /// Một lô lượt đặt treo ở `reserving` trong `database` (mọi khách): trả chỗ, đánh dấu `failed`.
     pub(crate) async fn recover_checkouts(&self, database: &Database) -> Result<u64, Error> {
-        let before = Utc::now() - Duration::minutes(self.config.checkout_stuck_minutes);
+        let before = crate::service::now() - Duration::minutes(self.config.checkout_stuck_minutes);
         let stuck: Vec<(Uuid, Uuid)> = checkout::Entity::find()
             .select_only()
             .column(checkout::Column::TenantId)

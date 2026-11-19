@@ -39,6 +39,22 @@ pub(crate) const SHIPMENTS_MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const COD_READ: Permission = Permission::new(
+    "shipping.cod.read",
+    "See cash-on-delivery statements of carriers and their discrepancies (accounting, audit).",
+);
+
+/// Xem đối soát COD: `shipping.cod.read`, hay `shipping.cod.manage` (người quản lý COD xem được
+/// thứ mình xử lý).
+pub(crate) fn require_cod_read(
+    principal: &autoxide_kernel::access::Principal,
+) -> Result<(), autoxide_kernel::error::Error> {
+    if principal.has(&COD_MANAGE) {
+        return Ok(());
+    }
+    principal.require(&COD_READ)
+}
+
 pub(crate) const COD_MANAGE: Permission = Permission::new(
     "shipping.cod.manage",
     "Import cash-on-delivery statements of carriers and resolve their discrepancies.",
@@ -52,6 +68,7 @@ pub(crate) fn all() -> Vec<Permission> {
         CARRIERS_MANAGE,
         SHIPMENTS_READ,
         SHIPMENTS_MANAGE,
+        COD_READ,
         COD_MANAGE,
     ]
 }
