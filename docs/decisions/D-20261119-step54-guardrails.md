@@ -19,7 +19,14 @@ xoá ngay trên máy đổi rào. Chế độ một khách không đọc gì. T�
 của tổ tiên), giữ nguyên khách đặt rào. Nhờ vậy khách tách ra làm khách gốc (không giữ cha) không thoát rào, và
 khách đặt rào vẫn sửa / gỡ được rào đã chép dù không còn ở trên khách mới. Khi **gộp**, khách nhận giữ rào của nó;
 khách bị gộp mất cùng rào của nó. Dữ liệu của khách bị gộp từ nay theo rào của khách nhận, kể cả khi rào cũ của
-khách bị gộp chặt hơn: người gộp là nhân sự nền tảng, quyết điều đó khi gộp. Khách bị xoá hẳn thì nghe `kernel.tenant_deleted` để xoá rào đặt cho nó và rào nó đặt.
+khách bị gộp chặt hơn: người gộp là nhân sự nền tảng, quyết điều đó khi gộp.
+
+Khe hở còn mở, đóng ở PR kế tiếp: event `kernel.relocation_started` chỉ được giao khi khách nguồn phục vụ lại, nên
+khách mới có thể mở vài giây trước khi nhận rào. Đó là một lỗ leo quyền. Cách đóng: kernel thêm một hook đồng bộ vào
+cuối trait `Module` (cài đặt mặc định không làm gì, D-038), chạy trong bước tách **trước** khi khách mới được mở.
+Hook nhận loại lượt, khách nguồn, khách mới và database nền tảng. Hook lỗi thì lượt tách dừng, khách mới không mở.
+`auth` chép rào trong hook này; event giữ lại làm lưới an toàn (chạy lại được). Test bắt buộc: hook lỗi thì khách mới
+không mở, trên cả SQLite và Postgres. Khách bị xoá hẳn thì nghe `kernel.tenant_deleted` để xoá rào đặt cho nó và rào nó đặt.
 
 Lý do: Đặc tả 54 P4, như SCP của AWS. Rào là trần, không phải quyền cấp thêm, nên giao các rào là đủ và dễ giải
 thích. Cache 30 giây đánh đổi thu hồi tức thì trên máy chủ khác lấy việc không thêm truy vấn ở đường nóng. Rào hiếm
