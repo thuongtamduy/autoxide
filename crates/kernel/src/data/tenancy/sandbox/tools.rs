@@ -8,6 +8,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 use validator::Validate;
 
+use super::mailbox::SandboxMessage;
 use super::service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 use super::{SANDBOXES_MANAGE, SANDBOXES_READ};
 use crate::access::Principal;
@@ -20,6 +21,20 @@ use crate::tenancy::TenantContext;
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListInput {
+    /// Maximum number of items to return, 1 to 200. Defaults to 50.
+    limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    cursor: Option<String>,
+    /// `desc` (newest first, the default) or `asc`.
+    order: Option<String>,
+}
+
+/// Which kept messages of the current sandbox to list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MessagesInput {
+    /// Only this channel: `partner`, `sms`, `zns`, `push`, `mail` or `webhook`.
+    channel: Option<String>,
     /// Maximum number of items to return, 1 to 200. Defaults to 50.
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
@@ -96,5 +111,20 @@ pub(crate) fn all(service: Arc<TenantSandboxes>) -> Vec<Tool> {
             },
         )
         .requires(SANDBOXES_MANAGE),
+        Tool::new(
+            "list_sandbox_messages",
+            "Inside a sandbox: list what it kept instead of sending out — simulated partner calls \
+             (payments, e-invoices, identity checks), SMS, Zalo and push messages, mail to people \
+             who cannot enter the sandbox and webhooks to URLs not allowed. Newest first.",
+            move |tenant: TenantContext, principal: Principal, input: MessagesInput| async move {
+                let page = PageInput::new(input.limit, input.cursor, input.order).page()?;
+                let found =
+                    super::mailbox::list(&tenant, &principal, input.channel.as_deref(), &page)
+                        .await?;
+                Ok::<Page<SandboxMessage>, Error>(found)
+            },
+        )
+        .requires(SANDBOXES_READ)
+        .read_only(),
     ]
 }

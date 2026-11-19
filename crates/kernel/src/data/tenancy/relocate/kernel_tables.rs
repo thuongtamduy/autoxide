@@ -47,6 +47,9 @@ pub(crate) fn kernel_relocation() -> Relocation {
             "kernel_pins",
             "kernel_request_log",
             "kernel_throttle",
+            // Hộp thư giả chỉ có ở sandbox, mà sandbox không tách / gộp.
+            "kernel_sandbox_messages",
+            "kernel_sandbox_links",
         ])
 }
 

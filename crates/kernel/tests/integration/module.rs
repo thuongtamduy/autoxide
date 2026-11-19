@@ -332,6 +332,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/relocations".to_owned(),
                     "/relocations/{id}".to_owned(),
                     "/resolve".to_owned(),
+                    "/sandbox/messages".to_owned(),
                     "/sandboxes/{id}".to_owned(),
                     "/sandboxes/{id}/extend".to_owned(),
                     "/settings".to_owned(),

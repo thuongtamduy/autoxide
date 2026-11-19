@@ -364,13 +364,46 @@ pub mod vector {
 
     /// Tích vô hướng; với hai vector đã [`normalize`] thì là cosine (−1 … 1). Hai vector khác
     /// độ dài: tính trên phần chung.
+    //
+    // Cộng vào 8 tổng riêng rồi gộp (bước 39 B6, `docs/BENCHMARKS.md` "Tìm theo ý nghĩa"): cộng
+    // số thực tuần tự vào MỘT tổng thì trình biên dịch không được đổi thứ tự (kết quả số thực phụ
+    // thuộc thứ tự), nên không dùng lệnh SIMD của CPU; 8 tổng độc lập thì được — nhanh gấp ~2,6 lần
+    // (100 000 vector × 1 024 chiều: 137 → 52 ms), không cần `unsafe`. Kết quả lệch ở chữ số cuối,
+    // thứ hạng tìm không đổi.
     pub fn dot(a: &[f32], b: &[f32]) -> f32 {
-        a.iter().zip(b).map(|(x, y)| x * y).sum()
+        const LANES: usize = 8;
+        let length = a.len().min(b.len());
+        let (a, b) = (&a[..length], &b[..length]);
+        // `as_chunks`: mảng đúng `LANES` phần tử (độ dài biết lúc biên dịch) và phần dư.
+        let ((a_lanes, a_tail), (b_lanes, b_tail)) =
+            (a.as_chunks::<LANES>(), b.as_chunks::<LANES>());
+        let mut sums = [0.0f32; LANES];
+        for (x, y) in a_lanes.iter().zip(b_lanes) {
+            for lane in 0..LANES {
+                sums[lane] += x[lane] * y[lane];
+            }
+        }
+        let tail: f32 = a_tail.iter().zip(b_tail).map(|(x, y)| x * y).sum();
+        sums.iter().sum::<f32>() + tail
     }
 
     #[cfg(test)]
     mod tests {
         use super::*;
+
+        #[test]
+        fn dot_khop_cach_tinh_tuan_tu() {
+            for length in [0, 1, 7, 8, 9, 17, 1024, 1027] {
+                let a: Vec<f32> =
+                    (0..length).map(|i| ((i * 37 % 101) as f32 - 50.0) / 50.0).collect();
+                let b: Vec<f32> =
+                    (0..length).map(|i| ((i * 53 % 97) as f32 - 48.0) / 48.0).collect();
+                let plain: f32 = a.iter().zip(&b).map(|(x, y)| x * y).sum();
+                assert!((dot(&a, &b) - plain).abs() < 1e-3, "{length}");
+            }
+            // Khác độ dài: phần chung.
+            assert!((dot(&[1.0, 2.0, 3.0], &[1.0, 1.0]) - 3.0).abs() < f32::EPSILON);
+        }
 
         #[test]
         fn ma_hoa_giai_ma_va_cosine() {

@@ -147,6 +147,7 @@ impl Module for WebhooksModule {
             secrets: secrets.as_ref().clone(),
             client: Sender::client(config.timeout, config.allow_private_networks)?,
             allow_private_networks: config.allow_private_networks,
+            settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?,
         });
         self.running = Some(Running {
             service,
