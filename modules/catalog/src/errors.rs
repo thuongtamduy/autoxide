@@ -171,3 +171,14 @@ pub(crate) fn category_slug_not_found(slug: &str) -> Error {
     )
     .with_param("slug", slug)
 }
+
+/// Module cắm điều kiện mở bán (bước 46) từ chối: `reason` là mã của module đó, `detail` lời của nó.
+pub(crate) fn listing_denied(reason: &str, detail: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "catalog.listing_denied",
+        "This product cannot go on sale yet ({reason}): {detail}",
+    )
+    .with_param("reason", reason)
+    .with_param("detail", detail)
+}

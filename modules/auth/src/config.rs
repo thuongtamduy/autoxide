@@ -117,6 +117,14 @@ pub(crate) const API_KEY_MAX_DAYS: Setting = Setting::new(
 )
 .with_default("365");
 
+pub(crate) const STEP_UP_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_AUTH_STEP_UP_MINUTES",
+    "How long after signing in or confirming with `POST /api/v1/auth/me/reauth` a session may do \
+     sensitive actions (deleting for good, money, other people's personal data), 1 to 120 \
+     minutes. Tenants can turn this off with the setting `auth.step_up`.",
+)
+.with_default("15");
+
 pub(crate) const REAUTH_MINUTES: Setting = Setting::new(
     "AUTOXIDE_AUTH_REAUTH_MINUTES",
     "How long a confirmation token from `POST /api/v1/auth/me/reauth` stays usable (1 to 60 \
@@ -236,6 +244,8 @@ pub(crate) struct AuthConfig {
     pub support_max_hours: u32,
     /// Hạn dài nhất của API key, theo ngày (bước 54).
     pub api_key_max_days: i64,
+    /// Cửa sổ xác nhận lại cho việc nhạy cảm, theo phút (bước 54 P5).
+    pub step_up_minutes: i64,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -293,6 +303,8 @@ impl AuthConfig {
         let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
         let support_max_hours =
             reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
+        let step_up_minutes =
+            reader.get_with(&STEP_UP_MINUTES, |raw| parse_in_range(raw, 1i64, 120));
         let api_key_max_days =
             reader.get_with(&API_KEY_MAX_DAYS, |raw| parse_in_range(raw, 1i64, 3650));
         let invitation_days =
@@ -378,6 +390,7 @@ impl AuthConfig {
             invitation_days: invitation_days?,
             support_max_hours: support_max_hours?,
             api_key_max_days: api_key_max_days?,
+            step_up_minutes: step_up_minutes?,
         })
     }
 }

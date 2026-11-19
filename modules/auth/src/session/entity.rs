@@ -26,6 +26,8 @@ pub struct Model {
     pub sign_in_method: Option<String>,
     /// Quốc gia gần đúng (ISO 3166-1 hai chữ) từ header của proxy tin cậy, khi có (D-272).
     pub country: Option<String>,
+    /// Lần đăng nhập hay xác nhận lại gần nhất của phiên (bước 54 P5); `None`: lúc phiên bắt đầu.
+    pub authenticated_at: Option<DateTimeUtc>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

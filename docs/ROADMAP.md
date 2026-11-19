@@ -178,7 +178,7 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
       (D-20261119-step54-api-key-limits), quản trị duyệt key (D-20261119-step54-key-approval)
 - [ ] API key chọn bản ghi cụ thể (qua `kernel_shares` với `subject_kind = api_key`): làm cùng mục chia sẻ bản ghi
 - [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
-      trên gán role
+      trên gán role — đã có: xác nhận lại cho việc nhạy cảm (D-20261119-step54-step-up)
 - [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
       trao quyền mình không có
 - [ ] Quyền theo trường dữ liệu: trường cá nhân / nhạy cảm / tài chính phân loại trong OpenAPI, bị che khi
@@ -466,7 +466,7 @@ bước 35.
 - [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm gom sản phẩm, danh mục, bài viết, cửa hàng qua một
       trait; khớp đúng dấu xếp trước không dấu; từ đồng nghĩa theo khách; sắp bán chạy và đánh giá; số đếm theo
       từng giá trị lọc (có giới hạn, có index, cả hai database)
-- [ ] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
+- [x] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
       thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại
 - [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
       xuất); gợi ý mô tả và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)

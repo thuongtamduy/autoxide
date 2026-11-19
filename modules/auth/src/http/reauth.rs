@@ -70,6 +70,11 @@ pub(crate) struct ReauthResponse {
     reauth_token: Option<String>,
     /// When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`).
     expires_at: DateTime<Utc>,
+    /// A new access token for this session, confirmed just now: use it to retry an action that
+    /// answered 401 `step_up_required`. Sensitive actions then work for
+    /// `AUTOXIDE_AUTH_STEP_UP_MINUTES` minutes (refreshing keeps the confirmation). `null` with
+    /// `email_link`, and for access tokens issued before this version.
+    access_token: Option<String>,
 }
 
 fn missing(field: &str) -> Error {
@@ -82,6 +87,10 @@ fn missing(field: &str) -> Error {
 /// authenticator code, a passkey, or a mail to your address; the answer (or the mail) carries a
 /// short-lived token used once instead of `current_password`. Accounts without a password use
 /// this to make sensitive changes. Wrong passwords and codes count towards the sign-in lock.
+///
+/// Also the answer to 401 `step_up_required`: except with `email_link`, the response carries a new
+/// `access_token` for this session, confirmed now; retry the sensitive action with it. Use a
+/// passkey or an authenticator code when the account has one.
 #[utoipa::path(
     post,
     path = "/me/reauth",
@@ -104,6 +113,7 @@ async fn reauthenticate(
     tenant: TenantContext,
     principal: Principal,
     language: Language,
+    headers: axum::http::HeaderMap,
     ValidJson(input): ValidJson<ReauthRequest>,
 ) -> Result<(StatusCode, Data<ReauthResponse>), Error> {
     super::require_session(&principal)?;
@@ -122,11 +132,24 @@ async fn reauthenticate(
     };
     let status =
         if input.method == ReauthMethod::EmailLink { StatusCode::ACCEPTED } else { StatusCode::OK };
+    let by_mail = input.method == ReauthMethod::EmailLink;
     let issued = state.reauth.issue(&tenant, principal.user_id(), proof, language).await?;
-    Ok((
-        status,
-        Data { data: ReauthResponse { reauth_token: issued.token, expires_at: issued.expires_at } },
-    ))
+    // Phiên của chính token đang gọi được ghi là vừa xác thực (bước 54 P5).
+    let authorization =
+        headers.get(axum::http::header::AUTHORIZATION).and_then(|value| value.to_str().ok());
+    let session = crate::session::bearer_token(authorization)
+        .and_then(|token| state.sessions.verify_access(token))
+        .ok()
+        .and_then(|verified| verified.session);
+    let access_token = match session {
+        Some(session) if !by_mail => {
+            Some(state.sessions.reconfirm(&tenant, principal.user_id(), session).await?)
+        }
+        _ => None,
+    };
+    let data =
+        ReauthResponse { reauth_token: issued.token, expires_at: issued.expires_at, access_token };
+    Ok((status, Data { data }))
 }
 
 #[cfg(test)]

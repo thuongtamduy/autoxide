@@ -37,6 +37,7 @@ mod m0038_api_key_networks;
 mod m0039_api_key_rotation;
 mod m0040_api_key_approval;
 mod m0041_tenant_guardrails;
+mod m0042_session_authenticated_at;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -120,6 +121,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0040_api_key_approval::Migration),
         // Rào quyền tối đa cho khách con (bước 54).
         Box::new(m0041_tenant_guardrails::Migration),
+        // Xác nhận lại cho việc nhạy cảm (bước 54).
+        Box::new(m0042_session_authenticated_at::Migration),
     ]
 }
 

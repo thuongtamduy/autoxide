@@ -291,7 +291,7 @@ pub(crate) struct StatusRequest {
         (status = 404, description = "No product with this id in your scope; code `catalog.product_not_found`.", body = Problem),
         (status = 409, description = "The change is not allowed (`catalog.invalid_status_transition`), the goods are prohibited (`catalog.prohibited_goods`) or need valid documents (`catalog.documents_required`).", body = Problem),
         (status = 412, description = "`If-Match` does not match; code `precondition_failed`.", body = Problem),
-        (status = 422, description = "The product is not ready to sell (see `errors`), or required attributes are missing (`catalog.required_attributes_missing`).", body = Problem),
+        (status = 422, description = "The product is not ready to sell (see `errors`), required attributes are missing (`catalog.required_attributes_missing`), or a module refuses the listing, e.g. an unverified marketplace seller (`catalog.listing_denied`; the reason is in `detail`).", body = Problem),
     )
 )]
 async fn set_product_status(
@@ -608,6 +608,13 @@ pub(crate) struct UpdateVariantRequest {
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<i64>, nullable)]
     pub weight_grams: Option<Option<i64>>,
+    /// Net content, with `net_unit`; `null` on both removes it.
+    #[serde(default, deserialize_with = "present")]
+    #[schema(value_type = Option<i64>, nullable)]
+    pub net_quantity: Option<Option<i64>>,
+    #[serde(default, deserialize_with = "present")]
+    #[schema(inline, value_type = Option<crate::http::dto::NetUnitDto>, nullable)]
+    pub net_unit: Option<Option<crate::http::dto::NetUnitDto>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<i64>, nullable)]
     pub length_mm: Option<Option<i64>>,
@@ -637,6 +644,10 @@ impl From<UpdateVariantRequest> for VariantChanges {
             preorder_ends_at: input.preorder_ends_at,
             preorder_messages: input.preorder_messages,
             weight_grams: input.weight_grams,
+            net_quantity: input.net_quantity,
+            net_unit: input
+                .net_unit
+                .map(|unit| unit.map(|unit| crate::http::dto::NetUnitDto::as_str(unit).to_owned())),
             length_mm: input.length_mm,
             width_mm: input.width_mm,
             height_mm: input.height_mm,

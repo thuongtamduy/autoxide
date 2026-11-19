@@ -28,8 +28,10 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 mod decision;
+mod step_up;
 
 pub use decision::Decision;
+pub use step_up::StepUp;
 
 use crate::error::Error;
 use crate::module::is_identifier;
@@ -405,6 +407,8 @@ pub struct Principal {
     denied: Arc<BTreeMap<String, &'static str>>,
     /// Dải IP được gọi (API key khai `allowed_ips`, bước 54); `None`: mọi địa chỉ.
     networks: Option<Arc<Vec<crate::config::IpRange>>>,
+    /// Xác nhận lại cho việc nhạy cảm (bước 54 P5); `None`: không đòi.
+    step_up: Option<StepUp>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -466,6 +470,8 @@ impl PrincipalSnapshot {
             ),
             // Job chạy không có request nên không có địa chỉ để kiểm: địa chỉ đã kiểm lúc yêu cầu.
             networks: None,
+            // Job không có phiên để xác nhận lại: đã kiểm lúc yêu cầu.
+            step_up: None,
         }
     }
 
@@ -560,6 +566,7 @@ impl Principal {
             kind: ActorKind::Human,
             denied: Arc::default(),
             networks: None,
+            step_up: None,
         }
     }
 
@@ -847,7 +854,7 @@ impl Principal {
     /// [`scope_condition`](Self::scope_condition).
     pub fn require(&self, permission: &Permission) -> Result<(), Error> {
         if self.has(permission) {
-            return Ok(());
+            return self.fresh_for(permission);
         }
         Err(self.refuse(permission))
     }
@@ -1061,6 +1068,8 @@ impl<S: Send + Sync> OptionalFromRequestParts<S> for Principal {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::error::ErrorKind;
 
     #[test]
     fn ban_chup_nguoi_goi_dung_lai_dung_quyen() {
@@ -1082,9 +1091,6 @@ mod tests {
         let admin = Principal::with_all_permissions(Uuid::now_v7());
         assert!(admin.snapshot().restore().has_all_permissions());
     }
-
-    use super::*;
-    use crate::error::ErrorKind;
 
     const READ: Permission = Permission::new("notes.read", "Read notes.");
 

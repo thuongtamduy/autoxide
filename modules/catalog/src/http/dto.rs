@@ -192,6 +192,11 @@ pub(crate) struct VariantRequest {
     pub preorder_messages: BTreeMap<String, String>,
     /// Shipping weight in grams (physical products and bundles).
     pub weight_grams: Option<i64>,
+    /// Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit
+    /// (per kg, l, m or piece). Give both or neither.
+    pub net_quantity: Option<i64>,
+    #[schema(inline)]
+    pub net_unit: Option<NetUnitDto>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
@@ -212,6 +217,8 @@ impl From<VariantRequest> for NewVariant {
             preorder_ends_at: input.preorder_ends_at,
             preorder_messages: input.preorder_messages,
             weight_grams: input.weight_grams,
+            net_quantity: input.net_quantity,
+            net_unit: input.net_unit.map(|unit| unit.as_str().to_owned()),
             length_mm: input.length_mm,
             width_mm: input.width_mm,
             height_mm: input.height_mm,
@@ -351,6 +358,9 @@ pub(crate) struct VariantResponse {
     pub preorder_ends_at: Option<DateTime<Utc>>,
     pub preorder_messages: BTreeMap<String, String>,
     pub weight_grams: Option<i64>,
+    pub net_quantity: Option<i64>,
+    /// `g`, `kg`, `ml`, `l`, `m` or `piece`.
+    pub net_unit: Option<String>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
@@ -379,6 +389,8 @@ impl From<&variant::Model> for VariantResponse {
             preorder_ends_at: row.preorder_ends_at,
             preorder_messages: row.preorder_messages.as_deref().map(texts_of).unwrap_or_default(),
             weight_grams: row.weight_grams,
+            net_quantity: row.net_quantity,
+            net_unit: row.net_unit.clone(),
             length_mm: row.length_mm,
             width_mm: row.width_mm,
             height_mm: row.height_mm,
@@ -738,6 +750,32 @@ impl From<price_guard::Model> for PriceGuardResponse {
                 FloorActionDto::Warn
             },
             created_at: row.created_at,
+        }
+    }
+}
+
+/// Unit of a variant's net content.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+#[schema(as = CatalogNetUnit)]
+pub(crate) enum NetUnitDto {
+    G,
+    Kg,
+    Ml,
+    L,
+    M,
+    Piece,
+}
+
+impl NetUnitDto {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            NetUnitDto::G => "g",
+            NetUnitDto::Kg => "kg",
+            NetUnitDto::Ml => "ml",
+            NetUnitDto::L => "l",
+            NetUnitDto::M => "m",
+            NetUnitDto::Piece => "piece",
         }
     }
 }

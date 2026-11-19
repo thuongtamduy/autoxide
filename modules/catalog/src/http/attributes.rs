@@ -536,7 +536,6 @@ pub(crate) struct AttributeValueDto {
     pub attribute_id: Uuid,
     /// By the attribute's type: text, a whole number, a decimal written as text (`"12.5"`),
     /// `true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.
-    #[schema(value_type = Object)]
     pub value: Value,
 }
 

@@ -6,6 +6,7 @@
 pub mod api;
 mod attributes;
 mod bulk;
+mod card;
 mod categories;
 mod collections;
 mod config;
@@ -122,6 +123,7 @@ impl Module for CatalogModule {
             jobs: context.jobs(),
             organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             sale_prices: std::sync::OnceLock::new(),
+            listing_gate: std::sync::OnceLock::new(),
             suggestions: context.suggest_sources(),
         });
         // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).

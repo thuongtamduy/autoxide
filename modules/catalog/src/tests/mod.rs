@@ -1,9 +1,11 @@
 //! Test của `catalog`, trên database gate đang chọn (gate chạy cả SQLite và Postgres). Dựng app
 //! như binary bằng `TestApp` của testkit; gọi qua REST, MCP và `dyn Catalog`.
 
+mod card;
 mod categories;
 mod changes;
 mod collections;
+mod extensions;
 mod pricing;
 mod products;
 mod public;

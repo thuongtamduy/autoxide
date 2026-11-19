@@ -47,6 +47,9 @@ mod role;
 mod sandbox;
 mod session;
 mod settings;
+mod step_up;
+#[cfg(test)]
+mod step_up_tests;
 mod support;
 #[cfg(test)]
 mod support_tests;
@@ -314,6 +317,10 @@ impl Module for AuthModule {
             api_keys: api_keys.clone(),
             databases: databases.clone(),
             delegations: delegations.clone(),
+            step_up: step_up::StepUpPolicy {
+                window: chrono::Duration::minutes(config.step_up_minutes),
+                settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
+            },
         };
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
@@ -428,7 +435,7 @@ impl Module for AuthModule {
     }
 
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
-        vec![api_key::REQUIRE_APPROVAL]
+        vec![api_key::REQUIRE_APPROVAL, step_up::STEP_UP]
     }
 
     fn events(&self) -> Vec<EventInfo> {

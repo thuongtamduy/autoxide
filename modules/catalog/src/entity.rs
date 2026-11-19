@@ -146,6 +146,9 @@ pub(crate) mod variant {
         pub image_media_id: Option<Uuid>,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// Lượng tịnh (m0012).
+        pub net_quantity: Option<i64>,
+        pub net_unit: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -633,6 +636,9 @@ pub(crate) mod storefront_entry {
         pub variant_count: i32,
         pub published_at: DateTimeUtc,
         pub refreshed_at: DateTimeUtc,
+        /// Đơn giá theo đơn vị cơ sở của biến thể rẻ nhất có lượng tịnh (m0012).
+        pub unit_price_minor: Option<i64>,
+        pub unit_price_unit: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

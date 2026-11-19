@@ -62,6 +62,8 @@ pub(crate) struct CatalogService {
     /// Nguồn giá sau giảm tự động, do `promotions` cắm vào sau khi khởi động
     /// (`CatalogExtensions`). `OnceLock`: ghi một lần, đọc không cần khoá.
     pub(crate) sale_prices: std::sync::OnceLock<Arc<dyn crate::api::SalePriceSource>>,
+    /// Điều kiện mở bán do `marketplace` cắm vào (bước 46).
+    pub(crate) listing_gate: std::sync::OnceLock<Arc<dyn crate::api::ListingGate>>,
     /// Sổ nguồn gợi ý tìm của mọi module (kernel), cho `GET /public/search/suggest`.
     pub(crate) suggestions: autoxide_kernel::suggest::SuggestSources,
 }
@@ -69,6 +71,10 @@ pub(crate) struct CatalogService {
 impl crate::api::CatalogExtensions for CatalogService {
     fn set_sale_price_source(&self, source: Arc<dyn crate::api::SalePriceSource>) -> bool {
         self.sale_prices.set(source).is_ok()
+    }
+
+    fn set_listing_gate(&self, gate: Arc<dyn crate::api::ListingGate>) -> bool {
+        self.listing_gate.set(gate).is_ok()
     }
 }
 

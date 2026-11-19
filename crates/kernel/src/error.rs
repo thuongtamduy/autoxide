@@ -198,6 +198,9 @@ struct Extra {
     /// Bản ghi hiện tại trên máy chủ, kèm phiên bản (lỗi 412 của ghi có điều kiện, bước 69 P2):
     /// trường mở rộng `current` của Problem và header `ETag`.
     current: Option<(serde_json::Value, chrono::DateTime<chrono::Utc>)>,
+    /// Giá trị header `WWW-Authenticate` của 401 thay cho `Bearer` trần (vd lời mời xác thực lại
+    /// của RFC 9470).
+    challenge: Option<String>,
 }
 
 /// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
@@ -335,6 +338,19 @@ impl Error {
     ) -> Self {
         self.extra.get_or_insert_default().current = Some((record, version));
         self
+    }
+
+    /// Header `WWW-Authenticate` riêng của lỗi 401 (vd `Bearer error="insufficient_user_authentication",
+    /// max_age=900` của RFC 9470).
+    #[must_use]
+    pub fn with_challenge(mut self, challenge: impl Into<String>) -> Self {
+        self.extra.get_or_insert_default().challenge = Some(challenge.into());
+        self
+    }
+
+    /// Header `WWW-Authenticate` gắn bằng [`with_challenge`](Self::with_challenge), nếu có.
+    pub fn challenge(&self) -> Option<&str> {
+        self.extra.as_ref().and_then(|extra| extra.challenge.as_deref())
     }
 
     /// Bản ghi hiện tại gắn bằng [`with_current`](Self::with_current), nếu có.

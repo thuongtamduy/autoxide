@@ -55,6 +55,24 @@ struct Claims {
     tid: Option<Uuid>,
     iat: i64,
     exp: i64,
+    /// Lần đăng nhập hay xác nhận lại gần nhất của phiên (giây Unix, như `auth_time` của OpenID
+    /// Connect): việc nhạy cảm đòi nó còn mới (bước 54 P5). Token cũ không có.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    auth_time: Option<i64>,
+    /// Phiên (họ refresh token) cấp token này: `POST /me/reauth` làm mới đúng phiên đó.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    sid: Option<Uuid>,
+}
+
+/// Nội dung đã kiểm của một access token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Verified {
+    pub tenant: TenantId,
+    pub user: Uuid,
+    /// Phiên cấp token; `None` với token cũ.
+    pub session: Option<Uuid>,
+    /// Lần xác thực gần nhất của phiên; `None` với token cũ.
+    pub authenticated_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -96,12 +114,15 @@ impl AccessTokens {
         self.ttl
     }
 
-    /// Cấp token cho người dùng `user` của khách `tenant`, tính từ `now`.
+    /// Cấp token cho người dùng `user` của khách `tenant`, tính từ `now`, thuộc phiên `session`
+    /// xác thực lần gần nhất lúc `authenticated_at`.
     pub(crate) fn issue(
         &self,
         tenant: TenantId,
         user: Uuid,
         now: DateTime<Utc>,
+        session: Uuid,
+        authenticated_at: DateTime<Utc>,
     ) -> Result<String, Error> {
         let iat = now.timestamp();
         let ttl = i64::try_from(self.ttl.as_secs()).map_err(Error::internal)?;
@@ -111,6 +132,8 @@ impl AccessTokens {
             tid: Some(tenant.as_uuid()),
             iat,
             exp: iat + ttl,
+            auth_time: Some(authenticated_at.timestamp()),
+            sid: Some(session),
         };
         let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(Error::internal)?);
         let signing_input = format!("{HEADER}.{payload}");
@@ -122,11 +145,7 @@ impl AccessTokens {
     /// Kiểm `token` tại thời điểm `now`; hợp lệ thì trả (khách, ID người dùng). Khách đọc từ
     /// claim `tid` TRƯỚC khi kiểm chữ ký — để chọn khoá — rồi chữ ký phải khớp khoá của đúng khách
     /// đó: `tid` giả không qua được.
-    pub(crate) fn verify(
-        &self,
-        token: &str,
-        now: DateTime<Utc>,
-    ) -> Result<(TenantId, Uuid), Error> {
+    pub(crate) fn verify(&self, token: &str, now: DateTime<Utc>) -> Result<Verified, Error> {
         // Đúng ba phần `header.payload.signature`; chữ ký phủ `header.payload`.
         let (signing_input, signature) = token.rsplit_once('.').ok_or_else(invalid_token)?;
         let (header, payload) = signing_input.split_once('.').ok_or_else(invalid_token)?;
@@ -164,7 +183,14 @@ impl AccessTokens {
                 "Your session has expired. Sign in again.",
             ));
         }
-        Ok((tenant, claims.sub))
+        Ok(Verified {
+            tenant,
+            user: claims.sub,
+            session: claims.sid,
+            authenticated_at: claims
+                .auth_time
+                .and_then(|seconds| DateTime::from_timestamp(seconds, 0)),
+        })
     }
 }
 
@@ -256,10 +282,13 @@ mod tests {
     #[test]
     fn cap_roi_kiem_lai_duoc() {
         let user = Uuid::now_v7();
-        let token = tokens().issue(DEFAULT_TENANT, user, now()).unwrap();
+        let token = tokens().issue(DEFAULT_TENANT, user, now(), Uuid::nil(), now()).unwrap();
 
         assert_eq!(token.split('.').count(), 3);
-        assert_eq!(tokens().verify(&token, now()).unwrap(), (DEFAULT_TENANT, user));
+        assert_eq!(
+            tokens().verify(&token, now()).map(|v| (v.tenant, v.user)).unwrap(),
+            (DEFAULT_TENANT, user)
+        );
         let (_, payload) = token.split_once('.').unwrap();
         let claims: Claims = decode_json(payload.split_once('.').unwrap().0).unwrap();
         assert_eq!(claims.tid, Some(DEFAULT_TENANT.as_uuid()));
@@ -271,10 +300,13 @@ mod tests {
     fn khoa_theo_khach_va_token_cu() {
         let other = TenantId::from_uuid(Uuid::now_v7());
         let user = Uuid::now_v7();
-        let token = tokens().issue(other, user, now()).unwrap();
-        assert_eq!(tokens().verify(&token, now()).unwrap(), (other, user));
+        let token = tokens().issue(other, user, now(), Uuid::nil(), now()).unwrap();
+        assert_eq!(
+            tokens().verify(&token, now()).map(|v| (v.tenant, v.user)).unwrap(),
+            (other, user)
+        );
         // Khoá của khách khác khác khoá cấu hình: cùng nội dung, khác chữ ký.
-        let in_default = tokens().issue(DEFAULT_TENANT, user, now()).unwrap();
+        let in_default = tokens().issue(DEFAULT_TENANT, user, now(), Uuid::nil(), now()).unwrap();
         assert_ne!(token.rsplit_once('.').unwrap().1, in_default.rsplit_once('.').unwrap().1);
 
         // `tid` đổi sang khách mặc định (hay khách khác), chữ ký giữ nguyên.
@@ -293,12 +325,16 @@ mod tests {
             b"0123456789abcdef0123456789abcdef",
             &format!(r#"{{"iss":"autoxide","sub":"{user}","iat":0,"exp":9999999999}}"#),
         );
-        assert_eq!(tokens().verify(&legacy, now()).unwrap(), (DEFAULT_TENANT, user));
+        assert_eq!(
+            tokens().verify(&legacy, now()).map(|v| (v.tenant, v.user)).unwrap(),
+            (DEFAULT_TENANT, user)
+        );
     }
 
     #[test]
     fn het_han_thi_bao_rieng() {
-        let token = tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
+        let token =
+            tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now(), Uuid::nil(), now()).unwrap();
 
         let still_valid = tokens().verify(&token, now() + chrono::Duration::seconds(899));
         let expired = tokens().verify(&token, now() + chrono::Duration::seconds(900));
@@ -322,8 +358,11 @@ mod tests {
         let other = TenantId::from_uuid(Uuid::now_v7());
         let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
         for tenant in [DEFAULT_TENANT, other] {
-            let old = keyed(OLD).issue(tenant, user, now()).unwrap();
-            assert_eq!(rotated.verify(&old, now()).unwrap(), (tenant, user));
+            let old = keyed(OLD).issue(tenant, user, now(), Uuid::nil(), now()).unwrap();
+            assert_eq!(
+                rotated.verify(&old, now()).map(|v| (v.tenant, v.user)).unwrap(),
+                (tenant, user)
+            );
             // Bỏ khoá cũ khỏi danh sách thì token cũ hết hiệu lực.
             assert_eq!(keyed(NEW).verify(&old, now()).unwrap_err().code(), "auth.invalid_token");
         }
@@ -332,8 +371,13 @@ mod tests {
     #[test]
     fn token_ky_bang_khoa_la_bi_tu_choi() {
         let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
-        let stranger =
-            keyed(b"someone-elses-key-someone-elses!").issue(DEFAULT_TENANT, Uuid::now_v7(), now());
+        let stranger = keyed(b"someone-elses-key-someone-elses!").issue(
+            DEFAULT_TENANT,
+            Uuid::now_v7(),
+            now(),
+            Uuid::nil(),
+            now(),
+        );
         assert_eq!(
             rotated.verify(&stranger.unwrap(), now()).unwrap_err().code(),
             "auth.invalid_token"
@@ -343,14 +387,16 @@ mod tests {
     #[test]
     fn token_moi_ky_bang_khoa_moi() {
         let rotated = keyed(NEW).with_previous(vec![OLD.to_vec()]);
-        let token = rotated.issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
+        let token =
+            rotated.issue(DEFAULT_TENANT, Uuid::now_v7(), now(), Uuid::nil(), now()).unwrap();
         assert!(keyed(NEW).verify(&token, now()).is_ok());
         assert!(keyed(OLD).verify(&token, now()).is_err());
     }
 
     #[test]
     fn sai_khoa_sua_noi_dung_hay_hong_deu_bi_tu_choi() {
-        let token = tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap();
+        let token =
+            tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now(), Uuid::nil(), now()).unwrap();
         let other_key = AccessTokens::new(
             b"another-key-another-key-another!!".to_vec(),
             Duration::from_secs(900),
@@ -367,7 +413,7 @@ mod tests {
         let unsigned = format!("{none_header}.{payload}.");
 
         for bad in [
-            other_key.issue(DEFAULT_TENANT, Uuid::now_v7(), now()).unwrap(),
+            other_key.issue(DEFAULT_TENANT, Uuid::now_v7(), now(), Uuid::nil(), now()).unwrap(),
             forged,
             unsigned,
             format!("{token}.extra"),

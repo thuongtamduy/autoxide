@@ -123,6 +123,7 @@ impl Principal {
         target: OrgTarget,
     ) -> Result<Decision, Error> {
         let Some(reach) = self.reach(permission) else { return Ok(Decision::Missing) };
+        self.fresh_for(permission)?;
         Ok(if reach.covers(db, target).await? { Decision::Allow } else { Decision::OutOfScope })
     }
 
@@ -137,6 +138,7 @@ impl Principal {
         owner: Option<C>,
     ) -> Result<Condition, Error> {
         let reach = self.reach(permission).ok_or_else(|| self.refuse(permission))?;
+        self.fresh_for(permission)?;
         Ok(reach.condition(org, owner))
     }
 
