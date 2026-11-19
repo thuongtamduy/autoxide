@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
+  its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
+  prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,
+  `shipping` and `tax` (`quote_token` for checkout, `free_shipping_remaining`); coupon codes and wallet vouchers kept
+  apart, rejected codes listed with the reason; abandoned carts (`orders.cart_abandoned`, `GET /carts?status=abandoned`)
+  and expired carts purged; the contract `autoxide_orders::api` for steps 46–49 with the extension point
+  `OrderExtensions`.
 - Module `promotions` (step 43, first part): promotions as rules reaching buyers automatically, by coupon (shared
   code or batch of codes) or as one-time vouchers in a buyer's wallet; kinds percent / amount off, fixed price, buy X
   get Y (cheapest free, same item, specified rewards), free shipping, flash sale, tiers, bundle price, add-on deals,

@@ -2,9 +2,41 @@
 //! transaction với thay đổi (luật kiến trúc 3). Tên event là hằng trong `api::events` để module khác
 //! nghe đúng tên.
 
-use autoxide_kernel::event::EventInfo;
+use autoxide_kernel::event::{Event, EventInfo};
+use serde::Serialize;
+use serde_json::Value;
 
 use crate::api::events as names;
+
+/// Dữ liệu chung của mọi event của module.
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct Change {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub before: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub after: Option<Value>,
+}
+
+impl Change {
+    pub(crate) fn after(after: Value) -> Self {
+        Change { before: None, after: Some(after) }
+    }
+}
+
+/// Một loại event: tên + dữ liệu `Change`.
+macro_rules! event {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, Serialize)]
+        #[serde(transparent)]
+        pub(crate) struct $kind(pub Change);
+
+        impl Event for $kind {
+            const NAME: &'static str = $name;
+        }
+    };
+}
+
+event!(CartAbandoned, names::CART_ABANDONED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![

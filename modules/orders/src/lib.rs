@@ -5,22 +5,38 @@
 //! `api` của chúng; core không bao giờ tự giữ tiền của người mua (D-187).
 //! Đặc tả: `docs/steps/45-orders.md`.
 
+mod abandoned;
 pub mod api;
+mod carts;
+mod config;
+mod entity;
+mod errors;
 mod events;
 mod extensions;
+mod http;
+mod jobs;
 mod migration;
 mod permissions;
+mod pricing;
 mod reasons;
 mod relocation;
+mod service;
+
+#[cfg(test)]
+mod tests;
 
 use std::sync::Arc;
 
 use autoxide_kernel::access::Permission;
+use autoxide_kernel::config::{ConfigReader, Invalid};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
+use utoipa_axum::router::OpenApiRouter;
 
+use crate::config::OrdersConfig;
 use crate::extensions::Extensions;
+use crate::service::OrdersService;
 
 /// Module `orders`, để binary đăng ký trong `crates/app/src/modules.rs`.
 pub fn module() -> impl Module {
@@ -31,6 +47,9 @@ pub fn module() -> impl Module {
 struct OrdersModule {
     /// Điểm cắm cho module đăng ký sau (bước 46–49); có từ lúc tạo để `start` trao ra ngoài.
     extensions: Arc<Extensions>,
+    config: Option<OrdersConfig>,
+    /// Có sau `start`.
+    service: Option<Arc<OrdersService>>,
 }
 
 impl Module for OrdersModule {
@@ -64,10 +83,46 @@ impl Module for OrdersModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
+        self.config = Some(config::read(reader)?);
+        Ok(())
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let config = self.config.clone().unwrap_or_default();
+        // `catalog` bắt buộc (giá, biến thể); module khác chưa cài thì bước đó bỏ qua: không giữ
+        // tồn, không khuyến mại, không phí giao, thuế 0.
+        let sources = pricing::Sources {
+            catalog: context.require::<dyn autoxide_catalog::api::Catalog>()?,
+            inventory: context.require::<dyn autoxide_inventory::api::Inventory>().ok(),
+            promotions: context.require::<dyn autoxide_promotions::api::Promotions>().ok(),
+            shipping: context.require::<dyn autoxide_shipping::api::ShippingRates>().ok(),
+            tax: context.require::<dyn autoxide_tax::api::TaxEngine>().ok(),
+        };
+        let parts = service::Parts {
+            outbox: context.outbox()?,
+            sources,
+            address_book: context.require::<dyn autoxide_shipping::api::AddressBook>().ok(),
+            units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
+            extensions: self.extensions.clone(),
+            databases: context.tenancy(),
+        };
+        self.service = Some(Arc::new(OrdersService::new(parts, config)));
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;
         Ok(())
+    }
+
+    fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
+        self.service.as_ref().map_or_else(Vec::new, jobs::registrations)
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        jobs::schedules()
+    }
+
+    fn routes(&self) -> OpenApiRouter {
+        self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
     }
 
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {

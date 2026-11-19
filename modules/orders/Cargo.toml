@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+autoxide-address.workspace = true
 autoxide-catalog.workspace = true
 autoxide-inventory.workspace = true
 autoxide-kernel.workspace = true

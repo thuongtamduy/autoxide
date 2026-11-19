@@ -28,20 +28,9 @@ fn twice(point: &str) -> Error {
 }
 
 impl Extensions {
-    /// Bộ tách theo người bán, nếu `marketplace` đã cắm.
-    pub(crate) fn seller_split(&self) -> Option<Arc<dyn SellerSplit>> {
-        self.seller_split.get().cloned()
-    }
-
     /// Nhóm khách, nếu `customers` đã cắm.
     pub(crate) fn buyer_groups(&self) -> Option<Arc<dyn BuyerGroups>> {
         self.buyer_groups.get().cloned()
-    }
-
-    /// `Tender` mang `kind`, nếu có.
-    pub(crate) fn tender(&self, kind: &str) -> Option<Arc<dyn Tender>> {
-        let tenders = self.tenders.lock().ok()?;
-        tenders.iter().find(|tender| tender.kind() == kind).cloned()
     }
 }
 
@@ -100,13 +89,10 @@ mod tests {
     #[test]
     fn moi_diem_cam_chi_cam_mot_lan() {
         let extensions = Extensions::default();
-        assert!(extensions.seller_split().is_none());
         extensions.set_seller_split(Arc::new(Split)).unwrap();
         assert!(extensions.set_seller_split(Arc::new(Split)).is_err());
-        assert!(extensions.seller_split().is_some());
         extensions.set_buyer_groups(Arc::new(Groups)).unwrap();
         assert!(extensions.set_buyer_groups(Arc::new(Groups)).is_err());
         assert!(extensions.buyer_groups().is_some());
-        assert!(extensions.tender("points").is_none());
     }
 }
