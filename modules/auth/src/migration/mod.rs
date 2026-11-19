@@ -32,6 +32,8 @@ mod m0033_invitations;
 mod m0034_support_grants;
 mod m0035_api_key_kind;
 mod m0036_oidc;
+mod m0037_role_denies;
+mod m0038_api_key_networks;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -105,6 +107,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "auth"),
         // Đăng nhập qua nhà cung cấp danh tính (bước 40 P3).
         Box::new(m0036_oidc::Migration),
+        // Deny thắng allow trên role (bước 54).
+        Box::new(m0037_role_denies::Migration),
+        // API key: dải IP được gọi, hạn bắt buộc (bước 54).
+        Box::new(m0038_api_key_networks::Migration),
     ]
 }
 

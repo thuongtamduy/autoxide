@@ -244,6 +244,7 @@
   "money.currency_mismatch": "Không cộng trừ được số tiền {left} với {right}; hãy đổi về cùng một loại tiền trước.",
   "money.currency_unknown": "`{code}` không phải mã tiền tệ ISO 4217 đang lưu hành; hãy dùng mã ba chữ cái như `USD`, `EUR` hay `VND`.",
   "money.overflow": "Số tiền vượt quá giới hạn lưu được: tối đa 9223372036854775807 đơn vị nhỏ nhất về mỗi phía của số 0.",
+  "network_not_allowed": "Credential này chỉ dùng được từ các địa chỉ IP nó khai, còn request này đến từ địa chỉ khác. Hãy gọi từ mạng được phép, hoặc sửa danh sách địa chỉ của key.",
   "not_acceptable": "Máy chủ không trả được nội dung theo kiểu bạn yêu cầu.",
   "not_found": "Không có endpoint này. Hãy đối chiếu đường dẫn với tài liệu OpenAPI.",
   "not_implemented": "Máy chủ chưa hỗ trợ việc này.",

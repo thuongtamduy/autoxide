@@ -13,6 +13,7 @@ const NOTES_WRITE: Permission = Permission::new("notes.write", "Write notes.");
 
 fn input(name: &str, permissions: &[&str]) -> RoleInput {
     RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         grants: Vec::new(),
         name: name.to_owned(),
@@ -300,6 +301,93 @@ async fn gan_role_dong_thoi_khong_tron_lan() {
         let last: BTreeSet<Uuid> =
             roles.user_roles(&tenant, ada).await.unwrap().into_iter().map(|role| role.id).collect();
         assert!(sets.contains(&last), "{last:?}");
+    })
+    .await
+    .unwrap();
+}
+
+// Bước 54: deny thắng allow — role cấm một permission thì không role nào khác của người dùng,
+// kể cả role toàn quyền `admin`, cấp lại được; lỗi nêu rõ lý do `denied_by_role`.
+#[tokio::test]
+async fn deny_thang_allow() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let (roles, tenant) = (services.roles.clone(), services.tenant.clone());
+        let mut intern = input("intern", &["notes.write"]);
+        intern.denies = vec!["auth.roles.manage".to_owned()];
+        let intern = roles.create(&tenant, Actor::system(), intern).await.unwrap();
+        assert_eq!(intern.denies, ["auth.roles.manage"]);
+        let manager = roles
+            .create(&tenant, Actor::system(), input("manager", &["auth.roles.manage"]))
+            .await
+            .unwrap();
+        let ann = user(&services, "ann@example.com").await;
+
+        // Role khác cấp, role thực tập cấm: cấm thắng.
+        roles
+            .set_user_roles(&tenant, Actor::system(), ann, vec![manager.id, intern.id])
+            .await
+            .unwrap();
+        let principal = roles.principal(&tenant, ann).await.unwrap();
+        assert!(principal.has(&NOTES_WRITE));
+        let manage = crate::permissions::ROLES_MANAGE;
+        let refused = principal.require(&manage).unwrap_err();
+        assert_eq!(refused.code(), "permission_denied");
+        assert_eq!(refused.reason(), Some("denied_by_role"));
+        assert!(!principal.permissions().contains(&"auth.roles.manage".to_owned()));
+
+        // Kể cả role toàn quyền: có mọi permission khác, trừ phần bị cấm. Ann chưa phải quản trị
+        // viên duy nhất: Bob giữ `admin`.
+        let admin = admin_role(&roles, &tenant).await;
+        let bob = user(&services, "bob@example.com").await;
+        roles.set_user_roles(&tenant, Actor::system(), bob, vec![admin.id]).await.unwrap();
+        roles
+            .set_user_roles(&tenant, Actor::system(), ann, vec![admin.id, intern.id])
+            .await
+            .unwrap();
+        let principal = roles.principal(&tenant, ann).await.unwrap();
+        assert!(!principal.has_all_permissions());
+        assert!(principal.has(&crate::permissions::USERS_READ));
+        assert_eq!(principal.require(&manage).unwrap_err().reason(), Some("denied_by_role"));
+
+        // Quản trị viên còn đủ mọi permission cuối cùng (Bob) không nhận role cấm, và role Bob giữ
+        // không thêm được permission cấm: không còn ai quản lý được hệ thống.
+        let mut both = vec![admin.id, intern.id];
+        let error = roles.set_user_roles(&tenant, Actor::system(), bob, both.clone()).await;
+        assert_eq!(error.unwrap_err().code(), "auth.last_admin");
+        both.retain(|id| *id != intern.id);
+        let helper = roles.create(&tenant, Actor::system(), input("helper", &[])).await.unwrap();
+        both.push(helper.id);
+        roles.set_user_roles(&tenant, Actor::system(), bob, both).await.unwrap();
+        let mut deny = input("helper", &[]);
+        deny.denies = vec!["notes.write".to_owned()];
+        let error = roles.update(&tenant, Actor::system(), helper.id, deny, None).await;
+        assert_eq!(error.unwrap_err().code(), "auth.last_admin");
+        roles.set_user_roles(&tenant, Actor::system(), ann, vec![admin.id]).await.unwrap();
+
+        // Thiếu hẳn thì lý do là `missing`.
+        roles.set_user_roles(&tenant, Actor::system(), ann, vec![intern.id]).await.unwrap();
+        let principal = roles.principal(&tenant, ann).await.unwrap();
+        let missing = crate::permissions::USERS_READ;
+        assert_eq!(principal.require(&missing).unwrap_err().reason(), Some("missing"));
+
+        // Một role không vừa cấp vừa cấm cùng permission; permission lạ bị từ chối.
+        let mut both = input("both", &["notes.write"]);
+        both.denies = vec!["notes.write".to_owned(), "nope.read".to_owned()];
+        let error = roles.create(&tenant, Actor::system(), both).await.unwrap_err();
+        let codes: Vec<(&str, &str)> = error
+            .fields()
+            .iter()
+            .map(|field| (field.field.as_str(), field.code.as_str()))
+            .collect();
+        assert_eq!(codes, [("denies[0]", "conflict"), ("denies[1]", "unknown")]);
+
+        // Role `admin` dựng sẵn không nhận permission cấm.
+        let mut boss = input("admin", &[]);
+        boss.description = admin.description.clone();
+        boss.denies = vec!["notes.write".to_owned()];
+        let error = roles.update(&tenant, Actor::system(), admin.id, boss, None).await.unwrap_err();
+        assert_eq!(error.code(), "auth.role_builtin");
     })
     .await
     .unwrap();

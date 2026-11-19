@@ -74,6 +74,7 @@ async fn ten_nut_trong_membership_cua_toi_va_client_config() {
         };
         let clerk = services.users.create(tenant, Actor::system(), input).await.unwrap().id;
         let role = crate::role::RoleInput {
+            denies: Vec::new(),
             requires_mfa: false,
             name: "clerk".to_owned(),
             description: String::new(),
