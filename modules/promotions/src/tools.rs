@@ -19,7 +19,7 @@ use crate::codes::{Generated, NewCodes};
 use crate::evaluate::Options;
 use crate::http::dto::{CodeDto, CodesAdded, PromotionListItem, PromotionResponse};
 use crate::model::{Kind, Purpose, Status};
-use crate::permissions::{CODES_MANAGE, PUBLISH, READ, VOUCHERS_GRANT, WRITE};
+use crate::permissions::{CODES_MANAGE, COMPLIANCE, PUBLISH, READ, VOUCHERS_GRANT, WRITE};
 use crate::programs::transitions::Transition;
 use crate::programs::{PromotionFilter, PromotionInput};
 use crate::service::PromotionsService;
@@ -132,7 +132,7 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (list, get, create, activate, end, codes) = (s(), s(), s(), s(), s(), s());
-    let (evaluate, grant, wallet) = (s(), s(), s());
+    let (evaluate, grant, wallet, notice) = (s(), s(), s(), s());
     vec![
         Tool::new(
             "list_promotions",
@@ -300,6 +300,18 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
             },
         )
         .requires(READ)
+        .read_only(),
+        Tool::new(
+            "export_notice",
+            "Get the data of a promotion notice, one entry per authority (e.g. `province:79`): \
+             whether a notice is required under the rules in force, the last day to submit, the \
+             legal basis and what was recorded. People submit the notice; this only prepares it.",
+            move |tenant: TenantContext, principal: Principal, input: PromotionId| {
+                let service = notice.clone();
+                async move { service.notice_export(&tenant, &principal, input.id).await }
+            },
+        )
+        .requires(COMPLIANCE)
         .read_only(),
     ]
 }
