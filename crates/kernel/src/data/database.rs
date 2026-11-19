@@ -279,6 +279,10 @@ fn base_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
     options
 }
 
+/// Số dòng mỗi index SQLite đọc khi lập thống kê (`PRAGMA analysis_limit`): mức SQLite khuyến
+/// nghị, đủ cho bộ lập kế hoạch, vài trăm mili giây cả khi bảng hàng triệu dòng.
+const ANALYSIS_LIMIT: u32 = 400;
+
 fn write_options(config: &DatabaseConfig) -> ConnectOptions {
     let mut options = base_options(config, &config.url);
     let wait = config.wait;
@@ -303,6 +307,16 @@ fn write_options(config: &DatabaseConfig) -> ConnectOptions {
                         // Chờ lock của tiến trình khác (vd api và worker chạy riêng)
                         // thay vì báo lỗi ngay.
                         .busy_timeout(wait)
+                        // Thống kê cho bộ lập kế hoạch truy vấn (bước 39, D-20261118-step39-sqlite-optimize):
+                        // không có `sqlite_stat1` thì SQLite có thể chọn sai index — trên 1 triệu
+                        // bình luận, luồng bình luận quét theo `(tenant_id, id)` mất 0,4 s thay vì
+                        // 0,4 ms. Postgres tự `ANALYZE` (autovacuum); SQLite thì không. `optimize`
+                        // với cờ 0x10002 lúc mở kết nối ghi: xét MỌI bảng, chỉ phân tích bảng cần,
+                        // mỗi index đọc tối đa `analysis_limit` dòng nên nhanh cả khi bảng lớn.
+                        // Đóng kết nối thì chạy lại (theo thay đổi từ lúc mở).
+                        .analysis_limit(ANALYSIS_LIMIT)
+                        .pragma("optimize", "0x10002")
+                        .optimize_on_close(true, ANALYSIS_LIMIT)
                 });
         }
         DatabaseBackend::Postgres => {

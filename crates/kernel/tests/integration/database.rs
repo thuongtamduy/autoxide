@@ -412,3 +412,44 @@ async fn loi_khac_khong_chay_lai() {
     .await
     .unwrap();
 }
+
+/// SQLite không tự lập thống kê cho bộ lập kế hoạch truy vấn (Postgres có autovacuum): kết nối ghi
+/// chạy `PRAGMA optimize` lúc mở, nên mở lại database sau khi dữ liệu lớn lên thì có
+/// `sqlite_stat1` (bước 39, D-20261118-step39-sqlite-optimize). Trên Postgres: thống kê là việc của
+/// autovacuum, kết nối mở lại vẫn chạy bình thường.
+#[tokio::test]
+async fn mo_lai_thi_co_thong_ke_cho_bo_lap_ke_hoach() {
+    TestDatabase::run(async |test| {
+        let database = connect(test).await;
+        create_note_table(database.write()).await;
+        let index = sea_orm::sea_query::Index::create()
+            .name("note_body_idx")
+            .table("note")
+            .col("body")
+            .to_owned();
+        database.write().execute(&index).await.unwrap();
+        for id in 0..300 {
+            insert_note(database.write(), id).await.unwrap();
+        }
+        database.close().await.unwrap();
+
+        let database = connect(test).await;
+        assert_eq!(count_notes(database.read()).await, 300);
+        if database.backend() == DatabaseBackend::Sqlite {
+            let row = database
+                .read()
+                .query_one_raw(Statement::from_string(
+                    DbBackend::Sqlite,
+                    "SELECT count(*) AS n FROM sqlite_stat1 WHERE tbl = 'note'",
+                ))
+                .await
+                .unwrap()
+                .unwrap();
+            let analyzed: i64 = row.try_get("", "n").unwrap();
+            assert!(analyzed > 0, "no statistics for `note`");
+        }
+        database.close().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

@@ -7,6 +7,8 @@
 //! module đăng ký SAU module `mail`; đích được kiểm qua sổ đối tượng của kernel (D-123) nên đăng
 //! ký SAU module sở hữu đích (`content`). Hướng dẫn dùng: `docs/COMMENTS.md`.
 
+#[cfg(any(test, feature = "bench-seed"))]
+mod bench_seed;
 mod bulk;
 mod config;
 mod entity;
@@ -251,6 +253,15 @@ impl Module for CommentsModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    // Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
+    #[cfg(feature = "bench-seed")]
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.databases
+            .clone()
+            .map(|databases| vec![bench_seed::task(databases)])
+            .unwrap_or_default()
     }
 
     fn tools(&self) -> Vec<Tool> {
