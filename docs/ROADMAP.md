@@ -867,12 +867,13 @@ Bắt đầu SAU bước 34 và 36; không cần phần bán hàng. Spa, salon, 
 
 Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
 
-- [ ] Cuộc trò chuyện giữa người mua và cửa hàng / người bán, gắn với sản phẩm hay đơn; tin nhắn chỉ thêm, gửi
-      lại không trùng, thu hồi trong thời hạn ngắn; hộp thư chung, phân công, đã đọc
-- [ ] Tin mới thời gian thực qua SSE, người không online nhận thông báo gom lô; chuyển thành phiếu hỗ trợ
-- [ ] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình; câu phức tạp:
+- [x] Cuộc trò chuyện giữa người mua và cửa hàng / người bán, gắn với sản phẩm hay đơn; tin nhắn chỉ thêm, gửi
+      lại không trùng, thu hồi trong thời hạn ngắn; hộp thư chung, phân công, đã đọc — xong (19/11, D-20261119-step61-conversations)
+- [x] Tin mới thời gian thực qua SSE, người không online nhận thông báo gom lô; chuyển thành phiếu hỗ trợ — xong
+      (19/11, D-20261119-step61-conversations, D-20261119-step61-stream-audience)
+- [x] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình; câu phức tạp:
       AI soạn nháp cho nhân viên; câu đơn giản đã có câu trả lời chính xác: trả lời tự động qua `AutoResponder`
-      của `support` (D-230); test trên cả hai database
+      của `support` (D-230); test trên cả hai database — xong (19/11, D-20261119-step61-conversations)
 - [ ] Gọi điện trong chat (D-232): `VoiceProvider` + bộ giả, yêu cầu gọi lại vào hộp việc, nhật ký cuộc gọi,
       ghi âm tắt mặc định và phải thông báo trước; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
 

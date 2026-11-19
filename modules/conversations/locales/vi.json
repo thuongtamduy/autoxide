@@ -27,7 +27,7 @@
   "field:must be `<kind>:<id>` of an existing record": "phải là `<kind>:<id>` của một bản ghi có thật",
   "field:must be `me`, `none` or a user id": "phải là `me`, `none` hay ID người dùng",
   "field:must be `open` or `closed`": "phải là `open` hay `closed`",
-  "field:must be at most {max} characters": "tối đa {max} ký tự",
+  "field:must be at most {max} characters": "phải dài tối đa {max} ký tự",
   "text:A conversation got a new assignee.": "Một cuộc trò chuyện được giao người mới.",
   "text:A conversation was closed.": "Một cuộc trò chuyện được đóng.",
   "text:A conversation was read, handed to a person, given an AI draft or handed over as a ticket.": "Một cuộc trò chuyện được đọc, chuyển cho người, có bản nháp AI hay được chuyển thành phiếu.",
