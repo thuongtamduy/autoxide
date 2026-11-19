@@ -443,6 +443,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step42-order-events](D-20261118-step42-order-events.md)** `inventory` nhận event của `orders` qua `Subscription::optional`, lỗi nghiệp vụ chỉ ghi log — 2026-11-18
 - **[D-20261118-step42-reservations](D-20261118-step42-reservations.md)** Giữ chỗ tồn của `inventory`: chọn kho bằng số đọc rồi `adjust` làm trọng tài, khoá dòng chỗ giữ cho mọi chuyển trạng thái — 2026-11-18
 - **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
+- **[D-20261118-step42-transfers-counts](D-20261118-step42-transfers-counts.md)** Chuyển kho và kiểm kê của `inventory`: giá vốn đi theo hàng, kiểm kê áp chênh lệch vào tồn hiện tại — 2026-11-18
 - **[D-20261118-step43-calculation](D-20261118-step43-calculation.md)** Khuyến mại: thứ tự tính, cộng dồn, làm tròn và chia tiền — 2026-11-18
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
@@ -453,6 +454,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
+- **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 
 ## Vận hành và hiệu năng
 
