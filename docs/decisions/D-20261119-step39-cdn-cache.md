@@ -5,7 +5,9 @@ Chủ đề: Vận hành và hiệu năng
 Quyết định: lớp `crates/kernel/src/http/cache.rs` (trong lớp `304`, để ETag nó thêm cũng cho `304`) chốt ba luật,
 handler vẫn quyết `Cache-Control` của mình:
 
-1. Lệnh không phải `GET` / `HEAD` chưa đặt gì → `no-store`.
+1. Lệnh ghi (không phải `GET` / `HEAD`): không đổi gì — cache dùng chung vốn không giữ response của lệnh ghi (RFC 9111
+   §9), và `no-store` trên lệnh ghi đã có nghĩa riêng ở lớp idempotency ("response chứa secret, không lưu"); tự đặt nó
+   làm mọi lệnh gọi lại với `Idempotency-Key` bị từ chối (gate bắt được).
 2. Request có `Authorization` hay `Cookie` → response không bao giờ `public`: chưa đặt gì → `private, no-store`;
    `public` → `private`, bỏ `s-maxage`, `stale-while-revalidate`, `proxy-revalidate`.
 3. Đọc không đăng nhập mà handler đặt đúng `public, no-cache` (quy ước sẵn có của endpoint công khai: `content`,

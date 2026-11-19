@@ -106,9 +106,9 @@ async fn response_co_authorization_khong_bao_gio_public() {
         let response = call(&app, "GET", "/plain", &[header]).await;
         assert_eq!(cache_control(&response), "private, no-store");
     }
-    // Ghi: `no-store`.
-    let response = call(&app, "POST", "/plain", &[]).await;
-    assert_eq!(cache_control(&response), "no-store");
+    // Ghi: không đổi gì — `no-store` trên lệnh ghi là tín hiệu "có secret" của lớp idempotency.
+    let response = call(&app, "POST", "/plain", &[("authorization", "Bearer abc")]).await;
+    assert!(!response.headers().contains_key(header::CACHE_CONTROL));
 }
 
 #[tokio::test]

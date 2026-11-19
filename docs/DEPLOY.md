@@ -365,7 +365,7 @@ within that many seconds. Media files with `?v=` in the address never change and
 (`immutable`).
 
 Autoxide never lets a shared cache keep anything personal: a request with `Authorization` or a cookie gets
-`private` (or `no-store`), writes get `no-store`, and draft previews get `no-store`. Set the CDN to:
+`private` (or `no-store`), and draft previews get `no-store`; writes are never cached. Set the CDN to:
 
 - **respect the origin's cache headers** (Cloudflare: Cache Rules → "Use cache-control header if present";
   CloudFront: a cache policy with minimum TTL `0`, honouring `Cache-Control`);

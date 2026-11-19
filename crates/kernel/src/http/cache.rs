@@ -4,7 +4,9 @@
 //! Handler vẫn quyết `Cache-Control` của mình; lớp này chỉ chốt ba luật để không response nào bị
 //! cache sai chỗ:
 //!
-//! 1. Lệnh không phải `GET` / `HEAD` mà handler chưa đặt gì: `no-store`.
+//! 1. Lệnh ghi (không phải `GET` / `HEAD`): không đổi gì. Cache dùng chung vốn không giữ response
+//!    của lệnh ghi (RFC 9111 §9); và `no-store` trên lệnh ghi có nghĩa riêng ở lớp idempotency
+//!    ("response chứa secret, không lưu để trả lại") nên lớp này không được tự đặt.
 //! 2. Request mang `Authorization` hay cookie (người đã đăng nhập, hay trình duyệt có phiên): response
 //!    **không bao giờ** `public` — chưa đặt gì thì `private, no-store`; handler đặt `public` thì đổi
 //!    thành `private` và bỏ `s-maxage` / `stale-while-revalidate` (chỉ dành cho cache dùng chung).
@@ -71,9 +73,6 @@ async fn finish(
     let reading = matches!(*method, Method::GET | Method::HEAD);
     let current = cache_control(response.headers());
     if !reading {
-        if current.is_none() {
-            set(&mut response, "no-store");
-        }
         return response;
     }
     if personal {

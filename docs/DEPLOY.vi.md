@@ -359,7 +359,7 @@ luôn hỏi lại và nhận `304 Not Modified` khi không có gì đổi. Bài 
 media có `?v=` trong địa chỉ không bao giờ đổi nên được giữ một năm (`immutable`).
 
 Autoxide không bao giờ để cache dùng chung giữ thứ gì riêng tư: request có `Authorization` hay cookie nhận
-`private` (hay `no-store`), lệnh ghi nhận `no-store`, bản xem trước nhận `no-store`. Cấu hình CDN để:
+`private` (hay `no-store`), bản xem trước nhận `no-store`; lệnh ghi không bao giờ được cache. Cấu hình CDN để:
 
 - **tôn trọng header cache của máy chủ gốc** (Cloudflare: Cache Rules → "Use cache-control header if present";
   CloudFront: cache policy có minimum TTL `0`, theo `Cache-Control`);
