@@ -285,13 +285,16 @@ async fn remove_stale(
     sqlite_parent: &std::path::Path,
     now: SystemTime,
 ) -> Result<usize, TestDatabaseError> {
+    // Thư mục tạm dọn với MỌI loại database: test chạy trên Postgres vẫn tạo thư mục tạm
+    // (nơi lưu file, bản backup…) dưới `temp_dir`.
+    let directories = sqlite::remove_stale_directories(sqlite_parent, now);
     match target {
-        Target::Sqlite => Ok(sqlite::remove_stale_directories(sqlite_parent, now)),
+        Target::Sqlite => Ok(directories),
         Target::Postgres(admin_url) => {
             let admin = postgres::connect_admin(admin_url).await?;
             let removed = postgres::remove_stale_databases(&admin, now).await;
             admin.close().await?;
-            Ok(removed?)
+            Ok(directories + removed?)
         }
     }
 }

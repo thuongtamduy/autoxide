@@ -14,7 +14,7 @@ use autoxide_kernel::tenancy::{
     DatabaseRegistry, OrgId, OrgTree, TenantContext, TenantId, root_of,
 };
 use autoxide_ledger::api::Ledger;
-use autoxide_organizations::api::OrgDirectory;
+use autoxide_organizations::api::{OrgDirectory, OrgGroups};
 use chrono::{Datelike, Duration, NaiveDate, Utc};
 use sea_orm::sea_query::{Expr, Func};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
@@ -34,6 +34,8 @@ pub(crate) struct KindInfo {
 pub(crate) struct Reporting {
     pub databases: DatabaseRegistry,
     pub directory: Option<Arc<dyn OrgDirectory>>,
+    /// Nhóm nút ngoài cây (D-232); `None`: app không có module `organizations`.
+    pub groups: Option<Arc<dyn OrgGroups>>,
     pub ledger: Option<Arc<dyn Ledger>>,
     pub kinds: Vec<KindInfo>,
     pub config: ReportingConfig,
@@ -53,7 +55,7 @@ impl Reporting {
                 source.kinds().iter().map(|kind| KindInfo { module, kind: *kind })
             })
             .collect();
-        Reporting { databases, directory, ledger, kinds, config }
+        Reporting { databases, directory, groups: None, ledger, kinds, config }
     }
 }
 
@@ -66,6 +68,8 @@ pub(crate) enum GroupBy {
     Month,
     Tenant,
     Org,
+    /// Theo nhóm nút (D-232): cần `group_ids`; một nút ở hai nhóm được tính ở cả hai.
+    Group,
 }
 
 impl GroupBy {
@@ -76,6 +80,7 @@ impl GroupBy {
             "month" => Some(GroupBy::Month),
             "tenant" => Some(GroupBy::Tenant),
             "org" => Some(GroupBy::Org),
+            "group" => Some(GroupBy::Group),
             _ => None,
         }
     }
@@ -87,6 +92,7 @@ impl GroupBy {
             GroupBy::Month => "month",
             GroupBy::Tenant => "tenant",
             GroupBy::Org => "org",
+            GroupBy::Group => "group",
         }
     }
 
@@ -107,6 +113,8 @@ pub(crate) struct Filter {
     pub to: Option<NaiveDate>,
     pub tenant_ids: Vec<Uuid>,
     pub org_ids: Vec<Uuid>,
+    /// Nhóm nút (D-232): chỉ số liệu của chính khách người xem ở các nút thuộc nhóm, giao phạm vi.
+    pub group_ids: Vec<Uuid>,
     pub dimensions: BTreeMap<String, String>,
 }
 
@@ -133,6 +141,8 @@ pub(crate) struct SummaryGroup {
     pub key: String,
     pub by_currency: Vec<CurrencyTotal>,
     pub converted: Option<Money>,
+    /// Số nút của nhóm ngoài phạm vi người xem (khi lọc / gom theo nhóm, D-232).
+    pub excluded_org_count: Option<u64>,
 }
 
 /// Một cặp (tiền, ngày) không có tỉ giá sang tiền xin quy đổi.
@@ -168,6 +178,17 @@ struct Visible {
     root: TenantId,
     tenants: Vec<Uuid>,
     orgs: Option<Vec<Uuid>>,
+    /// Nhóm đã hỏi: thành viên trong phạm vi, số thành viên ngoài phạm vi.
+    groups: Vec<VisibleGroup>,
+    /// Số nút (không trùng) của các nhóm đã hỏi nằm ngoài phạm vi; `None` khi không hỏi nhóm.
+    excluded_org_count: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct VisibleGroup {
+    id: Uuid,
+    members: BTreeSet<Uuid>,
+    excluded: u64,
 }
 
 /// `reporting.tenant_not_found` (404): khách ngoài cây hay ngoài phạm vi — không lộ có tồn tại.
@@ -185,6 +206,12 @@ pub(crate) fn store_unavailable() -> Error {
         "The report store of this customer tree is under maintenance. Retry in a few minutes.",
     )
     .with_retry_after(60)
+}
+
+/// `reporting.group_not_found` (404): khách người xem không có nhóm này.
+fn group_not_found(id: Uuid) -> Error {
+    Error::not_found("reporting.group_not_found", "There is no unit group `{id}` in this tenant.")
+        .with_param("id", id)
 }
 
 fn kind_unknown(kind: &str) -> Error {
@@ -283,6 +310,8 @@ impl Reporting {
             }
             filter.tenant_ids.clone()
         };
+        // Phạm vi theo nút (trước bộ lọc của client): nhóm giao với nó.
+        let scope = orgs.clone();
         if !filter.org_ids.is_empty() {
             orgs = Some(match orgs {
                 None => filter.org_ids.clone(),
@@ -291,7 +320,57 @@ impl Reporting {
                 }
             });
         }
-        Ok(Visible { root: self.root_of(viewer.id()).await?, tenants, orgs })
+        let mut visible = Visible {
+            root: self.root_of(viewer.id()).await?,
+            tenants,
+            orgs,
+            groups: Vec::new(),
+            excluded_org_count: None,
+        };
+        if !filter.group_ids.is_empty() {
+            self.narrow_to_groups(viewer, filter, scope.as_deref(), &mut visible).await?;
+        }
+        Ok(visible)
+    }
+
+    /// Nhóm không cấp quyền (D-232): thành viên của nhóm GIAO với phạm vi `reporting.read` của người
+    /// xem; nút ngoài phạm vi bị bỏ và chỉ lộ thành số đếm. Nhóm chỉ lọc số liệu của chính khách sở
+    /// hữu nhóm (khách người xem), không lọc khách con.
+    async fn narrow_to_groups(
+        &self,
+        viewer: &TenantContext,
+        filter: &Filter,
+        scope: Option<&[Uuid]>,
+        visible: &mut Visible,
+    ) -> Result<(), Error> {
+        let viewer_id = viewer.id().as_uuid();
+        visible.tenants.retain(|tenant| *tenant == viewer_id);
+        let mut union: BTreeSet<Uuid> = BTreeSet::new();
+        let mut everyone: BTreeSet<Uuid> = BTreeSet::new();
+        for id in &filter.group_ids {
+            let members = match &self.groups {
+                Some(groups) => groups.members(viewer, *id).await?,
+                None => None,
+            }
+            .ok_or_else(|| group_not_found(*id))?;
+            let members: BTreeSet<Uuid> = members.iter().map(OrgId::as_uuid).collect();
+            let inside: BTreeSet<Uuid> = match scope {
+                None => members.clone(),
+                Some(allowed) => {
+                    members.iter().filter(|org| allowed.contains(org)).copied().collect()
+                }
+            };
+            let excluded = u64::try_from(members.len() - inside.len()).unwrap_or(0);
+            union.extend(inside.iter().copied());
+            everyone.extend(members.iter().copied());
+            visible.groups.push(VisibleGroup { id: *id, members: inside, excluded });
+        }
+        visible.excluded_org_count = Some(u64::try_from(everyone.len() - union.len()).unwrap_or(0));
+        visible.orgs = Some(match visible.orgs.take() {
+            None => union.into_iter().collect(),
+            Some(orgs) => orgs.into_iter().filter(|org| union.contains(org)).collect(),
+        });
+        Ok(())
     }
 
     /// Khoảng ngày của câu hỏi: mặc định 30 ngày gần nhất (theo UTC).
@@ -335,6 +414,13 @@ impl Reporting {
         })?;
         let kind = self.kind(kind)?.kind.kind;
         let (from, to) = Self::range(&query.filter, query.group_by)?;
+        if query.group_by == GroupBy::Group && query.filter.group_ids.is_empty() {
+            return Err(Error::validation(vec![FieldError::new(
+                "group_ids",
+                "required",
+                "Give the unit groups to group by (`group_ids`).",
+            )]));
+        }
         let visible = self.visible(viewer, principal, &query.filter).await?;
         let store = self.store(visible.root).await?;
         let mut select = daily::Entity::find()
@@ -350,7 +436,7 @@ impl Reporting {
         // Cột nhóm thêm: khách nguồn hay nút; theo ngày / tuần / tháng thì chỉ cần (ngày, tiền).
         let extra = match query.group_by {
             GroupBy::Tenant => Some(daily::Column::SourceTenantId),
-            GroupBy::Org => Some(daily::Column::OrgId),
+            GroupBy::Org | GroupBy::Group => Some(daily::Column::OrgId),
             _ => None,
         };
         // `extra` vắng: chọn lại `tenant_id` (một giá trị) để kiểu dòng giữ nguyên.
@@ -397,7 +483,7 @@ impl Reporting {
                     - Duration::days(i64::from(day.weekday().num_days_from_monday())))
                 .to_string(),
                 GroupBy::Month => format!("{:04}-{:02}-01", day.year(), day.month()),
-                GroupBy::Tenant | GroupBy::Org => extra.to_string(),
+                GroupBy::Tenant | GroupBy::Org | GroupBy::Group => extra.to_string(),
             };
             let converted = match query.currency {
                 None => None,
@@ -414,10 +500,33 @@ impl Reporting {
                     }
                 },
             };
-            for accumulator in [groups.entry(key).or_default(), &mut totals] {
-                accumulator.add(&currency, amount, quantity, facts, converted)?;
+            // Theo nhóm: một nút ở hai nhóm được tính ở cả hai; tổng chung tính một lần.
+            let keys: Vec<String> = if query.group_by == GroupBy::Group {
+                visible
+                    .groups
+                    .iter()
+                    .filter(|group| group.members.contains(&extra))
+                    .map(|group| group.id.to_string())
+                    .collect()
+            } else {
+                vec![key]
+            };
+            for key in keys {
+                groups
+                    .entry(key)
+                    .or_default()
+                    .add(&currency, amount, quantity, facts, converted)?;
+            }
+            totals.add(&currency, amount, quantity, facts, converted)?;
+        }
+        if query.group_by == GroupBy::Group {
+            for group in &visible.groups {
+                groups.entry(group.id.to_string()).or_default();
             }
         }
+        let excluded: BTreeMap<String, u64> =
+            visible.groups.iter().map(|group| (group.id.to_string(), group.excluded)).collect();
+        let total_excluded = visible.excluded_org_count;
         let finish =
             |key: String, accumulator: Accumulator| accumulator.finish(key, query.currency);
         Ok(Summary {
@@ -427,9 +536,20 @@ impl Reporting {
             group_by: query.group_by,
             groups: groups
                 .into_iter()
-                .map(|(key, accumulator)| finish(key, accumulator))
+                .map(|(key, accumulator)| {
+                    let excluded_org_count = if query.group_by == GroupBy::Group {
+                        excluded.get(&key).copied()
+                    } else {
+                        None
+                    };
+                    finish(key, accumulator)
+                        .map(|group| SummaryGroup { excluded_org_count, ..group })
+                })
                 .collect::<Result<_, _>>()?,
-            totals: finish("total".to_owned(), totals)?,
+            totals: SummaryGroup {
+                excluded_org_count: total_excluded,
+                ..finish("total".to_owned(), totals)?
+            },
             missing_rates: missing.into_iter().collect(),
         })
     }
@@ -626,6 +746,6 @@ impl Accumulator {
             })
             .collect::<Result<Vec<_>, Error>>()?;
         let converted = target.map(|target| Money::new(self.converted, target));
-        Ok(SummaryGroup { key, by_currency, converted })
+        Ok(SummaryGroup { key, by_currency, converted, excluded_org_count: None })
     }
 }

@@ -6,7 +6,7 @@ use std::time::SystemTime;
 
 use uuid::Uuid;
 
-use crate::stale::is_stale;
+use crate::stale::{is_stale, is_stale_scratch};
 
 /// Tiền tố tên thư mục tạm của mỗi database test.
 pub(crate) const DIRECTORY_PREFIX: &str = "autoxide-test-";
@@ -25,7 +25,8 @@ pub(crate) fn create_directory(parent: &Path) -> std::io::Result<(PathBuf, Strin
     Ok((directory, url))
 }
 
-/// Xoá các thư mục test đã quá cũ dưới `parent`. Trả về số thư mục đã xoá.
+/// Xoá các thư mục test đã quá cũ dưới `parent` — của testkit (`autoxide-test-…`) và thư mục tạm
+/// test tự tạo (`autoxide-<việc>-<UUIDv7>`). Trả về số thư mục đã xoá.
 /// Lỗi (không đọc được thư mục, không xoá được) thì bỏ qua: đây chỉ là dọn rác.
 pub(crate) fn remove_stale_directories(parent: &Path, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(parent) else {
@@ -35,7 +36,9 @@ pub(crate) fn remove_stale_directories(parent: &Path, now: SystemTime) -> usize 
     // `flatten` bỏ qua các mục đọc lỗi.
     for entry in entries.flatten() {
         let name = entry.file_name().to_string_lossy().into_owned();
-        if is_stale(&name, DIRECTORY_PREFIX, now) && std::fs::remove_dir_all(entry.path()).is_ok() {
+        // Chỉ thư mục (không phải file): `remove_dir_all` trên file sẽ lỗi và bị bỏ qua.
+        let stale = is_stale(&name, DIRECTORY_PREFIX, now) || is_stale_scratch(&name, now);
+        if stale && entry.path().is_dir() && std::fs::remove_dir_all(entry.path()).is_ok() {
             removed += 1;
         }
     }

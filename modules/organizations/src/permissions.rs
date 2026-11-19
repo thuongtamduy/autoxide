@@ -43,6 +43,22 @@ pub(crate) const PROFILE_MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+/// Nhóm nút cho báo cáo (bước 38, D-232). Không `scoped`: chỉ cấp ở độ sâu `tenant`, vì nhóm vắt
+/// qua nhiều nhánh. Nhóm không cấp quyền gì.
+pub(crate) const GROUPS_MANAGE: Permission = Permission::new(
+    "organizations.groups.manage",
+    "Create, rename and delete unit groups (any units of the tenant, e.g. \"stores in the \
+     north\") and choose their units. Groups only filter and group reports; they grant nothing.",
+);
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![UNITS_READ, UNITS_WRITE, UNITS_MANAGE, TYPES_MANAGE, SETTINGS_WRITE, PROFILE_MANAGE]
+    vec![
+        UNITS_READ,
+        UNITS_WRITE,
+        UNITS_MANAGE,
+        TYPES_MANAGE,
+        SETTINGS_WRITE,
+        PROFILE_MANAGE,
+        GROUPS_MANAGE,
+    ]
 }

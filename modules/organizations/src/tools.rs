@@ -129,6 +129,7 @@ pub(crate) fn all(service: &Arc<OrgService>) -> Vec<Tool> {
         )
         .requires(SETTINGS_WRITE),
     );
+    tools.extend(crate::tools_groups::all(service));
     tools
 }
 
