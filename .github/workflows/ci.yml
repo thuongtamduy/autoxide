@@ -117,7 +117,9 @@ jobs:
     name: Mobile SDK (${{ matrix.sdk }})
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    # Swift lần đầu (chưa có cache) phải dựng swift-syntax của plugin sinh mã: lâu hơn; có cache thì
+    # chỉ biên dịch lại phần sinh ra.
+    timeout-minutes: ${{ matrix.sdk == 'swift' && 30 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -140,9 +142,15 @@ jobs:
             echo "Neither the API contract nor the SDKs changed: nothing to build."
           fi
       # Swift: plugin swift-openapi-generator sinh mã lúc build từ sdk/swift/Sources/Autoxide/openapi.json.
+      - uses: actions/cache@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift'
+        with:
+          path: .build
+          key: swift-${{ hashFiles('Package.swift') }}-${{ hashFiles('sdk/swift/Sources/Autoxide/openapi.json') }}
+          restore-keys: swift-${{ hashFiles('Package.swift') }}-
       - name: swift build
         if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift'
-        run: docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble swift build
+        run: docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble swift build --product Autoxide
       - uses: actions/setup-java@v6
         if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
         with:
