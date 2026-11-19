@@ -15,4 +15,5 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Connecting an AI agent over MCP](mcp.md): a key for the agent, client setup, the tools
 - [Receiving events in real time](realtime-events.md): Server-Sent Events, `Last-Event-ID`, limits
 - [Uploading large files straight to storage](direct-uploads.md): signed links to S3, completing, checks
+- [Trying changes in a sandbox](sandbox.md): a test copy of your tenant, simulated partners, bringing drafts back
 - [Automating work with rules](automations.md): triggers, conditions, MCP tools as actions, approvals, alerts on unusual figures

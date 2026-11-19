@@ -252,6 +252,71 @@ on ids. Your queue tables (`<module>_jobs`, `<module>_events`) need nothing: due
 copy. A table that needs its own handling (a hash chain, a counter keyed by text) implements
 `RelocateTable` (`TablePolicy::Custom`), as `audit` does.
 
+### Sandboxes (test copies of a tenant)
+
+A tenant owner can make a sandbox: a tenant of kind `sandbox` with the configuration of the real
+tenant and none of its personal data, deleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days. Staff enter
+it with `Autoxide-Tenant: <sandbox id>`. A module takes part in three ways; only the last two need code.
+
+**Partners are simulated for you.** The kernel wraps every partner contract a module provides or
+contributes (`PaymentGateway`, `PayoutGateway`, `BankFeed`, `SmsSender`, `ZnsSender`,
+`WebPushSender`, `MobilePushSender`, `EInvoiceProvider`, `IdentityVerifier`, `Mailer`). A call for a
+sandbox never reaches the partner: it gets a fixed simulated result (references start with
+`SANDBOX-`) and is listed in the sandbox message box. Do not branch on `TenantContext::is_sandbox()`
+in business code; a partner contract that your module defines itself (like the carriers of
+`shipping`) must swap in its simulated implementation for a sandbox in one place.
+
+**Copy your configuration** with `Module::sandbox_copy`. The kernel calls it once, in registration
+order, while the sandbox is created and before anyone can enter it:
+
+```rust
+fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+    let service = self.service.clone()?;
+    Some(Arc::new(ShopCopy { service }))
+}
+
+#[async_trait::async_trait]
+impl SandboxCopy for ShopCopy {
+    async fn copy(&self, context: &CopyContext<'_>) -> Result<u64, Error> {
+        let mut count = 0;
+        for row in self.service.settings_rows(context.source).await? {
+            if copied(context.sandbox, "shop.setting", row.id).await?.is_some() {
+                continue; // copied by an earlier run of the job
+            }
+            let made = self.service.create(context.sandbox, context.principal, row.into()).await?;
+            link_copy(context.sandbox, "shop.setting", made.id, row.id).await?;
+            count += 1;
+        }
+        Ok(count)
+    }
+}
+```
+
+- Copy **configuration only**. Never users, buyers, orders, ledger, documents, notifications, private
+  files, secrets or connection details of partners.
+- Write through your own service (`context.principal` has every permission, in the sandbox only), so
+  events and checks run as usual. Copies get new ids; `link_copy` remembers the original, and
+  `copied` finds the copy of an original (to skip it on a rerun, or to map a parent).
+- A record that cannot be written in the sandbox: skip it and log, do not fail the whole copy.
+
+**Let people bring records back** with `Module::promotable`. `POST /api/v1/kernel/sandboxes/{id}/promote`
+calls your `PromoteApply` in the real tenant with the **caller's** principal (check your own
+permissions as REST does). Always write a **draft**: never publish, never enable, never overwrite
+what is live. `request.existing` is the record in the real tenant to update (the original it was
+copied from, or the one a previous promotion made); `None` means create a new draft. Return
+`Unchanged` when the content fingerprint equals `previous`, and `Conflict` (not an error) when a
+name, path or code is taken.
+
+```rust
+fn promotable(&self) -> Vec<Promotable> {
+    vec![Promotable::new(
+        "shop.banner",
+        "A banner: becomes a draft banner in the real tenant.",
+        Arc::new(Banners { service: self.service.clone() }),
+    )]
+}
+```
+
 ### 3. Permissions
 
 Declare them in `src/permissions.rs` as `<module>.<action>` and return them from
