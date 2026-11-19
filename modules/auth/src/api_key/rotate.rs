@@ -23,6 +23,8 @@ pub(super) const MAX_OVERLAP_HOURS: u32 = 72;
 pub(crate) struct Replacing {
     pub id: Uuid,
     pub until: DateTime<Utc>,
+    /// Trạng thái của key cũ: key mới giữ nguyên (cấu hình y hệt, không cần duyệt lại).
+    pub status: &'static str,
 }
 
 /// Yêu cầu xoay vòng một key.
@@ -69,7 +71,7 @@ impl ApiKeyService {
             .map(ToString::to_string)
             .collect();
         let input = NewApiKey {
-            name: old.name,
+            name: old.name.clone(),
             kind: autoxide_kernel::access::ActorKind::of_key(&old.kind),
             permissions: permissions.unwrap_or_default(),
             // Key cũ không gắn nút (dữ liệu rất cũ) thì key mới cũng không.
@@ -80,7 +82,12 @@ impl ApiKeyService {
             second_factor: rotation.second_factor,
         };
         let until = Utc::now() + Duration::hours(i64::from(rotation.overlap_hours));
-        let replacing = Replacing { id, until };
+        let status = if old.status == super::approval::PENDING {
+            super::approval::PENDING
+        } else {
+            super::approval::ACTIVE
+        };
+        let replacing = Replacing { id, until, status };
         self.create_replacing(tenant, caller, input, Some(replacing)).await
     }
 }

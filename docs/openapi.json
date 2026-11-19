@@ -729,6 +729,21 @@
             },
             "type": "array"
           },
+          "approved_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approved_by": {
+            "description": "Who approved the key and when; `null` when it needed no approval.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -790,6 +805,11 @@
               "string",
               "null"
             ]
+          },
+          "status": {
+            "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+            "example": "active",
+            "type": "string"
           }
         },
         "required": [
@@ -799,8 +819,38 @@
           "permissions",
           "org_id",
           "allowed_ips",
+          "status",
           "created_at",
           "kind"
+        ],
+        "type": "object"
+      },
+      "AppliedGuardrailsResponse": {
+        "description": "The guardrails that limit this tenant.",
+        "properties": {
+          "guardrails": {
+            "description": "Every guardrail on the way from the top tenant to this one.",
+            "items": {
+              "$ref": "#/components/schemas/GuardrailResponse"
+            },
+            "type": "array"
+          },
+          "max_permissions": {
+            "description": "The most permissions anyone can use in this tenant: what every guardrail allows together,\nsorted by name. `null` when no guardrail limits this tenant.",
+            "example": [
+              "content.read"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "guardrails"
         ],
         "type": "object"
       },
@@ -13315,6 +13365,162 @@
         ],
         "type": "object"
       },
+      "Data_ApiKeyResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An API key, without its secret.",
+            "properties": {
+              "allowed_ips": {
+                "description": "IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request\nfrom elsewhere gets 403 `network_not_allowed`.",
+                "example": [
+                  "203.0.113.0/24"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "approved_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "approved_by": {
+                "description": "Who approved the key and when; `null` when it needed no approval.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "description": "When the key stops working. Every new key has one; `null` only for data that was never\nupgraded.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's\napproval) or `service` (another program). The audit log records it as `actor_kind`.",
+                "example": "agent",
+                "type": "string"
+              },
+              "last_used_at": {
+                "description": "Last time the key was used, to the minute; `null`: never used.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "What the key is for.",
+                "example": "nightly report agent",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The organization unit the key is bound to: it acts only on data of this unit and the\nunits below it. The root unit (the id of the tenant) means no limit.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "permissions": {
+                "description": "Permissions the key may use, sorted by name. The key never has more than its\nowner has at the moment of the request.",
+                "example": [
+                  "auth.users.read"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "prefix": {
+                "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
+                "example": "axk1_…3q9ZbXcV",
+                "type": "string"
+              },
+              "rotated_from": {
+                "description": "The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key\ncreated from scratch.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+                "example": "active",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "prefix",
+              "permissions",
+              "org_id",
+              "allowed_ips",
+              "status",
+              "created_at",
+              "kind"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AppliedGuardrailsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The guardrails that limit this tenant.",
+            "properties": {
+              "guardrails": {
+                "description": "Every guardrail on the way from the top tenant to this one.",
+                "items": {
+                  "$ref": "#/components/schemas/GuardrailResponse"
+                },
+                "type": "array"
+              },
+              "max_permissions": {
+                "description": "The most permissions anyone can use in this tenant: what every guardrail allows together,\nsorted by name. `null` when no guardrail limits this tenant.",
+                "example": [
+                  "content.read"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "guardrails"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ApplyTagResult": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -20367,6 +20573,58 @@
               "member_count",
               "excluded_org_count",
               "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_GuardrailResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The most permissions a tenant below this one can use.",
+            "properties": {
+              "max_permissions": {
+                "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+                "example": [
+                  "content.read",
+                  "content.write"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "set_by_tenant_id": {
+                "description": "The tenant above it that set the guardrail.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "tenant_id": {
+                "description": "The tenant limited by the guardrail (and every tenant below it).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "Who set it last, and when.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenant_id",
+              "set_by_tenant_id",
+              "max_permissions",
+              "updated_by",
               "updated_at"
             ],
             "type": "object"
@@ -41747,6 +42005,69 @@
         ],
         "type": "object"
       },
+      "GuardrailRequest": {
+        "description": "A guardrail to set.",
+        "properties": {
+          "max_permissions": {
+            "description": "The permissions roles of that tenant may grant at most (see\n`GET /api/v1/auth/permissions`). `[]` leaves no permission.",
+            "example": [
+              "content.read",
+              "content.write"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "max_permissions"
+        ],
+        "type": "object"
+      },
+      "GuardrailResponse": {
+        "description": "The most permissions a tenant below this one can use.",
+        "properties": {
+          "max_permissions": {
+            "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+            "example": [
+              "content.read",
+              "content.write"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "set_by_tenant_id": {
+            "description": "The tenant above it that set the guardrail.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The tenant limited by the guardrail (and every tenant below it).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "description": "Who set it last, and when.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "set_by_tenant_id",
+          "max_permissions",
+          "updated_by",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "GuestCancelRequest": {
         "additionalProperties": false,
         "description": "A guest cancels a booking.",
@@ -52963,6 +53284,21 @@
                   },
                   "type": "array"
                 },
+                "approved_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_by": {
+                  "description": "Who approved the key and when; `null` when it needed no approval.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "format": "date-time",
                   "type": "string"
@@ -53024,6 +53360,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "status": {
+                  "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+                  "example": "active",
+                  "type": "string"
                 }
               },
               "required": [
@@ -53033,6 +53374,7 @@
                 "permissions",
                 "org_id",
                 "allowed_ips",
+                "status",
                 "created_at",
                 "kind"
               ],
@@ -56680,6 +57022,66 @@
                 "member_count",
                 "excluded_org_count",
                 "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GuardrailResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The most permissions a tenant below this one can use.",
+              "properties": {
+                "max_permissions": {
+                  "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+                  "example": [
+                    "content.read",
+                    "content.write"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "set_by_tenant_id": {
+                  "description": "The tenant above it that set the guardrail.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "tenant_id": {
+                  "description": "The tenant limited by the guardrail (and every tenant below it).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "updated_by": {
+                  "description": "Who set it last, and when.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenant_id",
+                "set_by_tenant_id",
+                "max_permissions",
+                "updated_by",
                 "updated_at"
               ],
               "type": "object"
@@ -84078,7 +84480,7 @@
     },
     "/api/v1/auth/all-api-keys": {
       "get": {
-        "description": "Requires `auth.api_keys.manage`. Newest first unless `order=asc`, with the owner's name and\nemail; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.",
+        "description": "Requires `auth.api_keys.manage`, or `auth.api_keys.approve` to list the keys waiting for\napproval. Newest first unless `order=asc`, with the owner's name and\nemail; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.",
         "operationId": "auth_list_all_api_keys",
         "parameters": [
           {
@@ -84088,6 +84490,16 @@
             "required": false,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only keys in this state: `active` or `pending` (waiting for approval). Callers with\n`auth.api_keys.approve` but not `auth.api_keys.manage` always get `pending` keys only.",
+            "example": "pending",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           },
@@ -84219,6 +84631,12 @@
             "operator": "eq"
           },
           {
+            "description": "Only keys in this state: `active` or `pending` (waiting for approval). Callers with\n`auth.api_keys.approve` but not `auth.api_keys.manage` always get `pending` keys only.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
             "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
             "kind": "boolean",
             "name": "count",
@@ -84227,7 +84645,8 @@
         ],
         "x-autoxide-list": "auth.list_all_api_keys",
         "x-permissions": [
-          "auth.api_keys.manage"
+          "auth.api_keys.manage",
+          "auth.api_keys.approve"
         ]
       }
     },
@@ -84328,6 +84747,123 @@
         ],
         "x-permissions": [
           "auth.api_keys.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/all-api-keys/{id}/approve": {
+      "post": {
+        "description": "Requires `auth.api_keys.approve`, from a signed-in session (an API key cannot approve keys).\nThe key works from now on; the audit log records who approved it. To refuse a key, revoke it\nwith `DELETE /api/v1/auth/all-api-keys/{id}`.",
+        "operationId": "auth_approve_api_key",
+        "parameters": [
+          {
+            "description": "Id of the key.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ApiKeyResponse"
+                }
+              }
+            },
+            "description": "The key, now `active`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.api_keys.approve` (code `permission_denied`), or the request used an API key (code `auth.api_key_cannot_approve_keys`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key has this id; code `auth.api_key_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key does not wait for approval; code `auth.api_key_not_pending`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve an API key that waits for approval.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.api_keys.approve"
         ]
       }
     },
@@ -85800,6 +86336,434 @@
           "auth"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/auth/guardrails": {
+      "get": {
+        "description": "Requires `auth.guardrails.manage`. Newest first unless `order=asc`.",
+        "operationId": "auth_list_guardrails",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GuardrailResponse"
+                }
+              }
+            },
+            "description": "One page of guardrails."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the guardrails this tenant set for tenants below it.",
+        "tags": [
+          "auth"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_guardrails",
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/guardrails/applied": {
+      "get": {
+        "description": "Requires `auth.roles.read`. Tenants above this one may set the most permissions anyone here can\nuse; this lists them and what they allow together.",
+        "operationId": "auth_applied_guardrails",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AppliedGuardrailsResponse"
+                }
+              }
+            },
+            "description": "The guardrails on this tenant."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.roles.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "See the guardrails that limit this tenant.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.roles.read"
+        ]
+      }
+    },
+    "/api/v1/auth/guardrails/{tenant_id}": {
+      "delete": {
+        "description": "Requires `auth.guardrails.manage`. Guardrails set by other tenants above stay.",
+        "operationId": "auth_remove_guardrail",
+        "parameters": [
+          {
+            "description": "Id of the tenant below this one.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The guardrail was removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage` (code `permission_denied`), or the tenant is not below this one (code `auth.guardrail_not_a_child`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "This tenant set no guardrail for it; code `auth.guardrail_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the guardrail this tenant set for a tenant below it.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `auth.guardrails.manage`, from this tenant's own accounts (not while working in another\ntenant). The tenant must be below this one in the customer tree. Takes effect for that tenant\nand every tenant below it, for every role including administrators, within 30 seconds on every\nserver. Guardrails set by several tenants above all apply: a tenant cannot widen what a tenant\nabove it allowed.",
+        "operationId": "auth_set_guardrail",
+        "parameters": [
+          {
+            "description": "Id of the tenant below this one.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardrailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GuardrailResponse"
+                }
+              }
+            },
+            "description": "The guardrail as set."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage` (code `permission_denied`), or the tenant is not below this one (code `auth.guardrail_not_a_child`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A permission is unknown; code `validation_failed`, see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the most permissions a tenant below this one can use.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
       }
     },
     "/api/v1/auth/invitations": {

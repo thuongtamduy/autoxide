@@ -28,6 +28,8 @@ pub(crate) fn relocation() -> Relocation {
             "auth_mfa_challenge",
             "auth_passkey_ceremony",
             "auth_support_grant",
+            // Rào nằm ở database nền tảng, theo ID khách: không theo dữ liệu khi tách / gộp.
+            "auth_tenant_guardrails",
         ])
         .sealed("auth_totp", "secret", "auth.totp_secret", "id")
         .sealed("auth_oidc_provider", "client_secret", "auth.oidc_client_secret", "id")
