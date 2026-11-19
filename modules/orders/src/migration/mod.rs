@@ -2,6 +2,7 @@
 //! một dòng vào cuối [`all`].
 
 mod m0005_carts;
+mod m0006_orders;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -21,6 +22,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "orders"),
         // Giỏ hàng và dòng giỏ (mục 2).
         Box::new(m0005_carts::Migration),
+        // Lượt đặt, đơn, dòng, thuế, lịch sử, khoản thanh toán, hoãn hoàn tất (mục 3).
+        Box::new(m0006_orders::Migration),
     ]
 }
 

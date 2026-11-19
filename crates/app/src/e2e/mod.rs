@@ -20,6 +20,7 @@ pub(crate) mod media;
 pub(crate) mod migrations;
 pub(crate) mod moit;
 pub(crate) mod notifications;
+pub(crate) mod orders;
 pub(crate) mod plans;
 pub(crate) mod posting_verification;
 pub(crate) mod privacy;

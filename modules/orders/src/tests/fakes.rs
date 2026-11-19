@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use autoxide_inventory::api::{
     Availability, FulfilRequest, Inventory, ReleaseReason, Reservation, ReserveRequest,
@@ -25,6 +26,7 @@ use uuid::Uuid;
 const INSUFFICIENT_STOCK: &str = "inventory.insufficient_stock";
 const NO_RESERVATION: &str = "inventory.reservation_not_found";
 const PROMOTIONS_CHANGED: &str = "promotions.changed";
+const EXHAUSTED: &str = "promotions.exhausted";
 const NO_REDEMPTION: &str = "promotions.redemption_not_found";
 
 /// Lỗi mang mã của module mà bộ giả đóng vai (`inventory.…`, `promotions.…`): câu và bản dịch là
@@ -46,6 +48,15 @@ pub(crate) struct FakeInventory {
 impl FakeInventory {
     pub(crate) fn stock(&self, org: OrgId, variant: Uuid, quantity: i64) {
         *self.stock.lock().unwrap().entry((org, variant)).or_default() += quantity;
+    }
+
+    pub(crate) fn available(&self, org: OrgId, variant: Uuid) -> i64 {
+        self.stock.lock().unwrap().get(&(org, variant)).copied().unwrap_or(0)
+    }
+
+    /// Trạng thái chỗ giữ của đơn (`held`, `confirmed`, `released`).
+    pub(crate) fn hold_status(&self, order: Uuid) -> Option<&'static str> {
+        self.holds.lock().unwrap().get(&order).map(|hold| hold.2)
     }
 
     fn reservation(order: Uuid, hold: &Hold) -> Reservation {
@@ -203,6 +214,8 @@ pub(crate) struct FakePromotions {
     codes: Mutex<HashMap<String, (Uuid, i64)>>,
     /// Lượt giữ theo đơn: trạng thái.
     redemptions: Mutex<HashMap<Uuid, &'static str>>,
+    /// Số lời gọi `reserve` kế tiếp lỗi như hết lượt.
+    pub fail_reserve: AtomicUsize,
 }
 
 impl FakePromotions {
@@ -210,6 +223,10 @@ impl FakePromotions {
         let id = Uuid::now_v7();
         self.codes.lock().unwrap().insert(code.to_uppercase(), (id, basis_points));
         id
+    }
+
+    pub(crate) fn redemption_status(&self, order: Uuid) -> Option<&'static str> {
+        self.redemptions.lock().unwrap().get(&order).copied()
     }
 
     fn reason(code: &str, text: &str) -> Value {
@@ -291,6 +308,10 @@ impl Promotions for FakePromotions {
         _tenant: &TenantContext,
         request: &PromotionHold,
     ) -> Result<Submitted<Redemption>, Error> {
+        if self.fail_reserve.load(Ordering::SeqCst) > 0 {
+            self.fail_reserve.fetch_sub(1, Ordering::SeqCst);
+            return Err(foreign(ErrorKind::Conflict, EXHAUSTED));
+        }
         let evaluation = self.compute(&request.cart);
         if let Some(expected) = &request.expected_fingerprint
             && *expected != evaluation.fingerprint

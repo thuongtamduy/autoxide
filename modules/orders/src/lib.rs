@@ -8,14 +8,19 @@
 mod abandoned;
 pub mod api;
 mod carts;
+mod checkout;
 mod config;
 mod entity;
 mod errors;
 mod events;
 mod extensions;
+mod holds;
 mod http;
 mod jobs;
+mod lifecycle;
 mod migration;
+mod orders_read;
+mod payments;
 mod permissions;
 mod pricing;
 mod reasons;
@@ -106,6 +111,9 @@ impl Module for OrdersModule {
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
             extensions: self.extensions.clone(),
             databases: context.tenancy(),
+            // `ledger` đăng ký trước `orders`; chưa cài thì chỉ nhận COD.
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
         };
         self.service = Some(Arc::new(OrdersService::new(parts, config)));
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
@@ -119,6 +127,19 @@ impl Module for OrdersModule {
 
     fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
         jobs::schedules()
+    }
+
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        let Some(service) = self.service.clone() else {
+            return Vec::new();
+        };
+        let mut all = holds::subscriptions(&service);
+        // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
+        all.push(autoxide_kernel::event::Subscription::optional(
+            payments::LEDGER_PAYMENT_SUCCEEDED,
+            Arc::new(payments::LedgerEvents(service)),
+        ));
+        all
     }
 
     fn routes(&self) -> OpenApiRouter {
