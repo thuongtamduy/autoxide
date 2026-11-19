@@ -128,6 +128,10 @@ endpoints are marked deprecated with a sunset date first.
 - `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
 - `support::api`: attach point `SupportFacts` where later modules (`shipping`, `orders`) attach a `FactSource` that
   answers simple questions from exact data (used by automatic answers, D-230).
+- `support`: MCP tools (`support.list_tickets`, `get_ticket`, `reply_ticket`, `add_internal_note`, `update_ticket`,
+  `link_ticket`, `suggest_reply`) with the REST permissions; AI reply drafts (`/tickets/{id}/reply-suggestions`, never
+  sent by themselves); email replies into tickets through the trait `InboundMail` (off by default); guide
+  `docs/SUPPORT.md` (EN + VI).
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

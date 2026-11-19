@@ -97,3 +97,41 @@ pub trait SupportFacts: Send + Sync {
     /// Gắn một nguồn; ý định trùng với nguồn đã gắn, hay không mang tiền tố module → lỗi.
     fn attach(&self, source: std::sync::Arc<dyn FactSource>) -> Result<(), Error>;
 }
+
+/// Một thư trả lời nhận được (bộ nhận thư thật — webhook của nhà cung cấp email — là module riêng).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InboundEmail {
+    /// Địa chỉ nhận, dạng `support+<khoá trả lời>@…`.
+    pub recipient: String,
+    /// Địa chỉ người gửi.
+    pub sender: String,
+    /// Nội dung chữ thuần của thư (phần trích dẫn thư cũ sẽ bị cắt).
+    pub text: String,
+}
+
+/// Thư đã đi đâu.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InboundOutcome {
+    /// Thành một tin của phiếu.
+    Added { ticket_id: Uuid },
+    /// Bỏ: không khớp phiếu, người gửi lạ, phiếu đã đóng, hay nút chưa bật nhận thư.
+    Dropped,
+}
+
+/// Điểm nhận email trả lời vào lại phiếu (tắt mặc định: chính sách `inbound_email` của nút).
+#[async_trait::async_trait]
+pub trait InboundMail: Send + Sync {
+    /// Khoá trả lời của phiếu: địa chỉ `Reply-To` của thư thông báo là `support+<khoá>@<miền>`.
+    async fn reply_address_key(
+        &self,
+        tenant: &TenantContext,
+        ticket_id: Uuid,
+    ) -> Result<String, Error>;
+
+    /// Nhận một thư; không bao giờ tạo phiếu mới.
+    async fn receive(
+        &self,
+        tenant: &TenantContext,
+        mail: InboundEmail,
+    ) -> Result<InboundOutcome, Error>;
+}
