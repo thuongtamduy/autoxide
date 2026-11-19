@@ -27,7 +27,7 @@ pub(crate) struct Skip<'a> {
 impl CatalogService {
     /// Kiểm bộ lọc thuộc tính: chỉ thuộc tính `filterable`; giá trị theo kiểu của thuộc tính.
     /// Trả điều kiện trên `storefront_entry::Column::ProductId`.
-    async fn attribute_conditions(
+    pub(crate) async fn attribute_conditions(
         &self,
         tenant: &TenantContext,
         filters: &[(String, Vec<String>)],
@@ -170,6 +170,33 @@ impl CatalogService {
                     "is not the slug of a visible category in this language",
                 )),
             }
+        }
+        if !filter.category_ids.is_empty() {
+            let below = Query::select()
+                .column(category_path::Column::DescendantId)
+                .from(category_path::Entity)
+                .and_where(category_path::Column::TenantId.eq(tenant_id))
+                .and_where(category_path::Column::AncestorId.is_in(filter.category_ids.clone()))
+                .to_owned();
+            let products = Query::select()
+                .column(product_category::Column::ProductId)
+                .from(product_category::Entity)
+                .and_where(product_category::Column::TenantId.eq(tenant_id))
+                .and_where(product_category::Column::CategoryId.in_subquery(below))
+                .to_owned();
+            condition = condition.add(storefront_entry::Column::ProductId.in_subquery(products));
+        }
+        if let Some(after) = filter.published_after {
+            condition = condition.add(storefront_entry::Column::PublishedAt.gte(after));
+        }
+        if let Some(collection) = filter.collection {
+            let chosen = Query::select()
+                .column(crate::entity::collection_item::Column::ProductId)
+                .from(crate::entity::collection_item::Entity)
+                .and_where(crate::entity::collection_item::Column::TenantId.eq(tenant_id))
+                .and_where(crate::entity::collection_item::Column::CollectionId.eq(collection))
+                .to_owned();
+            condition = condition.add(storefront_entry::Column::ProductId.in_subquery(chosen));
         }
         if let Some(min) = filter.price_min {
             condition = condition.add(storefront_entry::Column::MinPriceMinor.gte(min));

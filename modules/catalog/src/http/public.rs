@@ -220,7 +220,7 @@ fn card(
 }
 
 /// Thẻ cho nhiều sản phẩm: một lần đọc ảnh và tên người bán cho cả trang.
-async fn cards(
+pub(crate) async fn cards(
     service: &CatalogService,
     tenant: &TenantContext,
     site: &Site,
@@ -399,6 +399,7 @@ pub(crate) fn parse_filter(
             SoldByDto::Marketplace => SoldBy::Marketplace,
         }),
         min_rating: query.min_rating.map(|rating| i32::from(rating) * 100),
+        ..Default::default()
     };
     Ok(filter)
 }

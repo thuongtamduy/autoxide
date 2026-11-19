@@ -60,6 +60,12 @@ pub(crate) const DOWNLOADS_MANAGE: Permission = Permission::new(
     "See and revoke the download grants of digital products.",
 );
 
+pub(crate) const COLLECTIONS_MANAGE: Permission = Permission::new(
+    "catalog.collections.manage",
+    "Create, change, order and archive the product collections in your scope for the website.",
+)
+.scoped();
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         PRODUCTS_READ,
@@ -73,5 +79,6 @@ pub(crate) fn all() -> Vec<Permission> {
         IMPORT,
         EXPORT,
         DOWNLOADS_MANAGE,
+        COLLECTIONS_MANAGE,
     ]
 }

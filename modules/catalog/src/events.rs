@@ -43,6 +43,7 @@ event!(PriceEffective, names::PRICE_EFFECTIVE);
 event!(CategoryChanged, "catalog.category_changed");
 event!(PreorderDateChanged, "catalog.preorder_date_changed");
 event!(PriceListChanged, "catalog.price_list_changed");
+event!(CollectionChanged, "catalog.collection_changed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -80,6 +81,10 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "catalog.preorder_date_changed",
             "The expected availability date of a pre-order variant changed.",
         ),
+        EventInfo::new(
+            "catalog.collection_changed",
+            "A product collection was created, changed, given other products or deleted.",
+        ),
     ]
 }
 
@@ -96,4 +101,9 @@ pub(crate) fn price_list_subject(id: uuid::Uuid) -> Option<String> {
 /// Chủ thể của event về danh mục `id`.
 pub(crate) fn category_subject(id: uuid::Uuid) -> Option<String> {
     Some(format!("catalog.category:{id}"))
+}
+
+/// Chủ thể của event về bộ sưu tập `id`.
+pub(crate) fn collection_subject(id: uuid::Uuid) -> Option<String> {
+    Some(format!("catalog.collection:{id}"))
 }

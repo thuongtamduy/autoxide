@@ -142,6 +142,31 @@ background job after every change of price, status, price list or store choice, 
 scheduled prices that just started or ended (event `catalog.price_effective`). If the public lists ever
 look out of date, run `autoxide task catalog.rebuild_storefront [tenant=<slug>]`.
 
+## Collections
+
+A collection groups products for a page of the website ("Summer sale", "New this month"). Manage them
+under `/collections` (`catalog.collections.manage` at the collection's unit; reading needs
+`catalog.products.read`); `PATCH` and `PUT /collections/{id}/items` need `If-Match`.
+
+- `kind: manual` — chosen products in order: `PUT /collections/{id}/items` `{"product_ids": [...]}` (at
+  most 500) replaces the list.
+- `kind: rule` — products matching every condition of `rules` (at most 10):
+  `{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000, "price_max": 500000,
+  "new_within_days": 30, "on_promotion": true, "match": "all"}`. Prices are in the smallest unit of the
+  website's price list currency; `on_promotion` needs module `promotions` (`catalog.rule_needs_module`).
+- `sort`: `manual` (chosen order, manual collections only), `newest`, `price_asc`, `price_desc`,
+  `best_selling`; equal values keep a stable order by id on both databases.
+- `texts` by language: `title`, `slug` (unique in the language), `description`, `meta_title`,
+  `meta_description`; `media_id` (a public picture); `status` (`draft`, `active`, `archived`) and an
+  optional `starts_at` / `ends_at`.
+
+The website reads `GET /api/v1/catalog/public/collections/{slug}?locale=vi` (public; `site` or the
+domain): the collection's texts and one page of its products, with the same cards as
+`/public/products`, only products still shown on that website, in the collection's order. Only `active`
+collections in their time window, of the website or a unit above it, are public. Banners and menus
+point to a collection as `catalog.collection` of the object directory (`/collections/<slug>`). MCP tools:
+`catalog.list_collections`, `catalog.save_collection` (drafts only: a person sets a collection `active`).
+
 ## For other modules
 
 ```rust

@@ -1187,6 +1187,53 @@ export type CatalogCategoryText = {
   slug?: string | null;
 };
 
+/** A product collection. */
+export type CatalogCollection = {
+  created_at: string;
+  ends_at?: string | null;
+  id: string;
+  /** Number of chosen products (`manual`). */
+  items: number;
+  /** `manual` (chosen products, in order) or `rule`. */
+  kind: string;
+  /** Picture (public media item). */
+  media_id?: string | null;
+  /** Organization unit that owns it; the tenant's id for the whole tenant. */
+  org_id: string;
+  /** The rule of a `rule` collection; `{}` for `manual`. */
+  rules: Record<string, unknown>;
+  /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+  sort: string;
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+  status: string;
+  /** Texts by language. */
+  texts: {
+    [key: string]: CatalogCollectionText;
+  };
+  updated_at: string;
+};
+
+/** The chosen products of a collection, in order. */
+export type CatalogCollectionItems = {
+  /** Product ids, first shown first; at most 500. */
+  product_ids: string[];
+};
+
+/** Texts of a collection in one language. */
+export type CatalogCollectionText = {
+  /** Up to 5000 characters. */
+  description?: string;
+  /** Up to 500 characters. */
+  meta_description?: string;
+  /** Up to 200 characters. */
+  meta_title?: string;
+  /** Address part, unique in the language; omitted: made from the title. */
+  slug?: string | null;
+  /** 1 to 200 characters. */
+  title: string;
+};
+
 /** A component of a bundle. */
 export type CatalogComponent = {
   /** Units of the component in one bundle, 1 to 10000. */
@@ -1232,6 +1279,32 @@ export type CatalogCreateCategory = {
   };
   /** Shown on the storefront; default `true`. */
   visible?: boolean;
+};
+
+/** A new collection. */
+export type CatalogCreateCollection = {
+  ends_at?: string | null;
+  /** `manual` or `rule`. */
+  kind: string;
+  media_id?: string | null;
+  /** Owning organization unit; omitted: the whole tenant. */
+  org_id?: string | null;
+  /**
+   * For `rule`: `{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000,
+   * "price_max": 500000, "new_within_days": 30, "on_promotion": true, "match": "all"}` — every
+   * condition must hold, at most 10 conditions; prices in the smallest unit of the default
+   * price list's currency; `on_promotion` needs module `promotions`.
+   */
+  rules?: Record<string, unknown> | null;
+  /** Omitted: `manual` for a manual collection, else `newest`. */
+  sort?: string | null;
+  starts_at?: string | null;
+  /** `draft` (default), `active` or `archived`. */
+  status?: string | null;
+  /** Texts by language, at least one. */
+  texts: {
+    [key: string]: CatalogCollectionText;
+  };
 };
 
 /** A new document. */
@@ -1727,6 +1800,25 @@ export type CatalogPublicCategory = {
   slug: string;
 };
 
+/** A collection page of the website. */
+export type CatalogPublicCollection = {
+  description: string;
+  id: string;
+  locale: string;
+  /** Picture (public media item). */
+  media_id?: string | null;
+  meta_description: string;
+  meta_title: string;
+  pagination: Pagination;
+  /**
+   * One page of its products, in the collection's order; same card as
+   * `GET /api/v1/catalog/public/products`.
+   */
+  products: CatalogPublicProductCard[];
+  slug: string;
+  title: string;
+};
+
 /** An image, as readers load it. */
 export type CatalogPublicImage = {
   /** Text alternative: the product's own, or the media library's. */
@@ -2029,6 +2121,22 @@ export type CatalogUpdateCategory = {
     [key: string]: CatalogCategoryText;
   };
   visible?: boolean | null;
+};
+
+/**
+ * Changes to a collection: fields left out stay; `null` clears; `texts` replaces the languages
+ * given.
+ */
+export type CatalogUpdateCollection = {
+  ends_at?: string | null;
+  media_id?: string | null;
+  rules?: Record<string, unknown> | null;
+  sort?: string | null;
+  starts_at?: string | null;
+  status?: string | null;
+  texts?: {
+    [key: string]: CatalogCollectionText;
+  };
 };
 
 /** Changes to a price list. Omitted fields stay as they are. */
@@ -5288,6 +5396,45 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogCollection = {
+  /** A product collection. */
+  data: {
+    created_at: string;
+    ends_at?: string | null;
+    id: string;
+    /** Number of chosen products (`manual`). */
+    items: number;
+    /** `manual` (chosen products, in order) or `rule`. */
+    kind: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    /** Organization unit that owns it; the tenant's id for the whole tenant. */
+    org_id: string;
+    /** The rule of a `rule` collection; `{}` for `manual`. */
+    rules: Record<string, unknown>;
+    /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+    sort: string;
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+    status: string;
+    /** Texts by language. */
+    texts: {
+      [key: string]: CatalogCollectionText;
+    };
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCollectionItems = {
+  /** The chosen products of a collection, in order. */
+  data: {
+    /** Product ids, first shown first; at most 500. */
+    product_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogFacets = {
   /** Filter counts of a public product list. */
   data: {
@@ -5447,6 +5594,28 @@ export type Data_CatalogPublicCategory = {
     parent_id?: string | null;
     position: number;
     slug: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicCollection = {
+  /** A collection page of the website. */
+  data: {
+    description: string;
+    id: string;
+    locale: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    meta_description: string;
+    meta_title: string;
+    pagination: Pagination;
+    /**
+     * One page of its products, in the collection's order; same card as
+     * `GET /api/v1/catalog/public/products`.
+     */
+    products: CatalogPublicProductCard[];
+    slug: string;
+    title: string;
   };
 };
 
@@ -18579,6 +18748,37 @@ export type Page_CampaignResponse = {
 };
 
 /** One page of a list. */
+export type Page_CatalogCollection = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    ends_at?: string | null;
+    id: string;
+    /** Number of chosen products (`manual`). */
+    items: number;
+    /** `manual` (chosen products, in order) or `rule`. */
+    kind: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    /** Organization unit that owns it; the tenant's id for the whole tenant. */
+    org_id: string;
+    /** The rule of a `rule` collection; `{}` for `manual`. */
+    rules: Record<string, unknown>;
+    /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+    sort: string;
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+    status: string;
+    /** Texts by language. */
+    texts: {
+      [key: string]: CatalogCollectionText;
+    };
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CatalogPrice = {
   /** The items of this page, in the requested order. */
   data: {
@@ -30271,6 +30471,100 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/collections": {
+    /** List product collections. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a product collection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateCollection;
+      responses: {
+        201: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/collections/{id}": {
+    /** Get a product collection. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a product collection. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateCollection;
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a product collection. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/collections/{id}/items": {
+    /** Get the chosen products of a collection. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCollectionItems;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the chosen products of a collection. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCollectionItems;
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/price-guards": {
     /** List the price floors in your scope. */
     get: {
@@ -30705,6 +30999,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string }; };
       responses: {
         200: Data_CatalogPublicCategory;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/collections/{slug}": {
+    /** Get a collection page (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Data_CatalogPublicCollection;
         403: Problem;
         404: Problem;
         422: Problem;
