@@ -29,6 +29,7 @@
 
 mod body_limit;
 mod client;
+mod compression;
 mod conditional;
 mod deprecation;
 mod disposition;
@@ -406,7 +407,11 @@ pub fn build(
         // NGOÀI lớp ngôn ngữ: lưu đúng response client nhận lần đầu.
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             idempotency::idempotency(idempotency.clone(), request, next)
-        }))
+        }));
+    // NGOÀI lớp idempotency: bản lưu để trả lại là bản chưa nén (D-20261118-step39-compression).
+    // Tắt bằng cấu hình thì lớp không có mặt.
+    let router = if config.compression { router.layer(compression::layer()) } else { router };
+    let router = router
         // TRONG lớp CORS: request preflight của trình duyệt không bị đếm, còn response
         // 429 vẫn mang header CORS để trang web đọc được lỗi.
         .layer(middleware::from_fn(move |request: Request, next: Next| {

@@ -466,6 +466,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-195** Khoảng rút trước khi tắt: `AUTOXIDE_HTTP_DRAIN_SECONDS`, mặc định 0 — 2026-11-13
 - **D-317** Số đo đường nóng sau bước 34 — 2026-11-16
 - **[D-20261118-step39-backlog-gauges](D-20261118-step39-backlog-gauges.md)** Gauge tồn đọng của job, event và pool kết nối — 2026-11-18
+- **[D-20261118-step39-compression](D-20261118-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
 - **[D-20261118-step39-monitoring-files](D-20261118-step39-monitoring-files.md)** Luật cảnh báo, dashboard và sổ tay sự cố nằm trong repo, `xtask` giữ khớp — 2026-11-18
 - **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
 - **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18

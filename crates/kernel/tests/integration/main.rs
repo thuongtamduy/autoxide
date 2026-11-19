@@ -13,6 +13,7 @@ mod backup_schedule;
 mod can;
 mod can_plan;
 mod client_config;
+mod compression;
 mod custom_fields_limit;
 mod database;
 mod distribution;

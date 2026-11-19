@@ -58,6 +58,14 @@ pub const API_DOCS: Setting = Setting::new(
 )
 .with_default("false");
 
+pub const COMPRESSION: Setting = Setting::new(
+    "AUTOXIDE_HTTP_COMPRESSION",
+    "Compress JSON and text responses with gzip or brotli when the client accepts it (`true` or \
+     `false`). Files such as images are never compressed again. Turn it off only when a reverse \
+     proxy or CDN in front of Autoxide already compresses responses.",
+)
+.with_default("true");
+
 pub const METRICS: Setting = Setting::new(
     "AUTOXIDE_HTTP_METRICS",
     "Serve Prometheus metrics at `/metrics` (`true` or `false`). The endpoint has no \
@@ -345,6 +353,8 @@ pub struct HttpConfig {
     pub drain: Duration,
     pub api_docs: bool,
     pub metrics: bool,
+    /// Nén response chữ (gzip, brotli) — bước 39, D-20261118-step39-compression.
+    pub compression: bool,
     pub rate_limit: RateLimit,
     /// Số proxy tin cậy đứng trước API (đọc địa chỉ thứ chừng này từ cuối header). Bỏ qua khi
     /// có `trusted_proxies`.
@@ -400,6 +410,7 @@ impl HttpConfig {
         let drain = reader.get_with(&DRAIN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let api_docs = reader.get_with(&API_DOCS, parse_bool);
         let metrics = reader.get_with(&METRICS, parse_bool);
+        let compression = reader.get_with(&COMPRESSION, parse_bool);
         let per_minute =
             reader.get_with(&RATE_LIMIT_PER_MINUTE, |raw| parse_in_range(raw, 0u32, 1_000_000));
         let burst = reader.get_with(&RATE_LIMIT_BURST, |raw| parse_in_range(raw, 1u32, 1_000_000));
@@ -450,6 +461,7 @@ impl HttpConfig {
             drain: Duration::from_secs(drain?),
             api_docs: api_docs?,
             metrics: metrics?,
+            compression: compression?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
             trusted_proxy_count: trusted_proxy_count?,
             trusted_proxies: trusted_proxies?.unwrap_or_default(),

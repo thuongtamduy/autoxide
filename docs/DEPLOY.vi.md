@@ -111,6 +111,10 @@ api.example.com {
 }
 ```
 
+Autoxide tự nén response JSON và chữ (gzip hay brotli, tuỳ client nhận cách nào; ảnh và file
+khác gửi nguyên), nên proxy không cần chỉ thị `encode`. Nếu proxy hay CDN đã nén, đặt
+`AUTOXIDE_HTTP_COMPRESSION=false` để khỏi nén hai lần.
+
 Rồi cho Autoxide biết header nào chứa địa chỉ thật của client, để rate limiting đếm theo
 client chứ không theo proxy. Thêm vào `.env` rồi khởi động lại:
 
@@ -337,6 +341,7 @@ database mới.
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Bật đăng nhập bằng passkey cho tên miền của bạn |
 | `AUTOXIDE_HTTP_DRAIN_SECONDS` | Sau bộ cân bằng tải: lúc tắt, phục vụ thêm bao lâu trong khi `/health/ready` trả `503`, xem [bên dưới](#cập-nhật-không-làm-rơi-request) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
+| `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
 | `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, cùng cổng với API: khi bật, hãy chặn `/metrics` ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 

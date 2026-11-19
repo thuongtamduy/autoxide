@@ -113,6 +113,11 @@ api.example.com {
 }
 ```
 
+Autoxide compresses JSON and text responses itself (gzip or brotli, whichever the client
+accepts; images and other files are sent as they are), so the proxy needs no `encode`
+directive. If your proxy or CDN already compresses, set `AUTOXIDE_HTTP_COMPRESSION=false` so the
+work is not done twice.
+
 Then tell Autoxide which header carries the real client address, so that rate limiting
 counts clients and not the proxy. Add to `.env` and restart:
 
@@ -341,6 +346,7 @@ into a new database.
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Turn on passkey sign-in for your domain |
 | `AUTOXIDE_HTTP_DRAIN_SECONDS` | Behind a load balancer: how long to keep serving while `/health/ready` says `503` on shutdown, see [below](#updating-without-dropping-requests) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
+| `AUTOXIDE_HTTP_COMPRESSION` | `true` (default): compress JSON and text with gzip or brotli; `false` when a reverse proxy or CDN in front already compresses |
 | `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, on the API port: when you turn it on, block `/metrics` in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
 
