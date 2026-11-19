@@ -13,7 +13,9 @@
 pub(crate) mod entity;
 pub(crate) mod headers;
 mod http;
+pub(crate) mod mailbox;
 mod migration;
+mod partners;
 mod service;
 mod tools;
 
@@ -25,7 +27,11 @@ use crate::entitlement::Limit;
 use crate::error::{Error, ErrorKind};
 use crate::event::EventInfo;
 
+pub(crate) use mailbox::CreateSandboxMessages;
+pub use mailbox::{HeldChannel, HeldMessage, HeldReason, SandboxMessage, hold_back, sandbox_only};
 pub(crate) use migration::AddSandbox;
+pub(crate) use partners::PartnerGuard;
+pub use partners::{SANDBOX_PREFIX, SandboxRecipients};
 pub(crate) use service::Wiring;
 pub use service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 
@@ -107,6 +113,54 @@ pub const SANDBOX_MAX_PRODUCTS: Setting = Setting::new(
 )
 .with_default("50");
 
+/// URL webhook mà sandbox được gửi thật (cài đặt của khách, đặt TRONG sandbox): mỗi dòng (hay dấu
+/// phẩy) một tiền tố. Mặc định rỗng: mọi webhook của sandbox vào hộp thư giả.
+pub const WEBHOOK_URLS: crate::tenancy::TenantSetting = crate::tenancy::TenantSetting::new(
+    "kernel.sandbox.webhook_urls",
+    "Only in a sandbox: URL prefixes its webhooks may really be sent to, one per line or separated \
+     by commas (e.g. `https://hooks.example.com/test/`). Empty by default: every webhook of the \
+     sandbox is kept in its message box instead (`GET /api/v1/kernel/sandbox/messages`).",
+)
+.checked(check_webhook_urls);
+
+fn check_webhook_urls(raw: &str) -> Result<(), crate::error::FieldError> {
+    match prefixes(raw)
+        .find(|prefix| !(prefix.starts_with("https://") || prefix.starts_with("http://")))
+    {
+        Some(_) => Err(crate::error::FieldError::new(
+            "value",
+            "invalid",
+            "every prefix must start with `https://` or `http://`",
+        )),
+        None => Ok(()),
+    }
+}
+
+/// Webhook tới `url` của khách `tenant` được gửi thật: khách thật luôn được; sandbox chỉ khi `url`
+/// bắt đầu bằng một tiền tố trong [`WEBHOOK_URLS`]. Module `webhooks` gọi trước khi gửi.
+pub async fn webhook_allowed(
+    settings: &dyn crate::tenancy::TenantSettings,
+    tenant: &crate::tenancy::TenantContext,
+    url: &str,
+) -> Result<bool, Error> {
+    if !tenant.is_sandbox() {
+        return Ok(true);
+    }
+    let Some(value) = settings.get(tenant, &WEBHOOK_URLS).await? else { return Ok(false) };
+    Ok(prefixes(value.as_str()).any(|prefix| url_matches(url, prefix)))
+}
+
+fn prefixes(raw: &str) -> impl Iterator<Item = &str> {
+    raw.split([',', '\n']).map(str::trim).filter(|prefix| !prefix.is_empty())
+}
+
+/// `url` bắt đầu bằng `prefix` và tiền tố kết thúc ở ranh giới (hết chuỗi, `/`, `?`, `#`) — để
+/// `https://a.example` không mở cửa cho `https://a.example.evil.com`.
+fn url_matches(url: &str, prefix: &str) -> bool {
+    let Some(rest) = url.strip_prefix(prefix) else { return false };
+    prefix.ends_with('/') || rest.is_empty() || rest.starts_with(['/', '?', '#'])
+}
+
 /// Loại job sao cấu hình rồi kích hoạt sandbox (`unique_key = "sandbox_copy:{sandbox}"`).
 pub(crate) const SANDBOX_COPY: &str = "kernel.sandbox_copy";
 /// Lịch xoá sandbox hết hạn (mỗi giờ, database điều khiển).
@@ -134,4 +188,17 @@ pub fn sandbox_forbidden(action: &str) -> Error {
         "A sandbox cannot do `{action}`; do it in the real tenant.",
     )
     .with_param("action", action.to_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::url_matches;
+
+    #[test]
+    fn tien_to_url_webhook_dung_o_ranh_gioi() {
+        assert!(url_matches("https://a.example/hook", "https://a.example"));
+        assert!(url_matches("https://a.example/test/1", "https://a.example/test/"));
+        assert!(!url_matches("https://a.example.evil.com/x", "https://a.example"));
+        assert!(!url_matches("https://b.example/hook", "https://a.example"));
+    }
 }
