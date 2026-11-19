@@ -1,5 +1,6 @@
 //! Rào quyền tối đa cho khách con (bước 54 P4): bảng ở database nền tảng, một dòng mỗi cặp (khách
-//! bị rào, khách đặt rào).
+//! bị rào, khách đặt rào). Bảng rất nhỏ (vài dòng mỗi khách con): đọc theo khách đặt rào (danh
+//! sách, xoá khi khách bị xoá) không cần index riêng.
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -36,16 +37,6 @@ impl MigrationTrait for Migration {
                     .col("tenant_id")
                     .col("set_by_tenant_id")
                     .unique()
-                    .to_owned(),
-            )
-            .await?;
-        manager
-            .create_index(
-                Index::create()
-                    .name("auth_tenant_guardrails_set_by_idx")
-                    .table("auth_tenant_guardrails")
-                    .col("set_by_tenant_id")
-                    .col("tenant_id")
                     .to_owned(),
             )
             .await
