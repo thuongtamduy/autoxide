@@ -112,6 +112,14 @@ impl StoreNotification {
     }
 }
 
+/// Lỗi 401 khi thông báo của cửa hàng không có chữ ký hợp lệ — bộ kết nối trả khi kiểm chữ ký hỏng.
+pub fn signature_invalid() -> Error {
+    Error::unauthenticated(
+        "store_signature_invalid",
+        "The store notification is not signed by the store.",
+    )
+}
+
 /// Kết nối tới một cửa hàng ứng dụng.
 #[async_trait::async_trait]
 pub trait StorePurchases: Send + Sync {

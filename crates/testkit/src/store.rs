@@ -105,12 +105,7 @@ impl StorePurchases for FakeStorePurchases {
         _headers: &axum::http::HeaderMap,
         body: &[u8],
     ) -> Result<StoreNotification, Error> {
-        let refused = || {
-            Error::unauthenticated(
-                "store_signature_invalid",
-                "The store notification is not signed by the store.",
-            )
-        };
+        let refused = autoxide_kernel::store::signature_invalid;
         let value: Value = serde_json::from_slice(body).map_err(|_| refused())?;
         let (Some(id), Some(payload), Some(signature)) =
             (value["id"].as_str(), value["payload"].as_str(), value["signature"].as_str())

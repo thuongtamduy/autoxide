@@ -391,5 +391,6 @@
   "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
   "web_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy trên trình duyệt.",
   "zns_disabled": "Máy chủ chưa cấu hình gửi tin Zalo ZNS.",
-  "text:See queue backlogs, dead jobs, undelivered events, database connections and the newest backup of every database (platform staff only).": "Xem tồn đọng của hàng đợi, job hỏng hẳn, event chưa giao, kết nối database và bản backup mới nhất của mọi database (chỉ nhân sự nền tảng)."
+  "text:See queue backlogs, dead jobs, undelivered events, database connections and the newest backup of every database (platform staff only).": "Xem tồn đọng của hàng đợi, job hỏng hẳn, event chưa giao, kết nối database và bản backup mới nhất của mọi database (chỉ nhân sự nền tảng).",
+  "store_signature_invalid": "Thông báo không có chữ ký của cửa hàng."
 }

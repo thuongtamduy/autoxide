@@ -283,10 +283,7 @@ impl PlansService {
     ) -> Result<(), Error> {
         let notification = self.store(store)?.notification(headers, body).await?;
         if notification.purchase.store != store {
-            return Err(Error::unauthenticated(
-                "store_signature_invalid",
-                "The store notification is not signed by the store.",
-            ));
+            return Err(autoxide_kernel::store::signature_invalid());
         }
         let fresh = notification::Entity::insert(notification::ActiveModel {
             id: Set(Uuid::now_v7()),
