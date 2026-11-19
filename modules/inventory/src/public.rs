@@ -55,7 +55,7 @@ pub(crate) struct PublicAvailability {
     pub quantity: Option<i64>,
 }
 
-fn visible(variant: &VariantSnapshot) -> bool {
+pub(crate) fn visible(variant: &VariantSnapshot) -> bool {
     variant.status == ProductStatus::Active && variant.variant_active
 }
 

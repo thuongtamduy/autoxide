@@ -772,6 +772,7 @@ dependencies = [
  "autoxide-catalog",
  "autoxide-kernel",
  "autoxide-ledger",
+ "autoxide-notifications",
  "autoxide-organizations",
  "autoxide-testkit",
  "axum",
