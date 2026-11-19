@@ -22434,6 +22434,12 @@ export type PublicTranslation = {
 
 /** A smaller copy of an image. */
 export type PublicVariant = {
+  /**
+   * URL of the AVIF copy, usually a third smaller than WebP: offer it in a
+   * `<source type="image/avif">` before the WebP one. `null` until it is made (the server makes
+   * them only when `AUTOXIDE_MEDIA_AVIF` is on).
+   */
+  avif_url?: string | null;
   height: number;
   /** JPEG copy (PNG for images with transparency). */
   url: string;
@@ -26121,6 +26127,14 @@ export type Utm = {
 
 /** A smaller copy of an image. */
 export type VariantResponse = {
+  /** Size of the AVIF copy in bytes; `null` like `avif_url`. */
+  avif_size?: number | null;
+  /**
+   * The same copy as AVIF, usually a third smaller than WebP: `url` with `&format=avif`. Offer
+   * it in a `<source type="image/avif">` before the WebP one. Made in the background only when
+   * the server sets `AUTOXIDE_MEDIA_AVIF=true`; `null` until then.
+   */
+  avif_url?: string | null;
   /** `image/jpeg`, or `image/png` for images with transparency. */
   content_type: string;
   height: number;

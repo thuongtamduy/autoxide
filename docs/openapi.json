@@ -69935,6 +69935,13 @@
       "PublicVariant": {
         "description": "A smaller copy of an image.",
         "properties": {
+          "avif_url": {
+            "description": "URL of the AVIF copy, usually a third smaller than WebP: offer it in a\n`<source type=\"image/avif\">` before the WebP one. `null` until it is made (the server makes\nthem only when `AUTOXIDE_MEDIA_AVIF` is on).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "height": {
             "format": "int32",
             "type": "integer"
@@ -80659,6 +80666,23 @@
       "VariantResponse": {
         "description": "A smaller copy of an image.",
         "properties": {
+          "avif_size": {
+            "description": "Size of the AVIF copy in bytes; `null` like `avif_url`.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "avif_url": {
+            "description": "The same copy as AVIF, usually a third smaller than WebP: `url` with `&format=avif`. Offer\nit in a `<source type=\"image/avif\">` before the WebP one. Made in the background only when\nthe server sets `AUTOXIDE_MEDIA_AVIF=true`; `null` until then.",
+            "example": "/api/v1/media/0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7a/content?v=0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7b&w=640&format=avif",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "content_type": {
             "description": "`image/jpeg`, or `image/png` for images with transparency.",
             "example": "image/jpeg",
@@ -163558,7 +163582,7 @@
             }
           },
           {
-            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "description": "`webp` or `avif`: with `w`, the WebP or AVIF copy of that width (much smaller; the\nvariant's `webp_url`, `avif_url`). Until it is made, the next best copy is sent instead\n(for `avif`: the WebP copy, then the JPEG or PNG one), so the address always shows an\nimage. Ignored without `w`.",
             "example": "webp",
             "in": "query",
             "name": "format",
@@ -163718,7 +163742,7 @@
                 }
               }
             },
-            "description": "`format` is not `webp`; see `errors`."
+            "description": "`format` is not `webp` or `avif`; see `errors`."
           },
           "default": {
             "content": {
@@ -163778,7 +163802,7 @@
             }
           },
           {
-            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "description": "`webp` or `avif`: with `w`, the WebP or AVIF copy of that width (much smaller; the\nvariant's `webp_url`, `avif_url`). Until it is made, the next best copy is sent instead\n(for `avif`: the WebP copy, then the JPEG or PNG one), so the address always shows an\nimage. Ignored without `w`.",
             "example": "webp",
             "in": "query",
             "name": "format",
@@ -163821,7 +163845,7 @@
             "description": "No media item has this id that you may load."
           },
           "422": {
-            "description": "`format` is not `webp`."
+            "description": "`format` is not `webp` or `avif`."
           },
           "default": {
             "content": {
