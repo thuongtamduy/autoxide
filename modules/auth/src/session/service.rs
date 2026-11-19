@@ -41,7 +41,7 @@ use super::{LoginThrottle, challenge};
 use crate::events;
 use crate::mfa::MfaService;
 use autoxide_kernel::event::{Actor, Outbox};
-use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, link_token};
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, link_token};
 use serde_json::json;
 
 mod devices;
@@ -442,6 +442,7 @@ impl SessionService {
         let family_id = Uuid::now_v7();
         let session = SessionDetails {
             started_at: now,
+            authenticated_at: now,
             user_agent,
             sign_in_method: Some(method.to_owned()),
             country: None,
@@ -482,12 +483,13 @@ impl SessionService {
         self.outbox.record(&transaction, tenant, Actor::user(user_id), subject, &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %user_id, "signed in");
-        self.tokens(tenant, user_id, family_id, &refresh_token, expires_at, now)
+        let session = Stamp { id: family_id, authenticated_at: now };
+        self.tokens(tenant, user_id, session, &refresh_token, expires_at, now)
     }
 
-    /// Kiểm access token `token` (không có chữ `Bearer`): (khách ghi trong token, người dùng).
-    /// Chữ ký đã kiểm bằng khoá của đúng khách đó; chưa hỏi database nào.
-    pub(crate) fn verify_access(&self, token: &str) -> Result<(TenantId, Uuid), Error> {
+    /// Kiểm access token `token` (không có chữ `Bearer`): khách ghi trong token, người dùng, phiên,
+    /// lần xác thực gần nhất. Chữ ký đã kiểm bằng khoá của đúng khách đó; chưa hỏi database nào.
+    pub(crate) fn verify_access(&self, token: &str) -> Result<token::Verified, Error> {
         self.access_tokens.verify(token, Utc::now())
     }
 
@@ -516,11 +518,11 @@ impl SessionService {
         tenant: &TenantContext,
         authorization: Option<&str>,
     ) -> Result<User, Error> {
-        let (tenant_id, user_id) = self.verify_access(bearer_token(authorization)?)?;
-        if tenant_id != tenant.id() {
+        let verified = self.verify_access(bearer_token(authorization)?)?;
+        if verified.tenant != tenant.id() {
             return Err(token::invalid_token());
         }
-        self.token_user(tenant, user_id).await
+        self.token_user(tenant, verified.user).await
     }
 
     /// Cặp token của khách `tenant`: access token mang `tid`, refresh token (phần thô
@@ -529,13 +531,16 @@ impl SessionService {
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
-        session_id: Uuid,
+        session: Stamp,
         refresh_token: &str,
         refresh_token_expires_at: DateTime<Utc>,
         now: DateTime<Utc>,
     ) -> Result<Tokens, Error> {
+        let Stamp { id: session_id, authenticated_at } = session;
+        let access_token =
+            self.access_tokens.issue(tenant.id(), user_id, now, session_id, authenticated_at)?;
         Ok(Tokens {
-            access_token: self.access_tokens.issue(tenant.id(), user_id, now)?,
+            access_token,
             expires_in: self.access_tokens.ttl().as_secs(),
             refresh_token: link_token(tenant, refresh_token),
             refresh_token_expires_at,
@@ -626,8 +631,17 @@ fn live_tokens(
 }
 
 /// Thông tin của một phiên, chép sang mỗi refresh token của nó.
+/// Phiên (họ refresh token) và lần xác thực gần nhất của nó, cho access token sắp cấp.
+#[derive(Clone, Copy)]
+struct Stamp {
+    id: Uuid,
+    authenticated_at: DateTime<Utc>,
+}
+
 struct SessionDetails {
     started_at: DateTime<Utc>,
+    /// Lần xác thực gần nhất (đăng nhập, xác nhận lại).
+    authenticated_at: DateTime<Utc>,
     user_agent: Option<String>,
     sign_in_method: Option<String>,
     country: Option<String>,
@@ -655,6 +669,7 @@ fn new_refresh_token(
         created_at: Set(now),
         user_agent: Set(session.user_agent),
         session_started_at: Set(Some(session.started_at)),
+        authenticated_at: Set(Some(session.authenticated_at)),
         sign_in_method: Set(session.sign_in_method),
         country: Set(session.country),
     };

@@ -178,7 +178,7 @@ Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe v
       (D-20261119-step54-api-key-limits), quản trị duyệt key (D-20261119-step54-key-approval)
 - [ ] API key chọn bản ghi cụ thể (qua `kernel_shares` với `subject_kind = api_key`): làm cùng mục chia sẻ bản ghi
 - [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
-      trên gán role
+      trên gán role — đã có: xác nhận lại cho việc nhạy cảm (D-20261119-step54-step-up)
 - [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
       trao quyền mình không có
 - [ ] Quyền theo trường dữ liệu: trường cá nhân / nhạy cảm / tài chính phân loại trong OpenAPI, bị che khi

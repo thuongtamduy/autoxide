@@ -36,6 +36,8 @@ pub(crate) struct RequestAuthenticator {
     pub support: Arc<crate::support::SupportService>,
     /// Rào quyền tối đa khách cấp trên đặt (bước 54): áp cho mọi đường vào.
     pub guardrails: Arc<crate::guardrail::GuardrailService>,
+    /// Xác nhận lại cho việc nhạy cảm (bước 54 P5): chỉ phiên đăng nhập.
+    pub step_up: crate::step_up::StepUpPolicy,
 }
 
 #[async_trait::async_trait]
@@ -55,7 +57,8 @@ impl Authenticator for RequestAuthenticator {
         }
         // Chữ ký kiểm bằng khoá của khách ghi trong token TRƯỚC khi tra khách: `tid` giả không
         // dò được khách nào tồn tại.
-        let (tenant, user_id) = self.sessions.verify_access(token)?;
+        let verified = self.sessions.verify_access(token)?;
+        let (tenant, user_id) = (verified.tenant, verified.user);
         let tenant = self.tenant(tenant, crate::token::invalid_token).await?;
         // Dòng người dùng và quyền đọc trong một câu (D-319).
         let (user, principal) = self
@@ -70,6 +73,7 @@ impl Authenticator for RequestAuthenticator {
         if user.realm == autoxide_kernel::access::Realm::Customer {
             return Ok(Principal::customer(user.id).in_tenant(tenant.id()));
         }
+        let principal = self.step_up.apply(&tenant, principal, verified.authenticated_at).await?;
         self.guardrails.apply(principal).await
     }
 
@@ -82,6 +86,11 @@ impl Authenticator for RequestAuthenticator {
         let entered = match self.delegations.enter(principal, target).await? {
             Some(entered) => Some(entered),
             None => self.support.enter(principal, target).await?,
+        };
+        // Đòi hỏi xác nhận lại của phiên đi theo người vào khách khác.
+        let entered = match (entered, principal.step_up()) {
+            (Some(entered), Some(step_up)) => Some(entered.with_step_up(step_up)),
+            (entered, _) => entered,
         };
         match entered {
             Some(entered) => Ok(Some(self.guardrails.apply(entered).await?)),

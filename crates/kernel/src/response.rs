@@ -182,9 +182,11 @@ impl IntoResponse for Error {
             .insert(header::CONTENT_TYPE, HeaderValue::from_static(PROBLEM_CONTENT_TYPE));
         if self.kind() == ErrorKind::Unauthenticated {
             // RFC 9110 bắt 401 phải nói cách xác thực; RFC 6750: cách đó là bearer token.
-            response
-                .headers_mut()
-                .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+            let challenge = self
+                .challenge()
+                .and_then(|value| HeaderValue::from_str(value).ok())
+                .unwrap_or(HeaderValue::from_static("Bearer"));
+            response.headers_mut().insert(header::WWW_AUTHENTICATE, challenge);
         }
         if let Some((_, version)) = self.current()
             && let Ok(value) = HeaderValue::from_str(&crate::version::etag(*version))
