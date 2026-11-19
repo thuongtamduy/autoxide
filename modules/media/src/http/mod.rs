@@ -308,8 +308,6 @@ where
 }
 
 #[cfg(test)]
-mod avif_tests;
-#[cfg(test)]
 mod tests;
 
 impl MediaItemResponse {
