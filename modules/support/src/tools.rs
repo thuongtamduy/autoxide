@@ -234,8 +234,7 @@ pub(crate) fn all(service: &Arc<SupportService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(crate::permissions::AUTO_REPLY_MANAGE)
-        .read_only(),
+        .requires(crate::permissions::AUTO_REPLY_MANAGE),
     ]
 }
 
