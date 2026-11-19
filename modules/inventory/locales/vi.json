@@ -1,8 +1,10 @@
 {
   "field:a line needs more than {max} units": "một dòng cần hơn {max} đơn vị",
   "field:comes from the purchase order: leave it out": "lấy từ đơn đặt hàng: hãy bỏ trường này",
+  "field:every id must be a UUID": "mọi ID phải là UUID",
   "field:every line must use the same currency": "mọi dòng phải cùng một tiền tệ",
   "field:give a reason from the list `inventory.adjustment`": "hãy chọn một lý do trong danh sách `inventory.adjustment`",
+  "field:give between 1 and {max} variant ids": "nêu từ 1 đến {max} ID biến thể",
   "field:give both `unit_cost_amount` and `unit_cost_currency`, or neither": "hãy gửi cả `unit_cost_amount` và `unit_cost_currency`, hoặc không gửi cả hai",
   "field:has no rows": "không có dòng nào",
   "field:is not a valid CSV file: {problem}": "không phải tệp CSV hợp lệ: {problem}",

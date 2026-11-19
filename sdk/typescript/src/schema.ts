@@ -11391,6 +11391,18 @@ export type Data_Vec_IdentityResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_InventoryPublicAvailability = {
+  data: {
+    level: InventoryPublicStockLevel;
+    /** Units left, only when `level` is `low`. */
+    quantity?: number | null;
+    /** The store (organization unit) selling it. */
+    store_id: string;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_InventoryValuation = {
   data: {
     org_id: string;
@@ -13788,6 +13800,19 @@ export type InventoryMovement = {
   unit_cost?: Money | null;
   variant_id: string;
 };
+
+/** Availability of one variant at one store. */
+export type InventoryPublicAvailability = {
+  level: InventoryPublicStockLevel;
+  /** Units left, only when `level` is `low`. */
+  quantity?: number | null;
+  /** The store (organization unit) selling it. */
+  store_id: string;
+  variant_id: string;
+};
+
+/** How much of a variant a store can sell, without revealing large stock numbers. */
+export type InventoryPublicStockLevel = "in_stock" | "low" | "out" | "preorder";
 
 /** A purchase order to a supplier. */
 export type InventoryPurchaseOrder = {
@@ -32103,6 +32128,19 @@ export interface paths {
       responses: {
         200: Page_InventoryMovement;
         401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/public/availability": {
+    /** Public availability of variants at stores. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { variant_ids: string; store_id?: string }; };
+      responses: {
+        200: Data_Vec_InventoryPublicAvailability;
+        304: void;
         403: Problem;
         422: Problem;
         default: Problem;

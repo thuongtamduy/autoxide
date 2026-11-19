@@ -144,6 +144,24 @@ Bật theo sản phẩm ở `catalog` (`lot_tracked`, `serial_tracked`).
 - `POST /supplier-returns` (`TH-…`): trả hàng cho nhà cung cấp theo giá vốn bình quân hiện tại (hay giá nêu); bút toán
   được đảo lại.
 
+## Tình trạng hàng công khai
+
+`GET /api/v1/inventory/public/availability?variant_ids=<id>,<id>&store_id=<nút>` không cần đăng nhập. Với mỗi biến thể
+(1 đến 100 mỗi lần) và cửa hàng, trả một mức:
+
+| Mức | Nghĩa |
+|---|---|
+| `in_stock` | Đủ bán; không bao giờ hiện số |
+| `low` | Còn dưới `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD` (5); `quantity` cho biết còn bao nhiêu |
+| `out` | Hiện không còn để bán |
+| `preorder` | Chưa có hàng, bán theo `preorder` |
+
+Cửa hàng bán từ các kho nguồn của nó (hay tồn của chính nó): bật `allow_split` thì cộng các kho, không thì lấy kho nhiều
+nhất, như khi giữ chỗ. Combo tính số bộ ráp được từ thành phần; biến thể không theo dõi tồn luôn `in_stock`. Biến thể
+không có hay đang ẩn bị bỏ qua. Bỏ `store_id` thì liệt kê mọi cửa hàng nhận hàng tại chỗ. Câu trả lời đổi ngay khi có
+giữ chỗ; có `ETag` (gửi lại trong `If-None-Match` để nhận 304) và `Cache-Control: public, max-age=5`. Module `catalog`
+lọc "còn hàng ở cửa hàng X" bằng cùng cách tính (`Inventory::in_stock_at`).
+
 ## Kiểm số liệu
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<nút>]` so mọi dòng tồn với sổ và chỗ giữ của nó,

@@ -148,6 +148,25 @@ Turned on per product in `catalog` (`lot_tracked`, `serial_tracked`).
 - `POST /supplier-returns` (`TH-…`): goods back to the supplier at the current average cost (or a given price); the
   posting is reversed.
 
+## Public availability
+
+`GET /api/v1/inventory/public/availability?variant_ids=<id>,<id>&store_id=<unit>` needs no sign-in. For each variant
+(1 to 100 per call) and store it answers a level:
+
+| Level | Meaning |
+|---|---|
+| `in_stock` | Enough to sell; the number is never shown |
+| `low` | Fewer than `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD` (5) left; `quantity` says how many |
+| `out` | None to sell now |
+| `preorder` | Not in stock yet, sold as `preorder` |
+
+A store sells from its warehouse sources (or its own stock): with `allow_split` the sources add up, otherwise the
+fullest one counts, as for a reservation. Bundles count the sets their components make; variants not tracking stock
+are always `in_stock`. Unknown or hidden variants are left out. Without `store_id` every store offering pickup is
+listed. The answer changes as soon as stock is reserved; it carries an `ETag` (send it in `If-None-Match` for 304)
+and `Cache-Control: public, max-age=5`. Module `catalog` filters "available at store X" with the same rule
+(`Inventory::in_stock_at`).
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and

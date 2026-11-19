@@ -541,7 +541,7 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
       cung cấp qua `ledger`
 - [x] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
       không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho đơn đặt trước theo thứ tự đặt
-- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
+- [x] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
       / `out` / `preorder`, không lộ số tồn lớn; `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api`; ETag,
       cache ngắn
 - [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho mục đích

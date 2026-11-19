@@ -7,6 +7,7 @@ mod levels;
 mod lots;
 mod orders;
 mod preorders;
+mod public;
 mod purchasing;
 mod reservations;
 
