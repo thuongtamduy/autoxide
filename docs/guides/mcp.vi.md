@@ -177,6 +177,8 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `content.unpublish` | `content.publish` or `content.publish_own` | destructive |
 | `content.update` | `content.write` or `content.write_own` | writes |
 | `conversations.get_thread` | `conversations.read` | read-only |
+| `conversations.list_callbacks` | `conversations.call` | read-only |
+| `conversations.list_calls` | `conversations.call` | read-only |
 | `conversations.list_threads` | `conversations.read` | read-only |
 | `conversations.reply` | `conversations.reply` | writes |
 | `conversations.suggest_reply` | `conversations.reply` | writes |

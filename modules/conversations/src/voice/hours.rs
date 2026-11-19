@@ -8,17 +8,17 @@ use utoipa::ToSchema;
 /// Lệch UTC mặc định: giờ Việt Nam.
 pub(crate) const DEFAULT_OFFSET_MINUTES: i32 = 7 * 60;
 
-/// Một khung giờ nhận gọi lại.
+/// A range of call-back hours, in the local time of the line.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[schema(as = CallbackHoursRange)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct Range {
-    /// Thứ trong tuần, 1 (thứ Hai) đến 7 (Chủ nhật).
+    /// Day of the week, 1 (Monday) to 7 (Sunday).
     pub day: u8,
-    /// Giờ bắt đầu, `HH:MM`.
+    /// Opening time, `HH:MM`.
     #[schema(example = "08:00")]
     pub from: String,
-    /// Giờ kết thúc, `HH:MM`, sau `from`.
+    /// Closing time, `HH:MM`, after `from`.
     #[schema(example = "20:00")]
     pub to: String,
 }

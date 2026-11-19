@@ -84,16 +84,16 @@ Mã lỗi chung của nhóm ở kernel: `voice.signature_invalid` (401), `voice.
 - **Đường dây của cửa hàng** (`conversations_voice_lines`, một dòng mỗi nút): nhà cung cấp, `hotline` (số công
   khai của cửa hàng), giờ nhận gọi lại, ghi âm bật / tắt. Nút chưa có đường dây thì giao diện không hiện nút gọi
   và endpoint gọi trả 404 `conversations.voice_unavailable`.
-- **Gọi cửa hàng từ trình duyệt.** `GET /me/conversations/threads/{id}/voice` trả thông tin cần hiện trước khi
+- **Gọi cửa hàng từ trình duyệt.** `GET /me/threads/{id}/voice` trả thông tin cần hiện trước khi
   gọi (`available`, `recording`, câu thông báo ghi âm, giờ nhận gọi lại). `POST
-  /me/conversations/threads/{id}/calls` ghi `conversations_calls` (`direction = inbound`, `queued`) rồi, ngoài
+  /me/threads/{id}/calls` ghi `conversations_calls` (`direction = inbound`, `queued`) rồi, ngoài
   transaction, gọi `browser_session` → trả token cho SDK WebRTC; cuộc gọi tới hotline, nhân viên nghe máy bằng
   phiên của mình (`GET /voice/agent-session`).
-- **Yêu cầu gọi lại.** Người mua bấm "Gọi lại cho tôi": `POST /me/conversations/threads/{id}/callbacks
+- **Yêu cầu gọi lại.** Người mua bấm "Gọi lại cho tôi": `POST /me/threads/{id}/callbacks
   {client_id, window_start, window_end, phone_source, recording_ack?}`.
   - Số gọi lại chỉ là số đã xác thực: `phone_source = account` (số của tài khoản qua
-    `AccountVerification::verified_phone` của bước 37) hay `otp` (số khách vãng lai đã xác thực OTP trong cuộc
-    trò chuyện); không có → 403 `conversations.phone_unverified`. Số lưu đã mã hoá theo khách (`seal`), kèm dạng
+    `AccountVerification::verified_phone` của bước 37; chat chỉ cho người mua có tài khoản nên chưa có `otp`,
+    D-20261119-step61-voice); không có → 403 `conversations.phone_unverified`. Số lưu đã mã hoá theo khách (`seal`), kèm dạng
     che.
   - Khung giờ trong giờ nhận gọi lại của đường dây và trong `CALLBACK_DAYS_AHEAD` ngày; sai → 422
     `conversations.callback_window_invalid` (gom lỗi một lần, D-083).
@@ -144,10 +144,10 @@ Mã lỗi chung của nhóm ở kernel: `voice.signature_invalid` (401), `voice.
 
 | Bảng | Cột chính | Khoá / index |
 |---|---|---|
-| `conversations_voice_lines` | `id`, `tenant_id`, `org_id`, `provider`, `hotline` (E.164), `line_token_hash`, `recording_enabled` BOOL default false, `callback_hours` text (JSON giờ nhận gọi lại theo thứ, mặc định 08:00–20:00 giờ của nút), `active`, `updated_at` | unique (`tenant_id`, `org_id`); index (`tenant_id`, `line_token_hash`) |
+| `conversations_voice_lines` | `id`, `tenant_id`, `org_id`, `provider`, `hotline` (E.164), `line_token_hash`, `recording_enabled` BOOL default false, `callback_hours` text (JSON giờ nhận gọi lại theo thứ, mặc định 08:00–20:00), `utc_offset_minutes` (mặc định 420, D-20261119-step61-voice), `active`, `updated_at` | unique (`tenant_id`, `org_id`); index (`tenant_id`, `line_token_hash`) |
 | `conversations_callback_requests` | `id`, `tenant_id`, `org_id`, `thread_id`, `requester_user_id` NULL, `client_id`, `phone_sealed`, `phone_masked`, `phone_source` (`account/otp`), `window_start`, `window_end`, `recording_ack_at` NULL, `status` (`open/calling/done/cancelled/expired`), `open_key` NULL (= `thread_id` khi `open` / `calling`), `assigned_user_id` NULL, `attempts` INT default 0, `last_call_id` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `thread_id`, `client_id`); unique (`tenant_id`, `open_key`); index (`tenant_id`, `org_id`, `status`, `window_start`) |
 | `conversations_calls` | `id`, `tenant_id`, `org_id`, `thread_id`, `callback_id` NULL, `direction` (`inbound/outbound`), `status` (`queued/ringing/in_progress/completed/no_answer/busy/failed/cancelled`), `provider`, `provider_call_id` NULL, `agent_user_id` NULL, `started_at` NULL, `answered_at` NULL, `ended_at` NULL, `duration_seconds` NULL, `recording_enabled` BOOL, `recording_ack_at` NULL, `provider_recording_id` NULL, `recording_ref` NULL (key trong `Storage`), `recording_expires_at` NULL, `created_at`, `updated_at` | unique (`tenant_id`, `provider`, `provider_call_id`); index (`tenant_id`, `thread_id`, `created_at`), (`tenant_id`, `org_id`, `created_at`, `id`), (`tenant_id`, `recording_expires_at`) |
-| `conversations_voice_events` | `id`, `tenant_id`, `provider`, `provider_event_id`, `call_id` NULL, `body` (nguyên văn đã kiểm chữ ký), `status` (`received/processed/failed`), `received_at` | unique (`tenant_id`, `provider`, `provider_event_id`); index (`tenant_id`, `status`, `received_at`) |
+| `conversations_voice_events` | `id`, `tenant_id`, `provider`, `provider_event_id`, `call_id` NULL, `notification` (thông báo đã đọc, JSON chuẩn hoá — D-20261119-step61-voice), `body` (nguyên văn đã kiểm chữ ký), `status` (`received/processed/failed`), `received_at` | unique (`tenant_id`, `provider`, `provider_event_id`); index (`tenant_id`, `status`, `received_at`) |
 
 `open_key`: cột mang giá trị khi yêu cầu còn mở, NULL khi không — unique trên cột NULL chạy được trên cả hai
 database (như `active_buyer_key` của bước 45).
@@ -158,9 +158,9 @@ database (như `active_buyer_key` của bước 45).
   `close`, `escalate`, `typing`, `recall`, `block`, `reports`, `suggest-reply`; `/me/threads…` cho người mua (kèm
   `handoff`); thời gian thực qua stream của kernel (D-20261119-step61-stream-audience).
 - REST gọi điện (D-232):
-  - người mua: `GET /me/conversations/threads/{id}/voice`, `POST /me/conversations/threads/{id}/calls`
-    (`recording_ack?`; 201 kèm token phiên WebRTC), `POST /me/conversations/threads/{id}/callbacks` (201; gửi
-    lại cùng `client_id` → 200), `DELETE /me/conversations/threads/{id}/callbacks/{callback_id}` (huỷ);
+  - người mua: `GET /me/threads/{id}/voice`, `POST /me/threads/{id}/calls`
+    (`recording_ack?`; 201 kèm token phiên WebRTC), `POST /me/threads/{id}/callbacks` (201; gửi
+    lại cùng `client_id` → 200), `DELETE /me/threads/{id}/callbacks/{callback_id}` (huỷ);
   - nhân viên: `GET /callbacks` (`Page`, lọc `status`, `org_id`, khung giờ; số đã che — `conversations.call`),
     `POST /callbacks/{id}/call` (`Idempotency-Key` bắt buộc), `POST /callbacks/{id}/close`, `GET
     /threads/{id}/calls`, `GET /voice/agent-session` (`conversations.call`); `GET /calls/{id}/recording`
