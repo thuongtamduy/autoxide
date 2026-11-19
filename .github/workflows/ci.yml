@@ -164,6 +164,9 @@ jobs:
             -i docs/openapi.json \
             -o "sdk/${{ matrix.sdk }}/generated" \
             --additional-properties="$(jq -r "$generator.additionalProperties | to_entries | map(\"\(.key)=\(.value)\") | join(\",\")" "$config")"
+      # Tải và cache bản Gradle mà wrapper do generator sinh cần (tải thẳng hay quá thời gian chờ).
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'kotlin'
       - name: gradle build
         if: steps.changed.outputs.run == 'true' && matrix.sdk == 'kotlin'
         working-directory: sdk/kotlin/generated
