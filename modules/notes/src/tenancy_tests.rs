@@ -144,9 +144,9 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
             .await
             .unwrap();
         let migrator: Migrator = app.modules().migrator().unwrap();
-        // Về schema trước bước 33 (bỏ `k0001_event_access`, `m0006_org` và `m0005_tenancy`), ghi
-        // một ghi chú kiểu cũ, rồi nâng lại.
-        migrator.down(app.database(), "notes", 3).await.unwrap();
+        // Về schema trước bước 33 (bỏ `k0002_sync_changes`, `k0001_event_access`, `m0006_org` và
+        // `m0005_tenancy`), ghi một ghi chú kiểu cũ, rồi nâng lại.
+        migrator.down(app.database(), "notes", 4).await.unwrap();
         let database = app.database();
         let backend = database.write().get_database_backend();
         let id = Uuid::now_v7();
@@ -202,7 +202,11 @@ async fn event_va_job_chay_dung_khach() {
 
         // Tài khoản bị xoá ở khách `own`: chỉ ghi chú của người đó ở `own` bị xoá, cùng ID người
         // dùng ở `shared` không bị đụng.
-        let service = NoteService::new(Outbox::standalone("notes"), Default::default());
+        let service = NoteService::new(
+            Outbox::standalone("notes"),
+            Default::default(),
+            autoxide_kernel::sync::SyncLog::standalone("notes"),
+        );
         let deleted = Delivered::new(
             own.clone(),
             "auth",

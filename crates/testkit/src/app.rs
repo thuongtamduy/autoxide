@@ -535,6 +535,7 @@ impl<'a> TestAppBuilder<'a> {
                     .and_then(|url| url.base().ok().map(str::to_owned)),
             )
             .entitlements(modules.entitlements())
+            .sync(modules.sync_resources())
             .translations(modules.translations().clone());
         if let Some(registry) = modules.tenancy() {
             extras = extras.tenancy(registry);

@@ -214,6 +214,7 @@ async fn tao_trung_ten_dong_thoi_chi_mot_thanh_cong() {
         let service = crate::service::NoteService::new(
             autoxide_kernel::event::Outbox::standalone("notes"),
             Default::default(),
+            autoxide_kernel::sync::SyncLog::standalone("notes"),
         );
         let service = Arc::new(service);
 
@@ -300,6 +301,7 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
                 let service = crate::service::NoteService::new(
                     Outbox::standalone("notes"),
                     Default::default(),
+                    autoxide_kernel::sync::SyncLog::standalone("notes"),
                 );
                 let note = NewNote { title: title.to_owned(), body: String::new(), org_id: None };
                 service.create(&tenant, &own(BOB), note).await.unwrap();
@@ -316,8 +318,11 @@ async fn xuat_du_lieu_va_xoa_theo_tai_khoan() {
             exported["notes"].as_array().unwrap().iter().map(|n| n["title"].clone()).collect();
         assert_eq!(titles, vec![json!("one"), json!("two")]);
 
-        let service =
-            crate::service::NoteService::new(Outbox::standalone("notes"), Default::default());
+        let service = crate::service::NoteService::new(
+            Outbox::standalone("notes"),
+            Default::default(),
+            autoxide_kernel::sync::SyncLog::standalone("notes"),
+        );
         let deleted = Delivered::new(
             app.default_tenant(),
             "auth",
@@ -349,6 +354,7 @@ async fn sua_dong_thoi_cung_phien_ban_chi_mot_nguoi_thang() {
         let service = Arc::new(crate::service::NoteService::new(
             Outbox::standalone("notes"),
             Default::default(),
+            autoxide_kernel::sync::SyncLog::standalone("notes"),
         ));
         let note = NewNote { title: "Shared".to_owned(), body: String::new(), org_id: None };
         let note = service.create(&tenant, &own(ADA), note).await.unwrap();

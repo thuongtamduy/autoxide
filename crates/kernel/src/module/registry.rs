@@ -91,6 +91,8 @@ pub struct Modules {
     analytics: crate::analytics::AnalyticsCatalog,
     /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
     automations: crate::automation::AutomationDirectory,
+    /// Thời hạn giữ luồng thay đổi đồng bộ (`AUTOXIDE_SYNC_RETENTION_DAYS`, bước 69 P2).
+    sync_keep: chrono::Duration,
 }
 
 impl Modules {
@@ -247,6 +249,21 @@ impl Modules {
             Translations::default()
         });
         let automations = crate::automation::AutomationDirectory::new(entitlements.clone());
+        // Loại bản ghi đồng bộ được (bước 69 P2): permission đọc phải có thật.
+        for module in &modules {
+            let declared = module.sync_resources();
+            problems.extend(crate::sync::declaration_problems(module.name(), &declared));
+            for resource in declared {
+                if !permissions.contains(resource.read.name()) {
+                    problems.push(format!(
+                        "sync resource `{}.{}` reads with permission `{}`, which no module declares",
+                        module.name(),
+                        resource.name,
+                        resource.read.name()
+                    ));
+                }
+            }
+        }
         if problems.is_empty() {
             Ok(Modules {
                 modules,
@@ -275,6 +292,7 @@ impl Modules {
                 facts,
                 analytics,
                 automations,
+                sync_keep: chrono::Duration::days(30),
             })
         } else {
             Err(ModuleError(problems.join("; ")))
@@ -294,7 +312,13 @@ impl Modules {
     /// Cho từng module đọc cấu hình của nó. Module nào sai cũng không chặn module
     /// khác đọc — để mọi lỗi được báo cùng lúc.
     pub fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
-        let mut result = Ok(());
+        let mut result = match crate::sync::read_retention(reader) {
+            Ok(keep) => {
+                self.sync_keep = keep;
+                Ok(())
+            }
+            Err(invalid) => Err(invalid),
+        };
         for module in &mut self.modules {
             if module.configure(reader).is_err() {
                 result = Err(Invalid);
@@ -376,6 +400,7 @@ impl Modules {
                 facts: &self.facts,
                 analytics: &self.analytics,
                 automations: &self.automations,
+                sync_keep: self.sync_keep,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -748,7 +773,14 @@ impl Modules {
         if !problems.is_empty() {
             return Err(ModuleError(problems.join("; ")));
         }
+        let sync = self
+            .modules
+            .iter()
+            .filter(|module| !module.sync_resources().is_empty())
+            .map(|module| crate::sync::SyncLog::new(module.name(), self.sync_keep))
+            .collect();
         Ok(Worker::new(databases, modules, handlers, schedules, concurrency)
+            .with_sync(sync)
             .with_timeouts(timeouts)
             .with_entitlements(self.entitlements.clone()))
     }
@@ -853,6 +885,18 @@ impl Modules {
             return Err(ModuleError(problems.join("; ")));
         }
         Ok(found)
+    }
+
+    /// Loại bản ghi đồng bộ được của mọi module (bước 69 P2): `(tên module, khai báo)`, theo thứ
+    /// tự đăng ký.
+    pub fn sync_resources(&self) -> Vec<(&'static str, crate::sync::SyncResource)> {
+        self.modules
+            .iter()
+            .flat_map(|module| {
+                let name = module.name();
+                module.sync_resources().into_iter().map(move |resource| (name, resource))
+            })
+            .collect()
     }
 
     /// Route của từng module kèm tên module, theo thứ tự đăng ký. Gọi sau

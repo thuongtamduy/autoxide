@@ -54,6 +54,8 @@ pub enum ErrorKind {
     RangeNotSatisfiable,
     /// Request đọc được nhưng giá trị không qua kiểm tra. HTTP 422.
     Validation,
+    /// Thứ được hỏi không còn nữa và sẽ không có lại (con trỏ đồng bộ quá cũ). HTTP 410.
+    Gone,
     /// Endpoint bắt buộc gửi điều kiện (`If-Match`) mà request không gửi. HTTP 428.
     PreconditionRequired,
     /// Gọi quá nhiều. HTTP 429.
@@ -75,6 +77,7 @@ impl ErrorKind {
             ErrorKind::Forbidden => 403,
             ErrorKind::NotFound => 404,
             ErrorKind::Conflict => 409,
+            ErrorKind::Gone => 410,
             ErrorKind::PreconditionFailed => 412,
             ErrorKind::PayloadTooLarge => 413,
             ErrorKind::UnsupportedMediaType => 415,
@@ -192,6 +195,9 @@ struct Extra {
     /// Lý do ổn định cho máy, chi tiết hơn `code` (vd `expired` / `used` của token): trường mở
     /// rộng `reason` của Problem (RFC 9457 cho phép trường mở rộng).
     reason: Option<&'static str>,
+    /// Bản ghi hiện tại trên máy chủ, kèm phiên bản (lỗi 412 của ghi có điều kiện, bước 69 P2):
+    /// trường mở rộng `current` của Problem và header `ETag`.
+    current: Option<(serde_json::Value, chrono::DateTime<chrono::Utc>)>,
 }
 
 /// Mã và thông báo của lỗi nội bộ. Client chỉ thấy đúng hai thứ này.
@@ -317,6 +323,23 @@ impl Error {
     pub fn with_reason(mut self, reason: &'static str) -> Self {
         self.extra.get_or_insert_default().reason = Some(reason);
         self
+    }
+
+    /// Gắn bản ghi hiện tại `record` (dạng như khi đọc nó) và phiên bản `version` của nó: client
+    /// thấy ngay bản trên máy chủ để tự gộp, không phải đọc lại.
+    #[must_use]
+    pub fn with_current(
+        mut self,
+        record: serde_json::Value,
+        version: chrono::DateTime<chrono::Utc>,
+    ) -> Self {
+        self.extra.get_or_insert_default().current = Some((record, version));
+        self
+    }
+
+    /// Bản ghi hiện tại gắn bằng [`with_current`](Self::with_current), nếu có.
+    pub fn current(&self) -> Option<&(serde_json::Value, chrono::DateTime<chrono::Utc>)> {
+        self.extra.as_ref().and_then(|extra| extra.current.as_ref())
     }
 
     /// Lý do gắn bằng [`with_reason`](Self::with_reason), nếu có.

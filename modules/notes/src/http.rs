@@ -9,6 +9,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
+use autoxide_kernel::sync::{ChangesQuery, SyncChange};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
@@ -27,6 +28,7 @@ use crate::service::{NewNote, Note, NoteChanges, NoteService};
 pub(crate) fn routes(service: Arc<NoteService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .routes(routes!(list_notes, create_note))
+        .routes(routes!(list_note_changes))
         .routes(routes!(get_note, update_note, delete_note))
         .with_state(service)
 }
@@ -120,6 +122,38 @@ async fn list_notes(
     Ok(page.map(NoteResponse::from))
 }
 
+/// List the notes changed since your last sync.
+///
+/// For offline apps (see `GET /api/v1/kernel/sync/resources`): each item is the note as it is
+/// now, or `deleted` when it was deleted or left your scope. Keep the `cursor` of the last item you
+/// applied and send it next time; an old cursor answers `410` (`sync_cursor_expired`): load the
+/// list again. Requires `notes.read`; its scope decides which notes you get.
+#[utoipa::path(
+    get,
+    path = "/changes",
+    extensions(("x-permissions" = json!(["notes.read"]))),
+    operation_id = "list_note_changes",
+    security(("bearer" = [])),
+    params(ChangesQuery),
+    responses(
+        (status = 200, description = "The notes changed after `cursor`, oldest change first.", body = Page<SyncChange<NoteResponse>>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `notes.read`; code `permission_denied`.", body = Problem),
+        (status = 410, description = "`cursor` is older than the changes the server keeps; code `sync_cursor_expired`. Load the list again, then ask without `cursor`.", body = Problem),
+        (status = 422, description = "`cursor` or `limit` is invalid; see `errors`.", body = Problem),
+    )
+)]
+async fn list_note_changes(
+    State(service): State<Arc<NoteService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Query(query): Query<ChangesQuery>,
+) -> Result<Page<SyncChange<NoteResponse>>, Error> {
+    principal.require(&NOTES_READ)?;
+    let page = service.changes(&tenant, &principal, &query).await?;
+    Ok(page.map(|change| change.map(NoteResponse::from)))
+}
+
 /// Create a note.
 ///
 /// Requires `notes.write` covering the unit of the note (`org_id`). Retry safely with an
@@ -196,7 +230,7 @@ async fn get_note(
         (status = 404, description = "No note with this id in your scope; code `notes.note_not_found`.", body = Problem),
         (status = 409, description = "You already have a note with this title; code `notes.title_taken`.", body = Problem),
         (status = 422, description = "A value is invalid; see `errors`.", body = Problem),
-        (status = 412, description = "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
+        (status = 412, description = "`If-Match` does not match: the record changed since you read it; code `precondition_failed`. The body's `current` is the note as it is now and `ETag` its version: merge your change and retry with it.", body = Problem),
     )
 )]
 async fn update_note(
