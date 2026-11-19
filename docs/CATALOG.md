@@ -123,6 +123,15 @@ Every answer has an `ETag` (send it back in `If-None-Match` to get 304) and
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | visible categories (a category under a hidden one is hidden) |
 | `GET /public/sitemap` | every product address in every language, at most 200 per page |
 
+Search helpers:
+
+- `GET /public/search/suggest?q=…&locale=vi` — suggestions as the shopper types (products,
+  categories, and what other modules add), exact accents first, at most 10.
+- `GET /public/products/facets` — takes the filters of `/public/products` and counts products per
+  attribute value and per seller (the counts of one filter ignore that filter).
+- `GET` / `PUT /synonyms` — the tenant's synonym groups (`[["áo thun", "áo phông", "tee"]]`); search
+  and suggestions use them (`catalog.categories.manage`).
+
 Which products a website shows: those of its own unit, of the units above it, and of sellers below
 it (`seller.own = false` on the card). A store hides a product of its chain with
 `PUT /stores/{org_id}/overrides/{product_id}` `{"hidden": true}` (`catalog.products.write` at the store).

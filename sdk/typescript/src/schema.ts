@@ -947,6 +947,15 @@ export type CatalogAttribute = {
   updated_at: string;
 };
 
+/** Counts of one filterable attribute. */
+export type CatalogAttributeFacet = {
+  /** Filter with `attr.<code>=<value>`. */
+  code: string;
+  name: string;
+  /** At most 50, most products first. */
+  values: CatalogFacetValue[];
+};
+
 /** A choosable value of an `option` / `options` attribute. */
 export type CatalogAttributeOption = {
   /** 1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute. */
@@ -1231,6 +1240,24 @@ export type CatalogCreateRoundingRule = {
   name: string;
   /** Step in minor units, above 0, e.g. `10000`. */
   step_minor: number;
+};
+
+/** A filter value and how many products match it. */
+export type CatalogFacetValue = {
+  count: number;
+  label: string;
+  /** Value to send back in the filter: an option code, `true` / `false`, or a seller unit id. */
+  value: string;
+};
+
+/** Filter counts of a public product list. */
+export type CatalogFacets = {
+  /** Filterable attributes of type option, options or boolean. */
+  attributes: CatalogAttributeFacet[];
+  /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+  sellers: CatalogFacetValue[];
+  /** Products matching every filter. */
+  total: number;
 };
 
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
@@ -1760,6 +1787,37 @@ export type CatalogStoredAttributeValue = {
   value_date?: string | null;
   value_integer?: number | null;
   value_text?: string | null;
+};
+
+/** A search suggestion. */
+export type CatalogSuggestion = {
+  /** Short context, e.g. the parent category; may be empty. */
+  context: string;
+  /**
+   * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+   * are ignored.
+   */
+  exact: boolean;
+  id?: string | null;
+  /**
+   * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+   * `organizations.unit`… (any module may add its own).
+   */
+  kind: string;
+  /** Text to show. */
+  label: string;
+  /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+  path?: string | null;
+};
+
+/** The tenant's search synonyms. */
+export type CatalogSynonyms = {
+  /**
+   * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+   * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+   * stored without accents, in lower case.
+   */
+  groups: string[][];
 };
 
 /** Texts of a product in one language. */
@@ -4906,6 +4964,19 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogFacets = {
+  /** Filter counts of a public product list. */
+  data: {
+    /** Filterable attributes of type option, options or boolean. */
+    attributes: CatalogAttributeFacet[];
+    /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+    sellers: CatalogFacetValue[];
+    /** Products matching every filter. */
+    total: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogPriceChange = {
   /** A bulk price change. */
   data: {
@@ -5109,6 +5180,19 @@ export type Data_CatalogStoreOverride = {
     org_id: string;
     product_id: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogSynonyms = {
+  /** The tenant's search synonyms. */
+  data: {
+    /**
+     * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+     * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+     * stored without accents, in lower case.
+     */
+    groups: string[][];
   };
 };
 
@@ -10974,6 +11058,29 @@ export type Data_Vec_CatalogStoredAttributeValue = {
     value_date?: string | null;
     value_integer?: number | null;
     value_text?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogSuggestion = {
+  data: {
+    /** Short context, e.g. the parent category; may be empty. */
+    context: string;
+    /**
+     * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+     * are ignored.
+     */
+    exact: boolean;
+    id?: string | null;
+    /**
+     * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+     * `organizations.unit`… (any module may add its own).
+     */
+    kind: string;
+    /** Text to show. */
+    label: string;
+    /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+    path?: string | null;
   }[];
 };
 
@@ -28734,6 +28841,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/products/facets": {
+    /** Count products per filter value (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; site?: string }; };
+      responses: {
+        200: Data_CatalogFacets;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/search/suggest": {
+    /** Suggest as the shopper types (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale: string; limit?: number; site?: string }; };
+      responses: {
+        200: Data_Vec_CatalogSuggestion;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/public/sitemap": {
     /** List product addresses for the sitemap (public). */
     get: {
@@ -28792,6 +28923,30 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/synonyms": {
+    /** List search synonyms. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace search synonyms. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogSynonyms;
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };

@@ -5,23 +5,21 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use autoxide_kernel::error::{Error, FieldError};
+use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
-use autoxide_kernel::search;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, Site, TenantContext};
 use chrono::Utc;
-use sea_orm::sea_query::{IntoCondition, Query};
+use sea_orm::sea_query::Query;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::attributes::scale_decimal;
 use crate::entity::{
-    attribute, attribute_option, category, category_path, category_translation, price_list,
-    product, product_attribute, product_category, product_media, store_override, storefront_entry,
-    translation, variant,
+    category, category_path, category_translation, price_list, product, product_media,
+    store_override, storefront_entry, translation, variant,
 };
 use crate::errors;
+use crate::public_filter::Skip;
 use crate::service::CatalogService;
 
 /// Độ dài tối đa của câu tìm (một câu `LIKE` dài là một lần quét đắt, ai gọi cũng được).
@@ -164,7 +162,11 @@ impl CatalogService {
 
     /// Điều kiện "dòng storefront thấy được ở website `site`": của nút bán của nó, đang hiện,
     /// sản phẩm của chuỗi tổ tiên hay của nhánh bên dưới website.
-    async fn visible_on(&self, tenant: &TenantContext, site: &Site) -> Result<Condition, Error> {
+    pub(crate) async fn visible_on(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+    ) -> Result<Condition, Error> {
         let pricing = self.storefront_of(tenant, site).await?;
         Ok(Condition::all()
             .add(storefront_entry::Column::OrgId.eq(pricing.as_uuid()))
@@ -263,87 +265,6 @@ impl CatalogService {
         Ok(out)
     }
 
-    /// Kiểm bộ lọc thuộc tính: chỉ thuộc tính `filterable`; giá trị theo kiểu của thuộc tính.
-    /// Trả điều kiện trên `storefront_entry::Column::ProductId`.
-    async fn attribute_conditions(
-        &self,
-        tenant: &TenantContext,
-        filters: &[(String, Vec<String>)],
-        problems: &mut Vec<FieldError>,
-    ) -> Result<Vec<Condition>, Error> {
-        let read = tenant.database().read();
-        let mut out = Vec::new();
-        for (code, values) in filters {
-            let field = format!("attr.{code}");
-            let Some(found) = attribute::Entity::find()
-                .filter(attribute::Column::Code.eq(code.as_str()))
-                .filter(attribute::Column::Filterable.eq(true))
-                .scoped(tenant)
-                .one(read)
-                .await?
-            else {
-                problems.push(FieldError::new(
-                    field,
-                    "unknown",
-                    "is not a filterable attribute of this catalog",
-                ));
-                continue;
-            };
-            let options = attribute_option::Entity::find()
-                .filter(attribute_option::Column::AttributeId.eq(found.id))
-                .scoped(tenant)
-                .all(read)
-                .await?;
-            let mut any = Condition::any();
-            for raw in values {
-                let raw = raw.trim();
-                let value = match found.data_type.as_str() {
-                    "text" => Some(product_attribute::Column::ValueText.eq(raw).into_condition()),
-                    "integer" => raw.parse::<i64>().ok().map(|number| {
-                        product_attribute::Column::ValueInteger.eq(number).into_condition()
-                    }),
-                    "decimal" => scale_decimal(raw, found.scale).map(|number| {
-                        product_attribute::Column::ValueInteger.eq(number).into_condition()
-                    }),
-                    "boolean" => match raw {
-                        "true" => {
-                            Some(product_attribute::Column::ValueBoolean.eq(true).into_condition())
-                        }
-                        "false" => {
-                            Some(product_attribute::Column::ValueBoolean.eq(false).into_condition())
-                        }
-                        _ => None,
-                    },
-                    "date" => chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
-                        .ok()
-                        .map(|date| product_attribute::Column::ValueDate.eq(date).into_condition()),
-                    _ => options.iter().find(|option| option.code == raw).map(|option| {
-                        product_attribute::Column::OptionId.eq(option.id).into_condition()
-                    }),
-                };
-                match value {
-                    Some(condition) => any = any.add(condition),
-                    None => problems.push(FieldError::new(
-                        field.clone(),
-                        "type",
-                        "is not a valid value of the attribute",
-                    )),
-                }
-            }
-            let matching = Query::select()
-                .column(product_attribute::Column::ProductId)
-                .from(product_attribute::Entity)
-                .and_where(product_attribute::Column::TenantId.eq(tenant.id().as_uuid()))
-                .and_where(product_attribute::Column::AttributeId.eq(found.id))
-                .cond_where(any)
-                .to_owned();
-            out.push(
-                Condition::all().add(storefront_entry::Column::ProductId.in_subquery(matching)),
-            );
-        }
-        Ok(out)
-    }
-
     /// Một trang sản phẩm công khai của website `site`.
     pub(crate) async fn public_products(
         &self,
@@ -352,89 +273,7 @@ impl CatalogService {
         filter: &PublicFilter,
         page: &PageRequest,
     ) -> Result<Page<PublicCard>, Error> {
-        let tenant_id = tenant.id().as_uuid();
-        let mut problems = Vec::new();
-        let mut condition = self.visible_on(tenant, site).await?;
-        // Chỉ sản phẩm có bản dịch bằng ngôn ngữ hỏi (không lấy ngôn ngữ khác thế vào, như
-        // `content`); `q` tìm trong bản dịch đó.
-        let mut texts = Query::select()
-            .column(translation::Column::ProductId)
-            .from(translation::Entity)
-            .and_where(translation::Column::TenantId.eq(tenant_id))
-            .and_where(translation::Column::Locale.eq(filter.locale.as_str()))
-            .to_owned();
-        if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
-            texts.and_where(search::contains(translation::Column::SearchKey, q));
-        }
-        condition = condition.add(storefront_entry::Column::ProductId.in_subquery(texts));
-        for attribute in
-            self.attribute_conditions(tenant, &filter.attributes, &mut problems).await?
-        {
-            condition = condition.add(attribute);
-        }
-        if let Some(slug) = &filter.category {
-            match self.public_category(tenant, &filter.locale, slug).await {
-                Ok(found) => {
-                    // Danh mục và mọi danh mục con của nó.
-                    let below = Query::select()
-                        .column(category_path::Column::DescendantId)
-                        .from(category_path::Entity)
-                        .and_where(category_path::Column::TenantId.eq(tenant_id))
-                        .and_where(category_path::Column::AncestorId.eq(found.category.id))
-                        .to_owned();
-                    let products = Query::select()
-                        .column(product_category::Column::ProductId)
-                        .from(product_category::Entity)
-                        .and_where(product_category::Column::TenantId.eq(tenant_id))
-                        .and_where(product_category::Column::CategoryId.in_subquery(below))
-                        .to_owned();
-                    condition =
-                        condition.add(storefront_entry::Column::ProductId.in_subquery(products));
-                }
-                Err(_) => problems.push(FieldError::new(
-                    "category",
-                    "unknown",
-                    "is not the slug of a visible category in this language",
-                )),
-            }
-        }
-        if let Some(min) = filter.price_min {
-            condition = condition.add(storefront_entry::Column::MinPriceMinor.gte(min));
-        }
-        if let Some(max) = filter.price_max {
-            condition = condition.add(storefront_entry::Column::MinPriceMinor.lte(max));
-        }
-        if filter.on_sale {
-            condition = condition.add(storefront_entry::Column::SalePriceMinor.is_not_null()).add(
-                Condition::any()
-                    .add(storefront_entry::Column::SaleEndsAt.is_null())
-                    .add(storefront_entry::Column::SaleEndsAt.gt(Utc::now())),
-            );
-        }
-        if let Some(seller) = filter.seller {
-            condition = condition.add(OrgTree::subtree_condition(
-                tenant.id(),
-                &[OrgId::from_uuid(seller)],
-                storefront_entry::Column::OwnerOrgId,
-            ));
-        }
-        match filter.sold_by {
-            Some(SoldBy::Own) => {
-                condition =
-                    condition.add(storefront_entry::Column::OwnerOrgId.is_in(site.lineage_ids()));
-            }
-            Some(SoldBy::Marketplace) => {
-                condition = condition
-                    .add(storefront_entry::Column::OwnerOrgId.is_not_in(site.lineage_ids()));
-            }
-            None => {}
-        }
-        if let Some(rating) = filter.min_rating {
-            condition = condition.add(storefront_entry::Column::RatingX100.gte(rating));
-        }
-        if !problems.is_empty() {
-            return Err(Error::validation(problems));
-        }
+        let condition = self.filter_condition(tenant, site, filter, Skip::default()).await?;
         let select = storefront_entry::Entity::find().filter(condition).scoped(tenant);
         let read = tenant.database().read();
         let id = storefront_entry::Column::ProductId;
