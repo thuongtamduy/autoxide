@@ -24,3 +24,9 @@ hiệu là thuộc tính để khách ngành nào cũng dùng được.
 
 Đã cân nhắc: số thập phân cho lượng tịnh (`0.5 kg`) — dùng đơn vị nhỏ hơn (`500 g`) thay, không cần số thực; cột
 `brand` riêng — khách không bán hàng có thương hiệu phải bỏ trống, và trùng với thuộc tính.
+
+Bổ sung cùng ngày — **điểm cắm `set_listing_gate`** (mục 10, cho bước 46): `CatalogExtensions::set_listing_gate(Arc<dyn
+ListingGate>)`, một điều kiện (cắm lần hai trả `false`). Trước khi chuyển sản phẩm sang `active`, `catalog` đọc sản
+phẩm qua kiểm quyền đọc (ngoài phạm vi → 404, không lộ lý do) rồi hỏi `can_publish(ListingCandidate { product_id,
+org_id, category_ids, kind })` NGOÀI transaction ghi; `Deny { code, message }` → 422 `catalog.listing_denied`, mã và
+lời của module cắm vào nằm trong `detail`. Không có module cắm vào thì không đổi gì.

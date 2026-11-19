@@ -113602,7 +113602,7 @@
                 }
               }
             },
-            "description": "The product is not ready to sell (see `errors`), or required attributes are missing (`catalog.required_attributes_missing`)."
+            "description": "The product is not ready to sell (see `errors`), required attributes are missing (`catalog.required_attributes_missing`), or a module refuses the listing, e.g. an unverified marketplace seller (`catalog.listing_denied`; the reason is in `detail`)."
           },
           "default": {
             "content": {

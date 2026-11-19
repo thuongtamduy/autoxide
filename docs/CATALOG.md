@@ -161,7 +161,9 @@ Every call takes at most 500 ids and runs a fixed number of queries. Events are 
 
 A module registered after `catalog` plugs in through `dyn CatalogExtensions`: a promotions module gives
 the public lists their automatic sale prices with `set_sale_price_source` (a `SalePriceSource`), and
-emits `promotions.automatic_prices_changed` (`after.variant_ids`) when they change.
+emits `promotions.automatic_prices_changed` (`after.variant_ids`) when they change. A marketplace
+module can refuse to put a product on sale with `set_listing_gate` (a `ListingGate`); the status
+change then answers 422 `catalog.listing_denied`.
 
 ## Settings
 

@@ -152,7 +152,9 @@ gọi nhận tối đa 500 ID và chạy số câu query cố định. Danh sác
 
 Module đăng ký sau `catalog` cắm vào qua `dyn CatalogExtensions`: module khuyến mại đưa giá giảm tự động
 vào danh sách công khai bằng `set_sale_price_source` (một `SalePriceSource`), và phát
-`promotions.automatic_prices_changed` (`after.variant_ids`) khi giá giảm đổi.
+`promotions.automatic_prices_changed` (`after.variant_ids`) khi giá giảm đổi. Module sàn có thể từ chối
+mở bán một sản phẩm bằng `set_listing_gate` (một `ListingGate`); lúc đó đổi trạng thái trả 422
+`catalog.listing_denied`.
 
 ## Cấu hình
 

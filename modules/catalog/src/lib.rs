@@ -122,6 +122,7 @@ impl Module for CatalogModule {
             jobs: context.jobs(),
             organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             sale_prices: std::sync::OnceLock::new(),
+            listing_gate: std::sync::OnceLock::new(),
             suggestions: context.suggest_sources(),
         });
         context.suggest_source(Arc::new(suggest::ProductSuggestions(service.clone())))?;

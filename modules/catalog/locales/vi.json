@@ -15,6 +15,7 @@
   "catalog.documents_required": "Hàng kinh doanh có điều kiện cần giấy tờ còn hạn: {documents}.",
   "catalog.invalid_status_transition": "Không chuyển được sản phẩm từ `{from}` sang `{to}`.",
   "catalog.last_variant": "Sản phẩm phải còn ít nhất một biến thể; hãy xoá sản phẩm thay vì biến thể cuối.",
+  "catalog.listing_denied": "Sản phẩm này chưa mở bán được ({reason}): {detail}",
   "catalog.media_not_public": "Media `{id}` không công khai (hay không có): ảnh sản phẩm phải là media công khai.",
   "catalog.option_combination_taken": "Sản phẩm đã có biến thể với tổ hợp tuỳ chọn này.",
   "catalog.option_value_in_use": "Biến thể `{sku}` còn dùng giá trị tuỳ chọn bạn vừa bỏ. Hãy đổi biến thể trước.",

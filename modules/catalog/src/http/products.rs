@@ -291,7 +291,7 @@ pub(crate) struct StatusRequest {
         (status = 404, description = "No product with this id in your scope; code `catalog.product_not_found`.", body = Problem),
         (status = 409, description = "The change is not allowed (`catalog.invalid_status_transition`), the goods are prohibited (`catalog.prohibited_goods`) or need valid documents (`catalog.documents_required`).", body = Problem),
         (status = 412, description = "`If-Match` does not match; code `precondition_failed`.", body = Problem),
-        (status = 422, description = "The product is not ready to sell (see `errors`), or required attributes are missing (`catalog.required_attributes_missing`).", body = Problem),
+        (status = 422, description = "The product is not ready to sell (see `errors`), required attributes are missing (`catalog.required_attributes_missing`), or a module refuses the listing, e.g. an unverified marketplace seller (`catalog.listing_denied`; the reason is in `detail`).", body = Problem),
     )
 )]
 async fn set_product_status(

@@ -751,6 +751,29 @@ impl CatalogService {
 
     /// Chuyển trạng thái bán của sản phẩm. Mở bán kiểm: có nhóm thuế, có nội dung, có biến thể
     /// đang bật, `readiness = ready`.
+    /// Hỏi điều kiện mở bán đã cắm (nếu có); từ chối → 422 với mã của module cắm vào.
+    async fn check_listing_gate(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let Some(gate) = self.listing_gate.get() else { return Ok(()) };
+        let detail = self.get_product(tenant, principal, id).await?;
+        let candidate = crate::api::ListingCandidate::new(
+            id,
+            autoxide_kernel::tenancy::OrgId::from_uuid(detail.product.org_id),
+            detail.category_ids.clone(),
+            parse_kind(&detail.product.kind),
+        );
+        match gate.can_publish(tenant, &candidate).await? {
+            crate::api::ListingDecision::Allow => Ok(()),
+            crate::api::ListingDecision::Deny { code, message } => {
+                Err(errors::listing_denied(&code, &message))
+            }
+        }
+    }
+
     pub(crate) async fn set_status(
         &self,
         tenant: &TenantContext,
@@ -760,6 +783,11 @@ impl CatalogService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<ProductDetail, Error> {
         let actor = Actor::from(principal);
+        if to == ProductStatus::Active {
+            // Điều kiện mở bán của module khác (bước 46) — có thể đọc database của nó, nên hỏi
+            // TRƯỚC transaction ghi. Đọc qua kiểm quyền đọc để người ngoài phạm vi không biết lý do.
+            self.check_listing_gate(tenant, principal, id).await?;
+        }
         let transaction = tenant.database().begin_write().await?;
         let before =
             self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_PUBLISH).await?;

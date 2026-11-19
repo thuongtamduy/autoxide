@@ -4,6 +4,7 @@
 mod card;
 mod categories;
 mod changes;
+mod extensions;
 mod pricing;
 mod products;
 mod public;
