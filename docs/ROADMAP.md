@@ -841,8 +841,9 @@ Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
 - [x] Chống lạm dụng (chặn, báo vi phạm, xác thực tài khoản khi khách bật), hạn lưu là cấu hình; câu phức tạp:
       AI soạn nháp cho nhân viên; câu đơn giản đã có câu trả lời chính xác: trả lời tự động qua `AutoResponder`
       của `support` (D-230); test trên cả hai database — xong (19/11, D-20261119-step61-conversations)
-- [ ] Gọi điện trong chat (D-232): `VoiceProvider` + bộ giả, yêu cầu gọi lại vào hộp việc, nhật ký cuộc gọi,
-      ghi âm tắt mặc định và phải thông báo trước; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
+- [x] Gọi điện trong chat (D-232): `VoiceProvider` + bộ giả, yêu cầu gọi lại vào hộp việc, nhật ký cuộc gọi,
+      ghi âm tắt mặc định và phải thông báo trước; bộ nối thật cần tài khoản — dừng hỏi chủ dự án — xong
+      (19/11, D-20261119-step61-voice; bộ nối thật chưa làm: chờ chủ dự án có tài khoản nhà cung cấp)
 
 ## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221)
 

@@ -47,6 +47,7 @@ mod sqlite;
 mod stale;
 mod storage;
 mod tenancy;
+mod voice;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
 pub use dns::FakeDns;
@@ -65,6 +66,7 @@ pub use s3::{
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
+pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
 use std::fmt;
 use std::path::PathBuf;

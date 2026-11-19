@@ -6,6 +6,7 @@
 mod me;
 mod staff;
 pub(crate) mod views;
+pub(crate) mod voice;
 
 use std::sync::Arc;
 
@@ -47,6 +48,18 @@ pub(crate) fn routes(service: Arc<ConversationsService>) -> OpenApiRouter {
         .routes(routes!(me::close_mine))
         .routes(routes!(me::handoff))
         .routes(routes!(me::report_mine))
+        .routes(routes!(voice::voice_info))
+        .routes(routes!(voice::start_call))
+        .routes(routes!(voice::request_callback))
+        .routes(routes!(voice::cancel_callback))
+        .routes(routes!(voice::list_callbacks))
+        .routes(routes!(voice::call_back))
+        .routes(routes!(voice::close_callback))
+        .routes(routes!(voice::list_calls))
+        .routes(routes!(voice::agent_session))
+        .routes(routes!(voice::get_recording, voice::delete_recording))
+        .routes(routes!(voice::get_line, voice::set_line))
+        .routes(routes!(voice::receive_webhook))
         .with_state(service)
 }
 

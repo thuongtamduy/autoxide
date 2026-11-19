@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 use uuid::Uuid;
 
-use crate::permissions::{MANAGE, READ};
+use crate::permissions::{CALL, MANAGE, READ};
 
 pub(crate) const THREAD_OPENED: EventInfo =
     EventInfo::new("conversations.thread_opened", "A customer started a conversation with a unit.")
@@ -58,6 +58,33 @@ pub(crate) const REPORT_CREATED: EventInfo = EventInfo::new(
 pub(crate) const REPORT_RESOLVED: EventInfo =
     EventInfo::new("conversations.report_resolved", "A report of abuse was reviewed.");
 
+pub(crate) const CALLBACK_REQUESTED: EventInfo = EventInfo::new(
+    "conversations.callback_requested",
+    "A customer asked the shop to call them back (without the phone number).",
+)
+.streamable(CALL)
+.to_audience();
+pub(crate) const CALL_UPDATED: EventInfo = EventInfo::new(
+    "conversations.call_updated",
+    "A call of a conversation changed status (without phone numbers).",
+)
+.streamable(CALL)
+.to_audience();
+pub(crate) const CALL_ENDED: EventInfo = EventInfo::new(
+    "conversations.call_ended",
+    "A call ended: direction, outcome, duration and whether it was recorded.",
+);
+pub(crate) const RECORDING_OPENED: EventInfo =
+    EventInfo::new("conversations.recording_opened", "Someone listened to a call recording.");
+pub(crate) const RECORDING_DELETED: EventInfo = EventInfo::new(
+    "conversations.recording_deleted",
+    "A call recording was deleted (on request, at the end of its retention or with the account).",
+);
+pub(crate) const VOICE_LINE_CHANGED: EventInfo = EventInfo::new(
+    "conversations.voice_line_changed",
+    "The phone line of a unit was set up or changed (recording on or off).",
+);
+
 /// Dữ liệu chung của mọi event của module.
 #[derive(Debug, Default, Serialize)]
 pub(crate) struct Change {
@@ -92,6 +119,12 @@ event!(Typing, "conversations.typing");
 event!(CustomerBlocked, "conversations.customer_blocked");
 event!(ReportCreated, "conversations.report_created");
 event!(ReportResolved, "conversations.report_resolved");
+event!(CallbackRequested, "conversations.callback_requested");
+event!(CallUpdated, "conversations.call_updated");
+event!(CallEnded, "conversations.call_ended");
+event!(RecordingOpened, "conversations.recording_opened");
+event!(RecordingDeleted, "conversations.recording_deleted");
+event!(VoiceLineChanged, "conversations.voice_line_changed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -105,6 +138,12 @@ pub(crate) fn all() -> Vec<EventInfo> {
         CUSTOMER_BLOCKED,
         REPORT_CREATED,
         REPORT_RESOLVED,
+        CALLBACK_REQUESTED,
+        CALL_UPDATED,
+        CALL_ENDED,
+        RECORDING_OPENED,
+        RECORDING_DELETED,
+        VOICE_LINE_CHANGED,
     ]
 }
 

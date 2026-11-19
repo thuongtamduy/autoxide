@@ -6,8 +6,8 @@ nên chuỗi và sàn chia việc theo nhánh như mọi bản ghi khác.
 
 English: [`CONVERSATIONS.md`](CONVERSATIONS.md).
 
-Gọi điện (gọi cửa hàng từ trình duyệt, "gọi lại cho tôi") sẽ dựng trên module này; cần tài khoản nhà cung cấp thoại và
-chưa có trong module.
+Gọi điện (gọi cửa hàng từ trình duyệt, "gọi lại cho tôi") đi qua bộ nối nhà cung cấp thoại — một module riêng cần tài
+khoản với nhà cung cấp; chưa có bộ nối nào đi kèm (test dùng `FakeVoiceProvider`).
 
 ## Permission
 
@@ -16,6 +16,9 @@ chưa có trong module.
 | `conversations.read`    | Xem cuộc trò chuyện của các nút trong phạm vi và nhận event của chúng theo thời gian thực  |
 | `conversations.reply`   | Trả lời, nhận cuộc, đóng, bản nháp AI, chuyển thành phiếu hỗ trợ                           |
 | `conversations.manage`  | Giao cho đồng nghiệp, chặn khách, xử lý báo vi phạm                                        |
+| `conversations.call`    | Yêu cầu gọi lại, gọi lại cho khách, cuộc gọi của cuộc trò chuyện (số bị che)               |
+| `conversations.recordings.read` | Nghe bản ghi âm cuộc gọi (mỗi lần nghe đều được ghi lại)                           |
+| `conversations.voice.manage` | Đường dây của nút, bật / tắt ghi âm, xoá bản ghi theo yêu cầu                          |
 
 Với độ sâu `own`, nhân viên thấy cuộc được giao cho mình. Khách không cần permission: tài khoản đã đăng nhập dùng
 `/api/v1/conversations/me/threads`.
@@ -62,3 +65,20 @@ cho nhân viên được giao — mỗi cuộc mỗi khung một thông báo, d�
 - Dữ liệu cá nhân (Luật 91/2025/QH15): cuộc trò chuyện bị xoá sau `AUTOXIDE_CONVERSATIONS_RETENTION_DAYS` (mặc định 365)
   ngày kể từ tin cuối; xoá tài khoản thì xoá nội dung tin của khách đó và bỏ liên kết cuộc trò chuyện; bản xuất dữ liệu
   cá nhân có các cuộc này.
+
+## Gọi điện
+
+- `PUT /voice/lines/{org_id}` đặt đường dây của nút: nhà cung cấp, hotline, giờ nhận gọi lại (mặc định 08:00–20:00 mỗi
+  ngày, UTC+7), ghi âm (tắt mặc định). Response đầu tiên có `webhook_path` cho nhà cung cấp — hãy giữ lại.
+- Khách đọc `GET /me/threads/{id}/voice` trước (ẩn nút gọi khi `available` là false). `POST /me/threads/{id}/calls` gọi
+  từ trình duyệt, trả token cho SDK WebRTC của nhà cung cấp. `POST /me/threads/{id}/callbacks` xin gọi lại vào số đã
+  xác thực của tài khoản, trong khung nằm trong giờ nhận gọi lại và trong `AUTOXIDE_CONVERSATIONS_CALLBACK_DAYS_AHEAD`
+  (7) ngày tới; mỗi cuộc trò chuyện một yêu cầu mở; `AUTOXIDE_CONVERSATIONS_CALLS_PER_DAY` (5) lượt gọi và yêu cầu mỗi
+  ngày.
+- Nhân viên thấy yêu cầu mở trong hộp việc và ở `GET /callbacks` (số bị che), gọi bằng `POST /callbacks/{id}/call` (kèm
+  `Idempotency-Key`); khách thấy số hotline của cửa hàng. Cuộc gọi kết thúc thì thêm đúng một dòng tóm tắt vào cuộc trò
+  chuyện. Không nghe máy thì yêu cầu mở lại; yêu cầu quá khung 2 giờ thì hết hạn và khách được báo một lần.
+- Ghi âm: chỉ bật được với nhà cung cấp phát câu thông báo ghi âm; khi đó khách phải gửi `recording_ack: true`. Bản ghi
+  chuyển từ nhà cung cấp về nơi lưu file của bạn, giữ `AUTOXIDE_CONVERSATIONS_RECORDING_RETENTION_DAYS` (90) ngày, xoá
+  bằng `DELETE /calls/{id}/recording` hay cùng tài khoản của khách. Luật dữ liệu cá nhân (Luật 91/2025/QH15): báo khách
+  trước khi ghi âm — hỏi người có chuyên môn pháp lý xem có cần thêm sự đồng ý không.

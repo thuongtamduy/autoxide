@@ -9,13 +9,17 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+autoxide-compliance.workspace = true
 autoxide-kernel.workspace = true
 autoxide-media.workspace = true
 autoxide-notifications.workspace = true
 autoxide-organizations.workspace = true
 autoxide-support.workspace = true
 axum.workspace = true
+bytes.workspace = true
 chrono.workspace = true
+futures-util.workspace = true
+metrics.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
