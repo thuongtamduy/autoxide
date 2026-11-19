@@ -115,7 +115,10 @@ impl Module for OrdersModule {
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
         };
-        self.service = Some(Arc::new(OrdersService::new(parts, config)));
+        let service = Arc::new(OrdersService::new(parts, config));
+        // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
+        context.provide::<dyn api::Orders>(service.clone())?;
+        self.service = Some(service);
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;
         Ok(())

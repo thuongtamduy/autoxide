@@ -388,3 +388,29 @@ async fn crash_after_reserve_is_recovered_by_job() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn orders_api_finds_order_and_delivered_lines() {
+    TestDatabase::run(async |test| {
+        use crate::api::Orders;
+        let shop = shop(test).await;
+        let shirt = shop.catalog.add(shop.tree.a, 100_000);
+        shop.inventory.stock(shop.tree.a, shirt, 5);
+        let buyer = Call::as_user(&shop, "buyer1");
+        let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 2).await;
+        let (_, placed) = checkout(&buyer, Some("k"), body(&cart, &quote, "cod")).await;
+        let id: Uuid = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
+        let orders = shop.api::<dyn Orders>().unwrap();
+        let tenant = shop.default_tenant();
+        let found = orders.find(&tenant, id).await.unwrap().unwrap();
+        assert_eq!(found.status, crate::api::OrderStatus::Confirmed);
+        assert_eq!(found.lines[0].quantity, 2);
+        assert_eq!(found.total.minor(), 230_000);
+        assert!(orders.find(&tenant, Uuid::now_v7()).await.unwrap().is_none());
+        // Chưa giao: chưa phải người đã nhận hàng.
+        let buyer_id = Uuid::from_u128(101);
+        assert!(orders.delivered_lines(&tenant, buyer_id, shirt).await.unwrap().is_empty());
+    })
+    .await
+    .unwrap();
+}
