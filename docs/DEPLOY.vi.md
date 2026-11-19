@@ -111,6 +111,10 @@ api.example.com {
 }
 ```
 
+Autoxide tự nén response JSON và chữ (gzip hay brotli, tuỳ client nhận cách nào; ảnh và file
+khác gửi nguyên), nên proxy không cần chỉ thị `encode`. Nếu proxy hay CDN đã nén, đặt
+`AUTOXIDE_HTTP_COMPRESSION=false` để khỏi nén hai lần.
+
 Rồi cho Autoxide biết header nào chứa địa chỉ thật của client, để rate limiting đếm theo
 client chứ không theo proxy. Thêm vào `.env` rồi khởi động lại:
 
@@ -337,11 +341,33 @@ database mới.
 | `AUTOXIDE_AUTH_PASSKEY_RP_ID`, `AUTOXIDE_AUTH_PASSKEY_ORIGINS` | Bật đăng nhập bằng passkey cho tên miền của bạn |
 | `AUTOXIDE_HTTP_DRAIN_SECONDS` | Sau bộ cân bằng tải: lúc tắt, phục vụ thêm bao lâu trong khi `/health/ready` trả `503`, xem [bên dưới](#cập-nhật-không-làm-rơi-request) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
+| `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
+| `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | CDN được giữ một lượt đọc công khai bao lâu (mặc định `60`), xem [CDN phía trước Autoxide](#cdn-phía-trước-autoxide) |
 | `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, cùng cổng với API: khi bật, hãy chặn `/metrics` ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
 trị (secret được giấu) và báo mọi vấn đề cùng một lượt.
+
+## CDN phía trước Autoxide
+
+Đọc công khai của website (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`) trả
+`Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`, một `ETag` và
+`Vary: Accept-Language, Accept-Encoding, Origin, autoxide-tenant`. CDN (Cloudflare, CloudFront, Fastly…) giữ
+response đó `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` giây (mặc định `60`; `0` thì lần nào cũng hỏi lại); trình duyệt
+luôn hỏi lại và nhận `304 Not Modified` khi không có gì đổi. Bài vừa sửa tới người đọc trong chừng đó giây. File
+media có `?v=` trong địa chỉ không bao giờ đổi nên được giữ một năm (`immutable`).
+
+Autoxide không bao giờ để cache dùng chung giữ thứ gì riêng tư: request có `Authorization` hay cookie nhận
+`private` (hay `no-store`), bản xem trước nhận `no-store`; lệnh ghi không bao giờ được cache. Cấu hình CDN để:
+
+- **tôn trọng header cache của máy chủ gốc** (Cloudflare: Cache Rules → "Use cache-control header if present";
+  CloudFront: cache policy có minimum TTL `0`, theo `Cache-Control`);
+- **không bao giờ cache request có `Authorization`** — Cloudflare và CloudFront mặc định bỏ qua khi máy chủ gốc
+  trả `private`; kiểm tra không có luật nào ghi đè;
+- đưa **host** vào khoá cache (host chọn khách) và chuyển tiếp `Accept-Language`, `Origin` và header
+  `autoxide-tenant` nếu website của bạn gửi nó;
+- không nén thêm lần nữa nếu CDN đã nén — khi đó đặt `AUTOXIDE_HTTP_COMPRESSION=false`.
 
 ## Cấu hình và trạng thái của từng khách
 

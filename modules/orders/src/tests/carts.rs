@@ -318,20 +318,7 @@ async fn gio_bo_do_phat_event_mot_lan_va_nhan_vien_xem_theo_pham_vi() {
 /// Chạy job `orders.mark_abandoned_carts` một lượt; trả số event `orders.cart_abandoned` mới.
 async fn run_mark_abandoned(shop: &super::Shop) -> u64 {
     let before = count_abandoned_events(shop).await;
-    #[derive(Debug, serde::Serialize)]
-    struct MarkNow {}
-    impl autoxide_kernel::job::Job for MarkNow {
-        const KIND: &'static str = crate::jobs::MARK_ABANDONED_CARTS;
-    }
-    autoxide_kernel::job::JobQueue::new("orders")
-        .enqueue_database(
-            shop.database().write(),
-            &MarkNow {},
-            autoxide_kernel::job::EnqueueOptions::default(),
-        )
-        .await
-        .unwrap();
-    drain(shop).await;
+    super::run_job(shop, crate::jobs::MARK_ABANDONED_CARTS).await;
     count_abandoned_events(shop).await - before
 }
 

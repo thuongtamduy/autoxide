@@ -37,6 +37,13 @@ macro_rules! event {
 }
 
 event!(CartAbandoned, names::CART_ABANDONED);
+event!(OrderPlaced, names::ORDER_PLACED);
+event!(OrderConfirmed, names::ORDER_CONFIRMED);
+event!(OrderStatusChanged, names::ORDER_STATUS_CHANGED);
+event!(OrderCancelled, names::ORDER_CANCELLED);
+event!(OrderDelivered, names::ORDER_DELIVERED);
+event!(OrderCompleted, names::ORDER_COMPLETED);
+event!(PaymentRecorded, names::PAYMENT_RECORDED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![

@@ -27,7 +27,6 @@ async fn app(test: &TestDatabase) -> TestApp {
         .setting("AUTOXIDE_FILES_DIR", &dir.join("files").display().to_string())
         .setting("AUTOXIDE_MAIL_FILE_DIR", &dir.join("mail").display().to_string())
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
-        .setting("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1")
         .setting("AUTOXIDE_RELOCATION_DRAIN_SECONDS", "10")
         .tenant("a")
         .placement("spare")
@@ -36,7 +35,9 @@ async fn app(test: &TestDatabase) -> TestApp {
     for module in crate::modules::all() {
         builder = builder.boxed_module(module);
     }
-    builder.build().await.unwrap()
+    let app = builder.build().await.unwrap();
+    app.skip_relocation_wait().unwrap();
+    app
 }
 
 async fn tenant(app: &TestApp, slug: &str) -> TenantContext {

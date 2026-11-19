@@ -4,6 +4,7 @@
 
 mod carts;
 mod dto;
+mod orders;
 
 use std::sync::Arc;
 
@@ -24,5 +25,11 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(carts::set_attribution))
         .routes(routes!(carts::cart_promotions))
         .routes(routes!(carts::merge_cart))
+        .routes(routes!(orders::checkout))
+        .routes(routes!(orders::public_payment))
+        .routes(routes!(orders::my_orders))
+        .routes(routes!(orders::my_order))
+        .routes(routes!(orders::list_orders))
+        .routes(routes!(orders::get_order))
         .with_state(service)
 }

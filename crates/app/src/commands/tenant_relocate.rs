@@ -190,7 +190,6 @@ mod tests {
                 ("AUTOXIDE_TENANCY_MODE", "multi"),
                 ("AUTOXIDE_SECRET_KEY", "a-configured-secret-that-is-long-enough-0123"),
                 ("AUTOXIDE_TENANCY_CACHE_SECONDS", "1"),
-                ("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1"),
                 ("AUTOXIDE_RELOCATION_DRAIN_SECONDS", "5"),
             ]);
             let settings = crate::settings::read(&source).unwrap();
@@ -198,6 +197,12 @@ mod tests {
             settings.modules.migrator().unwrap().up(&database).await.unwrap();
             database.close().await.unwrap();
             let runtime = runtime::start(settings, Migrations::RequireApplied).await.unwrap();
+            // Bước đóng băng không chờ TTL cache + thời gian tối đa của request.
+            runtime
+                .modules
+                .api::<autoxide_kernel::tenancy::TenantRelocations>()
+                .unwrap()
+                .skip_settle();
             let registry = runtime.modules.tenancy().unwrap();
             let placements = runtime.modules.placements(&registry).unwrap();
             let url = test.extra_database().await.unwrap();
