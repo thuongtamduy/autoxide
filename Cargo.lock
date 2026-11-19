@@ -1170,6 +1170,7 @@ dependencies = [
  "autoxide-kernel",
  "autoxide-ledger",
  "autoxide-organizations",
+ "autoxide-support",
  "autoxide-testkit",
  "axum",
  "chrono",

@@ -184,6 +184,14 @@ quote as checkout for a one-line cart to a province (fees, free-shipping thresho
 answers `estimate: true` — the real fee is always computed again for the cart. The variant's weight, size, selling
 unit and price come from the `catalog` module. Answers are cacheable for 60 seconds.
 
+## Automatic answers in support
+
+When the `support` module is installed, `shipping` answers the question "where is my parcel?" (intent
+`shipping.tracking`, by tracking number or order number) with the real status of the shipment, in the buyer's
+language. Only the owner gets an answer: the buyer account of the shipment, or a verified phone number equal to the
+recipient's. When the shipment is not found, an order has several shipments, or the asker cannot be shown to be the
+owner, there is no automatic answer and staff reply.
+
 ## MCP tools
 
 `shipping.quote` (read only), `shipping.list_shipments`, `shipping.get_shipment`, `shipping.book_shipment`,

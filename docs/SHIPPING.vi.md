@@ -178,6 +178,13 @@ lúc thanh toán cho giỏ một dòng tới một tỉnh (phí, ngưỡng miễ
 `estimate: true` — phí thật luôn tính lại cho giỏ. Cân nặng, kích thước, nút bán và giá của biến thể lấy từ module
 `catalog`. Response cache được 60 giây.
 
+## Trả lời tự động trong hỗ trợ khách hàng
+
+Khi cài module `support`, `shipping` trả lời câu hỏi "gói hàng của tôi đang ở đâu?" (ý định `shipping.tracking`, theo
+mã vận đơn hay số đơn hàng) bằng trạng thái thật của vận đơn, theo ngôn ngữ của người mua. Chỉ chủ đơn nhận được câu
+trả lời: tài khoản người mua của vận đơn, hay số điện thoại đã xác thực trùng số người nhận. Không thấy vận đơn, đơn có
+nhiều vận đơn, hay không chứng minh được người hỏi là chủ đơn thì không trả lời tự động, để nhân viên trả lời.
+
 ## Tool MCP
 
 `shipping.quote` (chỉ đọc), `shipping.list_shipments`, `shipping.get_shipment`, `shipping.book_shipment`,

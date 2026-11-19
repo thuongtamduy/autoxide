@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `shipping`: automatic answers for `support` about where a parcel is (intent `shipping.tracking`), only for the
+  owner of the order (buyer account or verified phone number); read permission `shipping.cod.read` for COD
+  statements and discrepancies.
 - Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
   its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
   prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,

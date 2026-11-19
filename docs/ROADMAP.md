@@ -605,7 +605,7 @@ Bắt đầu SAU bước 41. Không phụ thuộc `orders`: nhận đơn qua eve
       tại cửa hàng trả giờ sẵn sàng (chuẩn bị + giờ mở cửa của bước 34) và thời hạn giữ hàng chờ nhận
 - [x] Ước tính phí giao công khai (D-200): theo tỉnh và một sản phẩm / số lượng, chưa cần giỏ, cho trang sản
       phẩm; cùng bảng phí với báo giá của `orders`, ghi rõ "ước tính", ngưỡng miễn phí
-- [ ] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+- [x] Câu trả lời tự động về hành trình vận đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
 - [x] Website bán hàng (16/11/2026): phí và ngày giao dự kiến theo tỉnh khi chưa có giỏ (trang sản phẩm), kèm giờ
       chốt đơn trong ngày của nơi bán
 

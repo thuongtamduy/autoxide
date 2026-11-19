@@ -105,5 +105,21 @@
   "field:cannot be changed; create another calendar": "không đổi được; hãy tạo lịch khác",
   "field:must be `closed` or `special_hours`": "phải là `closed` hay `special_hours`",
   "field:must be an IANA time zone like `Asia/Ho_Chi_Minh`": "phải là múi giờ IANA, vd `Asia/Ho_Chi_Minh`",
-  "field:must list days 1 (Monday) to 7 (Sunday)": "phải liệt kê ngày từ 1 (thứ Hai) đến 7 (Chủ nhật)"
+  "field:must list days 1 (Monday) to 7 (Sunday)": "phải liệt kê ngày từ 1 (thứ Hai) đến 7 (Chủ nhật)",
+  "text:Where is my parcel? The status of a shipment, by tracking number or order number.": "Gói hàng của tôi đang ở đâu? Trạng thái vận đơn, theo mã vận đơn hay số đơn hàng.",
+  "text:Shipment {tracking} of order {order} is {status} (updated {at} UTC).": "Vận đơn {tracking} của đơn {order}: {status} (cập nhật lúc {at} UTC).",
+  "text:The shipment of order {order} is {status} (updated {at} UTC).": "Vận đơn của đơn {order}: {status} (cập nhật lúc {at} UTC).",
+  "text:being prepared": "đang được chuẩn bị",
+  "text:waiting for the carrier to pick it up": "đang chờ hãng vận chuyển đến lấy hàng",
+  "text:picked up by the carrier": "hãng vận chuyển đã lấy hàng",
+  "text:on its way": "đang trên đường giao",
+  "text:out for delivery today": "đang được giao trong hôm nay",
+  "text:delivered": "đã giao thành công",
+  "text:not delivered yet: the last attempt failed": "chưa giao được: lần giao gần nhất không thành",
+  "text:on its way back to the shop": "đang được hoàn về cửa hàng",
+  "text:returned to the shop": "đã hoàn về cửa hàng",
+  "text:ready for pickup at the store": "đã sẵn sàng để nhận tại cửa hàng",
+  "text:collected at the store": "đã được nhận tại cửa hàng",
+  "text:cancelled": "đã huỷ",
+  "text:reported lost by the carrier; the shop will contact you": "hãng vận chuyển báo thất lạc; cửa hàng sẽ liên hệ với bạn"
 }

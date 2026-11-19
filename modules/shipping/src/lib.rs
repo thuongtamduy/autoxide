@@ -15,6 +15,7 @@ mod errors;
 mod estimate;
 mod eta;
 mod events;
+mod facts;
 mod http;
 mod jobs;
 mod ledger;
@@ -157,6 +158,10 @@ impl Module for ShippingModule {
         context.provide::<dyn api::AddressBook>(service.clone())?;
         context.provide::<dyn api::ShippingRates>(service.clone())?;
         context.provide::<dyn api::CarrierRegistry>(registry)?;
+        // `support` đăng ký trước `shipping`; chưa cài thì không có trả lời tự động về vận đơn.
+        if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
+            facts.attach(facts::ShippingFacts::new(context.translations().clone()))?;
+        }
         self.service = Some(service);
         Ok(())
     }
