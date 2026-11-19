@@ -38,6 +38,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::antispam::tenant_table("plans"),
             ],
         ),
+        // Mua trong ứng dụng qua App Store / Google Play (bước 69 P4).
+        crate::store::migration(),
     ]
 }
 

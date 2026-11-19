@@ -46,6 +46,7 @@ mod schema;
 mod sqlite;
 mod stale;
 mod storage;
+mod store;
 mod tenancy;
 
 pub use app::{TestApp, TestAppBuilder, TestAppError, TestRequest, TestResponse, tool};
@@ -64,6 +65,7 @@ pub use s3::{
 };
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
+pub use store::FakeStorePurchases;
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
 
 use std::fmt;

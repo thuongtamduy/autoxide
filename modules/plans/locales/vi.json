@@ -105,5 +105,12 @@
   "text:Someone asked to sign up a new tenant and was sent a confirmation mail (`signup_id`, `plan_id`).": "Có người xin đăng ký khách mới và đã được gửi thư xác nhận (`signup_id`, `plan_id`).",
   "text:Subscriptions": "Thuê bao",
   "text:The status of a subscription changed (`tenant_id`, `from`, `to`).": "Trạng thái thuê bao đã đổi (`tenant_id`, `from`, `to`).",
-  "text:What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.": "Quyền dùng của khách hàng đã đổi do thuê bao, gói thêm hay ghi đè (`tenant_id`). Đọc lại `GET /api/v1/plans/entitlements`."
+  "text:What a tenant may use changed because of its subscription, add-ons or overrides (`tenant_id`). Read `GET /api/v1/plans/entitlements` again.": "Quyền dùng của khách hàng đã đổi do thuê bao, gói thêm hay ghi đè (`tenant_id`). Đọc lại `GET /api/v1/plans/entitlements`.",
+  "plans.store_unknown": "Không có cửa hàng ứng dụng `{store}`; dùng `app_store` hay `google_play`.",
+  "plans.store_unavailable": "Máy chủ này chưa cài mua qua `{store}`.",
+  "plans.store_product_unknown": "Sản phẩm `{product}` của `{store}` chưa nối với gói nào. Nhà vận hành nối bằng `PUT /api/v1/plans/store/products/{store}/{product}`.",
+  "plans.store_purchase_taken": "Giao dịch này đang trả tiền cho thuê bao của một khách khác.",
+  "plans.store_purchase_inactive": "Cửa hàng báo giao dịch này không còn hiệu lực (hết hạn, đã hoàn tiền hay bị thu hồi).",
+  "plans.store_billed": "Thuê bao này trả tiền qua cửa hàng ứng dụng: đổi, huỷ hay tiếp tục trong cửa hàng.",
+  "field:must be 1 to 200 characters": "phải dài 1 đến 200 ký tự"
 }

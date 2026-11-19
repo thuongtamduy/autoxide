@@ -171,7 +171,7 @@ async fn own_subscription(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No subscription (`plans.subscription_not_found`), plan (`plans.plan_not_found`) or price (`plans.price_not_found`).", body = Problem),
-        (status = 409, description = "The plan is not sold (`plans.plan_not_active`), or the subscription is not trialing or active (`plans.invalid_transition`).", body = Problem),
+        (status = 409, description = "The plan is not sold (`plans.plan_not_active`), or the subscription is not trialing or active (`plans.invalid_transition`), or it is paid through an app store (`plans.store_billed`): change it in the store.", body = Problem),
         (status = 422, description = "A value is invalid (see `errors`), or an add-on is of the wrong kind (`plans.addon_not_allowed`).", body = Problem),
     )
 )]
@@ -182,6 +182,7 @@ async fn change_subscription(
     ValidJson(input): ValidJson<ChangeRequest>,
 ) -> Result<Data<SubscriptionResponse>, Error> {
     principal.require(&BILLING_MANAGE)?;
+    service.ensure_not_store_billed(tenant.id()).await?;
     let reference = input.reference.trim();
     if reference.is_empty() || reference.len() > 200 {
         return Err(Error::validation(vec![FieldError::new(
@@ -218,7 +219,7 @@ async fn change_subscription(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No subscription; code `plans.subscription_not_found`.", body = Problem),
-        (status = 409, description = "Already canceled; code `plans.invalid_transition`.", body = Problem),
+        (status = 409, description = "Already canceled (`plans.invalid_transition`), or paid through an app store (`plans.store_billed`): cancel it in the store.", body = Problem),
     )
 )]
 async fn cancel_subscription(
@@ -228,6 +229,7 @@ async fn cancel_subscription(
     ValidJson(input): ValidJson<CancelRequest>,
 ) -> Result<Data<SubscriptionResponse>, Error> {
     principal.require(&BILLING_MANAGE)?;
+    service.ensure_not_store_billed(tenant.id()).await?;
     service.cancel(Actor::from(&principal), tenant.id(), input.at_period_end).await?;
     own_subscription(&service, tenant.id()).await
 }
@@ -247,7 +249,7 @@ async fn cancel_subscription(
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `plans.billing.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No subscription; code `plans.subscription_not_found`.", body = Problem),
-        (status = 409, description = "Nothing to resume; code `plans.invalid_transition`.", body = Problem),
+        (status = 409, description = "Nothing to resume (`plans.invalid_transition`), or paid through an app store (`plans.store_billed`).", body = Problem),
     )
 )]
 async fn resume_subscription(
@@ -256,6 +258,7 @@ async fn resume_subscription(
     principal: Principal,
 ) -> Result<Data<SubscriptionResponse>, Error> {
     principal.require(&BILLING_MANAGE)?;
+    service.ensure_not_store_billed(tenant.id()).await?;
     service.resume(tenant.id()).await?;
     own_subscription(&service, tenant.id()).await
 }

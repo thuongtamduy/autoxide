@@ -405,5 +405,6 @@
   "field:must be 1 to 100 characters": "phải dài 1 đến 100 ký tự",
   "field:must be a path under a sync resource (`GET /api/v1/kernel/sync/resources`)": "phải là đường dẫn dưới một loại bản ghi đồng bộ được (`GET /api/v1/kernel/sync/resources`)",
   "field:is required: keep one key per queued write": "là bắt buộc: giữ một key cho mỗi lệnh ghi đang chờ",
-  "field:must be visible ASCII characters": "chỉ gồm ký tự ASCII nhìn thấy được"
+  "field:must be visible ASCII characters": "chỉ gồm ký tự ASCII nhìn thấy được",
+  "store_signature_invalid": "Thông báo không có chữ ký của cửa hàng."
 }
