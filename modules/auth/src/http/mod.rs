@@ -2,6 +2,7 @@
 //! vào, gọi service và trả envelope; mọi logic nằm ở service.
 
 mod account;
+pub(crate) mod api_key_rotation;
 pub(crate) mod api_keys;
 mod customers;
 mod delegations;
@@ -74,6 +75,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(memberships::routes())
         .merge(users::routes())
         .merge(api_keys::routes())
+        .merge(api_key_rotation::routes())
         .merge(mfa::routes())
         .merge(reset::routes())
         .merge(email::routes())

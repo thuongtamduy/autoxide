@@ -11,9 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
-- `shipping`: automatic answers for `support` about where a parcel is (intent `shipping.tracking`), only for the
-  owner of the order (buyer account or verified phone number); read permission `shipping.cod.read` for COD
-  statements and discrepancies.
+- `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
+  one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
+  (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
 - Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
   limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
   stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
@@ -89,10 +89,6 @@ endpoints are marked deprecated with a sunset date first.
   `inventory.adjustment`, weighted average cost per warehouse (`inventory.cost_changed`), reorder points with
   `inventory.low_stock` / `inventory.out_of_stock`, the task `inventory.verify_levels` and a `doctor` check; MCP
   tools `inventory.*`.
-- `shipping`: delivery calendars (working days, holidays, special cut-offs as data), expected delivery dates
-  (`eta`) and store pickup `ready_at` / `hold_days` on every quote option, a public shipping estimate for product
-  pages (`GET /api/v1/shipping/public/estimate`), MCP tools `shipping.*`. `OrgDirectory::opening_hours` reads the
-  opening hours of a unit's public profile.
 - `shipping`: cash on delivery recorded as obligations in the ledger (never held), carrier statements imported
   from CSV or the carrier's API and matched by tracking number, discrepancies (amount, unknown, overdue) resolved
   with a reason code; `shipping.cod_settled` carries `seller_org_id`.
