@@ -254,6 +254,7 @@ async fn can_mat_khau_va_dat_lai_mat_khau_thu_hoi_passkey() {
         let mut attacker = SoftAuthenticator::new(9);
         register(&services, ada, &mut attacker).await;
         let key = crate::api_key::NewApiKey {
+            allowed_ips: Vec::new(),
             kind: autoxide_kernel::access::ActorKind::Human,
             org_id: None,
             name: "agent".to_owned(),
@@ -453,6 +454,7 @@ fn agent_key(
     second_factor: Option<crate::api_key::Reauth>,
 ) -> crate::api_key::NewApiKey {
     crate::api_key::NewApiKey {
+        allowed_ips: Vec::new(),
         kind: autoxide_kernel::access::ActorKind::Human,
         org_id: None,
         name: "agent".to_owned(),

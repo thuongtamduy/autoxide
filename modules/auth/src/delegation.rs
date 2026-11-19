@@ -72,6 +72,8 @@ const REASON_MAX: usize = 500;
 pub(crate) struct DelegationService {
     pub databases: DatabaseRegistry,
     pub outbox: Outbox,
+    /// Mọi permission của chương trình: mở role toàn quyền khi có role cấm (bước 54).
+    pub catalog: autoxide_kernel::access::PermissionCatalog,
 }
 
 fn now() -> DateTime<Utc> {
@@ -282,24 +284,28 @@ impl DelegationService {
         let roles: Vec<Uuid> = delegations.iter().map(|row| row.role_id).collect();
         let granted = crate::role::role_grants(&home, &roles).await?;
         let mut grants = Vec::new();
+        let mut denied = Vec::new();
+        let mut everything = false;
         for delegation in &delegations {
             let org = OrgId::from_uuid(delegation.org_id);
-            let Some((all, permissions)) = granted.get(&delegation.role_id) else { continue };
+            let Some((all, rules)) = granted.get(&delegation.role_id) else { continue };
             // Role toàn quyền của khách cha chỉ uỷ quyền được ở nút gốc của khách con (`grant`).
-            if *all {
-                let entered = Principal::with_all_permissions(principal.user_id())
-                    .in_tenant(home.id())
-                    .operating(target.id())
-                    .with_access(access);
-                return Ok(Some(entered));
-            }
-            for (permission, scope) in permissions {
+            everything |= *all;
+            denied.extend(rules.denies.iter().cloned());
+            for (permission, scope) in &rules.grants {
                 grants.push((permission.clone(), Grant::new(org, *scope)));
             }
         }
-        let entered = Principal::with_grants(principal.user_id(), grants)
+        let entered = if everything {
+            Principal::with_all_permissions(principal.user_id())
+        } else {
+            Principal::with_grants(principal.user_id(), grants)
+        };
+        // Role cấm thắng mọi role cấp, như ở khách nhà (bước 54).
+        let entered = entered
             .in_tenant(home.id())
             .operating(target.id())
+            .without(denied, &self.catalog)
             .with_access(access);
         Ok(Some(entered))
     }

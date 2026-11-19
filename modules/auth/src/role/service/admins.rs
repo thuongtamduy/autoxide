@@ -33,7 +33,29 @@ pub(crate) async fn grant_admin<C: ConnectionTrait>(
     Ok(())
 }
 
-/// Số người dùng CÒN HOẠT ĐỘNG (chưa bị khoá) đang có một role mang mọi permission.
+/// Người giữ ít nhất một role có permission cấm (bước 54) ở khách `tenant_id`: họ không còn đủ mọi
+/// permission nên không tính là quản trị viên — bỏ role cấm cho quản trị viên cuối cùng bị chặn
+/// như bỏ role `admin` của họ.
+fn holders_of_denies(tenant_id: Uuid) -> sea_orm::sea_query::SelectStatement {
+    Query::select()
+        .column(user_role::Column::UserId)
+        .from(user_role::Entity)
+        .and_where(user_role::Column::TenantId.eq(tenant_id))
+        .and_where(
+            user_role::Column::RoleId.in_subquery(
+                Query::select()
+                    .column(role_permission::Column::RoleId)
+                    .from(role_permission::Entity)
+                    .and_where(role_permission::Column::TenantId.eq(tenant_id))
+                    .and_where(role_permission::Column::Effect.eq(DENY))
+                    .to_owned(),
+            ),
+        )
+        .to_owned()
+}
+
+/// Số người dùng CÒN HOẠT ĐỘNG (chưa bị khoá) đang có một role mang mọi permission và không giữ
+/// role nào có permission cấm.
 pub(crate) async fn count_active_admins<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -79,6 +101,7 @@ pub(crate) async fn count_active_admins_unlocked<C: ConnectionTrait>(
                     .to_owned(),
             ),
         )
+        .filter(user_role::Column::UserId.not_in_subquery(holders_of_denies(id)))
         .scoped(tenant)
         .count(connection)
         .await?;
@@ -112,6 +135,7 @@ pub(crate) async fn active_admin_ids<C: ConnectionTrait>(
                     .to_owned(),
             ),
         )
+        .filter(user_role::Column::UserId.not_in_subquery(holders_of_denies(id)))
         .scoped(tenant)
         .all(connection)
         .await?;

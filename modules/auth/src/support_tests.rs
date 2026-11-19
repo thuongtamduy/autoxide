@@ -71,6 +71,7 @@ async fn setup(test: &TestDatabase) -> (Setup, crate::testing::Services) {
         write.commit().await.unwrap();
     }
     let role = RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         name: "support".to_owned(),
         description: String::new(),
@@ -330,6 +331,7 @@ async fn khach_tat_ho_tro_chi_con_yeu_cau_co_tham_quyen() {
             outbox: autoxide_kernel::event::Outbox::standalone("auth"),
             orgs: Some(Arc::new(SupportOff)),
             max_hours: 8,
+            catalog: services.roles.catalog().clone(),
         };
         let boss = autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::now_v7())
             .in_tenant(services.tenant.id());

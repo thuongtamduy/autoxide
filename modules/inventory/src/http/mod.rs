@@ -11,11 +11,13 @@ use crate::service::InventoryService;
 pub(crate) mod documents;
 pub(crate) mod dto;
 pub(crate) mod levels;
+pub(crate) mod purchasing;
 pub(crate) mod reservations;
 
 pub(crate) fn routes(service: Arc<InventoryService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .merge(levels::routes(service.clone()))
         .merge(reservations::routes(service.clone()))
-        .merge(documents::routes(service))
+        .merge(documents::routes(service.clone()))
+        .merge(purchasing::routes(service))
 }

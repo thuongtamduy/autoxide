@@ -31,6 +31,7 @@ fn new_user(email: &str, password: &str) -> NewUser {
 
 fn role(name: &str) -> RoleInput {
     RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         name: name.to_owned(),
         description: String::new(),
@@ -216,6 +217,7 @@ async fn khong_ro_ri_giua_khach() {
         let owner = Principal::new(user_id.parse().unwrap(), ["auth.users.read".to_owned()])
             .in_tenant(a.id());
         let key = NewApiKey {
+            allowed_ips: Vec::new(),
             kind: autoxide_kernel::access::ActorKind::Human,
             org_id: None,
             name: marker.to_owned(),
@@ -397,6 +399,7 @@ async fn api_key_dinh_tuyen_dung_database() {
         let services = crate::testing::services(test).await;
         let (app, a, b) = two_tenant_app(test, &services).await;
         let new_key = || NewApiKey {
+            allowed_ips: Vec::new(),
             kind: autoxide_kernel::access::ActorKind::Human,
             org_id: None,
             name: "agent".to_owned(),
