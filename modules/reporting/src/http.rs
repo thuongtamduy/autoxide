@@ -84,6 +84,11 @@ pub(crate) struct FilterQuery {
     pub tenant_ids: Option<String>,
     /// Only these organization units, comma-separated ids; units outside your scope are left out.
     pub org_ids: Option<String>,
+    /// Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated
+    /// ids, and only facts of your own tenant (not of the tenants below it). A group grants no
+    /// access: its units outside your scope are left out and counted in `excluded_org_count` of
+    /// the summary. An unknown group answers 404 `reporting.group_not_found`.
+    pub group_ids: Option<String>,
     /// Only facts with these dimension values, comma-separated `name:value` pairs, e.g.
     /// `kind:vat_invoice` (needs `kind`; see `dimensions` in `GET /kinds`).
     #[param(example = "kind:vat_invoice")]
@@ -95,7 +100,9 @@ pub(crate) struct FilterQuery {
 #[into_params(parameter_in = Query)]
 pub(crate) struct SummaryOptions {
     /// `day` (the default; at most 366 days), `week` (keyed by its Monday), `month` (keyed by its
-    /// first day), `tenant` (keyed by the source tenant id) or `org` (keyed by the unit id).
+    /// first day), `tenant` (keyed by the source tenant id), `org` (keyed by the unit id) or
+    /// `group` (keyed by the unit group id; needs `group_ids`). With `group`, a unit in two groups
+    /// counts in both, so the groups can add up to more than `totals`.
     #[param(example = "day")]
     pub group_by: Option<String>,
     /// Also convert every sum to this ISO 4217 currency, with the exchange rates of your own tenant
@@ -158,6 +165,7 @@ impl FilterQuery {
             to: day("to", self.to.as_deref(), problems),
             tenant_ids: ids("tenant_ids", self.tenant_ids.as_deref(), problems),
             org_ids: ids("org_ids", self.org_ids.as_deref(), problems),
+            group_ids: ids("group_ids", self.group_ids.as_deref(), problems),
             dimensions,
         }
     }
@@ -171,7 +179,7 @@ impl SummaryOptions {
                 problems.push(FieldError::new(
                     "group_by",
                     "invalid",
-                    "must be `day`, `week`, `month`, `tenant` or `org`",
+                    "must be `day`, `week`, `month`, `tenant`, `org` or `group`",
                 ));
                 GroupBy::Day
             }),
@@ -219,14 +227,18 @@ impl From<CurrencyTotal> for CurrencyTotalResponse {
 /// One group of the summary.
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct SummaryGroupResponse {
-    /// The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;
-    /// `total` for the totals.
+    /// The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id, a unit id or a
+    /// unit group id; `total` for the totals.
     #[schema(example = "2026-11-18")]
     key: String,
     /// Sums per original currency; money of two currencies is never added together.
     by_currency: Vec<CurrencyTotalResponse>,
     /// All amounts converted to the asked `currency` and added, when you asked for one.
     converted: Option<Money>,
+    /// With `group_ids` (on `totals`) or `group_by=group` (on each group): units of the asked
+    /// groups outside your scope, left out of the sums. Absent otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    excluded_org_count: Option<u64>,
 }
 
 impl From<SummaryGroup> for SummaryGroupResponse {
@@ -235,6 +247,7 @@ impl From<SummaryGroup> for SummaryGroupResponse {
             key: group.key,
             by_currency: group.by_currency.into_iter().map(Into::into).collect(),
             converted: group.converted,
+            excluded_org_count: group.excluded_org_count,
         }
     }
 }

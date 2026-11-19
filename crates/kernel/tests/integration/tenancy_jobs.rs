@@ -286,9 +286,9 @@ async fn tenant(setup: &Setup, slug: &str, placement: Option<&str>) -> TenantCon
     setup.registry.tenant(TenantId::from_uuid(id)).await.unwrap()
 }
 
-/// Job lịch của module nội bộ `kernel` ở chế độ `multi`: `kernel.verify_domains`, chỉ trên database
-/// chính (D-190).
-const KERNEL_JOBS: usize = 1;
+/// Job lịch của module nội bộ `kernel` ở chế độ `multi`: `kernel.verify_domains` (D-190) và
+/// `kernel.expire_sandboxes` (D-232), chỉ trên database chính.
+const KERNEL_JOBS: usize = 2;
 
 #[tokio::test]
 async fn worker_chia_luot_cong_bang() {

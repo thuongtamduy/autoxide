@@ -1185,6 +1185,8 @@ mod tests {
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
                 "AUTOXIDE_SEARCH_BACKEND",
                 "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
+                "AUTOXIDE_TENANCY_SANDBOX_DAYS",
+                "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
