@@ -81,6 +81,16 @@ impl EventHandler for ConversationsService {
 impl ConversationsService {
     /// Ẩn danh hoá người mua `user_id` (xem đầu file).
     pub(crate) async fn forget(&self, tenant: &TenantContext, user_id: Uuid) -> Result<(), Error> {
+        let threads: Vec<Uuid> = thread::Entity::find()
+            .select_only()
+            .column(thread::Column::Id)
+            .filter(thread::Column::CustomerUserId.eq(user_id))
+            .scoped(tenant)
+            .into_tuple()
+            .all(tenant.database().read())
+            .await?;
+        // Bản ghi âm và số trong yêu cầu gọi lại (gọi nơi lưu / nhà cung cấp: ngoài transaction).
+        self.forget_calls(tenant, user_id, &threads).await?;
         let transaction = tenant.database().begin_write().await?;
         let ids: Vec<Uuid> = thread::Entity::find()
             .select_only()

@@ -26,6 +26,26 @@ pub(crate) const MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const CALL: Permission = Permission::new(
+    "conversations.call",
+    "Work on call-back requests of the units in your scope, call customers back and see the calls \
+     of a conversation (phone numbers stay masked).",
+)
+.scoped();
+
+pub(crate) const RECORDINGS_READ: Permission = Permission::new(
+    "conversations.recordings.read",
+    "Listen to call recordings of the units in your scope; every listen is recorded.",
+)
+.scoped();
+
+pub(crate) const VOICE_MANAGE: Permission = Permission::new(
+    "conversations.voice.manage",
+    "Set up the phone line of the units in your scope, switch call recording on or off, and delete \
+     recordings when a customer asks.",
+)
+.scoped();
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![READ, REPLY, MANAGE]
+    vec![READ, REPLY, MANAGE, CALL, RECORDINGS_READ, VOICE_MANAGE]
 }

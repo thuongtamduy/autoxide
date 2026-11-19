@@ -209,6 +209,11 @@ pub(crate) fn service_of() -> Arc<crate::service::ConversationsService> {
         ai: None,
         authenticator: None,
         resources: None,
+        voice: Vec::new(),
+        accounts: None,
+        storage: None,
+        secret: None,
+        translations: autoxide_kernel::i18n::Translations::default(),
     };
     Arc::new(crate::service::ConversationsService::new(parts, Default::default()))
 }

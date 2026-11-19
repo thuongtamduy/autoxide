@@ -2,6 +2,7 @@
 //! mới và một dòng vào cuối [`all`].
 
 mod m0001_create_conversations;
+mod m0007_voice;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -22,5 +23,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             ],
         ),
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "conversations"),
+        // Gọi điện trong chat (D-232): đường dây, yêu cầu gọi lại, cuộc gọi, event webhook.
+        Box::new(m0007_voice::Migration),
     ]
 }
