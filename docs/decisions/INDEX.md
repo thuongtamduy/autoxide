@@ -464,6 +464,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 - **[D-20261119-step42-lots-serials](D-20261119-step42-lots-serials.md)** Lô, hạn dùng và serial của `inventory`: giữ ở mức dòng tồn, chọn lô lúc xuất, hàng không gắn lô được phép — 2026-11-19
 - **[D-20261119-step42-preorders](D-20261119-step42-preorders.md)** Hàng đặt trước của `inventory`: bộ đếm suất có trần, job chia hàng về tính lại từ trạng thái — 2026-11-19
+- **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 
 ## Vận hành và hiệu năng

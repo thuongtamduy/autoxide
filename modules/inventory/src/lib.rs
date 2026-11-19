@@ -17,6 +17,7 @@ mod migration;
 mod orders_events;
 mod permissions;
 mod preorders;
+mod public;
 mod purchasing;
 mod receipts;
 mod relocation;
