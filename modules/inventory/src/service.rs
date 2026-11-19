@@ -71,6 +71,10 @@ pub(crate) struct Parts {
     pub reasons: ReasonCodes,
     /// `dyn Ledger` của `ledger` khi đã cài: ghi công nợ nhà cung cấp và giá trị nhập.
     pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    /// `dyn Notifier` của `notifications` khi đã cài: báo khi có hàng lại.
+    pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    /// Chống spam cho form công khai (đăng ký báo có hàng lại).
+    pub guard: Arc<autoxide_kernel::antispam::SpamGuard>,
 }
 
 /// Mọi việc của module. Không giữ database: database là của khách, đi theo `TenantContext` của
@@ -83,6 +87,8 @@ pub(crate) struct InventoryService {
     pub(crate) orgs: Option<Arc<dyn OrgDirectory>>,
     pub(crate) reasons: ReasonCodes,
     pub(crate) ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    pub(crate) notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    pub(crate) guard: Arc<autoxide_kernel::antispam::SpamGuard>,
     pub(crate) config: InventoryConfig,
 }
 
@@ -96,6 +102,8 @@ impl InventoryService {
             orgs: parts.orgs,
             reasons: parts.reasons,
             ledger: parts.ledger,
+            notifier: parts.notifier,
+            guard: parts.guard,
             config,
         }
     }
