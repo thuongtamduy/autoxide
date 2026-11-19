@@ -322,7 +322,7 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
       hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên — vượt (137 ms); `dot` SIMD + chia nhân còn
       20 ms, D-20261119-step39-semantic-scan
-- [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
+- [x] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 - [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
       lượng tương đương, không thì ghi "không làm" kèm số đo
