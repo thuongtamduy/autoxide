@@ -11,6 +11,13 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
+  its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
+  prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,
+  `shipping` and `tax` (`quote_token` for checkout, `free_shipping_remaining`); coupon codes and wallet vouchers kept
+  apart, rejected codes listed with the reason; abandoned carts (`orders.cart_abandoned`, `GET /carts?status=abandoned`)
+  and expired carts purged; the contract `autoxide_orders::api` for steps 46–49 with the extension point
+  `OrderExtensions`.
 - Benchmark dataset (step 39): `scripts/bench-seed.sh small|full` fills a fresh benchmark database with
   made-up data of real size (full: 5,000 users, 50,000 images with their smaller copies, 100,000 posts in two
   languages with categories, tags and authors, 1,000,000 comments in reply threads) through the tasks

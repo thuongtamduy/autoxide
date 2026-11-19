@@ -12006,6 +12006,37 @@
         ],
         "type": "object"
       },
+      "CreateOrdersCartRequest": {
+        "additionalProperties": false,
+        "description": "A new cart.",
+        "properties": {
+          "currency": {
+            "description": "ISO 4217 code; default `VND`.",
+            "example": "VND",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language of product names and promotion terms; default `vi`.",
+            "example": "vi",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The shop (or marketplace store) selling; omitted: the root unit of the tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "CreateRuleRequest": {
         "additionalProperties": false,
         "description": "A new automation rule. Every problem (unknown event or tool, a tool you lack the permission\nfor, arguments that do not fit the tool) is reported at once.",
@@ -24443,6 +24474,203 @@
             "required": [
               "checked_at",
               "databases"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Option_PromotionsEligibility": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "Codes and vouchers usable for a cart, those not yet, and the best combination.",
+                "properties": {
+                  "best_selection": {
+                    "$ref": "#/components/schemas/PromotionsSelection"
+                  },
+                  "best_total_discount": {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  "ineligible": {
+                    "items": {
+                      "$ref": "#/components/schemas/PromotionsIneligibleOffer"
+                    },
+                    "type": "array"
+                  },
+                  "usable": {
+                    "items": {
+                      "$ref": "#/components/schemas/PromotionsOffer"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "usable",
+                  "ineligible",
+                  "best_selection",
+                  "best_total_discount"
+                ],
+                "type": "object"
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersCart": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A cart with its quote, computed again by the server on every read.",
+            "properties": {
+              "attribution": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersAttribution"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "buyer_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "cart_token": {
+                "description": "Guests only, once, when the cart is created: send it back in the `Cart-Token` header.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "codes": {
+                "description": "Coupon codes entered.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "free_shipping_remaining": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "How much more to spend for free shipping (`0`: already free), when the option has a\nthreshold."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/OrdersCartLine"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "description": "The shop (or marketplace store) selling.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "payment_method": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "promotions": {
+                "description": "Promotions applied, with their terms.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "quote_expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "quote_token": {
+                "description": "Send it to `POST /checkout`: checkout refuses with `orders.quote_changed` when prices,\ndiscounts or fees changed since.",
+                "type": "string"
+              },
+              "rejected_codes": {
+                "description": "Codes and vouchers that do not apply, with the reason.",
+                "items": {
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "ship_to": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersCartShipTo"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "shipping": {
+                "$ref": "#/components/schemas/OrdersCartShipping"
+              },
+              "status": {
+                "description": "`active`, `abandoned`, `merged` or `converted`.",
+                "type": "string"
+              },
+              "totals": {
+                "$ref": "#/components/schemas/OrdersCartTotals"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "voucher_ids": {
+                "description": "Vouchers of your wallet used for this cart.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "status",
+              "currency",
+              "lines",
+              "codes",
+              "voucher_ids",
+              "promotions",
+              "rejected_codes",
+              "shipping",
+              "totals",
+              "quote_token",
+              "quote_expires_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -48887,6 +49115,565 @@
         ],
         "type": "object"
       },
+      "OrdersAttribution": {
+        "description": "Referral of the cart.",
+        "properties": {
+          "click_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "live_session_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersCart": {
+        "description": "A cart with its quote, computed again by the server on every read.",
+        "properties": {
+          "attribution": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersAttribution"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "buyer_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cart_token": {
+            "description": "Guests only, once, when the cart is created: send it back in the `Cart-Token` header.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "codes": {
+            "description": "Coupon codes entered.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "free_shipping_remaining": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "How much more to spend for free shipping (`0`: already free), when the option has a\nthreshold."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersCartLine"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The shop (or marketplace store) selling.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment_method": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "promotions": {
+            "description": "Promotions applied, with their terms.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "quote_expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "quote_token": {
+            "description": "Send it to `POST /checkout`: checkout refuses with `orders.quote_changed` when prices,\ndiscounts or fees changed since.",
+            "type": "string"
+          },
+          "rejected_codes": {
+            "description": "Codes and vouchers that do not apply, with the reason.",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "ship_to": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersCartShipTo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/OrdersCartShipping"
+          },
+          "status": {
+            "description": "`active`, `abandoned`, `merged` or `converted`.",
+            "type": "string"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/OrdersCartTotals"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "voucher_ids": {
+            "description": "Vouchers of your wallet used for this cart.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "status",
+          "currency",
+          "lines",
+          "codes",
+          "voucher_ids",
+          "promotions",
+          "rejected_codes",
+          "shipping",
+          "totals",
+          "quote_token",
+          "quote_expires_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersCartLine": {
+        "description": "One cart line, priced again by the server.",
+        "properties": {
+          "compare_at": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Struck-through price, for display only."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "gift_of": {
+            "description": "The promotion that added this free gift.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "image_media_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "key": {
+            "description": "Line key: the variant id, or `gift:<promotion>:<variant>` for a free gift.",
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "preorder": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersPreorderInfo",
+                "description": "Set for pre-order items."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "problem": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersLineProblem",
+                "description": "Set when the line cannot be ordered now."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "sku": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/Money",
+            "description": "`unit_price × quantity`."
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax_inclusive": {
+            "description": "Whether `unit_price` includes taxes.",
+            "type": "boolean"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money",
+            "description": "What the buyer pays for the line: after discounts, taxes included."
+          },
+          "unit_price": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Unit price before discounts."
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "variant_label": {
+            "description": "Option labels, like `Red / M`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "variant_id",
+          "quantity",
+          "unit_price",
+          "tax_inclusive",
+          "subtotal",
+          "discount",
+          "tax",
+          "total"
+        ],
+        "type": "object"
+      },
+      "OrdersCartShipTo": {
+        "description": "Where the cart goes.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address_id": {
+            "description": "An address of your address book.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipient_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersCartShipping": {
+        "description": "Delivery part of a cart.",
+        "properties": {
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersShippingOption"
+            },
+            "type": "array"
+          },
+          "required": {
+            "description": "Some item must be delivered.",
+            "type": "boolean"
+          },
+          "selected": {
+            "description": "The chosen option, when still available.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "selected_unavailable": {
+            "description": "The chosen option is no longer available: choose again.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "required",
+          "options",
+          "selected_unavailable"
+        ],
+        "type": "object"
+      },
+      "OrdersCartSummary": {
+        "description": "A cart in a staff list (no quote).",
+        "properties": {
+          "abandoned_notified_at": {
+            "description": "When `orders.cart_abandoned` was sent.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "buyer_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "status",
+          "currency",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersCartTotals": {
+        "description": "Money totals of a cart.",
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "shipping_discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "shipping_fee": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "subtotal": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Taxes (already in `total` when prices include taxes)."
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money",
+            "description": "What the buyer pays."
+          }
+        },
+        "required": [
+          "subtotal",
+          "discount",
+          "shipping_fee",
+          "shipping_discount",
+          "tax",
+          "total"
+        ],
+        "type": "object"
+      },
+      "OrdersLineProblem": {
+        "description": "Why a cart line cannot be ordered now.",
+        "properties": {
+          "available": {
+            "description": "Units left, for `orders.out_of_stock`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "`orders.variant_unavailable`, `orders.out_of_stock` or `orders.preorder_closed`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "OrdersPreorderInfo": {
+        "description": "Pre-order information shown before ordering.",
+        "properties": {
+          "available_on": {
+            "description": "Expected date the item arrives (shop time zone).",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ends_at": {
+            "description": "Pre-orders close at.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersShippingOption": {
+        "description": "A way to deliver the cart.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "carrier_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eta_earliest": {
+            "description": "Earliest and latest expected delivery dates.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "eta_latest": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "free_over": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Spending over this ships free."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "description": "`table_rate`, `carrier` or `pickup`.",
+            "type": "string"
+          },
+          "method_code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "option_key": {
+            "description": "Send it back in `PUT /carts/{id}/delivery` to choose this option.",
+            "type": "string"
+          },
+          "pickup_org_id": {
+            "description": "Store of a pickup option.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "option_key",
+          "method_code",
+          "name",
+          "kind",
+          "amount"
+        ],
+        "type": "object"
+      },
       "OverrideRequest": {
         "additionalProperties": false,
         "description": "An override to set; it replaces one of the same kind and key.",
@@ -55619,6 +56406,74 @@
         ],
         "type": "object"
       },
+      "Page_OrdersCartSummary": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A cart in a staff list (no quote).",
+              "properties": {
+                "abandoned_notified_at": {
+                  "description": "When `orders.cart_abandoned` was sent.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "buyer_user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "status",
+                "currency",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_OverrideResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -61608,6 +62463,36 @@
         ],
         "type": "string"
       },
+      "PromotionsEligibility": {
+        "description": "Codes and vouchers usable for a cart, those not yet, and the best combination.",
+        "properties": {
+          "best_selection": {
+            "$ref": "#/components/schemas/PromotionsSelection"
+          },
+          "best_total_discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "ineligible": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionsIneligibleOffer"
+            },
+            "type": "array"
+          },
+          "usable": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionsOffer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "usable",
+          "ineligible",
+          "best_selection",
+          "best_total_discount"
+        ],
+        "type": "object"
+      },
       "PromotionsEvaluation": {
         "description": "Promotions computed for a cart; orders store it as a snapshot.",
         "properties": {
@@ -61995,6 +62880,22 @@
         ],
         "type": "object"
       },
+      "PromotionsIneligibleOffer": {
+        "description": "A code or voucher the cart does not qualify for yet, with the reason.",
+        "properties": {
+          "offer": {
+            "$ref": "#/components/schemas/PromotionsOffer"
+          },
+          "reason": {
+            "$ref": "#/components/schemas/PromotionsReason"
+          }
+        },
+        "required": [
+          "offer",
+          "reason"
+        ],
+        "type": "object"
+      },
       "PromotionsKind": {
         "description": "Kind of promotion.",
         "enum": [
@@ -62274,6 +63175,60 @@
           "effective_from",
           "legal_basis",
           "note"
+        ],
+        "type": "object"
+      },
+      "PromotionsOffer": {
+        "description": "A code or voucher in the promotion picker.",
+        "properties": {
+          "class": {
+            "$ref": "#/components/schemas/PromotionsPromotionClass"
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "remaining_uses": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "terms": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "voucher_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "promotion_id",
+          "class",
+          "title",
+          "terms",
+          "discount",
+          "ends_at"
         ],
         "type": "object"
       },
@@ -63006,6 +63961,29 @@
           "shipping"
         ],
         "type": "string"
+      },
+      "PromotionsSelection": {
+        "description": "Codes and vouchers to use together.",
+        "properties": {
+          "codes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "voucher_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "codes",
+          "voucher_ids"
+        ],
+        "type": "object"
       },
       "PromotionsShippingDiscount": {
         "description": "A discount on the shipping fee.",
@@ -67584,6 +68562,144 @@
           "started_at",
           "last_active_at",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "SetOrdersCartAttributionRequest": {
+        "additionalProperties": false,
+        "description": "Referral of the cart.",
+        "properties": {
+          "click_id": {
+            "description": "Affiliate click id.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "Affiliate or referral code.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "live_session_id": {
+            "description": "Live-selling session.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SetOrdersCartCodesRequest": {
+        "additionalProperties": false,
+        "description": "Coupon codes of the cart.",
+        "properties": {
+          "codes": {
+            "description": "Replaces the codes of the cart; `[]` removes them all.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "codes"
+        ],
+        "type": "object"
+      },
+      "SetOrdersCartDeliveryRequest": {
+        "additionalProperties": false,
+        "description": "Delivery of the cart.",
+        "properties": {
+          "address": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AddressInput",
+                "description": "An address typed in (guests, or a one-off address); names are filled in."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "address_id": {
+            "description": "An address of your address book (signed-in buyers).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipient_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shipping_option": {
+            "description": "`option_key` of one of the cart's `shipping.options`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SetOrdersCartLineRequest": {
+        "description": "The quantity of one product in the cart.",
+        "properties": {
+          "quantity": {
+            "description": "`0` removes the line.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "SetOrdersCartPaymentMethodRequest": {
+        "additionalProperties": false,
+        "description": "Payment method of the cart.",
+        "properties": {
+          "payment_method": {
+            "description": "`gateway`, `vietqr`, `bank_transfer`, `cod`…; `null` clears it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "SetOrdersCartVouchersRequest": {
+        "additionalProperties": false,
+        "description": "Vouchers of the cart.",
+        "properties": {
+          "voucher_ids": {
+            "description": "Ids of vouchers in your wallet; replaces the list, `[]` removes them all.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "voucher_ids"
         ],
         "type": "object"
       },
@@ -164267,6 +165383,1456 @@
           "health"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/orders/carts": {
+      "get": {
+        "description": "Requires `orders.read` (carts of shops in your scope).",
+        "operationId": "orders_list_orders_carts",
+        "parameters": [
+          {
+            "description": "`abandoned` (default), `active`, `merged` or `converted`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only carts of this shop.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OrdersCartSummary"
+                }
+              }
+            },
+            "description": "A page of carts, newest first by default."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad cursor or limit."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown `status`; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List carts, like abandoned carts.",
+        "tags": [
+          "orders"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`abandoned` (default), `active`, `merged` or `converted`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only carts of this shop.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "orders.list_orders_carts",
+        "x-permissions": [
+          "orders.read"
+        ]
+      },
+      "post": {
+        "description": "Public. Signed in: your cart at this shop (an existing active cart is returned with 200).\nGuest: the answer carries `cart_token` once — send it back in the `Cart-Token` header for\nevery call on this cart.",
+        "operationId": "orders_create_orders_cart",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrdersCartRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "You already have an active cart at this shop; here it is."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), like an unknown currency (`money.currency_unknown`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}": {
+      "get": {
+        "description": "Signed-in owner, or guest with the `Cart-Token` header. Prices, discounts, shipping fees and\ntaxes are computed again by the server on every read; numbers sent by clients are never used.",
+        "operationId": "orders_get_orders_cart",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart and its quote."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart of yours, or it expired; code `orders.cart_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Read a cart with its quote.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/attribution": {
+      "put": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. The order keeps it for commissions.",
+        "operationId": "orders_set_orders_cart_attribution",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartAttributionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart; code `orders.cart_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The cart was merged or ordered; code `orders.cart_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Record who referred the buyer to the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/codes": {
+      "put": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. A code that does not apply does not fail: the\ncart lists it in `rejected_codes` with the reason.",
+        "operationId": "orders_set_orders_cart_codes",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartCodesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart, priced again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart; code `orders.cart_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The cart was merged or ordered; code `orders.cart_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A code is empty or too long (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the coupon codes of the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/delivery": {
+      "put": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. The cart lists the delivery options for the\naddress in `shipping.options`; choose one by its `option_key`.",
+        "operationId": "orders_set_orders_cart_delivery",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartDeliveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart, priced again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart (`orders.cart_not_found`), or no such address in your book (`shipping.address_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The cart was merged or ordered; code `orders.cart_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The address is invalid, or both `address_id` and `address` were sent (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set where and how the cart is delivered.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/lines/{variant_id}": {
+      "put": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. Only the quantity is taken: prices are always the\nserver's. Stock is checked but not held until checkout.",
+        "operationId": "orders_set_orders_cart_line",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the product variant.",
+            "in": "path",
+            "name": "variant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartLineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart, priced again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart; code `orders.cart_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not enough in stock (`orders.out_of_stock`, with `available`), pre-orders closed (`orders.preorder_closed`), or the cart was merged / ordered (`orders.cart_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Quantity out of range (`orders.quantity_invalid`), too many products (`orders.cart_too_many_lines`), or the product is not on sale (`orders.variant_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the quantity of a product in the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/merge": {
+      "post": {
+        "description": "Signed in, with the guest cart's `Cart-Token` header (call it right after signing in).\nQuantities add up (capped at the maximum), coupon codes are kept; the guest cart becomes\n`merged`. Calling again returns your cart without adding twice.",
+        "operationId": "orders_merge_orders_cart",
+        "parameters": [
+          {
+            "description": "Id of the guest cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of the guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "Your cart after the merge."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in (`unauthenticated`), or wrong `Cart-Token` (`orders.cart_token_invalid`)."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such guest cart; code `orders.cart_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Merge a guest cart into your cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/orders/carts/{id}/payment-method": {
+      "put": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. Some promotions depend on the payment method, so\nthe cart is priced again.",
+        "operationId": "orders_set_orders_cart_payment_method",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartPaymentMethodRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart, priced again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart; code `orders.cart_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The cart was merged or ordered; code `orders.cart_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Choose the payment method of the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/promotions": {
+      "get": {
+        "description": "Signed-in owner, or guest with `Cart-Token`. Lists usable offers, offers not reached yet with\nthe reason, and the best combination. Empty when promotions are not installed.",
+        "operationId": "orders_list_orders_cart_promotions",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of a guest cart.",
+            "in": "header",
+            "name": "Cart-Token",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Option_PromotionsEligibility"
+                }
+              }
+            },
+            "description": "Offers for the cart."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart; code `orders.cart_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Codes and vouchers usable for the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/carts/{id}/vouchers": {
+      "put": {
+        "description": "Signed-in owner only (vouchers live in an account's wallet). A voucher that does not apply is\nlisted in `rejected_codes` with the reason.",
+        "operationId": "orders_set_orders_cart_vouchers",
+        "parameters": [
+          {
+            "description": "Id of the cart.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetOrdersCartVouchersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCart"
+                }
+              }
+            },
+            "description": "The cart, priced again."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such cart of yours; code `orders.cart_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The cart was merged or ordered; code `orders.cart_closed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Use vouchers of your wallet for the cart.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
       }
     },
     "/api/v1/organizations/public/site": {

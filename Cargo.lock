@@ -396,6 +396,7 @@ dependencies = [
  "autoxide-newsletter",
  "autoxide-notes",
  "autoxide-notifications",
+ "autoxide-orders",
  "autoxide-organizations",
  "autoxide-plans",
  "autoxide-promotions",
@@ -1020,6 +1021,33 @@ dependencies = [
  "axum",
  "chrono",
  "mrml",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
+name = "autoxide-orders"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-address",
+ "autoxide-catalog",
+ "autoxide-inventory",
+ "autoxide-kernel",
+ "autoxide-ledger",
+ "autoxide-promotions",
+ "autoxide-shipping",
+ "autoxide-tax",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
  "sea-orm",
  "serde",
  "serde_json",

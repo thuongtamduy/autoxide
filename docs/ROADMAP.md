@@ -619,7 +619,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Tạo tài khoản từ số điện thoại đã xác thực qua tra đơn vãng lai (D-202, chuyển từ bước 34 — D-316):
       `POST /api/v1/auth/phone-signups` khi `orders` có token xem đơn, đăng nhập bằng passkey hay OTP, không bắt
       buộc mật khẩu (đặc tả 34 mục "Tạo tài khoản từ số đã xác thực")
-- [ ] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
+- [x] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
       chủ, không tin số từ client; `free_shipping_remaining` (D-201); coupon và voucher tách nhau, điền dữ liệu
       điều kiện cho `promotions`, chụp khoản giảm kèm ai trả tiền vào đơn (D-222); danh sách giỏ bỏ dở
 - [ ] Đặt hàng: báo giá cuối → giữ tồn, lượt khuyến mại → số đơn tuần tự (bước 36) → thanh toán theo chế độ
