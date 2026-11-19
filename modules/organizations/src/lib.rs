@@ -18,6 +18,7 @@ mod permissions;
 mod profile;
 mod service;
 mod settings;
+mod storefront;
 mod suggest;
 mod tools;
 mod tools_groups;

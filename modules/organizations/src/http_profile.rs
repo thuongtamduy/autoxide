@@ -28,6 +28,7 @@ pub(crate) fn routes() -> OpenApiRouter<Arc<OrgService>> {
         .routes(routes!(get_public_profile, update_public_profile))
         .routes(routes!(list_public_stores))
         .routes(routes!(get_site_profile))
+        .routes(routes!(get_public_storefront))
 }
 
 /// The public profile of an organization unit, as websites show it.
@@ -235,5 +236,83 @@ async fn list_public_stores(
     response
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=300"));
+    Ok(response)
+}
+
+/// The brand of a website, inherited down the organization tree.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct BrandResponse {
+    /// Brand name (setting `organizations.brand_name`, else the unit's display name).
+    name: String,
+    /// Logo: a public media item; load it from `/api/v1/media/{id}/content`.
+    logo_media_id: Option<Uuid>,
+    /// Site icon (favicon): a public media item.
+    icon_media_id: Option<Uuid>,
+    phone: Option<String>,
+    email: Option<String>,
+    #[schema(inline)]
+    social_links: Vec<crate::storefront::SocialLink>,
+}
+
+/// What a website shows about its store: the brand and the location.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct StorefrontResponse {
+    brand: BrandResponse,
+    /// The unit's public profile: address, opening hours, special days, pickup, cover picture.
+    location: PublicProfileResponse,
+    /// IANA time zone of the unit; opening hours are local times in it.
+    #[schema(example = "Asia/Ho_Chi_Minh")]
+    timezone: String,
+    /// Open right now, in the unit's time zone (special days first); `null` when no opening
+    /// hours are set.
+    open_now: Option<bool>,
+}
+
+/// Get the store information of a website (public).
+///
+/// No sign-in needed. The brand (name, logo, site icon, phone, email, social profiles) is
+/// inherited down the organization tree: a chain sets it, a store overrides what it wants (manage
+/// it with `PUT /api/v1/organizations/units/{id}/settings/organizations.brand_name` and the other
+/// `organizations.brand_*`, `organizations.contact_*`, `organizations.social_links` settings). The
+/// location is the unit's public profile. For the legal footer of a Vietnamese shop, add the
+/// owner information and the Ministry of Industry and Trade badge from
+/// `GET /api/v1/compliance/public/owner` and `GET /api/v1/compliance/public/badge`.
+#[utoipa::path(
+    get,
+    path = "/public/storefront",
+    extensions(("x-public" = json!(true))),
+    operation_id = "get_public_storefront",
+    security((), ("bearer" = [])),
+    params(autoxide_kernel::tenancy::SiteQuery),
+    responses(
+        (status = 200, description = "The store information.", body = Data<StorefrontResponse>, headers(("Cache-Control" = String, description = "`public, max-age=60`: `open_now` changes with time."))),
+        (status = 400, description = "`site` is not a UUID; code `invalid_site`.", body = Problem),
+        (status = 404, description = "No active unit `site` in this tenant; code `site_not_found`.", body = Problem),
+    )
+)]
+async fn get_public_storefront(
+    State(service): State<Arc<OrgService>>,
+    tenant: TenantContext,
+    site: autoxide_kernel::tenancy::Site,
+) -> Result<Response, Error> {
+    let found = service.public_storefront(&tenant, &site, Utc::now()).await?;
+    let brand = found.brand;
+    let data = StorefrontResponse {
+        brand: BrandResponse {
+            name: brand.name,
+            logo_media_id: brand.logo_media_id,
+            icon_media_id: brand.icon_media_id,
+            phone: brand.phone,
+            email: brand.email,
+            social_links: brand.social_links,
+        },
+        location: found.profile.into(),
+        timezone: found.timezone,
+        open_now: found.open_now,
+    };
+    let mut response = Data { data }.into_response();
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=60"));
     Ok(response)
 }
