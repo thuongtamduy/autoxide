@@ -26,6 +26,11 @@
 # cấu hình mặc định — lô của `database` là burst / 4) để đo chi phí đếm mỗi request.
 # LOADTEST_ONLY=api_key chỉ chạy bài GET /auth/me bằng API key (so nhanh trước / sau).
 #
+# Bộ dữ liệu cỡ thật (bước 39 B2): LOADTEST_DATASET=small|full sinh dữ liệu bằng `scripts/bench-seed.sh`
+# (binary build với `--features bench-seed`; bài hai ngôn ngữ `en,vi`) rồi thêm các bài đọc công khai
+# của website: bài theo đường dẫn, danh sách, theo danh mục, sitemap, feed, tìm, ảnh và bản nhỏ,
+# bình luận. LOADTEST_ONLY=public chỉ chạy các bài đó.
+#
 # Máy tạo tải và máy chủ chạy chung một máy nên tranh CPU: số đo là cận dưới, dùng để so
 # trước / sau một thay đổi trên cùng máy.
 
@@ -48,9 +53,14 @@ done
 if [ -n "${LOADTEST_BINARY:-}" ]; then
   BINARY="$LOADTEST_BINARY"
 else
-  cargo build --release --locked -q -p autoxide
+  if [ -n "${LOADTEST_DATASET:-}" ]; then
+    cargo build --release --locked -q -p autoxide --features bench-seed
+  else
+    cargo build --release --locked -q -p autoxide
+  fi
   BINARY="$PWD/target/release/autoxide"
 fi
+REPO="$PWD"
 WORK="$(mktemp -d)"
 SERVER=""
 cleanup() {
@@ -76,6 +86,11 @@ export AUTOXIDE_LOG_LEVEL=warn
 export AUTOXIDE_AUTH_TOKEN_SECRET="$(od -An -N32 -tx1 /dev/urandom | tr -d ' \n')"
 export AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS=86400
 export AUTOXIDE_FILES_MAX_BYTES=1048576
+if [ -n "${LOADTEST_DATASET:-}" ]; then
+  export AUTOXIDE_CONTENT_LOCALES=en,vi
+  # Tìm công khai tắt mặc định; không có mô hình embedding thì tìm theo từ.
+  export AUTOXIDE_CONTENT_PUBLIC_SEMANTIC_SEARCH=true
+fi
 TENANCY="${LOADTEST_TENANCY:-single}"
 if [ "$TENANCY" = multi ]; then
   export AUTOXIDE_TENANCY_MODE=multi
@@ -105,9 +120,15 @@ if [ "$TENANCY" = multi ]; then
       --name Admin --admin --password-stdin >/dev/null 2>&1
   done
 fi
+if [ -n "${LOADTEST_DATASET:-}" ]; then
+  echo "Sinh bộ dữ liệu '$LOADTEST_DATASET'…"
+  BENCH_BINARY="$BINARY" "$REPO/scripts/bench-seed.sh" "$LOADTEST_DATASET"
+fi
 "$BINARY" serve >serve.log 2>&1 &
 SERVER=$!
-for _ in $(seq 1 100); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
+# Chờ sẵn sàng tới 2 phút: trên bộ dữ liệu `full`, SQLite lập thống kê lúc mở (vài giây).
+for _ in $(seq 1 1200); do curl -sf "$BASE/health/ready" >/dev/null && break; sleep 0.1; done
+curl -sf "$BASE/health/ready" >/dev/null || { echo "loadtest: server not ready; log:" >&2; tail -20 serve.log >&2; exit 1; }
 
 json() { python3 -c "import sys,json; print(json.load(sys.stdin)$1)"; }
 post() { curl -sf "$BASE$1" -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' -d "$2"; }
@@ -221,6 +242,36 @@ echo "## $backend ($TENANCY) — $(nproc) CPU, ${DURATION} mỗi bài"
 echo
 echo "| Bài đo                             | Kết nối |  Request/s |   p50 ms |   p95 ms |   p99 ms |  Thành công |"
 echo "| ---------------------------------- | ----: | --------: | -------: | -------: | -------: | ------: |"
+# Đọc công khai của website trên bộ dữ liệu cỡ thật (bước 39 B2): không đăng nhập, như trình duyệt
+# hay CDN gọi. Lấy địa chỉ thật từ chính API (bài thứ 10 của trang đầu, danh mục đầu, ảnh của bài).
+public_reads() {
+  local pub="$BASE/api/v1/content/public" first path term slug image thumb entry thread
+  first="$(curl -sf "$pub/posts?locale=en&limit=20")"
+  path="$(printf '%s' "$first" | json '["data"][9]["path"]')"
+  entry="$(printf '%s' "$first" | json '["data"][9]["id"]')"
+  image="$(printf '%s' "$first" | json '["data"][9]["featured_media"]["url"]')"
+  thumb="$(printf '%s' "$first" | json '["data"][9]["featured_media"]["variants"][0]["webp_url"]')"
+  term="$(curl -sf "$pub/terms?locale=en&taxonomy=category&limit=1")"
+  slug="$(printf '%s' "$term" | json '["data"][0]["slug"]')"
+  term="$(printf '%s' "$term" | json '["data"][0]["id"]')"
+  thread="$(curl -sf "$BASE/api/v1/comments/public/threads?target_type=content.entry&target_id=$entry&limit=1" | json '["data"][0]["id"]')"
+  run "public resolve (một bài)"            "$CONNECTIONS" "$pub/resolve?locale=en&path=$path"
+  run "public posts (trang đầu, 20)"        "$CONNECTIONS" "$pub/posts?locale=en&limit=20"
+  run "public posts theo danh mục (20)"     "$CONNECTIONS" "$pub/posts?locale=en&limit=20&term_id=$term"
+  run "public terms/category/{slug}"        "$CONNECTIONS" "$pub/terms/category/$slug?locale=en"
+  run "public sitemap (trang đầu)"          "$CONNECTIONS" "$pub/sitemap?locale=en"
+  run "public feed"                         "$CONNECTIONS" "$pub/feed?locale=en"
+  run "public search (từ khoá)"             "$CONNECTIONS" "$pub/search?locale=en&q=coffee+garden"
+  run "media content (ảnh gốc)"             "$CONNECTIONS" "$BASE$image"
+  run "media content (bản nhỏ WebP)"        "$CONNECTIONS" "$BASE$thumb"
+  run "comments public threads (20)"        "$CONNECTIONS" "$BASE/api/v1/comments/public/threads?target_type=content.entry&target_id=$entry&limit=20"
+  run "comments public comments/{id}"       "$CONNECTIONS" "$BASE/api/v1/comments/public/comments/$thread"
+}
+
+if [ -n "${LOADTEST_DATASET:-}" ] && [ "${LOADTEST_ONLY:-}" = public ]; then
+  public_reads
+  exit 0
+fi
 if [ "${LOADTEST_ONLY:-}" = api_key ]; then
   run "GET /auth/me (API key, ${LOADTEST_RATE_LIMIT_STORE:-off})" "$CONNECTIONS" -H "authorization: Bearer $API_KEY" "$BASE/api/v1/auth/me"
   run "MCP auth.whoami (API key, ${LOADTEST_RATE_LIMIT_STORE:-off})" "$CONNECTIONS" -m POST -H "authorization: Bearer $API_KEY" -H 'accept: application/json, text/event-stream' -T application/json -d "$MCP_BODY" "$BASE/mcp"
@@ -236,6 +287,8 @@ run "MCP tools/call auth.whoami"          "$CONNECTIONS" -m POST -H "$AUTH" -H '
 run "PATCH /auth/users/{id} (ghi + event)" "$CONNECTIONS" -m PATCH -H "$AUTH" -T application/json -d '{"name":"Robert"}' "$BASE/api/v1/auth/users/$BOB"
 run "POST /files (4 KiB, ghi)"            "$CONNECTIONS" -m POST -H "$AUTH" -T application/octet-stream -D small.bin "$BASE/api/v1/files?name=load.bin"
 run "POST /auth/login (Argon2id)"         16 -m POST -H 'autoxide-tenant: default' -T application/json -d "{\"email\":\"admin@example.com\",\"password\":\"$PASSWORD\"}" "$BASE/api/v1/auth/login"
+
+if [ -n "${LOADTEST_DATASET:-}" ]; then public_reads; fi
 
 echo
 echo "### Tăng dần số kết nối: đọc (GET /auth/me) và ghi (PATCH /auth/users/{id})"

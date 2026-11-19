@@ -10,6 +10,8 @@
 //! cho module khác, hai job định kỳ (dọn thùng rác, dọn nội dung mồ côi).
 
 pub mod api;
+#[cfg(any(test, feature = "bench-seed"))]
+mod bench_seed;
 mod client_config;
 mod config;
 mod entity;
@@ -240,7 +242,11 @@ impl Module for MediaModule {
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
         match (self.service.clone(), self.databases.clone()) {
-            (Some(service), Some(databases)) => vec![images::refresh::task(service, databases)],
+            (Some(service), Some(databases)) => {
+                let mut tasks = vec![images::refresh::task(service.clone(), databases.clone())];
+                tasks.extend(bench_tasks(service, databases));
+                tasks
+            }
             _ => Vec::new(),
         }
     }
@@ -248,6 +254,23 @@ impl Module for MediaModule {
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
     }
+}
+
+/// Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
+#[cfg(feature = "bench-seed")]
+fn bench_tasks(
+    service: Arc<MediaService>,
+    databases: autoxide_kernel::tenancy::DatabaseRegistry,
+) -> Vec<autoxide_kernel::task::Task> {
+    vec![bench_seed::task(service, databases)]
+}
+
+#[cfg(not(feature = "bench-seed"))]
+fn bench_tasks(
+    _: Arc<MediaService>,
+    _: autoxide_kernel::tenancy::DatabaseRegistry,
+) -> Vec<autoxide_kernel::task::Task> {
+    Vec::new()
 }
 
 /// Gieo dòng khoá cây thư mục (`media_lock.folder_tree`) cho khách mới (bước 33). Khách mặc định
