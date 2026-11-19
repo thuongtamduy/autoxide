@@ -347,6 +347,18 @@ const { data } = await res.json();
 for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
 ```
 
+### Store information (header and footer)
+
+`GET /api/v1/organizations/public/storefront` (public; the website from `site` or the domain) gives the
+**brand** — name, logo and site icon (ids of public media items: `/api/v1/media/{id}/content`), phone, email,
+social profiles — inherited down the organization tree (a chain sets it, a store overrides what it
+wants), the **location** (address, opening hours, special days, pickup, cover picture of the unit's
+public profile), the unit's time zone and `open_now`. Manage the brand with the unit settings
+`organizations.brand_name`, `organizations.brand_logo`, `organizations.brand_icon`,
+`organizations.contact_phone`, `organizations.contact_email`, `organizations.social_links`
+(`PUT /api/v1/organizations/units/{id}/settings/{key}`). For the legal footer of a shop in Vietnam,
+also show `GET /api/v1/compliance/public/owner` and the badge of `GET /api/v1/compliance/public/badge`.
+
 ### MCP tools
 
 `content.list_banners`, `content.save_banner` (drafts only: a person sets a banner `active`; text

@@ -39,9 +39,15 @@ async fn cai_dat_ke_thua_theo_cay() {
         assert_eq!(
             keys,
             [
+                "organizations.brand_icon",
+                "organizations.brand_logo",
+                "organizations.brand_name",
+                "organizations.contact_email",
+                "organizations.contact_phone",
                 "organizations.currency",
                 "organizations.language",
                 "organizations.languages",
+                "organizations.social_links",
                 "organizations.timezone"
             ]
         );
@@ -52,8 +58,14 @@ async fn cai_dat_ke_thua_theo_cay() {
             .iter()
             .map(|s| s["schema"]["type"].as_str().unwrap())
             .collect();
-        assert_eq!(types, ["string", "string", "array", "string"]);
-        assert_eq!(catalog["data"][1]["schema"]["enum"], json!(["en", "vi"]));
+        assert_eq!(
+            types,
+            [
+                "string", "string", "string", "string", "string", "string", "string", "array",
+                "array", "string"
+            ]
+        );
+        assert_eq!(catalog["data"][6]["schema"]["enum"], json!(["en", "vi"]));
 
         // Chưa ai đặt: mặc định, không có nút nguồn.
         let fresh = at(&app, &tree.s1).await;
@@ -217,6 +229,75 @@ async fn khong_dat_cai_dat_ngoai_nhanh_va_nut_khoa() {
         );
         let r2 = at(&app, &tree.r2).await;
         assert_eq!(settings_of(&r2, "organizations.timezone")["value"], "Asia/Bangkok");
+    })
+    .await
+    .unwrap();
+}
+
+/// Thông tin cửa hàng công khai (bước 55): chuỗi đặt thương hiệu, cửa hàng ghi đè tên; cửa hàng
+/// không đặt số điện thoại thì lấy của chuỗi; giờ mở cửa theo hồ sơ của nút; "đang mở cửa" có mặt
+/// khi đã khai giờ.
+#[tokio::test]
+async fn thong_tin_cua_hang_ke_thua() {
+    TestDatabase::run(async |test| {
+        let app = build(test, |builder| {
+            builder.user(
+                "profiler",
+                3,
+                &["organizations.units.read", "organizations.profile.manage"],
+            )
+        })
+        .await;
+        let tree = tree(&app).await;
+        let set = async |unit: &str, key: &str, value: Value| {
+            let (status, body) = put(&app, "admin", unit, key, value).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+        };
+        set(&tree.r1, "organizations.brand_name", json!("Chain")).await;
+        set(&tree.r1, "organizations.contact_phone", json!("+84 28 1234 5678")).await;
+        set(
+            &tree.r1,
+            "organizations.social_links",
+            json!([{"network": "facebook", "url": "https://facebook.com/chain"}]),
+        )
+        .await;
+        set(&tree.s1, "organizations.brand_name", json!("Chain — District 1")).await;
+        set(&tree.s1, "organizations.timezone", json!("Asia/Ho_Chi_Minh")).await;
+        let (status, body) =
+            put(&app, "admin", &tree.s1, "organizations.contact_email", json!("nope")).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        let hours: Vec<Value> =
+            (1..=7).map(|day| json!({"day": day, "opens": "00:00", "closes": "23:59"})).collect();
+        expect(
+            &app,
+            "PATCH",
+            &format!("/units/{}/public-profile", tree.s1),
+            "profiler",
+            Some(json!({"opening_hours": hours})),
+            StatusCode::OK,
+        )
+        .await;
+
+        let read = async |site: &str| {
+            let answer = app
+                .get(&format!("/api/v1/organizations/public/storefront?site={site}"))
+                .send()
+                .await
+                .unwrap();
+            assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+            assert_eq!(answer.header("cache-control"), "public, max-age=60");
+            answer.json()["data"].clone()
+        };
+        let store = read(&tree.s1).await;
+        assert_eq!(store["brand"]["name"], "Chain — District 1");
+        assert_eq!(store["brand"]["phone"], "+84 28 1234 5678", "lấy của chuỗi");
+        assert_eq!(store["brand"]["social_links"][0]["network"], "facebook");
+        assert_eq!(store["timezone"], "Asia/Ho_Chi_Minh");
+        assert_eq!(store["location"]["unit_id"], tree.s1.as_str());
+        assert!(store["open_now"].is_boolean());
+        let other = read(&tree.r2).await;
+        assert_eq!(other["brand"]["phone"], Value::Null, "nhánh khác không kế thừa của R1");
+        assert_eq!(other["open_now"], Value::Null, "chưa khai giờ");
     })
     .await
     .unwrap();
