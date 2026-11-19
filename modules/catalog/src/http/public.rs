@@ -192,6 +192,8 @@ fn card(
             .map_err(|_| Error::internal("storefront currency is not a currency code"))
     };
     let owner = entry.owner_org_id;
+    // Giá giảm đã hết (bảng dẫn xuất chưa kịp dựng lại): không hiện.
+    let sale_running = entry.sale_ends_at.is_none_or(|ends| ends > Utc::now());
     Ok(PublicCardResponse {
         id: card.product.id,
         name: card.text.name.clone(),
@@ -202,8 +204,8 @@ fn card(
         price_from: money(entry.min_price_minor)?,
         price_to: money(entry.max_price_minor)?,
         compare_at: entry.compare_at_minor.map(money).transpose()?,
-        sale_price: entry.sale_price_minor.map(money).transpose()?,
-        sale_ends_at: entry.sale_ends_at,
+        sale_price: entry.sale_price_minor.filter(|_| sale_running).map(money).transpose()?,
+        sale_ends_at: entry.sale_ends_at.filter(|_| sale_running),
         variant_count: entry.variant_count,
         rating: (entry.rating_count > 0).then(|| f64::from(entry.rating_x100) / 100.0),
         rating_count: entry.rating_count,

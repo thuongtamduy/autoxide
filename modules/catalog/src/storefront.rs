@@ -216,7 +216,7 @@ impl CatalogService {
             let Some(currency) = self.site_currency(read, tenant, *site).await? else {
                 // Nút chưa có giá chung: không sản phẩm nào bán được ở đó.
                 for product in &products {
-                    entries.push(empty_entry(tenant, *site, product, "VND"));
+                    entries.push((empty_entry(tenant, *site, product, "VND"), false));
                 }
                 continue;
             };
@@ -229,6 +229,7 @@ impl CatalogService {
             }
             let by_variant: HashMap<Uuid, &crate::api::PriceSnapshot> =
                 prices.iter().map(|price| (price.variant_id, price)).collect();
+            let sales = self.sale_prices_at(tenant, *site, at, &prices).await?;
             for product in &products {
                 let own: Vec<&variant::Model> =
                     variants.iter().filter(|row| row.product_id == product.id).collect();
@@ -251,7 +252,16 @@ impl CatalogService {
                 entry.max_price_minor = Set(max);
                 entry.compare_at_minor = Set(compare_at);
                 entry.variant_count = Set(i32::try_from(own.len()).unwrap_or(i32::MAX));
-                entries.push(entry);
+                if let Some(sales) = &sales {
+                    // Giá giảm thấp nhất trên các biến thể, và lúc nó hết.
+                    let best = own
+                        .iter()
+                        .filter_map(|row| sales.get(&row.id))
+                        .min_by_key(|sale| sale.sale_price.minor());
+                    entry.sale_price_minor = Set(best.map(|sale| sale.sale_price.minor()));
+                    entry.sale_ends_at = Set(best.map(|sale| sale.ends_at));
+                }
+                entries.push((entry, sales.is_some()));
             }
         }
         let transaction = tenant.database().begin_write().await?;
@@ -268,19 +278,50 @@ impl CatalogService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
-        for mut entry in entries {
+        for (mut entry, sale_computed) in entries {
             let key = (*entry.org_id.as_ref(), *entry.product_id.as_ref());
             if let Some(old) = keep.get(&key) {
                 entry.best_selling = Set(old.best_selling);
                 entry.rating_x100 = Set(old.rating_x100);
                 entry.rating_count = Set(old.rating_count);
-                entry.sale_price_minor = Set(old.sale_price_minor);
-                entry.sale_ends_at = Set(old.sale_ends_at);
+                if !sale_computed {
+                    entry.sale_price_minor = Set(old.sale_price_minor);
+                    entry.sale_ends_at = Set(old.sale_ends_at);
+                }
             }
             entry.insert(&transaction).await?;
         }
         transaction.commit().await?;
         Ok(())
+    }
+
+    /// Giá sau giảm tự động theo biến thể ở nút bán `site`; `None` khi chưa có nguồn nào cắm vào
+    /// (giữ giá giảm đã ghi). Gọi ngoài transaction: nguồn có thể đọc database của nó.
+    async fn sale_prices_at(
+        &self,
+        tenant: &TenantContext,
+        site: OrgId,
+        at: chrono::DateTime<Utc>,
+        prices: &[crate::api::PriceSnapshot],
+    ) -> Result<Option<HashMap<Uuid, crate::api::SalePrice>>, Error> {
+        let Some(source) = self.sale_prices.get() else { return Ok(None) };
+        let mut found = HashMap::new();
+        for chunk in prices.chunks(crate::api::MAX_IDS) {
+            let listed: Vec<(Uuid, autoxide_kernel::money::Money)> =
+                chunk.iter().map(|price| (price.variant_id, price.amount)).collect();
+            for sale in source.sale_prices(tenant, site, at, &listed).await? {
+                // Chỉ nhận giá giảm thật sự thấp hơn giá niêm yết, cùng tiền tệ.
+                let listed = listed.iter().find(|(id, _)| *id == sale.variant_id);
+                if listed.is_some_and(|(_, price)| {
+                    price.currency() == sale.sale_price.currency()
+                        && sale.sale_price.minor() < price.minor()
+                        && sale.ends_at > at
+                }) {
+                    found.insert(sale.variant_id, sale);
+                }
+            }
+        }
+        Ok(Some(found))
     }
 
     /// Dựng lại cả khách, theo lô [`BATCH`] sản phẩm.

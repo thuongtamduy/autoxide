@@ -18,6 +18,9 @@ endpoints are marked deprecated with a sunset date first.
   binary built with the cargo feature `bench-seed` (release builds do not have it) and refuse to run without
   `confirm=yes-this-is-a-benchmark-database` or on a customer that already has data. `scripts/loadtest.sh` takes
   `LOADTEST_DATASET=small|full` to measure the public read paths of a website on that data.
+- `catalog` (step 41): automatic sale prices on the public product lists through the plug-in point
+  `autoxide_catalog::api::CatalogExtensions::set_sale_price_source`; `catalog` listens to
+  `promotions.automatic_prices_changed` and rebuilds the storefront of those variants.
 - Module `inventory`: stock transfers between warehouses (draft, in transit with `incoming`, partial receipt carrying
   the source's average cost, close, cancel; numbers `CK-…`) and stock counts (`KK-…`, counting while selling, CSV
   import, differences applied as `count` ledger lines with a reason); MCP tools `inventory.create_transfer`,
