@@ -122,7 +122,7 @@ mrml = { version = "6.0.1", default-features = false, features = ["parse", "rend
 # glyph dựng bằng `skrifa`.
 krilla = { version = "0.8.2", default-features = false }
 # Tra glyph và đo bề rộng chữ cho PDF (cùng phiên bản krilla đã kéo vào).
-skrifa = "0.42"
+skrifa = "0.50"
 # File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
 rust_xlsxwriter = { version = "0.102.0", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["std"] }
@@ -243,7 +243,8 @@ tracing-opentelemetry = { version = "0.34", default-features = false }
 pulldown-cmark = { version = "0.13", default-features = false }
 
 # --- Chỉ dùng trong test ---
-# `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
+# `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port — trong test, và ở lô
+# ghi đồng bộ của kernel (bước 69 P2: chạy từng lệnh qua router con).
 tower = { version = "0.5", features = ["util"] }
 # Client WebSocket cho test của `GET /api/v1/kernel/events/ws` (cùng bản axum dùng, bước 69 P3).
 tokio-tungstenite = "0.29"

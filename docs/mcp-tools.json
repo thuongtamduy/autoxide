@@ -1610,6 +1610,69 @@
         "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
+        "returns_secret": true
+      },
+      "deprecation": null,
+      "description": "Replace one of your API keys with a new one that has the same name, permissions, unit, allowed addresses and kind. The old key keeps working for `overlap_hours` (24 by default) so programs can switch. Needs your current password and a password session. The result carries the new key, shown only once.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An API key to replace, and how.",
+        "properties": {
+          "current_password": {
+            "description": "Your current password, or give `totp_code` or `reauth_token` instead.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the new key stops working (RFC 3339); omit for the longest lifetime allowed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the key to replace.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "overlap_hours": {
+            "description": "Hours the old key keeps working, 0 to 72 (24 by default); 0 stops it at once.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reauth_token": {
+            "description": "A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totp_code": {
+            "description": "A code from your authenticator app, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.rotate_api_key",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
         "returns_secret": false
       },
       "deprecation": null,
@@ -7087,6 +7150,52 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a sandbox of your tenant: a test copy with its configuration and no personal data, where partners are simulated and mail and webhooks do not leave. Enter it with the header `Autoxide-Tenant: <id>` once it is active.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new sandbox of your tenant.",
+        "properties": {
+          "name": {
+            "description": "1 to 200 characters.",
+            "type": "string"
+          },
+          "products": {
+            "description": "Products to copy (0 by default).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "role_id": {
+            "description": "Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.create_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -7169,6 +7278,36 @@
       "output_schema": null,
       "permissions": [
         "kernel.data.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Extend a sandbox of your tenant: it is then deleted `AUTOXIDE_TENANCY_SANDBOX_DAYS` days from now.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A sandbox to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.extend_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
       ]
     },
     {
@@ -7455,6 +7594,51 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the sandboxes (test copies) of your tenant, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which sandboxes to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_sandboxes",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.read"
       ]
     },
     {
@@ -10042,6 +10226,45 @@
     },
     {
       "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add units of the tenant (any branch) to a unit group; units already in it are skipped.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Units to add to a group.",
+        "properties": {
+          "id": {
+            "description": "Id of the group.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_ids": {
+            "description": "1 to 200 unit ids of this tenant; units already in the group are skipped.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "org_ids"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.add_group_members",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": true,
         "read_only": false,
         "requires_approval_for_agent": false,
@@ -10080,6 +10303,43 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a unit group for reports. A group grants no access to its units.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new unit group.",
+        "properties": {
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters, unique in the tenant (accents and case ignored).",
+            "example": "Stores in the north",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.create_group",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
       ]
     },
     {
@@ -10199,6 +10459,58 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the unit groups of the tenant (free sets of units such as \"stores in the north\", used to filter and group reports). `member_count` counts only units in your scope.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which unit groups to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the name; accents and case are ignored.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "organizations.list_groups",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the organization units in your scope (head office, regions, stores…), newest first; filter by parent, type, status or name; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
@@ -10299,6 +10611,42 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Remove one unit from a unit group (nothing happens when it is not in the group).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A unit to remove from a group.",
+        "properties": {
+          "id": {
+            "description": "Id of the group.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.remove_group_member",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
       ]
     },
     {
@@ -11583,6 +11931,13 @@
               "null"
             ]
           },
+          "group_ids": {
+            "description": "Only the units of these unit groups, comma-separated ids (your own tenant only).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "description": "The fact kind, e.g. `invoices.issued_total`.",
             "type": [
@@ -11684,7 +12039,14 @@
             ]
           },
           "group_by": {
-            "description": "`day` (default, at most 366 days), `week`, `month`, `tenant` or `org`.",
+            "description": "`day` (default, at most 366 days), `week`, `month`, `tenant`, `org` or `group` (needs\n`group_ids`; a unit in two groups counts in both).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_ids": {
+            "description": "Only the units of these unit groups, comma-separated ids (your own tenant only; units\noutside your scope are left out and counted in `excluded_org_count`).",
             "type": [
               "string",
               "null"

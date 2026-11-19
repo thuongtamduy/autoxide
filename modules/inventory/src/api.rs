@@ -37,6 +37,10 @@ pub mod events {
     pub const RESERVATION_RELEASED: &str = "inventory.reservation_released";
     /// Chỗ giữ hết hạn khi chưa xác nhận.
     pub const RESERVATION_EXPIRED: &str = "inventory.reservation_expired";
+    /// Hàng về được chia cho một dòng đặt trước (D-204). `after`: `reservation_id`, `order_id`,
+    /// `line_key`, `variant_id`, `warehouse_org_id`, `quantity` (lần này), `allocated_quantity`
+    /// (cộng dồn) — `orders` chuyển đơn sang chuẩn bị hàng khi đủ.
+    pub const PREORDER_ALLOCATED: &str = "inventory.preorder_allocated";
 }
 
 /// Một dòng của đơn cần giữ hàng.
@@ -163,6 +167,8 @@ pub struct ReservedLine {
     pub backordered: bool,
     /// Dòng đặt trước (D-204).
     pub preordered: bool,
+    /// Dòng đặt trước: số đơn vị hàng về đã chia cho dòng này (cộng dồn, gồm phần đã xuất).
+    pub allocated_quantity: i64,
 }
 
 /// Chỗ giữ hàng của một đơn.

@@ -22,6 +22,7 @@
 
 pub(crate) mod admin;
 mod config;
+mod current;
 pub mod distribution;
 pub(crate) mod domains;
 pub(crate) mod erasure;
@@ -37,6 +38,7 @@ mod registry;
 pub mod relocate;
 pub(crate) mod request;
 pub(crate) mod residency;
+pub mod sandbox;
 pub(crate) mod schema;
 mod scope;
 pub(crate) mod settings;
@@ -52,11 +54,11 @@ use crate::database::Database;
 use crate::error::Error;
 
 pub use admin::{
-    CurrentTenant, NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE,
-    TENANTS_READ, Tenant, TenantAdmin, TenantChanges, TenantExpanded, TenantFilter, TenantSeed,
-    require_platform,
+    NewTenant, PLACEMENTS_READ, Placement, PlacementStorage, TENANTS_MANAGE, TENANTS_READ, Tenant,
+    TenantAdmin, TenantChanges, TenantExpanded, TenantFilter, TenantSeed, require_platform,
 };
 pub use config::{TenancyConfig, WorkerPlacements};
+pub use current::CurrentTenant;
 pub use domains::{
     CHALLENGE_PREFIX, CHALLENGE_VALUE_PREFIX, DOMAINS_MANAGE, DnsTxtLookup, DomainRecord,
     TenantDomain, TenantDomains, normalize_domain,
@@ -81,6 +83,10 @@ pub use relocate::{
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
+pub use sandbox::{
+    NewSandbox, SANDBOXES_LIMIT, SANDBOXES_MANAGE, SANDBOXES_READ, Sandbox, TenantKind,
+    TenantSandboxes,
+};
 pub use scope::{ScopeExt, TenantScoped};
 pub use settings::{
     BUSINESS_MODEL, BUSINESS_MODELS, CONNECTION_GROUP, PUBLIC_URL, SETTINGS_MANAGE, SettingCheck,
@@ -308,6 +314,8 @@ struct Inner {
     storage: Option<Arc<dyn crate::storage::Storage>>,
     /// Chỉ đọc (`kernel_tenants.read_only`): lệnh ghi bị chặn ở chỗ giải khách của request.
     read_only: bool,
+    /// Sandbox (D-232): khách gốc và hạn; `None` với khách thật.
+    sandbox: Option<(TenantId, Option<chrono::DateTime<chrono::Utc>>)>,
 }
 
 impl TenantContext {
@@ -330,6 +338,7 @@ impl TenantContext {
             schema_ready: true,
             storage: None,
             read_only: false,
+            sandbox: None,
         }))
     }
 
@@ -377,6 +386,38 @@ impl TenantContext {
     /// của khách vẫn chạy (việc đã nhận trước đó, dọn dẹp theo luật).
     pub fn read_only(&self) -> bool {
         self.0.read_only
+    }
+
+    /// Cùng khách, là sandbox của khách `of`, hết hạn lúc `expires_at` (sổ database dựng từ
+    /// `kernel_tenants`; test dựng).
+    #[must_use]
+    pub fn with_sandbox_of(
+        self,
+        of: TenantId,
+        expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
+        let inner = Arc::unwrap_or_clone(self.0);
+        TenantContext(Arc::new(Inner { sandbox: Some((of, expires_at)), ..inner }))
+    }
+
+    /// Khách thử nghiệm (sandbox, D-232): đối tác luôn là bộ giả, mail và webhook không ra ngoài.
+    pub fn is_sandbox(&self) -> bool {
+        self.0.sandbox.is_some()
+    }
+
+    /// Khách gốc của sandbox; `None` với khách thật.
+    pub fn sandbox_of(&self) -> Option<TenantId> {
+        self.0.sandbox.map(|(of, _)| of)
+    }
+
+    /// Hạn của sandbox; `None` với khách thật.
+    pub fn sandbox_expires_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+        self.0.sandbox.and_then(|(_, at)| at)
+    }
+
+    /// Loại khách.
+    pub fn kind(&self) -> TenantKind {
+        if self.is_sandbox() { TenantKind::Sandbox } else { TenantKind::Production }
     }
 
     /// Khách mặc định trên `database` — chế độ `single`, và đường chuyển tiếp cho code chưa nhận

@@ -6,6 +6,7 @@ mod documents;
 mod levels;
 mod lots;
 mod orders;
+mod preorders;
 mod purchasing;
 mod reservations;
 

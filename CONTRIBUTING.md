@@ -103,8 +103,11 @@ decisions are indexed by topic in [`docs/decisions/INDEX.md`](docs/decisions/IND
 - Keep a pull request to one change. Split unrelated changes.
 - Write the commit subject as a short summary of what changed (English or Vietnamese), and
   explain *why* in the body when it is not obvious.
-- Add a line under `## [Unreleased]` in [`CHANGELOG.md`](CHANGELOG.md) for anything a user
-  of Autoxide would notice.
+- For anything a user of Autoxide would notice, add a small file to
+  [`changelog.d/`](changelog.d/README.md) instead of editing `CHANGELOG.md`: name it
+  `<name>.<section>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` or `security`) and write
+  the English bullet points as they will appear in the changelog. They are folded into `CHANGELOG.md`
+  at release time, so parallel pull requests never conflict there.
 - In the pull request, say what you changed, why, and confirm that the full `./gate.sh` is
   green.
 

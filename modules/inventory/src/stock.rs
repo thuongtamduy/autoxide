@@ -380,6 +380,9 @@ pub(crate) async fn publish<C: ConnectionTrait>(
             "reserved": row.on_hand - row.available,
         });
         let subject = events::level_subject(row.id);
+        if delta.on_hand > 0 {
+            crate::preorders::schedule(transaction, tenant, row.id).await?;
+        }
         if delta.on_hand != 0 || delta.available != 0 {
             let change = Change {
                 before: Some(json!({"on_hand": before_on_hand, "available": before_available})),

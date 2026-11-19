@@ -6,7 +6,7 @@ rebase), không phát hành. Gate đầy đủ (SQLite và Postgres) chỉ bắt
 (D-300): đỏ thì sửa trên nhánh làm việc, merge bản sửa, rồi mới phát hành. Agent tự phát hành, không hỏi, khi xong trọn một **giai đoạn** của
 `docs/ROADMAP.md` (A, B, C…: mọi bước của giai đoạn đã `[x]`). Ngoài lúc đó chỉ phát hành khi chủ
 dự án giao. Không phát hành giữa bước, không phát hành khi mục `[Unreleased]` của `CHANGELOG.md`
-trống.
+trống sau khi gộp mảnh (bước 3).
 
 Cần quyền đẩy lên GitHub: `gh` đã đăng nhập, hoặc biến môi trường `GH_TOKEN` (token
 fine-grained chỉ cho repo này, quyền Contents và Pull requests: Read and write). Thiếu quyền
@@ -26,9 +26,12 @@ Theo Semantic Versioning, một số cho cả workspace (`[workspace.package] ve
 
 ## Khi làm việc hằng ngày
 
-Mỗi commit đổi hành vi mà người dùng thấy (API, cấu hình, CLI, migration, Docker) thêm một
-dòng tiếng Anh vào mục `## [Unreleased]` của `CHANGELOG.md`, dưới `Added`, `Changed`,
-`Deprecated`, `Removed`, `Fixed` hoặc `Security`.
+Mỗi thay đổi hành vi mà người dùng thấy (API, cấu hình, CLI, migration, Docker) thêm một **file
+mảnh** vào `changelog.d/`, **không sửa `CHANGELOG.md`** (D-20261119-changelog-fragments): tên
+`<tên>.<mục>.md` — `<tên>` chữ thường, số, `-` (vd `step45-checkout`); `<mục>` là `added`, `changed`,
+`deprecated`, `removed`, `fixed` hoặc `security` — nội dung là các gạch đầu dòng tiếng Anh đúng như sẽ
+nằm trong changelog. `cargo xtask check` (trong gate) kiểm tên và nội dung. Nhiều phiên song song
+không còn xung đột ở `CHANGELOG.md`; xem `changelog.d/README.md`.
 
 ## Các bước phát hành
 
@@ -46,7 +49,8 @@ bước 7.**
    theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
    `sdk/typescript/package-lock.json` (`cargo xtask sdk --check` của gate kiểm), bản phát hành mới
    nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
-3. Trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
+3. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
+   cuối mục của nó) và xoá các mảnh. Rồi trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
    mục `## [Unreleased]` trống ở trên, cập nhật hai dòng liên kết ở cuối file. Workflow kiểm
    có mục `## [X.Y.Z]` và tag khớp `version`, sai thì không phát hành.
    Rồi chạy `cargo xtask semver --markdown` (cần `cargo-semver-checks`, phiên bản ghim ở `STACK.md`;
@@ -131,8 +135,8 @@ Nhiều phiên agent có thể làm song song trên các nhánh khác nhau. Lúc
 - **Số quyết định trùng** (`D-NNN` của mình đã có trên `main` với nội dung khác): đổi số các
   mục của mình thành số kế tiếp sau mục cuối của `main`, sửa theo mọi chỗ nhắc tới số đó
   (code, tài liệu, thông điệp commit). Mục đã lên `main` thì không đổi số.
-- **`CHANGELOG.md`**: dòng mới của mình phải nằm trong `## [Unreleased]`. Git hay tự đặt chúng
-  vào mục của bản vừa phát hành — kiểm lại bằng mắt, mục đã phát hành không được thêm dòng.
+- **Thay đổi cho changelog**: viết bằng file mảnh trong `changelog.d/`, nên không có gì để gộp tay.
+  Mảnh nào còn nằm ở `changelog.d/` sau khi phiên khác phát hành thì sẽ vào bản sau — đúng ý.
 - **Tag đã có** (`git ls-remote --tags origin vX.Y.Z` trả về kết quả): phiên khác vừa phát
   hành số đó. Rebase lại lên `main`, lấy số kế tiếp, làm lại từ bước 2.
 

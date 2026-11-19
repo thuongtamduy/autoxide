@@ -29,6 +29,8 @@ pub(crate) fn relocation() -> Relocation {
         )
         .follow("inventory_reservation_lines", "reservation_id", "inventory_reservations")
         .follow("inventory_fulfilments", "reservation_id", "inventory_reservations")
+        // Suất đặt trước là của biến thể (cả khách): chép sang khách mới khi tách.
+        .copy_on_split(&["inventory_preorder_counters"])
         // Phiếu chuyển kho đi theo kho gửi.
         .table(
             "inventory_transfers",

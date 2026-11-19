@@ -1186,11 +1186,14 @@ mod tests {
                 "AUTOXIDE_TEMPLATE_MAX_BYTES",
                 "AUTOXIDE_SEARCH_BACKEND",
                 "AUTOXIDE_RELOCATION_DRAIN_SECONDS",
+                "AUTOXIDE_TENANCY_SANDBOX_DAYS",
+                "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
             ]
             .contains(name)
                 || name.starts_with("AUTOXIDE_ANTISPAM_")
                 || name.starts_with("AUTOXIDE_EVENTS_STREAM")
                 || name.starts_with("AUTOXIDE_BACKUP_")
+                || name.starts_with("AUTOXIDE_SYNC_")
         };
         assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());
