@@ -51,12 +51,15 @@ pub struct EventInfo {
     activity: Option<(&'static str, crate::access::Permission)>,
     /// Permission cần để nhận event này qua stream SSE (bước 40 P5); `None`: không stream.
     stream: Option<crate::access::Permission>,
+    /// Event còn tới người có tên trong trường `audience` của payload (bước 61,
+    /// D-20261119-step61-stream-audience).
+    audience: bool,
 }
 
 impl EventInfo {
     /// `name`: `<module>.<việc>` (chữ thường, số, `_`). `description`: câu tiếng Anh.
     pub const fn new(name: &'static str, description: &'static str) -> Self {
-        EventInfo { name, description, activity: None, stream: None }
+        EventInfo { name, description, activity: None, stream: None, audience: false }
     }
 
     /// Event này hiện trong "hoạt động gần đây" (bước 51 P5, `GET /api/v1/audit/activity`) với câu
@@ -79,6 +82,21 @@ impl EventInfo {
     pub const fn streamable(mut self, reader: crate::access::Permission) -> Self {
         self.stream = Some(reader);
         self
+    }
+
+    /// Event này còn tới người được nêu tên trong payload: trường `audience` (mảng user id) của
+    /// payload liệt kê những người được nhận event qua stream dù không có permission `reader` của
+    /// [`streamable`](Self::streamable) ở độ sâu cả khách — vd người mua và nhân viên được giao của
+    /// một cuộc trò chuyện (bước 61). Trường `audience` bị bỏ khỏi payload gửi ra client. Chỉ có tác
+    /// dụng cùng `streamable`.
+    pub const fn to_audience(mut self) -> Self {
+        self.audience = true;
+        self
+    }
+
+    /// Event khai [`to_audience`](Self::to_audience).
+    pub fn has_audience(&self) -> bool {
+        self.audience
     }
 
     /// Permission để nhận event qua stream, khi event khai [`streamable`](Self::streamable).

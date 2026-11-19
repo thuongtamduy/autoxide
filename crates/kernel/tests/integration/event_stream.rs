@@ -47,6 +47,17 @@ impl Event for SecretCreated {
 #[derive(Serialize)]
 struct NoteTouched {}
 
+/// Event tới người được nêu tên (`to_audience`).
+#[derive(Serialize)]
+struct NoteShared {
+    title: String,
+    audience: Vec<Uuid>,
+}
+
+impl Event for NoteShared {
+    const NAME: &'static str = "notes.note_shared";
+}
+
 impl Event for NoteTouched {
     const NAME: &'static str = "notes.note_touched";
 }
@@ -81,6 +92,9 @@ impl Module for Notes {
             EventInfo::new("notes.secret_created", "A secret note was created.")
                 .streamable(SECRETS_READ),
             EventInfo::new("notes.note_touched", "A note was opened."),
+            EventInfo::new("notes.note_shared", "A note was shared with some people.")
+                .streamable(SECRETS_READ)
+                .to_audience(),
         ]
     }
 
@@ -249,8 +263,12 @@ async fn khong_nhan_event_khong_co_quyen() {
         assert_eq!(status, StatusCode::FORBIDDEN);
         let (status, _) = server.open("bob", "names=notes.secret_created", None).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
-        let (status, _) = server.open("nobody", "names=notes.*", None).await;
+        let (status, _) =
+            server.open("nobody", "names=notes.note_created,notes.secret_created", None).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+        // `notes.*` có một event tới người được nêu tên (`to_audience`): mở được, chỉ nhận phần mình.
+        let (status, _) = server.open("nobody", "names=notes.*", None).await;
+        assert_eq!(status, StatusCode::OK);
         for query in ["names=notes.note_touched", "names=notes.nothing", "names=", "names=x.*"] {
             let (status, _) = server.open("ada", query, None).await;
             assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{query}");
@@ -277,6 +295,41 @@ async fn quyen_hep_chi_nhan_viec_cua_minh() {
         server.note("by ada").await;
         server.record(&tenant, 0x7, &NoteCreated { title: "mine".into() }).await;
         assert_eq!(unit.titles(SHORT * 2).await, ["mine"]);
+    })
+    .await
+    .unwrap();
+}
+
+/// Event khai `to_audience`: người không có permission vẫn mở được stream nhưng chỉ nhận event nêu
+/// tên mình; người có quyền hẹp nhận việc của mình cộng event nêu tên mình; danh sách người nhận
+/// không ra tới client.
+#[tokio::test]
+async fn event_toi_nguoi_duoc_neu_ten() {
+    TestDatabase::run(async |test| {
+        let server = server(test, &[]).await;
+        let (status, mut nobody) = server.open("nobody", "names=notes.note_shared", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (_, mut bob) = server.open("bob", "names=notes.note_shared", None).await;
+        let (_, mut ada) = server.open("ada", "names=notes.note_shared", None).await;
+        // Không permission, event không khai `to_audience`: vẫn bị từ chối như trước.
+        let (status, _) = server.open("nobody", "names=notes.note_created", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let tenant = server.app.default_tenant();
+        let to = |users: &[u128], title: &str| NoteShared {
+            title: title.to_owned(),
+            audience: users.iter().map(|user| Uuid::from_u128(*user)).collect(),
+        };
+        server.record(&tenant, 0xada, &to(&[0xdead], "for nobody")).await;
+        server.record(&tenant, 0xada, &to(&[0xb0b], "for bob")).await;
+        server.record(&tenant, 0xada, &to(&[], "for nobody else")).await;
+
+        let frame = nobody.next(SHORT * 2).await.expect("the event naming nobody");
+        assert_eq!(frame.data["payload"]["title"], "for nobody");
+        assert!(frame.data["payload"].get("audience").is_none(), "{}", frame.data);
+        assert!(nobody.next(SHORT).await.is_none());
+        assert_eq!(bob.titles(SHORT).await, ["for bob"]);
+        // Có permission ở cả khách: nhận mọi event.
+        assert_eq!(ada.titles(SHORT).await, ["for nobody", "for bob", "for nobody else"]);
     })
     .await
     .unwrap();

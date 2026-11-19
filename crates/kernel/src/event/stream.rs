@@ -140,6 +140,9 @@ pub(crate) struct StreamedEvent {
     pub tenant_id: Uuid,
     #[serde(skip)]
     pub actor_user_id: Option<Uuid>,
+    /// Người được nêu tên trong trường `audience` của payload (đã bỏ khỏi `payload`).
+    #[serde(skip)]
+    pub audience: Vec<Uuid>,
 }
 
 /// Một khung gửi cho client.
@@ -156,8 +159,8 @@ pub struct StreamHub(Arc<Hub>);
 
 struct Hub {
     config: StreamConfig,
-    /// Event stream được: tên → (module phát, permission cần).
-    events: BTreeMap<&'static str, (&'static str, Permission)>,
+    /// Event stream được: tên → (module phát, permission cần, có tới người trong `audience`).
+    events: BTreeMap<&'static str, (&'static str, Permission, bool)>,
     sender: broadcast::Sender<Arc<StreamedEvent>>,
     sources: Mutex<HashMap<PlacementId, Source>>,
     counts: Mutex<Counts>,
@@ -189,7 +192,11 @@ enum Reach {
     Tenant,
     /// Chỉ event do chính người gọi gây ra. Event chưa mang nút (`org_id`) nên chưa lọc được theo
     /// nhánh: quyền hẹp hơn `tenant` chỉ thấy việc của mình — không bao giờ thấy bản ghi của nhánh khác.
+    /// Event khai `to_audience`: cả event nêu tên người gọi trong `audience`.
     Own,
+    /// Không có permission của event, nhưng event khai `to_audience`: chỉ event nêu tên người gọi
+    /// trong `audience` (vd người mua nhận tin trả lời trong cuộc trò chuyện của mình).
+    Audience,
 }
 
 /// Bộ lọc của một kết nối.
@@ -204,7 +211,10 @@ impl StreamFilter {
         event.tenant_id == self.tenant
             && match self.names.get(event.name.as_str()) {
                 Some(Reach::Tenant) => true,
-                Some(Reach::Own) => event.actor_user_id == Some(self.user),
+                Some(Reach::Own) => {
+                    event.actor_user_id == Some(self.user) || event.audience.contains(&self.user)
+                }
+                Some(Reach::Audience) => event.audience.contains(&self.user),
                 None => false,
             }
     }
@@ -217,7 +227,9 @@ impl StreamHub {
             .streamable()
             .into_iter()
             .filter_map(|(module, event)| {
-                event.stream_permission().map(|permission| (event.name(), (module, permission)))
+                event
+                    .stream_permission()
+                    .map(|permission| (event.name(), (module, permission, event.has_audience())))
             })
             .collect();
         let (sender, _) = broadcast::channel(BROADCAST_CAPACITY);
@@ -272,19 +284,20 @@ impl StreamHub {
         // Permission thiếu đầu tiên: báo khi không còn event nào người gọi được xem.
         let mut denied: Option<Permission> = None;
         for pattern in patterns {
-            let matched: Vec<(&'static str, Permission)> = match pattern.strip_suffix(".*") {
+            let matched: Vec<(&'static str, Permission, bool)> = match pattern.strip_suffix(".*")
+            {
                 Some(module) => self
                     .0
                     .events
                     .iter()
-                    .filter(|(_, (owner, _))| *owner == module)
-                    .map(|(name, (_, permission))| (*name, *permission))
+                    .filter(|(_, (owner, _, _))| *owner == module)
+                    .map(|(name, (_, permission, audience))| (*name, *permission, *audience))
                     .collect(),
                 None => self
                     .0
                     .events
                     .get_key_value(pattern)
-                    .map(|(name, (_, permission))| (*name, *permission))
+                    .map(|(name, (_, permission, audience))| (*name, *permission, *audience))
                     .into_iter()
                     .collect(),
             };
@@ -292,10 +305,14 @@ impl StreamHub {
                 return Err(unknown_event(pattern));
             }
             let exact = !pattern.ends_with(".*");
-            for (name, permission) in matched {
+            for (name, permission, audience) in matched {
                 match reach(principal, &permission) {
                     Some(reach) => {
                         chosen.insert(name, reach);
+                    }
+                    // Không có permission nhưng event tới người được nêu tên: chỉ nhận phần của mình.
+                    None if audience => {
+                        chosen.insert(name, Reach::Audience);
                     }
                     // Xin đích danh một event không có quyền xem: báo rõ permission thiếu.
                     None if exact => return Err(permission_error(principal, &permission)),
@@ -464,7 +481,7 @@ impl StreamHub {
     ) -> Result<Vec<StreamedEvent>, Error> {
         let mut by_module: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
         for name in names {
-            if let Some((module, _)) = self.0.events.get(name) {
+            if let Some((module, _, _)) = self.0.events.get(name) {
                 by_module.entry(*module).or_default().push(*name);
             }
         }
@@ -521,6 +538,14 @@ fn streamed(row: &sea_orm::QueryResult) -> Result<StreamedEvent, Error> {
     let payload: String = row.try_get("", "payload")?;
     let actor_user_id: Option<Uuid> = row.try_get("", "actor_user_id")?;
     let actor_kind: Option<String> = row.try_get("", "actor_kind")?;
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&payload).unwrap_or(serde_json::Value::Null);
+    // `audience` chỉ để lọc: không gửi danh sách người nhận ra client.
+    let audience = payload
+        .as_object_mut()
+        .and_then(|object| object.remove("audience"))
+        .and_then(|value| serde_json::from_value::<Vec<Uuid>>(value).ok())
+        .unwrap_or_default();
     Ok(StreamedEvent {
         id: row.try_get("", "id")?,
         name: row.try_get("", "name")?,
@@ -528,9 +553,10 @@ fn streamed(row: &sea_orm::QueryResult) -> Result<StreamedEvent, Error> {
         subject: row.try_get("", "subject")?,
         actor_kind: actor_kind
             .unwrap_or_else(|| if actor_user_id.is_some() { "user" } else { "system" }.to_owned()),
-        payload: serde_json::from_str(&payload).unwrap_or(serde_json::Value::Null),
+        payload,
         tenant_id: row.try_get("", "tenant_id")?,
         actor_user_id,
+        audience,
     })
 }
 

@@ -71,6 +71,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // event lưu trữ / xoá của `content` (sau `content`).
         Box::new(autoxide_comments::module()),
         Box::new(autoxide_support::module()),
+        // Chat chăm sóc khách (bước 61): chuyển phiếu và trả lời tự động qua `dyn SupportIntake`,
+        // `dyn AutoResponder` của `support` (đứng trước); chính sách theo nút qua `dyn OrgDirectory`,
+        // thông báo qua `dyn Notifier`, ảnh qua `dyn Media` — đều đứng trước.
+        Box::new(autoxide_conversations::module()),
         // Phân tích truy cập (bước 57): đọc sổ đồng ý `dyn ConsentLedger` của `compliance` (sau
         // `compliance`); loại sự kiện và phễu của mọi module đọc từ kernel, nên module đăng ký sau
         // vẫn khai được.
@@ -252,7 +256,8 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), hai của `bookings` (trả chỗ giữ tạm quá hạn, nhắc lịch), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments`, hai của `support` (đánh dấu quá hạn, tự đóng — bước 53) và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), một của `conversations` (xoá cuộc trò
+            // chuyện quá hạn lưu — bước 61), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
             // hai của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
@@ -260,7 +265,7 @@ mod tests {
             // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43), bốn
             // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
             // đặt treo — bước 45), thêm một của `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 63);
+            assert_eq!(a.unwrap() + b.unwrap(), 64);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

@@ -98,6 +98,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-351** Bộ dựng mẫu của kernel `autoxide_kernel::template` dùng `minijinja` (bước 37 mục 2, phần kernel) — 2026-11-17
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
 - **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
+- **[D-20261119-step61-stream-audience](D-20261119-step61-stream-audience.md)** Stream SSE của kernel đưa event tới "người được nêu tên" — 2026-11-19
 
 ## Database, dữ liệu, job, event
 
@@ -475,6 +476,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 - **[D-20261119-step42-restock-alerts](D-20261119-step42-restock-alerts.md)** Báo khi có hàng lại của `inventory`: tin giao dịch đã xác nhận hai bước, giành lượt bằng `armed`, ở lại khách gốc khi tách — 2026-11-19
+- **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 
 ## Vận hành và hiệu năng
 

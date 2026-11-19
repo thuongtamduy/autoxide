@@ -50,8 +50,9 @@ pub(crate) struct StreamQuery {
 /// Requires sign-in, and for each event the permission its module declares (see
 /// `stream_permission` in `GET /api/v1/kernel/modules`): the same permission as reading the record
 /// over REST. Only events of your tenant are sent; with a permission narrower than the whole
-/// tenant you receive only the events you caused yourself. Only events a module declares
-/// streamable are sent — never raw table changes.
+/// tenant you receive only the events you caused yourself. Events marked `stream_audience` also
+/// reach, without the permission, the users they name (e.g. the customer and the assigned agent of
+/// a conversation). Only events a module declares streamable are sent — never raw table changes.
 ///
 /// Each event is one frame: `id: <event id>`, `event: <event name>`, `data: {"id", "name",
 /// "occurred_at", "subject", "actor_kind", "payload"}`. A `: ping` comment comes every 15 s.
