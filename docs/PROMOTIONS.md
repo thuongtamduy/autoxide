@@ -71,6 +71,15 @@ recorded. People submit the notice to the authority; Autoxide only prepares the 
 Percentages are rounded half up on the line total; order discounts are shared to lines in proportion
 to their amounts. The same cart always gives the same result and `fingerprint`.
 
+## Sellers in platform promotions
+
+On a marketplace, a seller joins a platform flash sale that has not started: `POST /promotions/{id}/participations`
+(permission `promotions.participate` on the seller's unit, below the unit running the promotion) with the seller's
+own products, each with a sale price or a discount and the units offered. The platform approves or rejects it
+(`POST …/participations/{participation_id}/approve` or `/reject`, permission `promotions.publish`); approved products
+join the flash sale and their discount is paid by the seller (`funding`). `GET …/participations` shows every
+application to the platform and their own to sellers.
+
 ## Planning
 
 All read-only, permission `promotions.read`:

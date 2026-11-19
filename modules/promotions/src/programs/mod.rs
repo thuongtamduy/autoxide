@@ -5,6 +5,8 @@
 
 pub(crate) mod input;
 mod store;
+
+pub(crate) use store::load as store_load;
 pub(crate) mod transitions;
 
 use autoxide_kernel::access::Principal;
@@ -72,6 +74,8 @@ pub(crate) struct PromotionView {
     pub gifts: Vec<gift_option::Model>,
     pub flash: Vec<flash_item::Model>,
     pub funding: Vec<funding::Model>,
+    /// Người bán đăng ký tham gia (chương trình của sàn).
+    pub participations: Vec<crate::entity::participation::Model>,
 }
 
 impl PromotionView {

@@ -272,5 +272,6 @@ pub(crate) fn program_of(view: &PromotionView) -> Program {
                 })
             })
             .collect(),
+        sponsors: crate::participations::sponsors(&view.participations),
     }
 }

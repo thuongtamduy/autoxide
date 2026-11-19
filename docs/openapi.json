@@ -26600,6 +26600,74 @@
         ],
         "type": "object"
       },
+      "Data_PromotionsParticipation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A seller's application, as it stands.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/PromotionsParticipationItem"
+                },
+                "type": "array"
+              },
+              "promotion_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reviewed_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reviewed_by": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "seller_org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`pending`, `approved` or `rejected`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "promotion_id",
+              "seller_org_id",
+              "status",
+              "items",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_PromotionsPromotion": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36672,6 +36740,77 @@
                 "effective_from",
                 "legal_basis",
                 "note"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PromotionsParticipation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A seller's application, as it stands.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "items": {
+                  "items": {
+                    "$ref": "#/components/schemas/PromotionsParticipationItem"
+                  },
+                  "type": "array"
+                },
+                "promotion_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reviewed_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reviewed_by": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "seller_org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`pending`, `approved` or `rejected`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "promotion_id",
+                "seller_org_id",
+                "status",
+                "items",
+                "created_at",
+                "updated_at"
               ],
               "type": "object"
             },
@@ -66822,6 +66961,134 @@
           "lte"
         ],
         "type": "string"
+      },
+      "PromotionsParticipation": {
+        "description": "A seller's application, as it stands.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionsParticipationItem"
+            },
+            "type": "array"
+          },
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewed_by": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seller_org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`pending`, `approved` or `rejected`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "promotion_id",
+          "seller_org_id",
+          "status",
+          "items",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "PromotionsParticipationItem": {
+        "additionalProperties": false,
+        "description": "One product a seller puts into a platform promotion.",
+        "properties": {
+          "per_customer_quantity_limit": {
+            "description": "Most units one buyer can get at that price.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "quantity_limit": {
+            "description": "Units offered at that price; omitted: not limited.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sale_price_minor": {
+            "description": "Sale price of one unit, in minor units (or `value_bp`).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "value_bp": {
+            "description": "Discount in basis points, 1 to 10000 (or `sale_price_minor`).",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id"
+        ],
+        "type": "object"
+      },
+      "PromotionsParticipationRequest": {
+        "additionalProperties": false,
+        "description": "A seller's application to join a platform promotion.",
+        "properties": {
+          "items": {
+            "description": "1 to 500 of your products.",
+            "items": {
+              "$ref": "#/components/schemas/PromotionsParticipationItem"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "Your unit (the seller), below the unit that runs the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "items"
+        ],
+        "type": "object"
       },
       "PromotionsPayer": {
         "enum": [
@@ -185038,6 +185305,508 @@
         ],
         "x-permissions": [
           "promotions.compliance"
+        ]
+      }
+    },
+    "/api/v1/promotions/promotions/{id}/participations": {
+      "get": {
+        "description": "Requires `promotions.read` on the promotion's unit (every application) or\n`promotions.participate` (the applications of your units).",
+        "operationId": "promotions_list_promotion_participations",
+        "parameters": [
+          {
+            "description": "Id of the platform promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotionsParticipation"
+                }
+              }
+            },
+            "description": "The applications, oldest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing both `promotions.read` and `promotions.participate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion; code `promotions.not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the applications to a platform promotion.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.read",
+          "promotions.participate"
+        ]
+      },
+      "post": {
+        "description": "Requires `promotions.participate` on your unit (`org_id`), which must be below the unit that\nruns the promotion. Each product with a sale price or a discount and the units offered. The\nplatform reviews it; once approved, the products join the flash sale and you pay their\ndiscount. Applying again before the review replaces the products (200). Only flash sales that\nhave not started take applications.",
+        "operationId": "promotions_apply_to_promotion",
+        "parameters": [
+          {
+            "description": "Id of the platform promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionsParticipationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromotionsParticipation"
+                }
+              }
+            },
+            "description": "Your waiting application was replaced."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromotionsParticipation"
+                }
+              }
+            },
+            "description": "Applied; waiting for review.",
+            "headers": {
+              "Location": {
+                "description": "Path of the applications of the promotion.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.participate` on your unit; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion above your unit; code `promotions.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a flash sale taking applications (`promotions.participation_closed`) or already approved (`promotions.participation_already_reviewed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A product is invalid, not yours or already in the promotion; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Apply to join a platform flash sale with your products.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.participate"
+        ]
+      }
+    },
+    "/api/v1/promotions/promotions/{id}/participations/{participation_id}/approve": {
+      "post": {
+        "description": "Requires `promotions.publish` on the promotion's unit. The products join the flash sale at\nthe prices offered; their discount is paid by the seller. Only before the sale starts.",
+        "operationId": "promotions_approve_promotion_participation",
+        "parameters": [
+          {
+            "description": "Id of the platform promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the application.",
+            "in": "path",
+            "name": "participation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromotionsParticipation"
+                }
+              }
+            },
+            "description": "Approved."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion or application; code `promotions.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Already approved (`promotions.participation_already_reviewed`) or the sale started (`promotions.participation_closed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve a seller's application.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.publish"
+        ]
+      }
+    },
+    "/api/v1/promotions/promotions/{id}/participations/{participation_id}/reject": {
+      "post": {
+        "description": "Requires `promotions.publish` on the promotion's unit. The seller can apply again with other\nproducts or prices.",
+        "operationId": "promotions_reject_promotion_participation",
+        "parameters": [
+          {
+            "description": "Id of the platform promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the application.",
+            "in": "path",
+            "name": "participation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromotionsParticipation"
+                }
+              }
+            },
+            "description": "Rejected."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.publish`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion or application; code `promotions.not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Already approved (`promotions.participation_already_reviewed`) or the sale started (`promotions.participation_closed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Reject a seller's application.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.publish"
         ]
       }
     },

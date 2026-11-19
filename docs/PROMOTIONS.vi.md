@@ -69,6 +69,14 @@ bị dữ liệu và ghi nhận.
 Phần trăm làm tròn nửa lên trên tổng dòng; khoản giảm cấp đơn chia về các dòng theo tiền dòng. Cùng giỏ luôn
 cho cùng kết quả và cùng `fingerprint`.
 
+## Người bán tham gia chương trình của sàn
+
+Trên sàn, người bán tham gia flash sale của sàn chưa bắt đầu: `POST /promotions/{id}/participations` (permission
+`promotions.participate` ở nút của người bán, dưới nút chạy chương trình) với sản phẩm của chính mình, mỗi sản phẩm
+một giá sale hay mức giảm và số suất. Sàn duyệt hay từ chối (`POST …/participations/{participation_id}/approve` hay
+`/reject`, permission `promotions.publish`); sản phẩm được duyệt vào flash sale và phần giảm của chúng do người bán trả
+(`funding`). `GET …/participations`: sàn thấy mọi lần đăng ký, người bán thấy lần của mình.
+
 ## Lên kế hoạch
 
 Đều chỉ đọc, permission `promotions.read`:

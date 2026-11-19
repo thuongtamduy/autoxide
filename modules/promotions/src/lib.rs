@@ -21,6 +21,7 @@ mod legal;
 mod migration;
 mod model;
 mod notices;
+mod participations;
 mod permissions;
 mod programs;
 mod provider;

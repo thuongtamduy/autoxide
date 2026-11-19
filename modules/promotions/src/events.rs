@@ -51,6 +51,7 @@ event!(VoucherIssued, names::VOUCHER_ISSUED);
 event!(VoucherUsed, names::VOUCHER_USED);
 event!(BudgetExhausted, names::BUDGET_EXHAUSTED);
 event!(LegalDataImported, "promotions.legal_data_imported");
+event!(ParticipationReviewed, names::PARTICIPATION_REVIEWED);
 event!(AutomaticPricesChanged, names::AUTOMATIC_PRICES_CHANGED);
 
 /// Event báo giá giảm tự động của chương trình `view` đổi (bắt đầu, dừng, hết hạn, đổi hạn) — để

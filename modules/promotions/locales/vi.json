@@ -163,5 +163,11 @@
   "promotions.flash_sale_starting.body": "Flash sale {title} bạn hẹn nhắc sẽ bắt đầu trong vài phút nữa.",
   "promotions.flash_sale_starting.short": "{title} sắp bắt đầu",
   "promotions.flash_sale_started": "Flash sale đã bắt đầu; không còn gì để nhắc.",
-  "promotions.too_many_reminders": "Bạn đang có {max} lời nhắc chờ gửi; hãy bỏ bớt một lời nhắc trước khi thêm."
+  "promotions.too_many_reminders": "Bạn đang có {max} lời nhắc chờ gửi; hãy bỏ bớt một lời nhắc trước khi thêm.",
+  "promotions.participation_closed": "Người bán chỉ tham gia được flash sale của sàn chưa bắt đầu.",
+  "promotions.participation_already_reviewed": "Lần đăng ký này đã được duyệt; sản phẩm đã có trong chương trình.",
+  "field:exactly one of `sale_price_minor` / `value_bp`; limits at least 1; each product once": "đúng một trong `sale_price_minor` / `value_bp`; giới hạn tối thiểu 1; mỗi sản phẩm một lần",
+  "field:not a product of your unit": "không phải sản phẩm của đơn vị bạn",
+  "field:send 1 to {max} products": "gửi từ 1 tới {max} sản phẩm",
+  "field:this product is already in the promotion": "sản phẩm này đã có trong chương trình"
 }

@@ -2,7 +2,7 @@
 //! database) và [`Program`] — chương trình đã biên dịch (điều kiện thành struct, mục tiêu thành
 //! tập) mà bộ tính dùng. Không chạm database.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
@@ -330,6 +330,9 @@ pub(crate) struct Program {
     pub flash_items: Vec<FlashItem>,
     pub gift_options: Vec<GiftOption>,
     pub funding: Vec<Funding>,
+    /// Biến thể do người bán tham gia góp vào chương trình của sàn (đã duyệt) → nút của người bán:
+    /// phần giảm của dòng đó do người bán trả.
+    pub sponsors: BTreeMap<Uuid, Uuid>,
 }
 
 impl Program {

@@ -4,6 +4,7 @@
 
 mod evaluate;
 mod insights;
+mod participations;
 mod programs;
 mod redemption;
 mod vouchers;

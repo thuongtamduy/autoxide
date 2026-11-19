@@ -8756,6 +8756,23 @@ export type Data_PromotionsNoticeExport = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsParticipation = {
+  /** A seller's application, as it stands. */
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsPromotion = {
   /** A promotion with its rule, counters and texts. */
   data: {
@@ -11914,6 +11931,22 @@ export type Data_Vec_PromotionsNoticeRule = {
     note: string;
     notice_required: boolean;
     promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsParticipation = {
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
   }[];
 };
 
@@ -21507,6 +21540,41 @@ export type PromotionsOffer = {
 };
 
 export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
+
+/** A seller's application, as it stands. */
+export type PromotionsParticipation = {
+  created_at: string;
+  id: string;
+  items: PromotionsParticipationItem[];
+  promotion_id: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  seller_org_id: string;
+  /** `pending`, `approved` or `rejected`. */
+  status: string;
+  updated_at: string;
+};
+
+/** One product a seller puts into a platform promotion. */
+export type PromotionsParticipationItem = {
+  /** Most units one buyer can get at that price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units offered at that price; omitted: not limited. */
+  quantity_limit?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp`). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points, 1 to 10000 (or `sale_price_minor`). */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A seller's application to join a platform promotion. */
+export type PromotionsParticipationRequest = {
+  /** 1 to 500 of your products. */
+  items: PromotionsParticipationItem[];
+  /** Your unit (the seller), below the unit that runs the promotion. */
+  org_id: string;
+};
 
 export type PromotionsPayer = "platform" | "seller" | "brand" | "payment_partner";
 
@@ -37845,6 +37913,62 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations": {
+    /** List the applications to a platform promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Apply to join a platform flash sale with your products. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsParticipationRequest;
+      responses: {
+        200: Data_PromotionsParticipation;
+        201: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/approve": {
+    /** Approve a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/reject": {
+    /** Reject a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

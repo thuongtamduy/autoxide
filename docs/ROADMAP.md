@@ -568,7 +568,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [x] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
       dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
       mỗi bên trả tiền (D-222)
-- [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
+- [x] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
       dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày (D-222)
 - [x] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
       xác nhận → trả lại), test đồng thời; chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện
