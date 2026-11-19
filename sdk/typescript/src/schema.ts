@@ -8394,6 +8394,64 @@ export type Data_OrdersPublicPayment = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersRefund = {
+  /** A refund of an order. */
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReturn = {
+  /** A return. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersShipmentRequested = {
   /** A shipment requested from the shipping module. */
   data: {
@@ -11758,6 +11816,28 @@ export type Data_Vec_OrdersPaymentAction = {
     status_token: string;
     /** Transfer content the bank transfer must carry. */
     transfer_code?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersRefund = {
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
   }[];
 };
 
@@ -17107,6 +17187,146 @@ export type OrdersPublicPayment = {
   status: string;
 };
 
+/** A line received back. */
+export type OrdersReceivedLineRequest = {
+  /** `restock` (sellable again) or `damaged`. */
+  condition: string;
+  line_id: string;
+  /** Units received (0 when missing). */
+  quantity: number;
+};
+
+/** A refund of an order. */
+export type OrdersRefund = {
+  amount: Money;
+  created_at: string;
+  id: string;
+  order_id: string;
+  /** The payment of the order it comes from. */
+  payment_id: string;
+  reason: string;
+  reference: string;
+  /** The return it pays back, if any. */
+  return_id?: string | null;
+  /**
+   * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+   * back by the shop outside the payment partner, e.g. cash).
+   */
+  status: string;
+  updated_at: string;
+};
+
+/** Refund part or all of an order. */
+export type OrdersRefundRequest = {
+  /** In the currency of the order; at most what is left to refund of one payment. */
+  amount: Money;
+  /** Why (no personal data; sent to the payment partner). */
+  reason: string;
+  /** Your unique key of this refund: sending it again returns the same refund. */
+  reference: string;
+};
+
+/** A return. */
+export type OrdersReturn = {
+  /** End of the return window of the order. */
+  deadline_at: string;
+  decided_at?: string | null;
+  id: string;
+  lines: OrdersReturnLine[];
+  /** Photos sent with the request. */
+  media_ids: string[];
+  note?: string | null;
+  number: string;
+  order_id: string;
+  /** The shop of the order. */
+  org_id: string;
+  reason_code: string;
+  received_at?: string | null;
+  refund?: Money | null;
+  refund_breakdown?: OrdersReturnRefundBreakdown | null;
+  /** Code of the `orders.return_rejected` list when rejected. */
+  reject_reason?: string | null;
+  requested_at: string;
+  /** `refund` or `exchange`. */
+  resolution: string;
+  /** `pickup`, `drop_off` or `in_store`. */
+  return_method: string;
+  /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+  status: string;
+  updated_at: string;
+  /** Warehouse that received the items. */
+  warehouse_org_id?: string | null;
+};
+
+/** One line of a return. */
+export type OrdersReturnLine = {
+  /** `restock` or `damaged`, once received. */
+  condition?: string | null;
+  /** A free gift sent back because the promotion's condition is no longer met. */
+  gift: boolean;
+  line_id: string;
+  quantity: number;
+  /** Units received back, once received. */
+  received?: number | null;
+  variant_id: string;
+};
+
+/** One line to return. */
+export type OrdersReturnLineRequest = {
+  /** Id of the order line. */
+  line_id: string;
+  /** Units to return (at most what is left of the line). */
+  quantity: number;
+};
+
+/** How the refund of a return was computed. */
+export type OrdersReturnRefundBreakdown = {
+  /**
+   * Order discount taken back because the rest of the order is below the promotion minimum
+   * (negative: given back from an earlier return).
+   */
+  clawback: Money;
+  /** Value of free gifts kept although their condition is no longer met. */
+  gift_deduction: Money;
+  /** What was paid for the returned units (after discounts). */
+  goods: Money;
+  /** Share of the shipping fee (only when the seller is at fault). */
+  shipping: Money;
+  total: Money;
+};
+
+/** Ask to return items of a delivered order. */
+export type OrdersReturnRequest = {
+  lines: OrdersReturnLineRequest[];
+  /** Photos uploaded by you (at most 6). */
+  media_ids?: string[];
+  note?: string | null;
+  /**
+   * A code of the shop's allowed return reasons (list `orders.return_reason`, see
+   * `GET /api/v1/kernel/reasons/orders.return_reason`).
+   */
+  reason_code: string;
+  /** `refund` (default) or `exchange`. */
+  resolution?: string | null;
+  /**
+   * How the items go back: `pickup` (a carrier picks them up), `drop_off` (default: at a
+   * post office) or `in_store`.
+   */
+  return_method?: string | null;
+};
+
+/** A step of a return. */
+export type OrdersReturnTransitionRequest = {
+  /** `approve`, `reject`, `receive`, `refund` or `close`. */
+  action: string;
+  /** `receive`: what arrived; lines left out count as received in full and sellable. */
+  lines?: OrdersReceivedLineRequest[] | null;
+  /** `reject`: a code of the `orders.return_rejected` list. */
+  reason?: string | null;
+  /** `receive`: warehouse that received the items (default: the warehouse that shipped them). */
+  warehouse_org_id?: string | null;
+};
+
 /** A shipment requested from the shipping module. */
 export type OrdersShipmentRequested = {
   cod_amount?: Money | null;
@@ -19325,6 +19545,42 @@ export type Page_OrdersOrder = {
     totals: OrdersOrderTotals;
     /** Changes on every update (for `If-Match`). */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersReturn = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -36621,6 +36877,35 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/returns": {
+    /** Ask to return items. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        201: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/returns/{id}": {
+    /** One of your returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/payments/{token}": {
     /** Status of a payment, for the QR code screen. */
     get: {
@@ -36629,6 +36914,48 @@ export interface paths {
         200: Data_OrdersPublicPayment;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns": {
+    /** List returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; order_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersReturn;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}": {
+    /** Read a return. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}/transitions": {
+    /** Move a return forward. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnTransitionRequest;
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36656,6 +36983,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/refunds": {
+    /** Refunds of an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Refund an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersRefundRequest;
+      responses: {
+        200: Data_OrdersRefund;
+        201: Data_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
