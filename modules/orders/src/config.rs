@@ -35,6 +35,27 @@ pub(crate) const QUOTE_TTL_MINUTES: Setting = Setting::new(
 )
 .with_default("15");
 
+pub(crate) const HOLD_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_HOLD_MINUTES",
+    "Minutes stock and promotion uses stay held for an unpaid order (15 to 1440). Keep it longer \
+     than the payment deadline of the ledger (`AUTOXIDE_LEDGER_PAYMENT_EXPIRY_MINUTES`) plus \
+     `AUTOXIDE_ORDERS_HOLD_GRACE_MINUTES`, so that unpaid orders are cancelled before holds lapse.",
+)
+.with_default("60");
+
+pub(crate) const HOLD_GRACE_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_HOLD_GRACE_MINUTES",
+    "Minutes holds outlive the payment deadline (1 to 120).",
+)
+.with_default("10");
+
+pub(crate) const CHECKOUT_STUCK_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_CHECKOUT_STUCK_MINUTES",
+    "Minutes after which a checkout stuck while holding stock is undone and its holds released \
+     (1 to 1440).",
+)
+.with_default("10");
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OrdersConfig {
@@ -43,6 +64,9 @@ pub(crate) struct OrdersConfig {
     pub line_max_quantity: i64,
     pub abandoned_after_minutes: i64,
     pub quote_ttl_minutes: i64,
+    pub hold_minutes: i64,
+    pub hold_grace_minutes: i64,
+    pub checkout_stuck_minutes: i64,
 }
 
 impl Default for OrdersConfig {
@@ -53,6 +77,9 @@ impl Default for OrdersConfig {
             line_max_quantity: 999,
             abandoned_after_minutes: 60,
             quote_ttl_minutes: 15,
+            hold_minutes: 60,
+            hold_grace_minutes: 10,
+            checkout_stuck_minutes: 10,
         }
     }
 }
@@ -64,11 +91,17 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<OrdersConfig, Invali
     let abandoned =
         reader.get_with(&ABANDONED_AFTER_MINUTES, |raw| parse_in_range(raw, 5i64, 10_080));
     let quote = reader.get_with(&QUOTE_TTL_MINUTES, |raw| parse_in_range(raw, 1i64, 1440));
+    let hold = reader.get_with(&HOLD_MINUTES, |raw| parse_in_range(raw, 15i64, 1440));
+    let grace = reader.get_with(&HOLD_GRACE_MINUTES, |raw| parse_in_range(raw, 1i64, 120));
+    let stuck = reader.get_with(&CHECKOUT_STUCK_MINUTES, |raw| parse_in_range(raw, 1i64, 1440));
     Ok(OrdersConfig {
         cart_ttl_days: ttl?,
         cart_max_lines: lines?,
         line_max_quantity: quantity?,
         abandoned_after_minutes: abandoned?,
         quote_ttl_minutes: quote?,
+        hold_minutes: hold?,
+        hold_grace_minutes: grace?,
+        checkout_stuck_minutes: stuck?,
     })
 }

@@ -459,6 +459,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step45-carts](D-20261118-step45-carts.md)** Giỏ hàng của `orders`: báo giá ở máy chủ, `quote_token`, giỏ vãng lai, module chưa cài — 2026-11-18
+- **[D-20261118-step45-checkout](D-20261118-step45-checkout.md)** Đặt hàng của `orders`: saga giữ chỗ, chống trùng, số đơn, thanh toán qua `ledger`, máy trạng thái — 2026-11-18
 - **[D-20261118-step45-orders-api](D-20261118-step45-orders-api.md)** Module `orders`: hợp đồng `api` cho bước 46–49, điểm cắm `OrderExtensions`, người mua không cần permission — 2026-11-18
 - **[D-20261118-step53-escalation](D-20261118-step53-escalation.md)** `support`: chuyển khiếu nại qua `ComplaintIntake` (đích là phiếu), liên kết qua sổ đối tượng, câu trả lời mẫu — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
