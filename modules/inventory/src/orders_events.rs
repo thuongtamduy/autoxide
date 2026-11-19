@@ -6,6 +6,7 @@
 //! |---|---|---|
 //! | `orders.order_confirmed` | `confirm(order_id)` | `order_id` |
 //! | `orders.order_cancelled` | `release(order_id, Cancelled)` | `order_id` |
+//! | `orders.preorder_cancelled` | `release_lines(order_id, reference = event id)` — trả riêng các dòng | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
 //! | `orders.return_received` | `restock`, `reference = return:<return_id>` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
 
 use std::sync::Arc;
@@ -18,18 +19,21 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::api::{ReleaseReason, RestockLine, RestockRequest};
+use crate::partial::CancelledLine;
 use crate::service::InventoryService;
 
 pub(crate) const ORDER_CONFIRMED: &str = "orders.order_confirmed";
 pub(crate) const ORDER_CANCELLED: &str = "orders.order_cancelled";
 pub(crate) const RETURN_RECEIVED: &str = "orders.return_received";
+pub(crate) const PREORDER_CANCELLED: &str = "orders.preorder_cancelled";
 
 pub(crate) fn subscriptions(service: &Arc<InventoryService>) -> Vec<Subscription> {
     let listener = Arc::new(OrderEvents(service.clone()));
     vec![
         Subscription::optional(ORDER_CONFIRMED, listener.clone()),
         Subscription::optional(ORDER_CANCELLED, listener.clone()),
-        Subscription::optional(RETURN_RECEIVED, listener),
+        Subscription::optional(RETURN_RECEIVED, listener.clone()),
+        Subscription::optional(PREORDER_CANCELLED, listener),
     ]
 }
 
@@ -59,6 +63,20 @@ struct Returned {
     order_id: Option<Uuid>,
     warehouse_org_id: Uuid,
     lines: Vec<ReturnedLine>,
+}
+
+/// Một dòng của `orders.preorder_cancelled`.
+#[derive(Debug, Deserialize)]
+struct CancelledLineIn {
+    line_key: String,
+    quantity: i64,
+}
+
+/// `after` của `orders.preorder_cancelled`.
+#[derive(Debug, Deserialize)]
+struct Cancelled {
+    order_id: Uuid,
+    lines: Vec<CancelledLineIn>,
 }
 
 fn order_id(after: &Value) -> Option<Uuid> {
@@ -120,6 +138,24 @@ impl EventHandler for OrderEvents {
                     lines,
                 );
                 let outcome = self.0.restock(tenant, &request).await;
+                settle(event, outcome)
+            }
+            PREORDER_CANCELLED => {
+                let Ok(cancelled) = serde_json::from_value::<Cancelled>(after.clone()) else {
+                    tracing::warn!(event_id = %event.id, "orders.preorder_cancelled without the fields inventory reads; ignored");
+                    return Ok(());
+                };
+                let lines: Vec<CancelledLine> = cancelled
+                    .lines
+                    .into_iter()
+                    .map(|line| CancelledLine { line_key: line.line_key, quantity: line.quantity })
+                    .collect();
+                let reference = format!("{PREORDER_CANCELLED}:{}", event.id);
+                let outcome = self
+                    .0
+                    .release_lines(tenant, cancelled.order_id, &reference, &lines, &Actor::system())
+                    .await
+                    .map(|_| ());
                 settle(event, outcome)
             }
             _ => Ok(()),

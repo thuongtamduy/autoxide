@@ -65,22 +65,27 @@ impl EventHandler for ShippingEvents {
         let tenant = &event.tenant;
         if event.name == names::COD_COLLECTED {
             if let Some(amount) = shipment.cod_amount {
-                return self.0.cod_collected(tenant, shipment.order_id, amount).await;
+                return self
+                    .0
+                    .cod_collected(tenant, shipment.order_id, &shipment.request_key, amount)
+                    .await;
             }
             return Ok(());
         }
         let Some(to) = target(shipment.status) else { return Ok(()) };
-        self.0.follow_shipment(tenant, shipment.order_id, to).await
+        self.0.follow_shipment(tenant, shipment.order_id, &shipment.request_key, to).await
     }
 }
 
 impl OrdersService {
-    /// Đưa đơn tới `to` theo vận đơn; đi qua các bước trung gian của bảng (`confirmed` →
-    /// `preparing` → `shipping` → `delivered`), ghi đủ lịch sử từng bước.
+    /// Đưa đơn tới `to` theo vận đơn `request_key`; đi qua các bước trung gian của bảng
+    /// (`confirmed` → `preparing` → `shipping` → `delivered`), ghi đủ lịch sử từng bước. Giao nhiều
+    /// lần: lần giao tới tay người mua mà còn đơn vị chưa giao thì đơn dừng ở `shipping`.
     pub(crate) async fn follow_shipment(
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
+        request_key: &str,
         to: OrderStatus,
     ) -> Result<(), Error> {
         let (database, outbox) = (tenant.database(), &self.outbox);
@@ -92,6 +97,13 @@ impl OrdersService {
                     // Vận đơn không thuộc đơn nào của `orders` (tạo tay ở `shipping`).
                     Err(error) if error.code() == "orders.order_not_found" => return Ok(()),
                     Err(error) => return Err(error),
+                };
+                let complete =
+                    self.note_fulfillment(&transaction, tenant, order_id, request_key, to).await?;
+                let to = if to == OrderStatus::Delivered && !complete {
+                    OrderStatus::Shipping
+                } else {
+                    to
                 };
                 for step in path(&current.status, to) {
                     let transition = Transition::new(step, Cause::Shipping, Actor::system());
@@ -117,6 +129,7 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
+        request_key: &str,
         amount: Money,
     ) -> Result<(), Error> {
         let database = tenant.database();
@@ -139,15 +152,42 @@ impl OrdersService {
                 else {
                     return Ok(());
                 };
+                // Giao nhiều lần: mỗi lần hãng thu một phần, ghi vào lần giao của nó (event tới lại
+                // không cộng hai lần); đủ số phải thu thì khoản COD xong.
+                let delivery = crate::entity::fulfillment::Entity::find()
+                    .filter(crate::entity::fulfillment::Column::OrderId.eq(order_id))
+                    .filter(crate::entity::fulfillment::Column::RequestKey.eq(request_key))
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?;
+                if let Some(delivery) = delivery {
+                    if delivery.cod_collected_minor.is_some() {
+                        return Ok(());
+                    }
+                    let mut noted: crate::entity::fulfillment::ActiveModel = delivery.into();
+                    noted.cod_collected_minor = Set(Some(amount.minor()));
+                    noted.update(&transaction).await?;
+                }
+                let lines = crate::entity::line::Entity::find()
+                    .filter(crate::entity::line::Column::OrderId.eq(order_id))
+                    .scoped(tenant)
+                    .all(&transaction)
+                    .await?;
+                let due = current.total_minor - crate::fulfillments::cancelled_value(&lines)?;
+                let paid_minor = current.paid_minor + amount.minor();
+                let fully = paid_minor >= due;
                 let now = crate::service::now();
-                let mut paid: payment::ActiveModel = row.into();
-                paid.status = Set(payments::SUCCEEDED.to_owned());
-                paid.succeeded_at = Set(Some(now));
-                paid.updated_at = Set(now);
-                paid.update(&transaction).await?;
+                if fully {
+                    let mut paid: payment::ActiveModel = row.into();
+                    paid.status = Set(payments::SUCCEEDED.to_owned());
+                    paid.succeeded_at = Set(Some(now));
+                    paid.updated_at = Set(now);
+                    paid.update(&transaction).await?;
+                }
                 let mut updated: order::ActiveModel = current.clone().into();
-                updated.paid_minor = Set(current.paid_minor + amount.minor());
-                updated.payment_status = Set(payments::PAID.to_owned());
+                updated.paid_minor = Set(paid_minor);
+                updated.payment_status =
+                    Set(if fully { payments::PAID } else { payments::PARTIALLY_PAID }.to_owned());
                 updated.updated_at = Set(now);
                 updated.update(&transaction).await?;
                 transaction.commit().await?;

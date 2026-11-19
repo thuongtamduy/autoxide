@@ -63,6 +63,12 @@ pub(crate) struct PublicFilter {
     pub sold_by: Option<SoldBy>,
     /// Điểm đánh giá tối thiểu × 100.
     pub min_rating: Option<i32>,
+    /// Bộ sưu tập (bước 55): thuộc một trong các danh mục này (gồm danh mục con).
+    pub category_ids: Vec<Uuid>,
+    /// Bộ sưu tập: lên kệ từ thời điểm này.
+    pub published_after: Option<chrono::DateTime<Utc>>,
+    /// Bộ sưu tập chọn tay: chỉ sản phẩm đã chọn của bộ sưu tập này.
+    pub collection: Option<Uuid>,
 }
 
 /// Một sản phẩm trên danh sách công khai.
@@ -339,7 +345,7 @@ impl CatalogService {
     }
 
     /// Ghép sản phẩm, bản dịch và ảnh đầu cho các dòng storefront (giữ thứ tự).
-    async fn cards(
+    pub(crate) async fn cards(
         &self,
         tenant: &TenantContext,
         locale: &str,

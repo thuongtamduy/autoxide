@@ -166,7 +166,10 @@ mod tests {
         // Ngân hàng chèn khoảng trắng, đổi chữ thường, thêm chữ khác.
         let spaced =
             format!("MBVCB.123 {} chuyen tien", code.to_lowercase().replacen('x', "x ", 1));
-        assert_eq!(codes_in(&spaced), vec![code.clone()]);
+        // Mã nằm đầu tiên. Có thể có thêm ứng viên giả khi phần đuôi của mã chứa "AX" rồi nối với chữ
+        // phía sau (vd "CHUYENTIEN" toàn chữ base32): vô hại vì tra theo mã không thấy, nhưng test không
+        // được giả định chỉ có đúng một ứng viên — mã ngẫu nhiên nên trước đây test thỉnh thoảng đỏ.
+        assert_eq!(codes_in(&spaced).first(), Some(&code));
         assert!(codes_in("thanh toan don hang").is_empty());
         assert!(bank("970436").is_some());
         assert!(bank("000000").is_none());

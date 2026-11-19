@@ -133,6 +133,30 @@ trạng thái, bảng giá hay lựa chọn của cửa hàng, và mỗi phút c
 (event `catalog.price_effective`). Nếu danh sách công khai có vẻ chưa cập nhật, chạy
 `autoxide task catalog.rebuild_storefront [tenant=<slug>]`.
 
+## Bộ sưu tập
+
+Bộ sưu tập gom sản phẩm cho một trang của website ("Giảm giá mùa hè", "Hàng mới tháng này"). Quản lý dưới
+`/collections` (`catalog.collections.manage` ở nút của bộ sưu tập; đọc cần `catalog.products.read`); `PATCH`
+và `PUT /collections/{id}/items` cần `If-Match`.
+
+- `kind: manual` — sản phẩm chọn tay có thứ tự: `PUT /collections/{id}/items` `{"product_ids": [...]}` (tối đa
+  500) thay cả danh sách.
+- `kind: rule` — sản phẩm khớp mọi điều kiện của `rules` (tối đa 10):
+  `{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000, "price_max": 500000,
+  "new_within_days": 30, "on_promotion": true, "match": "all"}`. Giá theo đơn vị nhỏ nhất của tiền tệ bảng giá
+  của website; `on_promotion` cần module `promotions` (`catalog.rule_needs_module`).
+- `sort`: `manual` (thứ tự chọn, chỉ bộ sưu tập chọn tay), `newest`, `price_asc`, `price_desc`, `best_selling`;
+  giá trị bằng nhau giữ thứ tự ổn định theo ID trên cả hai database.
+- `texts` theo ngôn ngữ: `title`, `slug` (không trùng trong ngôn ngữ), `description`, `meta_title`,
+  `meta_description`; `media_id` (ảnh công khai); `status` (`draft`, `active`, `archived`) và `starts_at` /
+  `ends_at` tuỳ chọn.
+
+Website đọc `GET /api/v1/catalog/public/collections/{slug}?locale=vi` (công khai; `site` hay tên miền): chữ của
+bộ sưu tập và một trang sản phẩm, cùng thẻ như `/public/products`, chỉ sản phẩm còn hiện trên website đó, theo
+thứ tự của bộ sưu tập. Chỉ bộ sưu tập `active` trong khung giờ, của website hay nút cấp trên, là công khai. Banner
+và menu trỏ tới bộ sưu tập bằng `catalog.collection` của sổ đối tượng (`/collections/<slug>`). Tool MCP:
+`catalog.list_collections`, `catalog.save_collection` (chỉ bản nháp: người dùng bật `active`).
+
 ## Cho module khác
 
 ```rust

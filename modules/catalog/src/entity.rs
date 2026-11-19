@@ -678,3 +678,78 @@ pub(crate) mod synonym {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+/// Bộ sưu tập sản phẩm (bước 55).
+pub(crate) mod collection {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_collections")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút sở hữu; gốc (= ID khách) cho cả khách.
+        pub org_id: Uuid,
+        /// `manual` hay `rule`.
+        pub kind: String,
+        /// JSON quy tắc đã kiểm (`{}` với `manual`).
+        pub rules: String,
+        /// `manual`, `newest`, `price_asc`, `price_desc`, `best_selling`.
+        pub sort: String,
+        pub media_id: Option<Uuid>,
+        /// `draft`, `active`, `archived`.
+        pub status: String,
+        pub starts_at: Option<DateTimeUtc>,
+        pub ends_at: Option<DateTimeUtc>,
+        pub created_at: DateTimeUtc,
+        /// Phiên bản (`ETag`).
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod collection_text {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_collection_texts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub collection_id: Uuid,
+        pub locale: String,
+        pub title: String,
+        pub slug: String,
+        pub description: String,
+        pub meta_title: String,
+        pub meta_description: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod collection_item {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_collection_items")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub collection_id: Uuid,
+        pub product_id: Uuid,
+        pub position: i32,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

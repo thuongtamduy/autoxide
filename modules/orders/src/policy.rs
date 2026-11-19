@@ -99,6 +99,19 @@ pub(crate) const RETURN_PHOTO_REASONS: OrgSetting = OrgSetting::new(
     _ => Err("must be a list of at most 50 lower_case reason codes".to_owned()),
 });
 
+/// Hết hạn giữ hàng chờ nhận tại cửa hàng thì làm gì (D-201).
+pub(crate) const PICKUP_EXPIRED_ACTION: OrgSetting = OrgSetting::new(
+    "orders.pickup_expired_action",
+    "What happens when an order waiting in store is not collected in time: `cancel_refund` \
+     (cancel, restock and refund) or `keep_waiting`.",
+)
+.with_default("\"cancel_refund\"")
+.with_schema(r#"{"type":"string","enum":["cancel_refund","keep_waiting"]}"#)
+.checked(|value| match value.as_str() {
+    Some("cancel_refund" | "keep_waiting") => Ok(value.clone()),
+    _ => Err("must be `cancel_refund` or `keep_waiting`".to_owned()),
+});
+
 /// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
 pub(crate) fn is_code(code: &str) -> bool {
     code.len() <= 64
@@ -114,6 +127,7 @@ pub(crate) fn all() -> Vec<OrgSetting> {
         COD_ENABLED,
         ALLOWED_RETURN_REASONS,
         RETURN_PHOTO_REASONS,
+        PICKUP_EXPIRED_ACTION,
     ]
 }
 
@@ -126,6 +140,8 @@ pub(crate) struct Policy {
     pub cod_enabled: bool,
     pub allowed_return_reasons: Vec<String>,
     pub return_photo_reasons: Vec<String>,
+    /// `true`: hết hạn giữ hàng thì huỷ và hoàn tiền.
+    pub pickup_cancel_on_expiry: bool,
 }
 
 impl Policy {
@@ -168,6 +184,7 @@ impl OrdersService {
         let cod = self.setting(tenant, org, &COD_ENABLED).await?;
         let reasons = self.setting(tenant, org, &ALLOWED_RETURN_REASONS).await?;
         let photos = self.setting(tenant, org, &RETURN_PHOTO_REASONS).await?;
+        let pickup = self.setting(tenant, org, &PICKUP_EXPIRED_ACTION).await?;
         let codes = |value: Option<Value>| -> Vec<String> {
             value
                 .as_ref()
@@ -186,6 +203,8 @@ impl OrdersService {
             cod_enabled: cod.as_ref().and_then(Value::as_bool).unwrap_or(true),
             allowed_return_reasons: codes(reasons),
             return_photo_reasons: codes(photos),
+            pickup_cancel_on_expiry: pickup.as_ref().and_then(Value::as_str)
+                != Some("keep_waiting"),
         })
     }
 }
@@ -203,6 +222,7 @@ mod tests {
             cod_enabled: true,
             allowed_return_reasons: Vec::new(),
             return_photo_reasons: Vec::new(),
+            pickup_cancel_on_expiry: true,
         };
         let confirmed = policy(OrderStatus::Confirmed);
         assert!(confirmed.buyer_may_cancel(OrderStatus::PendingPayment));

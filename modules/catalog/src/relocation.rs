@@ -13,6 +13,7 @@ pub(crate) fn relocation() -> Relocation {
             "catalog_price_guards",
             "catalog_variant_costs",
             "catalog_store_overrides",
+            "catalog_collections",
         ])
         // Bảng dẫn xuất: dựng lại sau khi tách / gộp (`autoxide task catalog.rebuild_storefront`).
         .follow("catalog_storefront_entries", "product_id", "catalog_products")
@@ -27,6 +28,8 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_price_changes", "price_list_id", "catalog_price_lists")
         .follow("catalog_product_attributes", "product_id", "catalog_products")
         .follow("catalog_product_documents", "product_id", "catalog_products")
+        .follow("catalog_collection_texts", "collection_id", "catalog_collections")
+        .follow("catalog_collection_items", "collection_id", "catalog_collections")
         .copy_on_split(&[
             "catalog_categories",
             "catalog_rounding_rules",

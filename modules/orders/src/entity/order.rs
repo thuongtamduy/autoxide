@@ -48,6 +48,7 @@ pub struct Model {
     pub completed_at: Option<DateTimeUtc>,
     pub cancelled_at: Option<DateTimeUtc>,
     pub cancel_reason: Option<String>,
+    pub preorder_accepted_at: Option<DateTimeUtc>,
     pub version: i32,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,

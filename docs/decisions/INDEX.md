@@ -484,12 +484,15 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 - **[D-20261119-step41-search-suggest](D-20261119-step41-search-suggest.md)** Gợi ý tìm gom nhiều module, từ đồng nghĩa và số đếm bộ lọc của `catalog` — 2026-11-19
 - **[D-20261119-step42-lots-serials](D-20261119-step42-lots-serials.md)** Lô, hạn dùng và serial của `inventory`: giữ ở mức dòng tồn, chọn lô lúc xuất, hàng không gắn lô được phép — 2026-11-19
+- **[D-20261119-step42-preorder-cancel](D-20261119-step42-preorder-cancel.md)** `inventory` trả riêng phần đặt trước bị huỷ của một đơn còn hiệu lực, chống trùng bằng bảng tham chiếu — 2026-11-19
 - **[D-20261119-step42-preorders](D-20261119-step42-preorders.md)** Hàng đặt trước của `inventory`: bộ đếm suất có trần, job chia hàng về tính lại từ trạng thái — 2026-11-19
 - **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 - **[D-20261119-step42-restock-alerts](D-20261119-step42-restock-alerts.md)** Báo khi có hàng lại của `inventory`: tin giao dịch đã xác nhận hai bước, giành lượt bằng `armed`, ở lại khách gốc khi tách — 2026-11-19
 - **[D-20261119-step45-buyer-returns](D-20261119-step45-buyer-returns.md)** Trả hàng phía người mua: ảnh kèm qua `Media::uploaders`, xem trước không ghi, thời gian hoàn là dữ liệu có ngày hiệu lực — 2026-11-19
+- **[D-20261119-step45-pickup-preorder](D-20261119-step45-pickup-preorder.md)** Nhận tại cửa hàng và hàng đặt trước của `orders` — 2026-11-19
 - **[D-20261119-step45-returns](D-20261119-step45-returns.md)** Đổi trả và hoàn tiền của `orders`: một đường hoàn, tiền hoàn tính lúc nhận hàng, bút toán đảo — 2026-11-19
+- **[D-20261119-step55-collections](D-20261119-step55-collections.md)** Bước 55: bộ sưu tập sản phẩm dùng bộ lọc storefront sẵn có, permission `catalog.collections.manage` — 2026-11-19
 - **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 - **[D-20261119-step61-voice](D-20261119-step61-voice.md)** Gọi điện trong chat (bước 61 mục 4): hợp đồng ở kernel, mặc định, ghi âm, sandbox — 2026-11-19
 

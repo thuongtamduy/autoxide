@@ -6,6 +6,7 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod collections;
 mod search;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
@@ -28,6 +29,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreatePriceChanges),
         Box::new(CreateStorefront),
         Box::new(search::CreateSearch),
+        // Bộ sưu tập sản phẩm (bước 55).
+        Box::new(collections::CreateCollections),
     ]
 }
 

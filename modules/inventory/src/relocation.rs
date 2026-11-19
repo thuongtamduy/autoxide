@@ -29,6 +29,7 @@ pub(crate) fn relocation() -> Relocation {
         )
         .follow("inventory_reservation_lines", "reservation_id", "inventory_reservations")
         .follow("inventory_fulfilments", "reservation_id", "inventory_reservations")
+        .follow("inventory_line_releases", "reservation_id", "inventory_reservations")
         // Đăng ký báo có hàng lại là của người mua với cả khách (cửa hàng có thể là kho online):
         // ở lại khách gốc. Bộ đếm giới hạn và nonce chống spam chỉ là tạm.
         .stay(&["inventory_restock_alerts"])

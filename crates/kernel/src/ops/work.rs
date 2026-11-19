@@ -389,10 +389,14 @@ impl WorkState {
         }
         counts.insert("work".to_owned(), total);
         let result = WorkCounts { counts, incomplete };
-        let mut cache = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
-        // Bộ nhớ không phình mãi: dọn mục đã hết hạn khi thêm mục mới.
-        cache.retain(|_, (at, _)| at.elapsed() < COUNT_CACHE);
-        cache.insert(key, (Instant::now(), result.clone()));
+        // Kết quả thiếu nguồn (nguồn chậm hay lỗi) không giữ lại: lần hỏi sau thử lại ngay, thay vì
+        // hiện số trống suốt `COUNT_CACHE`.
+        if result.incomplete.is_empty() {
+            let mut cache = self.counts.lock().unwrap_or_else(PoisonError::into_inner);
+            // Bộ nhớ không phình mãi: dọn mục đã hết hạn khi thêm mục mới.
+            cache.retain(|_, (at, _)| at.elapsed() < COUNT_CACHE);
+            cache.insert(key, (Instant::now(), result.clone()));
+        }
         Ok(result)
     }
 }

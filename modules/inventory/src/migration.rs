@@ -38,6 +38,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
                 autoxide_kernel::antispam::tenant_table("inventory"),
             ],
         ),
+        // Trả riêng phần đặt trước bị huỷ của một đơn (`orders.preorder_cancelled`).
+        Box::new(crate::partial::migration::CreateLineReleases),
     ]
 }
 

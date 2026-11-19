@@ -1209,6 +1209,53 @@ export type CatalogCategoryText = {
   slug?: string | null;
 };
 
+/** A product collection. */
+export type CatalogCollection = {
+  created_at: string;
+  ends_at?: string | null;
+  id: string;
+  /** Number of chosen products (`manual`). */
+  items: number;
+  /** `manual` (chosen products, in order) or `rule`. */
+  kind: string;
+  /** Picture (public media item). */
+  media_id?: string | null;
+  /** Organization unit that owns it; the tenant's id for the whole tenant. */
+  org_id: string;
+  /** The rule of a `rule` collection; `{}` for `manual`. */
+  rules: Record<string, unknown>;
+  /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+  sort: string;
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+  status: string;
+  /** Texts by language. */
+  texts: {
+    [key: string]: CatalogCollectionText;
+  };
+  updated_at: string;
+};
+
+/** The chosen products of a collection, in order. */
+export type CatalogCollectionItems = {
+  /** Product ids, first shown first; at most 500. */
+  product_ids: string[];
+};
+
+/** Texts of a collection in one language. */
+export type CatalogCollectionText = {
+  /** Up to 5000 characters. */
+  description?: string;
+  /** Up to 500 characters. */
+  meta_description?: string;
+  /** Up to 200 characters. */
+  meta_title?: string;
+  /** Address part, unique in the language; omitted: made from the title. */
+  slug?: string | null;
+  /** 1 to 200 characters. */
+  title: string;
+};
+
 /** A component of a bundle. */
 export type CatalogComponent = {
   /** Units of the component in one bundle, 1 to 10000. */
@@ -1254,6 +1301,32 @@ export type CatalogCreateCategory = {
   };
   /** Shown on the storefront; default `true`. */
   visible?: boolean;
+};
+
+/** A new collection. */
+export type CatalogCreateCollection = {
+  ends_at?: string | null;
+  /** `manual` or `rule`. */
+  kind: string;
+  media_id?: string | null;
+  /** Owning organization unit; omitted: the whole tenant. */
+  org_id?: string | null;
+  /**
+   * For `rule`: `{"category_ids": [...], "attributes": {"color": ["red"]}, "price_min": 100000,
+   * "price_max": 500000, "new_within_days": 30, "on_promotion": true, "match": "all"}` — every
+   * condition must hold, at most 10 conditions; prices in the smallest unit of the default
+   * price list's currency; `on_promotion` needs module `promotions`.
+   */
+  rules?: Record<string, unknown> | null;
+  /** Omitted: `manual` for a manual collection, else `newest`. */
+  sort?: string | null;
+  starts_at?: string | null;
+  /** `draft` (default), `active` or `archived`. */
+  status?: string | null;
+  /** Texts by language, at least one. */
+  texts: {
+    [key: string]: CatalogCollectionText;
+  };
 };
 
 /** A new document. */
@@ -1749,6 +1822,25 @@ export type CatalogPublicCategory = {
   slug: string;
 };
 
+/** A collection page of the website. */
+export type CatalogPublicCollection = {
+  description: string;
+  id: string;
+  locale: string;
+  /** Picture (public media item). */
+  media_id?: string | null;
+  meta_description: string;
+  meta_title: string;
+  pagination: Pagination;
+  /**
+   * One page of its products, in the collection's order; same card as
+   * `GET /api/v1/catalog/public/products`.
+   */
+  products: CatalogPublicProductCard[];
+  slug: string;
+  title: string;
+};
+
 /** An image, as readers load it. */
 export type CatalogPublicImage = {
   /** Text alternative: the product's own, or the media library's. */
@@ -2051,6 +2143,22 @@ export type CatalogUpdateCategory = {
     [key: string]: CatalogCategoryText;
   };
   visible?: boolean | null;
+};
+
+/**
+ * Changes to a collection: fields left out stay; `null` clears; `texts` replaces the languages
+ * given.
+ */
+export type CatalogUpdateCollection = {
+  ends_at?: string | null;
+  media_id?: string | null;
+  rules?: Record<string, unknown> | null;
+  sort?: string | null;
+  starts_at?: string | null;
+  status?: string | null;
+  texts?: {
+    [key: string]: CatalogCollectionText;
+  };
 };
 
 /** Changes to a price list. Omitted fields stay as they are. */
@@ -5513,6 +5621,45 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogCollection = {
+  /** A product collection. */
+  data: {
+    created_at: string;
+    ends_at?: string | null;
+    id: string;
+    /** Number of chosen products (`manual`). */
+    items: number;
+    /** `manual` (chosen products, in order) or `rule`. */
+    kind: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    /** Organization unit that owns it; the tenant's id for the whole tenant. */
+    org_id: string;
+    /** The rule of a `rule` collection; `{}` for `manual`. */
+    rules: Record<string, unknown>;
+    /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+    sort: string;
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+    status: string;
+    /** Texts by language. */
+    texts: {
+      [key: string]: CatalogCollectionText;
+    };
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCollectionItems = {
+  /** The chosen products of a collection, in order. */
+  data: {
+    /** Product ids, first shown first; at most 500. */
+    product_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogFacets = {
   /** Filter counts of a public product list. */
   data: {
@@ -5672,6 +5819,28 @@ export type Data_CatalogPublicCategory = {
     parent_id?: string | null;
     position: number;
     slug: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicCollection = {
+  /** A collection page of the website. */
+  data: {
+    description: string;
+    id: string;
+    locale: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    meta_description: string;
+    meta_title: string;
+    pagination: Pagination;
+    /**
+     * One page of its products, in the collection's order; same card as
+     * `GET /api/v1/catalog/public/products`.
+     */
+    products: CatalogPublicProductCard[];
+    slug: string;
+    title: string;
   };
 };
 
@@ -9231,6 +9400,9 @@ export type Data_OrdersOrder = {
     payment_method: string;
     /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
     payment_status: string;
+    pickup?: OrdersPickup | null;
+    /** Collecting in store: the shop, and the pickup once the order is ready. */
+    pickup_org_id?: string | null;
     placed_at: string;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -9240,6 +9412,20 @@ export type Data_OrdersOrder = {
     totals: OrdersOrderTotals;
     /** Changes on every update (for `If-Match`). */
     version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPickupReady = {
+  /** An order ready in store. */
+  data: {
+    /** Held until then; afterwards the shop's `orders.pickup_expired_action` applies. */
+    hold_until: string;
+    order_id: string;
+    pickup_org_id: string;
+    ready_at: string;
+    /** `ready`, `picked_up` or `expired`. */
+    status: string;
   };
 };
 
@@ -18499,6 +18685,11 @@ export type OrdersCartTotals = {
 
 /** Place the order of a cart. */
 export type OrdersCheckoutRequest = {
+  /**
+   * Required `true` when the cart has pre-order items: you showed their terms and expected
+   * dates (`preorder` of each cart line) to the buyer, who agreed.
+   */
+  accept_preorder_terms?: boolean | null;
   /** Version of the terms of sale the buyer accepted. */
   accept_terms_version?: string | null;
   cart_id: string;
@@ -18530,6 +18721,10 @@ export type OrdersContactRequest = {
   name: string;
   /** Mobile number; delivery and order lookup use it. */
   phone: string;
+  /** Picking up in store: name of someone else who may collect the order. */
+  proxy_name?: string | null;
+  /** Picking up in store: phone number of that person (both or neither). */
+  proxy_phone?: string | null;
 };
 
 /** Why a cart line cannot be ordered now. */
@@ -18563,6 +18758,9 @@ export type OrdersOrder = {
   payment_method: string;
   /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
   payment_status: string;
+  pickup?: OrdersPickup | null;
+  /** Collecting in store: the shop, and the pickup once the order is ready. */
+  pickup_org_id?: string | null;
   placed_at: string;
   /**
    * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -18624,6 +18822,39 @@ export type OrdersPaymentAction = {
   status_token: string;
   /** Transfer content the bank transfer must carry. */
   transfer_code?: string | null;
+};
+
+/** An order waiting in store. */
+export type OrdersPickup = {
+  /** The 6-digit code to show at the counter; only in your own order. */
+  code?: string | null;
+  handed_over_at?: string | null;
+  /** Held until then. */
+  hold_until: string;
+  ready_at: string;
+  /** `ready`, `picked_up` or `expired`. */
+  status: string;
+};
+
+/** Who collects the order. */
+export type OrdersPickupHandoverRequest = {
+  /** The 6-digit code the buyer shows. */
+  code?: string | null;
+  /** Or: the name of the person collecting for the buyer, as given when ordering. */
+  proxy_name?: string | null;
+  /** And that person's phone number. */
+  proxy_phone?: string | null;
+};
+
+/** An order ready in store. */
+export type OrdersPickupReady = {
+  /** Held until then; afterwards the shop's `orders.pickup_expired_action` applies. */
+  hold_until: string;
+  order_id: string;
+  pickup_org_id: string;
+  ready_at: string;
+  /** `ready`, `picked_up` or `expired`. */
+  status: string;
 };
 
 /** Pre-order information shown before ordering. */
@@ -19212,6 +19443,37 @@ export type Page_CampaignResponse = {
     started_at?: string | null;
     status: CampaignStatus;
     subject: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogCollection = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    ends_at?: string | null;
+    id: string;
+    /** Number of chosen products (`manual`). */
+    items: number;
+    /** `manual` (chosen products, in order) or `rule`. */
+    kind: string;
+    /** Picture (public media item). */
+    media_id?: string | null;
+    /** Organization unit that owns it; the tenant's id for the whole tenant. */
+    org_id: string;
+    /** The rule of a `rule` collection; `{}` for `manual`. */
+    rules: Record<string, unknown>;
+    /** `manual` (chosen order), `newest`, `price_asc`, `price_desc` or `best_selling`. */
+    sort: string;
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`; only `active` ones in their time window are public. */
+    status: string;
+    /** Texts by language. */
+    texts: {
+      [key: string]: CatalogCollectionText;
+    };
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -21208,6 +21470,9 @@ export type Page_OrdersOrder = {
     payment_method: string;
     /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
     payment_status: string;
+    pickup?: OrdersPickup | null;
+    /** Collecting in store: the shop, and the pickup once the order is ready. */
+    pickup_org_id?: string | null;
     placed_at: string;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -31369,6 +31634,100 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/collections": {
+    /** List product collections. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a product collection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateCollection;
+      responses: {
+        201: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/collections/{id}": {
+    /** Get a product collection. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a product collection. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateCollection;
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a product collection. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/collections/{id}/items": {
+    /** Get the chosen products of a collection. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCollectionItems;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the chosen products of a collection. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCollectionItems;
+      responses: {
+        200: Data_CatalogCollection;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/price-guards": {
     /** List the price floors in your scope. */
     get: {
@@ -31803,6 +32162,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string }; };
       responses: {
         200: Data_CatalogPublicCategory;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/collections/{slug}": {
+    /** Get a collection page (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Data_CatalogPublicCollection;
         403: Problem;
         404: Problem;
         422: Problem;
@@ -40136,7 +40508,7 @@ export interface paths {
   "/api/v1/orders": {
     /** List orders. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payment_status?: string; org_id?: string; channel?: string; number?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payment_status?: string; org_id?: string; channel?: string; number?: string; pickup_org_id?: string; pickup_status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_OrdersOrder;
         400: Problem;
@@ -40483,6 +40855,36 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/pickup/handover": {
+    /** Hand an order over at the counter. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPickupHandoverRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/pickup/ready": {
+    /** Mark an order ready for collection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersPickupReady;
         401: Problem;
         403: Problem;
         404: Problem;

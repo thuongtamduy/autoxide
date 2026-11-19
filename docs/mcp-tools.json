@@ -2895,6 +2895,51 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the product collections in your scope (manual or by rule), newest first, each with its `version`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Paging and filter of the collection list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft`, `active` or `archived`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalog.list_collections",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the products in your scope, newest first; filter by status, kind, unit, category, readiness or words; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,
@@ -3037,6 +3082,116 @@
       "output_schema": null,
       "permissions": [
         "catalog.prices.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Draft a product collection, or change one (with `id` and `version`): texts and SEO by language, a rule (categories, attributes, price range, new, on promotion) or chosen products in order, and the sort. A tool never turns a collection on: a person sets it `active`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A collection to draft. Without `id`: a new draft. With `id` and `version`: change it (fields\nleft out stay).",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The collection to change; omit to create one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "To create: `manual` or `rule`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "media_id": {
+            "description": "A public picture (media item id).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "To create: the owning unit; omit for the whole tenant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product_ids": {
+            "description": "`manual` collections: the chosen products, in order (replaces the list).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "rules": {
+            "description": "Rule of a `rule` collection, e.g. `{\"category_ids\": [\"…\"], \"price_max\": 500000}`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "sort": {
+            "description": "`manual`, `newest`, `price_asc`, `price_desc` or `best_selling`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`draft` or `archived`; a tool never makes a collection `active`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "texts": {
+            "description": "Texts by language (e.g. `{\"vi\": {\"title\": \"…\"}}`).",
+            "type": "object"
+          },
+          "version": {
+            "description": "Required with `id`: the `version` from `list_collections` or the previous save.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "catalog.save_collection",
+      "output_schema": null,
+      "permissions": [
+        "catalog.collections.manage"
       ]
     },
     {
