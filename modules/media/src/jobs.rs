@@ -216,7 +216,7 @@ impl MediaService {
 }
 
 /// Khoá thật ở nơi lưu chung → khách, ID item và phiên bản. Khoá của khách mặc định:
-/// `media/<item_id>/<version_id>` (bản gốc) hay `media/<item_id>/<version_id>_w<rộng>[.webp]`
+/// `media/<item_id>/<version_id>` (bản gốc) hay `media/<item_id>/<version_id>_w<rộng>[.webp|.avif]`
 /// (ảnh thu nhỏ); của khách khác: cùng dạng sau `tenants/<khách>/`.
 fn parse_key(key: &str) -> Option<(TenantId, Uuid, Uuid)> {
     if key.starts_with(KEY_PREFIX) {
@@ -231,7 +231,7 @@ fn parse_key(key: &str) -> Option<(TenantId, Uuid, Uuid)> {
 /// Khoá `media/…` (không tiền tố khách) → ID item và phiên bản.
 fn parse_media_key(key: &str) -> Option<(Uuid, Uuid)> {
     let (item, rest) = key.strip_prefix(KEY_PREFIX)?.split_once('/')?;
-    let rest = rest.strip_suffix(".webp").unwrap_or(rest);
+    let rest = rest.strip_suffix(".webp").or_else(|| rest.strip_suffix(".avif")).unwrap_or(rest);
     let version = match rest.split_once("_w") {
         Some((version, width))
             if !width.is_empty() && width.bytes().all(|b| b.is_ascii_digit()) =>
@@ -261,6 +261,9 @@ mod tests {
         assert_eq!(parse_key(&format!("media/{item}/{version}")), main);
         assert_eq!(parse_key(&format!("media/{item}/{version}_w640")), main);
         assert_eq!(parse_key(&format!("media/{item}/{version}_w640.webp")), main);
+        // Bản AVIF (bước 39 B8): `don_mo_coi_hieu_duoi_avif`.
+        assert_eq!(parse_key(&format!("media/{item}/{version}_w640.avif")), main);
+        assert_eq!(parse_key(&format!("media/{item}/{version}_w640.gif")), None);
         assert_eq!(parse_key(&format!("media/{item}/{version}_wx")), None);
         assert_eq!(parse_key("files/x"), None);
         assert_eq!(parse_key("media/x/y"), None);

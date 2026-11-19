@@ -574,7 +574,7 @@ async fn anh_thu_nho_qua_worker_va_tham_so_w() {
         assert_eq!(image::load_from_memory(webp.body()).unwrap().width(), 100);
 
         // `format` lạ: báo rõ thay vì lặng lẽ trả JPEG.
-        let wrong = webp_url.replace("format=webp", "format=avif");
+        let wrong = webp_url.replace("format=webp", "format=heic");
         let wrong =
             send(&app, "GET", &wrong, &[("authorization", auth.as_str())], Vec::new()).await;
         assert_eq!(wrong.status(), StatusCode::UNPROCESSABLE_ENTITY);

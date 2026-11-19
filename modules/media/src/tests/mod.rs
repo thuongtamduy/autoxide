@@ -7,6 +7,7 @@
 
 mod alt;
 mod alts;
+mod avif;
 mod direct;
 mod folders;
 mod images;

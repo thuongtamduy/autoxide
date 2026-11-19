@@ -55,6 +55,15 @@ pub(crate) const IMAGE_WIDTHS: Setting = Setting::new(
 )
 .with_default("320,640,1280,1920");
 
+pub(crate) const AVIF: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_AVIF",
+    "Also make an AVIF copy of every smaller copy of an image (`true` or `false`), in the \
+     background after upload; it is usually a third smaller than the WebP copy but takes seconds \
+     of CPU per image. Websites ask for it with `format=avif`. Turning it off keeps the AVIF \
+     copies already made.",
+)
+.with_default("false");
+
 pub(crate) const AI_SEND_PRIVATE: Setting = Setting::new(
     "AUTOXIDE_MEDIA_AI_SEND_PRIVATE",
     "Allow sending private images to the AI provider for alt text suggestions (`true` or \
@@ -78,6 +87,8 @@ pub(crate) struct MediaConfig {
     pub image_widths: Vec<u32>,
     /// Được gửi ảnh riêng tư cho nhà cung cấp AI để gợi ý alt text (D-109).
     pub ai_send_private: bool,
+    /// Làm bản AVIF bằng job nền (bước 39 B8, D-20261119-step39-avif).
+    pub avif: bool,
     /// Ngôn ngữ được dịch `alt` (D-202), đúng dạng đã khai.
     pub alt_locales: Vec<String>,
     /// Tải thẳng lên S3 (bước 40 P4).
@@ -173,6 +184,11 @@ impl MediaConfig {
                 Ok(widths)
             }
         });
+        let avif = reader.get_with(&AVIF, |raw| match raw.trim() {
+            "true" => Ok(true),
+            "false" => Ok(false),
+            _ => Err("must be `true` or `false`".to_owned()),
+        });
         let ai_send_private = reader.get_with(&AI_SEND_PRIVATE, |raw| match raw.trim() {
             "true" => Ok(true),
             "false" => Ok(false),
@@ -208,6 +224,7 @@ impl MediaConfig {
             trash_days: trash_days?,
             image_widths: image_widths?,
             ai_send_private: ai_send_private?,
+            avif: avif?,
             alt_locales: alt_locales?,
         })
     }

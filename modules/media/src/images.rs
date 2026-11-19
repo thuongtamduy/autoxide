@@ -2,6 +2,7 @@
 //! (`alt.rs`), alt theo ngôn ngữ (`alts.rs`).
 
 pub(crate) mod alt;
+pub(crate) mod avif;
 pub(crate) mod alts;
 pub(crate) mod refresh;
 pub(crate) mod variants;

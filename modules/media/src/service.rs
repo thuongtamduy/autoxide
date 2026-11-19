@@ -982,6 +982,9 @@ impl crate::api::Media for MediaService {
                             webp_url: copy
                                 .webp
                                 .map(|webp| format!("{url}&w={}&format=webp", webp.width)),
+                            avif_url: copy
+                                .avif
+                                .map(|avif| format!("{url}&w={}&format=avif", avif.width)),
                             width: copy.main.width,
                             height: copy.main.height,
                         })
