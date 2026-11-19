@@ -371,6 +371,7 @@ impl ModuleInfo {
                     stream_permission: event
                         .stream_permission()
                         .map(|permission| permission.name().to_owned()),
+                    stream_audience: event.stream_permission().is_some() && event.has_audience(),
                 })
                 .collect(),
             subscriptions: module
@@ -523,6 +524,10 @@ pub(crate) struct ModuleEvent {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "notes.read")]
     stream_permission: Option<String>,
+    /// The event also reaches, without `stream_permission`, the users it names as its audience
+    /// (e.g. the customer and the assigned agent of a conversation).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    stream_audience: bool,
 }
 
 /// A recurring job.

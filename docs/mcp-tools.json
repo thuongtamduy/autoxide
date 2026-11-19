@@ -5773,6 +5773,169 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a customer conversation in your scope with its latest 50 messages (oldest first).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A conversation to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the conversation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "conversations.get_thread",
+      "output_schema": null,
+      "permissions": [
+        "conversations.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List customer conversations in your scope, latest activity first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters of the conversation list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of conversations, 1 to 200 (default 50).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mine": {
+            "description": "`true`: only conversations assigned to you.",
+            "type": "boolean"
+          },
+          "needs_agent": {
+            "description": "`true`: only conversations where the customer asked for a person.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unread": {
+            "description": "`true`: only conversations where the customer wrote and no agent has read it yet.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "conversations.list_threads",
+      "output_schema": null,
+      "permissions": [
+        "conversations.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Send a message to the customer of a conversation in your scope; the same `client_id` never sends twice.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A message to send.",
+        "properties": {
+          "body": {
+            "description": "Plain text.",
+            "type": "string"
+          },
+          "client_id": {
+            "description": "An id you make up for this message (1 to 100 characters): calling again with the same\n`client_id` does not send it twice.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the conversation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "body",
+          "client_id"
+        ],
+        "type": "object"
+      },
+      "name": "conversations.reply",
+      "output_schema": null,
+      "permissions": [
+        "conversations.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the AI for a draft answer to a conversation; it is stored for an agent to edit and send, never sent by itself.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A conversation to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the conversation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "conversations.suggest_reply",
+      "output_schema": null,
+      "permissions": [
+        "conversations.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false

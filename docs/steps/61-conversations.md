@@ -28,8 +28,10 @@ thật của chủ dự án → dừng hỏi, không tự làm (D-232). Bước 
   `customer/agent/system`, `client_id` của máy gửi để gửi lại không trùng, `call_id` NULL — tin hệ thống tóm
   tắt cuộc gọi, D-232). Sửa không được; thu hồi trong 2 phút
   (ẩn nội dung, giữ dấu).
-- **Thời gian thực:** stream SSE của bước 40 (`/api/v1/conversations/stream`) phát `message_created`,
-  `thread_updated`, `typing` (không lưu), lọc theo quyền; không có WebSocket riêng. Đã đọc: con trỏ đọc theo người.
+- **Thời gian thực:** stream SSE của bước 40 (`GET /api/v1/kernel/events/stream?names=conversations.*`) phát
+  `message_created`, `thread_updated`, `typing` (không lưu nội dung), lọc theo quyền; người mua và nhân viên được giao
+  nhận qua trường `audience` của event (D-20261119-step61-stream-audience); không có WebSocket riêng. Đã đọc: con trỏ
+  đọc theo người.
 - **Không online:** tin chưa đọc sau N phút → thông báo qua `notifications` (email / đẩy di động), gom lô.
 - **Chuyển thành phiếu** (`support`, bước 53): `POST /threads/{id}/escalate` gọi `SupportIntake::open` với lịch
   sử rút gọn và liên kết.
@@ -153,7 +155,8 @@ database (như `active_buyer_key` của bước 45).
 ### API, MCP, quyền, lỗi
 
 - REST `/api/v1/conversations`: `threads` (lọc trạng thái, người nhận, chưa đọc), `messages`, `read`, `assign`,
-  `close`, `escalate`; `/me/conversations` cho người mua; `stream` (SSE).
+  `close`, `escalate`, `typing`, `recall`, `block`, `reports`, `suggest-reply`; `/me/threads…` cho người mua (kèm
+  `handoff`); thời gian thực qua stream của kernel (D-20261119-step61-stream-audience).
 - REST gọi điện (D-232):
   - người mua: `GET /me/conversations/threads/{id}/voice`, `POST /me/conversations/threads/{id}/calls`
     (`recording_ack?`; 201 kèm token phiên WebRTC), `POST /me/conversations/threads/{id}/callbacks` (201; gửi

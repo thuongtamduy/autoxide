@@ -179,6 +179,10 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `content.translate` | `content.write` or `content.write_own` | writes |
 | `content.unpublish` | `content.publish` or `content.publish_own` | destructive |
 | `content.update` | `content.write` or `content.write_own` | writes |
+| `conversations.get_thread` | `conversations.read` | read-only |
+| `conversations.list_threads` | `conversations.read` | read-only |
+| `conversations.reply` | `conversations.reply` | writes |
+| `conversations.suggest_reply` | `conversations.reply` | writes |
 | `files.confirm_upload` | `files.upload` or `files.manage` | writes |
 | `files.create_upload` | `files.upload` | writes |
 | `files.delete_file` | `files.upload` or `files.manage` | destructive |
