@@ -600,6 +600,31 @@ làn giống hệt `dot` cũ ở mọi cỡ. Kết luận: dưới ngưỡng 50 
 trên máy 4 nhân; vòng duyệt không còn chạy trên thread async. Giới hạn kế tiếp là bộ nhớ (cột cuối, mỗi khách mỗi
 ngôn ngữ mỗi bản), không phải thời gian.
 
+## Ảnh AVIF so với WebP (bước 39 B8, D-232) — 19/11/2026
+
+Quyết định: D-20261119-step39-avif. Máy như các mục trên (4 nhân Xeon 2,1 GHz dùng chung), build release, một chương
+trình đo tạm ngoài repo (`image` 0.25 đổi cỡ bằng CatmullRom như job ảnh thu nhỏ; WebP qua `webp` 0.3 chất lượng 80 như
+D-196; AVIF qua `ravif` 0.13, tốc độ 6; điểm bằng `dssim-core` 3.5, giải mã AVIF bằng `avifdec` — công cụ chấm điểm
+chạy ngoài repo, không vào workspace). Với mỗi cỡ, chọn chất lượng AVIF thấp nhất (bước 5) có DSSIM không kém bản WebP.
+
+Bộ ảnh: `lake.jpg` 4000 × 2250 (ảnh chụp, CC0, đi kèm crate `webp`); ảnh sản phẩm nền trắng 1600 × 1600 và bản cắt nền
+trong suốt (tự dựng bằng code: thân chai đổ bóng, nhãn có hoa văn); banner có chữ 2400 × 800 (tự dựng: nền chuyển
+màu, nét chữ mảnh tương phản cao, nút).
+
+| Ảnh | WebP 80, tổng các cỡ | AVIF cùng chất lượng | Chất lượng AVIF chọn | Mã hoá AVIF tổng, 1 thread (asm / Rust thuần) |
+| --- | ---: | ---: | :---: | ---: |
+| `lake.jpg` (320, 640, 1280, 1920) | 140 KB | 98 KB (**−30%**) | 75–80 | 4,9 s / 7,8 s |
+| sản phẩm nền trắng (320, 640, 1280) | 53 KB | 32 KB (**−39%**) | 60–75 | 2,8 s / — |
+| sản phẩm trong suốt (320, 640, 1280) | 72 KB | 40 KB (**−44%**) | 60–75 | 2,6 s / — |
+| banner có chữ (320, 640, 1280, 1920) | 267 KB | 192 KB (**−28%**) | 70–85 | 4,1 s / 6,8 s |
+
+Từng cỡ: nhẹ hơn 10–48%; ít nhất ở ảnh nhỏ nhất có chữ (320 px: −10%). WebP mã hoá 3–250 ms mỗi cỡ; AVIF chậm hơn
+20–40 lần — lý do chỉ làm bằng job nền, tắt mặc định. RAM đỉnh khi mã hoá cả 4 cỡ của `lake.jpg` (kể cả ảnh gốc đã giải
+mã): 146 MiB. Build sạch riêng `ravif` + `rav1e`: ~49 s, binary thêm ~3 MB.
+
+Ngưỡng (D-232): trung vị tiết kiệm ≥ 20% (đạt: −34%), tổng 4 cỡ ≤ 10 s một thread (đạt: 7,8 s Rust thuần), RAM ≤ 512 MiB
+(đạt) → làm.
+
 ## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
 
 Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,
