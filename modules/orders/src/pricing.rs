@@ -22,7 +22,7 @@ use autoxide_promotions::api::{
     Cart as PromotionCart, CartLine as PromotionLine, Evaluation, GiftSelection, Promotions,
 };
 use autoxide_shipping::api::{Address, QuoteItem, QuoteRequest, ShippingOption, ShippingRates};
-use autoxide_tax::api::{PriceMode, TaxEngine, TaxQuoteRequest, TaxableLine};
+use autoxide_tax::api::{PriceMode, TaxComponent, TaxEngine, TaxQuoteRequest, TaxableLine};
 use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
@@ -95,6 +95,8 @@ pub(crate) struct QuotedLine {
     /// Sau giảm, cùng chế độ giá với `unit_price`.
     pub net: Money,
     pub tax: Money,
+    /// Thành phần thuế của dòng như `TaxEngine` trả.
+    pub taxes: Vec<TaxComponent>,
     /// Người mua trả cho dòng: sau giảm, gồm thuế.
     pub gross: Money,
     /// Dòng quà do khuyến mại thêm.
@@ -122,6 +124,25 @@ pub(crate) struct Quote {
     pub evaluation: Option<Evaluation>,
     pub token: String,
     pub expires_at: DateTime<Utc>,
+}
+
+impl Quote {
+    /// Dấu vân tay trong `quote_token`.
+    pub(crate) fn fingerprint(&self) -> &str {
+        token_fingerprint(&self.token)
+    }
+}
+
+/// Dấu vân tay của một `quote_token` (token hỏng: chuỗi rỗng).
+pub(crate) fn token_fingerprint(token: &str) -> &str {
+    token.split_once('.').map_or("", |(_, fingerprint)| fingerprint)
+}
+
+/// Hạn và dấu vân tay trong `quote_token`; token hỏng → `None`.
+pub(crate) fn parse_token(token: &str) -> Option<(DateTime<Utc>, &str)> {
+    let (expires, fingerprint) = token.split_once('.')?;
+    let expires = DateTime::from_timestamp(expires.parse().ok()?, 0)?;
+    Some((expires, fingerprint))
 }
 
 fn add(a: Money, b: Money) -> Result<Money, Error> {
@@ -313,6 +334,7 @@ async fn priced_lines(
             discount: zero,
             net: subtotal,
             tax: zero,
+            taxes: Vec::new(),
             gross: subtotal,
             gift_of: None,
             problem,
@@ -428,6 +450,7 @@ async fn add_gifts(
             discount: zero,
             net: zero,
             tax: zero,
+            taxes: Vec::new(),
             gross: zero,
             gift_of: Some(gift.promotion_id),
             problem,
@@ -454,10 +477,11 @@ async fn apply_tax(
     let Some(engine) = &sources.tax else {
         return Ok((zero, shipping_net));
     };
-    let jurisdiction = engine
-        .profile(tenant, input.org_id)
-        .await?
-        .map_or_else(|| "VN".to_owned(), |profile| profile.jurisdiction);
+    // Nút chưa có hồ sơ thuế (chưa cấu hình thuế): chưa tính thuế, như `catalog` (bước 41).
+    let Some(profile) = engine.profile(tenant, input.org_id).await? else {
+        return Ok((zero, shipping_net));
+    };
+    let jurisdiction = profile.jurisdiction;
     let mut shipping = (zero, shipping_net);
     // Một lần gọi cho mỗi chế độ giá (bảng giá gồm thuế hay chưa); phí giao coi như gồm thuế.
     for inclusive in [true, false] {
@@ -497,6 +521,7 @@ async fn apply_tax(
             } else if let Some(line) = lines.iter_mut().find(|line| line.key == taxed_line.line_id)
             {
                 line.tax = line_tax;
+                line.taxes = taxed_line.taxes.clone();
                 line.gross = taxed_line.gross;
             }
         }
@@ -552,7 +577,15 @@ fn fingerprint(quote: &Quote) -> Result<String, Error> {
         "shipping_discount": quote.shipping_discount,
         "tax": quote.tax,
         "total": quote.total,
-        "promotions": quote.evaluation.as_ref().map(|evaluation| &evaluation.fingerprint),
+        // Chỉ thứ người mua thấy (chương trình, số tiền) — không dấu vân tay nội bộ của
+        // `promotions`, vốn đổi theo cả dữ liệu không làm đổi tiền (vd phương thức thanh toán).
+        "promotions": quote.evaluation.as_ref().map(|evaluation| {
+            evaluation
+                .applied
+                .iter()
+                .map(|applied| (applied.promotion_id, applied.amount))
+                .collect::<Vec<_>>()
+        }),
     }))
 }
 
