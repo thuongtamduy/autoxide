@@ -8,6 +8,7 @@
 mod alt;
 mod alts;
 mod avif;
+mod avif_http;
 mod direct;
 mod folders;
 mod images;
