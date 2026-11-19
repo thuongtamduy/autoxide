@@ -310,6 +310,14 @@ impl PromotionsService {
         }
         bump_revision(&transaction, tenant).await?;
         record_change(&self.outbox, &transaction, tenant, actor, &before, &after).await?;
+        // Đang chạy mà đổi (vd kéo dài): hạn của giá giảm tự động đổi theo.
+        if status == Status::Active
+            && let Some(prices) = events::automatic_prices_changed(&after)
+        {
+            self.outbox
+                .record(&transaction, tenant, actor, events::promotion_subject(id), &prices)
+                .await?;
+        }
         transaction.commit().await?;
         self.compiled.invalidate(tenant.id());
         self.promotion(tenant, principal, id).await

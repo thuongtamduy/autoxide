@@ -7,6 +7,10 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# Lệnh `comments.bench_seed` sinh dữ liệu đo (bước 39 B1); bật qua feature `bench-seed` của `autoxide`.
+bench-seed = []
+
 [dependencies]
 async-trait.workspace = true
 autoxide-kernel.workspace = true

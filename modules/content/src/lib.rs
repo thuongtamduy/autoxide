@@ -12,6 +12,8 @@
 
 mod ai;
 pub mod api;
+#[cfg(any(test, feature = "bench-seed"))]
+mod bench_seed;
 mod client_config;
 mod config;
 mod entity;
@@ -287,6 +289,12 @@ impl Module for ContentModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    // Lệnh sinh dữ liệu đo (bước 39 B1): chỉ có khi bật cargo feature `bench-seed`.
+    #[cfg(feature = "bench-seed")]
+    fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
+        self.service.clone().map(|service| vec![bench_seed::task(service)]).unwrap_or_default()
     }
 
     fn tools(&self) -> Vec<Tool> {

@@ -61,11 +61,11 @@ impl Job for MakeVariants {
 }
 
 /// Một ảnh thu nhỏ vừa làm, chưa lưu.
-struct Rendered {
-    width: u32,
-    height: u32,
-    content_type: &'static str,
-    bytes: Vec<u8>,
+pub(crate) struct Rendered {
+    pub(crate) width: u32,
+    pub(crate) height: u32,
+    pub(crate) content_type: &'static str,
+    pub(crate) bytes: Vec<u8>,
 }
 
 /// File có cỡ hợp lý so với số pixel của nó không: ảnh nén không bao giờ lớn hơn pixel
@@ -370,7 +370,7 @@ fn encode_webp(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, Strin
 
 /// Giải mã `original`, xoay theo EXIF, làm hai bản (JPEG / PNG và WebP) cho mỗi chiều rộng nhỏ
 /// hơn ảnh.
-fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
+pub(crate) fn render(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String> {
     let image = decode(original)?;
     let transparent = image.color().has_alpha();
     let mut rendered = Vec::new();
