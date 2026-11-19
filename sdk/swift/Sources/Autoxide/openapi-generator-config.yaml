@@ -1,0 +1,6 @@
+# swift-openapi-generator: what to generate from openapi.json (a copy of docs/openapi.json).
+generate:
+  - types
+  - client
+accessModifier: public
+namingStrategy: idiomatic

@@ -86,6 +86,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành nhiều job song song (theo phần và shard), main lưu cache, Postgres chia suất có sàn — 2026-11-19
 - **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
+- **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19
 
 ## Kiến trúc module và kernel
 
