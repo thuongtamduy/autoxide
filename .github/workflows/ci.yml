@@ -62,6 +62,24 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-deny
+      # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
+      # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
+      # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
+      - name: Configure the PostgreSQL service like gate.sh
+        run: |
+          container=${{ job.services.postgres.id }}
+          docker exec "$container" psql -U postgres -q \
+            -c "ALTER SYSTEM SET max_connections = 300" \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off"
+          docker restart "$container" >/dev/null
+          for _ in $(seq 1 30); do
+            docker exec "$container" pg_isready -h 127.0.0.1 -U postgres >/dev/null && \
+              docker exec "$container" psql -h 127.0.0.1 -U postgres -tAc "SHOW max_connections" && exit 0
+            sleep 1
+          done
+          exit 1
       - name: Create the S3 test bucket
         run: |
           for _ in $(seq 1 30); do

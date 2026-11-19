@@ -97,8 +97,11 @@ chốt có mục lục theo chủ đề ở [`docs/decisions/INDEX.md`](docs/dec
 - Mỗi pull request một thay đổi. Tách những thay đổi không liên quan.
 - Dòng tiêu đề commit tóm tắt ngắn điều đã đổi (tiếng Anh hay tiếng Việt), và giải thích
   *vì sao* trong phần thân khi điều đó không hiển nhiên.
-- Thêm một dòng dưới `## [Unreleased]` trong [`CHANGELOG.md`](CHANGELOG.md) cho mọi thứ
-  người dùng Autoxide sẽ nhận ra.
+- Với mọi thứ người dùng Autoxide sẽ nhận ra, thêm một file nhỏ vào
+  [`changelog.d/`](changelog.d/README.md) thay vì sửa `CHANGELOG.md`: đặt tên
+  `<tên>.<mục>.md` (`added`, `changed`, `deprecated`, `removed`, `fixed` hay `security`) và viết các
+  gạch đầu dòng tiếng Anh đúng như sẽ nằm trong changelog. Chúng được gộp vào `CHANGELOG.md` lúc
+  phát hành, nên các pull request song song không bao giờ xung đột ở đó.
 - Trong pull request, nói bạn đã đổi gì, vì sao, và xác nhận `./gate.sh` đầy đủ đã xanh.
 
 ## License của phần đóng góp
