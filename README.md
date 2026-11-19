@@ -401,6 +401,8 @@ never share foreign keys. These rules are checked automatically by the gate.
 - [`docs/BOOKINGS.md`](docs/BOOKINGS.md) — bookings: services, staff and rooms, weekly schedules in
   the unit's time zone, free times, deposits through the payment partner, cancellation policy,
   reminders, guests with a phone code
+- [`docs/SUPPORT.md`](docs/SUPPORT.md) — customer support tickets: guests with a ticket token, staff
+  scope by unit, teams and routing, business-hour deadlines, hand-over to consumer complaints, AI drafts
 - [`docs/ANALYTICS.md`](docs/ANALYTICS.md) — cookieless website analytics: sending events from a
   website, reports, funnels, consent for per-person tracking, legal notes
 - [`docs/ADDRESS.md`](docs/ADDRESS.md) — administrative units and addresses: reading the list,

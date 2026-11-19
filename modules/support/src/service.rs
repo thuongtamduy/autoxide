@@ -46,6 +46,8 @@ pub(crate) struct Parts {
     pub resources: Option<autoxide_kernel::resource::ResourceDirectory>,
     /// Chuyển phiếu thành khiếu nại người tiêu dùng; `None` khi không cài `compliance`.
     pub complaints: Option<Arc<dyn autoxide_compliance::api::ComplaintIntake>>,
+    /// Mô hình soạn bản nháp (module `ai`); `None` khi không cài.
+    pub ai: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
