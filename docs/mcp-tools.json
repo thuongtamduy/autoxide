@@ -11624,7 +11624,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Get the data of a promotion notice, one entry per authority (e.g. `province:79`): whether a notice is required under the rules in force, the last day to submit, the legal basis and what was recorded. People submit the notice; this only prepares it.",
+      "description": "Get the data of a promotion notice, one entry per authority (e.g. `province:79`): whether a notice is required under the rules in force, the last day to submit, the legal basis and what was recorded. People submit the notice; this only prepares it. Needs `promotions.compliance` too.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A promotion to act on.",
@@ -11643,7 +11643,7 @@
       "name": "promotions.export_notice",
       "output_schema": null,
       "permissions": [
-        "promotions.compliance"
+        "promotions.read"
       ]
     },
     {
