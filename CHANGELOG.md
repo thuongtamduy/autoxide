@@ -11,14 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
-- Module `inventory`: back-in-stock alerts per store — `POST /api/v1/inventory/public/restock-alerts` (separate
-  consent, anti-spam, two-step confirmation through `AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL`; signed-in buyers alerted
-  on their account), one message per restock wave through `notifications`, stop link in every message;
-  `Inventory::restock_alerts_of` answers.
-- Module `inventory`: public availability `GET /api/v1/inventory/public/availability?variant_ids&store_id` — `in_stock`,
-  `low` (with the quantity, only below `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`), `out` or `preorder` per variant and
-  store, never a large number; `ETag` and a 5-second cache. `Inventory::in_stock_at` uses the same rule (warehouse
-  sources, bundles).
+- `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
+  one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
+  (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
 - Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
   limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
   stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
@@ -226,6 +221,20 @@ endpoints are marked deprecated with a sunset date first.
   written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
   `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
   `kernel.relocation_finished`, `kernel.relocation_failed`.
+- Unit groups for reports (step 38): free sets of units of a tenant, from any branch (e.g. "stores in the north"),
+  under `/api/v1/organizations/groups` (`member_count` and `excluded_org_count` only count units within your scope)
+  and MCP tools `organizations.list_groups`, `organizations.create_group`, `organizations.add_group_members`,
+  `organizations.remove_group_member`; permission `organizations.groups.manage` (whole tenant only); events
+  `organizations.group_*`. A group grants no access: `GET /api/v1/reporting/summary` and `/facts` take `group_ids`
+  and `group_by=group`, always cut down to the caller's scope, and report `excluded_org_count`.
+- Sandboxes, first part (step 38): `POST /api/v1/kernel/tenants/{id}/sandboxes` makes a test copy of a tenant on the
+  same database (no personal data), ready when its job is done; staff of the tenant enter it with
+  `Autoxide-Tenant: <sandbox id>` through an automatic delegation. `GET …/sandboxes`, `POST /sandboxes/{id}/extend`,
+  `DELETE /sandboxes/{id}`; MCP tools `kernel.list_sandboxes`, `kernel.create_sandbox`, `kernel.extend_sandbox`;
+  permissions `kernel.sandboxes.read`, `kernel.sandboxes.manage`; plan limit `kernel.sandboxes` (1 when the plan does
+  not say). Every response of a sandbox carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`;
+  `GET /api/v1/kernel/tenant` adds `kind`, `sandbox_of`, `sandbox_expires_at`. Sandboxes are deleted after
+  `AUTOXIDE_TENANCY_SANDBOX_DAYS` (default 30) unless extended. Setting `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).

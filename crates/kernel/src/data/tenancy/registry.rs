@@ -620,10 +620,16 @@ impl DatabaseRegistry {
         let ready = placement == MAIN_PLACEMENT || schema_state.as_deref() == Some("ready");
         let storage_sealed: Option<String> = row.try_get("", "storage_sealed")?;
         let read_only: bool = row.try_get("", "read_only")?;
+        let sandbox_of: Option<Uuid> = row.try_get("", "sandbox_of")?;
+        let sandbox_expires_at: Option<chrono::DateTime<chrono::Utc>> =
+            row.try_get("", "sandbox_expires_at")?;
         let database = self.placement_database(placement).await?;
         let mut tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
             .with_schema_ready(ready)
             .with_read_only(read_only);
+        if let Some(of) = sandbox_of {
+            tenant = tenant.with_sandbox_of(TenantId::from_uuid(of), sandbox_expires_at);
+        }
         if let Some(sealed) = storage_sealed
             && placement != MAIN_PLACEMENT
         {
@@ -657,8 +663,17 @@ fn tenant_select() -> SelectStatement {
     let placements = Alias::new("kernel_placements");
     Query::select()
         .columns(
-            ["id", "slug", "name", "status", "placement_id", "read_only"]
-                .map(|column| (tenants.clone(), Alias::new(column))),
+            [
+                "id",
+                "slug",
+                "name",
+                "status",
+                "placement_id",
+                "read_only",
+                "sandbox_of",
+                "sandbox_expires_at",
+            ]
+            .map(|column| (tenants.clone(), Alias::new(column))),
         )
         .column((placements.clone(), Alias::new("schema_state")))
         .column((placements.clone(), Alias::new("storage_sealed")))

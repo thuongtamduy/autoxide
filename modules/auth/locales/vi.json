@@ -135,6 +135,7 @@
   "field:must be at most {description_max_length} characters long": "phải dài tối đa {description_max_length} ký tự",
   "field:must be at most {max_days} days from now": "phải trong vòng {max_days} ngày kể từ bây giờ",
   "field:must be at most {max} characters long": "phải dài tối đa {max} ký tự",
+  "field:must be between 0 and {max_overlap_hours}": "phải từ 0 tới {max_overlap_hours}",
   "field:must be between 1 and {name_max_length} characters long": "phải dài từ 1 đến {name_max_length} ký tự",
   "field:must be between {min_length} and {max_length} characters long": "phải dài từ {min_length} đến {max_length} ký tự",
   "field:must be in the future": "phải là thời điểm trong tương lai",

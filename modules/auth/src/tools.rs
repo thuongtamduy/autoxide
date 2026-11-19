@@ -52,6 +52,42 @@ pub(crate) struct ListUsersInput {
     order: Option<String>,
 }
 
+/// An API key to replace, and how.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RotateApiKeyInput {
+    /// Id of the key to replace.
+    id: Uuid,
+    /// Hours the old key keeps working, 0 to 72 (24 by default); 0 stops it at once.
+    overlap_hours: Option<u32>,
+    /// When the new key stops working (RFC 3339); omit for the longest lifetime allowed.
+    expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Your current password, or give `totp_code` or `reauth_token` instead.
+    #[serde(default)]
+    current_password: String,
+    /// A code from your authenticator app, instead of the password.
+    totp_code: Option<String>,
+    /// A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.
+    reauth_token: Option<String>,
+}
+
+impl From<RotateApiKeyInput> for crate::api_key::Rotation {
+    fn from(input: RotateApiKeyInput) -> Self {
+        use crate::api_key::Reauth;
+        crate::api_key::Rotation {
+            overlap_hours: input
+                .overlap_hours
+                .unwrap_or(crate::http::api_key_rotation::DEFAULT_OVERLAP_HOURS),
+            expires_at: input.expires_at,
+            current_password: input.current_password,
+            second_factor: input
+                .reauth_token
+                .map(Reauth::Token)
+                .or(input.totp_code.map(Reauth::Totp)),
+        }
+    }
+}
+
 /// A role or user to act on.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -284,6 +320,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
 /// Tool về API key của chính người gọi: cùng service với `/api/v1/auth/api-keys`.
 fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
     let (list, create, revoke) = (state.clone(), state.clone(), state.clone());
+    let rotate = state.clone();
     vec![
         Tool::new(
             "list_api_keys",
@@ -308,6 +345,23 @@ fn api_keys(state: &Arc<HttpState>) -> Vec<Tool> {
                 let state = create.clone();
                 async move {
                     let created = state.api_keys.create(&tenant, &principal, input.into()).await?;
+                    Ok::<_, Error>(CreatedApiKeyResponse::from(created))
+                }
+            },
+        )
+        .for_any_signed_in()
+        .returns_secret(),
+        Tool::new(
+            "rotate_api_key",
+            "Replace one of your API keys with a new one that has the same name, permissions, \
+             unit, allowed addresses and kind. The old key keeps working for `overlap_hours` \
+             (24 by default) so programs can switch. Needs your current password and a password \
+             session. The result carries the new key, shown only once.",
+            move |tenant: TenantContext, principal: Principal, input: RotateApiKeyInput| {
+                let state = rotate.clone();
+                async move {
+                    let created =
+                        state.api_keys.rotate(&tenant, &principal, input.id, input.into()).await?;
                     Ok::<_, Error>(CreatedApiKeyResponse::from(created))
                 }
             },

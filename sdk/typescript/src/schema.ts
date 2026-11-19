@@ -74,6 +74,12 @@ export type ActivityResponse = {
   subject?: string | null;
 };
 
+/** Units to add to a group. */
+export type AddMembersRequest = {
+  /** 1 to 200 unit ids of this tenant, from any branch. Units already in the group are skipped. */
+  org_ids: string[];
+};
+
 /** The authenticator's answer to an add-passkey ceremony. */
 export type AddPasskeyRequest = {
   /** The `ceremony_id` from `POST /api/v1/auth/me/passkeys/registration`. */
@@ -101,6 +107,14 @@ export type AddSupportMessageRequest = {
   media_ids?: string[];
   /** Colleagues to notify, in an internal note (at most 20). */
   mentions?: string[];
+};
+
+/** Result of adding units to a group. */
+export type AddedResponse = {
+  /** Units that were not in the group before. */
+  added: number;
+  /** Units in the group now (all of them, whatever your scope). */
+  member_count: number;
 };
 
 /** An add-on of a subscription. */
@@ -285,6 +299,11 @@ export type ApiKeyResponse = {
    * their first 12 characters.
    */
   prefix: string;
+  /**
+   * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+   * created from scratch.
+   */
+  rotated_from?: string | null;
 };
 
 /** Records to tag or untag in one call. */
@@ -4039,6 +4058,14 @@ export type CreateFormRequest = {
   success_message?: Localized | null;
 };
 
+/** A new unit group. */
+export type CreateGroupRequest = {
+  /** Up to 1000 characters. */
+  description?: string | null;
+  /** 1 to 200 characters, unique in the tenant (accents and case ignored). */
+  name: string;
+};
+
 /** A new list. */
 export type CreateListRequest = {
   description?: NewsletterText | null;
@@ -4229,6 +4256,11 @@ export type CurrencyTotalResponse = {
 /** The tenant of the caller. */
 export type CurrentTenant = {
   id: string;
+  /**
+   * `production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and
+   * webhooks do not leave, nothing done here counts in the real tenant).
+   */
+  kind?: string;
   /** `single` (one tenant) or `multi` (many tenants on one installation). */
   mode: string;
   name: string;
@@ -4239,6 +4271,10 @@ export type CurrentTenant = {
    * Always present.
    */
   read_only: boolean;
+  /** Sandbox only: when it is deleted unless extended. */
+  sandbox_expires_at?: string | null;
+  /** Sandbox only: the real tenant it was made from. */
+  sandbox_of?: string | null;
   slug: string;
   status: string;
 };
@@ -4332,6 +4368,17 @@ export type Data_AcceptedResponse = {
     tokens?: TokenResponse | null;
     /** The account that now has the roles. */
     user_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AddedResponse = {
+  /** Result of adding units to a group. */
+  data: {
+    /** Units that were not in the group before. */
+    added: number;
+    /** Units in the group now (all of them, whatever your scope). */
+    member_count: number;
   };
 };
 
@@ -6185,6 +6232,11 @@ export type Data_CurrentTenant = {
   /** The tenant of the caller. */
   data: {
     id: string;
+    /**
+     * `production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and
+     * webhooks do not leave, nothing done here counts in the real tenant).
+     */
+    kind?: string;
     /** `single` (one tenant) or `multi` (many tenants on one installation). */
     mode: string;
     name: string;
@@ -6195,6 +6247,10 @@ export type Data_CurrentTenant = {
      * Always present.
      */
     read_only: boolean;
+    /** Sandbox only: when it is deleted unless extended. */
+    sandbox_expires_at?: string | null;
+    /** Sandbox only: the real tenant it was made from. */
+    sandbox_of?: string | null;
     slug: string;
     status: string;
   };
@@ -6664,6 +6720,28 @@ export type Data_FunnelReport = {
     key: string;
     steps: FunnelStep[];
     to: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_GroupResponse = {
+  /**
+   * A unit group: any units of the tenant gathered to filter and group reports (e.g. "stores in
+   * the north"). A group grants no access.
+   */
+  data: {
+    created_at: string;
+    description?: string | null;
+    /** Units of the group outside your scope: only counted, never listed or named. */
+    excluded_org_count: number;
+    id: string;
+    /**
+     * Units of the group within your `organizations.units.read` scope; units outside it are not
+     * counted.
+     */
+    member_count: number;
+    name: string;
+    updated_at: string;
   };
 };
 
@@ -9236,6 +9314,43 @@ export type Data_RunResponse = {
     /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
     trigger_key: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Sandbox = {
+  /**
+   * A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are
+   * always simulated there and mail and webhooks do not leave it.
+   */
+  data: {
+    created_at: string;
+    /** When it is deleted unless extended. */
+    expires_at?: string | null;
+    /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+    id: string;
+    name: string;
+    /** Products asked to copy. */
+    products: number;
+    /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+    role_id?: string | null;
+    /** The real tenant it was made from. */
+    sandbox_of: string;
+    slug: string;
+    /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SandboxCreated = {
+  /** A new sandbox and the job copying the configuration into it. */
+  data: Sandbox & {
+    /**
+     * The background job copying the configuration; follow it at
+     * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
+     */
+    job_id?: string | null;
   };
 };
 
@@ -13289,6 +13404,32 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A unit in a group. */
+export type GroupMemberResponse = {
+  added_at: string;
+  /** Id of the unit (see `GET /api/v1/organizations/units/{id}`). */
+  org_id: string;
+};
+
+/**
+ * A unit group: any units of the tenant gathered to filter and group reports (e.g. "stores in
+ * the north"). A group grants no access.
+ */
+export type GroupResponse = {
+  created_at: string;
+  description?: string | null;
+  /** Units of the group outside your scope: only counted, never listed or named. */
+  excluded_org_count: number;
+  id: string;
+  /**
+   * Units of the group within your `organizations.units.read` scope; units outside it are not
+   * counted.
+   */
+  member_count: number;
+  name: string;
+  updated_at: string;
+};
+
 /** A guest cancels a booking. */
 export type GuestCancelRequest = {
   /** A fresh code sent to the phone number of the booking. */
@@ -16030,6 +16171,16 @@ export type NewRecordNote = {
   mentions?: string[];
 };
 
+/** A new sandbox. */
+export type NewSandbox = {
+  /** 1 to 200 characters. */
+  name: string;
+  /** Products to copy (0 by default), at most `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`. */
+  products?: number | null;
+  /** Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted. */
+  role_id?: string | null;
+};
+
 /** A new address in the address book. */
 export type NewShippingAddress = {
   address: ShippingPostalAddress;
@@ -16905,6 +17056,11 @@ export type Page_ApiKeyResponse = {
      * their first 12 characters.
      */
     prefix: string;
+    /**
+     * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+     * created from scratch.
+     */
+    rotated_from?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -17948,6 +18104,37 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GroupMemberResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    added_at: string;
+    /** Id of the unit (see `GET /api/v1/organizations/units/{id}`). */
+    org_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GroupResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    /** Units of the group outside your scope: only counted, never listed or named. */
+    excluded_org_count: number;
+    id: string;
+    /**
+     * Units of the group within your `organizations.units.read` scope; units outside it are not
+     * counted.
+     */
+    member_count: number;
+    name: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -19441,6 +19628,29 @@ export type Page_RunResponse = {
     /** What started the run: `event:<id>`, `schedule:<time>`, `metric:<day>` or `manual:<id>`. */
     trigger_key: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Sandbox = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** When it is deleted unless extended. */
+    expires_at?: string | null;
+    /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+    id: string;
+    name: string;
+    /** Products asked to copy. */
+    products: number;
+    /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+    role_id?: string | null;
+    /** The real tenant it was made from. */
+    sandbox_of: string;
+    slug: string;
+    /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -22672,6 +22882,33 @@ export type RoleResponse = {
   updated_at: string;
 };
 
+/** How to replace a key. */
+export type RotateApiKeyRequest = {
+  /**
+   * Your current password, as when creating a key. Or `totp_code`, a passkey
+   * (`passkey_ceremony_id` and `passkey_credential`) or a `reauth_token` instead — exactly one.
+   */
+  current_password?: string;
+  /**
+   * When the new key stops working (RFC 3339), at most `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days
+   * ahead. Omit for that longest lifetime.
+   */
+  expires_at?: string | null;
+  /**
+   * Hours the old key keeps working, 0 to 72 (24 by default): time to switch every program
+   * to the new key. 0 stops the old key at once.
+   */
+  overlap_hours?: number | null;
+  /** One of your passkeys, instead of the password (see `POST /api/v1/auth/api-keys`). */
+  passkey_ceremony_id?: string | null;
+  /** The browser's answer for `passkey_ceremony_id`. */
+  passkey_credential?: Record<string, unknown> | null;
+  /** A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password. */
+  reauth_token?: string | null;
+  /** A code from your authenticator app, instead of the password. */
+  totp_code?: string | null;
+};
+
 /** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
 export type RuleResponse = {
   /**
@@ -22765,6 +23002,37 @@ export type RunResponse = {
 export type RunRuleRequest = {
   /** What the templates see as `event` (e.g. `{"order": {"id": "…"}}`); default `{}`. */
   input?: Record<string, unknown> | null;
+};
+
+/**
+ * A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are
+ * always simulated there and mail and webhooks do not leave it.
+ */
+export type Sandbox = {
+  created_at: string;
+  /** When it is deleted unless extended. */
+  expires_at?: string | null;
+  /** Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it. */
+  id: string;
+  name: string;
+  /** Products asked to copy. */
+  products: number;
+  /** Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role. */
+  role_id?: string | null;
+  /** The real tenant it was made from. */
+  sandbox_of: string;
+  slug: string;
+  /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
+  status: string;
+};
+
+/** A new sandbox and the job copying the configuration into it. */
+export type SandboxCreated = Sandbox & {
+  /**
+   * The background job copying the configuration; follow it at
+   * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
+   */
+  job_id?: string | null;
 };
 
 /** A saved reply to write. */
@@ -24034,8 +24302,13 @@ export type SummaryGroupResponse = {
   by_currency: CurrencyTotalResponse[];
   converted?: Money | null;
   /**
-   * The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;
-   * `total` for the totals.
+   * With `group_ids` (on `totals`) or `group_by=group` (on each group): units of the asked
+   * groups outside your scope, left out of the sums. Absent otherwise.
+   */
+  excluded_org_count?: number | null;
+  /**
+   * The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id, a unit id or a
+   * unit group id; `total` for the totals.
    */
   key: string;
 };
@@ -25379,6 +25652,14 @@ export type UpdateFormRequest = {
   success_message?: Localized | null;
 };
 
+/** Changes to a unit group; omitted fields stay as they are. */
+export type UpdateGroupRequest = {
+  /** New description, up to 1000 characters; an empty string removes it. */
+  description?: string | null;
+  /** New name, 1 to 200 characters. */
+  name?: string | null;
+};
+
 /** Changes to a media item. Omitted fields stay as they are. */
 export type UpdateItemRequest = {
   /** Text alternative, up to 1000 characters; `""` clears it. */
@@ -26051,6 +26332,23 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/api-keys/{id}/rotate": {
+    /** Replace one of your API keys with a new one. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RotateApiKeyRequest;
+      responses: {
+        201: Data_CreatedApiKeyResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
@@ -33277,6 +33575,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandboxes/{id}": {
+    /** Delete a sandbox. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandboxes/{id}/extend": {
+    /** Extend a sandbox. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Sandbox;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/settings": {
     /** List this tenant's settings. */
     get: {
@@ -33630,6 +33954,33 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/tenants/{id}/sandboxes": {
+    /** List the sandboxes of a tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_Sandbox;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a sandbox of a tenant. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: NewSandbox;
+      responses: {
+        201: Data_SandboxCreated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -36056,6 +36407,111 @@ export interface paths {
       };
     };
   };
+  "/api/v1/organizations/groups": {
+    /** List the unit groups of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GroupResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a unit group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateGroupRequest;
+      responses: {
+        201: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}": {
+    /** Get a unit group. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename a unit group or change its description. */
+    patch: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateGroupRequest;
+      responses: {
+        200: Data_GroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a unit group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}/members": {
+    /** List the units of a group that are within your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GroupMemberResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add units to a group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddMembersRequest;
+      responses: {
+        200: Data_AddedResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/groups/{id}/members/{org_id}": {
+    /** Remove a unit from a group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; org_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/organizations/public/site": {
     /** Get the profile of the website being visited. */
     get: {
@@ -37254,7 +37710,7 @@ export interface paths {
   "/api/v1/reporting/facts": {
     /** List report facts. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; group_ids?: string; dimensions?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_FactResponse;
         401: Problem;
@@ -37308,7 +37764,7 @@ export interface paths {
   "/api/v1/reporting/summary": {
     /** Sum a report figure over a period. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; dimensions?: string; group_by?: string; currency?: string }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { kind?: string; from?: string; to?: string; tenant_ids?: string; org_ids?: string; group_ids?: string; dimensions?: string; group_by?: string; currency?: string }; };
       responses: {
         200: Data_SummaryResponse;
         401: Problem;

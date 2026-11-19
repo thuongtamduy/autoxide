@@ -9,9 +9,12 @@
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
-//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`) và độ dài
+//!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
+//!   (`changelog.rs`) và độ dài
 //!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
+//! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
+//!   xoá chúng; chạy lúc phát hành (xem `changelog.rs`, D-20261119-changelog-fragments).
 //! - `decisions` — sinh lại mục lục `docs/decisions/INDEX.md` từ nhật ký quyết định (xem
 //!   `decisions.rs`).
 //! - `new-module <module> <entity>` — sinh module mới từ khuôn `modules/notes` (xem
@@ -26,6 +29,7 @@
 mod affected;
 mod api_diff;
 mod boundaries;
+mod changelog;
 mod decisions;
 mod deploy_metrics;
 mod docs;
@@ -43,6 +47,7 @@ use std::process::ExitCode;
 
 const USAGE: &str = "usage: cargo xtask check
        cargo xtask decisions                     regenerate docs/decisions/INDEX.md
+       cargo xtask changelog                     fold changelog.d/ fragments into CHANGELOG.md (at release)
        cargo xtask api-diff [--base <ref>]       default base: the last release tag before HEAD
        cargo xtask semver [--base <tag>] [--deny] [--markdown]
        cargo xtask sdk [--check | --extract-examples <dir>]
@@ -60,6 +65,7 @@ fn main() -> ExitCode {
     match args.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["check"] => check(),
         ["decisions"] => decisions(),
+        ["changelog"] => changelog(),
         ["api-diff"] => api_diff(None),
         ["api-diff", "--base", base] => api_diff(Some(base)),
         ["semver", rest @ ..] => semver(rest),
@@ -188,6 +194,7 @@ fn check() -> ExitCode {
         violations.extend(docs::check_docs(&workspace.root)?);
         violations.extend(tenancy::check_entities(&workspace)?);
         violations.extend(decisions::check(&workspace.root)?);
+        violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);
         violations.extend(deploy_metrics::check(&workspace.root)?);
         let lengths = lengths::check(&workspace.root)?;
@@ -225,6 +232,26 @@ fn decisions() -> ExitCode {
         }
         Err(error) => {
             eprintln!("xtask decisions: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn changelog() -> ExitCode {
+    let result = workspace::load()
+        .map_err(|error| error.to_string())
+        .and_then(|workspace| changelog::fold(&workspace.root));
+    match result {
+        Ok(count) => {
+            println!(
+                "changelog: folded {count} fragment(s) from {} into {}",
+                changelog::DIR,
+                changelog::CHANGELOG_FILE
+            );
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask changelog: {error}");
             ExitCode::FAILURE
         }
     }

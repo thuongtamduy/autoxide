@@ -466,7 +466,7 @@ bị tạm khoá → sandbox của nó cũng bị chặn; khách gốc bị xoá
   người gọi (cùng luật lọc ở Luồng 1 bước 4); nút ngoài phạm vi bị bỏ và response ghi `excluded_org_count` (tổng
   và theo từng nhóm khi `group_by=group`). Nhóm chỉ lọc fact của chính khách sở hữu nhóm (`source_tenant_id` =
   khách người gọi), không lọc khách con.
-- `group_by=group`: một fact thuộc nút ở hai nhóm được tính ở cả hai nhóm — tổng các nhóm có thể lớn hơn tổng
+- `group_by=group` cần `group_ids` (thiếu → 422, D-20261118-step38-groups): một fact thuộc nút ở hai nhóm được tính ở cả hai nhóm — tổng các nhóm có thể lớn hơn tổng
   chung (ghi trong mô tả OpenAPI).
 - Xoá nút / lưu trữ nút không xoá thành viên (báo cáo lịch sử vẫn gom được); xoá nhóm không xoá fact.
 
@@ -512,10 +512,10 @@ Sandbox `{id}` không phải sandbox của khách người gọi → `tenancy.sa
 
 | Method + path | Permission | Tóm tắt |
 |---|---|---|
-| `GET /groups?q=` | `organizations.units.read` | `Page` nhóm; `member_count` chỉ đếm nút trong phạm vi người gọi |
+| `GET /groups?q=` | `organizations.units.read` | `Page` nhóm; `member_count` chỉ đếm nút trong phạm vi người gọi, `excluded_org_count` số nút ngoài phạm vi |
 | `POST /groups` `{name, description?}` | `organizations.groups.manage` | → `Created` |
 | `GET /groups/{id}` · `PATCH /groups/{id}` · `DELETE /groups/{id}` | units.read · groups.manage (`If-Match`) · groups.manage | |
-| `GET /groups/{id}/members` | `organizations.units.read` | `Page` nút thành viên **trong phạm vi** người gọi, kèm `excluded_org_count` |
+| `GET /groups/{id}/members` | `organizations.units.read` | `Page` nút thành viên **trong phạm vi** người gọi; số nút ngoài phạm vi là `excluded_org_count` của `GET /groups/{id}` (D-20261118-step38-groups) |
 | `POST /groups/{id}/members` `{org_ids}` | `organizations.groups.manage` | thêm (gọi lại không trùng); nút không thuộc khách → `organizations.group_member_invalid` |
 | `DELETE /groups/{id}/members/{org_id}` | `organizations.groups.manage` | bỏ một nút; không có thì vẫn 204 |
 
