@@ -21,7 +21,8 @@ chính website là các dự án riêng gọi vào nó. Module nằm dưới `/a
 | `content.publish`     | Đăng, gỡ, lưu trữ, chuyển trang, hẹn giờ; danh mục và tác giả của mục đang công khai |
 | `content.publish_own` | Chỉ đăng và gỡ mục do chính bên gọi tạo; không lưu trữ, hẹn giờ hay chuyển trang đang công khai |
 | `content.delete`      | Xoá hẳn mục                                                                  |
-| `content.manage`      | Danh mục, thẻ, tác giả, menu, chuyển hướng                                   |
+| `content.manage`      | Danh mục, thẻ, tác giả, menu, chuyển hướng, vị trí hiển thị                  |
+| `content.banners`     | Banner của vị trí hiển thị, theo nút                                         |
 
 Gán cho một role bằng `PUT /api/v1/auth/roles/{id}`. Role `admin` có đủ. Người đọc website
 không cần permission nào: mọi thứ dưới `/api/v1/content/public/` đều mở.
@@ -251,6 +252,92 @@ nhận event `compliance.target_restricted`: mục đã đăng trả **451** `co
 `GET /public/resolve` (trả 451 cho người đọc), và vắng khỏi `/public/posts`, sitemap, feed, tìm kiếm và
 module khác (sổ đối tượng). Đăng lại vẫn giữ ẩn. `compliance.target_restored` hiện lại như cũ. Xem
 [`COMPLIANCE.vi.md`](COMPLIANCE.vi.md#báo-vi-phạm-và-khiếu-nại-của-người-tiêu-dùng).
+
+## Banner và vị trí hiển thị
+
+**Vị trí** là một chỗ có tên trên website (`home_hero`, `top_strip`…), cho website biết **vẽ thế
+nào** và cho người soạn biết **ảnh cỡ nào**, để đổi banner không bao giờ làm vỡ giao diện. **Banner**
+là nội dung hiện ở đó, có khung giờ và thứ tự. Đổi banner là đổi dữ liệu (REST hay MCP), không sửa
+code của website.
+
+### Vị trí (`content.manage`)
+
+`GET/POST /placements`, `GET/PUT/DELETE /placements/{key}` (`PUT` cần `If-Match`; xoá vị trí còn
+banner trả 409 `content.placement_in_use`). Mỗi vị trí có:
+
+| Trường | Nghĩa |
+|---|---|
+| `display` | `single`, `carousel`, `grid` (2–4 ô), `stack` (xếp dọc, cho cột bên), `strip` (dải chữ mỏng), `popup` |
+| `display_settings` | `carousel`: `autoplay_seconds` (0 = tắt, còn lại ≥ 4); `grid`: `columns` (2–4); `popup`: `frequency` (`once_per_session`, `once_per_day`, `once_per_week`), `delay_seconds` (0–60) |
+| `accepts` | `image`, `text` hay `any`; `strip` chỉ nhận `text` |
+| `ratio`, `mobile_ratio`, `min_width`, `min_height` | luật ảnh, kiểm khi lưu banner (sai lệch tỉ lệ ≤ 2%), theo kích thước thư viện media đã lưu |
+| `devices` | `all`, `desktop`, `mobile`: chỉ gọi vị trí trên các thiết bị này |
+| `page_kinds` | loại trang dùng vị trí: `home`, `category`, `collection`, `product`, `search`, `cart`, `content_entry`, `content_type`, `landing`, hay `any` |
+| `max_items` | số banner tối đa cùng lúc (1–50) mỗi cửa hàng và ngôn ngữ |
+
+Khách mới có sẵn **bộ vị trí chuẩn**: `top_strip` (dải chữ), `home_hero` (trượt, 3:1, tối thiểu
+1800×600; điện thoại 4:5), `home_middle` (lưới 3, 1:1), `category_top` (4:1), `sidebar_left` và
+`sidebar_right` (xếp dọc, 1:2), `inline` (4:1, ảnh hay chữ), `above_footer` (4:1), `popup` (mỗi ngày một
+lần, sau 5 giây, 4:5). Sửa, tắt hay xoá như vị trí tự tạo. Khách có từ trước tính năng này thêm phần
+còn thiếu bằng `POST /placements/presets` (không bao giờ tự thêm lại vị trí đã xoá nếu bạn không gọi).
+
+### Banner (`content.banners`)
+
+`GET/POST /banners`, `GET/PATCH/DELETE /banners/{id}` (`PATCH` cần `If-Match`), và
+`PUT /placements/{key}/order` với `{"banner_ids": [...]}` cùng `ETag` của vị trí trong `If-Match` để
+sắp cả vị trí một lần. `content.banners` cấp theo nút: nhân viên một cửa hàng chỉ quản banner của cửa
+hàng đó; không gửi `org_id` nghĩa là mọi cửa hàng của khách.
+
+- `kind`: `image` (cần `media_id`, ảnh **công khai**; tuỳ chọn `mobile_media_id`) hay `text` (bắt
+  buộc `title`, `tone` = `primary`, `secondary`, `accent` hay `neutral` — không nhận mã màu, đổi theme
+  là đổi màu theo).
+- `link`: `{"url": "https://…"}` hay đường dẫn `/…`, hoặc `{"kind": "catalog.product", "id": "…"}` — loại
+  bất kỳ của sổ đối tượng (`GET /api/v1/kernel/resources`). Khi lưu kiểm đối tượng có thật; đọc công
+  khai bỏ banner khi đối tượng không còn công khai (sản phẩm ngừng bán, khuyến mại hết). Banner trỏ
+  tới `promotions.promotion` **tự lưu trữ** khi chương trình kết thúc hay bị huỷ: quảng cáo không được
+  hứa ưu đãi đã hết (Luật Bảo vệ quyền lợi người tiêu dùng 19/2023/QH15, Luật Quảng cáo — cần đối
+  chiếu văn bản gốc).
+- `page_kinds` (trong số loại trang của vị trí) và `page_targets` (`[{"kind": "catalog.category", "id": "…"}]`,
+  tối đa 50): chỉ hiện banner ở các trang đó. Ví dụ: banner cột trái chỉ ở danh mục "Điện thoại".
+- `starts_at` / `ends_at`, `status` (`draft`, `active`, `archived`), `ai_assisted`.
+
+### Đọc trên website (công khai)
+
+Một lời gọi cho mọi vị trí của một trang:
+
+```http
+GET /api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&locale=vi&page_kind=home
+GET /api/v1/content/public/placements?keys=category_top,sidebar_left&page_kind=category&page_ref=catalog.category:0190…
+```
+
+Mỗi vị trí kèm `display`, `display_settings`, `accepts`, tỉ lệ, `devices` và `banners`: đang bật, trong
+khung giờ lúc gọi, của website (`site`, hay tên miền) và các nút cấp trên, đúng ngôn ngữ của trang,
+theo **thứ tự cố định** (`position`). Ảnh có `variants` và `webp_url` cho `srcset` / `<picture>`; link
+dựng sẵn ở `href`. Banner không giới hạn trang luôn hiện; không gửi `page_kind` thì chỉ chúng hiện.
+`Cache-Control: public, max-age=…` chỉ tới mốc bắt đầu / kết thúc gần nhất (tối đa 60 giây), nên CDN
+không giữ banner đã hết giờ; `ETag` cho 304. `GET /public/placements/{key}` đọc một vị trí.
+
+**Luật cho website** (thuộc hợp đồng):
+
+- Vẽ banner đúng thứ tự trả về; không đảo ngẫu nhiên (phá cache, trang nhảy khi tải lại).
+- `popup` luôn có nút đóng thấy rõ, theo `frequency`, không bao giờ hiện ở trang giỏ hàng, thanh toán,
+  đăng nhập hay tài khoản.
+- `carousel` không tự trượt khi người xem bật giảm chuyển động (`prefers-reduced-motion`), và có nút
+  dừng, chuyển.
+- Banner có `ai_assisted: true` thì ghi nhãn viết với trợ giúp của AI.
+
+Ví dụ trang chủ:
+
+```js
+const res = await fetch(`/api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&page_kind=home&locale=${lang}`);
+const { data } = await res.json();
+for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
+```
+
+### Tool MCP
+
+`content.list_banners`, `content.save_banner` (chỉ bản nháp: người dùng bật banner `active`; chữ từ
+tool mang dấu `ai_assisted` trừ khi nói khác), `content.order_placement`.
 
 ## Xem trước bản nháp
 

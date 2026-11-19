@@ -281,7 +281,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-202** API còn thiếu cho thiết kế giao diện 2: hỏi đáp, `alt` theo ngôn ngữ, trả hàng, đơn vãng lai, nhật ký lệnh MCP — 2026-11-13 · **chủ dự án quyết**
 - **D-207** API cho trợ giúp trong giao diện: cờ theo người dùng, định nghĩa số liệu — 2026-11-14
 - **D-212** Hộp việc không có nút "Đã xử lý" (H5) — 2026-11-14
-- **D-219** Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 · *thay một phần bởi D-220*
+- **D-219** Giao diện cửa hàng qua API (bước 55) và chuyển dữ liệu từ nền tảng khác (bước 56) — 2026-11-13 · *thay một phần bởi D-220, D-20261119-step55-banners*
 - **D-235** Khách tự chỉnh không cần code: trường tự định nghĩa, nhãn, đổi câu chữ, loại nội dung, mã theo dõi và đồng ý cookie — 2026-11-14 · **chủ dự án quyết**
 - **D-262** Câu lỗi từng ô dịch theo `Accept-Language`: câu mẫu tiếng Anh làm khoá (đề bài giao diện A1) — 2026-11-15
 - **D-264** Đề bài giao diện, nhóm A: câu lỗi cho người dùng, `reason` của token, mô tả theo ngôn ngữ, `/me/permissions`, menu giữ id mục — 2026-11-15
@@ -397,6 +397,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
+- **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
 
 ## Tiền, thuế, chứng từ
 

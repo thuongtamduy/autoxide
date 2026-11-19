@@ -12,6 +12,7 @@
 
 mod ai;
 pub mod api;
+mod banners;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
 mod client_config;
@@ -241,10 +242,16 @@ impl Module for ContentModule {
         Ok(())
     }
 
+    fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
+        // Bộ vị trí banner chuẩn cho khách mới (bước 55, D-236).
+        Some(banners::presets::seed())
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: gỡ hồ sơ tác giả, bỏ liên kết, huỷ lịch (xem `privacy.rs`).
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
+            let mut list = banners::promotions::subscriptions(&service);
+            list.extend(vec![
                 Subscription::new(autoxide_kernel::privacy::USER_DELETED, service),
                 // Vụ việc của `compliance` ẩn / hiện lại mục (D-363, `restriction.rs`).
                 Subscription::new(
@@ -255,7 +262,8 @@ impl Module for ContentModule {
                     autoxide_kernel::moderation::TARGET_RESTORED,
                     Arc::new(restriction::Listener),
                 ),
-            ]
+            ]);
+            list
         })
     }
 

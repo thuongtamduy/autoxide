@@ -460,6 +460,71 @@ export type BanRequest = {
   value: string;
 };
 
+/** Where a banner links to: give `url`, or `kind` and `id`. */
+export type BannerLink = {
+  /** Id of that object. */
+  id?: string | null;
+  /**
+   * A type of the object directory, e.g. `content.entry`, `content.term`,
+   * `catalog.product`, `catalog.collection`, `promotions.promotion` — whatever the installed
+   * modules provide (`GET /api/v1/kernel/resources` lists them). A banner pointing to a
+   * promotion is archived when the promotion ends.
+   */
+  kind?: string | null;
+  /** An `https://` or `http://` address, or a path on the website starting with `/`. */
+  url?: string | null;
+};
+
+/** A page the banner shows on: an object of the object directory (e.g. a product category). */
+export type BannerPage = {
+  id: string;
+  kind: string;
+};
+
+/** A banner of a display placement. */
+export type BannerResponse = {
+  /**
+   * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+   * 134/2025/QH15): label it.
+   */
+  ai_assisted: boolean;
+  alt: string;
+  created_at: string;
+  created_by?: string | null;
+  /** Text of the button. */
+  cta_label: string;
+  /** Shown until (excluded); `null`: no end. */
+  ends_at?: string | null;
+  id: string;
+  /** `image` or `text`. */
+  kind: string;
+  link?: BannerLink | null;
+  locale: string;
+  /** Picture (media item id). */
+  media_id?: string | null;
+  /** Picture for phones; `null`: the same picture. */
+  mobile_media_id?: string | null;
+  /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+  org_id: string;
+  /** Only on these kinds of pages; empty: every kind of its placement. */
+  page_kinds: string[];
+  /** Only on these pages; empty: every page. */
+  page_targets: BannerPage[];
+  /** Key of its placement. */
+  placement: string;
+  /** Order in the placement, smallest first. */
+  position: number;
+  /** Shown from (included); `null`: at once. */
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`. */
+  status: string;
+  subtitle: string;
+  title: string;
+  /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+  tone?: string | null;
+  updated_at: string;
+};
+
 /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
 export type BillingPeriodResponse = {
   amount: Money;
@@ -3852,6 +3917,46 @@ export type CreateApiKeyRequest = {
   totp_code?: string | null;
 };
 
+/** A new banner. */
+export type CreateBannerRequest = {
+  /** Set when the text came from an AI suggestion. */
+  ai_assisted?: boolean;
+  /** At most 300 characters; empty: the picture's own `alt`. */
+  alt?: string;
+  /** Text of the button, at most 60 characters. */
+  cta_label?: string;
+  ends_at?: string | null;
+  /** `image` (default) or `text`; the placement must take it. */
+  kind?: string | null;
+  link?: BannerLink | null;
+  /** Omitted: the default language. */
+  locale?: string | null;
+  /** Image banners: a public picture with the placement's ratio and size. */
+  media_id?: string | null;
+  /** Optional picture for phones (the placement's `mobile_ratio`). */
+  mobile_media_id?: string | null;
+  /** Organization unit (store) it belongs to; omitted: every store of the tenant. */
+  org_id?: string | null;
+  /** Only on these kinds of pages (within those of the placement). */
+  page_kinds?: string[];
+  /** Only on these pages, at most 50; each must exist. */
+  page_targets?: BannerPage[];
+  /** Key of the placement, e.g. `home_hero`. */
+  placement: string;
+  starts_at?: string | null;
+  /** `draft` (default) or `active`. */
+  status?: string | null;
+  /** At most 300 characters. */
+  subtitle?: string;
+  /** At most 120 characters; required for a text banner. */
+  title?: string;
+  /**
+   * Text banners only: `primary`, `secondary`, `accent` or `neutral` (default) — never a
+   * colour code, so a new theme recolours it.
+   */
+  tone?: string | null;
+};
+
 /** Time off or extra working hours of a resource. */
 export type CreateBookingExceptionRequest = {
   /** After `starts_at`, at most 366 days later. */
@@ -4089,6 +4194,12 @@ export type CreateOrdersCartRequest = {
   locale?: string | null;
   /** The shop (or marketplace store) selling; omitted: the root unit of the tenant. */
   org_id?: string | null;
+};
+
+/** A new placement. */
+export type CreatePlacementRequest = PlacementFields & {
+  /** 1 to 64 lower-case letters, digits or `_`, e.g. `home_hero`. */
+  key: string;
 };
 
 /**
@@ -4575,6 +4686,53 @@ export type Data_AuthorResponse = {
 export type Data_BTreeMap_String_String = {
   data: {
     [key: string]: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_BannerResponse = {
+  /** A banner of a display placement. */
+  data: {
+    /**
+     * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+     * 134/2025/QH15): label it.
+     */
+    ai_assisted: boolean;
+    alt: string;
+    created_at: string;
+    created_by?: string | null;
+    /** Text of the button. */
+    cta_label: string;
+    /** Shown until (excluded); `null`: no end. */
+    ends_at?: string | null;
+    id: string;
+    /** `image` or `text`. */
+    kind: string;
+    link?: BannerLink | null;
+    locale: string;
+    /** Picture (media item id). */
+    media_id?: string | null;
+    /** Picture for phones; `null`: the same picture. */
+    mobile_media_id?: string | null;
+    /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+    org_id: string;
+    /** Only on these kinds of pages; empty: every kind of its placement. */
+    page_kinds: string[];
+    /** Only on these pages; empty: every page. */
+    page_targets: BannerPage[];
+    /** Key of its placement. */
+    placement: string;
+    /** Order in the placement, smallest first. */
+    position: number;
+    /** Shown from (included); `null`: at once. */
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`. */
+    status: string;
+    subtitle: string;
+    title: string;
+    /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+    tone?: string | null;
+    updated_at: string;
   };
 };
 
@@ -8530,6 +8688,53 @@ export type Data_Pin = {
 };
 
 /** Envelope of a single result. */
+export type Data_PlacementResponse = {
+  /** A display placement: where banners go on the website and how the website draws them. */
+  data: {
+    /** Banners it takes: `image`, `text` or `any`. */
+    accepts: string;
+    /** Off: public reads leave it out. */
+    active: boolean;
+    /** `site` (the website of the tenant). */
+    audience: string;
+    created_at: string;
+    description: string;
+    /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+    devices: string;
+    /**
+     * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+     * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+     * button and never shows on cart, checkout, sign-in or account pages).
+     */
+    display: string;
+    /**
+     * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+     * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+     * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+     */
+    display_settings: Record<string, unknown>;
+    id: string;
+    key: string;
+    /** Most banners shown at once (per organization unit and language). */
+    max_items: number;
+    min_height?: number | null;
+    /** Smallest picture accepted, in pixels. */
+    min_width?: number | null;
+    mobile_ratio?: Ratio | null;
+    name: string;
+    /**
+     * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+     * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+     */
+    page_kinds: string[];
+    /** Key in the standard set of placements, when the row came from it. */
+    preset_key?: string | null;
+    ratio?: Ratio | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PlanResponse = {
   /** A plan: the modules, features and limits a tenant gets, and its prices. */
   data: {
@@ -8995,6 +9200,40 @@ export type Data_PublicMenu = {
     key: string;
     /** The language actually returned (the default language when the menu is not translated). */
     locale: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PublicPlacement = {
+  /** A placement ready to draw, with its banners for the page asked about. */
+  data: {
+    /** `image`, `text` or `any`. */
+    accepts: string;
+    /** Banners to show, in this order (never shuffle them). */
+    banners: PublicBanner[];
+    /** `all`, `desktop` or `mobile`. */
+    devices: string;
+    /**
+     * `single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`
+     * says (a popup always has a close button; no autoplay when the viewer asks for reduced
+     * motion).
+     */
+    display: string;
+    display_settings: Record<string, unknown>;
+    key: string;
+    mobile_ratio?: Ratio | null;
+    ratio?: Ratio | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PublicPlacementsResponse = {
+  /** Several placements of one page. */
+  data: {
+    /** The language returned. */
+    locale: string;
+    /** The placements asked for that exist and are on, in the order asked. */
+    placements: PublicPlacement[];
   };
 };
 
@@ -11834,6 +12073,52 @@ export type Data_Vec_Placement = {
     /** `ready`, `behind` (migrations pending: its tenants answer `503`) or `migrating`. */
     schema_state: string;
     storage?: PlacementStorage | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PlacementResponse = {
+  data: {
+    /** Banners it takes: `image`, `text` or `any`. */
+    accepts: string;
+    /** Off: public reads leave it out. */
+    active: boolean;
+    /** `site` (the website of the tenant). */
+    audience: string;
+    created_at: string;
+    description: string;
+    /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+    devices: string;
+    /**
+     * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+     * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+     * button and never shows on cart, checkout, sign-in or account pages).
+     */
+    display: string;
+    /**
+     * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+     * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+     * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+     */
+    display_settings: Record<string, unknown>;
+    id: string;
+    key: string;
+    /** Most banners shown at once (per organization unit and language). */
+    max_items: number;
+    min_height?: number | null;
+    /** Smallest picture accepted, in pixels. */
+    min_width?: number | null;
+    mobile_ratio?: Ratio | null;
+    name: string;
+    /**
+     * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+     * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+     */
+    page_kinds: string[];
+    /** Key in the standard set of placements, when the row came from it. */
+    preset_key?: string | null;
+    ratio?: Ratio | null;
+    updated_at: string;
   }[];
 };
 
@@ -16847,6 +17132,15 @@ export type OpsBacklog = {
   databases: DatabaseBacklog[];
 };
 
+/** The new order of the banners of a placement. */
+export type OrderRequest = {
+  /**
+   * Banners of the placement, first shown first. Banners left out keep their order after
+   * them.
+   */
+  banner_ids: string[];
+};
+
 /** Referral of the cart. */
 export type OrdersAttribution = {
   click_id?: string | null;
@@ -17319,6 +17613,54 @@ export type Page_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BannerResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+     * 134/2025/QH15): label it.
+     */
+    ai_assisted: boolean;
+    alt: string;
+    created_at: string;
+    created_by?: string | null;
+    /** Text of the button. */
+    cta_label: string;
+    /** Shown until (excluded); `null`: no end. */
+    ends_at?: string | null;
+    id: string;
+    /** `image` or `text`. */
+    kind: string;
+    link?: BannerLink | null;
+    locale: string;
+    /** Picture (media item id). */
+    media_id?: string | null;
+    /** Picture for phones; `null`: the same picture. */
+    mobile_media_id?: string | null;
+    /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+    org_id: string;
+    /** Only on these kinds of pages; empty: every kind of its placement. */
+    page_kinds: string[];
+    /** Only on these pages; empty: every page. */
+    page_targets: BannerPage[];
+    /** Key of its placement. */
+    placement: string;
+    /** Order in the placement, smallest first. */
+    position: number;
+    /** Shown from (included); `null`: at once. */
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`. */
+    status: string;
+    subtitle: string;
+    title: string;
+    /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+    tone?: string | null;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -20796,11 +21138,82 @@ export type Placement = {
   storage?: PlacementStorage | null;
 };
 
+/** The fields of a placement. `PUT` sends the whole placement; the key never changes. */
+export type PlacementFields = {
+  /** `image`, `text` or `any`; omitted: `text` for a `strip`, else `image`. */
+  accepts?: string | null;
+  /** Omitted: `true`. */
+  active?: boolean | null;
+  /** At most 500 characters. */
+  description?: string;
+  /** `all` (default), `desktop` or `mobile`. */
+  devices?: string | null;
+  /** `single`, `carousel`, `grid`, `stack`, `strip` or `popup`. */
+  display: string;
+  /** See the placement schema; omitted: the defaults of the display. */
+  display_settings?: Record<string, unknown>;
+  /** 1 to 50; omitted: 10. */
+  max_items?: number | null;
+  min_height?: number | null;
+  /** 1 to 10000 pixels. */
+  min_width?: number | null;
+  mobile_ratio?: Ratio | null;
+  /** 1 to 120 characters. */
+  name: string;
+  /** Omitted: `["any"]`. */
+  page_kinds?: string[];
+  ratio?: Ratio | null;
+};
+
 /** Migrations of one placement. */
 export type PlacementMigrationList = {
   /** `<module>/<migration>`: pending ones for a dry run, applied ones for a run. */
   migrations: string[];
   placement: string;
+};
+
+/** A display placement: where banners go on the website and how the website draws them. */
+export type PlacementResponse = {
+  /** Banners it takes: `image`, `text` or `any`. */
+  accepts: string;
+  /** Off: public reads leave it out. */
+  active: boolean;
+  /** `site` (the website of the tenant). */
+  audience: string;
+  created_at: string;
+  description: string;
+  /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+  devices: string;
+  /**
+   * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+   * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+   * button and never shows on cart, checkout, sign-in or account pages).
+   */
+  display: string;
+  /**
+   * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+   * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+   * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+   */
+  display_settings: Record<string, unknown>;
+  id: string;
+  key: string;
+  /** Most banners shown at once (per organization unit and language). */
+  max_items: number;
+  min_height?: number | null;
+  /** Smallest picture accepted, in pixels. */
+  min_width?: number | null;
+  mobile_ratio?: Ratio | null;
+  name: string;
+  /**
+   * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+   * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+   */
+  page_kinds: string[];
+  /** Key in the standard set of placements, when the row came from it. */
+  preset_key?: string | null;
+  ratio?: Ratio | null;
+  updated_at: string;
 };
 
 /** Where a placement keeps its tenants' files. Access keys are never shown. */
@@ -21980,6 +22393,24 @@ export type PublicAuthorPage = {
   website_url: string;
 };
 
+/** A banner to show. */
+export type PublicBanner = {
+  /** The text was written from an AI suggestion: label it. */
+  ai_assisted: boolean;
+  cta_label: string;
+  /** Where it links to: a path on the website or an address; `null`: no link. */
+  href?: string | null;
+  id: string;
+  image?: PublicMedia | null;
+  /** `image` or `text`. */
+  kind: string;
+  mobile_image?: PublicMedia | null;
+  subtitle: string;
+  title: string;
+  /** Text banners: a colour token of the theme. */
+  tone?: string | null;
+};
+
 /** A service customers can book. */
 export type PublicBookingService = {
   capacity: number;
@@ -22271,6 +22702,34 @@ export type PublicOption = {
   value: string;
 };
 
+/** A placement ready to draw, with its banners for the page asked about. */
+export type PublicPlacement = {
+  /** `image`, `text` or `any`. */
+  accepts: string;
+  /** Banners to show, in this order (never shuffle them). */
+  banners: PublicBanner[];
+  /** `all`, `desktop` or `mobile`. */
+  devices: string;
+  /**
+   * `single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`
+   * says (a popup always has a close button; no autoplay when the viewer asks for reduced
+   * motion).
+   */
+  display: string;
+  display_settings: Record<string, unknown>;
+  key: string;
+  mobile_ratio?: Ratio | null;
+  ratio?: Ratio | null;
+};
+
+/** Several placements of one page. */
+export type PublicPlacementsResponse = {
+  /** The language returned. */
+  locale: string;
+  /** The placements asked for that exist and are on, in the order asked. */
+  placements: PublicPlacement[];
+};
+
 /** Changes to a public profile. Omitted fields stay as they are; `null` clears. */
 export type PublicProfileRequest = {
   address?: AddressInput | null;
@@ -22488,6 +22947,12 @@ export type RateSupportTicketRequest = {
   rating: number;
   /** Guests: the ticket token. Signed-in customers omit it. */
   token?: string | null;
+};
+
+/** A picture ratio, width to height (e.g. 3:1). */
+export type Ratio = {
+  h: number;
+  w: number;
 };
 
 /**
@@ -25772,6 +26237,26 @@ export type UnsubscribeRequest = {
 export type UnsubscribeResponse = {
   /** Always `true`. */
   unsubscribed: boolean;
+};
+
+/** Changes to a banner: fields left out stay; `null` clears a field that may be empty. */
+export type UpdateBannerRequest = {
+  ai_assisted?: boolean | null;
+  alt?: string | null;
+  cta_label?: string | null;
+  ends_at?: string | null;
+  kind?: string | null;
+  link?: BannerLink | null;
+  media_id?: string | null;
+  mobile_media_id?: string | null;
+  page_kinds?: string[] | null;
+  page_targets?: BannerPage[] | null;
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`. */
+  status?: string | null;
+  subtitle?: string | null;
+  title?: string | null;
+  tone?: string | null;
 };
 
 /** Changes to a resource. */
@@ -30912,6 +31397,74 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/banners": {
+    /** List banners. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { placement?: string; org_id?: string; status?: string; locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a banner. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBannerRequest;
+      responses: {
+        201: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/banners/{id}": {
+    /** Get a banner. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a banner. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBannerRequest;
+      responses: {
+        200: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a banner. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
@@ -31323,6 +31876,100 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/placements": {
+    /** List display placements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a display placement. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreatePlacementRequest;
+      responses: {
+        201: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/presets": {
+    /** Add the standard placements. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_Vec_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/{key}": {
+    /** Get a display placement. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; };
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace a display placement. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: PlacementFields;
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a display placement. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/{key}/order": {
+    /** Order the banners of a placement. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: OrderRequest;
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/public/authors/{slug}": {
     /** Get an author by slug (public). */
     get: {
@@ -31353,6 +32000,33 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicMenu;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/placements": {
+    /** Read several placements of a page (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { keys: string; locale?: string; page_kind?: string; page_ref?: string; site?: string }; };
+      responses: {
+        200: Data_PublicPlacementsResponse;
+        304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/placements/{key}": {
+    /** Read one placement (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string; page_kind?: string; page_ref?: string; site?: string }; };
+      responses: {
+        200: Data_PublicPlacement;
+        304: void;
         403: Problem;
         404: Problem;
         422: Problem;

@@ -53,7 +53,7 @@ pub(crate) struct PublicVariant {
     webp_url: Option<String>,
 }
 
-fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<PublicMedia> {
+pub(crate) fn media(item: Option<autoxide_media::api::MediaRef>, alt: &str) -> Option<PublicMedia> {
     item.map(|item| PublicMedia {
         alt_ai_assisted: alt.is_empty() && item.alt_ai_assisted,
         alt: if alt.is_empty() { item.alt } else { alt.to_owned() },

@@ -6,7 +6,7 @@ use autoxide_kernel::tenancy::Relocation;
 
 pub(crate) fn relocation() -> Relocation {
     Relocation::new()
-        .by_org(&["content_entries"])
+        .by_org(&["content_entries", "content_banners"])
         .follow("content_published", "entry_id", "content_entries")
         .follow("content_revisions", "entry_id", "content_entries")
         .follow("content_schedules", "entry_id", "content_entries")
@@ -20,6 +20,7 @@ pub(crate) fn relocation() -> Relocation {
             "content_term_translations",
             "content_authors",
             "content_menus",
+            "content_placements",
         ])
         .follow("content_menu_items", "menu_id", "content_menus")
         .stay(&["content_redirects"])
