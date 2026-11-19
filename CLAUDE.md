@@ -191,6 +191,8 @@ sẵn lệnh.
   `tests/integration/` và khai `mod <tên>;` ở `tests/integration/main.rs`. Không tạo
   `tests/<tên>.rs` rời — mỗi file đó là một chương trình link lại toàn bộ thư viện (D-20261118-build-size);
   `cargo xtask check` chặn cả file rời lẫn file quên khai `mod`.
+- Thay đổi người dùng thấy ghi bằng một file mảnh `changelog.d/<tên>.<mục>.md`, **không sửa
+  `CHANGELOG.md`** — gộp lúc phát hành bằng `cargo xtask changelog` (D-20261119-changelog-fragments).
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
   bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
