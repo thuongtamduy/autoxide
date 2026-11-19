@@ -11,13 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
-- Caching by a CDN (step 39): public reads of a website now say `public, max-age=0, s-maxage=60,
-  stale-while-revalidate=300` with an `ETag` and `Vary: Accept-Language, Accept-Encoding`, so a CDN keeps them for
-  `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` (default 60; `0` to always ask again). A request with `Authorization` or a
-  cookie never gets a `public` response. `docs/DEPLOY.md` explains how to set up the CDN.
-- Response compression (step 39): JSON and text responses of 1 KiB or more are compressed with brotli or gzip
-  when the client accepts it (a page of 20 posts goes from 136 KB to about 26 KB). Images and other files are never
-  compressed again. `AUTOXIDE_HTTP_COMPRESSION=false` turns it off when a reverse proxy or CDN already compresses.
+- `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
+  one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
+  (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
 - Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
   limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
   stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
@@ -225,6 +221,20 @@ endpoints are marked deprecated with a sunset date first.
   written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
   `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
   `kernel.relocation_finished`, `kernel.relocation_failed`.
+- Unit groups for reports (step 38): free sets of units of a tenant, from any branch (e.g. "stores in the north"),
+  under `/api/v1/organizations/groups` (`member_count` and `excluded_org_count` only count units within your scope)
+  and MCP tools `organizations.list_groups`, `organizations.create_group`, `organizations.add_group_members`,
+  `organizations.remove_group_member`; permission `organizations.groups.manage` (whole tenant only); events
+  `organizations.group_*`. A group grants no access: `GET /api/v1/reporting/summary` and `/facts` take `group_ids`
+  and `group_by=group`, always cut down to the caller's scope, and report `excluded_org_count`.
+- Sandboxes, first part (step 38): `POST /api/v1/kernel/tenants/{id}/sandboxes` makes a test copy of a tenant on the
+  same database (no personal data), ready when its job is done; staff of the tenant enter it with
+  `Autoxide-Tenant: <sandbox id>` through an automatic delegation. `GET …/sandboxes`, `POST /sandboxes/{id}/extend`,
+  `DELETE /sandboxes/{id}`; MCP tools `kernel.list_sandboxes`, `kernel.create_sandbox`, `kernel.extend_sandbox`;
+  permissions `kernel.sandboxes.read`, `kernel.sandboxes.manage`; plan limit `kernel.sandboxes` (1 when the plan does
+  not say). Every response of a sandbox carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`;
+  `GET /api/v1/kernel/tenant` adds `kind`, `sandbox_of`, `sandbox_expires_at`. Sandboxes are deleted after
+  `AUTOXIDE_TENANCY_SANDBOX_DAYS` (default 30) unless extended. Setting `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).

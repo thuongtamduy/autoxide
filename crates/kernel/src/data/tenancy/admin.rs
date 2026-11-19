@@ -25,8 +25,8 @@ use uuid::Uuid;
 use validator::Validate;
 
 use super::{
-    DEFAULT_TENANT, DatabaseRegistry, MAIN_PLACEMENT, PlacementId, PlacementKind, SchemaState,
-    TenancyMode, TenantContext, TenantId, TenantStatus, errors,
+    CurrentTenant, DEFAULT_TENANT, DatabaseRegistry, MAIN_PLACEMENT, PlacementId, PlacementKind,
+    SchemaState, TenancyMode, TenantContext, TenantId, TenantStatus, errors,
 };
 use crate::access::{Permission, Principal, Risk};
 use crate::error::{Error, FieldError};
@@ -198,25 +198,6 @@ pub struct TenantExpanded {
     /// or without the plans module.
     #[schema(value_type = Option<Vec<Object>>, required = true)]
     pub usage: Option<serde_json::Value>,
-}
-
-/// The tenant of the caller.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct CurrentTenant {
-    pub id: Uuid,
-    pub slug: String,
-    pub name: String,
-    pub status: String,
-    /// Read-only: data can be read but every change is refused with `403 tenant_read_only`.
-    /// Always present.
-    #[serde(default)]
-    #[schema(required = true)]
-    pub read_only: bool,
-    /// `single` (one tenant) or `multi` (many tenants on one installation).
-    #[schema(example = "single")]
-    pub mode: String,
-    /// Whether this is the platform tenant (the operator's own).
-    pub platform: bool,
 }
 
 /// Where tenants' data is kept: one database. Connection URLs are never shown.
@@ -432,23 +413,6 @@ impl TenantAdmin {
     async fn describe(&self, row: tenant::Model) -> Result<Tenant, Error> {
         let placements = self.placement_names().await?;
         Ok(describe(row, &placements))
-    }
-
-    /// Khách của người gọi.
-    pub fn current(&self, tenant: &TenantContext) -> CurrentTenant {
-        CurrentTenant {
-            id: tenant.id().as_uuid(),
-            slug: tenant.slug().to_owned(),
-            name: tenant.name().to_owned(),
-            status: tenant.status().as_str().to_owned(),
-            read_only: tenant.read_only(),
-            mode: match self.registry.mode() {
-                TenancyMode::Single => "single",
-                TenancyMode::Multi => "multi",
-            }
-            .to_owned(),
-            platform: tenant.is_platform(),
-        }
     }
 
     /// Một trang khách, mới nhất trước (trừ khi `order=asc`). Hai câu truy vấn cho cả trang (bảng

@@ -29,6 +29,8 @@ mod test_support;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_groups;
+#[cfg(test)]
 mod tests_scope;
 
 use std::sync::Arc;
@@ -107,13 +109,16 @@ impl Module for ReportingModule {
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
         let sources = context.fact_sources();
-        let service = Arc::new(Reporting::new(
+        let mut service = Reporting::new(
             context.tenancy(),
             context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             &sources,
             self.config,
-        ));
+        );
+        // Nhóm nút ngoài cây (D-232) để lọc / gom báo cáo.
+        service.groups = context.require::<dyn autoxide_organizations::api::OrgGroups>().ok();
+        let service = Arc::new(service);
         self.sources = sources.into_iter().map(|(_, source)| source).collect();
         self.service = Some(service);
         self.jobs = Some(context.jobs());

@@ -257,6 +257,9 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "kernel.migrate_placements",
                 "kernel.get_migration_run",
                 "kernel.request_log",
+                "kernel.list_sandboxes",
+                "kernel.create_sandbox",
+                "kernel.extend_sandbox",
                 "kernel.list_custom_fields",
                 "kernel.list_approvals",
                 "kernel.decide_approval"
