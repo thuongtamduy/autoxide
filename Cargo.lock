@@ -398,6 +398,7 @@ dependencies = [
  "autoxide-notifications",
  "autoxide-organizations",
  "autoxide-plans",
+ "autoxide-promotions",
  "autoxide-reporting",
  "autoxide-shipping",
  "autoxide-support",
@@ -602,14 +603,17 @@ dependencies = [
  "async-trait",
  "autoxide-kernel",
  "autoxide-media",
+ "autoxide-organizations",
  "autoxide-tax",
  "autoxide-testkit",
  "axum",
+ "base64 0.23.1",
  "chrono",
  "rmcp",
  "sea-orm",
  "serde",
  "serde_json",
+ "sha2 0.11.1",
  "tokio",
  "tracing",
  "utoipa",
@@ -770,6 +774,7 @@ dependencies = [
  "autoxide-testkit",
  "axum",
  "chrono",
+ "futures-util",
  "rmcp",
  "sea-orm",
  "serde",
@@ -1078,6 +1083,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "autoxide-promotions"
+version = "0.14.0"
+dependencies = [
+ "async-trait",
+ "autoxide-catalog",
+ "autoxide-kernel",
+ "autoxide-organizations",
+ "autoxide-testkit",
+ "axum",
+ "chrono",
+ "chrono-tz",
+ "rmcp",
+ "sea-orm",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+ "validator",
+]
+
+[[package]]
 name = "autoxide-reporting"
 version = "0.14.0"
 dependencies = [
@@ -1110,6 +1139,7 @@ dependencies = [
  "async-trait",
  "autoxide-address",
  "autoxide-kernel",
+ "autoxide-ledger",
  "autoxide-testkit",
  "axum",
  "chrono",

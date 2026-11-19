@@ -5,22 +5,29 @@
 
 pub mod api;
 mod attributes;
+mod bulk;
 mod categories;
 mod config;
+mod derived;
 mod entity;
 mod errors;
 mod events;
+mod floors;
 mod http;
 mod listeners;
 mod migration;
 mod permissions;
 mod pricing;
+mod product_parts;
 mod products;
+mod public;
 mod readiness;
 mod restrictions;
+mod rounding;
 mod rules_pack;
 mod service;
 mod snapshots;
+mod storefront;
 mod tools;
 mod variants;
 
@@ -99,16 +106,17 @@ impl Module for CatalogModule {
         let config = self.config.clone().unwrap_or_default();
         // `media` và `tax` đăng ký trước `catalog`; chưa cài thì không gắn được ảnh / không áp
         // luật giá theo hồ sơ thuế.
-        let media = context.require::<dyn autoxide_media::api::Media>().ok();
-        let tax = context.require::<dyn autoxide_tax::api::TaxEngine>().ok();
-        let service = Arc::new(CatalogService::new(
-            context.outbox()?,
-            context.entitlements(),
-            media,
-            tax,
+        // `organizations` (cài đặt kế thừa theo nút) cũng vậy: chưa cài thì dùng mặc định.
+        let service = Arc::new(CatalogService {
+            outbox: context.outbox()?,
+            entitlements: context.entitlements(),
+            media: context.require::<dyn autoxide_media::api::Media>().ok(),
+            tax: context.require::<dyn autoxide_tax::api::TaxEngine>().ok(),
             config,
-            context.tenancy(),
-        ));
+            databases: context.tenancy(),
+            jobs: context.jobs(),
+            organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+        });
         context.usage_counter(&service::PRODUCTS_LIMIT, Arc::new(service::ProductCounter))?;
         self.service = Some(service.clone());
         // `Arc<CatalogService>` tự đổi thành `Arc<dyn Catalog>`: module khác chỉ thấy trait.
@@ -120,23 +128,49 @@ impl Module for CatalogModule {
         vec!["catalog_restriction_rules"]
     }
 
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        vec![bulk::SECOND_PERSON]
+    }
+
     fn jobs(&self) -> Vec<JobRegistration> {
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![JobRegistration::new(
-                rules_pack::REFRESH_DOCUMENTS,
-                Arc::new(rules_pack::RefreshDocuments(service)),
-            )]
+            vec![
+                JobRegistration::new(
+                    rules_pack::REFRESH_DOCUMENTS,
+                    Arc::new(rules_pack::RefreshDocuments(service.clone())),
+                ),
+                JobRegistration::new(
+                    derived::DERIVE_PRICES,
+                    Arc::new(derived::Deriver(service.clone())),
+                ),
+                JobRegistration::new(bulk::APPLY_CHANGE, Arc::new(bulk::Applier(service.clone()))),
+                JobRegistration::new(
+                    storefront::REFRESH,
+                    Arc::new(storefront::Refresher(service.clone())),
+                ),
+                JobRegistration::new(
+                    storefront::SCHEDULED_PRICES,
+                    Arc::new(storefront::ScheduledPrices(service)),
+                ),
+            ]
         })
     }
 
     fn schedules(&self) -> Vec<Schedule> {
         // Giấy tờ hết hạn theo ngày: tính lại `readiness` mỗi ngày.
         let day = std::time::Duration::from_secs(24 * 3600);
-        vec![Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day)]
+        // Giá hẹn giờ bắt đầu / hết hạn: dựng lại storefront mỗi phút.
+        let minute = std::time::Duration::from_secs(60);
+        vec![
+            Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day),
+            Schedule::new(storefront::SCHEDULED_PRICES, storefront::SCHEDULED_PRICES, minute),
+        ]
     }
 
     fn tasks(&self) -> Vec<autoxide_kernel::task::Task> {
-        self.service.clone().map_or_else(Vec::new, |service| vec![rules_pack::task(service)])
+        self.service.clone().map_or_else(Vec::new, |service| {
+            vec![rules_pack::task(service.clone()), storefront::task(service)]
+        })
     }
 
     fn subscriptions(&self) -> Vec<Subscription> {

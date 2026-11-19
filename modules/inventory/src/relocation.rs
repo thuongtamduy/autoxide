@@ -4,5 +4,23 @@
 use autoxide_kernel::tenancy::Relocation;
 
 pub(crate) fn relocation() -> Relocation {
-    Relocation::new().by_org(&["inventory_levels", "inventory_movements", "inventory_adjustments"])
+    Relocation::new()
+        .by_org(&[
+            "inventory_levels",
+            "inventory_movements",
+            "inventory_adjustments",
+            "inventory_settings",
+            "inventory_restocks",
+        ])
+        // Kho phục vụ đi theo nút bán; chỗ giữ theo nút bán của đơn.
+        .table(
+            "inventory_sources",
+            autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "selling_org_id" },
+        )
+        .table(
+            "inventory_reservations",
+            autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "selling_org_id" },
+        )
+        .follow("inventory_reservation_lines", "reservation_id", "inventory_reservations")
+        .follow("inventory_fulfilments", "reservation_id", "inventory_reservations")
 }

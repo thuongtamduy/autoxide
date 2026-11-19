@@ -51,3 +51,29 @@ impl SupportIntake for SupportService {
         })
     }
 }
+
+/// Bộ tra loại đối tượng `support.ticket` cho sổ đối tượng: phiếu có thật, không công khai.
+pub(crate) struct TicketResolver;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::resource::ResourceResolver for TicketResolver {
+    async fn resolve(
+        &self,
+        tenant: &TenantContext,
+        id: &str,
+    ) -> Result<Option<autoxide_kernel::resource::Resource>, Error> {
+        use autoxide_kernel::tenancy::ScopeExt;
+        use sea_orm::EntityTrait;
+        let Ok(id) = id.parse::<uuid::Uuid>() else {
+            return Ok(None);
+        };
+        let row = crate::entity::ticket::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?;
+        Ok(row.map(|row| {
+            autoxide_kernel::resource::Resource::new(format!("Support ticket {}", row.number))
+                .url(Some(format!("/support/tickets/{id}")))
+        }))
+    }
+}

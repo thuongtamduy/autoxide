@@ -245,7 +245,7 @@ pub(crate) struct CaseFilter {
     pub held: bool,
 }
 
-fn check_case(input: &NewCase, problems: &mut Vec<FieldError>) {
+pub(crate) fn check_case(input: &NewCase, problems: &mut Vec<FieldError>) {
     if !KINDS.contains(&input.kind.as_str()) {
         problems.push(FieldError::new(
             "kind",
@@ -417,7 +417,7 @@ impl ComplianceService {
     }
 
     /// Ghi vụ việc mới; `spam` là lý do lớp chống spam giữ lại (khi đó không tự ẩn, không gửi mail).
-    async fn insert_case(
+    pub(crate) async fn insert_case(
         &self,
         tenant: &TenantContext,
         actor: Actor,
@@ -1228,7 +1228,7 @@ impl ComplianceService {
 
     /// Mail báo đã nhận cho người báo và cho người xử lý (`complaints.contact.email`). Lỗi gửi chỉ
     /// ghi log: vụ việc đã lưu.
-    async fn mail_opened(&self, tenant: &TenantContext, opened: &Opened) {
+    pub(crate) async fn mail_opened(&self, tenant: &TenantContext, opened: &Opened) {
         let Some(mailer) = self.mailer.clone() else { return };
         let row = &opened.case;
         let language = self.language(tenant).await;

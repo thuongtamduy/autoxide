@@ -547,3 +547,114 @@ pub(crate) mod product_document {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod rounding_rule {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_rounding_rules")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub name: String,
+        pub step_minor: i64,
+        /// `up`, `down`, `nearest`.
+        pub mode: String,
+        pub ending_minor: Option<i64>,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod price_change {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_price_changes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub price_list_id: Uuid,
+        /// JSON: danh mục, sản phẩm, biến thể.
+        pub filter: String,
+        /// `set`, `percent`, `amount`.
+        pub operation: String,
+        pub value: i64,
+        pub rounding_rule_id: Option<Uuid>,
+        pub valid_from: DateTimeUtc,
+        pub valid_to: Option<DateTimeUtc>,
+        /// `draft`, `previewed`, `approved`, `applied`, `cancelled`.
+        pub status: String,
+        pub affected: i64,
+        /// JSON của bản xem trước.
+        pub preview: Option<String>,
+        pub created_by: Option<Uuid>,
+        pub approved_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod storefront_entry {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_storefront_entries")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        /// Nút bán có giá riêng (gốc, hay nút có bảng giá / tuỳ biến riêng).
+        pub org_id: Uuid,
+        pub product_id: Uuid,
+        /// Nút sở hữu sản phẩm (người bán khi là sàn).
+        pub owner_org_id: Uuid,
+        pub visible: bool,
+        pub currency: String,
+        pub min_price_minor: i64,
+        pub max_price_minor: i64,
+        pub compare_at_minor: Option<i64>,
+        pub sale_price_minor: Option<i64>,
+        pub sale_ends_at: Option<DateTimeUtc>,
+        pub best_selling: i64,
+        /// Điểm đánh giá × 100 (0 = chưa có).
+        pub rating_x100: i32,
+        pub rating_count: i64,
+        pub variant_count: i32,
+        pub published_at: DateTimeUtc,
+        pub refreshed_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod store_override {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_store_overrides")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        pub product_id: Uuid,
+        pub hidden: bool,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

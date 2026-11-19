@@ -193,6 +193,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
 | `inventory.list_movements` | `inventory.read` | read-only |
+| `inventory.release_reservation` | `inventory.adjust` | destructive |
 | `invoices.create_draft` | `invoices.write` | writes |
 | `invoices.create_export` | `invoices.export` | writes |
 | `invoices.document` | `invoices.read` | read-only |
@@ -218,6 +219,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
 | `kernel.move_tenant` | `kernel.tenants.move` | destructive |
 | `kernel.navigation` | — | read-only |
+| `kernel.ops_backlog` | `kernel.ops.read` | read-only |
 | `kernel.request_log` | `kernel.devtools.read` | read-only |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
@@ -288,6 +290,15 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `plans.retire_plan` | `plans.plans.manage` | writes |
 | `plans.set_override` | `plans.subscriptions.manage` | writes |
 | `plans.update_plan` | `plans.plans.manage` | writes |
+| `promotions.activate_promotion` | `promotions.publish` | writes |
+| `promotions.create_promotion` | `promotions.write` | writes |
+| `promotions.end_promotion` | `promotions.publish` | writes |
+| `promotions.evaluate_cart` | `promotions.read` | read-only |
+| `promotions.generate_codes` | `promotions.codes.manage` | writes |
+| `promotions.get_promotion` | `promotions.read` | read-only |
+| `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
+| `promotions.list_promotions` | `promotions.read` | read-only |
+| `promotions.list_vouchers_of_user` | `promotions.read` | read-only |
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |

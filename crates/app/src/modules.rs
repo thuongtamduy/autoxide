@@ -90,6 +90,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Vận chuyển (bước 44): cần `dyn AdministrativeUnits` (kiểm địa chỉ), đứng sau `catalog`
         // (cạnh `inventory`, `promotions`) và trước `orders`. Bộ nối hãng đăng ký SAU nó.
         Box::new(autoxide_shipping::module()),
+        // Khuyến mại (bước 43): cần `dyn Catalog` (biến thể, giá ngay trước khuyến mại, sàn giá),
+        // nên đứng sau `catalog`; đọc cài đặt kế thừa qua `dyn OrgDirectory` nếu có. `orders`
+        // (bước 45) đăng ký SAU nó để gọi `dyn Promotions`.
+        Box::new(autoxide_promotions::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
@@ -243,11 +247,15 @@ mod tests {
             // hạn — D-360, D-361, D-363;
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), hai của `bookings` (trả chỗ giữ tạm quá hạn, nhắc lịch), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
-            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments` và hai của
+            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments`, hai của `support` (đánh dấu quá hạn, tự đóng — bước 53) và hai của
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
-            // một của `catalog` (tính lại readiness theo giấy tờ — bước 41)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 48);
+            // hai của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront — bước 41), một
+            // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
+            // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), ba của
+            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43)) đúng
+            // một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 58);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

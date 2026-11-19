@@ -24,12 +24,13 @@ use validator::Validate;
 
 use crate::api::{PriceQuery, PriceSnapshot};
 use crate::categories::NewCategory;
+use crate::floors::NewGuard;
 use crate::http::dto::{
     CategoryResponse, CategoryTextDto, FloorActionDto, PriceGuardResponse, PriceListResponse,
     PriceResponse, present,
 };
 use crate::permissions::{CATEGORIES_MANAGE, PRICES_READ, PRICES_WRITE, PRODUCTS_READ};
-use crate::pricing::{NewGuard, NewPriceList, PriceInput, PriceListChanges};
+use crate::pricing::{NewPriceList, PriceInput, PriceListChanges};
 use crate::service::CatalogService;
 
 pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
@@ -299,6 +300,16 @@ pub(crate) struct CreatePriceListRequest {
     /// Higher wins among lists that tie on unit and filters. Default 0.
     #[serde(default)]
     pub priority: i32,
+    /// Make a derived list: its prices are written from this source list (which cannot itself be
+    /// derived; `catalog.derived_chain`), adjusted and rounded. Same currency as the source.
+    pub derived_from: Option<Uuid>,
+    /// Adjustment of a derived list in basis points, signed (`-1500` = 15% off), -10000 to 100000.
+    #[serde(default)]
+    pub adjust_bp: i64,
+    /// Amount added after the percentage, in minor units, signed.
+    pub adjust_minor: Option<i64>,
+    /// Rounding rule of a derived list (`GET /rounding-rules`).
+    pub rounding_rule_id: Option<Uuid>,
 }
 
 fn consumer() -> String {
@@ -321,7 +332,8 @@ fn consumer() -> String {
         (status = 201, description = "Created.", body = Data<PriceListResponse>, headers(("Location" = String, description = "Path of the price list."))),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `catalog.prices.write` or the plan feature (`feature_not_enabled`), or the unit is outside your scope (`org_out_of_scope`, `org_frozen`).", body = Problem),
-        (status = 422, description = "A value is invalid (see `errors`), the currency is unknown (`money.currency_unknown`), or the consumer rules are broken (`catalog.consumer_price_rules`).", body = Problem),
+        (status = 404, description = "The source list (`catalog.price_list_not_found`) or rounding rule (`catalog.rounding_rule_not_found`) does not exist.", body = Problem),
+        (status = 422, description = "A value is invalid (see `errors`), the currency is unknown (`money.currency_unknown`) or differs from the source list (`catalog.currency_mismatch`), the source list is derived (`catalog.derived_chain`), or the consumer rules are broken (`catalog.consumer_price_rules`).", body = Problem),
     )
 )]
 async fn create_price_list(
@@ -339,6 +351,10 @@ async fn create_price_list(
         audience: input.audience,
         customer_group: input.customer_group,
         priority: input.priority,
+        derived_from: input.derived_from,
+        adjust_bp: input.adjust_bp,
+        adjust_minor: input.adjust_minor,
+        rounding_rule_id: input.rounding_rule_id,
     };
     let list =
         PriceListResponse::from(service.create_price_list(&tenant, &principal, input).await?);
