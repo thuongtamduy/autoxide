@@ -1,4 +1,3 @@
-// TẠM (PR #199): chỉ để đo CI khi mọi crate bị ảnh hưởng; xoá trước khi merge.
 //! Nền của Autoxide: thứ mà mọi module dựa vào (cấu hình, database, kiểu lỗi,
 //! HTTP, hợp đồng module). Kernel không biết module nào — phụ thuộc chỉ đi một
 //! chiều từ module vào kernel (`cargo xtask check` kiểm điều này).
