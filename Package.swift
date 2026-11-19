@@ -23,10 +23,10 @@ let package = Package(
                 .product(name: "OpenAPIRuntime", package: "swift-openapi-runtime"),
                 .product(name: "OpenAPIURLSession", package: "swift-openapi-urlsession"),
             ],
+            path: "sdk/swift/Sources/Autoxide",
             plugins: [
                 .plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator"),
-            ],
-            path: "sdk/swift/Sources/Autoxide"
+            ]
         ),
     ]
 )

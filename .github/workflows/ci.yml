@@ -131,15 +131,22 @@ jobs:
         with:
           distribution: temurin
           java-version: "21"
-      - uses: actions/setup-node@v6
-        if: matrix.sdk != 'swift'
-        with:
-          node-version: "22.23.4"
-      # Phiên bản openapi-generator và tham số của từng SDK ở sdk/openapitools.json.
+      # Phiên bản openapi-generator và tham số của từng SDK ở sdk/openapitools.json; tải jar thẳng từ
+      # Maven Central (bản bọc npm dùng API tìm kiếm của Maven, hay bị giới hạn lượt gọi).
       - name: generate
         if: matrix.sdk != 'swift'
-        working-directory: sdk
-        run: npx --yes @openapitools/openapi-generator-cli@2.42.2 generate --generator-key ${{ matrix.sdk }}
+        run: |
+          config=sdk/openapitools.json
+          version=$(jq -r '."generator-cli".version' "$config")
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/openapi-generator.jar" \
+            "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/$version/openapi-generator-cli-$version.jar"
+          generator=".\"generator-cli\".generators.${{ matrix.sdk }}"
+          java -jar "$RUNNER_TEMP/openapi-generator.jar" generate \
+            -g "$(jq -r "$generator.generatorName" "$config")" \
+            $(jq -r "$generator.library // empty | \"--library=\" + ." "$config") \
+            -i docs/openapi.json \
+            -o "sdk/${{ matrix.sdk }}/generated" \
+            --additional-properties="$(jq -r "$generator.additionalProperties | to_entries | map(\"\(.key)=\(.value)\") | join(\",\")" "$config")"
       - name: gradle build
         if: matrix.sdk == 'kotlin'
         working-directory: sdk/kotlin/generated
