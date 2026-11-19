@@ -397,6 +397,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
+- **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19
 
 ## Tiền, thuế, chứng từ
 
