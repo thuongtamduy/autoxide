@@ -77,6 +77,7 @@ use crate::idempotency::IdempotencyStore;
 
 pub use body_limit::{BodyLimit, is_too_large};
 pub use client::ClientInfo;
+pub(crate) use client::ClientIp;
 pub(crate) use client::ForwardedHost;
 pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};

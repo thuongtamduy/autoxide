@@ -5,6 +5,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 mod access;
+mod access_check;
 mod antispam;
 mod approvals_work;
 mod backlog;

@@ -671,6 +671,7 @@ mod tests {
 
     async fn role(services: &Services, permissions: &[&str]) -> uuid::Uuid {
         let input = RoleInput {
+            denies: Vec::new(),
             requires_mfa: false,
             name: "helpdesk".to_owned(),
             description: String::new(),

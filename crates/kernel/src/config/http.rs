@@ -257,7 +257,10 @@ impl IpRange {
         }
     }
 
-    fn parse(text: &str) -> Result<Self, String> {
+    /// Đọc `10.0.0.0/8`, `2001:db8::/32` hay một địa chỉ (= dải chỉ có nó). Lỗi là câu tiếng Anh
+    /// nói rõ phải viết thế nào.
+    pub fn parse(text: &str) -> Result<Self, String> {
+        let text = text.trim();
         let (address, prefix) = match text.split_once('/') {
             Some((address, prefix)) => (address, Some(prefix)),
             None => (text, None),
@@ -279,6 +282,13 @@ impl IpRange {
                 .ok_or_else(|| format!("`{text}`: the prefix length must be 0 to {bits}"))?,
         };
         Ok(IpRange { network, prefix })
+    }
+}
+
+// Dạng chuẩn để lưu và trả về: luôn có độ dài tiền tố (`192.0.2.7/32`).
+impl std::fmt::Display for IpRange {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{}/{}", self.network, self.prefix)
     }
 }
 

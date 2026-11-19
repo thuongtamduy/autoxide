@@ -248,8 +248,16 @@ export type AnswerResponse = {
 
 /** An API key, without its secret. */
 export type ApiKeyResponse = {
+  /**
+   * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+   * from elsewhere gets 403 `network_not_allowed`.
+   */
+  allowed_ips: string[];
   created_at: string;
-  /** When the key stops working; `null`: never. */
+  /**
+   * When the key stops working. Every new key has one; `null` only for data that was never
+   * upgraded.
+   */
   expires_at?: string | null;
   id: string;
   /**
@@ -319,6 +327,16 @@ export type ApprovalRequest = {
   summary: string;
   /** Where to look at it and decide. */
   url: string;
+};
+
+/** Approval of a saved reply for automatic answers. */
+export type ApproveSupportMacroRequest = {
+  /** `true`: you approve the exact text for automatic answers; `false`: stop using it. */
+  enabled: boolean;
+  /** Ways customers ask the question, per language (1 to 50 in all). */
+  questions?: Record<string, unknown>;
+  /** Automatic use stops after this day unless approved again (today to one year ahead). */
+  review_due_on?: string | null;
 };
 
 /** Put a tenant on a plan. */
@@ -3762,14 +3780,20 @@ export type ContentTemplateVariable = {
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
+   * IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be
+   * used from, at most 50. Omit for any address.
+   */
+  allowed_ips?: string[];
+  /**
    * Your current password: a stolen access token alone must not create a key that
    * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
    * `passkey_credential`) or a `reauth_token` instead — exactly one of them.
    */
   current_password?: string;
   /**
-   * When the key stops working (RFC 3339, in the future). Omit for a key that does
-   * not expire.
+   * When the key stops working (RFC 3339, in the future, at most
+   * `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest
+   * lifetime: every key expires.
    */
   expires_at?: string | null;
   /**
@@ -6768,6 +6792,52 @@ export type Data_InventoryLevel = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryPurchaseOrder = {
+  /** A purchase order to a supplier. */
+  data: {
+    created_at: string;
+    expected_on?: string | null;
+    id: string;
+    lines: InventoryPurchaseOrderLine[];
+    note: string;
+    /** Document number, e.g. `PO-2026-000001`. */
+    number: string;
+    /** The receiving warehouse. */
+    org_id: string;
+    /** `draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    supplier_id: string;
+    total: Money;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryReceipt = {
+  /** A goods receipt. */
+  data: {
+    id: string;
+    ledger_entry_id?: string | null;
+    ledger_error_code?: string | null;
+    ledger_posted_at?: string | null;
+    /**
+     * `pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or
+     * `not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).
+     */
+    ledger_status: string;
+    lines: InventoryReceiptLine[];
+    /** Document number, e.g. `PN-2026-000001`. */
+    number: string;
+    org_id: string;
+    posted_at: string;
+    purchase_order_id?: string | null;
+    reference: string;
+    supplier_id?: string | null;
+    total: Money;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InventoryReservation = {
   /** Stock held for one order. */
   data: {
@@ -6801,6 +6871,50 @@ export type Data_InventoryStoreSettings = {
     allow_split: boolean;
     /** Try warehouses in the buyer's province first (province from the units' public profile). */
     prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventorySupplier = {
+  /** A supplier. */
+  data: {
+    active: boolean;
+    address?: string | null;
+    code: string;
+    contact_name?: string | null;
+    created_at: string;
+    currency: string;
+    email?: string | null;
+    id: string;
+    name: string;
+    /** The purchasing unit; the supplier's payable is kept in its ledger book. */
+    org_id: string;
+    payable?: Money | null;
+    payment_terms_days: number;
+    phone?: string | null;
+    tax_code?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventorySupplierReturn = {
+  /** A return of goods to a supplier. */
+  data: {
+    id: string;
+    ledger_entry_id?: string | null;
+    ledger_error_code?: string | null;
+    /** `pending`, `posted`, `failed` or `not_applicable`. */
+    ledger_status: string;
+    lines: InventorySupplierReturnLine[];
+    /** Document number, e.g. `TH-2026-000001`. */
+    number: string;
+    org_id: string;
+    posted_at: string;
+    receipt_id?: string | null;
+    reference: string;
+    supplier_id: string;
+    total: Money;
   };
 };
 
@@ -8991,6 +9105,11 @@ export type Data_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -9583,6 +9702,44 @@ export type Data_SupportAllowedResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportAutoReply = {
+  /** One automatic answer. */
+  data: {
+    created_at: string;
+    /** `helpful`, `wrong`, or empty. */
+    feedback?: string | null;
+    id: string;
+    intent?: string | null;
+    macro_id?: string | null;
+    org_id: string;
+    /** The message sent. */
+    reply_message_id?: string | null;
+    /** `macro` or `fact`. */
+    source: string;
+    /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+    thread: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportAutoReplyDecision = {
+  /** What an automatic answer would do. */
+  data: {
+    intent?: string | null;
+    macro_id?: string | null;
+    /**
+     * `send` (answer automatically), `draft` (staff answer, a draft is prepared) or `handoff`
+     * (staff answer).
+     */
+    outcome: string;
+    /** `macro` or `fact`. */
+    source?: string | null;
+    /** The exact text that would be sent. */
+    text?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportGrantResponse = {
   /** A time-limited access of platform staff to a tenant's data. */
   data: {
@@ -9688,6 +9845,19 @@ export type Data_SupportPolicyInForce = {
     defined_at?: string | null;
     /** The unit asked about. */
     org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportReplyDraft = {
+  /** A draft answer staff review before sending. Never sent by itself. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   };
 };
 
@@ -11866,6 +12036,11 @@ export type Data_Vec_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -12006,6 +12181,18 @@ export type Data_Vec_SupportMacro = {
     /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
     review_due_on?: string | null;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportReplyDraft = {
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   }[];
 };
 
@@ -13267,6 +13454,15 @@ export type InventoryAdjustmentRequest = {
   reference: string;
 };
 
+/** A variant, a quantity and a unit cost. */
+export type InventoryCostLine = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  /** Unit cost; every line in the same currency. */
+  unit_cost: Money;
+  variant_id: string;
+};
+
 /** A stock count of one warehouse. */
 export type InventoryCount = {
   applied_at?: string | null;
@@ -13392,11 +13588,111 @@ export type InventoryMovement = {
   variant_id: string;
 };
 
+/** A purchase order to a supplier. */
+export type InventoryPurchaseOrder = {
+  created_at: string;
+  expected_on?: string | null;
+  id: string;
+  lines: InventoryPurchaseOrderLine[];
+  note: string;
+  /** Document number, e.g. `PO-2026-000001`. */
+  number: string;
+  /** The receiving warehouse. */
+  org_id: string;
+  /** `draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`. */
+  status: string;
+  supplier_id: string;
+  total: Money;
+  updated_at: string;
+};
+
+/** One line of a purchase order. */
+export type InventoryPurchaseOrderLine = {
+  quantity: number;
+  received_quantity: number;
+  unit_cost: Money;
+  variant_id: string;
+};
+
+/** A purchase order to create or change (while a draft). */
+export type InventoryPurchaseOrderRequest = {
+  expected_on?: string | null;
+  /** 1 to 500 lines, one per variant. */
+  lines: InventoryCostLine[];
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** The receiving warehouse. */
+  org_id: string;
+  supplier_id: string;
+};
+
 /** A variant and a quantity. */
 export type InventoryQuantityLine = {
   /** 1 to 1 000 000. */
   quantity: number;
   variant_id: string;
+};
+
+/** A goods receipt. */
+export type InventoryReceipt = {
+  id: string;
+  ledger_entry_id?: string | null;
+  ledger_error_code?: string | null;
+  ledger_posted_at?: string | null;
+  /**
+   * `pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or
+   * `not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).
+   */
+  ledger_status: string;
+  lines: InventoryReceiptLine[];
+  /** Document number, e.g. `PN-2026-000001`. */
+  number: string;
+  org_id: string;
+  posted_at: string;
+  purchase_order_id?: string | null;
+  reference: string;
+  supplier_id?: string | null;
+  total: Money;
+};
+
+/** One line of a goods receipt. */
+export type InventoryReceiptLine = {
+  expires_on?: string | null;
+  lot_code?: string | null;
+  quantity: number;
+  serials: string[];
+  unit_cost: Money;
+  variant_id: string;
+};
+
+/** One line of a goods receipt. */
+export type InventoryReceiptLineRequest = {
+  expires_on?: string | null;
+  /** Required when the variant tracks lots. */
+  lot_code?: string | null;
+  /** 1 to 1 000 000. */
+  quantity: number;
+  /** Exactly `quantity` serial numbers when the variant tracks serials. */
+  serials?: string[];
+  /** Unit cost; every line in the same currency. It updates the average cost. */
+  unit_cost: Money;
+  variant_id: string;
+};
+
+/** A goods receipt. */
+export type InventoryReceiptRequest = {
+  lines: InventoryReceiptLineRequest[];
+  /** The receiving warehouse. */
+  org_id: string;
+  /** The purchase order received (the supplier comes from it). */
+  purchase_order_id?: string | null;
+  /**
+   * Your id of this receipt (e.g. the delivery note number); the same reference and content
+   * again returns the receipt already made.
+   */
+  reference: string;
+  /** The supplier, for a receipt without a purchase order. */
+  supplier_id?: string | null;
 };
 
 /** Units received now; no lines receives everything still in transit. */
@@ -13464,6 +13760,112 @@ export type InventoryStoreSettings = {
   allow_split: boolean;
   /** Try warehouses in the buyer's province first (province from the units' public profile). */
   prefer_nearby: boolean;
+};
+
+/** A supplier. */
+export type InventorySupplier = {
+  active: boolean;
+  address?: string | null;
+  code: string;
+  contact_name?: string | null;
+  created_at: string;
+  currency: string;
+  email?: string | null;
+  id: string;
+  name: string;
+  /** The purchasing unit; the supplier's payable is kept in its ledger book. */
+  org_id: string;
+  payable?: Money | null;
+  payment_terms_days: number;
+  phone?: string | null;
+  tax_code?: string | null;
+  updated_at: string;
+};
+
+/** A supplier to create. */
+export type InventorySupplierRequest = {
+  /** Postal address as text, up to 500 characters. */
+  address?: string | null;
+  /** Your code, unique in the tenant, up to 64 characters. */
+  code: string;
+  contact_name?: string | null;
+  /** ISO 4217 code; default `VND`. */
+  currency?: string | null;
+  email?: string | null;
+  /** Up to 200 characters. */
+  name: string;
+  /** The purchasing unit; default the tenant's root unit. */
+  org_id?: string | null;
+  /** Days to pay, 0 to 365; default 0. */
+  payment_terms_days?: number | null;
+  phone?: string | null;
+  /** Tax registration number, up to 20 characters. */
+  tax_code?: string | null;
+};
+
+/** A return of goods to a supplier. */
+export type InventorySupplierReturn = {
+  id: string;
+  ledger_entry_id?: string | null;
+  ledger_error_code?: string | null;
+  /** `pending`, `posted`, `failed` or `not_applicable`. */
+  ledger_status: string;
+  lines: InventorySupplierReturnLine[];
+  /** Document number, e.g. `TH-2026-000001`. */
+  number: string;
+  org_id: string;
+  posted_at: string;
+  receipt_id?: string | null;
+  reference: string;
+  supplier_id: string;
+  total: Money;
+};
+
+/** One line of a supplier return. */
+export type InventorySupplierReturnLine = {
+  lot_code?: string | null;
+  quantity: number;
+  serials: string[];
+  unit_cost: Money;
+  variant_id: string;
+};
+
+/** One line of a supplier return. */
+export type InventorySupplierReturnLineRequest = {
+  /** The lot returned; default the lots that expire first. */
+  lot_code?: string | null;
+  /** 1 to 1 000 000. */
+  quantity: number;
+  /** Exactly `quantity` serial numbers when the variant tracks serials. */
+  serials?: string[];
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A return of goods to a supplier. */
+export type InventorySupplierReturnRequest = {
+  lines: InventorySupplierReturnLineRequest[];
+  /** The warehouse the goods leave. */
+  org_id: string;
+  /** The receipt the goods came with, if known. */
+  receipt_id?: string | null;
+  /** Your id of this return; the same reference and content again returns it. */
+  reference: string;
+  supplier_id: string;
+};
+
+/** Changes to a supplier; `null` clears an optional field. */
+export type InventorySupplierUpdate = {
+  active?: boolean | null;
+  address?: string | null;
+  code?: string | null;
+  contact_name?: string | null;
+  currency?: string | null;
+  email?: string | null;
+  name?: string | null;
+  payment_terms_days?: number | null;
+  phone?: string | null;
+  tax_code?: string | null;
 };
 
 /** A stock transfer between two warehouses. */
@@ -16423,8 +16825,16 @@ export type Page_AdministrativeUnit = {
 export type Page_ApiKeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+     * from elsewhere gets 403 `network_not_allowed`.
+     */
+    allowed_ips: string[];
     created_at: string;
-    /** When the key stops working; `null`: never. */
+    /**
+     * When the key stops working. Every new key has one; `null` only for data that was never
+     * upgraded.
+     */
     expires_at?: string | null;
     id: string;
     /**
@@ -17593,6 +18003,54 @@ export type Page_InventoryMovement = {
 };
 
 /** One page of a list. */
+export type Page_InventoryPurchaseOrder = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    expected_on?: string | null;
+    id: string;
+    lines: InventoryPurchaseOrderLine[];
+    note: string;
+    /** Document number, e.g. `PO-2026-000001`. */
+    number: string;
+    /** The receiving warehouse. */
+    org_id: string;
+    /** `draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    supplier_id: string;
+    total: Money;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryReceipt = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    ledger_entry_id?: string | null;
+    ledger_error_code?: string | null;
+    ledger_posted_at?: string | null;
+    /**
+     * `pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or
+     * `not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).
+     */
+    ledger_status: string;
+    lines: InventoryReceiptLine[];
+    /** Document number, e.g. `PN-2026-000001`. */
+    number: string;
+    org_id: string;
+    posted_at: string;
+    purchase_order_id?: string | null;
+    reference: string;
+    supplier_id?: string | null;
+    total: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InventoryReservation = {
   /** The items of this page, in the requested order. */
   data: {
@@ -17604,6 +18062,52 @@ export type Page_InventoryReservation = {
     selling_org_id: string;
     /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventorySupplier = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    address?: string | null;
+    code: string;
+    contact_name?: string | null;
+    created_at: string;
+    currency: string;
+    email?: string | null;
+    id: string;
+    name: string;
+    /** The purchasing unit; the supplier's payable is kept in its ledger book. */
+    org_id: string;
+    payable?: Money | null;
+    payment_terms_days: number;
+    phone?: string | null;
+    tax_code?: string | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventorySupplierReturn = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    ledger_entry_id?: string | null;
+    ledger_error_code?: string | null;
+    /** `pending`, `posted`, `failed` or `not_applicable`. */
+    ledger_status: string;
+    lines: InventorySupplierReturnLine[];
+    /** Document number, e.g. `TH-2026-000001`. */
+    number: string;
+    org_id: string;
+    posted_at: string;
+    receipt_id?: string | null;
+    reference: string;
+    supplier_id: string;
+    total: Money;
   }[];
   pagination: Pagination;
 };
@@ -18779,6 +19283,11 @@ export type Page_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -19306,6 +19815,27 @@ export type Page_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportAutoReply = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** `helpful`, `wrong`, or empty. */
+    feedback?: string | null;
+    id: string;
+    intent?: string | null;
+    macro_id?: string | null;
+    org_id: string;
+    /** The message sent. */
+    reply_message_id?: string | null;
+    /** `macro` or `fact`. */
+    source: string;
+    /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+    thread: string;
   }[];
   pagination: Pagination;
 };
@@ -20060,6 +20590,14 @@ export type PreviewEntryResponse = {
   /** Last change of the draft. */
   updated_at: string;
   word_count: number;
+};
+
+/** A question to try. */
+export type PreviewSupportAutoReplyRequest = {
+  /** Default `vi`. */
+  locale?: string | null;
+  org_id: string;
+  text: string;
 };
 
 /** A preview link for a draft. */
@@ -21977,6 +22515,12 @@ export type RoleGrant = {
 
 /** The full content of a role. */
 export type RoleRequest = {
+  /**
+   * Permissions the role denies. A denied permission wins over every grant: no other role of
+   * the user, not even the built-in `admin` role, gives it back. A role either grants or
+   * denies a permission, not both.
+   */
+  denies?: string[];
   /** What the role is for. Optional. */
   description?: string;
   /**
@@ -22016,6 +22560,11 @@ export type RoleResponse = {
    */
   all_permissions: boolean;
   created_at: string;
+  /**
+   * Permissions the role denies, sorted by name; they win over every grant of the user's
+   * other roles.
+   */
+  denies: string[];
   description: string;
   /**
    * The same permissions with their scope in the organization tree. Empty when
@@ -23431,6 +23980,46 @@ export type SupportAllowedResponse = {
 /** Who wrote a message. */
 export type SupportAuthorKind = "customer" | "agent" | "system";
 
+/** One automatic answer. */
+export type SupportAutoReply = {
+  created_at: string;
+  /** `helpful`, `wrong`, or empty. */
+  feedback?: string | null;
+  id: string;
+  intent?: string | null;
+  macro_id?: string | null;
+  org_id: string;
+  /** The message sent. */
+  reply_message_id?: string | null;
+  /** `macro` or `fact`. */
+  source: string;
+  /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+  thread: string;
+};
+
+/** What an automatic answer would do. */
+export type SupportAutoReplyDecision = {
+  intent?: string | null;
+  macro_id?: string | null;
+  /**
+   * `send` (answer automatically), `draft` (staff answer, a draft is prepared) or `handoff`
+   * (staff answer).
+   */
+  outcome: string;
+  /** `macro` or `fact`. */
+  source?: string | null;
+  /** The exact text that would be sent. */
+  text?: string | null;
+};
+
+/** Feedback on an automatic answer. */
+export type SupportAutoReplyFeedbackRequest = {
+  /** `true`: it helped; `false`: it was wrong. */
+  helpful: boolean;
+  /** Guests: the ticket token. */
+  token?: string | null;
+};
+
 /** Where a ticket came from. */
 export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
 
@@ -23489,6 +24078,11 @@ export type SupportGrantResponse = {
   starts_at: string;
   /** The tenant the staff may enter. */
   tenant_id: string;
+};
+
+/** The ticket token of a guest (empty for signed-in customers). */
+export type SupportHandoffRequest = {
+  token?: string | null;
 };
 
 /** A saved reply staff insert into answers. */
@@ -23593,6 +24187,16 @@ export type SupportPolicyInForce = SupportPolicy & {
 
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** A draft answer staff review before sending. Never sent by itself. */
+export type SupportReplyDraft = {
+  /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+  ai_assisted: boolean;
+  body: string;
+  created_at: string;
+  id: string;
+  ticket_id: string;
+};
 
 /** Support figures for tickets created in a period. */
 export type SupportReport = {
@@ -30978,6 +31582,156 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/purchase-orders": {
+    /** List purchase orders in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { supplier_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a purchase order as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryPurchaseOrderRequest;
+      responses: {
+        201: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/purchase-orders/{id}": {
+    /** Get a purchase order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a draft purchase order (its lines are replaced). */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryPurchaseOrderRequest;
+      responses: {
+        200: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/purchase-orders/{id}/cancel": {
+    /** Cancel a purchase order that is a draft, or ordered with nothing received. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/purchase-orders/{id}/close": {
+    /** Close a purchase order: what has not arrived stops counting as `incoming`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/purchase-orders/{id}/order": {
+    /** Send a draft purchase order to the supplier: its units count as `incoming`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryPurchaseOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/receipts": {
+    /** List goods receipts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { supplier_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryReceipt;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Receive goods into a warehouse, against a purchase order or directly. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryReceiptRequest;
+      responses: {
+        200: Data_InventoryReceipt;
+        201: Data_InventoryReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/receipts/{id}": {
+    /** Get a goods receipt. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/receipts/{id}/retry-ledger": {
+    /** Post a receipt whose ledger posting failed again. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/reports/valuation": {
     /** Value of the stock now: on hand × weighted average cost, per warehouse and currency. */
     get: {
@@ -31058,6 +31812,100 @@ export interface paths {
         200: Data_InventorySources;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/supplier-returns": {
+    /** List supplier returns in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventorySupplierReturn;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Return goods to a supplier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventorySupplierReturnRequest;
+      responses: {
+        200: Data_InventorySupplierReturn;
+        201: Data_InventorySupplierReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/supplier-returns/{id}": {
+    /** Get a supplier return. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventorySupplierReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/suppliers": {
+    /** List suppliers in your scope with what you owe each one. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string | null; active?: boolean | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventorySupplier;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a supplier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventorySupplierRequest;
+      responses: {
+        201: Data_InventorySupplier;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/suppliers/{id}": {
+    /** Get a supplier with what you owe it. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventorySupplier;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a supplier. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventorySupplierUpdate;
+      responses: {
+        200: Data_InventorySupplier;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
@@ -36885,6 +37733,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/auto-replies": {
+    /** List automatic answers in your scope, with the customers' feedback. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportAutoReply;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/auto-reply/preview": {
+    /** Try the automatic answer without sending anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PreviewSupportAutoReplyRequest;
+      responses: {
+        200: Data_SupportAutoReplyDecision;
+        401: Problem;
+        403: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/macros": {
     /** List the saved replies usable at a unit. */
     get: {
@@ -36935,6 +37810,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/macros/{id}/auto-reply": {
+    /** Approve a saved reply for automatic answers, or stop using it. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ApproveSupportMacroRequest;
+      responses: {
+        200: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -36971,6 +37861,35 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/auto-replies/{reply_id}/feedback": {
+    /** Tell whether an automatic answer on your ticket helped. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; reply_id: string }; };
+      requestBody: SupportAutoReplyFeedbackRequest;
+      responses: {
+        200: Data_SupportAutoReply;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/handoff": {
+    /** Ask for a person on your ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SupportHandoffRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -37064,6 +37983,33 @@ export interface paths {
         200: Data_SupportTicketDetail;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/auto-replies/{reply_id}/feedback": {
+    /** Tell whether an automatic answer on a guest ticket helped. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; reply_id: string }; };
+      requestBody: SupportAutoReplyFeedbackRequest;
+      responses: {
+        200: Data_SupportAutoReply;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/handoff": {
+    /** Ask for a person on a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SupportHandoffRequest;
+      responses: {
+        200: Data_SupportTicket;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -37378,6 +38324,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-drafts": {
+    /** List the drafts of a ticket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-suggestions": {
+    /** Draft an answer with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        502: Problem;
+        503: Problem;
         default: Problem;
       };
     };

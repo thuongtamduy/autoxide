@@ -2,7 +2,9 @@
 //! service → trả envelope. Ba nhóm: nhân viên (`/tickets`, theo permission ở nút), người mua có tài
 //! khoản (`/me/…`, chỉ phiếu của mình), khách vãng lai (`/public/…`, bằng token phiếu).
 
-mod extras;
+pub(crate) mod ai;
+pub(crate) mod auto;
+pub(crate) mod extras;
 mod me;
 mod policy;
 mod public;
@@ -46,5 +48,14 @@ pub(crate) fn routes(service: Arc<SupportService>) -> OpenApiRouter {
         .routes(routes!(extras::list_macros, extras::create_macro))
         .routes(routes!(extras::update_macro, extras::delete_macro))
         .routes(routes!(extras::render_macro))
+        .routes(routes!(ai::suggest_reply))
+        .routes(routes!(ai::list_drafts))
+        .routes(routes!(auto::approve_macro))
+        .routes(routes!(auto::preview))
+        .routes(routes!(auto::list_auto_replies))
+        .routes(routes!(auto::feedback_mine))
+        .routes(routes!(auto::feedback_public))
+        .routes(routes!(auto::handoff_mine))
+        .routes(routes!(auto::handoff_public))
         .with_state(service)
 }

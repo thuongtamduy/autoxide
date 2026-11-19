@@ -18,6 +18,20 @@ endpoints are marked deprecated with a sunset date first.
 - Response compression (step 39): JSON and text responses of 1 KiB or more are compressed with brotli or gzip
   when the client accepts it (a page of 20 posts goes from 136 KB to about 26 KB). Images and other files are never
   compressed again. `AUTOXIDE_HTTP_COMPRESSION=false` turns it off when a reverse proxy or CDN already compresses.
+- Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
+  limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
+  stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
+- Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
+  receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
+  posting; MCP tool `inventory.create_receipt`.
+- `auth`: API keys take `allowed_ips` (addresses or CIDR ranges, at most 50); a request from elsewhere gets 403
+  `network_not_allowed`. Every key now expires: omitting `expires_at` gives the longest lifetime,
+  `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` (365 days by default), and a later date is refused (`too_far`). **Upgrade note:**
+  existing keys without an expiry date get one 365 days after the upgrade.
+- `auth`: roles take `denies`, permissions the role forbids. A denied permission wins over every grant of the user's
+  other roles, even the built-in `admin` role; `permission_denied` answers `reason: denied_by_role` (or `missing`).
+- Kernel: `Principal::check` decides one record (`Decision::Allow` / `Missing` / `OutOfScope`) from the same rule
+  that builds the list filter (`scope_condition`); a randomized test proves both agree on SQLite and Postgres.
 - Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
   `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
   sold only once; transfers keep lots and serial numbers.
@@ -132,6 +146,16 @@ endpoints are marked deprecated with a sunset date first.
 - `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
 - `support::api`: attach point `SupportFacts` where later modules (`shipping`, `orders`) attach a `FactSource` that
   answers simple questions from exact data (used by automatic answers, D-230).
+- `support`: MCP tools (`support.list_tickets`, `get_ticket`, `reply_ticket`, `add_internal_note`, `update_ticket`,
+  `link_ticket`, `suggest_reply`) with the REST permissions; AI reply drafts (`/tickets/{id}/reply-suggestions`, never
+  sent by themselves); email replies into tickets through the trait `InboundMail` (off by default); guide
+  `docs/SUPPORT.md` (EN + VI).
+- `support`: automatic answers to simple questions (off by default, per unit): the AI only classifies; Rust rules send
+  either an approved saved reply word for word (`PUT /macros/{id}/auto-reply`, with a review day) or a sentence built
+  from exact data by a `FactSource`; never for complaints, refunds, cancellations, payment problems, personal data,
+  legal questions, angry customers or blocked words. "Talk to a person" (`…/handoff`), feedback that retires wrong
+  answers, `POST /auto-reply/preview`, `GET /auto-replies`, MCP tool `support.preview_auto_reply`; `AutoResponder` for
+  chat (step 61). Setting `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

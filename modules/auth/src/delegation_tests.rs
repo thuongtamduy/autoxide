@@ -83,6 +83,7 @@ async fn chain(test: &TestDatabase) -> (Chain, crate::testing::Services) {
     write.commit().await.unwrap();
     let agent_id = person(&services, &parent, "agent@parent.example").await;
     let role = RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         name: "support".to_owned(),
         description: String::new(),

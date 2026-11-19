@@ -101,6 +101,9 @@ pub(crate) struct RoleResponse {
     /// The same permissions with their scope in the organization tree. Empty when
     /// `all_permissions`.
     grants: Vec<RoleGrant>,
+    /// Permissions the role denies, sorted by name; they win over every grant of the user's
+    /// other roles.
+    denies: Vec<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -119,6 +122,7 @@ impl From<Role> for RoleResponse {
                 .into_iter()
                 .map(|(permission, scope)| RoleGrant { permission, scope })
                 .collect(),
+            denies: role.denies,
             created_at: role.created_at,
             updated_at: role.updated_at,
         }
@@ -144,6 +148,12 @@ pub(crate) struct RoleRequest {
     #[serde(default)]
     #[schema(inline)]
     grants: Vec<RoleGrant>,
+    /// Permissions the role denies. A denied permission wins over every grant: no other role of
+    /// the user, not even the built-in `admin` role, gives it back. A role either grants or
+    /// denies a permission, not both.
+    #[serde(default)]
+    #[schema(example = json!([]))]
+    denies: Vec<String>,
     /// When `true`, the role's permissions work only for accounts with two-step sign-in
     /// (an authenticator app or a passkey); others see `mfa_required` in `GET /api/v1/auth/me`
     /// until they turn it on. The only change the built-in `admin` role accepts.
@@ -163,6 +173,7 @@ impl From<RoleRequest> for RoleInput {
                 .into_iter()
                 .map(|grant| (grant.permission, grant.scope))
                 .collect(),
+            denies: request.denies,
         }
     }
 }
@@ -551,6 +562,7 @@ mod tests {
                     &tenant,
                     Actor::system(),
                     crate::role::RoleInput {
+                        denies: Vec::new(),
                         requires_mfa: false,
                         grants: Vec::new(),
                         name: "reader".to_owned(),
@@ -582,6 +594,52 @@ mod tests {
             let (_, _, me) = call(&app, "GET", "/me", Some(&ada), None).await;
             assert_eq!(me["data"]["permissions"], json!(["auth.roles.read"]));
             assert_eq!(me["data"]["all_permissions"], false);
+        })
+        .await
+        .unwrap();
+    }
+
+    // Bước 54 mục 1 (P11): quyền không nằm trong access token — đổi role, đổi permission của
+    // role có hiệu lực ngay ở request kế tiếp với CÙNG token, không chờ token hết hạn.
+    #[tokio::test]
+    async fn doi_role_co_hieu_luc_o_request_ke_tiep() {
+        TestDatabase::run(async |test| {
+            let (app, services) = app(test).await;
+            let tenant = services.tenant.clone();
+            let input = |permissions: &[&str]| crate::role::RoleInput {
+                denies: Vec::new(),
+                requires_mfa: false,
+                grants: Vec::new(),
+                name: "reader".to_owned(),
+                description: String::new(),
+                permissions: permissions.iter().map(|name| (*name).to_owned()).collect(),
+            };
+            let reader =
+                services.roles.create(&tenant, Actor::system(), input(&["auth.roles.read"])).await;
+            let reader = reader.unwrap();
+            let user =
+                services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+            let assign = |roles: Vec<uuid::Uuid>| {
+                services.roles.set_user_roles(&tenant, Actor::system(), user.id, roles)
+            };
+            assign(vec![reader.id]).await.unwrap();
+            let ada = bearer(&app, "ada@example.com", PASSWORD).await;
+            let status = async || call(&app, "GET", "/roles", Some(&ada), None).await.0;
+            assert_eq!(status().await, StatusCode::OK);
+
+            // Gỡ role: cùng token, request kế tiếp bị từ chối.
+            assign(Vec::new()).await.unwrap();
+            assert_eq!(status().await, StatusCode::FORBIDDEN);
+            // Gán lại: có quyền lại ngay.
+            assign(vec![reader.id]).await.unwrap();
+            assert_eq!(status().await, StatusCode::OK);
+            // Bớt permission của role (người dùng vẫn giữ role): mất quyền ngay.
+            services
+                .roles
+                .update(&tenant, Actor::system(), reader.id, input(&[]), None)
+                .await
+                .unwrap();
+            assert_eq!(status().await, StatusCode::FORBIDDEN);
         })
         .await
         .unwrap();

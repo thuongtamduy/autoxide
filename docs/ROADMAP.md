@@ -168,10 +168,13 @@ Bắt đầu SAU bước 34. Mô hình: RBAC theo cây tổ chức có độ sâ
 và rào + điều kiện theo ngữ cảnh — luật là dữ liệu có kiểu, không ngôn ngữ chính sách tự do. Đối chiếu với
 Google Zanzibar, AWS IAM, GitHub, Microsoft Entra, Salesforce, Shopify, Stripe và chuẩn OpenID AuthZEN.
 
-- [ ] Một hàm quyết định duy nhất, thu hồi tức thì (quyền không nằm trong token; cache theo phiên bản quyền
-      của khách); test so khớp "lọc danh sách = kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database
+- [x] Một hàm quyết định duy nhất, thu hồi tức thì (quyền không nằm trong token); test so khớp "lọc danh sách =
+      kiểm từng bản ghi" sinh ngẫu nhiên trên cả hai database (D-20261118-step54-one-decision)
+- [ ] Cache quyền theo phiên bản quyền của khách (P11): chỉ làm khi benchmark bước 39 cho thấy câu nạp quyền
+      đáng kể (D-20261118-step54-one-decision)
 - [ ] Deny thắng allow trên role; rào quyền tối đa cho khách con (kể cả admin của khách con); API key chi
-      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key
+      tiết: hạn bắt buộc, chọn tài nguyên, dải IP, lần dùng cuối, xoay vòng, quản trị duyệt key — đã có: deny
+      thắng allow (D-20261118-step54-role-denies); hạn bắt buộc, dải IP (D-20261119-step54-api-key-limits)
 - [ ] Xác thực lại cho việc nhạy cảm (passkey / MFA gần đây, RFC 9470); điều kiện theo IP và khung giờ
       trên gán role
 - [ ] Chia sẻ bản ghi có hạn cho người, nhóm, nút, key (module khai quan hệ `viewer` / `editor`…), không
@@ -345,10 +348,10 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
       hạn, mức hài lòng
 - [x] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
       khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
-- [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
+- [x] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
       trên cả hai database
-- [ ] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
+- [x] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
       chính xác (`FactSource` của module sau), mô hình chỉ phân loại; luật quyết trong Rust, không bao giờ tự động
       cho khiếu nại / hoàn tiền / dữ liệu cá nhân; tắt mặc định, nhãn và "gặp nhân viên"; câu phức tạp → nháp
 
@@ -527,10 +530,10 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [x] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
       sắp hết hạn theo nút), số serial — bật theo sản phẩm
 - [x] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
-- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
+- [x] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
       cấp; công nợ phải trả vào sổ cái, trạng thái ghi sổ của phiếu nhập (ghi lại được), công nợ từng nhà
       cung cấp qua `ledger`
-- [ ] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
+- [x] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
       không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho đơn đặt trước theo thứ tự đặt
 - [ ] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
       / `out` / `preorder`, không lộ số tồn lớn; `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api`; ETag,

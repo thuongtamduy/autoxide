@@ -11,6 +11,7 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-catalog.workspace = true
 autoxide-kernel.workspace = true
+autoxide-ledger.workspace = true
 autoxide-organizations.workspace = true
 axum.workspace = true
 chrono.workspace = true

@@ -5,6 +5,8 @@ mod m0001_create_support;
 mod m0008_create_teams;
 mod m0009_policies;
 mod m0010_macros;
+mod m0011_drafts;
+mod m0012_auto_replies;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -33,5 +35,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0009_policies::Migration),
         // Câu trả lời mẫu theo nút (mục 4).
         Box::new(m0010_macros::Migration),
+        // Bản nháp trả lời của AI (mục 5).
+        Box::new(m0011_drafts::Migration),
+        // Nhật ký trả lời tự động (mục 6, D-230).
+        Box::new(m0012_auto_replies::Migration),
     ]
 }

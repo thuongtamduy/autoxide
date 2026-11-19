@@ -181,6 +181,8 @@ pub(crate) mod reservation_line {
         pub released_quantity: i64,
         pub backordered: bool,
         pub preordered: bool,
+        /// Dòng đặt trước: hàng về đã chia (cộng dồn).
+        pub allocated_quantity: i64,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -366,6 +368,213 @@ pub(crate) mod serial {
         /// `in_stock`, `in_transit`, `sold`, `returned`, `written_off`.
         pub status: String,
         pub order_id: Option<Uuid>,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod supplier {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_suppliers")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub org_id: Uuid,
+        pub code: String,
+        pub name: String,
+        pub name_key: String,
+        pub tax_code: Option<String>,
+        pub contact_name: Option<String>,
+        pub phone: Option<String>,
+        pub email: Option<String>,
+        pub address: Option<String>,
+        pub payment_terms_days: i32,
+        pub currency: String,
+        pub active: bool,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod purchase_order {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_purchase_orders")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub number: String,
+        pub org_id: Uuid,
+        pub supplier_id: Uuid,
+        pub status: String,
+        pub expected_on: Option<Date>,
+        pub total_minor: i64,
+        pub currency: String,
+        pub note: String,
+        pub created_by: Option<Uuid>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod purchase_order_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_purchase_order_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub purchase_order_id: Uuid,
+        pub variant_id: Uuid,
+        pub quantity: i64,
+        pub received_quantity: i64,
+        pub unit_cost_minor: i64,
+        pub unit_cost_currency: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod receipt {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_receipts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub number: String,
+        pub org_id: Uuid,
+        pub supplier_id: Option<Uuid>,
+        pub purchase_order_id: Option<Uuid>,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub posted_at: DateTimeUtc,
+        pub total_minor: i64,
+        pub currency: String,
+        pub created_by: Option<Uuid>,
+        pub ledger_status: String,
+        pub ledger_entry_id: Option<Uuid>,
+        pub ledger_posted_at: Option<DateTimeUtc>,
+        pub ledger_error_code: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod receipt_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_receipt_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub receipt_id: Uuid,
+        pub variant_id: Uuid,
+        pub quantity: i64,
+        pub unit_cost_minor: i64,
+        pub unit_cost_currency: String,
+        pub lot_code: Option<String>,
+        pub expires_on: Option<Date>,
+        pub serials: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod supplier_return {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_supplier_returns")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub number: String,
+        pub org_id: Uuid,
+        pub supplier_id: Uuid,
+        pub receipt_id: Option<Uuid>,
+        pub reference: String,
+        pub reference_fingerprint: String,
+        pub posted_at: DateTimeUtc,
+        pub total_minor: i64,
+        pub currency: String,
+        pub created_by: Option<Uuid>,
+        pub ledger_status: String,
+        pub ledger_entry_id: Option<Uuid>,
+        pub ledger_posted_at: Option<DateTimeUtc>,
+        pub ledger_error_code: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod supplier_return_line {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_supplier_return_lines")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub supplier_return_id: Uuid,
+        pub variant_id: Uuid,
+        pub quantity: i64,
+        pub unit_cost_minor: i64,
+        pub unit_cost_currency: String,
+        pub lot_code: Option<String>,
+        pub serials: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod preorder_counter {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_preorder_counters")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub variant_id: Uuid,
+        /// Suất đang giữ / đã xác nhận; chỉ đổi bằng `rows::adjust`.
+        pub reserved: i64,
+        pub preorder_limit: i64,
         pub updated_at: DateTimeUtc,
     }
 

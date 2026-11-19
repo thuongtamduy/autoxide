@@ -190,6 +190,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_receipt` | `inventory.receive` | writes |
 | `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
@@ -304,6 +305,14 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |
+| `support.add_internal_note` | `support.tickets.reply` | writes |
+| `support.get_ticket` | `support.tickets.read` | read-only |
+| `support.link_ticket` | `support.tickets.reply` | writes |
+| `support.list_tickets` | `support.tickets.read` | read-only |
+| `support.preview_auto_reply` | `support.auto_reply.manage` | writes |
+| `support.reply_ticket` | `support.tickets.reply` | writes |
+| `support.suggest_reply` | `support.tickets.reply` | writes |
+| `support.update_ticket` | `support.tickets.reply` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
 | `webhooks.list_deliveries` | `webhooks.manage` | read-only |
