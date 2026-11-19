@@ -674,9 +674,17 @@ async fn binh_luan_cho_duyet_vao_hop_viec() {
         assert_eq!(items.len(), 1, "{work}");
         assert_eq!(items[0]["key"], format!("comments.pending:{id}"));
         assert_eq!(items[0]["title"], "Approve or reject the comment of Ada");
-        let counts =
-            app.get("/api/v1/kernel/work/counts").token("admin").send().await.unwrap().json();
-        assert_eq!(counts["data"]["counts"]["comments.pending"], 1);
+        // Mỗi nguồn đếm có hạn giờ ngắn (`SOURCE_TIMEOUT`); máy CI bận có thể trễ hạn, khi đó nguồn nằm
+        // trong `incomplete` và không bị nhớ lại — hỏi lại vài lần thay vì đọc số trống.
+        let mut counts = json!(null);
+        for _ in 0..5 {
+            counts =
+                app.get("/api/v1/kernel/work/counts").token("admin").send().await.unwrap().json();
+            if counts["data"]["incomplete"].as_array().is_some_and(Vec::is_empty) {
+                break;
+            }
+        }
+        assert_eq!(counts["data"]["counts"]["comments.pending"], 1, "{counts}");
         let reader = app.get("/api/v1/kernel/work").token("reader").send().await.unwrap().json();
         assert_eq!(reader["data"]["items"], json!([]), "chỉ người duyệt được thấy");
 
