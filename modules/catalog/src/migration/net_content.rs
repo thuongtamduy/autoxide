@@ -1,4 +1,4 @@
-//! m0011: lượng tịnh của biến thể (`net_quantity` + `net_unit`) và đơn giá theo đơn vị cơ sở trên
+//! m0012: lượng tịnh của biến thể (`net_quantity` + `net_unit`) và đơn giá theo đơn vị cơ sở trên
 //! storefront (D-201). SQLite chỉ thêm được một cột mỗi lệnh `ALTER TABLE`: thêm từng cột.
 
 use autoxide_kernel::migration::prelude::*;
@@ -7,7 +7,7 @@ pub(super) struct AddNetContent;
 
 impl MigrationName for AddNetContent {
     fn name(&self) -> &str {
-        "m0011_net_content"
+        "m0012_net_content"
     }
 }
 

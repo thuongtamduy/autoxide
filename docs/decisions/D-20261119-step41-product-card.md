@@ -5,7 +5,7 @@ Chủ đề: Thương mại
 Quyết định:
 
 1. **Lượng tịnh** là dữ liệu của biến thể: `net_quantity` (số nguyên > 0) + `net_unit` (`g`, `kg`, `ml`, `l`, `m`,
-   `piece`), cho cả hai hay không cho cái nào (m0011). **Đơn giá theo đơn vị cơ sở** (D-201) tính bằng số nguyên,
+   `piece`), cho cả hai hay không cho cái nào (m0012). **Đơn giá theo đơn vị cơ sở** (D-201) tính bằng số nguyên,
    làm tròn nửa lên: `g`→`kg` (×1000), `ml`→`l` (×1000), còn lại theo chính đơn vị. Thẻ dùng biến thể rẻ nhất có lượng
    tịnh; storefront ghi sẵn `unit_price_minor` / `unit_price_unit` khi dựng lại.
 2. **Thương hiệu** là thuộc tính mã `brand` (kiểu `text` hay `option`) mà khách tự khai — không thêm cột vào sản
