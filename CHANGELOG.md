@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: back-in-stock alerts per store — `POST /api/v1/inventory/public/restock-alerts` (separate
+  consent, anti-spam, two-step confirmation through `AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL`; signed-in buyers alerted
+  on their account), one message per restock wave through `notifications`, stop link in every message;
+  `Inventory::restock_alerts_of` answers.
 - Module `inventory`: public availability `GET /api/v1/inventory/public/availability?variant_ids&store_id` — `in_stock`,
   `low` (with the quantity, only below `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`), `out` or `preorder` per variant and
   store, never a large number; `ETag` and a 5-second cache. `Inventory::in_stock_at` uses the same rule (warehouse
