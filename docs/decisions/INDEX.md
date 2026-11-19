@@ -231,6 +231,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
 - **[D-20261119-step54-guardrails](D-20261119-step54-guardrails.md)** Bước 54: rào quyền tối đa cho khách con — 2026-11-19
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
+- **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19
 
 ## Đa khách, tổ chức, gói
 

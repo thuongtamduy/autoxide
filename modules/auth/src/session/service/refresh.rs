@@ -47,8 +47,11 @@ impl SessionService {
 
         let expires_at = now + self.refresh_token_ttl;
         // Token mới mang theo thông tin của phiên.
+        let started_at = row.session_started_at.unwrap_or(row.created_at);
+        let authenticated_at = row.authenticated_at.unwrap_or(started_at);
         let session = SessionDetails {
-            started_at: row.session_started_at.unwrap_or(row.created_at),
+            started_at,
+            authenticated_at,
             user_agent: row.user_agent.clone(),
             sign_in_method: row.sign_in_method.clone(),
             country: row.country.clone(),
@@ -81,10 +84,36 @@ impl SessionService {
         }
         new_row.insert(&transaction).await?;
         transaction.commit().await?;
-        self.tokens(tenant, user.id, row.family_id, &new_token, expires_at, now)
+        self.tokens(tenant, user.id, row.family_id, &new_token, expires_at, now, authenticated_at)
     }
 
     /// Thu hồi cả họ của `row` và trả lỗi báo token bị dùng lại.
+    /// Phiên `session` của người dùng `user_id` vừa xác nhận lại danh tính (`POST /me/reauth`, bước
+    /// 54 P5): ghi lần xác thực mới vào dòng refresh token còn dùng được của phiên (refresh sau đó
+    /// giữ nó) và cấp ngay một access token mang `auth_time` mới.
+    pub(crate) async fn reconfirm(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        session: Uuid,
+    ) -> Result<String, Error> {
+        let now = now();
+        let updated = Entity::update_many()
+            .col_expr(Column::AuthenticatedAt, Expr::value(Some(now)))
+            .filter(Column::FamilyId.eq(session))
+            .filter(Column::UserId.eq(user_id))
+            .filter(Column::UsedAt.is_null())
+            .filter(Column::RevokedAt.is_null())
+            .scoped(tenant)
+            .exec(tenant.database().write())
+            .await?;
+        if updated.rows_affected == 0 {
+            // Phiên đã kết thúc (đăng xuất, thu hồi): không cấp token mới cho nó.
+            return Err(crate::token::invalid_token());
+        }
+        self.access_tokens.issue(tenant.id(), user_id, now, session, now)
+    }
+
     pub(super) async fn reuse_detected(
         &self,
         tenant: &TenantContext,
