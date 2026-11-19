@@ -62,6 +62,7 @@ pub(crate) async fn transition(
     if_match: IfMatch,
     ValidJson(input): ValidJson<TransitionRequest>,
 ) -> Result<Tagged<OrderResponse>, Error> {
+    principal.require(&crate::permissions::MANAGE)?;
     let expected = if_match.required()?;
     let to = OrderStatus::parse(&input.to).ok_or_else(|| {
         Error::validation(vec![FieldError::new("to", "invalid", "is not an order status")])
