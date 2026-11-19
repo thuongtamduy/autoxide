@@ -256,8 +256,8 @@ mod tests {
             // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
             // của `notifications` (dọn nhật ký gửi), hai của `bookings` (trả chỗ giữ tạm quá hạn, nhắc lịch), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
             // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments`, hai của `support` (đánh dấu quá hạn, tự đóng — bước 53) và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), một của `conversations` (xoá cuộc trò
-            // chuyện quá hạn lưu — bước 61), hai của `analytics` (gộp mỗi giờ,
+            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), ba của `conversations` (xoá cuộc trò
+            // chuyện quá hạn lưu, xoá bản ghi âm quá hạn, yêu cầu gọi lại quá hạn — bước 61), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
             // hai của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
@@ -266,7 +266,7 @@ mod tests {
             // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
             // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận — bước 45), thêm một của
             // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 66);
+            assert_eq!(a.unwrap() + b.unwrap(), 68);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

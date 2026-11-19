@@ -33,11 +33,13 @@ pub(crate) type Call = call::Model;
 
 pub(crate) const PROCESS_VOICE_EVENT: &str = "conversations.process_voice_event";
 
-/// Câu thông báo ghi âm (dịch qua `text:` của module).
-pub(crate) const RECORDING_NOTICE: &str =
-    "This call is recorded to keep the quality of our service and to settle disputes.";
-/// Tóm tắt cuộc gọi trong dòng thời gian (dịch qua `text:` của module).
-pub(crate) const CALL_SUMMARY: &str = "Call ({direction}): {outcome}, {duration} seconds.";
+/// Câu mẫu dịch qua `text:<câu>` của `locales/vi.json`. Macro chỉ trả lại chuỗi; tên `answer_text!` là
+/// dấu để `cargo xtask check` thấy câu và đòi bản dịch (như `shipping`).
+macro_rules! answer_text {
+    ($text:literal) => {
+        $text
+    };
+}
 
 /// Thông tin người mua cần trước khi gọi.
 #[derive(Debug, Clone)]
@@ -89,7 +91,13 @@ impl ConversationsService {
     /// Câu thông báo ghi âm theo ngôn ngữ `locale`.
     pub(crate) fn recording_notice(&self, locale: Option<&str>) -> String {
         let language = locale.and_then(Language::from_tag).unwrap_or(Language::Vi);
-        self.parts.translations.describe(RECORDING_NOTICE, language)
+        // Câu dịch qua `text:` của module.
+        self.parts.translations.describe(
+            answer_text!(
+                "This call is recorded to keep the quality of our service and to settle disputes."
+            ),
+            language,
+        )
     }
 
     /// Thông tin gọi điện của cuộc `thread_id` cho người mua.
@@ -399,7 +407,7 @@ impl ConversationsService {
             thread.locale.as_deref().and_then(Language::from_tag).unwrap_or(Language::Vi);
         let duration = row.duration_seconds.unwrap_or(0).to_string();
         let body = self.parts.translations.describe_with(
-            CALL_SUMMARY,
+            answer_text!("Call ({direction}): {outcome}, {duration} seconds."),
             &[("direction", &row.direction), ("outcome", &row.status), ("duration", &duration)],
             language,
         );
