@@ -5,6 +5,7 @@ mod assist;
 mod chat;
 mod privacy;
 mod stream;
+mod voice;
 
 use std::sync::{Arc, Mutex};
 
@@ -29,10 +30,13 @@ pub(crate) const BRANCH: u128 = 0xa7;
 pub(crate) const BUYER: u128 = 0xb1;
 pub(crate) const OTHER_BUYER: u128 = 0xb2;
 
-pub(crate) const STAFF: [(&str, Scope); 3] = [
+pub(crate) const STAFF: [(&str, Scope); 6] = [
     ("conversations.read", Scope::Tenant),
     ("conversations.reply", Scope::Tenant),
     ("conversations.manage", Scope::Tenant),
+    ("conversations.call", Scope::Tenant),
+    ("conversations.recordings.read", Scope::Tenant),
+    ("conversations.voice.manage", Scope::Tenant),
 ];
 
 /// Thông báo đã gửi (giữ lại để test đọc).
@@ -108,7 +112,11 @@ pub(crate) async fn harness_with(
             "branch",
             BRANCH,
             OrgId::from_uuid(Uuid::from_u128(0x7)),
-            &[("conversations.read", Scope::Unit), ("conversations.reply", Scope::Unit)],
+            &[
+                ("conversations.read", Scope::Unit),
+                ("conversations.reply", Scope::Unit),
+                ("conversations.call", Scope::Unit),
+            ],
         )
         .principal("buyer", Principal::customer(Uuid::from_u128(BUYER)))
         .principal("other", Principal::customer(Uuid::from_u128(OTHER_BUYER)));
