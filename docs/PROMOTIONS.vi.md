@@ -69,6 +69,9 @@ bị dữ liệu và ghi nhận.
 Phần trăm làm tròn nửa lên trên tổng dòng; khoản giảm cấp đơn chia về các dòng theo tiền dòng. Cùng giỏ luôn
 cho cùng kết quả và cùng `fingerprint`.
 
+Menu của website trỏ được tới một chương trình: loại `promotions.promotion` trong sổ đối tượng chỉ công khai khi chương
+trình `public` đang chạy, kèm tiêu đề, điều kiện và đường dẫn chuẩn `/promotions/<id>`.
+
 ## Người bán tham gia chương trình của sàn
 
 Trên sàn, người bán tham gia flash sale của sàn chưa bắt đầu: `POST /promotions/{id}/participations` (permission

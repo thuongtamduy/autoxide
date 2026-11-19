@@ -618,3 +618,34 @@ async fn bam_nhac_toi_dong_thoi_chi_mot_loi_nhac() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn so_doi_tuong_chi_cong_khai_khi_dang_chay() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let live = running(&setup, body(setup.tree.a, json!({"public": true}))).await;
+        let hidden = running(&setup, body(setup.tree.a, json!({"public": false}))).await;
+        let draft = create(&setup, body(setup.tree.a, json!({"public": true}))).await;
+        let resources = setup.app.modules().resources();
+        assert!(resources.knows("promotions.promotion"));
+        let found = resources
+            .resolve_many(
+                &setup.tenant(),
+                "promotions.promotion",
+                &[live.to_string(), hidden.to_string(), draft.clone()],
+                Some("vi"),
+            )
+            .await
+            .unwrap();
+        let shown = &found[&live.to_string()];
+        assert!(shown.public);
+        assert_eq!(shown.title, "Giảm giá");
+        assert_eq!(shown.url.as_deref(), Some(format!("/promotions/{live}").as_str()));
+        for id in [hidden.to_string(), draft] {
+            assert!(!found[&id].public);
+            assert_eq!(found[&id].title, "");
+        }
+    })
+    .await
+    .unwrap();
+}

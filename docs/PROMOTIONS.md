@@ -71,6 +71,9 @@ recorded. People submit the notice to the authority; Autoxide only prepares the 
 Percentages are rounded half up on the line total; order discounts are shared to lines in proportion
 to their amounts. The same cart always gives the same result and `fingerprint`.
 
+A website menu can point to a promotion: the type `promotions.promotion` in the resource directory is public only
+while a `public` promotion runs, with its title, conditions and the standard path `/promotions/<id>`.
+
 ## Sellers in platform promotions
 
 On a marketplace, a seller joins a platform flash sale that has not started: `POST /promotions/{id}/participations`

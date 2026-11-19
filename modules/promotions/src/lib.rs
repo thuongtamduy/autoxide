@@ -30,6 +30,7 @@ mod reasons;
 mod redemption;
 mod relocation;
 mod reminders;
+mod resource;
 mod service;
 mod settings;
 mod tools;
@@ -137,6 +138,7 @@ impl Module for PromotionsModule {
             notifier,
         });
         context.personal_data(service.clone())?;
+        context.resource_type(resource::PROMOTION, Arc::new(resource::PromotionResolver))?;
         self.service = Some(service.clone());
         // `catalog` không gọi thẳng `dyn Promotions` được (promotions phụ thuộc catalog — gọi ngược
         // là vòng phụ thuộc), nên promotions cắm nguồn giá giảm tự động vào catalog. Catalog thật
