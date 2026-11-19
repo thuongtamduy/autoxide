@@ -16,3 +16,10 @@
 
 # Bản sao làm việc tạm của subagent (Claude Code)
 .claude/worktrees/
+
+# SDK Kotlin và Dart sinh trong CI từ docs/openapi.json (sdk/openapitools.json), không commit.
+/sdk/kotlin/
+/sdk/dart/
+/sdk/node_modules/
+/.build/
+/.swiftpm/

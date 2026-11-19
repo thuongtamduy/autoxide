@@ -109,6 +109,53 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
 
+  sdk-mobile:
+    # Bước 69 P1 (D-20261119-step69-sdk): sinh và biên dịch SDK Swift, Kotlin, Dart từ docs/openapi.json
+    # bằng công cụ ghim phiên bản. Gate không cần Swift hay JDK — nó chỉ kiểm cấu hình (`xtask sdk --check`).
+    name: Mobile SDK (${{ matrix.sdk }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [swift, kotlin, dart]
+    steps:
+      - uses: actions/checkout@v7
+      # Swift: plugin swift-openapi-generator sinh mã lúc build từ sdk/swift/Sources/Autoxide/openapi.json.
+      - name: swift build
+        if: matrix.sdk == 'swift'
+        run: docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble swift build
+      - uses: actions/setup-java@v6
+        if: matrix.sdk != 'swift'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: actions/setup-node@v6
+        if: matrix.sdk != 'swift'
+        with:
+          node-version: "22.23.4"
+      # Phiên bản openapi-generator và tham số của từng SDK ở sdk/openapitools.json.
+      - name: generate
+        if: matrix.sdk != 'swift'
+        working-directory: sdk
+        run: npx --yes @openapitools/openapi-generator-cli@2.42.2 generate --generator-key ${{ matrix.sdk }}
+      - name: gradle build
+        if: matrix.sdk == 'kotlin'
+        working-directory: sdk/kotlin/generated
+        run: chmod +x gradlew && ./gradlew --no-daemon assemble
+      - uses: dart-lang/setup-dart@v1
+        if: matrix.sdk == 'dart'
+        with:
+          sdk: "3.14.1"
+      - name: dart analyze
+        if: matrix.sdk == 'dart'
+        working-directory: sdk/dart/generated
+        run: |
+          dart pub get
+          dart run build_runner build --delete-conflicting-outputs
+          dart analyze --no-fatal-warnings --no-fatal-infos
+
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.

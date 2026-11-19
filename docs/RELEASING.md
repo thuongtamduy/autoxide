@@ -47,7 +47,9 @@ bước 7.**
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
 2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
    theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
-   `sdk/typescript/package-lock.json` (`cargo xtask sdk --check` của gate kiểm), bản phát hành mới
+   `sdk/typescript/package-lock.json`, `artifactVersion` / `pubVersion` trong `sdk/openapitools.json`
+   (SDK Kotlin, Dart), rồi `cargo xtask sdk` (chép hợp đồng cho SDK Swift) — `cargo xtask sdk --check`
+   của gate kiểm cả mấy chỗ này; bản phát hành mới
    nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
 3. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
    cuối mục của nó) và xoá các mảnh. Rồi trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một

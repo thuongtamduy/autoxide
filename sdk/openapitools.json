@@ -1,0 +1,35 @@
+{
+  "$schema": "./node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.27.0",
+    "generators": {
+      "kotlin": {
+        "generatorName": "kotlin",
+        "inputSpec": "#{cwd}/../docs/openapi.json",
+        "output": "#{cwd}/kotlin/generated",
+        "additionalProperties": {
+          "groupId": "dev.autoxide",
+          "artifactId": "autoxide-sdk",
+          "artifactVersion": "0.14.0",
+          "packageName": "dev.autoxide.sdk",
+          "library": "jvm-okhttp4",
+          "serializationLibrary": "kotlinx_serialization",
+          "enumUnknownDefaultCase": true
+        }
+      },
+      "dart": {
+        "generatorName": "dart-dio",
+        "inputSpec": "#{cwd}/../docs/openapi.json",
+        "output": "#{cwd}/dart/generated",
+        "additionalProperties": {
+          "pubName": "autoxide_sdk",
+          "pubVersion": "0.14.0",
+          "pubDescription": "Autoxide API client, generated from the OpenAPI document.",
+          "serializationLibrary": "json_serializable",
+          "enumUnknownDefaultCase": true
+        }
+      }
+    }
+  }
+}
