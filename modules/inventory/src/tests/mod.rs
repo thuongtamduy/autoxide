@@ -2,11 +2,13 @@
 //! như binary bằng `TestApp` của testkit; `dyn Catalog`, `dyn OrgDirectory` là bộ giả (module khác
 //! chỉ dùng qua `api`).
 
+mod alerts;
 mod documents;
 mod levels;
 mod lots;
 mod orders;
 mod preorders;
+mod public;
 mod purchasing;
 mod reservations;
 

@@ -3,6 +3,7 @@
 //! khác dùng qua `autoxide_inventory::api`, không đọc bảng `inventory_…`. Hướng dẫn:
 //! `docs/INVENTORY.md`; đặc tả: `docs/steps/42-inventory.md`.
 
+mod alerts;
 pub mod api;
 mod config;
 mod contract;
@@ -17,6 +18,7 @@ mod migration;
 mod orders_events;
 mod permissions;
 mod preorders;
+mod public;
 mod purchasing;
 mod receipts;
 mod relocation;
@@ -129,7 +131,13 @@ impl Module for InventoryModule {
             reasons: context.reason_codes(),
             // `ledger` không bắt buộc: thiếu thì phiếu nhập không ghi sổ cái (`not_applicable`).
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            // `notifications` không bắt buộc: thiếu thì không có báo khi có hàng lại.
+            notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
+            guard: context.require::<autoxide_kernel::antispam::SpamGuard>()?,
         };
+        if let Some(notifier) = &parts.notifier {
+            alerts::declare(notifier.as_ref())?;
+        }
         let service = Arc::new(InventoryService::new(parts, config));
         self.service = Some(service.clone());
         self.databases = Some(databases);
@@ -141,6 +149,7 @@ impl Module for InventoryModule {
         let Some(service) = &self.service else { return Vec::new() };
         let mut subscriptions = contract::subscriptions(service);
         subscriptions.extend(orders_events::subscriptions(service));
+        subscriptions.extend(alerts::subscriptions(service));
         subscriptions
     }
 
