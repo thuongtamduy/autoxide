@@ -267,6 +267,9 @@ export type ApiKeyResponse = {
    * from elsewhere gets 403 `network_not_allowed`.
    */
   allowed_ips: string[];
+  approved_at?: string | null;
+  /** Who approved the key and when; `null` when it needed no approval. */
+  approved_by?: string | null;
   created_at: string;
   /**
    * When the key stops working. Every new key has one; `null` only for data that was never
@@ -304,6 +307,22 @@ export type ApiKeyResponse = {
    * created from scratch.
    */
   rotated_from?: string | null;
+  /**
+   * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+   * 401 `auth.api_key_pending`).
+   */
+  status: string;
+};
+
+/** The guardrails that limit this tenant. */
+export type AppliedGuardrailsResponse = {
+  /** Every guardrail on the way from the top tenant to this one. */
+  guardrails: GuardrailResponse[];
+  /**
+   * The most permissions anyone can use in this tenant: what every guardrail allows together,
+   * sorted by name. `null` when no guardrail limits this tenant.
+   */
+  max_permissions?: string[] | null;
 };
 
 /** Records to tag or untag in one call. */
@@ -458,6 +477,56 @@ export type BanRequest = {
   until?: string | null;
   /** The user id, the email address, or the `ip_fingerprint` shown on a comment. */
   value: string;
+};
+
+/** HTTP method of a write. */
+export type BatchMethod = "POST" | "PUT" | "PATCH" | "DELETE";
+
+/** One write, as you would send it to the REST endpoint. */
+export type BatchOperation = {
+  /** The JSON body of the write, if it has one. */
+  body?: unknown;
+  /** Your id for this write, 1 to 100 characters; its result carries it back. */
+  id: string;
+  /**
+   * Sent as the `Idempotency-Key` header. Keep it with the queued write and send the same key
+   * when you send the batch again: a write already done answers what it answered the first time.
+   */
+  idempotency_key: string;
+  /**
+   * Sent as the `If-Match` header: the `ETag` (`version`) of the record you changed. If someone
+   * changed it since, the result is `412` with the current record in the body's `current`.
+   */
+  if_match?: string | null;
+  method: BatchMethod;
+  /**
+   * Path of the REST endpoint, under the `path` of a sync resource
+   * (`GET /api/v1/kernel/sync/resources`).
+   */
+  path: string;
+};
+
+/** Writes queued on a device while it was offline. */
+export type BatchRequest = {
+  /** 1 to 100 writes, run one after the other in this order. */
+  operations: BatchOperation[];
+};
+
+/** What one write answered. */
+export type BatchResult = {
+  /**
+   * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+   * failed; `null` when the answer has no body.
+   */
+  body?: unknown;
+  /** The `ETag` header of the answer (version of the record after the write), if any. */
+  etag?: string | null;
+  /** The `id` you gave the write. */
+  id: string;
+  /** The `Location` header of the answer (the record created), if any. */
+  location?: string | null;
+  /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+  status: number;
 };
 
 /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
@@ -890,6 +959,11 @@ export type CanRequest = {
 /** Why the booking is cancelled. */
 export type CancelBookingRequest = {
   /** Up to 200 characters. */
+  reason?: string | null;
+};
+
+/** Cancel one of your orders. */
+export type CancelMyOrderRequest = {
   reason?: string | null;
 };
 
@@ -4474,6 +4548,77 @@ export type Data_AltSuggestionResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ApiKeyResponse = {
+  /** An API key, without its secret. */
+  data: {
+    /**
+     * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+     * from elsewhere gets 403 `network_not_allowed`.
+     */
+    allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
+    created_at: string;
+    /**
+     * When the key stops working. Every new key has one; `null` only for data that was never
+     * upgraded.
+     */
+    expires_at?: string | null;
+    id: string;
+    /**
+     * Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
+     * approval) or `service` (another program). The audit log records it as `actor_kind`.
+     */
+    kind: string;
+    /** Last time the key was used, to the minute; `null`: never used. */
+    last_used_at?: string | null;
+    /** What the key is for. */
+    name: string;
+    /**
+     * The organization unit the key is bound to: it acts only on data of this unit and the
+     * units below it. The root unit (the id of the tenant) means no limit.
+     */
+    org_id: string;
+    /**
+     * Permissions the key may use, sorted by name. The key never has more than its
+     * owner has at the moment of the request.
+     */
+    permissions: string[];
+    /**
+     * A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the
+     * key's random part (after the tenant part). Keys created in older versions (`axk_…`) show
+     * their first 12 characters.
+     */
+    prefix: string;
+    /**
+     * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+     * created from scratch.
+     */
+    rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_AppliedGuardrailsResponse = {
+  /** The guardrails that limit this tenant. */
+  data: {
+    /** Every guardrail on the way from the top tenant to this one. */
+    guardrails: GuardrailResponse[];
+    /**
+     * The most permissions anyone can use in this tenant: what every guardrail allows together,
+     * sorted by name. `null` when no guardrail limits this tenant.
+     */
+    max_permissions?: string[] | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ApplyTagResult = {
   /** What a bulk tagging changed. */
   data: {
@@ -6760,6 +6905,25 @@ export type Data_GroupResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_GuardrailResponse = {
+  /** The most permissions a tenant below this one can use. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Health = {
   /** Health of the service. */
   data: {
@@ -8403,6 +8567,17 @@ export type Data_OrdersPublicPayment = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersShipmentRequested = {
+  /** A shipment requested from the shipping module. */
+  data: {
+    cod_amount?: Money | null;
+    order_id: string;
+    /** Key of the request at the shipping module. */
+    request_key: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -8786,6 +8961,46 @@ export type Data_PromotionsNotice = {
     status: string;
     submitted_at?: string | null;
     submitted_by?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsNoticeExport = {
+  /** The data of a promotion notice, one entry per authority. */
+  data: {
+    authorities: PromotionsNoticeEntry[];
+    currency: string;
+    ends_at: string;
+    /** Number of flash-sale or add-on prices. */
+    flash_item_count: number;
+    /** Jurisdiction of the law data used. */
+    jurisdiction: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    /** Locale of `title` and `terms`. */
+    locale: string;
+    /** Unit that runs the promotion. */
+    org_id: string;
+    promotion_id: string;
+    /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+    promotion_kind: string;
+    /**
+     * `false` when no notice rule is in force for this kind of promotion on its start day
+     * (load the law data with `autoxide task promotions.load_legal_data`).
+     */
+    rules_found: boolean;
+    starts_at: string;
+    /** Status of the promotion. */
+    status: string;
+    /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+    target_count: number;
+    /** Conditions shown to buyers. */
+    terms: string;
+    title: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
   };
 };
 
@@ -10871,6 +11086,25 @@ export type Data_Vec_ApprovalRequest = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_BatchResult = {
+  data: {
+    /**
+     * The JSON body of the answer: `{"data": …}`, or a problem (`code`, `detail`…) when the write
+     * failed; `null` when the answer has no body.
+     */
+    body?: unknown;
+    /** The `ETag` header of the answer (version of the record after the write), if any. */
+    etag?: string | null;
+    /** The `id` you gave the write. */
+    id: string;
+    /** The `Location` header of the answer (the record created), if any. */
+    location?: string | null;
+    /** The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`. */
+    status: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_BillingPeriodResponse = {
   data: {
     amount: Money;
@@ -11791,6 +12025,30 @@ export type Data_Vec_NotificationTemplateVersion = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_OrdersPaymentAction = {
+  data: {
+    amount: Money;
+    expires_at?: string | null;
+    /**
+     * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
+     * `none` (the payment could not be started yet; retry from the order).
+     */
+    kind: string;
+    order_id: string;
+    payment_id: string;
+    /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
+    qr_payload?: string | null;
+    redirect_url?: string | null;
+    /** `pending`, `succeeded`, `failed`, `expired`… */
+    status: string;
+    /** For `GET /public/payments/{token}`. */
+    status_token: string;
+    /** Transfer content the bank transfer must carry. */
+    transfer_code?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_OverrideResponse = {
   data: {
     created_at: string;
@@ -12451,6 +12709,21 @@ export type Data_Vec_SupportRoutingRule = {
     /** Rules of one unit are tried in this order; rules of nearer units first. */
     position: number;
     team_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SyncResourceView = {
+  data: {
+    /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+    changes: string;
+    description: string;
+    /** `<module>.<name>`. */
+    name: string;
+    /** The list endpoint of these records; writes in a batch go under this path. */
+    path: string;
+    /** The permission needed to read them; its scope decides which records you get. */
+    read_permission: string;
   }[];
 };
 
@@ -13531,6 +13804,31 @@ export type GroupResponse = {
   member_count: number;
   name: string;
   updated_at: string;
+};
+
+/** A guardrail to set. */
+export type GuardrailRequest = {
+  /**
+   * The permissions roles of that tenant may grant at most (see
+   * `GET /api/v1/auth/permissions`). `[]` leaves no permission.
+   */
+  max_permissions: string[];
+};
+
+/** The most permissions a tenant below this one can use. */
+export type GuardrailResponse = {
+  /**
+   * The permissions roles there may still grant, sorted by name. Any other permission is
+   * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+   */
+  max_permissions: string[];
+  /** The tenant above it that set the guardrail. */
+  set_by_tenant_id: string;
+  /** The tenant limited by the guardrail (and every tenant below it). */
+  tenant_id: string;
+  updated_at: string;
+  /** Who set it last, and when. */
+  updated_by: string;
 };
 
 /** A guest cancels a booking. */
@@ -17153,6 +17451,14 @@ export type OrdersPublicPayment = {
   status: string;
 };
 
+/** A shipment requested from the shipping module. */
+export type OrdersShipmentRequested = {
+  cod_amount?: Money | null;
+  order_id: string;
+  /** Key of the request at the shipping module. */
+  request_key: string;
+};
+
 /** A way to deliver the cart. */
 export type OrdersShippingOption = {
   amount: Money;
@@ -17169,6 +17475,14 @@ export type OrdersShippingOption = {
   option_key: string;
   /** Store of a pickup option. */
   pickup_org_id?: string | null;
+};
+
+/** A status change of an order. */
+export type OrdersTransitionRequest = {
+  /** Why (kept in the order history; shown to the buyer when cancelling). */
+  reason?: string | null;
+  /** `preparing` (accept the order), `shipping`, `delivered`, `delivery_failed` or `cancelled`. */
+  to: string;
 };
 
 /** An override to set; it replaces one of the same kind and key. */
@@ -17258,6 +17572,9 @@ export type Page_ApiKeyResponse = {
      * from elsewhere gets 403 `network_not_allowed`.
      */
     allowed_ips: string[];
+    approved_at?: string | null;
+    /** Who approved the key and when; `null` when it needed no approval. */
+    approved_by?: string | null;
     created_at: string;
     /**
      * When the key stops working. Every new key has one; `null` only for data that was never
@@ -17295,6 +17612,11 @@ export type Page_ApiKeyResponse = {
      * created from scratch.
      */
     rotated_from?: string | null;
+    /**
+     * `active` (works) or `pending` (waits for an administrator's approval: requests with it get
+     * 401 `auth.api_key_pending`).
+     */
+    status: string;
   }[];
   pagination: Pagination;
 };
@@ -18373,6 +18695,26 @@ export type Page_GroupResponse = {
     member_count: number;
     name: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_GuardrailResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The permissions roles there may still grant, sorted by name. Any other permission is
+     * refused with `permission_denied` and `reason: outside_guardrail`, even for administrators.
+     */
+    max_permissions: string[];
+    /** The tenant above it that set the guardrail. */
+    set_by_tenant_id: string;
+    /** The tenant limited by the guardrail (and every tenant below it). */
+    tenant_id: string;
+    updated_at: string;
+    /** Who set it last, and when. */
+    updated_by: string;
   }[];
   pagination: Pagination;
 };
@@ -21229,6 +21571,12 @@ export type Problem = {
    * on `detail`.
    */
   code: string;
+  /**
+   * For `precondition_failed` on endpoints that say so: the record as it is now on the server,
+   * in the same shape as reading it. Its version is in the `ETag` header: merge your change
+   * into it and send that `ETag` in `If-Match`.
+   */
+  current?: unknown;
   /** Human-readable explanation of what went wrong and how to fix it. */
   detail: string;
   /** One entry per invalid input field. Present only for validation problems. */
@@ -21575,6 +21923,62 @@ export type PromotionsNotice = {
   status: string;
   submitted_at?: string | null;
   submitted_by?: string | null;
+};
+
+/** The notice to one authority. */
+export type PromotionsNoticeEntry = {
+  /** Authority, e.g. `province:79` (the provincial Department of Industry and Trade). */
+  authority_code: string;
+  /** Days before the start the notice is due. */
+  days_before?: number | null;
+  /** Last day to submit (Vietnam date), when a notice is required. */
+  due_on?: string | null;
+  /** Legal basis of the rule, with its date in force. */
+  legal_basis?: string | null;
+  /** Reference given by the authority, when recorded. */
+  reference?: string | null;
+  /** Whether the rule in force asks for a notice. */
+  required: boolean;
+  /** `pending`, `submitted` or `not_required`. */
+  status: string;
+  submitted_at?: string | null;
+};
+
+/** The data of a promotion notice, one entry per authority. */
+export type PromotionsNoticeExport = {
+  authorities: PromotionsNoticeEntry[];
+  currency: string;
+  ends_at: string;
+  /** Number of flash-sale or add-on prices. */
+  flash_item_count: number;
+  /** Jurisdiction of the law data used. */
+  jurisdiction: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  /** Locale of `title` and `terms`. */
+  locale: string;
+  /** Unit that runs the promotion. */
+  org_id: string;
+  promotion_id: string;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+  promotion_kind: string;
+  /**
+   * `false` when no notice rule is in force for this kind of promotion on its start day
+   * (load the law data with `autoxide task promotions.load_legal_data`).
+   */
+  rules_found: boolean;
+  starts_at: string;
+  /** Status of the promotion. */
+  status: string;
+  /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+  target_count: number;
+  /** Conditions shown to buyers. */
+  terms: string;
+  title: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
 };
 
 /** A promotion notice recorded for one authority. */
@@ -22980,6 +23384,12 @@ export type ReportRequest = {
   /** What is wrong, for the moderators (at most 500 characters). */
   note?: string | null;
   reason: CommentReportReason;
+};
+
+/** A shipment to request. */
+export type RequestOrderShipmentRequest = {
+  /** Note for the carrier. */
+  note?: string | null;
 };
 
 /** The new time of a booking. */
@@ -25119,6 +25529,19 @@ export type SuspendRequest = {
   reason: string;
 };
 
+/** A kind of record an offline app can keep in sync. */
+export type SyncResourceView = {
+  /** The change feed: `GET` it with the `cursor` of the last change you applied. */
+  changes: string;
+  description: string;
+  /** `<module>.<name>`. */
+  name: string;
+  /** The list endpoint of these records; writes in a batch go under this path. */
+  path: string;
+  /** The permission needed to read them; its scope decides which records you get. */
+  read_permission: string;
+};
+
 /** Changes to a tag; omitted fields stay. */
 export type TagChanges = {
   color?: string | null;
@@ -26678,7 +27101,7 @@ export interface paths {
   "/api/v1/auth/all-api-keys": {
     /** List the API keys of every user. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { user_id?: string; status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_ManagedApiKeyResponse;
         401: Problem;
@@ -26697,6 +27120,20 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/all-api-keys/{id}/approve": {
+    /** Approve an API key that waits for approval. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ApiKeyResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -26869,6 +27306,56 @@ export interface paths {
         400: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails": {
+    /** List the guardrails this tenant set for tenants below it. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/applied": {
+    /** See the guardrails that limit this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_AppliedGuardrailsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/guardrails/{tenant_id}": {
+    /** Set the most permissions a tenant below this one can use. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      requestBody: GuardrailRequest;
+      responses: {
+        200: Data_GuardrailResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the guardrail this tenant set for a tenant below it. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { tenant_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -34091,6 +34578,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sync/batch": {
+    /** Send writes queued while offline. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: BatchRequest;
+      responses: {
+        200: Data_Vec_BatchResult;
+        401: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sync/resources": {
+    /** List what an offline app can keep in sync. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_SyncResourceView;
+        401: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/tags": {
     /** List the tags. */
     get: {
@@ -36882,6 +37393,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/cancel": {
+    /** Cancel one of your orders. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: CancelMyOrderRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/payments/{token}": {
     /** Status of a payment, for the QR code screen. */
     get: {
@@ -36903,6 +37429,54 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/payment-link": {
+    /** Resend the payment of an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/shipments": {
+    /** Request a shipment for an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: RequestOrderShipmentRequest;
+      responses: {
+        202: Data_OrdersShipmentRequested;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/transitions": {
+    /** Move an order through its lifecycle. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersTransitionRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
         default: Problem;
       };
     };
@@ -38057,6 +38631,19 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/notice-export": {
+    /** Export the data of a promotion notice, one entry per authority. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: "json" | "csv" | null }; };
+      responses: {
+        200: Data_PromotionsNoticeExport | string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

@@ -117,6 +117,11 @@ pub struct Problem {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(example = "expired")]
     pub reason: Option<String>,
+    /// For `precondition_failed` on endpoints that say so: the record as it is now on the server,
+    /// in the same shape as reading it. Its version is in the `ETag` header: merge your change
+    /// into it and send that `ETag` in `If-Match`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current: Option<serde_json::Value>,
 }
 
 /// One invalid field of the request.
@@ -156,6 +161,7 @@ impl From<&Error> for Problem {
                 })
                 .collect(),
             reason: error.reason().map(str::to_owned),
+            current: error.current().map(|(record, _)| record.clone()),
         }
     }
 }
@@ -179,6 +185,11 @@ impl IntoResponse for Error {
             response
                 .headers_mut()
                 .insert(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer"));
+        }
+        if let Some((_, version)) = self.current()
+            && let Ok(value) = HeaderValue::from_str(&crate::version::etag(*version))
+        {
+            response.headers_mut().insert(header::ETAG, value);
         }
         if let Some(seconds) = self.retry_after() {
             response.headers_mut().insert(header::RETRY_AFTER, HeaderValue::from(seconds));

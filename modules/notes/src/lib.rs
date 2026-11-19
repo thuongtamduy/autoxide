@@ -17,6 +17,8 @@ mod tools;
 #[cfg(test)]
 mod branch_tests;
 #[cfg(test)]
+mod sync_tests;
+#[cfg(test)]
 mod tenancy_tests;
 #[cfg(test)]
 mod tests;
@@ -74,7 +76,11 @@ impl Module for NotesModule {
     }
 
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
-        let service = Arc::new(NoteService::new(context.outbox()?, context.entitlements()));
+        let service = Arc::new(NoteService::new(
+            context.outbox()?,
+            context.entitlements(),
+            context.sync_log(),
+        ));
         context.usage_counter(&service::NOTES_LIMIT, Arc::new(service::NoteCounter))?;
         self.service = Some(service.clone());
         // `Arc<NoteService>` tự đổi thành `Arc<dyn Notes>`: module khác chỉ thấy trait.
@@ -95,5 +101,11 @@ impl Module for NotesModule {
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    // Ghi chú đồng bộ được với app ngoại tuyến (bước 69 P2): luồng thay đổi ở
+    // `GET /api/v1/notes/changes`, ghi qua lô `POST /api/v1/kernel/sync/batch`.
+    fn sync_resources(&self) -> Vec<autoxide_kernel::sync::SyncResource> {
+        vec![service::NOTES_SYNC]
     }
 }

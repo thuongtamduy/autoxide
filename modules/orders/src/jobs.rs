@@ -19,6 +19,11 @@ pub(crate) const EXPIRE_UNPAID: &str = "orders.expire_unpaid";
 /// Trả chỗ của lượt đặt treo (mỗi phút).
 pub(crate) const RECOVER_CHECKOUTS: &str = "orders.recover_checkouts";
 
+/// Hoàn tất đơn đã giao quá hạn đổi trả (mỗi giờ).
+pub(crate) const COMPLETE_DELIVERED: &str = "orders.complete_delivered";
+/// Huỷ đơn cửa hàng không nhận kịp (mỗi 10 phút).
+pub(crate) const EXPIRE_UNACCEPTED: &str = "orders.expire_unaccepted";
+
 /// Số bản ghi một lượt của job định kỳ.
 pub(crate) const BATCH: u64 = 100;
 
@@ -28,6 +33,8 @@ pub(crate) fn registrations(service: &Arc<OrdersService>) -> Vec<JobRegistration
         JobRegistration::new(PURGE_CARTS, Arc::new(Purge(service.clone()))),
         JobRegistration::new(EXPIRE_UNPAID, Arc::new(ExpireUnpaid(service.clone()))),
         JobRegistration::new(RECOVER_CHECKOUTS, Arc::new(Recover(service.clone()))),
+        JobRegistration::new(COMPLETE_DELIVERED, Arc::new(Complete(service.clone()))),
+        JobRegistration::new(EXPIRE_UNACCEPTED, Arc::new(Unaccepted(service.clone()))),
     ]
 }
 
@@ -37,6 +44,8 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(PURGE_CARTS, PURGE_CARTS, Duration::from_secs(86_400)),
         Schedule::new(EXPIRE_UNPAID, EXPIRE_UNPAID, Duration::from_secs(60)),
         Schedule::new(RECOVER_CHECKOUTS, RECOVER_CHECKOUTS, Duration::from_secs(60)),
+        Schedule::new(COMPLETE_DELIVERED, COMPLETE_DELIVERED, Duration::from_secs(3600)),
+        Schedule::new(EXPIRE_UNACCEPTED, EXPIRE_UNACCEPTED, Duration::from_secs(600)),
     ]
 }
 
@@ -73,5 +82,23 @@ struct Recover(Arc<OrdersService>);
 impl JobHandler for Recover {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.recover_checkouts(&job.database).await.map(|_| ())
+    }
+}
+
+struct Complete(Arc<OrdersService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Complete {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.complete_delivered(&job.database).await.map(|_| ())
+    }
+}
+
+struct Unaccepted(Arc<OrdersService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Unaccepted {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.expire_unaccepted(&job.database).await.map(|_| ())
     }
 }

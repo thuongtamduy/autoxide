@@ -818,6 +818,19 @@ Nhãn `database` là tên database (`main`, hay placement của khách có datab
 `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` (mặc định 50) database thì phần còn lại cộng chung dưới
 `database="other"`. Không có nhãn theo khách: tra một khách bằng log và trace.
 
+**Một khách.** Số đo không có nhãn theo khách (mỗi khách một nhãn làm số chuỗi của Prometheus tăng
+không giới hạn). Để xem một khách:
+
+- **Log và trace.** Mỗi dòng log của request mang `tenant_id` khi đã biết khách (log JSON: ở
+  `span.tenant_id`), span của job nền (`job`), lượt giao event (`event_delivery`) và tool MCP
+  (`mcp_tool`) cũng vậy; khi đặt `OTEL_EXPORTER_OTLP_ENDPOINT`, trace mang cùng thuộc tính `tenant_id`.
+  Lọc theo nó: `jq 'select(.span.tenant_id == "<id>")'`, hay `tenant_id="<id>"` trong công cụ tìm
+  log / trace.
+- **Lượng dùng.** `GET /api/v1/plans/tenants/{tenant_id}/usage` (module `plans`) cho biết khách dùng
+  mỗi hạn mức tới đâu.
+- **Tồn đọng.** `GET /api/v1/kernel/ops/backlog` (nhân sự nền tảng, `kernel.ops.read`) đếm job và event
+  đang chờ của từng database và module; khách có database riêng là một dòng riêng.
+
 Repo có sẵn hai file:
 
 - [`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml): luật cảnh báo —

@@ -515,11 +515,12 @@ async fn tao_api_key_xac_nhan_bang_passkey_hay_ma_va_quan_tri_thu_hoi() {
         let first = PageRequest::first(50, Order::Asc);
         let nobody = autoxide_kernel::access::Principal::new(bob, Vec::<String>::new());
         let denied =
-            services.api_keys.list_all(&tenant, &nobody, None, &first).await.err().unwrap();
+            services.api_keys.list_all(&tenant, &nobody, None, None, &first).await.err().unwrap();
         assert_eq!(denied.code(), "permission_denied");
         let admin =
             autoxide_kernel::access::Principal::new(bob, ["auth.api_keys.manage".to_owned()]);
-        let all = services.api_keys.list_all(&tenant, &admin, Some(ada), &first).await.unwrap();
+        let all =
+            services.api_keys.list_all(&tenant, &admin, Some(ada), None, &first).await.unwrap();
         assert_eq!(all.data.len(), 2);
         services.api_keys.revoke_any(&tenant, &admin, made.key.id).await.unwrap();
         let left = services.api_keys.list(&tenant, ada, &first).await.unwrap();

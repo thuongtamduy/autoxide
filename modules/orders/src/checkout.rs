@@ -148,7 +148,7 @@ impl OrdersService {
         let Some((expires, expected)) = pricing::parse_token(&input.quote_token) else {
             return Err(errors::quote_changed());
         };
-        if expires < Utc::now() {
+        if expires < crate::service::now() {
             return Err(errors::quote_expired());
         }
         // Dòng hết hàng / ngừng bán báo trước (rõ hơn "giá đổi").
@@ -170,8 +170,26 @@ impl OrdersService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let ship_to: Option<ShipTo> =
+        // Bản chụp nơi giao: địa chỉ thật (kể cả địa chỉ lấy từ sổ của người mua) và người nhận —
+        // đơn không phụ thuộc sổ địa chỉ đổi sau này.
+        let chosen: Option<ShipTo> =
             row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok());
+        let ship_to = price_input.destination.clone().map(|address| ShipTo {
+            address_id: chosen.as_ref().and_then(|chosen| chosen.address_id),
+            recipient_name: Some(
+                chosen
+                    .as_ref()
+                    .and_then(|chosen| chosen.recipient_name.clone())
+                    .unwrap_or_else(|| input.contact.name.clone()),
+            ),
+            phone: Some(
+                chosen
+                    .as_ref()
+                    .and_then(|chosen| chosen.phone.clone())
+                    .unwrap_or_else(|| input.contact.phone.clone()),
+            ),
+            address: Some(address),
+        });
         if quote.requires_shipping
             && (quote.shipping.is_none() || price_input.destination.is_none())
         {
@@ -180,13 +198,18 @@ impl OrdersService {
         if method == Method::Cod && !quote.requires_shipping {
             return Err(errors::payment_method_unavailable(&input.payment_method));
         }
+        if method == Method::Cod
+            && !self.policy(tenant, OrgId::from_uuid(row.org_id)).await?.cod_enabled
+        {
+            return Err(errors::cod_not_allowed());
+        }
         if method != Method::Cod && self.ledger.is_none() {
             return Err(errors::payment_method_unavailable(&input.payment_method));
         }
 
         // 3. Lượt đặt `reserving`.
         let order_id = Uuid::now_v7();
-        let now = Utc::now();
+        let now = crate::service::now();
         let started = checkout::ActiveModel {
             id: Set(order_id),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -360,7 +383,7 @@ impl OrdersService {
         checkout::Entity::update_many()
             .col_expr(checkout::Column::State, Expr::value(FAILED))
             .col_expr(checkout::Column::FailureCode, Expr::value(code.to_owned()))
-            .col_expr(checkout::Column::UpdatedAt, Expr::value(Utc::now()))
+            .col_expr(checkout::Column::UpdatedAt, Expr::value(crate::service::now()))
             .filter(checkout::Column::Id.eq(id))
             .filter(checkout::Column::State.eq(RESERVING))
             .scoped(tenant)
@@ -376,7 +399,7 @@ impl OrdersService {
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
-                let now = Utc::now();
+                let now = crate::service::now();
                 let year = now.year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.order:{year}"))
@@ -457,14 +480,8 @@ impl Draft<'_> {
         payment_status: &str,
     ) -> Result<order::ActiveModel, Error> {
         let quote = self.quote;
-        let now = Utc::now();
+        let now = crate::service::now();
         let json = |value: &dyn erased::Json| value.to_json();
-        let mut ship_to = self.ship_to.clone();
-        if let Some(ship_to) = &mut ship_to
-            && ship_to.address.is_none()
-        {
-            ship_to.address = None;
-        }
         Ok(order::ActiveModel {
             id: Set(self.order_id),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -568,7 +585,7 @@ impl Draft<'_> {
     }
 
     fn payment_row(&self, tenant: &TenantContext, order: &order::Model) -> payment::ActiveModel {
-        let now = Utc::now();
+        let now = crate::service::now();
         payment::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -639,7 +656,7 @@ fn line_row(
         gift_of: Set(quoted.gift_of),
         warehouse_org_id: Set(None),
         returned_quantity: Set(0),
-        created_at: Set(Utc::now()),
+        created_at: Set(crate::service::now()),
     })
 }
 

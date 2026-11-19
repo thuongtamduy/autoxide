@@ -145,6 +145,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-213** Job API chung, xuất danh sách chung, yêu cầu duyệt đầy đủ (bước 51) — 2026-11-14
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
+- **[D-20261119-step69-sync](D-20261119-step69-sync.md)** Đồng bộ khi mất mạng: luồng thay đổi `<module>_changes` theo con trỏ, `412` kèm bản hiện tại, lô ghi chạy từng lệnh như request REST — 2026-11-19
 
 ## MCP, AI, agent dùng API
 
@@ -228,6 +229,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step54-one-decision](D-20261118-step54-one-decision.md)** Bước 54 mục 1: một hàm quyết định quyền; cache theo phiên bản quyền tách thành mục riêng, chờ số đo — 2026-11-18
 - **[D-20261118-step54-role-denies](D-20261118-step54-role-denies.md)** Bước 54: role cấm permission (deny thắng allow) — 2026-11-18
 - **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
+- **[D-20261119-step54-guardrails](D-20261119-step54-guardrails.md)** Bước 54: rào quyền tối đa cho khách con — 2026-11-19
+- **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 
 ## Đa khách, tổ chức, gói
 
@@ -464,6 +467,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step45-carts](D-20261118-step45-carts.md)** Giỏ hàng của `orders`: báo giá ở máy chủ, `quote_token`, giỏ vãng lai, module chưa cài — 2026-11-18
 - **[D-20261118-step45-checkout](D-20261118-step45-checkout.md)** Đặt hàng của `orders`: saga giữ chỗ, chống trùng, số đơn, thanh toán qua `ledger`, máy trạng thái — 2026-11-18
+- **[D-20261118-step45-lifecycle](D-20261118-step45-lifecycle.md)** Vòng đời đơn của `orders`: chính sách là cài đặt kế thừa, theo vận đơn, bút toán doanh thu — 2026-11-18
 - **[D-20261118-step45-orders-api](D-20261118-step45-orders-api.md)** Module `orders`: hợp đồng `api` cho bước 46–49, điểm cắm `OrderExtensions`, người mua không cần permission — 2026-11-18
 - **[D-20261118-step53-escalation](D-20261118-step53-escalation.md)** `support`: chuyển khiếu nại qua `ComplaintIntake` (đích là phiếu), liên kết qua sổ đối tượng, câu trả lời mẫu — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
@@ -494,3 +498,4 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-sqlite-optimize](D-20261118-step39-sqlite-optimize.md)** SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18
 - **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
 - **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
+- **[D-20261119-step39-semantic-scan](D-20261119-step39-semantic-scan.md)** Tìm theo ý nghĩa trên dữ liệu lớn: `dot` dùng SIMD, duyệt chia nhiều nhân ngoài thread async — 2026-11-19

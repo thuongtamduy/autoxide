@@ -853,6 +853,19 @@ The `database` label names the database (`main`, or the placement of a tenant wi
 past `AUTOXIDE_METRICS_MAX_DATABASE_LABELS` (default 50) databases, the others are added up under
 `database="other"`. There is no label per tenant: look a tenant up in the logs and traces.
 
+**One tenant.** Metrics have no tenant label (a label per tenant would make Prometheus series grow
+without bound). To look into one tenant:
+
+- **Logs and traces.** Every request line carries `tenant_id` once the tenant is known (in JSON logs
+  under `span.tenant_id`), and so do the spans of background jobs (`job`), event deliveries
+  (`event_delivery`) and MCP tools (`mcp_tool`); with `OTEL_EXPORTER_OTLP_ENDPOINT` the traces carry the
+  same `tenant_id` attribute. Filter by it: `jq 'select(.span.tenant_id == "<id>")'`, or
+  `tenant_id="<id>"` in your log or trace search.
+- **Usage.** `GET /api/v1/plans/tenants/{tenant_id}/usage` (module `plans`) gives the tenant's use of
+  each limit.
+- **Backlog.** `GET /api/v1/kernel/ops/backlog` (platform staff, `kernel.ops.read`) counts the waiting
+  jobs and events of each database and module; a tenant with its own database is its own line.
+
 The repository ships ready-made files:
 
 - [`deploy/prometheus/autoxide-alerts.yml`](../deploy/prometheus/autoxide-alerts.yml): alerting

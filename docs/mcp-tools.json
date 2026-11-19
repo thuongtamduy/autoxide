@@ -10279,6 +10279,172 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Read an order with its lines, totals and payment status.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One order.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "orders.get_order",
+      "output_schema": null,
+      "permissions": [
+        "orders.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List orders of shops in your scope, newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Orders to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of orders, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "number": {
+            "description": "The order number.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only orders of this shop.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only orders in this status (`pending_payment`, `confirmed`, `preparing`, `shipping`,\n`delivered`, `delivery_failed`, `completed`, `cancelled`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "orders.list_orders",
+      "output_schema": null,
+      "permissions": [
+        "orders.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask the shipping module for a shipment of an order's items (accepting the order first when it is confirmed); cash-on-delivery orders carry the amount to collect.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A shipment to request.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "note": {
+            "description": "Note for the carrier.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "orders.request_shipment",
+      "output_schema": null,
+      "permissions": [
+        "orders.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move an order through its lifecycle: accept it (`preparing`), mark it shipping, delivered or failed, or cancel it (a paid order is refunded through the payment partner).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A status change of an order.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why (kept in the history; shown to the buyer when cancelling).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "`preparing`, `shipping`, `delivered`, `delivery_failed` or `cancelled`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "orders.transition_order",
+      "output_schema": null,
+      "permissions": [
+        "orders.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -11663,6 +11829,36 @@
         "type": "object"
       },
       "name": "promotions.evaluate_cart",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get the data of a promotion notice, one entry per authority (e.g. `province:79`): whether a notice is required under the rules in force, the last day to submit, the legal basis and what was recorded. People submit the notice; this only prepares it. Needs `promotions.compliance` too.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.export_notice",
       "output_schema": null,
       "permissions": [
         "promotions.read"

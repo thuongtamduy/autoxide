@@ -1,0 +1,146 @@
+//! Chính sách đơn theo nút (D-209, D-215): cài đặt kế thừa của bước 34 — đặt ở chuỗi, cửa hàng ghi
+//! đè, đọc qua `dyn OrgDirectory` của `organizations`; chưa cài module đó thì dùng mặc định. Thay
+//! bảng `orders_policies` của đặc tả bằng khuôn cài đặt kế thừa sẵn có
+//! (D-20261118-step45-lifecycle).
+
+use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::{OrgId, OrgSetting, TenantContext};
+use serde_json::Value;
+
+use crate::api::OrderStatus;
+use crate::service::OrdersService;
+
+/// Người mua tự huỷ được tới trạng thái nào (D-209).
+pub(crate) const BUYER_CANCEL_UNTIL: OrgSetting = OrgSetting::new(
+    "orders.buyer_cancel_until",
+    "Up to which order status buyers may cancel by themselves: `pending_payment`, `confirmed` \
+     or `preparing`.",
+)
+.with_default("\"confirmed\"")
+.with_schema(r#"{"type":"string","enum":["pending_payment","confirmed","preparing"]}"#)
+.checked(|value| match value.as_str() {
+    Some("pending_payment" | "confirmed" | "preparing") => Ok(value.clone()),
+    _ => Err("must be `pending_payment`, `confirmed` or `preparing`".to_owned()),
+});
+
+/// Số giờ cửa hàng có để nhận đơn đã thanh toán / COD; 0: tự nhận (D-209).
+pub(crate) const ACCEPTANCE_HOURS: OrgSetting = OrgSetting::new(
+    "orders.acceptance_hours",
+    "Hours a shop has to accept a paid or cash-on-delivery order before it is cancelled and \
+     refunded (0 to 720; 0: no acceptance step).",
+)
+.with_default("0")
+.with_schema(r#"{"type":"integer","minimum":0,"maximum":720}"#)
+.checked(|value| match value.as_i64() {
+    Some(hours) if (0..=720).contains(&hours) => Ok(value.clone()),
+    _ => Err("must be a whole number from 0 to 720".to_owned()),
+});
+
+/// Hạn đổi trả, ngày sau khi giao (đơn hoàn tất khi hết hạn).
+pub(crate) const RETURN_WINDOW_DAYS: OrgSetting = OrgSetting::new(
+    "orders.return_window_days",
+    "Days after delivery during which buyers may ask to return items; the order completes \
+     when they end (0 to 365).",
+)
+.with_default("7")
+.with_schema(r#"{"type":"integer","minimum":0,"maximum":365}"#)
+.checked(|value| match value.as_i64() {
+    Some(days) if (0..=365).contains(&days) => Ok(value.clone()),
+    _ => Err("must be a whole number from 0 to 365".to_owned()),
+});
+
+/// Nhận thanh toán khi giao hàng.
+pub(crate) const COD_ENABLED: OrgSetting =
+    OrgSetting::new("orders.cod_enabled", "Whether buyers may pay cash on delivery.")
+        .with_default("true")
+        .with_schema(r#"{"type":"boolean"}"#)
+        .checked(|value| match value.as_bool() {
+            Some(_) => Ok(value.clone()),
+            None => Err("must be `true` or `false`".to_owned()),
+        });
+
+pub(crate) fn all() -> Vec<OrgSetting> {
+    vec![BUYER_CANCEL_UNTIL, ACCEPTANCE_HOURS, RETURN_WINDOW_DAYS, COD_ENABLED]
+}
+
+/// Chính sách hiệu lực của một nút.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Policy {
+    pub buyer_cancel_until: OrderStatus,
+    pub acceptance_hours: i64,
+    pub return_window_days: i64,
+    pub cod_enabled: bool,
+}
+
+impl Policy {
+    /// Người mua tự huỷ được đơn đang ở `status` không.
+    pub(crate) fn buyer_may_cancel(&self, status: OrderStatus) -> bool {
+        let rank = |status: OrderStatus| match status {
+            OrderStatus::PendingPayment => Some(0),
+            OrderStatus::Confirmed => Some(1),
+            OrderStatus::Preparing => Some(2),
+            _ => None,
+        };
+        match (rank(status), rank(self.buyer_cancel_until)) {
+            (Some(now), Some(until)) => now <= until,
+            _ => false,
+        }
+    }
+}
+
+impl OrdersService {
+    async fn setting(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        setting: &OrgSetting,
+    ) -> Result<Option<Value>, Error> {
+        let found = match &self.orgs {
+            Some(orgs) => {
+                orgs.setting(tenant, org, setting.key()).await?.and_then(|found| found.value)
+            }
+            None => None,
+        };
+        Ok(found.or_else(|| setting.default_value()))
+    }
+
+    /// Chính sách hiệu lực của nút `org`.
+    pub(crate) async fn policy(&self, tenant: &TenantContext, org: OrgId) -> Result<Policy, Error> {
+        let cancel = self.setting(tenant, org, &BUYER_CANCEL_UNTIL).await?;
+        let acceptance = self.setting(tenant, org, &ACCEPTANCE_HOURS).await?;
+        let returns = self.setting(tenant, org, &RETURN_WINDOW_DAYS).await?;
+        let cod = self.setting(tenant, org, &COD_ENABLED).await?;
+        Ok(Policy {
+            buyer_cancel_until: cancel
+                .as_ref()
+                .and_then(Value::as_str)
+                .and_then(OrderStatus::parse)
+                .unwrap_or(OrderStatus::Confirmed),
+            acceptance_hours: acceptance.as_ref().and_then(Value::as_i64).unwrap_or(0),
+            return_window_days: returns.as_ref().and_then(Value::as_i64).unwrap_or(7),
+            cod_enabled: cod.as_ref().and_then(Value::as_bool).unwrap_or(true),
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nguoi_mua_huy_toi_trang_thai_cua_chinh_sach() {
+        let policy = |until| Policy {
+            buyer_cancel_until: until,
+            acceptance_hours: 0,
+            return_window_days: 7,
+            cod_enabled: true,
+        };
+        let confirmed = policy(OrderStatus::Confirmed);
+        assert!(confirmed.buyer_may_cancel(OrderStatus::PendingPayment));
+        assert!(confirmed.buyer_may_cancel(OrderStatus::Confirmed));
+        assert!(!confirmed.buyer_may_cancel(OrderStatus::Preparing));
+        assert!(!confirmed.buyer_may_cancel(OrderStatus::Shipping));
+        assert!(policy(OrderStatus::Preparing).buyer_may_cancel(OrderStatus::Preparing));
+        assert!(!policy(OrderStatus::PendingPayment).buyer_may_cancel(OrderStatus::Confirmed));
+    }
+}

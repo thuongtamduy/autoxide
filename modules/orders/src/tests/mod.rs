@@ -7,6 +7,7 @@ mod carts;
 mod checkout;
 mod fake_ledger;
 mod fakes;
+mod lifecycle;
 
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
@@ -212,6 +213,9 @@ pub(crate) struct Shop {
     pub ledger: Arc<FakeLedger>,
     /// Outbox của module giả `ledger` (phát `ledger.payment_succeeded`).
     pub ledger_outbox: Arc<Mutex<Option<Outbox>>>,
+    /// Outbox của module giả `shipping` (phát event vận đơn).
+    pub shipping_outbox: Arc<Mutex<Option<Outbox>>>,
+    pub orgs: Arc<FakeOrgs>,
     pub tree: Tree,
 }
 
@@ -236,6 +240,8 @@ pub(crate) async fn shop_with<'a>(
     let promotions = Arc::new(FakePromotions::default());
     let ledger = Arc::new(FakeLedger::default());
     let (emitter, ledger_outbox) = Emitter::new("ledger", &[PAYMENT_SUCCEEDED]);
+    let (shipping_emitter, shipping_outbox) = Emitter::new("shipping", &SHIPPING_EVENTS);
+    let orgs = Arc::new(FakeOrgs::default());
     let builder = TestApp::builder(test)
         .principal("boss", Principal::with_all_permissions(Uuid::from_u128(1)))
         .member("staff_a", 2, tree.a, &[("orders.read", autoxide_kernel::access::Scope::Unit)])
@@ -246,7 +252,9 @@ pub(crate) async fn shop_with<'a>(
         .provide::<dyn autoxide_inventory::api::Inventory>(inventory.clone())
         .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
         .provide::<dyn autoxide_ledger::api::Ledger>(ledger.clone())
-        .module(emitter);
+        .provide::<dyn autoxide_organizations::api::OrgDirectory>(orgs.clone())
+        .module(emitter)
+        .module(shipping_emitter);
     let app = extra(builder, &tree).module(crate::module()).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
@@ -254,7 +262,18 @@ pub(crate) async fn shop_with<'a>(
     OrgTree::insert(&write, DEFAULT_TENANT, tree.a, tree.chain, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.b, tree.chain, 8).await.unwrap();
     write.commit().await.unwrap();
-    Shop { app, catalog, inventory, promotions, shipping, ledger, ledger_outbox, tree }
+    Shop {
+        app,
+        catalog,
+        inventory,
+        promotions,
+        shipping,
+        ledger,
+        ledger_outbox,
+        shipping_outbox,
+        orgs,
+        tree,
+    }
 }
 
 pub(crate) async fn shop(test: &TestDatabase) -> Shop {
@@ -373,7 +392,16 @@ impl Module for Emitter {
 
 /// Ghi `event` vào outbox của `ledger` giả (một transaction riêng).
 pub(crate) async fn emit<E: Event>(shop: &Shop, event: &E) {
-    let outbox = shop.ledger_outbox.lock().unwrap().clone().unwrap();
+    emit_from(shop, &shop.ledger_outbox, event).await;
+}
+
+/// Ghi `event` vào outbox của module giả `outbox` (một transaction riêng).
+pub(crate) async fn emit_from<E: Event>(
+    shop: &Shop,
+    outbox: &Arc<Mutex<Option<Outbox>>>,
+    event: &E,
+) {
+    let outbox = outbox.lock().unwrap().clone().unwrap();
     let tenant = shop.default_tenant();
     let transaction = shop.database().begin_write().await.unwrap();
     outbox.record(&transaction, &tenant, Actor::system(), None, event).await.unwrap();
@@ -395,6 +423,8 @@ macro_rules! now_job {
 now_job!(MarkAbandonedNow, crate::jobs::MARK_ABANDONED_CARTS);
 now_job!(ExpireUnpaidNow, crate::jobs::EXPIRE_UNPAID);
 now_job!(RecoverNow, crate::jobs::RECOVER_CHECKOUTS);
+now_job!(CompleteNow, crate::jobs::COMPLETE_DELIVERED);
+now_job!(UnacceptedNow, crate::jobs::EXPIRE_UNACCEPTED);
 
 /// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
 pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
@@ -411,8 +441,100 @@ pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
         crate::jobs::RECOVER_CHECKOUTS => {
             queue.enqueue_database(write, &RecoverNow {}, options()).await
         }
+        crate::jobs::COMPLETE_DELIVERED => {
+            queue.enqueue_database(write, &CompleteNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_UNACCEPTED => {
+            queue.enqueue_database(write, &UnacceptedNow {}, options()).await
+        }
         other => panic!("no test job for `{other}`"),
     }
     .unwrap();
     drain(app).await;
+}
+
+/// Event vận đơn của `shipping` mà `orders` nghe.
+pub(crate) const SHIPPING_EVENTS: [&str; 5] = [
+    autoxide_shipping::api::events::SHIPMENT_STATUS_CHANGED,
+    autoxide_shipping::api::events::SHIPMENT_DELIVERED,
+    autoxide_shipping::api::events::SHIPMENT_DELIVERY_FAILED,
+    autoxide_shipping::api::events::SHIPMENT_RETURNED,
+    autoxide_shipping::api::events::COD_COLLECTED,
+];
+
+/// Event vận đơn do module giả `shipping` phát: mỗi tên một kiểu (`Event::NAME` là hằng).
+macro_rules! shipping_event {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, serde::Serialize)]
+        #[serde(transparent)]
+        pub(crate) struct $kind(pub Value);
+
+        impl Event for $kind {
+            const NAME: &'static str = $name;
+        }
+    };
+}
+
+shipping_event!(ShipmentDelivered, autoxide_shipping::api::events::SHIPMENT_DELIVERED);
+shipping_event!(CodCollected, autoxide_shipping::api::events::COD_COLLECTED);
+
+/// Thân `{"after": ShipmentEvent}` của event vận đơn cho đơn `order`.
+pub(crate) fn shipment_event(order: uuid::Uuid, status: &str, cod: Option<i64>) -> Value {
+    json!({"after": {
+        "shipment_id": uuid::Uuid::now_v7(), "order_id": order, "request_key": format!("order:{order}:1"),
+        "direction": "outbound", "org_id": uuid::Uuid::nil(), "status": status,
+        "tracking_number": "T1", "carrier_code": "fake", "cod_amount": cod.map(money),
+        "at": Utc::now(),
+    }})
+}
+
+/// `dyn OrgDirectory` giả: cài đặt theo nút đặt sẵn (không kế thừa), còn lại mặc định.
+#[derive(Default)]
+pub(crate) struct FakeOrgs {
+    settings: Mutex<HashMap<(OrgId, String), Value>>,
+}
+
+impl FakeOrgs {
+    pub(crate) fn set(&self, org: OrgId, key: &str, value: Value) {
+        self.settings.lock().unwrap().insert((org, key.to_owned()), value);
+    }
+}
+
+#[async_trait::async_trait]
+impl autoxide_organizations::api::OrgDirectory for FakeOrgs {
+    async fn unit(
+        &self,
+        _: &TenantContext,
+        _: OrgId,
+    ) -> Result<Option<autoxide_organizations::api::Unit>, Error> {
+        Ok(None)
+    }
+    async fn root(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<autoxide_organizations::api::Unit, Error> {
+        let root = autoxide_kernel::tenancy::root_of(tenant.id());
+        Ok(autoxide_organizations::api::Unit::new(root, None, "root", "Root"))
+    }
+    async fn ancestors(
+        &self,
+        _: &TenantContext,
+        _: OrgId,
+    ) -> Result<Vec<autoxide_organizations::api::Unit>, Error> {
+        Ok(Vec::new())
+    }
+    async fn is_within(&self, _: &TenantContext, _: OrgId, _: OrgId) -> Result<bool, Error> {
+        Ok(true)
+    }
+    async fn setting(
+        &self,
+        _: &TenantContext,
+        id: OrgId,
+        key: &str,
+    ) -> Result<Option<autoxide_organizations::api::EffectiveSetting>, Error> {
+        let value = self.settings.lock().unwrap().get(&(id, key.to_owned())).cloned();
+        Ok(value.map(|value| {
+            autoxide_organizations::api::EffectiveSetting::new(key, Some(value), Some(id), false)
+        }))
+    }
 }

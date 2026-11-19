@@ -3,7 +3,8 @@
 //! đơn); nhân viên theo permission ở nút.
 
 mod carts;
-mod dto;
+pub(crate) mod dto;
+mod lifecycle;
 mod orders;
 
 use std::sync::Arc;
@@ -31,5 +32,9 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(orders::my_order))
         .routes(routes!(orders::list_orders))
         .routes(routes!(orders::get_order))
+        .routes(routes!(lifecycle::transition))
+        .routes(routes!(lifecycle::cancel_mine))
+        .routes(routes!(lifecycle::request_shipment))
+        .routes(routes!(lifecycle::payment_link))
         .with_state(service)
 }

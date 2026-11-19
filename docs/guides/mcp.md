@@ -276,6 +276,10 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |
 | `notifications.send_notification` | `notifications.send` | writes |
 | `notifications.update_template_draft` | `notifications.templates.manage` | writes |
+| `orders.get_order` | `orders.read` | read-only |
+| `orders.list_orders` | `orders.read` | read-only |
+| `orders.request_shipment` | `orders.manage` | writes |
+| `orders.transition_order` | `orders.manage` | destructive |
 | `organizations.add_group_members` | `organizations.groups.manage` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
 | `organizations.create_group` | `organizations.groups.manage` | writes |
@@ -306,6 +310,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `promotions.create_promotion` | `promotions.write` | writes |
 | `promotions.end_promotion` | `promotions.publish` | writes |
 | `promotions.evaluate_cart` | `promotions.read` | read-only |
+| `promotions.export_notice` | `promotions.read` | read-only |
 | `promotions.generate_codes` | `promotions.codes.manage` | writes |
 | `promotions.get_promotion` | `promotions.read` | read-only |
 | `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
