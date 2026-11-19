@@ -15,7 +15,7 @@
 
 use std::collections::HashMap;
 
-use autoxide_kernel::access::{OrgTarget, Principal};
+use autoxide_kernel::access::{OrgTarget, Permission, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::numbering;
@@ -35,7 +35,7 @@ use crate::api::OrderStatus;
 use crate::entity::{completion_hold, line, order, return_request};
 use crate::errors;
 use crate::events::{Change, ReturnReceived, ReturnRequested, ReturnStatusChanged};
-use crate::permissions::RETURNS_MANAGE;
+use crate::permissions::{READ, RETURNS_MANAGE};
 use crate::reasons::{RETURN_REASON, RETURN_REJECTED};
 use crate::refunds::RefundRequest;
 use crate::return_refund::{self, Breakdown, Earlier};
@@ -413,21 +413,23 @@ impl OrdersService {
             .ok_or_else(errors::return_not_found)
     }
 
-    /// Yêu cầu trả `id` cho nhân viên có `orders.returns.manage` ở nút bán của đơn.
+    /// Yêu cầu trả `id` cho nhân viên có `permission` (`orders.read` để xem,
+    /// `orders.returns.manage` để xử lý) ở nút bán của đơn.
     pub(crate) async fn staff_return(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
+        permission: &Permission,
     ) -> Result<return_request::Model, Error> {
-        principal.require(&RETURNS_MANAGE)?;
+        principal.require(permission)?;
         let row = return_request::Entity::find_by_id(id)
             .scoped(tenant)
             .one(tenant.database().read())
             .await?
             .ok_or_else(errors::return_not_found)?;
         let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
-        principal.require_at(tenant.database().read(), &RETURNS_MANAGE, target).await?;
+        principal.require_at(tenant.database().read(), permission, target).await?;
         Ok(row)
     }
 
@@ -439,8 +441,7 @@ impl OrdersService {
         filter: &ReturnFilter,
         page: &PageRequest,
     ) -> Result<Page<return_request::Model>, Error> {
-        let scope =
-            principal.scope_condition(&RETURNS_MANAGE, return_request::Column::OrgId, None)?;
+        let scope = principal.scope_condition(&READ, return_request::Column::OrgId, None)?;
         let mut condition = Condition::all().add(scope);
         if let Some(status) = &filter.status {
             condition = condition.add(return_request::Column::Status.eq(status.as_str()));
@@ -464,7 +465,7 @@ impl OrdersService {
         id: Uuid,
         action: ReturnAction,
     ) -> Result<return_request::Model, Error> {
-        let row = self.staff_return(tenant, principal, id).await?;
+        let row = self.staff_return(tenant, principal, id, &RETURNS_MANAGE).await?;
         if row.status == action.target() {
             // Gửi lại cùng bước (agent retry): kết quả hiện có.
             return Ok(row);

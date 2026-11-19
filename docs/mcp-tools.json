@@ -10450,7 +10450,7 @@
       "name": "orders.list_returns",
       "output_schema": null,
       "permissions": [
-        "orders.returns.manage"
+        "orders.read"
       ]
     },
     {

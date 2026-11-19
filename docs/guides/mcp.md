@@ -278,7 +278,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `orders.decide_return` | `orders.returns.manage` | destructive |
 | `orders.get_order` | `orders.read` | read-only |
 | `orders.list_orders` | `orders.read` | read-only |
-| `orders.list_returns` | `orders.returns.manage` | read-only |
+| `orders.list_returns` | `orders.read` | read-only |
 | `orders.refund_order` | `orders.refund` | destructive |
 | `orders.request_shipment` | `orders.manage` | writes |
 | `orders.transition_order` | `orders.manage` | destructive |

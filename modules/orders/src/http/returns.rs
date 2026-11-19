@@ -251,18 +251,18 @@ pub(crate) struct ReturnListQuery {
 
 /// List returns.
 ///
-/// Requires `orders.returns.manage` (returns of shops in your scope).
+/// Requires `orders.read` (returns of orders of shops in your scope).
 #[utoipa::path(
     get,
     path = "/returns",
-    extensions(("x-permissions" = json!(["orders.returns.manage"]))),
+    extensions(("x-permissions" = json!(["orders.read"]))),
     operation_id = "list_returns",
     params(ReturnListQuery, PageQuery),
     responses(
         (status = 200, description = "A page of returns, newest first by default.", body = Page<ReturnResponse>),
         (status = 400, description = "Bad cursor or limit.", body = Problem),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
-        (status = 403, description = "Missing `orders.returns.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `orders.read`; code `permission_denied`.", body = Problem),
     )
 )]
 pub(crate) async fn list_returns(
@@ -283,17 +283,17 @@ pub(crate) async fn list_returns(
 
 /// Read a return.
 ///
-/// Requires `orders.returns.manage` at the order's shop. The photos are in `media_ids`.
+/// Requires `orders.read` at the order's shop. The photos are in `media_ids`.
 #[utoipa::path(
     get,
     path = "/returns/{id}",
-    extensions(("x-permissions" = json!(["orders.returns.manage"]))),
+    extensions(("x-permissions" = json!(["orders.read"]))),
     operation_id = "get_return",
     params(("id" = Uuid, Path, description = "Id of the return.")),
     responses(
         (status = 200, description = "The return.", body = Data<ReturnResponse>),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
-        (status = 403, description = "Missing `orders.returns.manage` at the order's shop; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `orders.read` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such return; code `orders.return_not_found`.", body = Problem),
     )
 )]
@@ -303,7 +303,7 @@ pub(crate) async fn get_return(
     principal: Principal,
     Path(id): Path<Uuid>,
 ) -> Result<Data<ReturnResponse>, Error> {
-    let row = service.staff_return(&tenant, &principal, id).await?;
+    let row = service.staff_return(&tenant, &principal, id, &crate::permissions::READ).await?;
     Ok(Data { data: ReturnResponse::new(row)? })
 }
 
@@ -401,7 +401,9 @@ pub(crate) async fn return_action(
                 })
                 .collect();
             // Dòng không nêu: nhận đủ, bán lại được.
-            let stored = service.staff_return(tenant, principal, id).await?;
+            let stored = service
+                .staff_return(tenant, principal, id, &crate::permissions::RETURNS_MANAGE)
+                .await?;
             for line in returns::lines_of(&stored)? {
                 if !lines.iter().any(|item| item.line_id == line.line_id) {
                     lines.push(Received {

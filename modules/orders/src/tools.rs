@@ -260,7 +260,7 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(RETURNS_MANAGE)
+        .requires(READ)
         .read_only(),
         Tool::new(
             "decide_return",

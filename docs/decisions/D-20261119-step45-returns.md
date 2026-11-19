@@ -32,7 +32,7 @@ Quyết định:
    báo một lần (D-083). Yêu cầu mở giữ một dòng `orders_completion_holds` (`return:<id>`) — đơn không hoàn tất tới khi
    yêu cầu bị từ chối, đã hoàn tiền hay đóng.
 5. **Các bước của nhân viên** (`orders.returns.manage`, `POST /returns/{id}/transitions`, tool `decide_return`):
-   `approve`, `reject` (mã của `orders.return_rejected`), `receive` (từng dòng: số nhận, `restock` / `damaged`; nhận tại
+   xem yêu cầu trả cần `orders.read` (tool chỉ-đọc `list_returns` phải gọi được bằng quyền mức đọc); `approve`, `reject` (mã của `orders.return_rejected`), `receive` (từng dòng: số nhận, `restock` / `damaged`; nhận tại
    cửa hàng được bỏ qua bước duyệt), `refund`, `close`. Gửi lại đúng bước hiện tại trả kết quả hiện có (agent retry).
    `receive` cộng `returned_quantity` có chặn trên (không trả quá số mua kể cả khi chạy song song), phát
    `orders.return_received` đúng hình dạng `inventory` đọc (`warehouse_org_id` một kho cho cả lần nhận — mặc định kho

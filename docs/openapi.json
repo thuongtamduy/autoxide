@@ -175934,7 +175934,7 @@
     },
     "/api/v1/orders/returns": {
       "get": {
-        "description": "Requires `orders.returns.manage` (returns of shops in your scope).",
+        "description": "Requires `orders.read` (returns of orders of shops in your scope).",
         "operationId": "orders_list_returns",
         "parameters": [
           {
@@ -176064,7 +176064,7 @@
                 }
               }
             },
-            "description": "Missing `orders.returns.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `orders.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "default": {
             "content": {
@@ -176109,13 +176109,13 @@
         ],
         "x-autoxide-list": "orders.list_returns",
         "x-permissions": [
-          "orders.returns.manage"
+          "orders.read"
         ]
       }
     },
     "/api/v1/orders/returns/{id}": {
       "get": {
-        "description": "Requires `orders.returns.manage` at the order's shop. The photos are in `media_ids`.",
+        "description": "Requires `orders.read` at the order's shop. The photos are in `media_ids`.",
         "operationId": "orders_get_return",
         "parameters": [
           {
@@ -176170,7 +176170,7 @@
                 }
               }
             },
-            "description": "Missing `orders.returns.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `orders.read` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -176198,7 +176198,7 @@
           "orders"
         ],
         "x-permissions": [
-          "orders.returns.manage"
+          "orders.read"
         ]
       }
     },
