@@ -9634,6 +9634,19 @@ export type Data_SupportPolicyInForce = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportReplyDraft = {
+  /** A draft answer staff review before sending. Never sent by itself. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportReport = {
   /** Support figures for tickets created in a period. */
   data: {
@@ -11937,6 +11950,18 @@ export type Data_Vec_SupportMacro = {
     /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
     review_due_on?: string | null;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportReplyDraft = {
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   }[];
 };
 
@@ -23218,6 +23243,16 @@ export type SupportPolicyInForce = SupportPolicy & {
 
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** A draft answer staff review before sending. Never sent by itself. */
+export type SupportReplyDraft = {
+  /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+  ai_assisted: boolean;
+  body: string;
+  created_at: string;
+  id: string;
+  ticket_id: string;
+};
 
 /** Support figures for tickets created in a period. */
 export type SupportReport = {
@@ -36818,6 +36853,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-drafts": {
+    /** List the drafts of a ticket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-suggestions": {
+    /** Draft an answer with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        502: Problem;
+        503: Problem;
         default: Problem;
       };
     };
