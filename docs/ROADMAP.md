@@ -530,7 +530,7 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
 - [x] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
       sắp hết hạn theo nút), số serial — bật theo sản phẩm
 - [x] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
-- [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
+- [x] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
       cấp; công nợ phải trả vào sổ cái, trạng thái ghi sổ của phiếu nhập (ghi lại được), công nợ từng nhà
       cung cấp qua `ledger`
 - [ ] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất

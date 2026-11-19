@@ -14,6 +14,9 @@ endpoints are marked deprecated with a sunset date first.
 - `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
   one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
   (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
+- Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
+  receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
+  posting; MCP tool `inventory.create_receipt`.
 - `auth`: API keys take `allowed_ips` (addresses or CIDR ranges, at most 50); a request from elsewhere gets 403
   `network_not_allowed`. Every key now expires: omitting `expires_at` gives the longest lifetime,
   `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` (365 days by default), and a later date is refused (`too_far`). **Upgrade note:**

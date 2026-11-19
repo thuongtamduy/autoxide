@@ -25,6 +25,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateReservations),
         Box::new(CreateDocuments),
         Box::new(CreateLots),
+        Box::new(CreatePurchasing),
     ]
 }
 
@@ -529,5 +530,204 @@ impl MigrationTrait for CreateLots {
                 .await?;
         }
         drop_all(manager, &["inventory_lots", "inventory_serials"]).await
+    }
+}
+
+struct CreatePurchasing;
+
+impl MigrationName for CreatePurchasing {
+    fn name(&self) -> &str {
+        "m0010_create_purchasing"
+    }
+}
+
+const PURCHASING_TABLES: [&str; 7] = [
+    "inventory_suppliers",
+    "inventory_purchase_orders",
+    "inventory_purchase_order_lines",
+    "inventory_receipts",
+    "inventory_receipt_lines",
+    "inventory_supplier_returns",
+    "inventory_supplier_return_lines",
+];
+
+/// Cột ghi sổ cái của phiếu (D-223…D-227).
+fn ledger_columns(table: &mut TableCreateStatement) {
+    table
+        .col(schema::string_len("ledger_status", 16))
+        .col(schema::uuid_null("ledger_entry_id"))
+        .col(schema::timestamp_with_time_zone_null("ledger_posted_at"))
+        .col(schema::string_len_null("ledger_error_code", 100));
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreatePurchasing {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Nhà cung cấp, thuộc một nút (đơn vị mua hàng — sổ cái ghi công nợ ở nút đó).
+        let mut suppliers = table("inventory_suppliers");
+        suppliers
+            .col(schema::uuid("org_id"))
+            .col(schema::string_len("code", 64))
+            .col(schema::string_len("name", 200))
+            .col(schema::string_len("name_key", 200))
+            .col(schema::string_len_null("tax_code", 20))
+            .col(schema::string_len_null("contact_name", 200))
+            .col(schema::string_len_null("phone", 32))
+            .col(schema::string_len_null("email", 254))
+            .col(schema::text_null("address"))
+            .col(schema::integer("payment_terms_days"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::boolean("active"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(suppliers).await?;
+        let t = "inventory_suppliers";
+        index(manager, t, "inventory_suppliers_code_key", &["tenant_id", "code"], true).await?;
+        index(
+            manager,
+            t,
+            "inventory_suppliers_org_idx",
+            &["tenant_id", "org_id", "name_key"],
+            false,
+        )
+        .await?;
+
+        // Đơn đặt hàng nhà cung cấp (`PO-…`).
+        let mut orders = table("inventory_purchase_orders");
+        orders
+            .col(schema::string_len("number", 32))
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid("supplier_id"))
+            .col(schema::string_len("status", 24))
+            .col(schema::date_null("expected_on"))
+            .col(schema::big_integer("total_minor"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::text("note"))
+            .col(schema::uuid_null("created_by"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(orders).await?;
+        let t = "inventory_purchase_orders";
+        index(manager, t, "inventory_purchase_orders_number_key", &["tenant_id", "number"], true)
+            .await?;
+        index(
+            manager,
+            t,
+            "inventory_purchase_orders_supplier_idx",
+            &["tenant_id", "supplier_id", "status"],
+            false,
+        )
+        .await?;
+
+        let mut order_lines = table("inventory_purchase_order_lines");
+        order_lines
+            .col(schema::uuid("purchase_order_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("quantity"))
+            .col(schema::big_integer("received_quantity"))
+            .col(schema::big_integer("unit_cost_minor"))
+            .col(schema::string_len("unit_cost_currency", 3));
+        manager.create_table(order_lines).await?;
+        index(
+            manager,
+            "inventory_purchase_order_lines",
+            "inventory_purchase_order_lines_idx",
+            &["tenant_id", "purchase_order_id"],
+            false,
+        )
+        .await?;
+
+        // Phiếu nhập (`PN-…`): `reference` vĩnh viễn (D-184).
+        let mut receipts = table("inventory_receipts");
+        receipts
+            .col(schema::string_len("number", 32))
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid_null("supplier_id"))
+            .col(schema::uuid_null("purchase_order_id"))
+            .col(schema::string_len("reference", 100))
+            .col(schema::string_len("reference_fingerprint", 64))
+            .col(schema::timestamp_with_time_zone("posted_at"))
+            .col(schema::big_integer("total_minor"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::uuid_null("created_by"));
+        ledger_columns(&mut receipts);
+        manager.create_table(receipts).await?;
+        let t = "inventory_receipts";
+        index(manager, t, "inventory_receipts_number_key", &["tenant_id", "number"], true).await?;
+        index(manager, t, "inventory_receipts_reference_key", &["tenant_id", "reference"], true)
+            .await?;
+        index(manager, t, "inventory_receipts_supplier_idx", &["tenant_id", "supplier_id"], false)
+            .await?;
+
+        let mut receipt_lines = table("inventory_receipt_lines");
+        receipt_lines
+            .col(schema::uuid("receipt_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("quantity"))
+            .col(schema::big_integer("unit_cost_minor"))
+            .col(schema::string_len("unit_cost_currency", 3))
+            .col(schema::string_len_null("lot_code", 64))
+            .col(schema::date_null("expires_on"))
+            .col(schema::text("serials"));
+        manager.create_table(receipt_lines).await?;
+        index(
+            manager,
+            "inventory_receipt_lines",
+            "inventory_receipt_lines_idx",
+            &["tenant_id", "receipt_id"],
+            false,
+        )
+        .await?;
+
+        // Trả hàng nhà cung cấp (`TH-…`).
+        let mut returns = table("inventory_supplier_returns");
+        returns
+            .col(schema::string_len("number", 32))
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid("supplier_id"))
+            .col(schema::uuid_null("receipt_id"))
+            .col(schema::string_len("reference", 100))
+            .col(schema::string_len("reference_fingerprint", 64))
+            .col(schema::timestamp_with_time_zone("posted_at"))
+            .col(schema::big_integer("total_minor"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::uuid_null("created_by"));
+        ledger_columns(&mut returns);
+        manager.create_table(returns).await?;
+        let t = "inventory_supplier_returns";
+        index(manager, t, "inventory_supplier_returns_number_key", &["tenant_id", "number"], true)
+            .await?;
+        index(
+            manager,
+            t,
+            "inventory_supplier_returns_reference_key",
+            &["tenant_id", "reference"],
+            true,
+        )
+        .await?;
+
+        let mut return_lines = table("inventory_supplier_return_lines");
+        return_lines
+            .col(schema::uuid("supplier_return_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("quantity"))
+            .col(schema::big_integer("unit_cost_minor"))
+            .col(schema::string_len("unit_cost_currency", 3))
+            .col(schema::string_len_null("lot_code", 64))
+            .col(schema::text("serials"));
+        manager.create_table(return_lines).await?;
+        index(
+            manager,
+            "inventory_supplier_return_lines",
+            "inventory_supplier_return_lines_idx",
+            &["tenant_id", "supplier_return_id"],
+            false,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(manager, &PURCHASING_TABLES).await
     }
 }

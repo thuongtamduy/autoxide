@@ -6,6 +6,7 @@ mod documents;
 mod levels;
 mod lots;
 mod orders;
+mod purchasing;
 mod reservations;
 
 use std::collections::HashMap;

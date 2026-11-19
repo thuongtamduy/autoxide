@@ -6297,6 +6297,108 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Receive goods into a warehouse, against a purchase order or directly from a supplier; each line updates the average cost. The same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A goods receipt.",
+        "properties": {
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a goods receipt.",
+              "properties": {
+                "expires_on": {
+                  "description": "`YYYY-MM-DD`.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lot_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "serials": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost in minor units as a string, e.g. `\"150000\"`.",
+                  "type": "string"
+                },
+                "unit_cost_currency": {
+                  "description": "e.g. `VND`.",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "unit_cost_amount",
+                "unit_cost_currency"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "purchase_order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this receipt, e.g. the delivery note number.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.create_receipt",
+      "output_schema": null,
+      "permissions": [
+        "inventory.receive"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a stock transfer between two warehouses as a draft (one line per variant); ship it with the REST endpoint `POST /api/v1/inventory/transfers/{id}/ship`.",
       "input_schema": {
         "additionalProperties": false,

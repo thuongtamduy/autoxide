@@ -102,6 +102,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `auth.replace_role` | `auth.roles.manage` | writes |
 | `auth.revoke_api_key` | — | destructive |
 | `auth.revoke_invitation` | `auth.invitations.manage` | writes |
+| `auth.rotate_api_key` | — | writes |
 | `auth.set_memberships` | `auth.roles.manage` | writes |
 | `auth.set_user_roles` | `auth.roles.manage` | writes |
 | `auth.update_oidc_provider` | `auth.oidc.manage` | writes |
@@ -190,6 +191,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_receipt` | `inventory.receive` | writes |
 | `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
