@@ -47,6 +47,8 @@ event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
 event!(PickupReady, names::PICKUP_READY);
+event!(PreorderDelayed, names::PREORDER_DELAYED);
+event!(PreorderCancelled, names::PREORDER_CANCELLED);
 event!(PickupReminder, names::PICKUP_REMINDER);
 event!(PickupExpired, names::PICKUP_EXPIRED);
 event!(ReturnRequested, names::RETURN_REQUESTED);
@@ -103,6 +105,14 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::PICKUP_EXPIRED,
             "An order waiting in store was not collected in time.",
+        ),
+        EventInfo::new(
+            names::PREORDER_DELAYED,
+            "A pre-order item will arrive later than promised; the buyer may cancel for free.",
+        ),
+        EventInfo::new(
+            names::PREORDER_CANCELLED,
+            "Pre-order items not yet arrived were cancelled from an order and refunded.",
         ),
         EventInfo::new(names::INVOICE_LINKED, "An electronic invoice was linked to an order."),
         EventInfo::new(names::CART_ABANDONED, "A buyer left a cart without placing an order."),

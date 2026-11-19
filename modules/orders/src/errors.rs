@@ -251,3 +251,11 @@ pub(crate) fn pickup_code_invalid() -> Error {
          order.",
     )
 }
+
+pub(crate) fn nothing_to_ship() -> Error {
+    Error::conflict(
+        "orders.nothing_to_ship",
+        "Nothing of the order is ready to ship: pre-order items have not arrived yet, or every \
+         item was already requested.",
+    )
+}

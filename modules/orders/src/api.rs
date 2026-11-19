@@ -69,6 +69,12 @@ pub mod events {
     pub const PICKUP_REMINDER: &str = "orders.pickup_reminder";
     /// Hết hạn giữ hàng chờ nhận (`after.action`: `cancel_refund` hay `keep_waiting`).
     pub const PICKUP_EXPIRED: &str = "orders.pickup_expired";
+    /// Ngày giao của hàng đặt trước dời muộn hơn ngày đã hứa: người mua được huỷ miễn phí
+    /// (`after.promised_on`, `after.expected_on`, `after.line_id`).
+    pub const PREORDER_DELAYED: &str = "orders.preorder_delayed";
+    /// Phần đặt trước chưa có hàng của đơn bị huỷ (`after.reason`: `preorder_stopped`,
+    /// `buyer_cancelled`; `after.lines`, `after.amount` hoàn lại).
+    pub const PREORDER_CANCELLED: &str = "orders.preorder_cancelled";
     /// Một hoá đơn điện tử đã gắn vào đơn.
     pub const INVOICE_LINKED: &str = "orders.invoice_linked";
     /// Giỏ bị bỏ dở (người mua, tóm tắt giỏ) — cho bước 47.

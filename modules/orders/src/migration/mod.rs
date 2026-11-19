@@ -5,6 +5,7 @@ mod m0005_carts;
 mod m0006_orders;
 mod m0007_returns;
 mod m0008_pickups;
+mod m0009_preorders;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -30,6 +31,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0007_returns::Migration),
         // Nhận tại cửa hàng (mục 5).
         Box::new(m0008_pickups::Migration),
+        // Hàng đặt trước, giao nhiều lần (mục 5).
+        Box::new(m0009_preorders::Migration),
     ]
 }
 

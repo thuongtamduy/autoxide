@@ -8541,6 +8541,9 @@ export type Data_OrdersOrder = {
     payment_method: string;
     /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
     payment_status: string;
+    pickup?: OrdersPickup | null;
+    /** Collecting in store: the shop, and the pickup once the order is ready. */
+    pickup_org_id?: string | null;
     placed_at: string;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -8550,6 +8553,20 @@ export type Data_OrdersOrder = {
     totals: OrdersOrderTotals;
     /** Changes on every update (for `If-Match`). */
     version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPickupReady = {
+  /** An order ready in store. */
+  data: {
+    /** Held until then; afterwards the shop's `orders.pickup_expired_action` applies. */
+    hold_until: string;
+    order_id: string;
+    pickup_org_id: string;
+    ready_at: string;
+    /** `ready`, `picked_up` or `expired`. */
+    status: string;
   };
 };
 
@@ -17404,6 +17421,11 @@ export type OrdersCartTotals = {
 
 /** Place the order of a cart. */
 export type OrdersCheckoutRequest = {
+  /**
+   * Required `true` when the cart has pre-order items: you showed their terms and expected
+   * dates (`preorder` of each cart line) to the buyer, who agreed.
+   */
+  accept_preorder_terms?: boolean | null;
   /** Version of the terms of sale the buyer accepted. */
   accept_terms_version?: string | null;
   cart_id: string;
@@ -17435,6 +17457,10 @@ export type OrdersContactRequest = {
   name: string;
   /** Mobile number; delivery and order lookup use it. */
   phone: string;
+  /** Picking up in store: name of someone else who may collect the order. */
+  proxy_name?: string | null;
+  /** Picking up in store: phone number of that person (both or neither). */
+  proxy_phone?: string | null;
 };
 
 /** Why a cart line cannot be ordered now. */
@@ -17468,6 +17494,9 @@ export type OrdersOrder = {
   payment_method: string;
   /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
   payment_status: string;
+  pickup?: OrdersPickup | null;
+  /** Collecting in store: the shop, and the pickup once the order is ready. */
+  pickup_org_id?: string | null;
   placed_at: string;
   /**
    * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -17529,6 +17558,39 @@ export type OrdersPaymentAction = {
   status_token: string;
   /** Transfer content the bank transfer must carry. */
   transfer_code?: string | null;
+};
+
+/** An order waiting in store. */
+export type OrdersPickup = {
+  /** The 6-digit code to show at the counter; only in your own order. */
+  code?: string | null;
+  handed_over_at?: string | null;
+  /** Held until then. */
+  hold_until: string;
+  ready_at: string;
+  /** `ready`, `picked_up` or `expired`. */
+  status: string;
+};
+
+/** Who collects the order. */
+export type OrdersPickupHandoverRequest = {
+  /** The 6-digit code the buyer shows. */
+  code?: string | null;
+  /** Or: the name of the person collecting for the buyer, as given when ordering. */
+  proxy_name?: string | null;
+  /** And that person's phone number. */
+  proxy_phone?: string | null;
+};
+
+/** An order ready in store. */
+export type OrdersPickupReady = {
+  /** Held until then; afterwards the shop's `orders.pickup_expired_action` applies. */
+  hold_until: string;
+  order_id: string;
+  pickup_org_id: string;
+  ready_at: string;
+  /** `ready`, `picked_up` or `expired`. */
+  status: string;
 };
 
 /** Pre-order information shown before ordering. */
@@ -19961,6 +20023,9 @@ export type Page_OrdersOrder = {
     payment_method: string;
     /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
     payment_status: string;
+    pickup?: OrdersPickup | null;
+    /** Collecting in store: the shop, and the pickup once the order is ready. */
+    pickup_org_id?: string | null;
     placed_at: string;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
@@ -37484,7 +37549,7 @@ export interface paths {
   "/api/v1/orders": {
     /** List orders. */
     get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payment_status?: string; org_id?: string; channel?: string; number?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payment_status?: string; org_id?: string; channel?: string; number?: string; pickup_org_id?: string; pickup_status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
       responses: {
         200: Page_OrdersOrder;
         400: Problem;
@@ -37831,6 +37896,36 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/pickup/handover": {
+    /** Hand an order over at the counter. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersPickupHandoverRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/pickup/ready": {
+    /** Mark an order ready for collection. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersPickupReady;
         401: Problem;
         403: Problem;
         404: Problem;

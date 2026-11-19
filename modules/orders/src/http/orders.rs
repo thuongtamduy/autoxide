@@ -61,6 +61,9 @@ pub(crate) struct CheckoutRequest {
     /// Version of the terms of sale the buyer accepted.
     #[validate(length(min = 1, max = 40))]
     accept_terms_version: Option<String>,
+    /// Required `true` when the cart has pre-order items: you showed their terms and expected
+    /// dates (`preorder` of each cart line) to the buyer, who agreed.
+    accept_preorder_terms: Option<bool>,
     /// Company details for a VAT invoice (tax code, name, address).
     #[schema(value_type = Option<Object>)]
     invoice_request: Option<serde_json::Value>,
@@ -126,6 +129,7 @@ pub(crate) async fn checkout(
         },
         note: input.note,
         accept_terms_version: input.accept_terms_version,
+        accept_preorder_terms: input.accept_preorder_terms.unwrap_or(false),
         invoice_request: input.invoice_request,
         return_url: input.return_url,
     };

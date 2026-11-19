@@ -16,6 +16,7 @@ mod entity;
 mod errors;
 mod events;
 mod extensions;
+mod fulfillments;
 mod holds;
 mod http;
 mod jobs;
@@ -26,6 +27,7 @@ mod payments;
 mod permissions;
 mod pickups;
 mod policy;
+mod preorders;
 mod pricing;
 mod reasons;
 mod refunds;
@@ -160,6 +162,7 @@ impl Module for OrdersModule {
         let mut all = holds::subscriptions(&service);
         all.extend(accounting::subscriptions(&service));
         all.extend(shipping_events::subscriptions(&service));
+        all.extend(preorders::subscriptions(&service));
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
         all.push(autoxide_kernel::event::Subscription::optional(
             payments::LEDGER_PAYMENT_SUCCEEDED,

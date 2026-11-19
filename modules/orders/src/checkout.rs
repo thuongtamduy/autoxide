@@ -66,6 +66,8 @@ pub(crate) struct CheckoutInput {
     pub contact: Contact,
     pub note: Option<String>,
     pub accept_terms_version: Option<String>,
+    /// Người mua đồng ý điều kiện đặt trước (bắt buộc khi giỏ có hàng đặt trước, D-204).
+    pub accept_preorder_terms: bool,
     pub invoice_request: Option<serde_json::Value>,
     pub return_url: Option<String>,
 }
@@ -194,6 +196,13 @@ impl OrdersService {
         }
         let mut problems = Vec::new();
         check_contact(&input.contact, &mut problems);
+        if quote.has_preorder() && !input.accept_preorder_terms {
+            problems.push(FieldError::new(
+                "accept_preorder_terms",
+                "required",
+                "the cart has pre-order items: show their terms and expected dates, then send `true`",
+            ));
+        }
         if input.note.as_deref().is_some_and(|note| note.chars().count() > 1000) {
             problems.push(FieldError::new(
                 "note",
@@ -565,6 +574,7 @@ impl Draft<'_> {
             stock_shortage: Set(false),
             invoice_request: Set(self.input.invoice_request.as_ref().map(ToString::to_string)),
             terms_version: Set(self.input.accept_terms_version.clone()),
+            preorder_accepted_at: Set(self.quote.has_preorder().then_some(now)),
             note: Set(self.input.note.clone()),
             locale: Set(self.cart.locale.clone()),
             placed_at: Set(now),
@@ -676,6 +686,9 @@ fn line_row(
         name: Set(variant.name.clone()),
         snapshot: Set(snapshot.to_string()),
         sale_mode: Set(sale_mode.as_str().unwrap_or("in_stock").to_owned()),
+        allocated_quantity: Set(0),
+        cancelled_quantity: Set(0),
+        preorder_delayed_to: Set(None),
         preorder_available_on: Set(variant.preorder_available_on),
         requires_shipping: Set(variant.requires_shipping),
         tax_inclusive: Set(quoted.tax_inclusive),

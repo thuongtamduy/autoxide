@@ -40,6 +40,16 @@ pub(crate) const MANUAL: &str = "manual";
 /// Event của `ledger` khi cổng đã hoàn xong (lượt hoàn báo sau).
 pub(crate) const LEDGER_PAYMENT_REFUNDED: &str = "ledger.payment_refunded";
 
+/// Mã tham chiếu tối đa 100 ký tự (giới hạn của kernel): dài hơn thì thay bằng băm của nó — cùng
+/// nội dung luôn ra cùng mã.
+pub(crate) fn short_reference(raw: &str) -> String {
+    if raw.len() <= autoxide_kernel::reference::MAX_LENGTH {
+        raw.to_owned()
+    } else {
+        format!("orders:{}", autoxide_kernel::secret::sha256(raw))
+    }
+}
+
 /// Một lệnh hoàn.
 #[derive(Debug, Clone)]
 pub(crate) struct RefundRequest {

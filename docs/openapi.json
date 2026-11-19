@@ -25775,6 +25775,24 @@
                 "description": "`unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`…",
                 "type": "string"
               },
+              "pickup": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersPickup"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "pickup_org_id": {
+                "description": "Collecting in store: the shop, and the pickup once the order is ready.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "placed_at": {
                 "format": "date-time",
                 "type": "string"
@@ -25807,6 +25825,49 @@
               "lines",
               "placed_at",
               "version"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersPickupReady": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An order ready in store.",
+            "properties": {
+              "hold_until": {
+                "description": "Held until then; afterwards the shop's `orders.pickup_expired_action` applies.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "pickup_org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "ready_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "status": {
+                "description": "`ready`, `picked_up` or `expired`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id",
+              "pickup_org_id",
+              "status",
+              "ready_at",
+              "hold_until"
             ],
             "type": "object"
           }
@@ -53077,6 +53138,13 @@
         "additionalProperties": false,
         "description": "Place the order of a cart.",
         "properties": {
+          "accept_preorder_terms": {
+            "description": "Required `true` when the cart has pre-order items: you showed their terms and expected\ndates (`preorder` of each cart line) to the buyer, who agreed.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "accept_terms_version": {
             "description": "Version of the terms of sale the buyer accepted.",
             "type": [
@@ -53167,6 +53235,20 @@
           "phone": {
             "description": "Mobile number; delivery and order lookup use it.",
             "type": "string"
+          },
+          "proxy_name": {
+            "description": "Picking up in store: name of someone else who may collect the order.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proxy_phone": {
+            "description": "Picking up in store: phone number of that person (both or neither).",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -53273,6 +53355,24 @@
           "payment_status": {
             "description": "`unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`…",
             "type": "string"
+          },
+          "pickup": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersPickup"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pickup_org_id": {
+            "description": "Collecting in store: the shop, and the pickup once the order is ready.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "placed_at": {
             "format": "date-time",
@@ -53476,6 +53576,106 @@
           "amount",
           "status",
           "status_token"
+        ],
+        "type": "object"
+      },
+      "OrdersPickup": {
+        "description": "An order waiting in store.",
+        "properties": {
+          "code": {
+            "description": "The 6-digit code to show at the counter; only in your own order.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "handed_over_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "hold_until": {
+            "description": "Held until then.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "ready_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "`ready`, `picked_up` or `expired`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "ready_at",
+          "hold_until"
+        ],
+        "type": "object"
+      },
+      "OrdersPickupHandoverRequest": {
+        "additionalProperties": false,
+        "description": "Who collects the order.",
+        "properties": {
+          "code": {
+            "description": "The 6-digit code the buyer shows.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proxy_name": {
+            "description": "Or: the name of the person collecting for the buyer, as given when ordering.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "proxy_phone": {
+            "description": "And that person's phone number.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersPickupReady": {
+        "description": "An order ready in store.",
+        "properties": {
+          "hold_until": {
+            "description": "Held until then; afterwards the shop's `orders.pickup_expired_action` applies.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "pickup_org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ready_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "`ready`, `picked_up` or `expired`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "pickup_org_id",
+          "status",
+          "ready_at",
+          "hold_until"
         ],
         "type": "object"
       },
@@ -61722,6 +61922,24 @@
                 "payment_status": {
                   "description": "`unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`…",
                   "type": "string"
+                },
+                "pickup": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrdersPickup"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "pickup_org_id": {
+                  "description": "Collecting in store: the shop, and the pickup once the order is ready.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "placed_at": {
                   "format": "date-time",
@@ -176713,6 +176931,25 @@
             }
           },
           {
+            "description": "Only orders collected at this shop.",
+            "in": "query",
+            "name": "pickup_org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only orders collected in store in this state: `ready`, `picked_up` or `expired`.",
+            "in": "query",
+            "name": "pickup_status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
             "example": 50,
             "in": "query",
@@ -176856,6 +177093,18 @@
             "description": "The order number.",
             "kind": "string",
             "name": "number",
+            "operator": "eq"
+          },
+          {
+            "description": "Only orders collected at this shop.",
+            "kind": "uuid",
+            "name": "pickup_org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only orders collected in store in this state: `ready`, `picked_up` or `expired`.",
+            "kind": "string",
+            "name": "pickup_status",
             "operator": "eq"
           },
           {
@@ -179793,6 +180042,224 @@
           }
         },
         "summary": "Resend the payment of an order.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/pickup/handover": {
+      "post": {
+        "description": "Requires `orders.manage` at the order's shop. Give the buyer's `code`, or the `proxy_name`\nand `proxy_phone` given when ordering; the order becomes `delivered`. Sent again after the\nhandover: the order.",
+        "operationId": "orders_hand_over_order_pickup",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersPickupHandoverRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersOrder"
+                }
+              }
+            },
+            "description": "The delivered order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not ready yet (`orders.pickup_not_ready`) or not collected in store (`orders.pickup_not_allowed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Wrong code or person (`orders.pickup_code_invalid`), or neither a code nor a person given (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Hand an order over at the counter.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/pickup/ready": {
+      "post": {
+        "description": "Requires `orders.manage` at the order's shop. For an order collected in store that is\n`confirmed` (accepted now) or `preparing`: the buyer gets a 6-digit pickup code and the items\nare held for the pickup method's hold days. Sent again: the same pickup.",
+        "operationId": "orders_mark_order_pickup_ready",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersPickupReady"
+                }
+              }
+            },
+            "description": "The pickup."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not collected in store, or not in a status to get ready; code `orders.pickup_not_allowed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Mark an order ready for collection.",
         "tags": [
           "orders"
         ],

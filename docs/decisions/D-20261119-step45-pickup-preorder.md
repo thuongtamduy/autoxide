@@ -25,4 +25,32 @@ Quyết định — nhận tại cửa hàng:
    `orders.pickup_expired` và theo cài đặt kế thừa `orders.pickup_expired_action`: `cancel_refund` (mặc định — huỷ
    `pickup_expired`, trả kho qua `orders.order_cancelled`, hoàn tiền) hay `keep_waiting` (đánh dấu hết hạn, vẫn giao được).
 
-Hệ quả: lịch định kỳ thứ bảy của `orders`; ba event mới; không tool MCP (việc ở quầy).
+Quyết định — hàng đặt trước (D-204):
+
+6. **Đồng ý điều kiện trước khi đặt:** báo giá giỏ đã trả `preorder` (ngày giao dự kiến) cho từng dòng; `POST /checkout`
+   bắt buộc `accept_preorder_terms = true` khi giỏ có hàng đặt trước (lỗi trường, gom cùng lỗi khác — D-083), lúc đồng ý
+   lưu ở `orders_orders.preorder_accepted_at`. Chứng cứ đồng ý của `compliance` (`ConsentLedger`) dành cho xử lý dữ liệu
+   cá nhân, không dùng cho điều kiện bán hàng.
+7. **Giao nhiều lần** (`orders_fulfillments`, khoá gửi `shipping` là `fulfillment:<id>`, thay khoá `order:<id>:<version>`):
+   mỗi `POST /{id}/shipments` gom các đơn vị đã có hàng chưa nằm trong lần giao nào chưa hỏng — hàng sẵn đi ngay, hàng đặt
+   trước khi `inventory.preorder_allocated` báo đã chia đủ. Không có gì mới mà còn lần giao đang chờ → gửi lại đúng yêu cầu
+   đó; không có gì cả → 409 `orders.nothing_to_ship`. Vận đơn tới tay người mua chỉ đưa đơn tới `delivered` khi mọi đơn vị
+   cần giao (trừ phần đã huỷ) nằm trong lần giao đã giao; không thì đơn dừng ở `shipping`. Lần giao hỏng thì đơn vị của nó
+   được giao lại ở lần sau.
+8. **COD giao nhiều lần:** lần trước thu tiền hàng của lần đó (theo tỉ lệ đã trả), lần cuối thu phần còn lại của đơn (trừ
+   tiền hàng của lần khác chưa thu và phần đã huỷ). `shipping.cod_collected` cộng theo từng lần giao (ghi
+   `cod_collected_minor`, event tới lại không cộng hai lần); chưa đủ → `payment_status = partially_paid`, đủ → `paid`.
+9. **Dời ngày:** nghe `catalog.preorder_date_changed`; ngày mới muộn hơn ngày đã hứa (chụp lúc đặt) → ghi
+   `preorder_delayed_to`, phát `orders.preorder_delayed` (một lần cho mỗi ngày mới) cho thông báo. Người mua được huỷ
+   **miễn phí, bỏ qua `buyer_cancel_until`**: cả đơn khi đơn chưa giao đi; đơn đã giao một phần thì huỷ phần đặt trước
+   chưa có hàng.
+10. **Ngừng bán đặt trước** = biến thể đặt trước bị tắt (`catalog.variant_updated`, `after.active = false`) hay bị xoá.
+    Chuyển chế độ bán sang có sẵn **không** coi là ngừng (thường là hàng đã về). Đơn chỉ còn chờ hàng đó và chưa giao gì →
+    huỷ cả đơn (`preorder_stopped`) và hoàn tiền; đơn có phần khác → ghi `cancelled_quantity` cho phần chưa có hàng, phát
+    `orders.preorder_cancelled`, hoàn đúng tiền của phần đó (không vượt số đã thu) qua đường hoàn tiền chung.
+11. **Chỗ giữ của phần huỷ ở `inventory`:** `Inventory::release` chỉ trả theo cả đơn; phần đặt trước bị huỷ khi đơn vẫn
+    còn hiệu lực cần `inventory` nghe `orders.preorder_cancelled` (`after.lines[{line_key, variant_id, quantity}]`) — đã
+    nhắn phiên của `inventory`. Thanh toán `on_arrival` / trả trước một phần thuộc mục "Trả trước một phần" (D-232).
+
+Hệ quả: lịch định kỳ thứ bảy của `orders`; năm event mới (`orders.pickup_*`, `orders.preorder_delayed`,
+`orders.preorder_cancelled`); bảng `orders_pickups`, `orders_fulfillments`; không tool MCP mới (việc ở quầy).

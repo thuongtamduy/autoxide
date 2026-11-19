@@ -14,8 +14,8 @@ use uuid::Uuid;
 
 use super::checkout::{body, checkout, ready_cart};
 use super::{
-    Call, CodCollected, PaymentSucceeded, ShipmentDelivered, Shop, drain, emit, emit_from, run_job,
-    shipment_event, shop,
+    Call, CodCollected, PaymentSucceeded, ShipmentDelivered, Shop, drain, emit, emit_from,
+    keyed_shipment_event, run_job, shop,
 };
 use crate::entity::order;
 
@@ -184,13 +184,14 @@ async fn shipment_request_and_carrier_events_drive_the_order_and_post_balanced_r
         assert_eq!(shipment.recipient_phone, "0901234567");
 
         // Hãng báo đã giao tới trước "đã lấy hàng", giao hai lần: đơn `delivered` một lần.
-        let delivered = shipment_event(id, "delivered", None);
+        let key = requested["data"]["request_key"].as_str().unwrap().to_owned();
+        let delivered = keyed_shipment_event(id, &key, "delivered", None);
         emit_from(&shop, &shop.shipping_outbox, &ShipmentDelivered(delivered.clone())).await;
         emit_from(&shop, &shop.shipping_outbox, &ShipmentDelivered(delivered)).await;
         emit_from(
             &shop,
             &shop.shipping_outbox,
-            &CodCollected(shipment_event(id, "delivered", Some(230_000))),
+            &CodCollected(keyed_shipment_event(id, &key, "delivered", Some(230_000))),
         )
         .await;
         drain(&shop).await;

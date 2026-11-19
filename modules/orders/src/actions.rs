@@ -8,20 +8,15 @@ use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
-use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use autoxide_shipping::api::{Address, ShipmentItem, ShipmentRequest};
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
-use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::OrderStatus;
-use crate::carts::ShipTo;
-use crate::entity::{completion_hold, line, order, payment};
+use crate::entity::{completion_hold, order, payment};
 use crate::errors;
-use crate::events::{Change, FulfillmentRequested};
 use crate::jobs::BATCH;
 use crate::lifecycle::{Applied, Cause, Transition};
 use crate::payments::{self, Method};
@@ -100,6 +95,25 @@ impl OrdersService {
         reason: Option<String>,
     ) -> Result<order::Model, Error> {
         let policy = self.policy(tenant, OrgId::from_uuid(row.org_id)).await?;
+        // Hàng đặt trước dời muộn hơn ngày đã hứa (D-204): huỷ miễn phí, không theo chính sách —
+        // cả đơn khi chưa giao gì, không thì phần đặt trước chưa có hàng.
+        let delayed: Vec<Uuid> = crate::entity::line::Entity::find()
+            .filter(crate::entity::line::Column::OrderId.eq(row.id))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?
+            .into_iter()
+            .filter(crate::preorders::delayed)
+            .map(|line| line.id)
+            .collect();
+        let status = OrderStatus::parse(&row.status).unwrap_or(OrderStatus::Cancelled);
+        if !delayed.is_empty()
+            && matches!(status, OrderStatus::Shipping | OrderStatus::DeliveryFailed)
+        {
+            self.cancel_preorder_lines(tenant, row.id, &delayed, "buyer_cancelled").await?;
+            return self.order(tenant, row.id).await;
+        }
+        let free = !delayed.is_empty();
         let transition = Transition::new(OrderStatus::Cancelled, Cause::Buyer, actor)
             .reason(reason.unwrap_or_else(|| "buyer_cancelled".to_owned()));
         let check = move |current: &order::Model| -> Result<bool, Error> {
@@ -107,7 +121,11 @@ impl OrdersService {
             if status == OrderStatus::Cancelled {
                 return Ok(false);
             }
-            if policy.buyer_may_cancel(status) {
+            let early = matches!(
+                status,
+                OrderStatus::PendingPayment | OrderStatus::Confirmed | OrderStatus::Preparing
+            );
+            if policy.buyer_may_cancel(status) || (free && early) {
                 Ok(true)
             } else {
                 Err(errors::cancel_not_allowed())
@@ -118,75 +136,6 @@ impl OrdersService {
             self.refund_cancelled(tenant, row.id).await?;
         }
         self.order(tenant, row.id).await
-    }
-
-    /// Yêu cầu vận đơn cho đơn `id` (`orders.manage`): đơn `confirmed` thì nhận đơn (`preparing`)
-    /// trước; phát `orders.fulfillment_requested` với `after.shipment` là `ShipmentRequest` của
-    /// `shipping`. Khoá yêu cầu `order:<id>:<lần>` — gửi lại cùng lần không tạo vận đơn thứ hai.
-    pub(crate) async fn request_shipment(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        note: Option<String>,
-    ) -> Result<ShipmentRequest, Error> {
-        principal.require(&MANAGE)?;
-        let row = self.order(tenant, id).await?;
-        let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
-        principal.require_at(tenant.database().read(), &MANAGE, target).await?;
-        let status = OrderStatus::parse(&row.status).unwrap_or(OrderStatus::Cancelled);
-        if !matches!(
-            status,
-            OrderStatus::Confirmed | OrderStatus::Preparing | OrderStatus::DeliveryFailed
-        ) {
-            return Err(errors::shipment_not_allowed(status));
-        }
-        let lines = line::Entity::find()
-            .filter(line::Column::OrderId.eq(id))
-            .filter(line::Column::RequiresShipping.eq(true))
-            .scoped(tenant)
-            .order_by_asc(line::Column::Id)
-            .all(tenant.database().read())
-            .await?;
-        let request = shipment_request(&row, &lines, note)?;
-        let actor = Actor::user(principal.user_id());
-        let (database, outbox) = (tenant.database(), &self.outbox);
-        let request_ref = &request;
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                let current = crate::lifecycle::lock(&transaction, tenant, id).await?;
-                // Nhận đơn khi yêu cầu giao lần đầu; giao lại sau khi giao hỏng.
-                let next = match OrderStatus::parse(&current.status) {
-                    Some(OrderStatus::Confirmed) => Some(OrderStatus::Preparing),
-                    Some(OrderStatus::DeliveryFailed) => Some(OrderStatus::Shipping),
-                    Some(OrderStatus::Preparing) => None,
-                    Some(other) => return Err(errors::shipment_not_allowed(other)),
-                    None => return Err(errors::order_not_found()),
-                };
-                if let Some(next) = next {
-                    let transition = Transition::new(next, Cause::Staff, actor);
-                    crate::lifecycle::apply(
-                        &transaction,
-                        tenant,
-                        outbox,
-                        current,
-                        &transition,
-                        |_| {},
-                    )
-                    .await?;
-                }
-                let event = FulfillmentRequested(Change::after(json!({
-                    "order_id": id, "shipment": request_ref,
-                })));
-                outbox
-                    .record(&transaction, tenant, actor, Some(format!("orders.order:{id}")), &event)
-                    .await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await?;
-        Ok(request)
     }
 
     /// Một lô đơn `delivered` quá hạn đổi trả của nút, không có hoãn → `completed`.
@@ -308,79 +257,6 @@ impl OrdersService {
             .all(tenant.database().read())
             .await?)
     }
-}
-
-/// `ShipmentRequest` của `shipping` cho các dòng cần giao của đơn.
-fn shipment_request(
-    row: &order::Model,
-    lines: &[line::Model],
-    note: Option<String>,
-) -> Result<ShipmentRequest, Error> {
-    let ship_to: ShipTo = row
-        .ship_to
-        .as_deref()
-        .and_then(|raw| serde_json::from_str(raw).ok())
-        .ok_or_else(errors::delivery_required)?;
-    let address: Address = ship_to.address.clone().ok_or_else(errors::delivery_required)?;
-    let option: Value = row
-        .shipping_option
-        .as_deref()
-        .and_then(|raw| serde_json::from_str(raw).ok())
-        .ok_or_else(errors::delivery_required)?;
-    let method_id = option["method_id"]
-        .as_str()
-        .and_then(|id| id.parse::<Uuid>().ok())
-        .ok_or_else(errors::delivery_required)?;
-    if lines.is_empty() {
-        return Err(errors::delivery_required());
-    }
-    let items = lines
-        .iter()
-        .map(|line| {
-            let snapshot: Value = serde_json::from_str(&line.snapshot).unwrap_or(Value::Null);
-            ShipmentItem::new(
-                line.id.to_string(),
-                line.variant_id,
-                &line.sku,
-                &line.name,
-                line.quantity,
-            )
-            .weight(snapshot["weight_grams"].as_i64())
-        })
-        .collect();
-    let money = |minor: i64| Money::from_columns(minor, &row.currency);
-    let declared = money(lines.iter().map(|line| line.total_minor).sum())?;
-    let org = OrgId::from_uuid(row.org_id);
-    let recipient = (
-        ship_to.recipient_name.clone().unwrap_or_default(),
-        ship_to.phone.clone().unwrap_or_default(),
-    );
-    let mut request = ShipmentRequest::new(
-        row.id,
-        row.number.clone(),
-        format!("order:{}:{}", row.id, row.version),
-        org,
-        org,
-        method_id,
-        recipient,
-        address,
-        items,
-        declared,
-    )
-    .quoted_fee(money(row.shipping_fee_minor - row.shipping_discount_minor)?);
-    if let Some(key) = option["option_key"].as_str() {
-        request = request.option_key(key);
-    }
-    if let Some(buyer) = row.buyer_user_id {
-        request = request.buyer(buyer);
-    }
-    if row.payment_status == payments::COD_PENDING {
-        request = request.cod(money(row.total_minor - row.paid_minor)?);
-    }
-    if let Some(note) = note {
-        request = request.note(note);
-    }
-    Ok(request)
 }
 
 /// Hoãn hoàn tất đơn (tranh chấp của bước 46, yêu cầu trả hàng).
