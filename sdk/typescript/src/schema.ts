@@ -1021,6 +1021,15 @@ export type CatalogAttribute = {
   updated_at: string;
 };
 
+/** Counts of one filterable attribute. */
+export type CatalogAttributeFacet = {
+  /** Filter with `attr.<code>=<value>`. */
+  code: string;
+  name: string;
+  /** At most 50, most products first. */
+  values: CatalogFacetValue[];
+};
+
 /** A choosable value of an `option` / `options` attribute. */
 export type CatalogAttributeOption = {
   /** 1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute. */
@@ -1305,6 +1314,24 @@ export type CatalogCreateRoundingRule = {
   name: string;
   /** Step in minor units, above 0, e.g. `10000`. */
   step_minor: number;
+};
+
+/** A filter value and how many products match it. */
+export type CatalogFacetValue = {
+  count: number;
+  label: string;
+  /** Value to send back in the filter: an option code, `true` / `false`, or a seller unit id. */
+  value: string;
+};
+
+/** Filter counts of a public product list. */
+export type CatalogFacets = {
+  /** Filterable attributes of type option, options or boolean. */
+  attributes: CatalogAttributeFacet[];
+  /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+  sellers: CatalogFacetValue[];
+  /** Products matching every filter. */
+  total: number;
 };
 
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
@@ -1834,6 +1861,37 @@ export type CatalogStoredAttributeValue = {
   value_date?: string | null;
   value_integer?: number | null;
   value_text?: string | null;
+};
+
+/** A search suggestion. */
+export type CatalogSuggestion = {
+  /** Short context, e.g. the parent category; may be empty. */
+  context: string;
+  /**
+   * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+   * are ignored.
+   */
+  exact: boolean;
+  id?: string | null;
+  /**
+   * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+   * `organizations.unit`… (any module may add its own).
+   */
+  kind: string;
+  /** Text to show. */
+  label: string;
+  /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+  path?: string | null;
+};
+
+/** The tenant's search synonyms. */
+export type CatalogSynonyms = {
+  /**
+   * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+   * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+   * stored without accents, in lower case.
+   */
+  groups: string[][];
 };
 
 /** Texts of a product in one language. */
@@ -5056,6 +5114,19 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogFacets = {
+  /** Filter counts of a public product list. */
+  data: {
+    /** Filterable attributes of type option, options or boolean. */
+    attributes: CatalogAttributeFacet[];
+    /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+    sellers: CatalogFacetValue[];
+    /** Products matching every filter. */
+    total: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogPriceChange = {
   /** A bulk price change. */
   data: {
@@ -5259,6 +5330,19 @@ export type Data_CatalogStoreOverride = {
     org_id: string;
     product_id: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogSynonyms = {
+  /** The tenant's search synonyms. */
+  data: {
+    /**
+     * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+     * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+     * stored without accents, in lower case.
+     */
+    groups: string[][];
   };
 };
 
@@ -8567,6 +8651,82 @@ export type Data_OrdersPublicPayment = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersRefund = {
+  /** A refund of an order. */
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReturn = {
+  /** A return. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReturnPreview = {
+  /** What a return would give. */
+  data: {
+    /** Last moment to ask. */
+    deadline_at: string;
+    /** Lines to send back, gifts included when the promotion wants them back. */
+    lines: OrdersReturnLine[];
+    methods: OrdersReturnMethodOption[];
+    /** Whether this reason needs photos. */
+    photos_required: boolean;
+    /** Money you would get back. */
+    refund: Money;
+    refund_breakdown: OrdersReturnRefundBreakdown;
+    refund_eta?: OrdersRefundEta | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersShipmentRequested = {
   /** A shipment requested from the shipping module. */
   data: {
@@ -8901,6 +9061,17 @@ export type Data_PreviewToken = {
     expires_at: string;
     /** Give it to `GET /api/v1/content/public/preview?token=…`. */
     token: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromoteResult = {
+  /**
+   * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+   * in the real tenant: people there publish the drafts themselves.
+   */
+  data: {
+    items: PromoteOutcome[];
   };
 };
 
@@ -11329,6 +11500,29 @@ export type Data_Vec_CatalogStoredAttributeValue = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogSuggestion = {
+  data: {
+    /** Short context, e.g. the parent category; may be empty. */
+    context: string;
+    /**
+     * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+     * are ignored.
+     */
+    exact: boolean;
+    id?: string | null;
+    /**
+     * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+     * `organizations.unit`… (any module may add its own).
+     */
+    kind: string;
+    /** Text to show. */
+    label: string;
+    /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+    path?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogVariant = {
   data: {
     active: boolean;
@@ -12049,6 +12243,28 @@ export type Data_Vec_OrdersPaymentAction = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_OrdersRefund = {
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_OverrideResponse = {
   data: {
     created_at: string;
@@ -12184,6 +12400,17 @@ export type Data_Vec_PlanResponse = {
     /** Days of free trial for a tenant that never had one; 0 for none. */
     trial_days: number;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotableKind = {
+  data: {
+    description: string;
+    /** `<module>.<kind>`, e.g. `content.page`. */
+    kind: string;
+    /** The module that owns it. */
+    module: string;
   }[];
 };
 
@@ -17451,6 +17678,177 @@ export type OrdersPublicPayment = {
   status: string;
 };
 
+/** A line received back. */
+export type OrdersReceivedLineRequest = {
+  /** `restock` (sellable again) or `damaged`. */
+  condition: string;
+  line_id: string;
+  /** Units received (0 when missing). */
+  quantity: number;
+};
+
+/** A refund of an order. */
+export type OrdersRefund = {
+  amount: Money;
+  created_at: string;
+  id: string;
+  order_id: string;
+  /** The payment of the order it comes from. */
+  payment_id: string;
+  reason: string;
+  reference: string;
+  /** The return it pays back, if any. */
+  return_id?: string | null;
+  /**
+   * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+   * back by the shop outside the payment partner, e.g. cash).
+   */
+  status: string;
+  updated_at: string;
+};
+
+/** When the refund should reach you. */
+export type OrdersRefundEta = {
+  /** `original_payment` (back to the card or wallet you paid with) or `bank_transfer`. */
+  channel: string;
+  max_days: number;
+  min_days: number;
+};
+
+/** Refund part or all of an order. */
+export type OrdersRefundRequest = {
+  /** In the currency of the order; at most what is left to refund of one payment. */
+  amount: Money;
+  /** Why (no personal data; sent to the payment partner). */
+  reason: string;
+  /** Your unique key of this refund: sending it again returns the same refund. */
+  reference: string;
+};
+
+/** A return. */
+export type OrdersReturn = {
+  /** End of the return window of the order. */
+  deadline_at: string;
+  decided_at?: string | null;
+  id: string;
+  lines: OrdersReturnLine[];
+  /** Photos sent with the request. */
+  media_ids: string[];
+  note?: string | null;
+  number: string;
+  order_id: string;
+  /** The shop of the order. */
+  org_id: string;
+  reason_code: string;
+  received_at?: string | null;
+  refund?: Money | null;
+  refund_breakdown?: OrdersReturnRefundBreakdown | null;
+  /** Code of the `orders.return_rejected` list when rejected. */
+  reject_reason?: string | null;
+  requested_at: string;
+  /** `refund` or `exchange`. */
+  resolution: string;
+  /** `pickup`, `drop_off` or `in_store`. */
+  return_method: string;
+  /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+  status: string;
+  updated_at: string;
+  /** Warehouse that received the items. */
+  warehouse_org_id?: string | null;
+};
+
+/** One line of a return. */
+export type OrdersReturnLine = {
+  /** `restock` or `damaged`, once received. */
+  condition?: string | null;
+  /** A free gift sent back because the promotion's condition is no longer met. */
+  gift: boolean;
+  line_id: string;
+  quantity: number;
+  /** Units received back, once received. */
+  received?: number | null;
+  variant_id: string;
+};
+
+/** One line to return. */
+export type OrdersReturnLineRequest = {
+  /** Id of the order line. */
+  line_id: string;
+  /** Units to return (at most what is left of the line). */
+  quantity: number;
+};
+
+/** A way to send items back. */
+export type OrdersReturnMethodOption = {
+  available: boolean;
+  fee?: Money | null;
+  /** `pickup`, `drop_off` or `in_store`. */
+  method: string;
+};
+
+/** What a return would give. */
+export type OrdersReturnPreview = {
+  /** Last moment to ask. */
+  deadline_at: string;
+  /** Lines to send back, gifts included when the promotion wants them back. */
+  lines: OrdersReturnLine[];
+  methods: OrdersReturnMethodOption[];
+  /** Whether this reason needs photos. */
+  photos_required: boolean;
+  /** Money you would get back. */
+  refund: Money;
+  refund_breakdown: OrdersReturnRefundBreakdown;
+  refund_eta?: OrdersRefundEta | null;
+};
+
+/** How the refund of a return was computed. */
+export type OrdersReturnRefundBreakdown = {
+  /**
+   * Order discount taken back because the rest of the order is below the promotion minimum
+   * (negative: given back from an earlier return).
+   */
+  clawback: Money;
+  /** Value of free gifts kept although their condition is no longer met. */
+  gift_deduction: Money;
+  /** What was paid for the returned units (after discounts). */
+  goods: Money;
+  /** Share of the shipping fee (only when the seller is at fault). */
+  shipping: Money;
+  total: Money;
+};
+
+/** Ask to return items of a delivered order. */
+export type OrdersReturnRequest = {
+  lines: OrdersReturnLineRequest[];
+  /** Photos uploaded by you (at most 6). */
+  media_ids?: string[];
+  note?: string | null;
+  /**
+   * A code of the shop's allowed return reasons (list `orders.return_reason`, see
+   * `GET /api/v1/kernel/reasons/orders.return_reason`).
+   */
+  reason_code: string;
+  /** `refund` (default) or `exchange`. */
+  resolution?: string | null;
+  /**
+   * How the items go back: `pickup` (a carrier picks them up), `drop_off` (default: at a
+   * post office) or `in_store`.
+   */
+  return_method?: string | null;
+};
+
+/** A step of a return. */
+export type OrdersReturnTransitionRequest = {
+  /** `approve`, `reject`, `receive`, `refund` or `close`. */
+  action: string;
+  /** `receive`: what arrived; lines left out count as received in full and sellable. */
+  lines?: OrdersReceivedLineRequest[] | null;
+  /** `reject`: a code of the `orders.return_rejected` list. */
+  reason?: string | null;
+  /** `receive`: warehouse that received the items (default: the warehouse that shipped them). */
+  warehouse_org_id?: string | null;
+};
+
 /** A shipment requested from the shipping module. */
 export type OrdersShipmentRequested = {
   cod_amount?: Money | null;
@@ -19706,6 +20104,42 @@ export type Page_OrdersOrder = {
 };
 
 /** One page of a list. */
+export type Page_OrdersReturn = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_OverrideResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21611,6 +22045,61 @@ export type ProfileRequest = {
    * moderators; no two users share a name.
    */
   display_name: string;
+};
+
+/** A kind of record that can be promoted from a sandbox to the real tenant. */
+export type PromotableKind = {
+  description: string;
+  /** `<module>.<kind>`, e.g. `content.page`. */
+  kind: string;
+  /** The module that owns it. */
+  module: string;
+};
+
+/** Why a record could not be promoted. */
+export type PromoteConflict = {
+  /** The field that clashes, e.g. `slug`. */
+  field: string;
+  message: string;
+};
+
+/** What to promote. */
+export type PromoteInput = {
+  /** 1 to 100 records of the sandbox. */
+  items: PromoteItem[];
+};
+
+/** One record of the sandbox to promote. */
+export type PromoteItem = {
+  /** Id of the record in the sandbox. */
+  id: string;
+  /** A kind from `GET /api/v1/kernel/sandboxes/promotable`. */
+  kind: string;
+};
+
+/** Outcome of one promoted record. */
+export type PromoteOutcome = {
+  conflict?: PromoteConflict | null;
+  /** Id of the record in the sandbox. */
+  id: string;
+  kind: string;
+  /**
+   * `created_draft` (a new draft in the real tenant), `updated_draft` (the draft or pending
+   * change of the record in the real tenant was replaced; what is live is untouched),
+   * `unchanged` (already promoted with the same content) or `conflict` (a name, path or code
+   * is taken in the real tenant; see `conflict`).
+   */
+  outcome: string;
+  /** The record in the real tenant; `null` on `conflict`. */
+  target_id?: string | null;
+};
+
+/**
+ * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+ * in the real tenant: people there publish the drafts themselves.
+ */
+export type PromoteResult = {
+  items: PromoteOutcome[];
 };
 
 /** A promotion just turned on, with the warnings of its checks. */
@@ -29717,6 +30206,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/products/facets": {
+    /** Count products per filter value (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; site?: string }; };
+      responses: {
+        200: Data_CatalogFacets;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/search/suggest": {
+    /** Suggest as the shopper types (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale: string; limit?: number; site?: string }; };
+      responses: {
+        200: Data_Vec_CatalogSuggestion;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/public/sitemap": {
     /** List product addresses for the sitemap (public). */
     get: {
@@ -29775,6 +30288,30 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/synonyms": {
+    /** List search synonyms. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace search synonyms. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogSynonyms;
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -34480,6 +35017,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandboxes/promotable": {
+    /** List the kinds of records that can be promoted from a sandbox. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PromotableKind;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/sandboxes/{id}": {
     /** Delete a sandbox. */
     delete: {
@@ -34502,6 +35051,21 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandboxes/{id}/promote": {
+    /** Promote records tried in a sandbox to the real tenant, as drafts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromoteInput;
+      responses: {
+        200: Data_PromoteResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37408,6 +37972,51 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/returns": {
+    /** Ask to return items. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        201: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/returns/preview": {
+    /** Preview a return. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        200: Data_OrdersReturnPreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/returns/{id}": {
+    /** One of your returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/payments/{token}": {
     /** Status of a payment, for the QR code screen. */
     get: {
@@ -37416,6 +38025,48 @@ export interface paths {
         200: Data_OrdersPublicPayment;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns": {
+    /** List returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; order_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersReturn;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}": {
+    /** Read a return. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}/transitions": {
+    /** Move a return forward. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnTransitionRequest;
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -37443,6 +38094,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/refunds": {
+    /** Refunds of an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Refund an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersRefundRequest;
+      responses: {
+        200: Data_OrdersRefund;
+        201: Data_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

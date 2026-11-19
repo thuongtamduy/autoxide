@@ -1,4 +1,4 @@
-# Lộ trình — các bước đã xong (0–37, 40)
+# Lộ trình — các bước đã xong (0–38, 40)
 
 Chuyển nguyên văn từ `docs/ROADMAP.md` theo D-228 để lộ trình chỉ còn việc đang mở. Lịch sử từng bước
 xem `CHANGELOG.md` và `docs/DECISIONS.md`.
@@ -825,6 +825,43 @@ trong quyết định của nó; quy định hay đổi để dạng dữ liệu
       khoá — dừng lại hỏi), token thiết bị mã hoá, cùng luật đồng ý và khung giờ như web push — D-368:
       `GET|POST /me/device-tokens`, `DELETE /me/device-tokens/{id}`, tool `list_my_devices`, token mất / bị từ chối xoá
       ngay, lỗi 10 lần liên tiếp xoá; chưa có bộ nối FCM / APNs thật (cần khoá của nhà cung cấp)
+
+## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
+
+Đặc tả: [`docs/steps/38-cross-database-reporting.md`](steps/38-cross-database-reporting.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
+
+- [x] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
+      gian thực, mang `tenant_id`, `org_id`; báo cáo gộp nhiều cửa hàng, nhiều tiền tệ; người có quyền
+      ở cha mới xem — xong (18/11, D-20261118-step38-report-facts): kernel `report` + `Module::facts`, module
+      `reporting` (rút ở database nguồn, lịch đẩy lên kho ở database của khách gốc, cộng dồn ngày, dọn),
+      `invoices` / `ledger` khai số liệu, `/api/v1/reporting/*` + tool MCP, phạm vi theo cây khách và cây tổ chức,
+      quy đổi theo tỉ giá của người xem; test cha / con khác database trên cả hai database
+- [x] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
+      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng — xong (18/11,
+      D-20261118-step38-distribution): test đầu-cuối uỷ quyền vào con có database riêng (audit hai phía, thu hồi);
+      kernel `tenancy::distribution` (`Distributor`, `DistributionApply`, `distribution_migration`) với module mẫu
+- [x] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
+      test trên cả hai database — xong (18/11, D-20261118-step38-relocation): kernel `tenancy::relocate` (chính sách theo
+      bảng `Module::relocation` cho mọi module, kế hoạch / dry-run với xung đột tham chiếu và unique, chép có lọc + đổi
+      `tenant_id` giữ khoá chính, trạng thái chạy lại được, chuyển mặt điều khiển, dọn, file theo khách), audit ghi lại vào
+      chuỗi của đích, `reporting.rehome`, CLI `autoxide tenant split|merge|relocation-status`; test khứ hồi so mọi bảng
+- [x] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu — xong
+      (18/11, D-20261118-step38-relocation): `POST /api/v1/kernel/relocations` (dry-run mặc định, job) +
+      `GET …/{id}`; khách gửi `POST /api/v1/kernel/tenant/relocation-requests`, yêu cầu vào hộp việc của nhân sự nền tảng
+- [x] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
+      chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
+      — xong (19/11): phần nền (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
+      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); cách ly xong (19/11,
+      D-20261119-step38-sandbox-isolation: kernel bọc hợp đồng đối tác lúc công bố → bộ giả, mail chỉ tới nhân viên,
+      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); sao / đẩy xong
+      (19/11, D-20261119-step38-sandbox-copy: `Module::sandbox_copy` / `promotable`, bảng nối `kernel_sandbox_links`,
+      sao cài đặt / role / trang / mẫu thông báo, `POST …/sandboxes/{id}/promote` thành bản nháp); tài liệu
+      `docs/guides/sandbox.md` (+ `.vi`) và mục sandbox của `docs/MODULE_GUIDE.md` (+ `.vi`)
+- [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
+      D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
+      `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
 
 ## 40. Năng lực còn thiếu của core (agent đề xuất; số cũ 34, D-189)
 

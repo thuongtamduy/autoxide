@@ -2853,6 +2853,31 @@
         ],
         "type": "object"
       },
+      "CatalogAttributeFacet": {
+        "description": "Counts of one filterable attribute.",
+        "properties": {
+          "code": {
+            "description": "Filter with `attr.<code>=<value>`.",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "values": {
+            "description": "At most 50, most products first.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogFacetValue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "values"
+        ],
+        "type": "object"
+      },
       "CatalogAttributeOption": {
         "additionalProperties": false,
         "description": "A choosable value of an `option` / `options` attribute.",
@@ -3669,6 +3694,60 @@
           "name",
           "step_minor",
           "mode"
+        ],
+        "type": "object"
+      },
+      "CatalogFacetValue": {
+        "description": "A filter value and how many products match it.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          },
+          "value": {
+            "description": "Value to send back in the filter: an option code, `true` / `false`, or a seller unit id.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label",
+          "count"
+        ],
+        "type": "object"
+      },
+      "CatalogFacets": {
+        "description": "Filter counts of a public product list.",
+        "properties": {
+          "attributes": {
+            "description": "Filterable attributes of type option, options or boolean.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogAttributeFacet"
+            },
+            "type": "array"
+          },
+          "sellers": {
+            "description": "Sellers (filter with `seller=<value>`), at most 50, most products first.",
+            "items": {
+              "$ref": "#/components/schemas/CatalogFacetValue"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "Products matching every filter.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "attributes",
+          "sellers"
         ],
         "type": "object"
       },
@@ -5420,6 +5499,68 @@
         },
         "required": [
           "attribute_id"
+        ],
+        "type": "object"
+      },
+      "CatalogSuggestion": {
+        "description": "A search suggestion.",
+        "properties": {
+          "context": {
+            "description": "Short context, e.g. the parent category; may be empty.",
+            "type": "string"
+          },
+          "exact": {
+            "description": "Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents\nare ignored.",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,\n`organizations.unit`… (any module may add its own).",
+            "type": "string"
+          },
+          "label": {
+            "description": "Text to show.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Address on the website (no domain, no language prefix); `null`: open the record by `id`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "exact",
+          "context"
+        ],
+        "type": "object"
+      },
+      "CatalogSynonyms": {
+        "additionalProperties": false,
+        "description": "The tenant's search synonyms.",
+        "properties": {
+          "groups": {
+            "description": "Groups of words meaning the same thing, e.g. `[[\"áo thun\", \"áo phông\", \"tee\"]]`: searching\nany word of a group also finds the others. At most 500 groups of 2 to 20 words; words are\nstored without accents, in lower case.",
+            "items": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
         ],
         "type": "object"
       },
@@ -14910,6 +15051,46 @@
         ],
         "type": "object"
       },
+      "Data_CatalogFacets": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Filter counts of a public product list.",
+            "properties": {
+              "attributes": {
+                "description": "Filterable attributes of type option, options or boolean.",
+                "items": {
+                  "$ref": "#/components/schemas/CatalogAttributeFacet"
+                },
+                "type": "array"
+              },
+              "sellers": {
+                "description": "Sellers (filter with `seller=<value>`), at most 50, most products first.",
+                "items": {
+                  "$ref": "#/components/schemas/CatalogFacetValue"
+                },
+                "type": "array"
+              },
+              "total": {
+                "description": "Products matching every filter.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "attributes",
+              "sellers"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogPriceChange": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -15656,6 +15837,35 @@
               "product_id",
               "hidden",
               "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogSynonyms": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "additionalProperties": false,
+            "description": "The tenant's search synonyms.",
+            "properties": {
+              "groups": {
+                "description": "Groups of words meaning the same thing, e.g. `[[\"áo thun\", \"áo phông\", \"tee\"]]`: searching\nany word of a group also finds the others. At most 500 groups of 2 to 20 words; words are\nstored without accents, in lower case.",
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "groups"
             ],
             "type": "object"
           }
@@ -25857,6 +26067,281 @@
         ],
         "type": "object"
       },
+      "Data_OrdersRefund": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A refund of an order.",
+            "properties": {
+              "amount": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "payment_id": {
+                "description": "The payment of the order it comes from.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "return_id": {
+                "description": "The return it pays back, if any.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid\nback by the shop outside the payment partner, e.g. cash).",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "order_id",
+              "payment_id",
+              "amount",
+              "status",
+              "reason",
+              "reference",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReturn": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A return.",
+            "properties": {
+              "deadline_at": {
+                "description": "End of the return window of the order.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "decided_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReturnLine"
+                },
+                "type": "array"
+              },
+              "media_ids": {
+                "description": "Photos sent with the request.",
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "number": {
+                "type": "string"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The shop of the order.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "reason_code": {
+                "type": "string"
+              },
+              "received_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "refund": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "Amount to refund, computed when the items are received."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "refund_breakdown": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reject_reason": {
+                "description": "Code of the `orders.return_rejected` list when rejected.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "requested_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "resolution": {
+                "description": "`refund` or `exchange`.",
+                "type": "string"
+              },
+              "return_method": {
+                "description": "`pickup`, `drop_off` or `in_store`.",
+                "type": "string"
+              },
+              "status": {
+                "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "warehouse_org_id": {
+                "description": "Warehouse that received the items.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "order_id",
+              "org_id",
+              "number",
+              "status",
+              "reason_code",
+              "resolution",
+              "return_method",
+              "media_ids",
+              "lines",
+              "requested_at",
+              "deadline_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReturnPreview": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a return would give.",
+            "properties": {
+              "deadline_at": {
+                "description": "Last moment to ask.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lines": {
+                "description": "Lines to send back, gifts included when the promotion wants them back.",
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReturnLine"
+                },
+                "type": "array"
+              },
+              "methods": {
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReturnMethodOption"
+                },
+                "type": "array"
+              },
+              "photos_required": {
+                "description": "Whether this reason needs photos.",
+                "type": "boolean"
+              },
+              "refund": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Money you would get back."
+              },
+              "refund_breakdown": {
+                "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+              },
+              "refund_eta": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersRefundEta",
+                    "description": "Estimate from the payment method of the order; absent when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "refund",
+              "refund_breakdown",
+              "lines",
+              "methods",
+              "deadline_at",
+              "photos_required"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OrdersShipmentRequested": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -26879,6 +27364,30 @@
             "required": [
               "token",
               "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PromoteResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled\nin the real tenant: people there publish the drafts themselves.",
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/PromoteOutcome"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "items"
             ],
             "type": "object"
           }
@@ -34506,6 +35015,60 @@
         ],
         "type": "object"
       },
+      "Data_Vec_CatalogSuggestion": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A search suggestion.",
+              "properties": {
+                "context": {
+                  "description": "Short context, e.g. the parent category; may be empty.",
+                  "type": "string"
+                },
+                "exact": {
+                  "description": "Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents\nare ignored.",
+                  "type": "boolean"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "description": "Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,\n`organizations.unit`… (any module may add its own).",
+                  "type": "string"
+                },
+                "label": {
+                  "description": "Text to show.",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "Address on the website (no domain, no language prefix); `null`: open the record by `id`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "kind",
+                "label",
+                "exact",
+                "context"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_CatalogVariant": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36901,6 +37464,77 @@
         ],
         "type": "object"
       },
+      "Data_Vec_OrdersRefund": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A refund of an order.",
+              "properties": {
+                "amount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "payment_id": {
+                  "description": "The payment of the order it comes from.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "return_id": {
+                  "description": "The return it pays back, if any.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid\nback by the shop outside the payment partner, e.g. cash).",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "payment_id",
+                "amount",
+                "status",
+                "reason",
+                "reference",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_OverrideResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -37293,6 +37927,41 @@
                 "prices",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PromotableKind": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of record that can be promoted from a sandbox to the real tenant.",
+              "properties": {
+                "description": {
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`<module>.<kind>`, e.g. `content.page`.",
+                  "example": "content.page",
+                  "type": "string"
+                },
+                "module": {
+                  "description": "The module that owns it.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "module",
+                "description"
               ],
               "type": "object"
             },
@@ -53187,6 +53856,540 @@
         ],
         "type": "object"
       },
+      "OrdersReceivedLineRequest": {
+        "additionalProperties": false,
+        "description": "A line received back.",
+        "properties": {
+          "condition": {
+            "description": "`restock` (sellable again) or `damaged`.",
+            "type": "string"
+          },
+          "line_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units received (0 when missing).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line_id",
+          "quantity",
+          "condition"
+        ],
+        "type": "object"
+      },
+      "OrdersRefund": {
+        "description": "A refund of an order.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "payment_id": {
+            "description": "The payment of the order it comes from.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "reference": {
+            "type": "string"
+          },
+          "return_id": {
+            "description": "The return it pays back, if any.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid\nback by the shop outside the payment partner, e.g. cash).",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "payment_id",
+          "amount",
+          "status",
+          "reason",
+          "reference",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersRefundEta": {
+        "description": "When the refund should reach you.",
+        "properties": {
+          "channel": {
+            "description": "`original_payment` (back to the card or wallet you paid with) or `bank_transfer`.",
+            "type": "string"
+          },
+          "max_days": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "min_days": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "min_days",
+          "max_days",
+          "channel"
+        ],
+        "type": "object"
+      },
+      "OrdersRefundRequest": {
+        "additionalProperties": false,
+        "description": "Refund part or all of an order.",
+        "properties": {
+          "amount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "In the currency of the order; at most what is left to refund of one payment."
+          },
+          "reason": {
+            "description": "Why (no personal data; sent to the payment partner).",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your unique key of this refund: sending it again returns the same refund.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "reason",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "OrdersReturn": {
+        "description": "A return.",
+        "properties": {
+          "deadline_at": {
+            "description": "End of the return window of the order.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "decided_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnLine"
+            },
+            "type": "array"
+          },
+          "media_ids": {
+            "description": "Photos sent with the request.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The shop of the order.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason_code": {
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "refund": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Amount to refund, computed when the items are received."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "refund_breakdown": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reject_reason": {
+            "description": "Code of the `orders.return_rejected` list when rejected.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requested_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "resolution": {
+            "description": "`refund` or `exchange`.",
+            "type": "string"
+          },
+          "return_method": {
+            "description": "`pickup`, `drop_off` or `in_store`.",
+            "type": "string"
+          },
+          "status": {
+            "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "warehouse_org_id": {
+            "description": "Warehouse that received the items.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "org_id",
+          "number",
+          "status",
+          "reason_code",
+          "resolution",
+          "return_method",
+          "media_ids",
+          "lines",
+          "requested_at",
+          "deadline_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnLine": {
+        "description": "One line of a return.",
+        "properties": {
+          "condition": {
+            "description": "`restock` or `damaged`, once received.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "gift": {
+            "description": "A free gift sent back because the promotion's condition is no longer met.",
+            "type": "boolean"
+          },
+          "line_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "received": {
+            "description": "Units received back, once received.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "line_id",
+          "variant_id",
+          "quantity",
+          "gift"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnLineRequest": {
+        "additionalProperties": false,
+        "description": "One line to return.",
+        "properties": {
+          "line_id": {
+            "description": "Id of the order line.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "quantity": {
+            "description": "Units to return (at most what is left of the line).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnMethodOption": {
+        "description": "A way to send items back.",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "fee": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "What you pay for it (0: the shop pays); absent when it could not be priced."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "description": "`pickup`, `drop_off` or `in_store`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "available"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnPreview": {
+        "description": "What a return would give.",
+        "properties": {
+          "deadline_at": {
+            "description": "Last moment to ask.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Lines to send back, gifts included when the promotion wants them back.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnLine"
+            },
+            "type": "array"
+          },
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnMethodOption"
+            },
+            "type": "array"
+          },
+          "photos_required": {
+            "description": "Whether this reason needs photos.",
+            "type": "boolean"
+          },
+          "refund": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Money you would get back."
+          },
+          "refund_breakdown": {
+            "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+          },
+          "refund_eta": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersRefundEta",
+                "description": "Estimate from the payment method of the order; absent when unknown."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "refund",
+          "refund_breakdown",
+          "lines",
+          "methods",
+          "deadline_at",
+          "photos_required"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnRefundBreakdown": {
+        "description": "How the refund of a return was computed.",
+        "properties": {
+          "clawback": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Order discount taken back because the rest of the order is below the promotion minimum\n(negative: given back from an earlier return)."
+          },
+          "gift_deduction": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Value of free gifts kept although their condition is no longer met."
+          },
+          "goods": {
+            "$ref": "#/components/schemas/Money",
+            "description": "What was paid for the returned units (after discounts)."
+          },
+          "shipping": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Share of the shipping fee (only when the seller is at fault)."
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "goods",
+          "shipping",
+          "clawback",
+          "gift_deduction",
+          "total"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnRequest": {
+        "additionalProperties": false,
+        "description": "Ask to return items of a delivered order.",
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnLineRequest"
+            },
+            "type": "array"
+          },
+          "media_ids": {
+            "description": "Photos uploaded by you (at most 6).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "description": "A code of the shop's allowed return reasons (list `orders.return_reason`, see\n`GET /api/v1/kernel/reasons/orders.return_reason`).",
+            "type": "string"
+          },
+          "resolution": {
+            "description": "`refund` (default) or `exchange`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "return_method": {
+            "description": "How the items go back: `pickup` (a carrier picks them up), `drop_off` (default: at a\npost office) or `in_store`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "lines",
+          "reason_code"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnTransitionRequest": {
+        "additionalProperties": false,
+        "description": "A step of a return.",
+        "properties": {
+          "action": {
+            "description": "`approve`, `reject`, `receive`, `refund` or `close`.",
+            "type": "string"
+          },
+          "lines": {
+            "description": "`receive`: what arrived; lines left out count as received in full and sellable.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersReceivedLineRequest"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "`reject`: a code of the `orders.return_rejected` list.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warehouse_org_id": {
+            "description": "`receive`: warehouse that received the items (default: the warehouse that shipped them).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
       "OrdersShipmentRequested": {
         "description": "A shipment requested from the shipping module.",
         "properties": {
@@ -60890,6 +62093,158 @@
         ],
         "type": "object"
       },
+      "Page_OrdersReturn": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A return.",
+              "properties": {
+                "deadline_at": {
+                  "description": "End of the return window of the order.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "decided_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/OrdersReturnLine"
+                  },
+                  "type": "array"
+                },
+                "media_ids": {
+                  "description": "Photos sent with the request.",
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "number": {
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The shop of the order.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "reason_code": {
+                  "type": "string"
+                },
+                "received_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "refund": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "Amount to refund, computed when the items are received."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "refund_breakdown": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reject_reason": {
+                  "description": "Code of the `orders.return_rejected` list when rejected.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "requested_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "resolution": {
+                  "description": "`refund` or `exchange`.",
+                  "type": "string"
+                },
+                "return_method": {
+                  "description": "`pickup`, `drop_off` or `in_store`.",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "warehouse_org_id": {
+                  "description": "Warehouse that received the items.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "org_id",
+                "number",
+                "status",
+                "reason_code",
+                "resolution",
+                "return_method",
+                "media_ids",
+                "lines",
+                "requested_at",
+                "deadline_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_OverrideResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -66777,6 +68132,142 @@
         },
         "required": [
           "display_name"
+        ],
+        "type": "object"
+      },
+      "PromotableKind": {
+        "description": "A kind of record that can be promoted from a sandbox to the real tenant.",
+        "properties": {
+          "description": {
+            "type": "string"
+          },
+          "kind": {
+            "description": "`<module>.<kind>`, e.g. `content.page`.",
+            "example": "content.page",
+            "type": "string"
+          },
+          "module": {
+            "description": "The module that owns it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "module",
+          "description"
+        ],
+        "type": "object"
+      },
+      "PromoteConflict": {
+        "description": "Why a record could not be promoted.",
+        "properties": {
+          "field": {
+            "description": "The field that clashes, e.g. `slug`.",
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "message"
+        ],
+        "type": "object"
+      },
+      "PromoteInput": {
+        "additionalProperties": false,
+        "description": "What to promote.",
+        "properties": {
+          "items": {
+            "description": "1 to 100 records of the sandbox.",
+            "items": {
+              "$ref": "#/components/schemas/PromoteItem"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "PromoteItem": {
+        "additionalProperties": false,
+        "description": "One record of the sandbox to promote.",
+        "properties": {
+          "id": {
+            "description": "Id of the record in the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "A kind from `GET /api/v1/kernel/sandboxes/promotable`.",
+            "example": "content.page",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "id"
+        ],
+        "type": "object"
+      },
+      "PromoteOutcome": {
+        "description": "Outcome of one promoted record.",
+        "properties": {
+          "conflict": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PromoteConflict",
+                "description": "Why it was not promoted, on `conflict`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "description": "Id of the record in the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "outcome": {
+            "description": "`created_draft` (a new draft in the real tenant), `updated_draft` (the draft or pending\nchange of the record in the real tenant was replaced; what is live is untouched),\n`unchanged` (already promoted with the same content) or `conflict` (a name, path or code\nis taken in the real tenant; see `conflict`).",
+            "example": "created_draft",
+            "type": "string"
+          },
+          "target_id": {
+            "description": "The record in the real tenant; `null` on `conflict`.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "outcome"
+        ],
+        "type": "object"
+      },
+      "PromoteResult": {
+        "description": "Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled\nin the real tenant: people there publish the drafts themselves.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PromoteOutcome"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
         ],
         "type": "object"
       },
@@ -107723,6 +109214,328 @@
         "x-public": true
       }
     },
+    "/api/v1/catalog/public/products/facets": {
+      "get": {
+        "description": "No sign-in needed. Takes the same filters as `GET /public/products`. The counts of one filter\nare taken with every other filter applied but not that one, so choosing another value of it\nwidens the list as the count says.",
+        "operationId": "catalog_count_public_catalog_facets",
+        "parameters": [
+          {
+            "description": "Language of the texts; only products written in it are listed.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only products in the category with this slug (in `locale`) or one below it.",
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lowest `price_from`, in the currency's smallest unit.",
+            "in": "query",
+            "name": "price_min",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Highest `price_from`, in the currency's smallest unit.",
+            "in": "query",
+            "name": "price_max",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only products whose name, SKU or short description contains this text, with or without\nVietnamese accents. At most 200 characters.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Order of the list; keep it while following `next_cursor`.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "description": "Order of the public product list.",
+              "enum": [
+                "newest",
+                "price_asc",
+                "price_desc",
+                "best_selling",
+                "rating"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true`: only products with an automatic discount running now.",
+            "in": "query",
+            "name": "on_sale",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only products of this seller (organization unit) or of the units below it.",
+            "in": "query",
+            "name": "seller",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only the website's own products, or only marketplace sellers' products.",
+            "in": "query",
+            "name": "sold_by",
+            "required": false,
+            "schema": {
+              "description": "Whose products to list.",
+              "enum": [
+                "own",
+                "marketplace"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Lowest average rating, 1 to 5.",
+            "in": "query",
+            "name": "min_rating",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 5,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogFacets"
+                }
+              }
+            },
+            "description": "The counts.",
+            "headers": {
+              "ETag": {
+                "description": "Fingerprint of the whole answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Count products per filter value (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/catalog/public/search/suggest": {
+      "get": {
+        "description": "No sign-in needed. Products on sale on the website asking, categories, and what other modules\nadd (posts, stores…), gathered in one list: matches with the exact accents first, then matches\nignoring accents; the tenant's synonyms count. A module that fails is left out of the answer.",
+        "operationId": "catalog_suggest_public_catalog_search",
+        "parameters": [
+          {
+            "description": "What the shopper has typed so far, at most 200 characters.",
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the suggestions.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "At most this many suggestions, 1 to 10 (default 10; 8 suits a phone).",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogSuggestion"
+                }
+              }
+            },
+            "description": "Suggestions, best first.",
+            "headers": {
+              "ETag": {
+                "description": "Fingerprint of the whole answer; send it in `If-None-Match` to get 304.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`q` is empty or too long, `limit` is out of range, or the language is not supported; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Suggest as the shopper types (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/catalog/public/sitemap": {
       "get": {
         "description": "No sign-in needed. Every product on sale on the website asking, with its address in each\nlanguage; follow `next_cursor` (at most 200 per page).",
@@ -108285,6 +110098,185 @@
         ],
         "x-permissions": [
           "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/synonyms": {
+      "get": {
+        "description": "Requires `catalog.categories.manage`.",
+        "operationId": "catalog_get_catalog_synonyms",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogSynonyms"
+                }
+              }
+            },
+            "description": "Every synonym group."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List search synonyms.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `catalog.categories.manage`. Replaces every group; send the whole set. Public search\nand suggestions use them at once.",
+        "operationId": "catalog_put_catalog_synonyms",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogSynonyms"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogSynonyms"
+                }
+              }
+            },
+            "description": "The groups as stored (without accents, lower case)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.categories.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many groups, or a group with fewer than 2 or more than 20 words, or a word that is empty or too long; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace search synonyms.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.categories.manage"
         ]
       }
     },
@@ -150911,6 +152903,80 @@
         ]
       }
     },
+    "/api/v1/kernel/sandboxes/promotable": {
+      "get": {
+        "description": "Requires `kernel.sandboxes.read`. Each module declares its own kinds (pages, mail templates…).",
+        "operationId": "kernel_list_sandbox_promotable",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotableKind"
+                }
+              }
+            },
+            "description": "Every kind that can be promoted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the kinds of records that can be promoted from a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.read"
+        ]
+      }
+    },
     "/api/v1/kernel/sandboxes/{id}": {
       "delete": {
         "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is\ndeleted now and cannot be recovered; promote what you want to keep first.",
@@ -151110,6 +153176,133 @@
           }
         ],
         "summary": "Extend a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/sandboxes/{id}/promote": {
+      "post": {
+        "description": "Requires `kernel.sandboxes.manage`, called in the real tenant of the sandbox, plus the\npermission each module needs to write the record (e.g. `content.write` for a page): you cannot\npromote what you could not write by hand. Up to 100 records. Each one becomes a **draft** in the\nreal tenant — nothing is published or enabled, and what is live is never overwritten. A record\ncopied from the real tenant updates the draft of its original; a record made in the sandbox\nbecomes a new draft. Promoting again with the same content gives `unchanged`. A name, path or\ncode already taken in the real tenant gives `conflict` for that record while the others go on.\nSend an `Idempotency-Key` to retry safely.",
+        "operationId": "kernel_promote_sandbox",
+        "parameters": [
+          {
+            "description": "Id of the sandbox.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromoteInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromoteResult"
+                }
+              }
+            },
+            "description": "One outcome per record, in the order sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.manage` or the permission of a module (`permission_denied`), or called outside the real tenant of the sandbox (`tenancy.sandbox_forbidden`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such sandbox of your tenant (`tenancy.sandbox_not_found`), or no such record in it (`tenancy.promote_record_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No records, more than 100, or a kind that cannot be promoted (`validation_failed`, see `errors`: `tenancy.promote_kind_unknown`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Promote records tried in a sandbox to the real tenant, as drafts.",
         "tags": [
           "kernel"
         ],
@@ -177777,6 +179970,334 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/returns": {
+      "post": {
+        "description": "Signed in: an order you placed, delivered and inside the shop's return window. Units already\nreturned or in another open return cannot be asked again. Free gifts are added when returning\nmakes the promotion's condition fail and the promotion wants gifts back. Send an\n`Idempotency-Key` header to retry safely.",
+        "operationId": "orders_request_my_return",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturn"
+                }
+              }
+            },
+            "description": "The return, waiting for the shop.",
+            "headers": {
+              "Location": {
+                "description": "Where to read the return.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not delivered (`orders.return_not_allowed`) or the return window ended (`orders.return_window_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid lines, quantities, reason, method or photos (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Ask to return items.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/orders/me/orders/{id}/returns/preview": {
+      "post": {
+        "description": "Signed in: same body as asking to return, nothing is saved. Gives the money you would get\nback (with discounts taken back shown), the ways to send items back and their fee, when the\nrefund should arrive and the deadline. Invalid input gets the same errors as asking.",
+        "operationId": "orders_preview_my_return",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturnPreview"
+                }
+              }
+            },
+            "description": "The preview."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not delivered (`orders.return_not_allowed`) or the return window ended (`orders.return_window_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid lines, quantities, reason, method or photos (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Preview a return.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/orders/me/returns/{id}": {
+      "get": {
+        "operationId": "orders_get_my_return",
+        "parameters": [
+          {
+            "description": "Id of the return.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturn"
+                }
+              }
+            },
+            "description": "The return."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such return of yours; code `orders.return_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "One of your returns.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/public/payments/{token}": {
       "get": {
         "description": "Public, with the `status_token` of a payment action; works until the payment deadline (and\nafter the payment succeeded). Poll it while the buyer pays.",
@@ -177854,6 +180375,395 @@
           "orders"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/orders/returns": {
+      "get": {
+        "description": "Requires `orders.read` (returns of orders of shops in your scope).",
+        "operationId": "orders_list_returns",
+        "parameters": [
+          {
+            "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only returns of orders of this shop.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only returns of this order.",
+            "in": "query",
+            "name": "order_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OrdersReturn"
+                }
+              }
+            },
+            "description": "A page of returns, newest first by default."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad cursor or limit."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List returns.",
+        "tags": [
+          "orders"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only returns of orders of this shop.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only returns of this order.",
+            "kind": "uuid",
+            "name": "order_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "orders.list_returns",
+        "x-permissions": [
+          "orders.read"
+        ]
+      }
+    },
+    "/api/v1/orders/returns/{id}": {
+      "get": {
+        "description": "Requires `orders.read` at the order's shop. The photos are in `media_ids`.",
+        "operationId": "orders_get_return",
+        "parameters": [
+          {
+            "description": "Id of the return.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturn"
+                }
+              }
+            },
+            "description": "The return."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.read` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such return; code `orders.return_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Read a return.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.read"
+        ]
+      }
+    },
+    "/api/v1/orders/returns/{id}/transitions": {
+      "post": {
+        "description": "Requires `orders.returns.manage` at the order's shop. `approve` and `reject` a request;\n`receive` the items (restocked or damaged; the refund is computed then); `refund` pays the\ncomputed amount back through the payment partner (or records a refund paid by the shop for\ncash payments); `close` ends it (exchanges close after receiving).",
+        "operationId": "orders_transition_return",
+        "parameters": [
+          {
+            "description": "Id of the return.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReturnTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturn"
+                }
+              }
+            },
+            "description": "The return after the step."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.returns.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such return; code `orders.return_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The step is not allowed now (`orders.return_invalid_transition`), or the refund is more than what is left to refund (`orders.refund_exceeds_paid`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown action, reason, line or condition (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Move a return forward.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.returns.manage"
+        ]
       }
     },
     "/api/v1/orders/{id}": {
@@ -178049,6 +180959,230 @@
         ],
         "x-permissions": [
           "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/refunds": {
+      "get": {
+        "description": "Requires `orders.read` at the order's shop. Oldest first.",
+        "operationId": "orders_list_order_refunds",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersRefund"
+                }
+              }
+            },
+            "description": "The refunds of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.read` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Refunds of an order.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `orders.refund` at the order's shop. Paid through the payment partner when the\npayment came through it; otherwise (cash on delivery, cash) recorded as `manual`: the shop\npays the buyer back itself. The total refunded never exceeds what was paid.",
+        "operationId": "orders_refund_order",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersRefundRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersRefund"
+                }
+              }
+            },
+            "description": "Same `reference` and content as an earlier refund: that refund."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersRefund"
+                }
+              }
+            },
+            "description": "The refund.",
+            "headers": {
+              "Location": {
+                "description": "The refunds of the order.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.refund` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "More than what is left to refund; code `orders.refund_exceeds_paid`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid amount, reason or reference, or the reference was used for another refund (`reference_reused`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Refund an order.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.refund"
         ]
       }
     },

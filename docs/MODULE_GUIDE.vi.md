@@ -246,6 +246,70 @@ Dòng giữ nguyên khoá chính, chỉ `tenant_id` đổi, nên giữ tham chi�
 cần xử lý riêng (chuỗi băm, bộ đếm theo tên dạng chữ) cài `RelocateTable` (`TablePolicy::Custom`),
 như `audit`.
 
+### Sandbox (bản thử của một khách)
+
+Chủ khách tạo được sandbox: một khách loại `sandbox` mang cấu hình của khách thật, không mang dữ liệu
+cá nhân, tự xoá sau `AUTOXIDE_TENANCY_SANDBOX_DAYS` ngày. Nhân viên vào bằng
+`Autoxide-Tenant: <id sandbox>`. Module tham gia theo ba cách; chỉ hai cách sau cần viết code.
+
+**Đối tác được giả lập sẵn.** Kernel bọc mọi hợp đồng đối tác mà module công bố hay góp
+(`PaymentGateway`, `PayoutGateway`, `BankFeed`, `SmsSender`, `ZnsSender`, `WebPushSender`,
+`MobilePushSender`, `EInvoiceProvider`, `IdentityVerifier`, `Mailer`). Lời gọi cho sandbox không bao giờ
+tới đối tác: nó nhận kết quả giả cố định (mã bắt đầu bằng `SANDBOX-`) và được ghi vào hộp thư giả của
+sandbox. Đừng rẽ nhánh theo `TenantContext::is_sandbox()` trong code nghiệp vụ; hợp đồng đối tác do
+chính module định nghĩa (như hãng vận chuyển của `shipping`) thì đổi sang bản giả cho sandbox ở đúng một
+chỗ.
+
+**Sao cấu hình** bằng `Module::sandbox_copy`. Kernel gọi một lần, theo thứ tự đăng ký, khi tạo sandbox
+và trước khi ai vào được:
+
+```rust
+fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+    let service = self.service.clone()?;
+    Some(Arc::new(ShopCopy { service }))
+}
+
+#[async_trait::async_trait]
+impl SandboxCopy for ShopCopy {
+    async fn copy(&self, context: &CopyContext<'_>) -> Result<u64, Error> {
+        let mut count = 0;
+        for row in self.service.settings_rows(context.source).await? {
+            if copied(context.sandbox, "shop.setting", row.id).await?.is_some() {
+                continue; // copied by an earlier run of the job
+            }
+            let made = self.service.create(context.sandbox, context.principal, row.into()).await?;
+            link_copy(context.sandbox, "shop.setting", made.id, row.id).await?;
+            count += 1;
+        }
+        Ok(count)
+    }
+}
+```
+
+- **Chỉ sao cấu hình.** Không bao giờ sao người dùng, người mua, đơn, sổ cái, chứng từ, thông báo, file
+  riêng tư, secret hay thông tin kết nối đối tác.
+- Ghi qua service của chính module (`context.principal` có mọi permission, chỉ trong sandbox) để event và
+  bước kiểm chạy như thường. Bản sao có ID mới; `link_copy` nhớ bản gốc, `copied` tìm bản sao của một
+  bản gốc (để bỏ qua khi job chạy lại, hay để đổi tham chiếu cha – con).
+- Bản ghi không ghi được ở sandbox: bỏ qua và ghi log, đừng làm hỏng cả lần sao.
+
+**Cho người dùng đẩy bản ghi về** bằng `Module::promotable`. `POST /api/v1/kernel/sandboxes/{id}/promote`
+gọi `PromoteApply` của module ở khách thật với principal **của người gọi** (module kiểm permission của
+mình như REST). Luôn ghi **bản nháp**: không đăng, không bật, không ghi đè bản đang chạy.
+`request.existing` là bản ghi ở khách thật cần sửa (bản gốc mà bản ghi được sao từ, hay bản lần đẩy trước
+tạo); `None` nghĩa là tạo bản nháp mới. Trả `Unchanged` khi dấu vân tay nội dung bằng `previous`, và
+`Conflict` (không phải lỗi) khi tên, đường dẫn hay mã đã bị dùng.
+
+```rust
+fn promotable(&self) -> Vec<Promotable> {
+    vec![Promotable::new(
+        "shop.banner",
+        "A banner: becomes a draft banner in the real tenant.",
+        Arc::new(Banners { service: self.service.clone() }),
+    )]
+}
+```
+
 ### 3. Permission
 
 Khai trong `src/permissions.rs` dạng `<module>.<việc>` và trả từ `Module::permissions`.

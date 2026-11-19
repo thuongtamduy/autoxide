@@ -444,6 +444,7 @@ impl Module for KernelModule {
             crate::tenancy::sandbox::SANDBOX_CREATED,
             crate::tenancy::sandbox::SANDBOX_EXTENDED,
             crate::tenancy::sandbox::SANDBOX_DELETED,
+            crate::tenancy::sandbox::SANDBOX_PROMOTED,
         ]
     }
 

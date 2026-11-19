@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
+Trạng thái: **bước 0–38 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
@@ -229,41 +229,6 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       - [x] Gợi ý `mobile` trên `NavItem`, `GET /kernel/navigation?device=mobile`, tool MCP nhận `device` (D-369)
 
 ## Giai đoạn C — Vận hành
-
-## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
-
-Đặc tả: [`docs/steps/38-cross-database-reporting.md`](steps/38-cross-database-reporting.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
-
-- [x] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
-      gian thực, mang `tenant_id`, `org_id`; báo cáo gộp nhiều cửa hàng, nhiều tiền tệ; người có quyền
-      ở cha mới xem — xong (18/11, D-20261118-step38-report-facts): kernel `report` + `Module::facts`, module
-      `reporting` (rút ở database nguồn, lịch đẩy lên kho ở database của khách gốc, cộng dồn ngày, dọn),
-      `invoices` / `ledger` khai số liệu, `/api/v1/reporting/*` + tool MCP, phạm vi theo cây khách và cây tổ chức,
-      quy đổi theo tỉ giá của người xem; test cha / con khác database trên cả hai database
-- [x] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
-      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng — xong (18/11,
-      D-20261118-step38-distribution): test đầu-cuối uỷ quyền vào con có database riêng (audit hai phía, thu hồi);
-      kernel `tenancy::distribution` (`Distributor`, `DistributionApply`, `distribution_migration`) với module mẫu
-- [x] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
-      test trên cả hai database — xong (18/11, D-20261118-step38-relocation): kernel `tenancy::relocate` (chính sách theo
-      bảng `Module::relocation` cho mọi module, kế hoạch / dry-run với xung đột tham chiếu và unique, chép có lọc + đổi
-      `tenant_id` giữ khoá chính, trạng thái chạy lại được, chuyển mặt điều khiển, dọn, file theo khách), audit ghi lại vào
-      chuỗi của đích, `reporting.rehome`, CLI `autoxide tenant split|merge|relocation-status`; test khứ hồi so mọi bảng
-- [x] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu — xong
-      (18/11, D-20261118-step38-relocation): `POST /api/v1/kernel/relocations` (dry-run mặc định, job) +
-      `GET …/{id}`; khách gửi `POST /api/v1/kernel/tenant/relocation-requests`, yêu cầu vào hộp việc của nhân sự nền tảng
-- [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
-      chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
-      — đang làm: phần nền xong (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
-      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); cách ly xong (19/11,
-      D-20261119-step38-sandbox-isolation: kernel bọc hợp đồng đối tác lúc công bố → bộ giả, mail chỉ tới nhân viên,
-      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); còn sao / đẩy
-      (`Module::sandbox_copy` / `promotable`, API promote)
-- [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
-      D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
-      `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
@@ -644,10 +609,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Nhận tại cửa hàng và hàng đặt trước: mã nhận 6 số, người nhận hộ, giữ hàng chờ nhận có hạn rồi huỷ /
       hoàn theo chính sách; đặt trước (D-204): tách lần giao, đồng ý điều kiện và thấy ngày giao trước khi
       đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt trước thì huỷ và hoàn tiền tự động
-- [ ] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
+- [x] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
       nhận về (nhập kho), hoàn qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi
       NĐ 70/2025 — cần đối chiếu); hoàn theo tỉ lệ khoản giảm, xử lý quà, voucher về ví (D-222)
-- [ ] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
+- [x] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
       theo phương thức thanh toán; ảnh kèm (lý do bắt buộc ảnh là chính sách theo nút); `returns/preview`
       trả tiền hoàn, cách gửi và phí, thời gian hoàn, hạn — không ghi
 - [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc

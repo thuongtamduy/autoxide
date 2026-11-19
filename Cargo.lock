@@ -1071,6 +1071,7 @@ dependencies = [
  "autoxide-inventory",
  "autoxide-kernel",
  "autoxide-ledger",
+ "autoxide-media",
  "autoxide-organizations",
  "autoxide-promotions",
  "autoxide-shipping",

@@ -13,6 +13,7 @@ pub(crate) mod dto;
 pub(crate) mod pricing;
 pub(crate) mod products;
 pub(crate) mod public;
+pub(crate) mod search;
 pub(crate) mod stores;
 
 pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
@@ -22,5 +23,6 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
         .merge(attributes::routes(service.clone()))
         .merge(changes::routes(service.clone()))
         .merge(public::routes(service.clone()))
+        .merge(search::routes(service.clone()))
         .merge(stores::routes(service))
 }

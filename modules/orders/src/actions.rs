@@ -10,13 +10,10 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use autoxide_ledger::api::NewRefund;
 use autoxide_shipping::api::{Address, ShipmentItem, ShipmentRequest};
 use chrono::{DateTime, Duration, Utc};
-use sea_orm::sea_query::{Expr, OnConflict};
-use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
-};
+use sea_orm::sea_query::OnConflict;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -24,7 +21,7 @@ use crate::api::OrderStatus;
 use crate::carts::ShipTo;
 use crate::entity::{completion_hold, line, order, payment};
 use crate::errors;
-use crate::events::{Change, FulfillmentRequested, RefundCompleted};
+use crate::events::{Change, FulfillmentRequested};
 use crate::jobs::BATCH;
 use crate::lifecycle::{Applied, Cause, Transition};
 use crate::payments::{self, Method};
@@ -121,93 +118,6 @@ impl OrdersService {
             self.refund_cancelled(tenant, row.id).await?;
         }
         self.order(tenant, row.id).await
-    }
-
-    /// Hoàn toàn bộ khoản đã thu của đơn đã huỷ qua `ledger` (mã tham chiếu theo khoản: gọi lại
-    /// không hoàn hai lần). Khoản không qua đối tác (COD chưa thu) thì không có gì để hoàn.
-    pub(crate) async fn refund_cancelled(
-        &self,
-        tenant: &TenantContext,
-        id: Uuid,
-    ) -> Result<(), Error> {
-        let paid = payment::Entity::find()
-            .filter(payment::Column::OrderId.eq(id))
-            .filter(payment::Column::Status.eq(payments::SUCCEEDED))
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        let Some(ledger) = &self.ledger else { return Ok(()) };
-        for row in paid {
-            let Some(ledger_payment) = row.ledger_payment_id else { continue };
-            let amount = Money::from_columns(row.amount_minor, &row.currency)?;
-            let refund = NewRefund::new(
-                ledger_payment,
-                amount,
-                "order_cancelled",
-                format!("orders:{id}:cancel:{}", row.id),
-            );
-            ledger.refund(tenant, Actor::system(), refund).await?;
-            self.mark_refunded(tenant, &row, amount).await?;
-        }
-        Ok(())
-    }
-
-    /// Ghi khoản `row` đã hoàn `amount`, cộng vào `refunded_minor` của đơn, phát
-    /// `orders.refund_completed` — một transaction; khoản đã ghi hoàn thì không làm gì.
-    async fn mark_refunded(
-        &self,
-        tenant: &TenantContext,
-        row: &payment::Model,
-        amount: Money,
-    ) -> Result<(), Error> {
-        let (database, outbox) = (tenant.database(), &self.outbox);
-        let (payment_id, order_id) = (row.id, row.order_id);
-        database
-            .write_with_retry(move || async move {
-                let transaction = database.begin_write().await?;
-                let current = crate::lifecycle::lock(&transaction, tenant, order_id).await?;
-                let Some(stored) =
-                    payment::Entity::find_by_id(payment_id).one(&transaction).await?
-                else {
-                    return Ok(());
-                };
-                if stored.status == payments::REFUNDED {
-                    return Ok(());
-                }
-                let now = crate::service::now();
-                let mut refunded: payment::ActiveModel = stored.into();
-                refunded.status = Set(payments::REFUNDED.to_owned());
-                refunded.updated_at = Set(now);
-                refunded.update(&transaction).await?;
-                let total = current.refunded_minor + amount.minor();
-                let state =
-                    if total >= current.paid_minor { "refunded" } else { "partially_refunded" };
-                order::Entity::update_many()
-                    .col_expr(order::Column::RefundedMinor, Expr::value(total))
-                    .col_expr(order::Column::PaymentStatus, Expr::value(state))
-                    .col_expr(order::Column::UpdatedAt, Expr::value(now))
-                    .filter(order::Column::Id.eq(order_id))
-                    .scoped(tenant)
-                    .exec(&transaction)
-                    .await?;
-                let event = RefundCompleted(Change::after(json!({
-                    "order_id": order_id, "tenant_id": current.tenant_id, "org_id": current.org_id,
-                    "channel": current.channel, "payment_id": payment_id, "amount": amount,
-                    "reason": "order_cancelled",
-                })));
-                outbox
-                    .record(
-                        &transaction,
-                        tenant,
-                        Actor::system(),
-                        Some(format!("orders.order:{order_id}")),
-                        &event,
-                    )
-                    .await?;
-                transaction.commit().await?;
-                Ok(())
-            })
-            .await
     }
 
     /// Yêu cầu vận đơn cho đơn `id` (`orders.manage`): đơn `confirmed` thì nhận đơn (`preparing`)

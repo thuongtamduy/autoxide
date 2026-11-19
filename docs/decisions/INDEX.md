@@ -274,6 +274,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 - **[D-20261118-step38-sandbox](D-20261118-step38-sandbox.md)** Khách thử nghiệm, phần nền: cột của `kernel_tenants`, cùng placement, hạn mức mặc định 1, uỷ quyền vào bằng event — 2026-11-18
 - **[D-20261119-relocation-switch-hook](D-20261119-relocation-switch-hook.md)** Hook đồng bộ ở bước chuyển của lượt tách / gộp khách — 2026-11-19
+- **[D-20261119-step38-sandbox-copy](D-20261119-step38-sandbox-copy.md)** Sandbox: sao cấu hình bằng `Module::sandbox_copy`, đẩy về thành bản nháp bằng `Module::promotable`, bảng nối của kernel — 2026-11-19
 - **[D-20261119-step38-sandbox-isolation](D-20261119-step38-sandbox-isolation.md)** Sandbox cách ly: kernel bọc hợp đồng đối tác lúc công bố, hộp thư giả `kernel_sandbox_messages` — 2026-11-19
 
 ## Hợp đồng cho giao diện
@@ -475,11 +476,14 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 - **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
+- **[D-20261119-step41-search-suggest](D-20261119-step41-search-suggest.md)** Gợi ý tìm gom nhiều module, từ đồng nghĩa và số đếm bộ lọc của `catalog` — 2026-11-19
 - **[D-20261119-step42-lots-serials](D-20261119-step42-lots-serials.md)** Lô, hạn dùng và serial của `inventory`: giữ ở mức dòng tồn, chọn lô lúc xuất, hàng không gắn lô được phép — 2026-11-19
 - **[D-20261119-step42-preorders](D-20261119-step42-preorders.md)** Hàng đặt trước của `inventory`: bộ đếm suất có trần, job chia hàng về tính lại từ trạng thái — 2026-11-19
 - **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 - **[D-20261119-step42-restock-alerts](D-20261119-step42-restock-alerts.md)** Báo khi có hàng lại của `inventory`: tin giao dịch đã xác nhận hai bước, giành lượt bằng `armed`, ở lại khách gốc khi tách — 2026-11-19
+- **[D-20261119-step45-buyer-returns](D-20261119-step45-buyer-returns.md)** Trả hàng phía người mua: ảnh kèm qua `Media::uploaders`, xem trước không ghi, thời gian hoàn là dữ liệu có ngày hiệu lực — 2026-11-19
+- **[D-20261119-step45-returns](D-20261119-step45-returns.md)** Đổi trả và hoàn tiền của `orders`: một đường hoàn, tiền hoàn tính lúc nhận hàng, bút toán đảo — 2026-11-19
 
 ## Vận hành và hiệu năng
 

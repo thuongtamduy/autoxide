@@ -2,6 +2,8 @@
 //! bản dịch, cấu hình, migration, rồi khởi động từng module theo thứ tự đăng ký. Hợp đồng
 //! với module (trait `Module`, `StartContext`) ở `module.rs`.
 
+mod sandbox;
+
 use std::fmt;
 use std::sync::Arc;
 
@@ -88,6 +90,8 @@ pub struct Modules {
     analytics: crate::analytics::AnalyticsCatalog,
     /// Sổ tool và mẫu luật cho tự động hoá (bước 58); điền sau khi mọi module khởi động.
     automations: crate::automation::AutomationDirectory,
+    /// Sổ sao / đẩy sandbox (bước 38, D-232).
+    sandbox: crate::tenancy::sandbox::SandboxCatalog,
     /// Thời hạn giữ luồng thay đổi đồng bộ (`AUTOXIDE_SYNC_RETENTION_DAYS`, bước 69 P2).
     sync_keep: chrono::Duration,
 }
@@ -275,6 +279,7 @@ impl Modules {
                 facts,
                 analytics,
                 automations,
+                sandbox: Default::default(),
                 sync_keep: chrono::Duration::days(30),
             })
         } else {
@@ -319,6 +324,7 @@ impl Modules {
         let database = registry.control();
         let work = self.catalog.work_sources();
         let finders = self.catalog.finder_sources();
+        let suggestions = self.catalog.suggest_sources();
         let metrics = self.catalog.summary_metrics();
         let exports = self.catalog.export_sources();
         let bulk = self.catalog.bulk_actions();
@@ -358,6 +364,7 @@ impl Modules {
                 resources: &self.resources,
                 work: &work,
                 finders: &finders,
+                suggestions: &suggestions,
                 metrics: &metrics,
                 exports: &exports,
                 bulk: &bulk,
@@ -380,6 +387,7 @@ impl Modules {
                 automations: &self.automations,
                 sync_keep: self.sync_keep,
                 partners: &partners,
+                sandbox: &self.sandbox,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
@@ -429,6 +437,7 @@ impl Modules {
             }
         }
         self.automations.fill(self.tools().unwrap_or_default(), templates);
+        self.fill_sandbox()?;
         self.client_configs.fill(&self.modules);
         self.seeds.fill(
             self.modules
@@ -494,14 +503,6 @@ impl Modules {
         T: ?Sized + Send + Sync + 'static,
     {
         self.apis.get()
-    }
-
-    /// Mọi bộ cài đặt các module đã góp cho `T` (`StartContext::contribute`), theo thứ tự đăng ký.
-    pub fn contributions<T>(&self) -> Vec<Arc<T>>
-    where
-        T: ?Sized + Send + Sync + 'static,
-    {
-        self.apis.contributions()
     }
 
     /// Sổ thời hạn lưu của mọi module (đủ sau `start`).
