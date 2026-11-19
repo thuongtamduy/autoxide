@@ -280,7 +280,7 @@ mod tests {
                  kernel/m0031_create_request_log, \
                  kernel/m0032_create_throttle, \
                  kernel/m0033_tenancy_throttle, \
-                 kernel/m0034_create_search_docs, kernel/m0035_create_relocations, kernel/m0036_create_backups, kernel/m0037_tenant_sandbox, kernel/m0038_create_sandbox_messages, notes/m0001_create_note; run `autoxide migrate up` first"
+                 kernel/m0034_create_search_docs, kernel/m0035_create_relocations, kernel/m0036_create_backups, kernel/m0037_tenant_sandbox, kernel/m0038_create_sandbox_tables, notes/m0001_create_note; run `autoxide migrate up` first"
             );
         })
         .await

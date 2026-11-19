@@ -245,12 +245,16 @@ pub(crate) async fn list(
     Ok(page.map(describe))
 }
 
-/// Migration `m0038_create_sandbox_messages`: hộp thư giả, ở mọi database dữ liệu.
+/// Bảng nối bản ghi của sandbox với bản ghi gốc ở khách thật (sao cấu hình, đẩy sang khách thật).
+const LINKS: &str = "kernel_sandbox_links";
+
+/// Migration `m0038_create_sandbox_tables`, ở mọi database dữ liệu: hộp thư giả và bảng nối bản ghi
+/// sandbox ↔ khách gốc (`kind`, bản ghi ở sandbox, bản ghi gốc, bản đã đẩy sang khách thật).
 pub(crate) struct CreateSandboxMessages;
 
 impl MigrationName for CreateSandboxMessages {
     fn name(&self) -> &str {
-        "m0038_create_sandbox_messages"
+        "m0038_create_sandbox_tables"
     }
 }
 
@@ -282,10 +286,50 @@ impl MigrationTrait for CreateSandboxMessages {
                     .col(Alias::new("id"))
                     .to_owned(),
             )
+            .await?;
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new(LINKS))
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::string_len("kind", 64))
+                    .col(schema::uuid("record_id"))
+                    .col(schema::uuid_null("source_id"))
+                    .col(schema::uuid_null("promoted_id"))
+                    .col(schema::string_len_null("promoted_fingerprint", 64))
+                    .col(schema::timestamp_with_time_zone("created_at"))
+                    .col(schema::timestamp_with_time_zone("updated_at"))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("kernel_sandbox_links_record")
+                    .table(Alias::new(LINKS))
+                    .col(Alias::new("tenant_id"))
+                    .col(Alias::new("kind"))
+                    .col(Alias::new("record_id"))
+                    .unique()
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("kernel_sandbox_links_source")
+                    .table(Alias::new(LINKS))
+                    .col(Alias::new("tenant_id"))
+                    .col(Alias::new("kind"))
+                    .col(Alias::new("source_id"))
+                    .to_owned(),
+            )
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table(Alias::new(LINKS)).to_owned()).await?;
         manager.drop_table(Table::drop().table(Alias::new(TABLE)).to_owned()).await
     }
 }

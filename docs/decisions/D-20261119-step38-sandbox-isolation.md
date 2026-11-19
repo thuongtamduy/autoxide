@@ -17,7 +17,7 @@ Quyết định: Bước 38 mục sandbox (D-232), phần cách ly (thứ tự l
    đồng bộ, không tra được khách; đối tác thật không biết giao dịch giả).
 3. **Không bọc**: `TextModel` / `Embedder` (không có hệ quả tiền hay pháp lý; hạn mức AI của sandbox đếm riêng),
    `ExchangeRateSource` (chỉ đọc dữ liệu công khai), `Storage`.
-4. **Hộp thư giả**: migration kernel `m0038_create_sandbox_messages`, bảng cấp khách hàng `kernel_sandbox_messages`
+4. **Hộp thư giả**: migration kernel `m0038_create_sandbox_tables`, bảng cấp khách hàng `kernel_sandbox_messages` (cùng migration tạo sẵn bảng nối `kernel_sandbox_links` cho đợt sao / đẩy)
    (kênh `partner` / `sms` / `zns` / `push` / `mail` / `webhook`, lý do `simulated` / `recipient_not_allowed` /
    `url_not_allowed`), ghi bằng `hold_back` ngoài transaction của bên gọi; relocation `ephemeral` (sandbox không tách /
    gộp); xoá cùng sandbox theo luồng xoá khách. Đọc: `GET /api/v1/kernel/sandbox/messages` (lọc `channel`) và tool MCP
