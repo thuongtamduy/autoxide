@@ -1610,6 +1610,69 @@
         "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
+        "returns_secret": true
+      },
+      "deprecation": null,
+      "description": "Replace one of your API keys with a new one that has the same name, permissions, unit, allowed addresses and kind. The old key keeps working for `overlap_hours` (24 by default) so programs can switch. Needs your current password and a password session. The result carries the new key, shown only once.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An API key to replace, and how.",
+        "properties": {
+          "current_password": {
+            "description": "Your current password, or give `totp_code` or `reauth_token` instead.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the new key stops working (RFC 3339); omit for the longest lifetime allowed.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the key to replace.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "overlap_hours": {
+            "description": "Hours the old key keeps working, 0 to 72 (24 by default); 0 stops it at once.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "reauth_token": {
+            "description": "A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totp_code": {
+            "description": "A code from your authenticator app, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "auth.rotate_api_key",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
         "returns_secret": false
       },
       "deprecation": null,

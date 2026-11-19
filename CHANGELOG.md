@@ -17,6 +17,9 @@ endpoints are marked deprecated with a sunset date first.
   confirms on `ledger.payment_succeeded`, cancels unpaid orders at the ledger's payment deadline and refunds late
   payments; public payment status for the QR screen (`GET /public/payments/{token}`); `GET /me/orders`,
   `GET /` and `GET /{id}` for staff.
+- `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
+  one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
+  (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
 - Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
   limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
   stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).

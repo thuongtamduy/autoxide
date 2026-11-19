@@ -18,6 +18,8 @@ pub(crate) mod api_key {
         pub expires_at: Option<DateTimeUtc>,
         /// Dải IP được gọi, CIDR cách nhau bằng dấu phẩy (bước 54); NULL: mọi địa chỉ.
         pub allowed_ips: Option<String>,
+        /// Key này thay key nào khi xoay vòng (bước 54); NULL: tạo mới.
+        pub rotated_from: Option<Uuid>,
         /// Nút của hàng rào (bước 34); nút gốc = không rào. Luôn có giá trị.
         pub org_id: Option<Uuid>,
         pub last_used_at: Option<DateTimeUtc>,

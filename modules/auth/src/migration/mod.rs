@@ -34,6 +34,7 @@ mod m0035_api_key_kind;
 mod m0036_oidc;
 mod m0037_role_denies;
 mod m0038_api_key_networks;
+mod m0039_api_key_rotation;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -111,6 +112,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0037_role_denies::Migration),
         // API key: dải IP được gọi, hạn bắt buộc (bước 54).
         Box::new(m0038_api_key_networks::Migration),
+        // Xoay vòng API key (bước 54).
+        Box::new(m0039_api_key_rotation::Migration),
     ]
 }
 
