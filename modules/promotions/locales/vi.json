@@ -157,5 +157,6 @@
   "text:Turn the promotions in your scope on, pause, resume, end or cancel them; release stuck holds.": "Bật, tạm dừng, chạy lại, kết thúc hay huỷ chương trình trong phạm vi của bạn; gỡ lượt giữ bị kẹt.",
   "field:must not be after `to`": "không được sau `to`",
   "field:send 1 to {max} carts": "gửi từ 1 tới {max} giỏ",
-  "field:the range must be at most {max} days": "khoảng ngày dài tối đa {max} ngày"
+  "field:the range must be at most {max} days": "khoảng ngày dài tối đa {max} ngày",
+  "promotions.product_not_found": "Không có sản phẩm `{product}` với biến thể này đang bán ở đây."
 }

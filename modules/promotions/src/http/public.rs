@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
-use autoxide_kernel::response::Problem;
+use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
-use axum::extract::{Query, State};
+use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
 use serde::Deserialize;
@@ -14,11 +14,15 @@ use utoipa::IntoParams;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 
+use crate::for_product::ProductCode;
 use crate::public::PublicPromotion;
 use crate::service::PromotionsService;
 
 pub(crate) fn routes(service: Arc<PromotionsService>) -> OpenApiRouter {
-    OpenApiRouter::new().routes(routes!(list_public_promotions)).with_state(service)
+    OpenApiRouter::new()
+        .routes(routes!(list_public_promotions))
+        .routes(routes!(codes_for_product))
+        .with_state(service)
 }
 
 /// Language of the texts.
@@ -79,4 +83,51 @@ async fn list_public_promotions(
     }
     headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, no-cache"));
     Ok(response)
+}
+
+/// The variant and language asked for.
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct ForProductQuery {
+    /// The variant shown (required: prices are per variant).
+    pub variant_id: uuid::Uuid,
+    /// Language of `title` and `terms`, e.g. `vi`.
+    #[param(example = "vi")]
+    pub locale: Option<String>,
+}
+
+/// List the public coupons that lower the price of a product (public).
+///
+/// No sign-in. Coupons of running public promotions of this website that apply to the variant,
+/// each with the price of one unit with the coupon, its conditions and the uses left (only when
+/// there is a real limit). Cheapest first; empty when none applies. The listed price stays the
+/// price without a coupon: show these as "X with code …", not as a discounted price. Discounts
+/// that need no coupon are already in the catalog price.
+#[utoipa::path(
+    get,
+    path = "/public/promotions/for-product/{product_id}",
+    extensions(("x-public" = json!(true))),
+    operation_id = "list_public_codes_for_product",
+    security((), ("bearer" = [])),
+    params(("product_id" = Uuid, Path, description = "Id of the product."), ForProductQuery, SiteQuery),
+    responses(
+        (status = 200, description = "The coupons, cheapest first.", body = Data<Vec<ProductCode>>),
+        (status = 404, description = "The variant is not of this product (`promotions.product_not_found`) or the `site` is not a unit of this tenant (`site_not_found`).", body = Problem),
+    )
+)]
+async fn codes_for_product(
+    State(service): State<Arc<PromotionsService>>,
+    tenant: TenantContext,
+    site: Site,
+    Path(product_id): Path<uuid::Uuid>,
+    Query(query): Query<ForProductQuery>,
+) -> Result<Data<Vec<ProductCode>>, Error> {
+    let locale = query
+        .locale
+        .as_deref()
+        .and_then(autoxide_kernel::i18n::canonical_locale)
+        .unwrap_or_default();
+    let data =
+        service.codes_for_product(&tenant, &site, product_id, query.variant_id, &locale).await?;
+    Ok(Data { data })
 }

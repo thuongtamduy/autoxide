@@ -11906,6 +11906,28 @@ export type Data_Vec_PromotionsNoticeRule = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotionsProductCode = {
+  data: {
+    /** The coupon to enter at checkout. */
+    code: string;
+    /** Discount on one unit. */
+    discount: Money;
+    ends_at: string;
+    /**
+     * Price of one unit with the coupon. The listed price stays the price without it: show
+     * this as "X with code …", not as a discounted price.
+     */
+    price_with_code: Money;
+    promotion_id: string;
+    /** Conditions, in full (the same as in `GET /public/promotions`). */
+    terms: string;
+    title: string;
+    /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+    uses_left?: number | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PromotionsSimulation = {
   data: {
     /**
@@ -21462,6 +21484,26 @@ export type PromotionsPayerKind = "platform" | "seller" | "brand" | "payment_par
 
 /** Period of the per-customer limit. */
 export type PromotionsPeriod = "lifetime" | "day" | "week" | "month";
+
+/** A public coupon that lowers the price of a product. */
+export type PromotionsProductCode = {
+  /** The coupon to enter at checkout. */
+  code: string;
+  /** Discount on one unit. */
+  discount: Money;
+  ends_at: string;
+  /**
+   * Price of one unit with the coupon. The listed price stays the price without it: show
+   * this as "X with code …", not as a discounted price.
+   */
+  price_with_code: Money;
+  promotion_id: string;
+  /** Conditions, in full (the same as in `GET /public/promotions`). */
+  terms: string;
+  title: string;
+  /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+  uses_left?: number | null;
+};
 
 /** Legal kind of programme: `regular` or a `national_focus` promotion programme. */
 export type PromotionsProgramKind = "regular" | "national_focus";
@@ -37867,6 +37909,18 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/for-product/{product_id}": {
+    /** List the public coupons that lower the price of a product (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { variant_id: string; locale?: string; site?: string }; };
+      responses: {
+        200: Data_Vec_PromotionsProductCode;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

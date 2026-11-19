@@ -1,0 +1,1 @@
+- `GET /api/v1/promotions/public/promotions/for-product/{product_id}`: public coupons that lower the price of a product variant, with the price with the coupon and the real uses left.

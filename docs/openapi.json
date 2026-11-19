@@ -36647,6 +36647,68 @@
         ],
         "type": "object"
       },
+      "Data_Vec_PromotionsProductCode": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A public coupon that lowers the price of a product.",
+              "properties": {
+                "code": {
+                  "description": "The coupon to enter at checkout.",
+                  "type": "string"
+                },
+                "discount": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Discount on one unit."
+                },
+                "ends_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "price_with_code": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Price of one unit with the coupon. The listed price stays the price without it: show\nthis as \"X with code …\", not as a discounted price."
+                },
+                "promotion_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "terms": {
+                  "description": "Conditions, in full (the same as in `GET /public/promotions`).",
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "uses_left": {
+                  "description": "Uses left, only when the coupon or promotion has a real limit; `null` otherwise.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "code",
+                "promotion_id",
+                "title",
+                "terms",
+                "price_with_code",
+                "discount",
+                "ends_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_PromotionsSimulation": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -66683,6 +66745,56 @@
           "month"
         ],
         "type": "string"
+      },
+      "PromotionsProductCode": {
+        "description": "A public coupon that lowers the price of a product.",
+        "properties": {
+          "code": {
+            "description": "The coupon to enter at checkout.",
+            "type": "string"
+          },
+          "discount": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Discount on one unit."
+          },
+          "ends_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "price_with_code": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Price of one unit with the coupon. The listed price stays the price without it: show\nthis as \"X with code …\", not as a discounted price."
+          },
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "terms": {
+            "description": "Conditions, in full (the same as in `GET /public/promotions`).",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "uses_left": {
+            "description": "Uses left, only when the coupon or promotion has a real limit; `null` otherwise.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "promotion_id",
+          "title",
+          "terms",
+          "price_with_code",
+          "discount",
+          "ends_at"
+        ],
+        "type": "object"
       },
       "PromotionsProgramKind": {
         "description": "Legal kind of programme: `regular` or a `national_focus` promotion programme.",
@@ -185890,6 +186002,119 @@
           }
         ],
         "x-autoxide-list": "promotions.list_public_promotions",
+        "x-public": true
+      }
+    },
+    "/api/v1/promotions/public/promotions/for-product/{product_id}": {
+      "get": {
+        "description": "No sign-in. Coupons of running public promotions of this website that apply to the variant,\neach with the price of one unit with the coupon, its conditions and the uses left (only when\nthere is a real limit). Cheapest first; empty when none applies. The listed price stays the\nprice without a coupon: show these as \"X with code …\", not as a discounted price. Discounts\nthat need no coupon are already in the catalog price.",
+        "operationId": "promotions_list_public_codes_for_product",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The variant shown (required: prices are per variant).",
+            "in": "query",
+            "name": "variant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of `title` and `terms`, e.g. `vi`.",
+            "example": "vi",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The website (organization unit) asking, when it is not called on its own domain; a domain\nbound to a unit chooses it already. Content of that unit and of the units above it is\nshown. Omitted: the website of the whole tenant.",
+            "in": "query",
+            "name": "site",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotionsProductCode"
+                }
+              }
+            },
+            "description": "The coupons, cheapest first."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The variant is not of this product (`promotions.product_not_found`) or the `site` is not a unit of this tenant (`site_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the public coupons that lower the price of a product (public).",
+        "tags": [
+          "promotions"
+        ],
         "x-public": true
       }
     },

@@ -108,6 +108,12 @@ the Departments of Industry and Trade (authority and reference) and the largest 
 allows (`legal_limit`, from the law data). Pages with `limit` / `cursor`; send the `ETag` back in
 `If-None-Match` to get `304`.
 
+`GET /public/promotions/for-product/{product_id}?variant_id=&site=` lists the public coupons that lower the price of
+one variant, cheapest first: the price of one unit with the coupon, its conditions and the uses left (only when
+there is a real limit). The listed price stays the price without a coupon — show "X with code …", not a
+discounted price. For a cart, `Promotions::eligible` (served by `orders`) gives the coupons and vouchers that work,
+those that do not yet with a reason ("add X to use"), and the best selection, so a picker can replace the code box.
+
 ## Returns
 
 `api::returns` has the rules for `orders`: the refund of a line is the amount paid × returned / bought,

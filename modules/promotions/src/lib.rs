@@ -13,6 +13,7 @@ mod engine;
 mod entity;
 mod evaluate;
 mod events;
+mod for_product;
 mod http;
 mod insights;
 mod jobs;

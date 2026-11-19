@@ -104,6 +104,12 @@ website: của nút đó và các nút cấp trên, kèm điều kiện đầy �
 nhận và số tiếp nhận) và mức giảm tối đa luật đang áp hôm nay cho phép (`legal_limit`, lấy từ dữ liệu luật). Chia
 trang bằng `limit` / `cursor`; gửi lại `ETag` trong `If-None-Match` để nhận `304`.
 
+`GET /public/promotions/for-product/{product_id}?variant_id=&site=` liệt kê mã công khai làm giảm giá một biến thể,
+rẻ nhất trước: giá một đơn vị khi dùng mã, điều kiện và số lượt còn (chỉ khi có giới hạn thật). Giá niêm yết vẫn là
+giá không mã — hiện "còn X với mã …", không trình bày như giá đã giảm. Với một giỏ, `Promotions::eligible` (`orders`
+phục vụ) trả mã và voucher dùng được, mã chưa đủ điều kiện kèm lý do ("thêm X để dùng") và tổ hợp tốt nhất, để bộ
+chọn thay ô nhập mã.
+
 ## Trả hàng
 
 `api::returns` có quy tắc cho `orders`: tiền hoàn của một dòng = tiền đã trả × số trả / số mua, đơn vị cuối nhận
