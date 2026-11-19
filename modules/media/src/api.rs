@@ -52,6 +52,9 @@ pub struct MediaVariant {
     /// Bản WebP cùng cỡ (`url` kèm `&format=webp`), nhẹ hơn nhiều; `None` khi chưa làm (ảnh tải
     /// lên trước khi có WebP, tới khi chạy `autoxide task media.refresh_variants`).
     pub webp_url: Option<String>,
+    /// Bản AVIF cùng cỡ (`url` kèm `&format=avif`, bước 39 B8); `None` khi chưa làm hay máy chủ
+    /// không bật `AUTOXIDE_MEDIA_AVIF`.
+    pub avif_url: Option<String>,
 }
 
 #[async_trait::async_trait]
