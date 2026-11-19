@@ -307,7 +307,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `shipping.book_shipment` | `shipping.shipments.manage` | writes |
 | `shipping.cancel_shipment` | `shipping.shipments.manage` | destructive |
 | `shipping.get_shipment` | `shipping.shipments.read` | read-only |
-| `shipping.list_cod_discrepancies` | `shipping.cod.read` hoặc `shipping.cod.manage` | read-only |
+| `shipping.list_cod_discrepancies` | `shipping.cod.read` or `shipping.cod.manage` | read-only |
 | `shipping.list_shipments` | `shipping.shipments.read` | read-only |
 | `shipping.quote` | `shipping.read` | read-only |
 | `shipping.update_status` | `shipping.shipments.manage` | writes |
