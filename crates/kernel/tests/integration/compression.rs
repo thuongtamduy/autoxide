@@ -47,7 +47,9 @@ async fn events() -> Response {
 async fn part() -> Response {
     let mut response = with_type("application/json", big_json().into_bytes());
     *response.status_mut() = StatusCode::PARTIAL_CONTENT;
-    response.headers_mut().insert(header::CONTENT_RANGE, HeaderValue::from_static("bytes 0-99/200"));
+    response
+        .headers_mut()
+        .insert(header::CONTENT_RANGE, HeaderValue::from_static("bytes 0-99/200"));
     response
 }
 
@@ -93,7 +95,10 @@ async fn nen_json_lon_khi_client_nhan_br() {
     assert_eq!(encoding(&response), Some("br"));
     assert!(body.len() * 4 < plain, "{} of {plain}", body.len());
     let vary: Vec<_> = response.headers().get_all(header::VARY).iter().collect();
-    assert!(vary.iter().any(|value| value.to_str().unwrap().contains("accept-encoding")), "{vary:?}");
+    assert!(
+        vary.iter().any(|value| value.to_str().unwrap().contains("accept-encoding")),
+        "{vary:?}"
+    );
     let (response, body) = call(&app, "/json", "gzip").await;
     assert_eq!(encoding(&response), Some("gzip"));
     assert_eq!(&body[..2], &[0x1f, 0x8b], "gzip magic");
