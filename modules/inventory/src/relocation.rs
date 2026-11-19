@@ -11,6 +11,7 @@ pub(crate) fn relocation() -> Relocation {
             "inventory_adjustments",
             "inventory_settings",
             "inventory_restocks",
+            "inventory_counts",
         ])
         // Kho phục vụ đi theo nút bán; chỗ giữ theo nút bán của đơn.
         .table(
@@ -23,4 +24,11 @@ pub(crate) fn relocation() -> Relocation {
         )
         .follow("inventory_reservation_lines", "reservation_id", "inventory_reservations")
         .follow("inventory_fulfilments", "reservation_id", "inventory_reservations")
+        // Phiếu chuyển kho đi theo kho gửi.
+        .table(
+            "inventory_transfers",
+            autoxide_kernel::tenancy::TablePolicy::ByOrg { column: "from_org_id" },
+        )
+        .follow("inventory_transfer_lines", "transfer_id", "inventory_transfers")
+        .follow("inventory_count_lines", "count_id", "inventory_counts")
 }

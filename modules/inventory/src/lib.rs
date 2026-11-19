@@ -6,6 +6,7 @@
 pub mod api;
 mod config;
 mod contract;
+mod counts;
 mod entity;
 mod errors;
 mod events;
@@ -20,6 +21,7 @@ mod service;
 mod settings;
 mod stock;
 mod tools;
+mod transfers;
 mod verify;
 
 #[cfg(test)]

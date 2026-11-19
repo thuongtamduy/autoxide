@@ -45,6 +45,9 @@ event!(ReservationHeld, names::RESERVATION_HELD);
 event!(ReservationConfirmed, names::RESERVATION_CONFIRMED);
 event!(ReservationReleased, names::RESERVATION_RELEASED);
 event!(ReservationExpired, names::RESERVATION_EXPIRED);
+event!(TransferShipped, "inventory.transfer_shipped");
+event!(TransferReceived, "inventory.transfer_received");
+event!(CountApplied, "inventory.count_applied");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -80,6 +83,18 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::RESERVATION_EXPIRED,
             "A stock reservation expired before the order was confirmed.",
+        ),
+        EventInfo::new(
+            "inventory.transfer_shipped",
+            "A stock transfer left its source warehouse and is in transit.",
+        ),
+        EventInfo::new(
+            "inventory.transfer_received",
+            "Goods of a stock transfer arrived at the destination (all or part).",
+        ),
+        EventInfo::new(
+            "inventory.count_applied",
+            "A stock count was applied: its differences were written to the ledger.",
         ),
     ]
 }
