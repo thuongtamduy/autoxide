@@ -2698,6 +2698,33 @@
                   "null"
                 ]
               },
+              "net_quantity": {
+                "description": "Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit\n(per kg, l, m or piece). Give both or neither.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "net_unit": {
+                "oneOf": [
+                  {
+                    "description": "Unit of a variant's net content.",
+                    "enum": [
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "m",
+                      "piece"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "option_value_ids": {
                 "description": "One value id of each option of the product; empty when the product has no options.",
                 "items": {
@@ -3196,6 +3223,33 @@
                       "null"
                     ]
                   },
+                  "net_quantity": {
+                    "description": "Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit\n(per kg, l, m or piece). Give both or neither.",
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "net_unit": {
+                    "oneOf": [
+                      {
+                        "description": "Unit of a variant's net content.",
+                        "enum": [
+                          "g",
+                          "kg",
+                          "ml",
+                          "l",
+                          "m",
+                          "piece"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "option_value_ids": {
                     "description": "One value id of each option of the product; empty when the product has no options.",
                     "items": {
@@ -3340,6 +3394,33 @@
                     "type": [
                       "integer",
                       "null"
+                    ]
+                  },
+                  "net_quantity": {
+                    "description": "Net content, with `net_unit`; `null` on both removes it.",
+                    "format": "int64",
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "net_unit": {
+                    "oneOf": [
+                      {
+                        "description": "Unit of a variant's net content.",
+                        "enum": [
+                          "g",
+                          "kg",
+                          "ml",
+                          "l",
+                          "m",
+                          "piece"
+                        ],
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
                     ]
                   },
                   "option_value_ids": {
