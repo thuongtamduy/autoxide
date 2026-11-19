@@ -318,6 +318,7 @@ impl Modules {
         let database = registry.control();
         let work = self.catalog.work_sources();
         let finders = self.catalog.finder_sources();
+        let suggestions = self.catalog.suggest_sources();
         let metrics = self.catalog.summary_metrics();
         let exports = self.catalog.export_sources();
         let bulk = self.catalog.bulk_actions();
@@ -356,6 +357,7 @@ impl Modules {
                 resources: &self.resources,
                 work: &work,
                 finders: &finders,
+                suggestions: &suggestions,
                 metrics: &metrics,
                 exports: &exports,
                 bulk: &bulk,
