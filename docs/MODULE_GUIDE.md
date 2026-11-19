@@ -629,6 +629,35 @@ context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // the real count, 
 Without a provider, for the platform tenant, and for tenants with no plan, every call succeeds
 at once. `modules/notes` is the worked example (`notes.notes`).
 
+### Offline sync
+
+Apps on phones, desktops and point-of-sale devices keep a copy of records, write while offline
+and send the writes later. To let them sync a kind of record:
+
+```rust
+const NOTES_SYNC: SyncResource =
+    SyncResource::new("notes", "", NOTES_READ, "Your notes, in your scope of `notes.read`.");
+
+fn sync_resources(&self) -> Vec<SyncResource> { vec![NOTES_SYNC] }
+// migrations, at the end:
+autoxide_kernel::sync::changes_migration("k0002_sync_changes", "notes"),
+// in `start`:
+let sync = context.sync_log();
+```
+
+- In the write transaction of every create / change / delete, add a row:
+  `sync.changed(&transaction, tenant, &NOTES_SYNC, id, target)` (or `sync.deleted(…)`), like
+  `Outbox::record`.
+- Serve `GET <path>/changes` (`ChangesQuery` in, `Page<SyncChange<YourView>>` out) by calling
+  `sync.changes(tenant, principal, &NOTES_SYNC, &query, |ids| async move { … })`: load the records
+  with these ids that the caller may still read, with their `updated_at`; the kernel turns the
+  others into deletion marks.
+- On a stale `If-Match`, answer `version::changed_with(&current_view, current.updated_at)`: `412`
+  with the current record, so the app can merge.
+
+Writes queued on the device go through `POST /api/v1/kernel/sync/batch`, which runs each one
+through your REST endpoint — nothing more to write. `modules/notes` is the worked example.
+
 ### 9. Configuration, jobs, limits
 
 - Settings: declare each with `Setting` and read it in `Module::configure` through

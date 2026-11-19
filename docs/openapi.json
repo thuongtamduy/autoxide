@@ -729,6 +729,21 @@
             },
             "type": "array"
           },
+          "approved_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "approved_by": {
+            "description": "Who approved the key and when; `null` when it needed no approval.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -790,6 +805,11 @@
               "string",
               "null"
             ]
+          },
+          "status": {
+            "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+            "example": "active",
+            "type": "string"
           }
         },
         "required": [
@@ -799,8 +819,38 @@
           "permissions",
           "org_id",
           "allowed_ips",
+          "status",
           "created_at",
           "kind"
+        ],
+        "type": "object"
+      },
+      "AppliedGuardrailsResponse": {
+        "description": "The guardrails that limit this tenant.",
+        "properties": {
+          "guardrails": {
+            "description": "Every guardrail on the way from the top tenant to this one.",
+            "items": {
+              "$ref": "#/components/schemas/GuardrailResponse"
+            },
+            "type": "array"
+          },
+          "max_permissions": {
+            "description": "The most permissions anyone can use in this tenant: what every guardrail allows together,\nsorted by name. `null` when no guardrail limits this tenant.",
+            "example": [
+              "content.read"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "guardrails"
         ],
         "type": "object"
       },
@@ -1239,6 +1289,112 @@
           "kind",
           "value",
           "reason"
+        ],
+        "type": "object"
+      },
+      "BatchMethod": {
+        "description": "HTTP method of a write.",
+        "enum": [
+          "POST",
+          "PUT",
+          "PATCH",
+          "DELETE"
+        ],
+        "type": "string"
+      },
+      "BatchOperation": {
+        "additionalProperties": false,
+        "description": "One write, as you would send it to the REST endpoint.",
+        "properties": {
+          "body": {
+            "description": "The JSON body of the write, if it has one."
+          },
+          "id": {
+            "description": "Your id for this write, 1 to 100 characters; its result carries it back.",
+            "example": "op-1",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "description": "Sent as the `Idempotency-Key` header. Keep it with the queued write and send the same key\nwhen you send the batch again: a write already done answers what it answered the first time.",
+            "example": "8b2f6a3e-5c1d-4e7f-9a0b-1c2d3e4f5a6b",
+            "type": "string"
+          },
+          "if_match": {
+            "description": "Sent as the `If-Match` header: the `ETag` (`version`) of the record you changed. If someone\nchanged it since, the result is `412` with the current record in the body's `current`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "method": {
+            "$ref": "#/components/schemas/BatchMethod"
+          },
+          "path": {
+            "description": "Path of the REST endpoint, under the `path` of a sync resource\n(`GET /api/v1/kernel/sync/resources`).",
+            "example": "/api/v1/notes/0190f5c2-7b1a-7cde-8f00-123456789abc",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "method",
+          "path",
+          "idempotency_key"
+        ],
+        "type": "object"
+      },
+      "BatchRequest": {
+        "additionalProperties": false,
+        "description": "Writes queued on a device while it was offline.",
+        "properties": {
+          "operations": {
+            "description": "1 to 100 writes, run one after the other in this order.",
+            "items": {
+              "$ref": "#/components/schemas/BatchOperation"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "operations"
+        ],
+        "type": "object"
+      },
+      "BatchResult": {
+        "description": "What one write answered.",
+        "properties": {
+          "body": {
+            "description": "The JSON body of the answer: `{\"data\": …}`, or a problem (`code`, `detail`…) when the write\nfailed; `null` when the answer has no body."
+          },
+          "etag": {
+            "description": "The `ETag` header of the answer (version of the record after the write), if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "The `id` you gave the write.",
+            "type": "string"
+          },
+          "location": {
+            "description": "The `Location` header of the answer (the record created), if any.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`.",
+            "example": 200,
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "status"
         ],
         "type": "object"
       },
@@ -2522,6 +2678,19 @@
         "properties": {
           "reason": {
             "description": "Up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "CancelMyOrderRequest": {
+        "additionalProperties": false,
+        "description": "Cancel one of your orders.",
+        "properties": {
+          "reason": {
             "type": [
               "string",
               "null"
@@ -13209,6 +13378,162 @@
         ],
         "type": "object"
       },
+      "Data_ApiKeyResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "An API key, without its secret.",
+            "properties": {
+              "allowed_ips": {
+                "description": "IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request\nfrom elsewhere gets 403 `network_not_allowed`.",
+                "example": [
+                  "203.0.113.0/24"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "approved_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "approved_by": {
+                "description": "Who approved the key and when; `null` when it needed no approval.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "description": "When the key stops working. Every new key has one; `null` only for data that was never\nupgraded.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's\napproval) or `service` (another program). The audit log records it as `actor_kind`.",
+                "example": "agent",
+                "type": "string"
+              },
+              "last_used_at": {
+                "description": "Last time the key was used, to the minute; `null`: never used.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "What the key is for.",
+                "example": "nightly report agent",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The organization unit the key is bound to: it acts only on data of this unit and the\nunits below it. The root unit (the id of the tenant) means no limit.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "permissions": {
+                "description": "Permissions the key may use, sorted by name. The key never has more than its\nowner has at the moment of the request.",
+                "example": [
+                  "auth.users.read"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "prefix": {
+                "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
+                "example": "axk1_…3q9ZbXcV",
+                "type": "string"
+              },
+              "rotated_from": {
+                "description": "The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key\ncreated from scratch.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+                "example": "active",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "prefix",
+              "permissions",
+              "org_id",
+              "allowed_ips",
+              "status",
+              "created_at",
+              "kind"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AppliedGuardrailsResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The guardrails that limit this tenant.",
+            "properties": {
+              "guardrails": {
+                "description": "Every guardrail on the way from the top tenant to this one.",
+                "items": {
+                  "$ref": "#/components/schemas/GuardrailResponse"
+                },
+                "type": "array"
+              },
+              "max_permissions": {
+                "description": "The most permissions anyone can use in this tenant: what every guardrail allows together,\nsorted by name. `null` when no guardrail limits this tenant.",
+                "example": [
+                  "content.read"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": [
+                  "array",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "guardrails"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ApplyTagResult": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -20271,6 +20596,58 @@
         ],
         "type": "object"
       },
+      "Data_GuardrailResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The most permissions a tenant below this one can use.",
+            "properties": {
+              "max_permissions": {
+                "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+                "example": [
+                  "content.read",
+                  "content.write"
+                ],
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "set_by_tenant_id": {
+                "description": "The tenant above it that set the guardrail.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "tenant_id": {
+                "description": "The tenant limited by the guardrail (and every tenant below it).",
+                "format": "uuid",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "updated_by": {
+                "description": "Who set it last, and when.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "tenant_id",
+              "set_by_tenant_id",
+              "max_permissions",
+              "updated_by",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Health": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -25480,6 +25857,44 @@
         ],
         "type": "object"
       },
+      "Data_OrdersShipmentRequested": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A shipment requested from the shipping module.",
+            "properties": {
+              "cod_amount": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "Cash to collect on delivery, if any."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "request_key": {
+                "description": "Key of the request at the shipping module.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "order_id",
+              "request_key"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OverrideResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -26704,6 +27119,122 @@
             "required": [
               "authority_code",
               "status"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_PromotionsNoticeExport": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The data of a promotion notice, one entry per authority.",
+            "properties": {
+              "authorities": {
+                "items": {
+                  "$ref": "#/components/schemas/PromotionsNoticeEntry"
+                },
+                "type": "array"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "ends_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "flash_item_count": {
+                "description": "Number of flash-sale or add-on prices.",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "jurisdiction": {
+                "description": "Jurisdiction of the law data used.",
+                "type": "string"
+              },
+              "kind": {
+                "description": "Kind of the promotion (`percent_off`, `flash_sale`…).",
+                "type": "string"
+              },
+              "locale": {
+                "description": "Locale of `title` and `terms`.",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "Unit that runs the promotion.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "promotion_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "promotion_kind": {
+                "description": "Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…).",
+                "type": "string"
+              },
+              "rules_found": {
+                "description": "`false` when no notice rule is in force for this kind of promotion on its start day\n(load the law data with `autoxide task promotions.load_legal_data`).",
+                "type": "boolean"
+              },
+              "starts_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "status": {
+                "description": "Status of the promotion.",
+                "type": "string"
+              },
+              "target_count": {
+                "description": "Number of products, variants and categories the promotion targets (0 = the whole store).",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "terms": {
+                "description": "Conditions shown to buyers.",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "value_bp": {
+                "description": "Discount in basis points (1000 = 10%), when the promotion has one.",
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "value_minor": {
+                "description": "Discount amount in minor units of `currency`, when the promotion has one.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "promotion_id",
+              "org_id",
+              "kind",
+              "promotion_kind",
+              "locale",
+              "title",
+              "terms",
+              "starts_at",
+              "ends_at",
+              "currency",
+              "target_count",
+              "flash_item_count",
+              "status",
+              "jurisdiction",
+              "rules_found",
+              "authorities"
             ],
             "type": "object"
           }
@@ -29011,6 +29542,64 @@
         ],
         "type": "object"
       },
+      "Data_ShippingCalendar": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A delivery calendar.",
+            "properties": {
+              "days": {
+                "description": "Holidays and special days (only in single-calendar answers).",
+                "items": {
+                  "$ref": "#/components/schemas/ShippingCalendarDayEntry"
+                },
+                "type": "array"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "time_zone": {
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "working_days": {
+                "description": "1 = Monday … 7 = Sunday.",
+                "items": {
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "name",
+              "time_zone",
+              "working_days",
+              "days",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ShippingCarrierAccount": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -29265,6 +29854,35 @@
               }
             ],
             "description": "A carrier statement with its lines."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ShippingEstimate": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShippingQuote"
+              },
+              {
+                "properties": {
+                  "estimate": {
+                    "description": "Always `true`: the fee is computed again when the order is placed.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "estimate"
+                ],
+                "type": "object"
+              }
+            ],
+            "description": "A public shipping estimate."
           }
         },
         "required": [
@@ -33053,6 +33671,56 @@
         ],
         "type": "object"
       },
+      "Data_Vec_BatchResult": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "What one write answered.",
+              "properties": {
+                "body": {
+                  "description": "The JSON body of the answer: `{\"data\": …}`, or a problem (`code`, `detail`…) when the write\nfailed; `null` when the answer has no body."
+                },
+                "etag": {
+                  "description": "The `ETag` header of the answer (version of the record after the write), if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "description": "The `id` you gave the write.",
+                  "type": "string"
+                },
+                "location": {
+                  "description": "The `Location` header of the answer (the record created), if any.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "The HTTP status the REST endpoint answered, e.g. `201`, `200`, `204`, `412`.",
+                  "example": 200,
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "status"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_BillingPeriodResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36181,6 +36849,82 @@
         ],
         "type": "object"
       },
+      "Data_Vec_OrdersPaymentAction": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "What the buyer does next to pay one amount.",
+              "properties": {
+                "amount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "description": "`redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or\n`none` (the payment could not be started yet; retry from the order).",
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "payment_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "qr_payload": {
+                  "description": "VietQR payload; the money goes to the seller's or the licensed partner's account.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "redirect_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`pending`, `succeeded`, `failed`, `expired`…",
+                  "type": "string"
+                },
+                "status_token": {
+                  "description": "For `GET /public/payments/{token}`.",
+                  "type": "string"
+                },
+                "transfer_code": {
+                  "description": "Transfer content the bank transfer must carry.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "order_id",
+                "payment_id",
+                "kind",
+                "amount",
+                "status",
+                "status_token"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_OverrideResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -38303,6 +39047,54 @@
                 "org_id",
                 "team_id",
                 "position"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_SyncResourceView": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A kind of record an offline app can keep in sync.",
+              "properties": {
+                "changes": {
+                  "description": "The change feed: `GET` it with the `cursor` of the last change you applied.",
+                  "example": "/api/v1/notes/changes",
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "name": {
+                  "description": "`<module>.<name>`.",
+                  "example": "notes.notes",
+                  "type": "string"
+                },
+                "path": {
+                  "description": "The list endpoint of these records; writes in a batch go under this path.",
+                  "example": "/api/v1/notes",
+                  "type": "string"
+                },
+                "read_permission": {
+                  "description": "The permission needed to read them; its scope decides which records you get.",
+                  "example": "notes.read",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "path",
+                "changes",
+                "read_permission",
+                "description"
               ],
               "type": "object"
             },
@@ -41511,6 +42303,69 @@
           "member_count",
           "excluded_org_count",
           "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "GuardrailRequest": {
+        "description": "A guardrail to set.",
+        "properties": {
+          "max_permissions": {
+            "description": "The permissions roles of that tenant may grant at most (see\n`GET /api/v1/auth/permissions`). `[]` leaves no permission.",
+            "example": [
+              "content.read",
+              "content.write"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "max_permissions"
+        ],
+        "type": "object"
+      },
+      "GuardrailResponse": {
+        "description": "The most permissions a tenant below this one can use.",
+        "properties": {
+          "max_permissions": {
+            "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+            "example": [
+              "content.read",
+              "content.write"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "set_by_tenant_id": {
+            "description": "The tenant above it that set the guardrail.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The tenant limited by the guardrail (and every tenant below it).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updated_by": {
+            "description": "Who set it last, and when.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "set_by_tenant_id",
+          "max_permissions",
+          "updated_by",
           "updated_at"
         ],
         "type": "object"
@@ -52391,6 +53246,35 @@
         ],
         "type": "object"
       },
+      "OrdersShipmentRequested": {
+        "description": "A shipment requested from the shipping module.",
+        "properties": {
+          "cod_amount": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Cash to collect on delivery, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "request_key": {
+            "description": "Key of the request at the shipping module.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "order_id",
+          "request_key"
+        ],
+        "type": "object"
+      },
       "OrdersShippingOption": {
         "description": "A way to deliver the cart.",
         "properties": {
@@ -52458,6 +53342,27 @@
           "name",
           "kind",
           "amount"
+        ],
+        "type": "object"
+      },
+      "OrdersTransitionRequest": {
+        "additionalProperties": false,
+        "description": "A status change of an order.",
+        "properties": {
+          "reason": {
+            "description": "Why (kept in the order history; shown to the buyer when cancelling).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "`preparing` (accept the order), `shipping`, `delivered`, `delivery_failed` or `cancelled`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
         ],
         "type": "object"
       },
@@ -52731,6 +53636,21 @@
                   },
                   "type": "array"
                 },
+                "approved_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "approved_by": {
+                  "description": "Who approved the key and when; `null` when it needed no approval.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "created_at": {
                   "format": "date-time",
                   "type": "string"
@@ -52792,6 +53712,11 @@
                     "string",
                     "null"
                   ]
+                },
+                "status": {
+                  "description": "`active` (works) or `pending` (waits for an administrator's approval: requests with it get\n401 `auth.api_key_pending`).",
+                  "example": "active",
+                  "type": "string"
                 }
               },
               "required": [
@@ -52801,6 +53726,7 @@
                 "permissions",
                 "org_id",
                 "allowed_ips",
+                "status",
                 "created_at",
                 "kind"
               ],
@@ -56448,6 +57374,66 @@
                 "member_count",
                 "excluded_org_count",
                 "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GuardrailResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The most permissions a tenant below this one can use.",
+              "properties": {
+                "max_permissions": {
+                  "description": "The permissions roles there may still grant, sorted by name. Any other permission is\nrefused with `permission_denied` and `reason: outside_guardrail`, even for administrators.",
+                  "example": [
+                    "content.read",
+                    "content.write"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "set_by_tenant_id": {
+                  "description": "The tenant above it that set the guardrail.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "tenant_id": {
+                  "description": "The tenant limited by the guardrail (and every tenant below it).",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "updated_by": {
+                  "description": "Who set it last, and when.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "tenant_id",
+                "set_by_tenant_id",
+                "max_permissions",
+                "updated_by",
                 "updated_at"
               ],
               "type": "object"
@@ -62124,6 +63110,72 @@
         ],
         "type": "object"
       },
+      "Page_ShippingCalendar": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A delivery calendar.",
+              "properties": {
+                "days": {
+                  "description": "Holidays and special days (only in single-calendar answers).",
+                  "items": {
+                    "$ref": "#/components/schemas/ShippingCalendarDayEntry"
+                  },
+                  "type": "array"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "time_zone": {
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "working_days": {
+                  "description": "1 = Monday … 7 = Sunday.",
+                  "items": {
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "name",
+                "time_zone",
+                "working_days",
+                "days",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ShippingCarrierAccount": {
         "description": "One page of a list.",
         "properties": {
@@ -65698,6 +66750,9 @@
             "example": "validation_failed",
             "type": "string"
           },
+          "current": {
+            "description": "For `precondition_failed` on endpoints that say so: the record as it is now on the server,\nin the same shape as reading it. Its version is in the `ETag` header: merge your change\ninto it and send that `ETag` in `If-Match`."
+          },
           "detail": {
             "description": "Human-readable explanation of what went wrong and how to fix it.",
             "type": "string"
@@ -66984,6 +68039,173 @@
         "required": [
           "authority_code",
           "status"
+        ],
+        "type": "object"
+      },
+      "PromotionsNoticeEntry": {
+        "description": "The notice to one authority.",
+        "properties": {
+          "authority_code": {
+            "description": "Authority, e.g. `province:79` (the provincial Department of Industry and Trade).",
+            "type": "string"
+          },
+          "days_before": {
+            "description": "Days before the start the notice is due.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "due_on": {
+            "description": "Last day to submit (Vietnam date), when a notice is required.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "legal_basis": {
+            "description": "Legal basis of the rule, with its date in force.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Reference given by the authority, when recorded.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "required": {
+            "description": "Whether the rule in force asks for a notice.",
+            "type": "boolean"
+          },
+          "status": {
+            "description": "`pending`, `submitted` or `not_required`.",
+            "type": "string"
+          },
+          "submitted_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "authority_code",
+          "required",
+          "status"
+        ],
+        "type": "object"
+      },
+      "PromotionsNoticeExport": {
+        "description": "The data of a promotion notice, one entry per authority.",
+        "properties": {
+          "authorities": {
+            "items": {
+              "$ref": "#/components/schemas/PromotionsNoticeEntry"
+            },
+            "type": "array"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "ends_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "flash_item_count": {
+            "description": "Number of flash-sale or add-on prices.",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "jurisdiction": {
+            "description": "Jurisdiction of the law data used.",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind of the promotion (`percent_off`, `flash_sale`…).",
+            "type": "string"
+          },
+          "locale": {
+            "description": "Locale of `title` and `terms`.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Unit that runs the promotion.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "promotion_kind": {
+            "description": "Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…).",
+            "type": "string"
+          },
+          "rules_found": {
+            "description": "`false` when no notice rule is in force for this kind of promotion on its start day\n(load the law data with `autoxide task promotions.load_legal_data`).",
+            "type": "boolean"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "Status of the promotion.",
+            "type": "string"
+          },
+          "target_count": {
+            "description": "Number of products, variants and categories the promotion targets (0 = the whole store).",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "terms": {
+            "description": "Conditions shown to buyers.",
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "value_bp": {
+            "description": "Discount in basis points (1000 = 10%), when the promotion has one.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "value_minor": {
+            "description": "Discount amount in minor units of `currency`, when the promotion has one.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "promotion_id",
+          "org_id",
+          "kind",
+          "promotion_kind",
+          "locale",
+          "title",
+          "terms",
+          "starts_at",
+          "ends_at",
+          "currency",
+          "target_count",
+          "flash_item_count",
+          "status",
+          "jurisdiction",
+          "rules_found",
+          "authorities"
         ],
         "type": "object"
       },
@@ -71350,6 +72572,20 @@
         ],
         "type": "object"
       },
+      "RequestOrderShipmentRequest": {
+        "additionalProperties": false,
+        "description": "A shipment to request.",
+        "properties": {
+          "note": {
+            "description": "Note for the carrier.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "RescheduleBookingRequest": {
         "additionalProperties": false,
         "description": "The new time of a booking.",
@@ -73168,6 +74404,150 @@
         },
         "type": "object"
       },
+      "ShippingCalendar": {
+        "description": "A delivery calendar.",
+        "properties": {
+          "days": {
+            "description": "Holidays and special days (only in single-calendar answers).",
+            "items": {
+              "$ref": "#/components/schemas/ShippingCalendarDayEntry"
+            },
+            "type": "array"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "time_zone": {
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "working_days": {
+            "description": "1 = Monday … 7 = Sunday.",
+            "items": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "name",
+          "time_zone",
+          "working_days",
+          "days",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ShippingCalendarDay": {
+        "additionalProperties": false,
+        "description": "A day with other rules than usual.",
+        "properties": {
+          "cutoff_minute": {
+            "description": "`special_hours`: orders before this minute of the day leave that day.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`closed` (no dispatch: holiday) or `special_hours` (dispatch with its own cut-off).",
+            "type": "string"
+          },
+          "note": {
+            "description": "E.g. the name of the holiday.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "type": "object"
+      },
+      "ShippingCalendarDayEntry": {
+        "description": "A special day of a calendar.",
+        "properties": {
+          "cutoff_minute": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "day": {
+            "format": "date",
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "note": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "kind",
+          "note"
+        ],
+        "type": "object"
+      },
+      "ShippingCalendarFields": {
+        "additionalProperties": false,
+        "description": "Fields of a delivery calendar; on create `name` is required.",
+        "properties": {
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Organization unit owning the calendar (create only).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "time_zone": {
+            "description": "IANA time zone; default `Asia/Ho_Chi_Minh`.",
+            "example": "Asia/Ho_Chi_Minh",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "working_days": {
+            "description": "Working days of the week, 1 = Monday … 7 = Sunday; default Monday to Friday.",
+            "items": {
+              "format": "int32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "ShippingCarrierAccount": {
         "description": "A carrier account. Credentials are never returned: only the names of the fields set.",
         "properties": {
@@ -73489,6 +74869,26 @@
           "return"
         ],
         "type": "string"
+      },
+      "ShippingEstimate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ShippingQuote"
+          },
+          {
+            "properties": {
+              "estimate": {
+                "description": "Always `true`: the fee is computed again when the order is placed.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "estimate"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A public shipping estimate."
       },
       "ShippingEta": {
         "description": "Expected delivery dates.",
@@ -74212,61 +75612,6 @@
         ],
         "type": "object"
       },
-      "ShippingQuoteItem": {
-        "additionalProperties": false,
-        "description": "One line of the cart, with the figures of the variant (from the catalog).",
-        "properties": {
-          "height_mm": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "length_mm": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "quantity": {
-            "format": "int64",
-            "type": "integer"
-          },
-          "requires_shipping": {
-            "description": "`false` for digital goods and services: not weighed, not shipped.",
-            "type": "boolean"
-          },
-          "sku": {
-            "type": "string"
-          },
-          "variant_id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "weight_grams": {
-            "description": "Weight of one item, grams.",
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          },
-          "width_mm": {
-            "format": "int64",
-            "type": [
-              "integer",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "variant_id",
-          "quantity"
-        ],
-        "type": "object"
-      },
       "ShippingQuoteRequest": {
         "additionalProperties": false,
         "description": "A cart to quote.",
@@ -74280,10 +75625,56 @@
             ]
           },
           "destination": {
+            "description": "Where to deliver; leave out for store pickup only.",
             "oneOf": [
               {
-                "$ref": "#/components/schemas/ShippingPostalAddress",
-                "description": "Where to deliver; leave out for store pickup only."
+                "additionalProperties": false,
+                "description": "A postal address. In Vietnam: `province_code` and `commune_code` from the official list of\nadministrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the\nregion (state, province…), `city` the city, with an optional `postal_code`.",
+                "properties": {
+                  "city": {
+                    "description": "Outside Vietnam: the city (required).",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "commune_code": {
+                    "description": "Vietnam: code of the commune, ward or special zone (required).",
+                    "example": "00004",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "country": {
+                    "description": "ISO 3166-1 alpha-2 country code.",
+                    "example": "VN",
+                    "type": "string"
+                  },
+                  "line": {
+                    "description": "House number, street, village… (1 to 300 characters).",
+                    "example": "12 Trang Tien",
+                    "type": "string"
+                  },
+                  "postal_code": {
+                    "description": "Postal code, mostly for addresses outside Vietnam.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "province_code": {
+                    "description": "Vietnam: code of the province. Elsewhere: the region.",
+                    "example": "01",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "country",
+                  "province_code",
+                  "line"
+                ],
+                "type": "object"
               },
               {
                 "type": "null"
@@ -74292,7 +75683,59 @@
           },
           "items": {
             "items": {
-              "$ref": "#/components/schemas/ShippingQuoteItem"
+              "additionalProperties": false,
+              "description": "One line of the cart, with the figures of the variant (from the catalog).",
+              "properties": {
+                "height_mm": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "length_mm": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "requires_shipping": {
+                  "description": "`false` for digital goods and services: not weighed, not shipped.",
+                  "type": "boolean"
+                },
+                "sku": {
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "weight_grams": {
+                  "description": "Weight of one item, grams.",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "width_mm": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "type": "object"
             },
             "type": "array"
           },
@@ -77511,6 +78954,42 @@
         },
         "required": [
           "reason"
+        ],
+        "type": "object"
+      },
+      "SyncResourceView": {
+        "description": "A kind of record an offline app can keep in sync.",
+        "properties": {
+          "changes": {
+            "description": "The change feed: `GET` it with the `cursor` of the last change you applied.",
+            "example": "/api/v1/notes/changes",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "description": "`<module>.<name>`.",
+            "example": "notes.notes",
+            "type": "string"
+          },
+          "path": {
+            "description": "The list endpoint of these records; writes in a batch go under this path.",
+            "example": "/api/v1/notes",
+            "type": "string"
+          },
+          "read_permission": {
+            "description": "The permission needed to read them; its scope decides which records you get.",
+            "example": "notes.read",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "path",
+          "changes",
+          "read_permission",
+          "description"
         ],
         "type": "object"
       },
@@ -83670,7 +85149,7 @@
     },
     "/api/v1/auth/all-api-keys": {
       "get": {
-        "description": "Requires `auth.api_keys.manage`. Newest first unless `order=asc`, with the owner's name and\nemail; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.",
+        "description": "Requires `auth.api_keys.manage`, or `auth.api_keys.approve` to list the keys waiting for\napproval. Newest first unless `order=asc`, with the owner's name and\nemail; secrets are never listed. Revoke one with `DELETE /api/v1/auth/all-api-keys/{id}`.",
         "operationId": "auth_list_all_api_keys",
         "parameters": [
           {
@@ -83680,6 +85159,16 @@
             "required": false,
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only keys in this state: `active` or `pending` (waiting for approval). Callers with\n`auth.api_keys.approve` but not `auth.api_keys.manage` always get `pending` keys only.",
+            "example": "pending",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
               "type": "string"
             }
           },
@@ -83811,6 +85300,12 @@
             "operator": "eq"
           },
           {
+            "description": "Only keys in this state: `active` or `pending` (waiting for approval). Callers with\n`auth.api_keys.approve` but not `auth.api_keys.manage` always get `pending` keys only.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
             "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
             "kind": "boolean",
             "name": "count",
@@ -83819,7 +85314,8 @@
         ],
         "x-autoxide-list": "auth.list_all_api_keys",
         "x-permissions": [
-          "auth.api_keys.manage"
+          "auth.api_keys.manage",
+          "auth.api_keys.approve"
         ]
       }
     },
@@ -83920,6 +85416,123 @@
         ],
         "x-permissions": [
           "auth.api_keys.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/all-api-keys/{id}/approve": {
+      "post": {
+        "description": "Requires `auth.api_keys.approve`, from a signed-in session (an API key cannot approve keys).\nThe key works from now on; the audit log records who approved it. To refuse a key, revoke it\nwith `DELETE /api/v1/auth/all-api-keys/{id}`.",
+        "operationId": "auth_approve_api_key",
+        "parameters": [
+          {
+            "description": "Id of the key.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ApiKeyResponse"
+                }
+              }
+            },
+            "description": "The key, now `active`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.api_keys.approve` (code `permission_denied`), or the request used an API key (code `auth.api_key_cannot_approve_keys`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No key has this id; code `auth.api_key_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The key does not wait for approval; code `auth.api_key_not_pending`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Approve an API key that waits for approval.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.api_keys.approve"
         ]
       }
     },
@@ -85392,6 +87005,434 @@
           "auth"
         ],
         "x-public": true
+      }
+    },
+    "/api/v1/auth/guardrails": {
+      "get": {
+        "description": "Requires `auth.guardrails.manage`. Newest first unless `order=asc`.",
+        "operationId": "auth_list_guardrails",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GuardrailResponse"
+                }
+              }
+            },
+            "description": "One page of guardrails."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the guardrails this tenant set for tenants below it.",
+        "tags": [
+          "auth"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_guardrails",
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/guardrails/applied": {
+      "get": {
+        "description": "Requires `auth.roles.read`. Tenants above this one may set the most permissions anyone here can\nuse; this lists them and what they allow together.",
+        "operationId": "auth_applied_guardrails",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AppliedGuardrailsResponse"
+                }
+              }
+            },
+            "description": "The guardrails on this tenant."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.roles.read`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "See the guardrails that limit this tenant.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.roles.read"
+        ]
+      }
+    },
+    "/api/v1/auth/guardrails/{tenant_id}": {
+      "delete": {
+        "description": "Requires `auth.guardrails.manage`. Guardrails set by other tenants above stay.",
+        "operationId": "auth_remove_guardrail",
+        "parameters": [
+          {
+            "description": "Id of the tenant below this one.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The guardrail was removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage` (code `permission_denied`), or the tenant is not below this one (code `auth.guardrail_not_a_child`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "This tenant set no guardrail for it; code `auth.guardrail_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove the guardrail this tenant set for a tenant below it.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `auth.guardrails.manage`, from this tenant's own accounts (not while working in another\ntenant). The tenant must be below this one in the customer tree. Takes effect for that tenant\nand every tenant below it, for every role including administrators, within 30 seconds on every\nserver. Guardrails set by several tenants above all apply: a tenant cannot widen what a tenant\nabove it allowed.",
+        "operationId": "auth_set_guardrail",
+        "parameters": [
+          {
+            "description": "Id of the tenant below this one.",
+            "in": "path",
+            "name": "tenant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuardrailRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GuardrailResponse"
+                }
+              }
+            },
+            "description": "The guardrail as set."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.guardrails.manage` (code `permission_denied`), or the tenant is not below this one (code `auth.guardrail_not_a_child`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A permission is unknown; code `validation_failed`, see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the most permissions a tenant below this one can use.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.guardrails.manage"
+        ]
       }
     },
     "/api/v1/auth/invitations": {
@@ -150019,6 +152060,163 @@
         "x-permissions": []
       }
     },
+    "/api/v1/kernel/sync/batch": {
+      "post": {
+        "description": "Runs each write, in order, exactly as its REST endpoint would (same permissions, checks and\nanswers), and answers one result per write; a failed write does not stop the others. Give each\nwrite an `idempotency_key` and keep it: sending the batch again does not repeat what was done.\nSend the record's `ETag` in `if_match`: a write over someone else's change answers `412` with\nthe current record. Each write needs the permission of its endpoint.",
+        "operationId": "kernel_sync_batch",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_BatchResult"
+                }
+              }
+            },
+            "description": "One result per write, in the order sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The batch is invalid (no writes, more than 100, a path outside the sync resources…); see `errors`. Nothing was run."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send writes queued while offline.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/sync/resources": {
+      "get": {
+        "description": "Each kind of record has a change feed (`changes`): load the list endpoint once, then ask the\nfeed for what changed, keeping the `cursor` of the last change. Queue your writes on the device\nand send them with `POST /api/v1/kernel/sync/batch`. Needs only to be signed in.",
+        "operationId": "kernel_list_sync_resources",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_SyncResourceView"
+                }
+              }
+            },
+            "description": "The kinds of records that can be kept in sync."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List what an offline app can keep in sync.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/kernel/tags": {
       "get": {
         "description": "Any signed-in user. Every tag of the tenant, by name, with how many records carry it.",
@@ -175868,6 +178066,113 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/cancel": {
+      "post": {
+        "description": "Signed in: an order you placed. Allowed until the status the shop's policy says\n(`orders.buyer_cancel_until`, by default while the order is not being prepared yet); a paid\norder is refunded through the payment partner.",
+        "operationId": "orders_cancel_my_order",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CancelMyOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersOrder"
+                }
+              }
+            },
+            "description": "The cancelled order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too late to cancel by yourself; code `orders.cancel_not_allowed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Cancel one of your orders.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/public/payments/{token}": {
       "get": {
         "description": "Public, with the `status_token` of a payment action; works until the payment deadline (and\nafter the payment succeeded). Poll it while the buyer pays.",
@@ -175984,7 +178289,15 @@
                 }
               }
             },
-            "description": "The order with lines and payments."
+            "description": "The order with lines and payments.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the order, for `If-Match`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "content": {
@@ -176033,6 +178346,380 @@
         ],
         "x-permissions": [
           "orders.read"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/payment-link": {
+      "post": {
+        "description": "Requires `orders.manage` at the order's shop. For an order waiting for payment before its\ndeadline: the payment actions still valid (starting the payment again when it could not be\nstarted at checkout), to send to the buyer.",
+        "operationId": "orders_resend_order_payment_link",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersPaymentAction"
+                }
+              }
+            },
+            "description": "The payment actions of the order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not waiting for payment (`orders.invalid_transition`) or its deadline passed (`orders.payment_expired`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Resend the payment of an order.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/shipments": {
+      "post": {
+        "description": "Requires `orders.manage` at the order's shop. Accepts the order (`preparing`) when it is\n`confirmed`, then asks the shipping module for a shipment of the items to deliver (with the\ncash to collect for cash-on-delivery orders). Sent again while preparing: the same request.",
+        "operationId": "orders_request_order_shipment",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestOrderShipmentRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersShipmentRequested"
+                }
+              }
+            },
+            "description": "Requested; the shipment appears at the shipping module."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order cannot ship in its status; code `orders.shipment_not_allowed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order has nothing to deliver or no delivery address; code `orders.delivery_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Request a shipment for an order.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/transitions": {
+      "post": {
+        "description": "Requires `orders.manage` at the order's shop and the `If-Match` header with the order's\n`ETag`. Only moves of the lifecycle table are allowed; cancelling a paid order refunds it\nthrough the payment partner.",
+        "operationId": "orders_transition_order",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read.",
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersTransitionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersOrder"
+                }
+              }
+            },
+            "description": "The order after the move.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the order.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the order's shop; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The move is not in the lifecycle table; code `orders.invalid_transition`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order changed since you read it; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Unknown status (see `errors`)."
+          },
+          "428": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` is missing; code `precondition_required`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Move an order through its lifecycle.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
         ]
       }
     },
@@ -186176,6 +188863,127 @@
         ]
       }
     },
+    "/api/v1/promotions/promotions/{id}/notice-export": {
+      "get": {
+        "description": "Requires `promotions.compliance` and `promotions.read`. For each authority that must be told\nof the promotion under the rules in force on its start day (e.g. `province:79`, the\nDepartment of Industry and Trade of that province): whether a notice is required, the last day\nto submit, the legal basis and what was recorded with\n`PATCH /api/v1/promotions/{id}/notices/{authority_code}`. People submit the notice; this only\nprepares the data. `rules_found` is `false` when no law data is in force for the promotion.",
+        "operationId": "promotions_export_promotion_notice",
+        "parameters": [
+          {
+            "description": "Id of the promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`json` (default) or `csv` (one line per authority, safe to open in a spreadsheet).",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "oneOf": [
+                {
+                  "description": "Format of an export.",
+                  "enum": [
+                    "json",
+                    "csv"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_PromotionsNoticeExport"
+                }
+              },
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The notice data: JSON (`format=json`) or a CSV file (`format=csv`)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.compliance` or `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion in your scope; code `promotions.not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export the data of a promotion notice, one entry per authority.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.compliance",
+          "promotions.read"
+        ]
+      }
+    },
     "/api/v1/promotions/promotions/{id}/notices/{authority_code}": {
       "patch": {
         "description": "Requires `promotions.compliance`. The authority code is the one shown by `activation-check`\n(e.g. `province:79` for the Department of Industry and Trade of that province). People\nsubmit the notice; this only records it.",
@@ -188365,6 +191173,724 @@
         ]
       }
     },
+    "/api/v1/shipping/calendars": {
+      "get": {
+        "operationId": "shipping_list_shipping_calendars",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ShippingCalendar"
+                }
+              }
+            },
+            "description": "One page of calendars, without their special days."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List delivery calendars.",
+        "tags": [
+          "shipping"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "shipping.list_shipping_calendars",
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      },
+      "post": {
+        "description": "Needs `shipping.settings.manage` at the unit. Methods use it (`calendar_id`) to compute expected\ndelivery dates and same-day cut-offs.",
+        "operationId": "shipping_create_shipping_calendar",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingCalendarFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingCalendar"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage` at the unit; codes `permission_denied`, `org_out_of_scope`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a delivery calendar.",
+        "tags": [
+          "shipping"
+        ],
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/shipping/calendars/{id}": {
+      "get": {
+        "operationId": "shipping_get_shipping_calendar",
+        "parameters": [
+          {
+            "description": "Id of the calendar.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingCalendar"
+                }
+              }
+            },
+            "description": "The calendar."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No calendar with this id in your scope; code `shipping.calendar_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a delivery calendar with its special days.",
+        "tags": [
+          "shipping"
+        ],
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      },
+      "patch": {
+        "operationId": "shipping_update_shipping_calendar",
+        "parameters": [
+          {
+            "description": "Id of the calendar.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingCalendarFields"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingCalendar"
+                }
+              }
+            },
+            "description": "The calendar after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage` at the unit; codes `permission_denied`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No calendar with this id in your scope; code `shipping.calendar_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a delivery calendar.",
+        "tags": [
+          "shipping"
+        ],
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/shipping/calendars/{id}/days/{day}": {
+      "delete": {
+        "operationId": "shipping_delete_shipping_calendar_day",
+        "parameters": [
+          {
+            "description": "Id of the calendar.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The day, `YYYY-MM-DD`.",
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingCalendar"
+                }
+              }
+            },
+            "description": "The calendar after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage` at the unit; codes `permission_denied`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No calendar with this id in your scope; code `shipping.calendar_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a special day of a delivery calendar.",
+        "tags": [
+          "shipping"
+        ],
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      },
+      "put": {
+        "operationId": "shipping_set_shipping_calendar_day",
+        "parameters": [
+          {
+            "description": "Id of the calendar.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The day, `YYYY-MM-DD`.",
+            "in": "path",
+            "name": "day",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShippingCalendarDay"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingCalendar"
+                }
+              }
+            },
+            "description": "The calendar after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `shipping.settings.manage` at the unit; codes `permission_denied`, `org_frozen`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No calendar with this id in your scope; code `shipping.calendar_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set a special day of a delivery calendar (holiday, other cut-off).",
+        "tags": [
+          "shipping"
+        ],
+        "x-permissions": [
+          "shipping.settings.manage"
+        ]
+      }
+    },
     "/api/v1/shipping/carrier-accounts": {
       "get": {
         "description": "Needs `shipping.carriers.manage`.",
@@ -188961,7 +192487,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -189009,6 +192535,7 @@
         ],
         "x-autoxide-list": "shipping.list_shipping_cod_discrepancies",
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       }
@@ -189359,7 +192886,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "422": {
             "content": {
@@ -189401,6 +192928,7 @@
         ],
         "x-autoxide-list": "shipping.list_shipping_cod_statements",
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       },
@@ -189614,7 +193142,7 @@
                 }
               }
             },
-            "description": "Missing `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+            "description": "Missing `shipping.cod.read` or `shipping.cod.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
           },
           "404": {
             "content": {
@@ -189647,6 +193175,7 @@
           "shipping"
         ],
         "x-permissions": [
+          "shipping.cod.read",
           "shipping.cod.manage"
         ]
       }
@@ -191178,6 +194707,162 @@
         "x-permissions": [
           "shipping.settings.manage"
         ]
+      }
+    },
+    "/api/v1/shipping/public/estimate": {
+      "get": {
+        "description": "Public. Fees and expected delivery dates to a province for a quantity of one variant, from the\nsame rates as checkout, with the free-shipping threshold and today's cut-off of the store. Only\nan estimate: the fee is computed again for the real cart.",
+        "operationId": "shipping_estimate_shipping",
+        "parameters": [
+          {
+            "description": "The variant on the product page.",
+            "in": "query",
+            "name": "variant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Its product (checked when given).",
+            "in": "query",
+            "name": "product_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Default 1.",
+            "in": "query",
+            "name": "quantity",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Code of the destination province.",
+            "in": "query",
+            "name": "province_code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO country code, default `VN`.",
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The selling store when a chain website sells from one store; default: the product's unit.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "ISO 4217 currency, default `VND`.",
+            "in": "query",
+            "name": "currency",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of method names, default `en`.",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ShippingEstimate"
+                }
+              }
+            },
+            "description": "The options, cheapest first (`estimate: true`). Cached briefly."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No variant on sale with this id; code `shipping.variant_not_for_sale`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A parameter is invalid; see `errors`. No catalog installed: `shipping.estimate_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Estimate shipping for a product page.",
+        "tags": [
+          "shipping"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/shipping/quote": {

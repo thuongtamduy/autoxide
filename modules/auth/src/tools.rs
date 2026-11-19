@@ -552,6 +552,11 @@ mod tests {
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
                 catalog: services.roles.catalog().clone(),
             }),
+            guardrails: Arc::new(crate::guardrail::GuardrailService::new(
+                autoxide_kernel::tenancy::DatabaseRegistry::single(services.database.clone()),
+                services.roles.catalog().clone(),
+                autoxide_kernel::event::Outbox::standalone("auth"),
+            )),
             personal_data: services.personal_data.clone(),
             self_registration: false,
             country_header: None,

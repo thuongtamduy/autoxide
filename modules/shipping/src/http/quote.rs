@@ -26,18 +26,18 @@ use crate::service::ShippingService;
 #[schema(as = ShippingQuoteItem)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ItemBody {
-    variant_id: Uuid,
+    pub(crate) variant_id: Uuid,
     #[serde(default)]
-    sku: String,
-    quantity: i64,
+    pub(crate) sku: String,
+    pub(crate) quantity: i64,
     /// `false` for digital goods and services: not weighed, not shipped.
     #[serde(default = "yes")]
-    requires_shipping: bool,
+    pub(crate) requires_shipping: bool,
     /// Weight of one item, grams.
-    weight_grams: Option<i64>,
-    length_mm: Option<i64>,
-    width_mm: Option<i64>,
-    height_mm: Option<i64>,
+    pub(crate) weight_grams: Option<i64>,
+    pub(crate) length_mm: Option<i64>,
+    pub(crate) width_mm: Option<i64>,
+    pub(crate) height_mm: Option<i64>,
 }
 
 fn yes() -> bool {
@@ -50,18 +50,20 @@ fn yes() -> bool {
 #[serde(deny_unknown_fields)]
 pub(crate) struct QuoteBody {
     /// The selling store; methods of the units above it apply too.
-    org_id: Uuid,
+    pub(crate) org_id: Uuid,
     /// The warehouse shipping, when known.
-    origin_org_id: Option<Uuid>,
+    pub(crate) origin_org_id: Option<Uuid>,
     /// Where to deliver; leave out for store pickup only.
-    destination: Option<PostalAddressRequest>,
-    items: Vec<ItemBody>,
+    #[schema(inline)]
+    pub(crate) destination: Option<PostalAddressRequest>,
+    #[schema(inline)]
+    pub(crate) items: Vec<ItemBody>,
     /// Order value after discounts, for free shipping.
-    order_value: Money,
+    pub(crate) order_value: Money,
     /// Time of the order (default: now).
-    at: Option<DateTime<Utc>>,
+    pub(crate) at: Option<DateTime<Utc>>,
     /// Language of method names (default `en`).
-    locale: Option<String>,
+    pub(crate) locale: Option<String>,
 }
 
 /// Expected delivery dates.

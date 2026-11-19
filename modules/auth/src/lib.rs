@@ -23,6 +23,9 @@ mod doctor;
 mod email_report;
 mod events;
 mod find;
+mod guardrail;
+#[cfg(test)]
+mod guardrail_tests;
 mod http;
 mod invitation;
 mod login_link;
@@ -263,16 +266,19 @@ impl Module for AuthModule {
                 .with_entitlements(context.entitlements()),
         );
         context.usage_counter(&crate::role::MEMBERS_LIMIT, Arc::new(crate::role::MemberCounter))?;
-        let api_keys = Arc::new(
-            ApiKeyService::new(
-                roles.clone(),
-                sessions.clone(),
-                outbox.clone(),
-                mfa.clone(),
-                passkeys.clone(),
-            )
-            .with_max_days(config.api_key_max_days),
-        );
+        let mut api_keys = ApiKeyService::new(
+            roles.clone(),
+            sessions.clone(),
+            outbox.clone(),
+            mfa.clone(),
+            passkeys.clone(),
+        )
+        .with_max_days(config.api_key_max_days);
+        // Cấu hình theo khách do kernel công bố; thiếu (chương trình rút gọn) thì không duyệt key.
+        if let Ok(settings) = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>() {
+            api_keys = api_keys.with_settings(settings);
+        }
+        let api_keys = Arc::new(api_keys);
         let resets = Arc::new(reset::PasswordResets {
             jobs: context.jobs(),
             users: users.clone(),
@@ -295,7 +301,13 @@ impl Module for AuthModule {
             max_hours: config.support_max_hours,
             catalog: context.permissions().clone(),
         });
+        let guardrails = Arc::new(guardrail::GuardrailService::new(
+            databases.clone(),
+            context.permissions().clone(),
+            outbox.clone(),
+        ));
         let authenticator = RequestAuthenticator {
+            guardrails: guardrails.clone(),
             support: support.clone(),
             sessions: sessions.clone(),
             roles: roles.clone(),
@@ -387,6 +399,7 @@ impl Module for AuthModule {
             invitations,
             login_links,
             delegations,
+            guardrails,
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reauth,
             personal_data: context.personal_data_export(),
@@ -412,6 +425,10 @@ impl Module for AuthModule {
 
     fn permissions(&self) -> Vec<Permission> {
         permissions::all()
+    }
+
+    fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
+        vec![api_key::REQUIRE_APPROVAL]
     }
 
     fn events(&self) -> Vec<EventInfo> {
@@ -493,7 +510,10 @@ impl Module for AuthModule {
 
     // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
-        sandbox::subscriptions()
+        let mut subscriptions = sandbox::subscriptions();
+        let guardrails = self.state.as_ref().map(|state| state.guardrails.clone());
+        subscriptions.extend(guardrail::subscriptions(guardrails));
+        subscriptions
     }
 
     // Sao role vào sandbox mới (bước 38, D-232).

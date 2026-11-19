@@ -553,14 +553,12 @@ impl ContentService {
     ) -> Result<Vec<(Uuid, f32, i32)>, Error> {
         let query = self.query_vector(tenant, q).await?;
         let loaded = self.loaded(tenant, scope, locale).await?;
-        let mut best: HashMap<Uuid, (f32, i32)> = HashMap::new();
-        for (entry_id, chunk, vector) in &loaded.chunks {
-            let similarity = vector::dot(&query, vector);
-            let slot = best.entry(*entry_id).or_insert((f32::MIN, *chunk));
-            if similarity > slot.0 {
-                *slot = (similarity, *chunk);
-            }
-        }
+        // Duyệt mọi vector là việc CPU dài (100 000 đoạn × 1 024 chiều ~50 ms một nhân): chạy trên
+        // thread cho việc chặn của tokio để không giữ thread async, và chia ra các nhân (bước 39 B6,
+        // `docs/BENCHMARKS.md` "Tìm theo ý nghĩa").
+        let best = tokio::task::spawn_blocking(move || best_chunks(&query, &loaded.chunks))
+            .await
+            .map_err(Error::internal)??;
         let mut ranked: Vec<(Uuid, f32, i32)> =
             best.into_iter().map(|(id, (similarity, chunk))| (id, similarity, chunk)).collect();
         ranked.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
@@ -752,6 +750,58 @@ impl ContentService {
 }
 
 /// Chữ của mục cắt thành đoạn: tiêu đề và tóm tắt đầu mỗi đoạn (cho đoạn có ngữ cảnh), rồi
+/// Số đoạn tối thiểu mỗi khúc khi chia ra nhiều nhân: ít hơn thì mở thread tốn hơn tính.
+const CHUNKS_PER_THREAD: usize = 10_000;
+
+/// Đoạn giống `query` nhất của mỗi mục: mục → (độ giống, số thứ tự đoạn). Chia `chunks` thành các
+/// khúc liền nhau, mỗi nhân một khúc (`std::thread::scope`: thread mượn được dữ liệu, xong hết mới
+/// trả về), rồi gộp theo thứ tự khúc — bằng nhau thì giữ đoạn đứng trước, như duyệt một lượt.
+fn best_chunks(
+    query: &[f32],
+    chunks: &[(Uuid, i32, Vec<f32>)],
+) -> Result<HashMap<Uuid, (f32, i32)>, Error> {
+    let threads = std::thread::available_parallelism()
+        .map_or(1, std::num::NonZeroUsize::get)
+        .min(chunks.len() / CHUNKS_PER_THREAD)
+        .max(1);
+    if threads == 1 {
+        return Ok(best_in(query, chunks));
+    }
+    let size = chunks.len().div_ceil(threads);
+    let parts: Vec<HashMap<Uuid, (f32, i32)>> = std::thread::scope(|scope| {
+        let handles: Vec<_> =
+            chunks.chunks(size).map(|part| scope.spawn(move || best_in(query, part))).collect();
+        handles
+            .into_iter()
+            .map(|handle| {
+                handle.join().map_err(|_| Error::internal("a semantic search thread failed"))
+            })
+            .collect::<Result<_, _>>()
+    })?;
+    let mut best: HashMap<Uuid, (f32, i32)> = HashMap::new();
+    for part in parts {
+        for (entry_id, (similarity, chunk)) in part {
+            let slot = best.entry(entry_id).or_insert((f32::MIN, chunk));
+            if similarity > slot.0 {
+                *slot = (similarity, chunk);
+            }
+        }
+    }
+    Ok(best)
+}
+
+fn best_in(query: &[f32], chunks: &[(Uuid, i32, Vec<f32>)]) -> HashMap<Uuid, (f32, i32)> {
+    let mut best: HashMap<Uuid, (f32, i32)> = HashMap::new();
+    for (entry_id, chunk, vector) in chunks {
+        let similarity = vector::dot(query, vector);
+        let slot = best.entry(*entry_id).or_insert((f32::MIN, *chunk));
+        if similarity > slot.0 {
+            *slot = (similarity, *chunk);
+        }
+    }
+    best
+}
+
 /// ~[`CHUNK_WORDS`] từ, chồng [`OVERLAP_WORDS`] từ lên đoạn trước. Ít nhất một đoạn.
 pub(crate) fn chunks(title: &str, excerpt: &str, plain_text: &str) -> Vec<String> {
     let header: String = [title, excerpt]
@@ -921,5 +971,24 @@ mod tests {
         assert!(pieces[0].starts_with("0 ") && pieces[0].ends_with(" 299"));
         assert!(pieces[1].starts_with("250 "), "overlaps the previous chunk");
         assert!(pieces[2].ends_with(" 699"));
+    }
+
+    #[test]
+    fn chia_nhieu_nhan_cho_ket_qua_nhu_duyet_mot_luot() {
+        // Đủ đoạn để chia ra nhiều khúc; mỗi mục 3 đoạn, có đoạn trùng điểm để thử luật "bằng nhau
+        // thì giữ đoạn đứng trước" qua ranh giới khúc.
+        let entries: Vec<Uuid> = (0..12_000).map(|_| Uuid::now_v7()).collect();
+        let mut data = Vec::new();
+        for (index, entry) in entries.iter().enumerate() {
+            for chunk in 0..3 {
+                let value = ((index * 7 + chunk * 3) % 11) as f32;
+                let tie = if chunk == 2 { 0.0 } else { value };
+                data.push((*entry, i32::try_from(chunk).unwrap(), vec![tie, 1.0, 0.5]));
+            }
+        }
+        let query = [0.3, 0.2, 0.1];
+        let parallel = best_chunks(&query, &data).unwrap();
+        assert_eq!(parallel, best_in(&query, &data));
+        assert_eq!(parallel.len(), entries.len());
     }
 }

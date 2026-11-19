@@ -369,6 +369,14 @@ pub trait Module: Send + Sync {
     fn promotable(&self) -> Vec<crate::tenancy::sandbox::Promotable> {
         Vec::new()
     }
+
+    /// Loại bản ghi app ngoại tuyến đồng bộ được (bước 69 P2, D-20261119-step69-sync): module có
+    /// thì thêm `sync::changes_migration` vào migration, ghi thay đổi bằng `StartContext::sync_log`
+    /// trong transaction ghi, và phục vụ `GET <đường dẫn>/changes`. Kernel kiểm khai báo lúc khởi
+    /// động. Mặc định: không có.
+    fn sync_resources(&self) -> Vec<crate::sync::SyncResource> {
+        Vec::new()
+    }
 }
 
 /// Những gì một module nhận được lúc khởi động.
@@ -406,6 +414,7 @@ pub struct StartContext<'a> {
     facts: &'a crate::report::FactCatalog,
     analytics: &'a crate::analytics::AnalyticsCatalog,
     automations: &'a crate::automation::AutomationDirectory,
+    sync_keep: chrono::Duration,
     /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
     partners: &'a crate::tenancy::sandbox::PartnerGuard,
     /// Sổ sao / đẩy sandbox của mọi module, điền sau khi mọi module khởi động.
@@ -496,6 +505,12 @@ impl StartContext<'_> {
             )));
         }
         Ok(Outbox::with_wake(self.module, Arc::clone(self.wake)))
+    }
+
+    /// Nơi module ghi và đọc luồng thay đổi cho app ngoại tuyến (bước 69 P2): bảng
+    /// `<module>_changes`, thời hạn giữ theo `AUTOXIDE_SYNC_RETENTION_DAYS`.
+    pub fn sync_log(&self) -> crate::sync::SyncLog {
+        crate::sync::SyncLog::new(self.module, self.sync_keep)
     }
 
     /// Đăng ký phần dữ liệu cá nhân module giữ, để có trong bản xuất dữ liệu của người

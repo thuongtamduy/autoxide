@@ -135,6 +135,7 @@ pub(crate) async fn authenticate(
     if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
         slot.note_principal(&principal);
     }
+    crate::http::RequestSpan::note_tenant(&parts.extensions, principal.tenant_id());
     Ok(principal)
 }
 
@@ -197,6 +198,7 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
     if let Some(slot) = parts.extensions.get::<crate::ops::request_log::CallerSlot>() {
         slot.note_tenant(&tenant);
     }
+    crate::http::RequestSpan::note_tenant(&parts.extensions, tenant.id());
     // Sandbox (D-232): lớp HTTP thêm `Autoxide-Sandbox` và `X-Robots-Tag` vào response.
     if let Some(slot) = parts.extensions.get::<super::sandbox::headers::SandboxSlot>() {
         slot.note(&tenant);
