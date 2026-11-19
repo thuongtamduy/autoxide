@@ -59,6 +59,15 @@ pub(crate) struct CatalogService {
     pub(crate) jobs: autoxide_kernel::job::JobQueue,
     /// `dyn OrgDirectory` của `organizations` khi đã cài: đọc cài đặt kế thừa theo nút.
     pub(crate) organizations: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
+    /// Nguồn giá sau giảm tự động, do `promotions` cắm vào sau khi khởi động
+    /// (`CatalogExtensions`). `OnceLock`: ghi một lần, đọc không cần khoá.
+    pub(crate) sale_prices: std::sync::OnceLock<Arc<dyn crate::api::SalePriceSource>>,
+}
+
+impl crate::api::CatalogExtensions for CatalogService {
+    fn set_sale_price_source(&self, source: Arc<dyn crate::api::SalePriceSource>) -> bool {
+        self.sale_prices.set(source).is_ok()
+    }
 }
 
 impl CatalogService {
