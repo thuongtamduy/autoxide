@@ -487,3 +487,5 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
 - **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18
 - **[D-20261118-step39-sqlite-optimize](D-20261118-step39-sqlite-optimize.md)** SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18
+- **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
+- **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
