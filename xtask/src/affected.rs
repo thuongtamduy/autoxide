@@ -261,14 +261,28 @@ impl Mode {
 /// suất không vượt trần, nên số test chạy cùng lúc vẫn không vượt trần.
 fn share_postgres(jobs: &mut [Job]) -> Result<(), String> {
     let counts: Vec<usize> = jobs.iter().map(count_tests).collect::<Result<_, _>>()?;
-    let total: usize = counts.iter().sum::<usize>().max(1);
+    let total: usize = counts.iter().sum();
     for (job, count) in jobs.iter_mut().zip(counts) {
-        job.threads =
-            (POSTGRES_CONCURRENT_TESTS * count).div_ceil(total).clamp(1, POSTGRES_CONCURRENT_TESTS);
+        job.threads = postgres_threads(count, total);
     }
     // Chương trình lớn chạy trước: nó quyết định tổng thời gian.
     jobs.sort_by_key(|job| std::cmp::Reverse(job.threads));
     Ok(())
+}
+
+/// Suất ít nhất của một chương trình test trên Postgres (hoặc số test của nó, nếu ít hơn).
+///
+/// Chia theo số test thì chương trình ít test mà mỗi test nặng chỉ được một suất và chạy tuần tự:
+/// test đầu-cuối của `autoxide` (125 test, mỗi test dựng mọi module) được 1/16 suất, chạy 10 phút
+/// rưỡi, sáu phút cuối chạy một mình khi các chương trình khác đã xong (D-20261119-ci-faster).
+const POSTGRES_MIN_THREADS: usize = 4;
+
+/// Số suất của một chương trình có `count` test, trong tổng `total` test: theo tỉ lệ, nhưng không
+/// dưới [`POSTGRES_MIN_THREADS`] (trừ khi nó có ít test hơn) và không quá trần.
+fn postgres_threads(count: usize, total: usize) -> usize {
+    let share = (POSTGRES_CONCURRENT_TESTS * count).div_ceil(total.max(1));
+    let floor = count.min(POSTGRES_MIN_THREADS);
+    share.max(floor).clamp(1, POSTGRES_CONCURRENT_TESTS)
 }
 
 /// Số test của một chương trình test (`--list`, không chạy gì).
@@ -558,6 +572,19 @@ fn build_tests(root: &Path) -> Result<Vec<TestBinary>, String> {
 mod tests {
     use super::*;
     use crate::workspace::{Dep, DepKind, Package, Role};
+
+    #[test]
+    fn suat_postgres_theo_ti_le_nhung_khong_qua_it() {
+        // Chương trình nhiều test lấy phần theo tỉ lệ.
+        assert_eq!(postgres_threads(1000, 2000), 8);
+        // Chương trình ít test mà nặng vẫn được vài suất, không chạy tuần tự.
+        assert_eq!(postgres_threads(125, 2000), POSTGRES_MIN_THREADS);
+        // Ít test hơn mức sàn: mỗi test một suất là đủ.
+        assert_eq!(postgres_threads(2, 2000), 2);
+        assert_eq!(postgres_threads(0, 2000), 1);
+        // Không vượt trần, kể cả khi chỉ có một chương trình.
+        assert_eq!(postgres_threads(500, 500), POSTGRES_CONCURRENT_TESTS);
+    }
 
     fn package(name: &str, dir: &str, deps: &[(&str, DepKind)]) -> Package {
         Package {

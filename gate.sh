@@ -11,8 +11,18 @@
 #                       vào chúng, trên cả SQLite và Postgres, không chạy doc-test. Push lên main
 #                       vẫn chạy gate đầy đủ.
 #
+#   --only lint|sqlite|postgres   đi kèm gate đầy đủ hoặc `--pr`: chỉ chạy một phần, để CI chạy ba
+#                       phần trên ba máy cùng lúc (D-20261119-ci-faster). Ba phần cộng lại đúng bằng
+#                       gate không có cờ này:
+#                         lint      bước 1–6 (fmt, clippy, xtask check, api-diff, sdk --check, deny,
+#                                   gitleaks);
+#                         sqlite    bước 7 (kèm doc-test ở gate đầy đủ);
+#                         postgres  bước 8.
+#                       Không có `--only` thì chạy cả ba, như cũ.
+#
 # CI trên GitHub (.github/workflows/ci.yml): pull request chạy `--pr`, push lên main chạy gate đầy
-# đủ (D-175, D-197); gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
+# đủ (D-175, D-197), mỗi lần tách thành ba job `--only …` chạy song song; gate trên máy vẫn là định
+# nghĩa "xong", CI là lưới thứ hai.
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
@@ -63,15 +73,33 @@ cd "$(dirname "$0")"
 
 QUICK=0
 PR=0
-case "${1:-}" in
-  "") ;;
-  --quick) QUICK=1 ;;
-  --pr) PR=1 ;;
-  *)
-    echo "usage: ./gate.sh [--quick | --pr]" >&2
-    exit 2
-    ;;
+ONLY=""
+usage() {
+  echo "usage: ./gate.sh [--quick | --pr] [--only lint|sqlite|postgres]" >&2
+  exit 2
+}
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --quick) QUICK=1 ;;
+    --pr) PR=1 ;;
+    --only)
+      [ $# -ge 2 ] || usage
+      ONLY="$2"
+      shift
+      ;;
+    *) usage ;;
+  esac
+  shift
+done
+[ "$QUICK" = 1 ] && [ "$PR" = 1 ] && usage
+case "$ONLY" in
+  "" | lint | sqlite | postgres) ;;
+  *) usage ;;
 esac
+# Gate nhanh vốn chỉ có SQLite và đã nhanh: không chia.
+[ "$QUICK" = 1 ] && [ -n "$ONLY" ] && usage
+# Phần `part` có được chạy không (không có `--only` thì mọi phần đều chạy).
+runs() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 
 # Ưu tiên CPU thấp cho cả script và mọi tiến trình con (cargo, rustc, test): việc khác trên máy
 # được chạy trước, gate dùng phần CPU còn thừa. Không có `renice` thì chạy bình thường.
@@ -105,7 +133,9 @@ require() {
 }
 
 require cargo "Install Rust from https://rustup.rs"
-require cargo-deny "Install it with: cargo install cargo-deny --locked"
+if runs lint; then
+  require cargo-deny "Install it with: cargo install cargo-deny --locked"
+fi
 
 export CARGO_INCREMENTAL=0
 
@@ -121,6 +151,8 @@ if [ "$TARGET_MAX_GB" != 0 ] && [ -d target ] && [ "$(target_gb)" -gt "$TARGET_M
     cargo clean
   fi
 fi
+
+if runs lint; then
 
 # --- 1-5: kiểm tĩnh, nhanh, không cần database ---------------------------------
 
@@ -167,6 +199,13 @@ gitleaks_run git . "${leaks[@]}"
 gitleaks_run git . "${leaks[@]}" --pre-commit --staged
 gitleaks_run git . "${leaks[@]}" --pre-commit
 
+fi
+
+if [ "$ONLY" = lint ]; then
+  printf '\n\033[32mgate%s --only lint: green — fmt, clippy, boundaries, api contract, dependencies, secrets\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
+  exit 0
+fi
+
 # --- Gate nhanh: test của crate bị ảnh hưởng, chỉ SQLite ---------------------------
 
 if [ "$QUICK" = 1 ]; then
@@ -212,12 +251,19 @@ export TEST_S3_ENDPOINT="$S3_ENDPOINT"
 BASE="${GATE_BASE:-origin/main}"
 
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
-if [ "$PR" = 1 ]; then
+if ! runs sqlite; then
+  :
+elif [ "$PR" = 1 ]; then
   step "tests on SQLite, crates changed since $BASE only (cargo xtask test-affected)"
   env -u TEST_DATABASE_URL cargo xtask test-affected --base "$BASE" --keep-env
 else
   step "tests on SQLite"
   env -u TEST_DATABASE_URL cargo xtask test-all --doc
+fi
+
+if [ "$ONLY" = sqlite ]; then
+  printf '\n\033[32mgate%s --only sqlite: green — tests on SQLite\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
+  exit 0
 fi
 
 # --- 8: Postgres ----------------------------------------------------------------
@@ -266,10 +312,18 @@ else
 fi
 if [ "$PR" = 1 ]; then
   TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env
+  if [ "$ONLY" = postgres ]; then
+    printf '\n\033[32mgate --pr --only postgres: green — tests of crates changed since %s on Postgres\033[0m\n' "$BASE"
+    exit 0
+  fi
   printf '\n\033[32mgate --pr: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of crates changed since %s on SQLite and Postgres\033[0m\n' "$BASE"
   printf 'Not checked: doc tests, crates the change does not reach. The push to main runs the full gate.\n'
   exit 0
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all
+if [ "$ONLY" = postgres ]; then
+  printf '\n\033[32mgate --only postgres: green — tests on Postgres (files also on S3)\033[0m\n'
+  exit 0
+fi
 
 printf '\n\033[32mgate: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'

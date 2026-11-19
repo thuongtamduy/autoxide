@@ -1,5 +1,5 @@
-# CI của Autoxide: gate đầy đủ (giống `./gate.sh` trên máy) trên PostgreSQL thấp nhất
-# được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074). `./gate.sh` trên
+# CI của Autoxide: gate đầy đủ (giống `./gate.sh` trên máy, chia ba phần chạy song song) trên
+# PostgreSQL thấp nhất được hỗ trợ và mới nhất, cộng quét secret trong toàn bộ lịch sử git (D-074). `./gate.sh` trên
 # máy vẫn là định nghĩa "xong" (D-173); CI là lưới thứ hai (D-175).
 #
 # Mọi job chỉ chạy khi repo công khai (D-197): repo riêng tư thì GitHub tính phí runner, nên
@@ -16,25 +16,71 @@ on:
 permissions:
   contents: read
 
+# Pull request: lần push mới huỷ lần chạy cũ của cùng nhánh. Main thì không huỷ: lần chạy bị huỷ
+# không lưu được cache (bước Post của rust-cache không chạy), và trước đây mỗi lần merge huỷ lần
+# chạy main trước nên main không bao giờ có cache, mọi PR build từ đầu (D-20261119-ci-faster).
+# Không huỷ thì lần chạy main mới chờ lần đang chạy xong; GitHub chỉ giữ một lần chờ (lần mới nhất).
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Gate tách thành ba phần chạy song song trên ba máy (`./gate.sh --only lint|sqlite|postgres`, cộng
+# lại đúng bằng gate một máy), rồi job `gate` gộp kết quả dưới tên check cũ (D-20261119-ci-faster).
+#
+# Cache (Swatinem/rust-cache): chỉ main ghi (`save-if`), pull request chỉ đọc. Cache của pull request
+# chỉ nhánh đó đọc được, nên ghi chỉ tốn chỗ trong 10 GB của repo và đẩy cache của main ra. Hai job
+# test build ra cùng một bộ file nên dùng chung `shared-key: test`; clippy build khác nên có khoá riêng.
 jobs:
-  gate:
-    name: gate (PostgreSQL ${{ matrix.postgres }})
+  lint:
+    name: gate / lint
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất; gitleaks quét
+          # toàn bộ lịch sử.
+          fetch-depth: 0
+      # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lint
+          save-if: ${{ github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only lint
+
+  tests:
+    name: gate / ${{ matrix.target.name }}
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        # Thấp nhất được hỗ trợ (STACK.md) và mới nhất. Pull request chỉ chạy bản thấp nhất (dễ
-        # hỏng nhất) để có kết quả sớm; push lên main và chạy tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
-        postgres: ${{ github.event_name == 'pull_request' && fromJSON('["16"]') || fromJSON('["16", "18"]') }}
+        # `part`: phần của `./gate.sh --only`. Postgres thấp nhất được hỗ trợ (STACK.md) và mới nhất:
+        # pull request chỉ chạy bản thấp nhất (dễ hỏng nhất) để có kết quả sớm; push lên main và chạy
+        # tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
+        target: >-
+          ${{ github.event_name == 'pull_request' && fromJSON('[
+            {"name": "sqlite", "part": "sqlite", "postgres": "16"},
+            {"name": "postgres 16", "part": "postgres", "postgres": "16"}
+          ]') || fromJSON('[
+            {"name": "sqlite", "part": "sqlite", "postgres": "16"},
+            {"name": "postgres 16", "part": "postgres", "postgres": "16"},
+            {"name": "postgres 18", "part": "postgres", "postgres": "18"}
+          ]') }}
     services:
+      # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
+      # cho matrix khỏi rẽ nhánh; nó không dùng tới.
       postgres:
-        image: postgres:${{ matrix.postgres }}-alpine
+        image: postgres:${{ matrix.target.postgres }}-alpine
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -54,18 +100,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất.
+          # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
           fetch-depth: 0
-      # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
         with:
-          tool: cargo-deny
+          shared-key: test
+          # Một job ghi là đủ: các job test build ra cùng một bộ file.
+          save-if: ${{ (github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster') && matrix.target.part == 'sqlite' }}
       # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
       # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
       # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
       - name: Configure the PostgreSQL service like gate.sh
+        if: ${{ matrix.target.part == 'postgres' }}
         run: |
           container=${{ job.services.postgres.id }}
           docker exec "$container" psql -U postgres -q \
@@ -89,7 +136,27 @@ jobs:
           exit 1
       # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc, không doc-test; push lên
       # main và chạy tay: gate đầy đủ (D-20261118-ci-pr-affected-tests).
-      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+      - run: >-
+          ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+          --only ${{ matrix.target.part }}
+
+  # Tên check cũ, có thể là check bắt buộc của branch protection: chỉ xanh khi mọi phần của gate
+  # xanh. `always()`: phần nào đỏ thì job này vẫn chạy và báo đỏ, không bị bỏ qua (check bị bỏ qua
+  # được tính là đạt).
+  gate:
+    name: gate (PostgreSQL ${{ github.event_name == 'pull_request' && '16' || '16, 18' }})
+    if: ${{ always() && !github.event.repository.private }}
+    needs: [lint, tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every part of the gate passed
+        env:
+          LINT: ${{ needs.lint.result }}
+          TESTS: ${{ needs.tests.result }}
+        run: |
+          echo "lint: $LINT, tests: $TESTS"
+          [ "$LINT" = success ] && [ "$TESTS" = success ]
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)
@@ -100,6 +167,8 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@v6
         with:
           node-version: "22.23.4"
@@ -144,6 +213,8 @@ jobs:
           fetch-depth: 0
       - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: docker/login-action@v4
         with:
           registry: ghcr.io
