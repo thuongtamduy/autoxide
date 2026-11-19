@@ -62,7 +62,8 @@ async fn tu_dong_tra_loi_qua_autoresponder_cua_support() {
         run_jobs(&h.app).await;
         let (_, waiting) = call(&h.app, "GET", "/threads?needs_agent=true", "agent", None).await;
         assert_eq!(waiting["data"].as_array().unwrap().len(), 1);
-        let automatic = messages(&h.app, &id).await.iter().filter(|m| m["auto_reply"] == true).count();
+        let automatic =
+            messages(&h.app, &id).await.iter().filter(|m| m["auto_reply"] == true).count();
         assert_eq!(automatic, 3);
     })
     .await
@@ -86,7 +87,8 @@ async fn gap_nhan_vien_dung_tu_dong_trong_cuoc() {
         run_jobs(&h.app).await;
         // Chỉ câu đầu được hỏi `support`; sau "gặp nhân viên" không còn tin tự động.
         assert_eq!(h.responder.questions.lock().unwrap().len(), 1);
-        let automatic = messages(&h.app, &id).await.iter().filter(|m| m["auto_reply"] == true).count();
+        let automatic =
+            messages(&h.app, &id).await.iter().filter(|m| m["auto_reply"] == true).count();
         assert_eq!(automatic, 1);
     })
     .await
@@ -102,7 +104,8 @@ async fn goi_y_ai_chi_la_ban_nhap() {
             assert!(!seen.contains("0901234567"), "{seen}");
             Ok(json!({"reply": "Chào bạn, shop kiểm tra ngay."}))
         }));
-        let h = harness_with(test, false, move |builder| builder.provide::<dyn TextModel>(model)).await;
+        let h =
+            harness_with(test, false, move |builder| builder.provide::<dyn TextModel>(model)).await;
         let id = start(&h.app, "buyer", "Gọi tôi số 0901234567 nhé").await;
         let (status, drafted) =
             call(&h.app, "POST", &format!("/threads/{id}/suggest-reply"), "agent", None).await;

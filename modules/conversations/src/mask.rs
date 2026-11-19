@@ -125,7 +125,10 @@ mod tests {
         );
         assert_eq!(mask("mail an@example.com, ok", &terms), "mail •••, ok");
         assert_eq!(mask("xem https://x.vn/a và shop.vn/b", &terms), "xem ••• và •••");
-        assert_eq!(mask("nhắn zalo nhé, zalopay thì không", &terms), "nhắn ••• nhé, zalopay thì không");
+        assert_eq!(
+            mask("nhắn zalo nhé, zalopay thì không", &terms),
+            "nhắn ••• nhé, zalopay thì không"
+        );
     }
 
     #[test]

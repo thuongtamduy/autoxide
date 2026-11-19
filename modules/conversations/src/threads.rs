@@ -145,7 +145,9 @@ impl ConversationsService {
                 at,
             )
             .await?
-            .ok_or_else(|| Error::internal("the first message of a new conversation is a duplicate"))?;
+            .ok_or_else(|| {
+                Error::internal("the first message of a new conversation is a duplicate")
+            })?;
         let actor = Actor::user(customer);
         let opened = events::ThreadOpened(Change {
             before: None,
@@ -178,7 +180,8 @@ impl ConversationsService {
             return Ok(());
         }
         if let Some(resources) = &self.parts.resources {
-            let found = resources.knows(kind) && resources.resolve(tenant, kind, id).await?.is_some();
+            let found =
+                resources.knows(kind) && resources.resolve(tenant, kind, id).await?.is_some();
             if !found {
                 problems.push(unknown());
             }
@@ -338,7 +341,10 @@ impl ConversationsService {
             audience: people,
         });
         let subject = events::thread_subject(id);
-        self.parts.outbox.record(&transaction, tenant, Actor::from(principal), subject, &event).await?;
+        self.parts
+            .outbox
+            .record(&transaction, tenant, Actor::from(principal), subject, &event)
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -411,7 +417,10 @@ impl ConversationsService {
             after: Some(snapshot(&after)),
             audience: audience(&after),
         });
-        self.parts.outbox.record(&transaction, tenant, actor, events::thread_subject(id), &event).await?;
+        self.parts
+            .outbox
+            .record(&transaction, tenant, actor, events::thread_subject(id), &event)
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -456,9 +465,8 @@ impl ConversationsService {
         let user = viewer.user_id();
         let at = now();
         let transaction = tenant.database().begin_write().await?;
-        let cursor = read::Entity::find_by_id((tenant.id().as_uuid(), id, user))
-            .one(&transaction)
-            .await?;
+        let cursor =
+            read::Entity::find_by_id((tenant.id().as_uuid(), id, user)).one(&transaction).await?;
         match cursor {
             Some(cursor) if cursor.last_read_message_id >= upto => {}
             Some(cursor) => {
@@ -504,7 +512,10 @@ impl ConversationsService {
                 audience: audience(&after),
             });
             let subject = events::thread_subject(id);
-            self.parts.outbox.record(&transaction, tenant, actor_of(viewer), subject, &event).await?;
+            self.parts
+                .outbox
+                .record(&transaction, tenant, actor_of(viewer), subject, &event)
+                .await?;
         }
         transaction.commit().await?;
         Ok(after)

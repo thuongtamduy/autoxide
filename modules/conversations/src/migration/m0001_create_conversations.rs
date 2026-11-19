@@ -138,8 +138,14 @@ impl MigrationTrait for Migration {
             true,
         )
         .await?;
-        index(manager, m, "conversations_messages_thread_idx", &["tenant_id", "thread_id", "id"], false)
-            .await?;
+        index(
+            manager,
+            m,
+            "conversations_messages_thread_idx",
+            &["tenant_id", "thread_id", "id"],
+            false,
+        )
+        .await?;
 
         manager
             .create_table(
@@ -216,9 +222,16 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        index(manager, r, "conversations_reports_org_idx", &["tenant_id", "org_id", "status", "id"], false)
-            .await?;
-        index(manager, r, "conversations_reports_thread_idx", &["tenant_id", "thread_id"], false).await
+        index(
+            manager,
+            r,
+            "conversations_reports_org_idx",
+            &["tenant_id", "org_id", "status", "id"],
+            false,
+        )
+        .await?;
+        index(manager, r, "conversations_reports_thread_idx", &["tenant_id", "thread_id"], false)
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {

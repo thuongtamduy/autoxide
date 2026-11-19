@@ -136,7 +136,11 @@ impl ConversationsService {
 
     /// Xoá cuộc trò chuyện có tin cuối trước hạn lưu (tính từ `now`) trên `database`, theo lô; trả
     /// số cuộc đã xoá. Hạn lưu là của cả bản cài, nên quét cả database.
-    pub(crate) async fn purge(&self, database: &Database, now: DateTime<Utc>) -> Result<u64, Error> {
+    pub(crate) async fn purge(
+        &self,
+        database: &Database,
+        now: DateTime<Utc>,
+    ) -> Result<u64, Error> {
         let before = now - chrono::Duration::days(i64::from(self.config.retention_days));
         let mut total = 0;
         loop {

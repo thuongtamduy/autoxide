@@ -139,7 +139,8 @@ impl ConversationsService {
             transaction.rollback().await?;
             return Ok(());
         }
-        let mut changes = thread::Entity::update_many().col_expr(thread::Column::UpdatedAt, Expr::value(at));
+        let mut changes =
+            thread::Entity::update_many().col_expr(thread::Column::UpdatedAt, Expr::value(at));
         match decision {
             ReplyDecision::Send { text, .. } => {
                 let new = NewMessage {
@@ -170,19 +171,31 @@ impl ConversationsService {
                     thread::Column::AutoRepliesInRow,
                     Expr::col(thread::Column::AutoRepliesInRow).add(1),
                 );
-                changes.filter(thread::Column::Id.eq(thread_id)).scoped(tenant).exec(&transaction).await?;
+                changes
+                    .filter(thread::Column::Id.eq(thread_id))
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
                 self.after_message(&transaction, tenant, Actor::system(), &current, &sent).await?;
             }
             ReplyDecision::Draft { text } => {
                 changes = changes
                     .col_expr(thread::Column::DraftReply, Expr::value(Some(text)))
                     .col_expr(thread::Column::DraftFor, Expr::value(Some(message_id)));
-                changes.filter(thread::Column::Id.eq(thread_id)).scoped(tenant).exec(&transaction).await?;
+                changes
+                    .filter(thread::Column::Id.eq(thread_id))
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
                 self.record_update(&transaction, tenant, Actor::system(), &current).await?;
             }
             ReplyDecision::Handoff => {
                 changes = changes.col_expr(thread::Column::NeedsAgent, Expr::value(true));
-                changes.filter(thread::Column::Id.eq(thread_id)).scoped(tenant).exec(&transaction).await?;
+                changes
+                    .filter(thread::Column::Id.eq(thread_id))
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
                 self.record_update(&transaction, tenant, Actor::system(), &current).await?;
             }
         }
@@ -236,7 +249,8 @@ impl ConversationsService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
-        let after = self.record_update(&transaction, tenant, Actor::user(customer), &before).await?;
+        let after =
+            self.record_update(&transaction, tenant, Actor::user(customer), &before).await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -291,7 +305,8 @@ impl ConversationsService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
-        let after = self.record_update(&transaction, tenant, Actor::from(principal), &before).await?;
+        let after =
+            self.record_update(&transaction, tenant, Actor::from(principal), &before).await?;
         transaction.commit().await?;
         Ok(after)
     }
@@ -367,7 +382,8 @@ impl ConversationsService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
-        let after = self.record_update(&transaction, tenant, Actor::from(principal), &before).await?;
+        let after =
+            self.record_update(&transaction, tenant, Actor::from(principal), &before).await?;
         transaction.commit().await?;
         tracing::info!(thread_id = %id, ticket_id = %opened.id, "conversation handed over as a ticket");
         Ok((after, opened))

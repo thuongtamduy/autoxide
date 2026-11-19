@@ -158,7 +158,10 @@ impl Module for ConversationsModule {
             return Vec::new();
         };
         vec![
-            JobRegistration::new(assist::AUTO_REPLY, Arc::new(assist::AutoReplies(service.clone()))),
+            JobRegistration::new(
+                assist::AUTO_REPLY,
+                Arc::new(assist::AutoReplies(service.clone())),
+            ),
             JobRegistration::new(notify::NOTIFY_UNREAD, Arc::new(notify::Unread(service.clone()))),
             JobRegistration::new(privacy::PURGE, Arc::new(privacy::Purge(service))),
         ]

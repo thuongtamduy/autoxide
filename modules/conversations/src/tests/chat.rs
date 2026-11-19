@@ -17,7 +17,8 @@ async fn gui_lai_cung_client_id_khong_trung() {
     TestDatabase::run(async |test| {
         let h = harness(test).await;
         let first = json!({"body": "Còn size 42 không?", "client_id": "m-1"});
-        let (status, started) = call(&h.app, "POST", "/me/threads", "buyer", Some(first.clone())).await;
+        let (status, started) =
+            call(&h.app, "POST", "/me/threads", "buyer", Some(first.clone())).await;
         assert_eq!(status, StatusCode::CREATED, "{started}");
         let id = started["data"]["thread"]["id"].as_str().unwrap().to_owned();
         // Gửi lại y hệt (mất mạng, retry): cùng cuộc, cùng tin, 200.
@@ -92,10 +93,9 @@ async fn nhan_vien_nhanh_khac_khong_doc_duoc() {
         let (status, inbox) = call(&h.app, "GET", "/threads", "branch", None).await;
         assert_eq!(status, StatusCode::OK);
         assert!(inbox["data"].as_array().unwrap().is_empty());
-        for (method, uri) in [
-            ("GET", format!("/threads/{id}")),
-            ("GET", format!("/threads/{id}/messages")),
-        ] {
+        for (method, uri) in
+            [("GET", format!("/threads/{id}")), ("GET", format!("/threads/{id}/messages"))]
+        {
             let (status, body) = call(&h.app, method, &uri, "branch", None).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{uri} {body}");
             assert_eq!(body["code"], "conversations.thread_not_found");
@@ -198,7 +198,8 @@ async fn da_doc_phan_cong_dong_va_chan() {
         let (status, body) = call(&h.app, "POST", &uri, "buyer", Some(input.clone())).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert_eq!(body["code"], "conversations.blocked");
-        let (status, _) = call(&h.app, "DELETE", &format!("/threads/{id}/block"), "agent", None).await;
+        let (status, _) =
+            call(&h.app, "DELETE", &format!("/threads/{id}/block"), "agent", None).await;
         assert_eq!(status, StatusCode::OK);
         let (status, _) = call(&h.app, "POST", &uri, "buyer", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED);
@@ -219,10 +220,17 @@ async fn da_doc_phan_cong_dong_va_chan() {
             call(&h.app, "POST", &format!("/reports/{report_id}/resolve"), "agent", None).await;
         assert_eq!(status, StatusCode::OK);
         // Đóng: không viết được nữa; viết lại thì thành cuộc mới.
-        let (status, _) = call(&h.app, "POST", &format!("/threads/{id}/close"), "agent", None).await;
+        let (status, _) =
+            call(&h.app, "POST", &format!("/threads/{id}/close"), "agent", None).await;
         assert_eq!(status, StatusCode::OK);
-        let (status, body) =
-            call(&h.app, "POST", &uri, "buyer", Some(json!({"body": "Còn đó không", "client_id": "x-2"}))).await;
+        let (status, body) = call(
+            &h.app,
+            "POST",
+            &uri,
+            "buyer",
+            Some(json!({"body": "Còn đó không", "client_id": "x-2"})),
+        )
+        .await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(body["code"], "conversations.thread_closed");
         let next = start(&h.app, "buyer", "Mình hỏi lại").await;
@@ -266,7 +274,12 @@ async fn tin_chua_doc_gui_thong_bao_mot_lan() {
         call(&h.app, "POST", &format!("/me/threads/{id}/read"), "buyer", Some(json!({}))).await;
         due_now(&h.app).await;
         run_jobs(&h.app).await;
-        let count = h.notifier.sent().iter().filter(|sent| sent.kind == "conversations.shop_replied").count();
+        let count = h
+            .notifier
+            .sent()
+            .iter()
+            .filter(|sent| sent.kind == "conversations.shop_replied")
+            .count();
         assert_eq!(count, 1);
     })
     .await
@@ -300,7 +313,8 @@ async fn chuyen_thanh_phieu_ho_tro() {
         let ticket = escalated["data"]["ticket_id"].as_str().unwrap().to_owned();
         assert_eq!(escalated["data"]["thread"]["ticket_id"], ticket.as_str());
         // Gọi lại: cùng phiếu.
-        let (_, again) = call(&h.app, "POST", &format!("/threads/{id}/escalate"), "agent", None).await;
+        let (_, again) =
+            call(&h.app, "POST", &format!("/threads/{id}/escalate"), "agent", None).await;
         assert_eq!(again["data"]["ticket_id"], ticket.as_str());
         // Phiếu của người mua, mang lịch sử và liên kết về cuộc trò chuyện.
         let got = h
@@ -328,12 +342,18 @@ async fn tool_mcp_dung_chung_service() {
         let id = start(&h.app, "buyer", "Có giao tỉnh không?").await;
         let client = h.app.mcp("agent").await.unwrap();
         let listed = client
-            .call_tool(autoxide_testkit::tool("conversations.list_threads", json!({"unread": true})))
+            .call_tool(autoxide_testkit::tool(
+                "conversations.list_threads",
+                json!({"unread": true}),
+            ))
             .await
             .unwrap();
         assert!(format!("{listed:?}").contains(&id), "{listed:?}");
         let args = json!({"id": id, "body": "Có bạn nhé", "client_id": "t-1"});
-        client.call_tool(autoxide_testkit::tool("conversations.reply", args.clone())).await.unwrap();
+        client
+            .call_tool(autoxide_testkit::tool("conversations.reply", args.clone()))
+            .await
+            .unwrap();
         client.call_tool(autoxide_testkit::tool("conversations.reply", args)).await.unwrap();
         // Gọi lại cùng `client_id`: một tin.
         assert_eq!(messages(&h.app, &id).await.len(), 2);

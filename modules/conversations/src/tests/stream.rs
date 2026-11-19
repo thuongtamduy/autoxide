@@ -70,7 +70,12 @@ async fn stream_chi_phat_cho_nguoi_co_quyen() {
         reply(&h.app, "agent2", &id, "Bí mật trả lời").await;
         let got = buyer.names(Duration::from_secs(3)).await;
         assert!(got.contains(&"conversations.message_created".to_owned()), "{got:?}");
-        assert!(agent.names(Duration::from_millis(500)).await.contains(&"conversations.message_created".to_owned()));
+        assert!(
+            agent
+                .names(Duration::from_millis(500))
+                .await
+                .contains(&"conversations.message_created".to_owned())
+        );
         assert!(other.names(Duration::from_millis(500)).await.is_empty());
         assert!(branch.names(Duration::from_millis(500)).await.is_empty());
     })

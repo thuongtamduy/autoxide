@@ -243,7 +243,8 @@ pub(crate) async fn read(
     ValidJson(input): ValidJson<ReadRequest>,
 ) -> Result<Data<ThreadResponse>, Error> {
     principal.require(&READ)?;
-    let thread = service.mark_read(&tenant, Viewer::Staff(&principal), id, input.message_id).await?;
+    let thread =
+        service.mark_read(&tenant, Viewer::Staff(&principal), id, input.message_id).await?;
     Ok(Data { data: ThreadResponse::new(thread, true) })
 }
 

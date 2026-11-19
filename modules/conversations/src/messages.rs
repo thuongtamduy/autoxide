@@ -216,8 +216,10 @@ impl ConversationsService {
             .col_expr(thread::Column::LastMessageAt, Expr::value(at))
             .col_expr(thread::Column::UpdatedAt, Expr::value(at));
         update = match kind {
-            AuthorKind::Customer => update
-                .col_expr(thread::Column::UnreadStaff, Expr::col(thread::Column::UnreadStaff).add(1)),
+            AuthorKind::Customer => update.col_expr(
+                thread::Column::UnreadStaff,
+                Expr::col(thread::Column::UnreadStaff).add(1),
+            ),
             AuthorKind::Agent => update
                 .col_expr(
                     thread::Column::UnreadCustomer,
@@ -274,7 +276,11 @@ impl ConversationsService {
 
     /// Chữ sẽ lưu: che liên hệ khi nút bật.
     pub(crate) fn prepare_body(&self, policy: &Policy, body: &str) -> String {
-        if policy.mask_contacts { crate::mask::mask(body, &policy.mask_terms) } else { body.to_owned() }
+        if policy.mask_contacts {
+            crate::mask::mask(body, &policy.mask_terms)
+        } else {
+            body.to_owned()
+        }
     }
 
     /// Người mua được viết tới nút `org` không: chưa bị chặn, đã xác thực khi nút / khách đòi, chưa
@@ -447,7 +453,9 @@ impl ConversationsService {
         let kind = if viewer.is_staff() { AuthorKind::Agent } else { AuthorKind::Customer };
         let event = events::Typing(Change {
             before: None,
-            after: Some(json!({"thread_id": thread_id, "author_kind": kind.as_str(), "user_id": viewer.user_id()})),
+            after: Some(
+                json!({"thread_id": thread_id, "author_kind": kind.as_str(), "user_id": viewer.user_id()}),
+            ),
             audience: audience(&thread),
         });
         let transaction = tenant.database().begin_write().await?;

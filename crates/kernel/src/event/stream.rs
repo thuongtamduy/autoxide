@@ -284,8 +284,7 @@ impl StreamHub {
         // Permission thiếu đầu tiên: báo khi không còn event nào người gọi được xem.
         let mut denied: Option<Permission> = None;
         for pattern in patterns {
-            let matched: Vec<(&'static str, Permission, bool)> = match pattern.strip_suffix(".*")
-            {
+            let matched: Vec<(&'static str, Permission, bool)> = match pattern.strip_suffix(".*") {
                 Some(module) => self
                     .0
                     .events

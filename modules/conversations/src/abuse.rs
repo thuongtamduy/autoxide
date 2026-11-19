@@ -84,11 +84,16 @@ impl ConversationsService {
         if changed > 0 {
             let event = events::CustomerBlocked(Change {
                 before: None,
-                after: Some(json!({"org_id": thread.org_id, "user_id": customer, "blocked": blocked})),
+                after: Some(
+                    json!({"org_id": thread.org_id, "user_id": customer, "blocked": blocked}),
+                ),
                 audience: Vec::new(),
             });
             let subject = events::thread_subject(id);
-            self.parts.outbox.record(&transaction, tenant, Actor::from(principal), subject, &event).await?;
+            self.parts
+                .outbox
+                .record(&transaction, tenant, Actor::from(principal), subject, &event)
+                .await?;
         }
         transaction.commit().await?;
         Ok(blocked)
@@ -165,7 +170,8 @@ impl ConversationsService {
         status: Option<&str>,
         page: &PageRequest,
     ) -> Result<Page<Report>, Error> {
-        let scope = principal.scope_condition(&MANAGE, report::Column::OrgId, None::<report::Column>)?;
+        let scope =
+            principal.scope_condition(&MANAGE, report::Column::OrgId, None::<report::Column>)?;
         let mut condition = Condition::all().add(scope);
         if let Some(status) = status {
             condition = condition.add(report::Column::Status.eq(status));
@@ -192,9 +198,10 @@ impl ConversationsService {
         let before =
             report::Entity::find_by_id(id).scoped(tenant).one(read).await?.ok_or_else(missing)?;
         let at = autoxide_kernel::access::OrgTarget::new(OrgId::from_uuid(before.org_id), None);
-        principal.require_at(read, &MANAGE, at).await.map_err(|error| {
-            if error.code() == "org_out_of_scope" { missing() } else { error }
-        })?;
+        principal
+            .require_at(read, &MANAGE, at)
+            .await
+            .map_err(|error| if error.code() == "org_out_of_scope" { missing() } else { error })?;
         if before.status == "resolved" {
             return Ok(before);
         }
@@ -218,7 +225,10 @@ impl ConversationsService {
             audience: Vec::new(),
         });
         let subject = events::thread_subject(before.thread_id);
-        self.parts.outbox.record(&transaction, tenant, Actor::from(principal), subject, &event).await?;
+        self.parts
+            .outbox
+            .record(&transaction, tenant, Actor::from(principal), subject, &event)
+            .await?;
         transaction.commit().await?;
         Ok(after)
     }

@@ -59,7 +59,8 @@ async fn xoa_tai_khoan_an_danh_hoa_phia_nguoi_mua() {
         let id = start(&h.app, "buyer", "Số tôi 0901234567").await;
         reply(&h.app, "agent", &id, "Dạ shop nhận").await;
         let service = service_of();
-        let exported = service.export(&h.app.default_tenant(), Uuid::from_u128(BUYER)).await.unwrap();
+        let exported =
+            service.export(&h.app.default_tenant(), Uuid::from_u128(BUYER)).await.unwrap();
         assert_eq!(exported[0]["messages"][0]["body"], "Số tôi 0901234567");
 
         let event = Delivered::new(
