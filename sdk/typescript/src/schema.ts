@@ -8965,6 +8965,46 @@ export type Data_PromotionsNotice = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsNoticeExport = {
+  /** The data of a promotion notice, one entry per authority. */
+  data: {
+    authorities: PromotionsNoticeEntry[];
+    currency: string;
+    ends_at: string;
+    /** Number of flash-sale or add-on prices. */
+    flash_item_count: number;
+    /** Jurisdiction of the law data used. */
+    jurisdiction: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    /** Locale of `title` and `terms`. */
+    locale: string;
+    /** Unit that runs the promotion. */
+    org_id: string;
+    promotion_id: string;
+    /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+    promotion_kind: string;
+    /**
+     * `false` when no notice rule is in force for this kind of promotion on its start day
+     * (load the law data with `autoxide task promotions.load_legal_data`).
+     */
+    rules_found: boolean;
+    starts_at: string;
+    /** Status of the promotion. */
+    status: string;
+    /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+    target_count: number;
+    /** Conditions shown to buyers. */
+    terms: string;
+    title: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsPromotion = {
   /** A promotion with its rule, counters and texts. */
   data: {
@@ -21883,6 +21923,62 @@ export type PromotionsNotice = {
   status: string;
   submitted_at?: string | null;
   submitted_by?: string | null;
+};
+
+/** The notice to one authority. */
+export type PromotionsNoticeEntry = {
+  /** Authority, e.g. `province:79` (the provincial Department of Industry and Trade). */
+  authority_code: string;
+  /** Days before the start the notice is due. */
+  days_before?: number | null;
+  /** Last day to submit (Vietnam date), when a notice is required. */
+  due_on?: string | null;
+  /** Legal basis of the rule, with its date in force. */
+  legal_basis?: string | null;
+  /** Reference given by the authority, when recorded. */
+  reference?: string | null;
+  /** Whether the rule in force asks for a notice. */
+  required: boolean;
+  /** `pending`, `submitted` or `not_required`. */
+  status: string;
+  submitted_at?: string | null;
+};
+
+/** The data of a promotion notice, one entry per authority. */
+export type PromotionsNoticeExport = {
+  authorities: PromotionsNoticeEntry[];
+  currency: string;
+  ends_at: string;
+  /** Number of flash-sale or add-on prices. */
+  flash_item_count: number;
+  /** Jurisdiction of the law data used. */
+  jurisdiction: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  /** Locale of `title` and `terms`. */
+  locale: string;
+  /** Unit that runs the promotion. */
+  org_id: string;
+  promotion_id: string;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`, `free_shipping`…). */
+  promotion_kind: string;
+  /**
+   * `false` when no notice rule is in force for this kind of promotion on its start day
+   * (load the law data with `autoxide task promotions.load_legal_data`).
+   */
+  rules_found: boolean;
+  starts_at: string;
+  /** Status of the promotion. */
+  status: string;
+  /** Number of products, variants and categories the promotion targets (0 = the whole store). */
+  target_count: number;
+  /** Conditions shown to buyers. */
+  terms: string;
+  title: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
 };
 
 /** A promotion notice recorded for one authority. */
@@ -38535,6 +38631,19 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/notice-export": {
+    /** Export the data of a promotion notice, one entry per authority. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { format?: "json" | "csv" | null }; };
+      responses: {
+        200: Data_PromotionsNoticeExport | string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
