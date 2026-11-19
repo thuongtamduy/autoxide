@@ -22,6 +22,7 @@ mod notices;
 mod permissions;
 mod programs;
 mod provider;
+mod public;
 mod reasons;
 mod redemption;
 mod relocation;

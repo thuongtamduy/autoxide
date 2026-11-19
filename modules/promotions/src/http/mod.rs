@@ -11,10 +11,12 @@ pub(crate) mod admin;
 pub(crate) mod buyer;
 pub(crate) mod dto;
 pub(crate) mod notices;
+pub(crate) mod public;
 
 pub(crate) fn routes(service: Arc<PromotionsService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .merge(admin::routes(service.clone()))
         .merge(notices::routes(service.clone()))
+        .merge(public::routes(service.clone()))
         .merge(buyer::routes(service))
 }

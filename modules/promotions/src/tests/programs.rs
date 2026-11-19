@@ -409,3 +409,42 @@ async fn xuat_thong_bao_theo_noi_nhan_json_va_csv() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn danh_sach_cong_khai_kem_thong_bao_va_tran_theo_luat() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        // Chuỗi (nút cha của A): hiện ở website của A. Cửa hàng B: không. Không `public`: không.
+        let chain = running(&setup, body(setup.tree.chain, json!({"public": true}))).await;
+        running(&setup, body(setup.tree.b, json!({"public": true}))).await;
+        running(&setup, body(setup.tree.a, json!({"public": false}))).await;
+        let uri = format!(
+            "/api/v1/promotions/public/promotions?site={}&locale=vi",
+            setup.tree.a.as_uuid()
+        );
+        let answer = setup.app.request(axum::http::Method::GET, &uri).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let etag = answer.header("etag").to_owned();
+        let found: serde_json::Value = serde_json::from_slice(answer.body()).unwrap();
+        let rows = found["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{found}");
+        let row = &rows[0];
+        assert_eq!(row["id"], chain.to_string());
+        assert_eq!((row["title"].clone(), row["locale"].clone()), (json!("Giảm giá"), json!("vi")));
+        assert_eq!(row["notices"][0]["reference"], "TB-1");
+        assert_eq!(row["legal_limit"]["max_bp"], 5000);
+        assert_eq!(row["legal_limit"]["promotion_kind"], "price_reduction");
+
+        // Không đổi gì: cùng ETag → 304.
+        let again = setup
+            .app
+            .request(axum::http::Method::GET, &uri)
+            .header("if-none-match", &etag)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+    })
+    .await
+    .unwrap();
+}
