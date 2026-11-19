@@ -9381,6 +9381,23 @@ export type Data_PromotionsNoticeExport = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsParticipation = {
+  /** A seller's application, as it stands. */
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsPromotion = {
   /** A promotion with its rule, counters and texts. */
   data: {
@@ -9413,6 +9430,18 @@ export type Data_PromotionsRedemption = {
     id: string;
     order_id: string;
     status: PromotionsRedemptionStatus;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsReminder = {
+  /** A reminder of a flash sale. */
+  data: {
+    promotion_id: string;
+    /** When the reminder is sent. */
+    remind_at: string;
+    /** When it was sent; `null` until then. */
+    sent_at?: string | null;
   };
 };
 
@@ -12700,6 +12729,34 @@ export type Data_Vec_PromotableKind = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotionsConflict = {
+  data: {
+    ends_at: string;
+    exclusivity: "none" | "class" | "global";
+    id: string;
+    /** Kind of promotion. */
+    kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+    starts_at: string;
+    status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsDailyStats = {
+  data: {
+    day: string;
+    /** Discount given, in minor units. */
+    discount_minor: number;
+    /** Value of the orders that used it, in minor units. */
+    order_value_minor: number;
+    platform_funded_minor: number;
+    /** Confirmed uses. */
+    redemptions: number;
+    seller_funded_minor: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PromotionsLegalLimit = {
   data: {
     effective_from: string;
@@ -12733,6 +12790,59 @@ export type Data_Vec_PromotionsNoticeRule = {
     note: string;
     notice_required: boolean;
     promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsParticipation = {
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsProductCode = {
+  data: {
+    /** The coupon to enter at checkout. */
+    code: string;
+    /** Discount on one unit. */
+    discount: Money;
+    ends_at: string;
+    /**
+     * Price of one unit with the coupon. The listed price stays the price without it: show
+     * this as "X with code …", not as a discounted price.
+     */
+    price_with_code: Money;
+    promotion_id: string;
+    /** Conditions, in full (the same as in `GET /public/promotions`). */
+    terms: string;
+    title: string;
+    /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+    uses_left?: number | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsSimulation = {
+  data: {
+    /**
+     * What the promotion adds to the discount of this cart, in minor units (can be negative
+     * when it pushes out a better promotion).
+     */
+    difference_minor: number;
+    /** With the promotion (counted even while it is a draft or paused). */
+    with: PromotionsEvaluation;
+    /** Without it. */
+    without: PromotionsEvaluation;
   }[];
 };
 
@@ -20653,6 +20763,64 @@ export type Page_PromotionsPromotionListItem = {
 };
 
 /** One page of a list. */
+export type Page_PromotionsPublicFlashSale = {
+  /** The items of this page, in the requested order. */
+  data: {
+    currency: string;
+    ends_at: string;
+    id: string;
+    items: PromotionsPublicFlashItem[];
+    org_id: string;
+    starts_at: string;
+    /** `running` or `upcoming`. */
+    state: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsPublicPromotion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+    claimable: boolean;
+    currency: string;
+    ends_at: string;
+    /** Only for the buyer's first order. */
+    first_order_only: boolean;
+    id: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    legal_limit?: PromotionsPublicLegalLimit | null;
+    /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+    locale: string;
+    /** Smallest order, in minor units of `currency`. */
+    min_order_minor?: number | null;
+    /**
+     * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+     * Trade of that province), with their reference.
+     */
+    notices: PromotionsPublicNotice[];
+    /** Unit that runs it. */
+    org_id: string;
+    starts_at: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+    /** `automatic`, `code` or `voucher`. */
+    trigger: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PromotionsRedemptionItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22642,6 +22810,30 @@ export type PromotionsConditionInput = {
 /** Kind of extra condition. */
 export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
 
+/** Another promotion that may clash with this one. */
+export type PromotionsConflict = {
+  ends_at: string;
+  exclusivity: "none" | "class" | "global";
+  id: string;
+  /** Kind of promotion. */
+  kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+  starts_at: string;
+  status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+};
+
+/** Counts of one day (Vietnam date). */
+export type PromotionsDailyStats = {
+  day: string;
+  /** Discount given, in minor units. */
+  discount_minor: number;
+  /** Value of the orders that used it, in minor units. */
+  order_value_minor: number;
+  platform_funded_minor: number;
+  /** Confirmed uses. */
+  redemptions: number;
+  seller_funded_minor: number;
+};
+
 /** Codes and vouchers usable for a cart, those not yet, and the best combination. */
 export type PromotionsEligibility = {
   best_selection: PromotionsSelection;
@@ -22921,6 +23113,41 @@ export type PromotionsOffer = {
 
 export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
 
+/** A seller's application, as it stands. */
+export type PromotionsParticipation = {
+  created_at: string;
+  id: string;
+  items: PromotionsParticipationItem[];
+  promotion_id: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  seller_org_id: string;
+  /** `pending`, `approved` or `rejected`. */
+  status: string;
+  updated_at: string;
+};
+
+/** One product a seller puts into a platform promotion. */
+export type PromotionsParticipationItem = {
+  /** Most units one buyer can get at that price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units offered at that price; omitted: not limited. */
+  quantity_limit?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp`). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points, 1 to 10000 (or `sale_price_minor`). */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A seller's application to join a platform promotion. */
+export type PromotionsParticipationRequest = {
+  /** 1 to 500 of your products. */
+  items: PromotionsParticipationItem[];
+  /** Your unit (the seller), below the unit that runs the promotion. */
+  org_id: string;
+};
+
 export type PromotionsPayer = "platform" | "seller" | "brand" | "payment_partner";
 
 /** Who pays for a discount. */
@@ -22928,6 +23155,26 @@ export type PromotionsPayerKind = "platform" | "seller" | "brand" | "payment_par
 
 /** Period of the per-customer limit. */
 export type PromotionsPeriod = "lifetime" | "day" | "week" | "month";
+
+/** A public coupon that lowers the price of a product. */
+export type PromotionsProductCode = {
+  /** The coupon to enter at checkout. */
+  code: string;
+  /** Discount on one unit. */
+  discount: Money;
+  ends_at: string;
+  /**
+   * Price of one unit with the coupon. The listed price stays the price without it: show
+   * this as "X with code …", not as a discounted price.
+   */
+  price_with_code: Money;
+  promotion_id: string;
+  /** Conditions, in full (the same as in `GET /public/promotions`). */
+  terms: string;
+  title: string;
+  /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+  uses_left?: number | null;
+};
 
 /** Legal kind of programme: `regular` or a `national_focus` promotion programme. */
 export type PromotionsProgramKind = "regular" | "national_focus";
@@ -23040,6 +23287,86 @@ export type PromotionsPromotionListItem = {
   usage_count: number;
 };
 
+/** One product of a flash sale. */
+export type PromotionsPublicFlashItem = {
+  /** Most units one buyer can get at the sale price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units left at the sale price: a real count, `null` when not limited. */
+  quantity_left?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp` off the price). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points (1000 = 10%), when the sale is a percentage. */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A public flash sale, running or starting within a day. */
+export type PromotionsPublicFlashSale = {
+  currency: string;
+  ends_at: string;
+  id: string;
+  items: PromotionsPublicFlashItem[];
+  org_id: string;
+  starts_at: string;
+  /** `running` or `upcoming`. */
+  state: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
+};
+
+/** The legal discount limit in force. */
+export type PromotionsPublicLegalLimit = {
+  /** Legal basis, with its date in force. */
+  legal_basis: string;
+  /** Largest discount, in basis points of the price just before the promotion (5000 = 50%). */
+  max_bp: number;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`…). */
+  promotion_kind: string;
+};
+
+/** A promotion notice recorded with an authority. */
+export type PromotionsPublicNotice = {
+  authority_code: string;
+  /** Reference given by the authority. */
+  reference?: string | null;
+};
+
+/** A running promotion, as buyers see it. */
+export type PromotionsPublicPromotion = {
+  /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+  claimable: boolean;
+  currency: string;
+  ends_at: string;
+  /** Only for the buyer's first order. */
+  first_order_only: boolean;
+  id: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  legal_limit?: PromotionsPublicLegalLimit | null;
+  /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+  locale: string;
+  /** Smallest order, in minor units of `currency`. */
+  min_order_minor?: number | null;
+  /**
+   * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+   * Trade of that province), with their reference.
+   */
+  notices: PromotionsPublicNotice[];
+  /** Unit that runs it. */
+  org_id: string;
+  starts_at: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
+  /** `automatic`, `code` or `voucher`. */
+  trigger: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
+};
+
 export type PromotionsPurpose = "redeem" | "claim";
 
 /** Why a discount applies or not, for the buyer: `code` (i18n key), `params` and the translated `text`. */
@@ -23082,6 +23409,15 @@ export type PromotionsRejectedCode = {
   voucher_id?: string | null;
 };
 
+/** A reminder of a flash sale. */
+export type PromotionsReminder = {
+  promotion_id: string;
+  /** When the reminder is sent. */
+  remind_at: string;
+  /** When it was sent; `null` until then. */
+  sent_at?: string | null;
+};
+
 export type PromotionsRewardSelection = "cheapest" | "same_item" | "specified";
 
 export type PromotionsRole = "condition" | "reward";
@@ -23101,6 +23437,25 @@ export type PromotionsShippingDiscount = {
   funding: PromotionsFundingShare[];
   promotion_id: string;
   reason: PromotionsReason;
+};
+
+/** Carts to compute with and without the promotion. */
+export type PromotionsSimulateRequest = {
+  /** 1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate`. */
+  carts: PromotionsCart[];
+};
+
+/** One cart computed with and without the promotion. */
+export type PromotionsSimulation = {
+  /**
+   * What the promotion adds to the discount of this cart, in minor units (can be negative
+   * when it pushes out a better promotion).
+   */
+  difference_minor: number;
+  /** With the promotion (counted even while it is a draft or paused). */
+  with: PromotionsEvaluation;
+  /** Without it. */
+  without: PromotionsEvaluation;
 };
 
 export type PromotionsStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
@@ -39837,6 +40192,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/calendar": {
+    /** List the promotions running on some days (calendar). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsPromotionListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}": {
     /** Get a promotion with its rule, texts, targets and counters. */
     get: {
@@ -39958,6 +40326,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/conflicts": {
+    /** List the promotions that may clash with this one. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsConflict;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/end": {
     /** End a promotion now. */
     post: {
@@ -40016,6 +40397,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/participations": {
+    /** List the applications to a platform promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Apply to join a platform flash sale with your products. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsParticipationRequest;
+      responses: {
+        200: Data_PromotionsParticipation;
+        201: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/approve": {
+    /** Approve a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/reject": {
+    /** Reject a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/pause": {
     /** Pause a running or scheduled promotion. */
     post: {
@@ -40040,6 +40477,35 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/simulate": {
+    /** Try a promotion on sample carts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsSimulateRequest;
+      responses: {
+        200: Data_Vec_PromotionsSimulation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/stats": {
+    /** Get the daily counts of a promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { from: string; to: string }; };
+      responses: {
+        200: Data_Vec_PromotionsDailyStats;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -40106,6 +40572,44 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/public/promotions": {
+    /** List the promotions running now on this website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicPromotion;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/flash-sales": {
+    /** List the public flash sales running now or starting within a day (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicFlashSale;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/for-product/{product_id}": {
+    /** List the public coupons that lower the price of a product (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { variant_id: string; locale?: string; site?: string }; };
+      responses: {
+        200: Data_Vec_PromotionsProductCode;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/public/promotions/{id}/claim": {
     /** Save the voucher of a public promotion into your wallet ("Save" button). */
     post: {
@@ -40117,6 +40621,31 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/{id}/reminders": {
+    /** Ask to be reminded when a flash sale starts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsReminder;
+        201: Data_PromotionsReminder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Cancel your reminder of a flash sale. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
