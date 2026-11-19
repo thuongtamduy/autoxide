@@ -65,6 +65,7 @@ use autoxide_kernel::tls::install_crypto_provider;
 use autoxide_kernel::tokens::Issued;
 use autoxide_kernel::transfer::TransferError;
 use autoxide_kernel::version::etag;
+use autoxide_kernel::voice::VoiceProvider;
 use autoxide_kernel::zns::ZnsSender;
 
 #[test]

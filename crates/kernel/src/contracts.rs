@@ -16,4 +16,5 @@ pub mod report;
 pub mod resource;
 pub mod sms;
 pub mod storage;
+pub mod voice;
 pub mod zns;
