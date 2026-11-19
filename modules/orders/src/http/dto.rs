@@ -319,3 +319,221 @@ impl From<crate::entity::cart::Model> for CartSummaryResponse {
         }
     }
 }
+
+/// A line of an order (as ordered).
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersOrderLine)]
+pub(crate) struct OrderLineResponse {
+    id: Uuid,
+    variant_id: Uuid,
+    product_id: Uuid,
+    sku: String,
+    name: String,
+    quantity: i64,
+    unit_price: Money,
+    discount: Money,
+    tax: Money,
+    /// What the buyer pays for the line.
+    total: Money,
+    /// The promotion that added this free gift.
+    gift_of: Option<Uuid>,
+    returned_quantity: i64,
+}
+
+/// Money totals of an order.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersOrderTotals)]
+pub(crate) struct OrderTotalsResponse {
+    subtotal: Money,
+    discount: Money,
+    shipping_fee: Money,
+    shipping_discount: Money,
+    tax: Money,
+    total: Money,
+    paid: Money,
+    refunded: Money,
+}
+
+/// An order.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersOrder)]
+pub(crate) struct OrderResponse {
+    id: Uuid,
+    number: String,
+    /// The shop (or seller) of the order.
+    org_id: Uuid,
+    channel: String,
+    buyer_user_id: Option<Uuid>,
+    /// `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
+    /// `completed` or `cancelled`.
+    status: String,
+    /// `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`…
+    payment_status: String,
+    /// `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`.
+    fulfillment_status: String,
+    payment_method: String,
+    /// `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`.
+    funds_flow: String,
+    currency: String,
+    totals: OrderTotalsResponse,
+    /// Lines; empty in lists.
+    lines: Vec<OrderLineResponse>,
+    /// Pay before this, or the order is cancelled.
+    payment_due_at: Option<DateTime<Utc>>,
+    placed_at: DateTime<Utc>,
+    confirmed_at: Option<DateTime<Utc>>,
+    cancelled_at: Option<DateTime<Utc>>,
+    cancel_reason: Option<String>,
+    /// Changes on every update (for `If-Match`).
+    version: i32,
+}
+
+impl OrderResponse {
+    /// Đơn không kèm dòng (danh sách).
+    pub(crate) fn summary(
+        row: crate::entity::order::Model,
+    ) -> Result<Self, autoxide_kernel::error::Error> {
+        let money = |minor: i64| Money::from_columns(minor, &row.currency);
+        Ok(OrderResponse {
+            totals: OrderTotalsResponse {
+                subtotal: money(row.subtotal_minor)?,
+                discount: money(row.discount_minor)?,
+                shipping_fee: money(row.shipping_fee_minor)?,
+                shipping_discount: money(row.shipping_discount_minor)?,
+                tax: money(row.tax_minor)?,
+                total: money(row.total_minor)?,
+                paid: money(row.paid_minor)?,
+                refunded: money(row.refunded_minor)?,
+            },
+            id: row.id,
+            number: row.number,
+            org_id: row.org_id,
+            channel: row.channel,
+            buyer_user_id: row.buyer_user_id,
+            status: row.status,
+            payment_status: row.payment_status,
+            fulfillment_status: row.fulfillment_status,
+            payment_method: row.payment_method,
+            funds_flow: row.funds_flow,
+            currency: row.currency,
+            lines: Vec::new(),
+            payment_due_at: row.payment_due_at,
+            placed_at: row.placed_at,
+            confirmed_at: row.confirmed_at,
+            cancelled_at: row.cancelled_at,
+            cancel_reason: row.cancel_reason,
+            version: row.version,
+        })
+    }
+
+    /// Đơn kèm dòng.
+    pub(crate) fn new(
+        view: crate::orders_read::OrderView,
+    ) -> Result<Self, autoxide_kernel::error::Error> {
+        let currency = view.order.currency.clone();
+        let money = |minor: i64| Money::from_columns(minor, &currency);
+        let lines = view
+            .lines
+            .iter()
+            .map(|line| {
+                Ok(OrderLineResponse {
+                    id: line.id,
+                    variant_id: line.variant_id,
+                    product_id: line.product_id,
+                    sku: line.sku.clone(),
+                    name: line.name.clone(),
+                    quantity: line.quantity,
+                    unit_price: money(line.unit_price_minor)?,
+                    discount: money(line.discount_minor)?,
+                    tax: money(line.tax_minor)?,
+                    total: money(line.total_minor)?,
+                    gift_of: line.gift_of,
+                    returned_quantity: line.returned_quantity,
+                })
+            })
+            .collect::<Result<Vec<_>, autoxide_kernel::error::Error>>()?;
+        let mut response = OrderResponse::summary(view.order)?;
+        response.lines = lines;
+        Ok(response)
+    }
+}
+
+/// What the buyer does next to pay one amount.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersPaymentAction)]
+pub(crate) struct PaymentActionResponse {
+    order_id: Uuid,
+    payment_id: Uuid,
+    /// `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
+    /// `none` (the payment could not be started yet; retry from the order).
+    kind: String,
+    amount: Money,
+    /// `pending`, `succeeded`, `failed`, `expired`…
+    status: String,
+    redirect_url: Option<String>,
+    /// VietQR payload; the money goes to the seller's or the licensed partner's account.
+    qr_payload: Option<String>,
+    /// Transfer content the bank transfer must carry.
+    transfer_code: Option<String>,
+    expires_at: Option<DateTime<Utc>>,
+    /// For `GET /public/payments/{token}`.
+    status_token: String,
+}
+
+impl PaymentActionResponse {
+    pub(crate) fn new(
+        row: &crate::entity::payment::Model,
+        status_token: String,
+    ) -> Result<Self, autoxide_kernel::error::Error> {
+        let action = crate::payments::action_of(row);
+        let text = |key: &str| action[key].as_str().map(str::to_owned);
+        Ok(PaymentActionResponse {
+            order_id: row.order_id,
+            payment_id: row.id,
+            kind: text("kind").unwrap_or_else(|| "none".to_owned()),
+            amount: Money::from_columns(row.amount_minor, &row.currency)?,
+            status: row.status.clone(),
+            redirect_url: text("redirect_url"),
+            qr_payload: text("qr_payload"),
+            transfer_code: text("transfer_code"),
+            expires_at: row.expires_at,
+            status_token,
+        })
+    }
+}
+
+/// Result of a checkout.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersCheckoutResult)]
+pub(crate) struct CheckoutResponse {
+    pub orders: Vec<OrderResponse>,
+    /// One per amount to pay (D-216).
+    pub payment_actions: Vec<PaymentActionResponse>,
+}
+
+/// Public status of a payment.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersPublicPayment)]
+pub(crate) struct PublicPaymentResponse {
+    /// `pending`, `succeeded`, `failed`, `expired`.
+    status: String,
+    amount: Money,
+    expires_at: Option<DateTime<Utc>>,
+    order_number: String,
+    order_status: String,
+}
+
+impl PublicPaymentResponse {
+    pub(crate) fn new(
+        payment: &crate::entity::payment::Model,
+        order: &crate::entity::order::Model,
+    ) -> Result<Self, autoxide_kernel::error::Error> {
+        Ok(PublicPaymentResponse {
+            status: payment.status.clone(),
+            amount: Money::from_columns(payment.amount_minor, &payment.currency)?,
+            expires_at: payment.expires_at,
+            order_number: order.number.clone(),
+            order_status: order.status.clone(),
+        })
+    }
+}
