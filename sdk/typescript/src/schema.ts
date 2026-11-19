@@ -33139,6 +33139,23 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/events/ws": {
+    /** Receive events and send live signals over a WebSocket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { names: string; last_event_id?: string }; };
+      responses: {
+        101: void;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/exports": {
     /** Export a list. */
     post: {

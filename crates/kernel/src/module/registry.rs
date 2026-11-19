@@ -1190,10 +1190,9 @@ mod tests {
                 "AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS",
             ]
             .contains(name)
-                || name.starts_with("AUTOXIDE_ANTISPAM_")
-                || name.starts_with("AUTOXIDE_EVENTS_STREAM")
-                || name.starts_with("AUTOXIDE_BACKUP_")
-                || name.starts_with("AUTOXIDE_SYNC_")
+                || ["AUTOXIDE_ANTISPAM_", "AUTOXIDE_EVENTS_", "AUTOXIDE_BACKUP_", "AUTOXIDE_SYNC_"]
+                    .iter()
+                    .any(|prefix| name.starts_with(prefix))
         };
         assert!(names.iter().all(internal), "{names:?}");
         assert!(modules.migrator().is_ok());
