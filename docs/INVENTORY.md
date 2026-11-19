@@ -124,6 +124,19 @@ Turned on per product in `catalog` (`lot_tracked`, `serial_tracked`).
   adjusted down or transferred; a serial number can be sold only once, even by two shipments at the same time.
 - Transfers carry lots and serial numbers: the destination gets the same lot codes and expiry dates.
 
+## Purchasing
+
+- `POST /suppliers` (`inventory.purchasing.manage`): suppliers belong to a purchasing unit; `GET /suppliers` shows
+  `payable` — what that unit owes each supplier, from module `ledger` (absent without it).
+- Purchase orders (`PO-…`): draft → `POST /purchase-orders/{id}/order` (units count as `incoming`) → goods receipts,
+  in parts → `close` (what never arrived leaves `incoming`) or `cancel`.
+- `POST /receipts` (`inventory.receive`, `PN-…`): against a purchase order (never more than ordered) or directly; each
+  line updates the average cost and may carry a lot and serial numbers. With a supplier and module `ledger`, a job posts
+  Debit `inventory.stock` / Credit `payable.supplier` once (`ledger_status`: `pending`, `posted`, `failed` — retry
+  with `POST /receipts/{id}/retry-ledger` — or `not_applicable`). MCP tool `inventory.create_receipt`.
+- `POST /supplier-returns` (`TH-…`): goods back to the supplier at the current average cost (or a given price); the
+  posting is reversed.
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and
