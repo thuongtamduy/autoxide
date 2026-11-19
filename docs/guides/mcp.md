@@ -305,6 +305,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `promotions.create_promotion` | `promotions.write` | writes |
 | `promotions.end_promotion` | `promotions.publish` | writes |
 | `promotions.evaluate_cart` | `promotions.read` | read-only |
+| `promotions.export_notice` | `promotions.compliance` | read-only |
 | `promotions.generate_codes` | `promotions.codes.manage` | writes |
 | `promotions.get_promotion` | `promotions.read` | read-only |
 | `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
