@@ -1,6 +1,6 @@
 ## D-20261118-step39-sqlite-optimize · SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18 — agent quyết
 
-Chủ đề: Database
+Chủ đề: Vận hành và hiệu năng
 
 Quyết định: kết nối ghi SQLite của kernel (`Database::connect`) đặt `PRAGMA analysis_limit = 400` rồi chạy
 `PRAGMA optimize = 0x10002` lúc mở, và `optimize` lần nữa khi đóng (`optimize_on_close` của sqlx). Cờ `0x10002` xét mọi
