@@ -24,6 +24,35 @@ pub(crate) fn is_stale(name: &str, prefix: &str, now: SystemTime) -> bool {
     now.duration_since(created_at).is_ok_and(|age| age > STALE_AFTER)
 }
 
+/// `name` là thư mục tạm của một bài test dạng `autoxide-<việc>-<UUIDv7>` (vd `autoxide-catalog-…`,
+/// `autoxide-plans-…`) và đã cũ hơn [`STALE_AFTER`]?
+///
+/// Nhiều test tự tạo thư mục tạm dưới `std::env::temp_dir()` mà không xoá; trước đây chỉ thư mục
+/// `autoxide-test-…` của testkit được dọn nên rác tích lại tới hết đĩa. UUIDv7 ở cuối tên mang thời
+/// điểm tạo, nên nhận ra được mà không cần sổ ghi. Tên không đúng dạng thì không đụng tới.
+pub(crate) fn is_stale_scratch(name: &str, now: SystemTime) -> bool {
+    const UUID_LEN: usize = 36;
+    let Some(rest) = name.strip_prefix("autoxide-") else {
+        return false;
+    };
+    // Phải còn `<việc>-` trước UUID: không nhận `autoxide-<UUID>` trần.
+    if rest.len() <= UUID_LEN + 1 || !rest.is_char_boundary(rest.len() - UUID_LEN) {
+        return false;
+    }
+    let (label, uuid_text) = rest.split_at(rest.len() - UUID_LEN);
+    let Some(label) = label.strip_suffix('-') else {
+        return false;
+    };
+    if label.is_empty() || !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return false;
+    }
+    let Some(created_at) = created_at(uuid_text) else {
+        return false;
+    };
+    now.duration_since(created_at).is_ok_and(|age| age > STALE_AFTER)
+}
+
 /// Thời điểm tạo ghi trong một UUIDv7 (viết có hoặc không có dấu gạch).
 fn created_at(uuid_text: &str) -> Option<SystemTime> {
     let uuid = Uuid::parse_str(uuid_text).ok()?;
@@ -73,6 +102,28 @@ pub(crate) mod tests {
             "autoxide-test-936da01f-9abd-4d9d-80c7-02af85c822a8".to_owned(),
         ] {
             assert!(!is_stale(&name, "autoxide-test-", now), "{name}");
+        }
+    }
+
+    #[test]
+    fn thu_muc_tam_cua_test_cu_la_rac_moi_hay_sai_dang_thi_khong() {
+        let now = SystemTime::now();
+        let old = uuid_created_at(now - STALE_AFTER - Duration::from_secs(60));
+        let fresh = uuid_created_at(now - STALE_AFTER + Duration::from_secs(60));
+
+        assert!(is_stale_scratch(&format!("autoxide-catalog-{old}"), now));
+        assert!(is_stale_scratch(&format!("autoxide-test-{old}"), now));
+        assert!(is_stale_scratch(&format!("autoxide-missing-parent-directory-{old}"), now));
+        assert!(!is_stale_scratch(&format!("autoxide-catalog-{fresh}"), now));
+        for name in [
+            format!("autoxide-{old}"),
+            format!("other-catalog-{old}"),
+            format!("autoxide-catalog{old}"),
+            format!("autoxide-cat alog-{old}"),
+            "autoxide-catalog-936da01f-9abd-4d9d-80c7-02af85c822a8".to_owned(),
+            "autoxide-production".to_owned(),
+        ] {
+            assert!(!is_stale_scratch(&name, now), "{name}");
         }
     }
 

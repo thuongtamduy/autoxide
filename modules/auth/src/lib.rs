@@ -41,6 +41,7 @@ mod relocation;
 mod reset;
 mod resource;
 mod role;
+mod sandbox;
 mod session;
 mod settings;
 mod support;
@@ -262,13 +263,16 @@ impl Module for AuthModule {
                 .with_entitlements(context.entitlements()),
         );
         context.usage_counter(&crate::role::MEMBERS_LIMIT, Arc::new(crate::role::MemberCounter))?;
-        let api_keys = Arc::new(ApiKeyService::new(
-            roles.clone(),
-            sessions.clone(),
-            outbox.clone(),
-            mfa.clone(),
-            passkeys.clone(),
-        ));
+        let api_keys = Arc::new(
+            ApiKeyService::new(
+                roles.clone(),
+                sessions.clone(),
+                outbox.clone(),
+                mfa.clone(),
+                passkeys.clone(),
+            )
+            .with_max_days(config.api_key_max_days),
+        );
         let resets = Arc::new(reset::PasswordResets {
             jobs: context.jobs(),
             users: users.clone(),
@@ -282,12 +286,14 @@ impl Module for AuthModule {
         let delegations = Arc::new(delegation::DelegationService {
             databases: databases.clone(),
             outbox: outbox.clone(),
+            catalog: context.permissions().clone(),
         });
         let support = Arc::new(support::SupportService {
             databases: databases.clone(),
             outbox: outbox.clone(),
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             max_hours: config.support_max_hours,
+            catalog: context.permissions().clone(),
         });
         let authenticator = RequestAuthenticator {
             support: support.clone(),
@@ -479,6 +485,11 @@ impl Module for AuthModule {
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         relocation::relocation()
+    }
+
+    // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        sandbox::subscriptions()
     }
 }
 

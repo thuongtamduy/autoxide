@@ -66,7 +66,10 @@ pub(crate) struct ApiKey {
     pub permissions: Vec<String>,
     /// Nút của hàng rào (bước 34): key chỉ có quyền trong nhánh này; nút gốc = không rào.
     pub org_id: Uuid,
+    /// Mọi key mới đều có hạn (bước 54); `None` chỉ còn ở dữ liệu không qua nâng cấp.
     pub expires_at: Option<DateTime<Utc>>,
+    /// Dải IP được gọi, dạng CIDR (bước 54); rỗng: mọi địa chỉ.
+    pub allowed_ips: Vec<String>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     /// `Human`, `Agent` hay `Service` (bước 51 P12).
@@ -88,8 +91,10 @@ pub(crate) struct NewApiKey {
     pub permissions: Vec<String>,
     /// Nút của hàng rào; `None`: nút gốc (không rào). Phải là nút người tạo làm việc ở đó.
     pub org_id: Option<Uuid>,
-    /// `None`: không hết hạn.
+    /// `None`: hạn dài nhất cho phép (`AUTOXIDE_AUTH_API_KEY_MAX_DAYS`).
     pub expires_at: Option<DateTime<Utc>>,
+    /// Dải IP được gọi (`203.0.113.0/24`, một địa chỉ); rỗng: mọi địa chỉ.
+    pub allowed_ips: Vec<String>,
     /// Mật khẩu hiện tại của người tạo: access token bị lộ không đủ để tạo key sống lâu
     /// hơn nó (D-079). Rỗng khi xác nhận bằng `second_factor`.
     pub current_password: String,
@@ -114,7 +119,12 @@ pub(crate) struct ApiKeyService {
     outbox: Outbox,
     mfa: Arc<crate::mfa::MfaService>,
     passkeys: Arc<crate::passkey::PasskeyService>,
+    /// Hạn dài nhất của key, theo ngày (`AUTOXIDE_AUTH_API_KEY_MAX_DAYS`).
+    max_days: i64,
 }
+
+/// Mặc định của `AUTOXIDE_AUTH_API_KEY_MAX_DAYS`.
+const DEFAULT_MAX_DAYS: i64 = 365;
 
 impl ApiKeyService {
     pub(crate) fn new(
@@ -124,7 +134,13 @@ impl ApiKeyService {
         mfa: Arc<crate::mfa::MfaService>,
         passkeys: Arc<crate::passkey::PasskeyService>,
     ) -> Self {
-        ApiKeyService { roles, sessions, outbox, mfa, passkeys }
+        ApiKeyService { roles, sessions, outbox, mfa, passkeys, max_days: DEFAULT_MAX_DAYS }
+    }
+
+    /// Hạn dài nhất của key mới, theo ngày.
+    pub(crate) fn with_max_days(mut self, days: i64) -> Self {
+        self.max_days = days;
+        self
     }
 
     /// Tạo key cho `creator`, với permission nằm trong số permission `creator` đang có.
@@ -156,7 +172,15 @@ impl ApiKeyService {
             )),
         };
         let org_id = input.org_id.unwrap_or(root_of(tenant.id()).as_uuid());
-        let mut checked = self.check(creator, input.name, input.permissions, input.expires_at, now);
+        // Hạn và dải IP (bước 54): lỗi gom cùng các ô khác.
+        let mut extra = Vec::new();
+        let expires_at = super::rules::expiry(input.expires_at, now, self.max_days)
+            .map_err(|problem| extra.push(problem))
+            .ok();
+        let networks = super::rules::networks(&input.allowed_ips)
+            .map_err(|problems| extra.extend(problems))
+            .unwrap_or_default();
+        let mut checked = self.check(creator, input.name, input.permissions, extra);
         if let Some(problem) = fence_problem(tenant, creator, org_id).await? {
             checked = match checked {
                 Ok(_) => Err(Error::validation(vec![problem])),
@@ -178,6 +202,9 @@ impl ApiKeyService {
             }
             (Err(error), _) => return Err(error),
         };
+        // `check` đã báo lỗi nếu hạn sai, nên tới đây luôn có hạn.
+        let expires_at = expires_at.unwrap_or_else(|| now + chrono::Duration::days(self.max_days));
+        let allowed_ips = super::rules::stored(&networks);
         let user_id = creator.user_id();
         let verified_hash = match &input.second_factor {
             None => {
@@ -231,7 +258,8 @@ impl ApiKeyService {
             name: Set(name.clone()),
             prefix: Set(prefix.clone()),
             key_hash: Set(token::sha256(&secret)),
-            expires_at: Set(input.expires_at),
+            expires_at: Set(Some(expires_at)),
+            allowed_ips: Set(allowed_ips.clone()),
             org_id: Set(Some(org_id)),
             last_used_at: Set(None),
             created_at: Set(now),
@@ -255,7 +283,8 @@ impl ApiKeyService {
             "prefix": prefix,
             "permissions": permissions,
             "org_id": org_id,
-            "expires_at": input.expires_at,
+            "expires_at": expires_at,
+            "allowed_ips": allowed_ips,
             "kind": input.kind.key_name(),
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
@@ -271,7 +300,8 @@ impl ApiKeyService {
             prefix,
             permissions,
             org_id,
-            expires_at: input.expires_at,
+            expires_at: Some(expires_at),
+            allowed_ips: networks.iter().map(ToString::to_string).collect(),
             last_used_at: None,
             created_at: now,
             kind: input.kind,
@@ -415,6 +445,8 @@ impl ApiKeyService {
         if let Some(org) = row.org_id {
             principal = principal.with_fence(OrgId::from_uuid(org));
         }
+        // Kernel kiểm địa chỉ của request với các dải này cho mọi endpoint (bước 54).
+        principal = principal.with_networks(super::rules::parse_stored(row.allowed_ips.as_deref()));
         self.touch(tenant, &row, now).await;
         Ok(principal)
     }
@@ -449,8 +481,7 @@ impl ApiKeyService {
         creator: &Principal,
         name: String,
         permissions: Vec<String>,
-        expires_at: Option<DateTime<Utc>>,
-        now: DateTime<Utc>,
+        extra: Vec<FieldError>,
     ) -> Result<(String, Vec<String>), Error> {
         let name = name.trim().to_owned();
         let mut problems = Vec::new();
@@ -490,9 +521,7 @@ impl ApiKeyService {
                 ));
             }
         }
-        if expires_at.is_some_and(|expires_at| expires_at <= now) {
-            problems.push(FieldError::new("expires_at", "past", "must be in the future"));
-        }
+        problems.extend(extra);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -529,6 +558,10 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
         permissions,
         org_id: row.org_id.unwrap_or(row.tenant_id),
         expires_at: row.expires_at,
+        allowed_ips: super::rules::parse_stored(row.allowed_ips.as_deref())
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
         last_used_at: row.last_used_at,
         created_at: row.created_at,
         kind: ActorKind::of_key(&row.kind),
@@ -705,6 +738,7 @@ mod tests {
                 &tenant,
                 Actor::system(),
                 RoleInput {
+                    denies: Vec::new(),
                     requires_mfa: false,
                     grants: Vec::new(),
                     name: "reader".to_owned(),
@@ -725,6 +759,7 @@ mod tests {
 
     fn new_key(permissions: &[&str]) -> NewApiKey {
         NewApiKey {
+            allowed_ips: Vec::new(),
             kind: autoxide_kernel::access::ActorKind::Human,
             org_id: None,
             name: "agent".to_owned(),
@@ -806,6 +841,7 @@ mod tests {
             let tenant = services.tenant.clone();
             let past = Utc::now() - chrono::Duration::hours(1);
             let input = NewApiKey {
+                allowed_ips: Vec::new(),
                 kind: autoxide_kernel::access::ActorKind::Human,
                 org_id: None,
                 name: " ".to_owned(),
@@ -904,6 +940,55 @@ mod tests {
                 keys.authenticate(&tenant, "axk_nope").await.unwrap_err().code(),
                 "auth.invalid_api_key"
             );
+        })
+        .await
+        .unwrap();
+    }
+
+    // Bước 54: mọi key có hạn (mặc định là trần), không vượt trần; key khai dải IP chỉ dùng được
+    // từ các dải đó.
+    #[tokio::test]
+    async fn key_co_han_bat_buoc_va_gioi_han_dai_ip() {
+        TestDatabase::run(async |test| {
+            let (services, ada) = setup(test).await;
+            let tenant = services.tenant.clone();
+            let keys = &services.api_keys;
+            let before = now();
+            let plain = keys.create(&tenant, &ada, new_key(&["auth.users.read"])).await.unwrap();
+            let expires = plain.key.expires_at.unwrap();
+            assert!(expires >= before + chrono::Duration::days(DEFAULT_MAX_DAYS));
+            assert!(plain.key.allowed_ips.is_empty());
+
+            let mut far = new_key(&["auth.users.read"]);
+            far.expires_at = Some(now() + chrono::Duration::days(DEFAULT_MAX_DAYS + 1));
+            far.allowed_ips = vec!["not an address".to_owned()];
+            let error = keys.create(&tenant, &ada, far).await.unwrap_err();
+            let fields: Vec<(&str, &str)> = error
+                .fields()
+                .iter()
+                .map(|field| (field.field.as_str(), field.code.as_str()))
+                .collect();
+            assert_eq!(fields, [("expires_at", "too_far"), ("allowed_ips[0]", "invalid")]);
+
+            let mut fenced = new_key(&["auth.users.read"]);
+            fenced.allowed_ips = vec!["203.0.113.0/24".to_owned(), "2001:db8::1".to_owned()];
+            let fenced = keys.create(&tenant, &ada, fenced).await.unwrap();
+            assert_eq!(fenced.key.allowed_ips, ["203.0.113.0/24", "2001:db8::1/128"]);
+            let listed = keys
+                .list(&tenant, ada.user_id(), &PageRequest::first(10, Order::Desc))
+                .await
+                .unwrap();
+            let row = listed.data.iter().find(|key| key.id == fenced.key.id).unwrap();
+            assert_eq!(row.allowed_ips, fenced.key.allowed_ips);
+
+            let principal = keys.authenticate(&tenant, &fenced.secret).await.unwrap();
+            assert!(principal.admits(Some("203.0.113.9".parse().unwrap())).is_ok());
+            assert!(principal.admits(Some("2001:db8::1".parse().unwrap())).is_ok());
+            let outside = principal.admits(Some("198.51.100.1".parse().unwrap())).unwrap_err();
+            assert_eq!(outside.code(), "network_not_allowed");
+            assert!(principal.admits(None).is_err(), "không biết địa chỉ thì không đoán");
+            let open = keys.authenticate(&tenant, &plain.secret).await.unwrap();
+            assert!(open.admits(None).is_ok(), "key không khai dải: mọi nơi");
         })
         .await
         .unwrap();

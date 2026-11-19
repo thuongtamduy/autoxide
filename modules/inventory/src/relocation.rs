@@ -13,6 +13,10 @@ pub(crate) fn relocation() -> Relocation {
             "inventory_restocks",
             "inventory_counts",
             "inventory_lots",
+            "inventory_suppliers",
+            "inventory_purchase_orders",
+            "inventory_receipts",
+            "inventory_supplier_returns",
         ])
         // Kho phục vụ đi theo nút bán; chỗ giữ theo nút bán của đơn.
         .table(
@@ -25,6 +29,8 @@ pub(crate) fn relocation() -> Relocation {
         )
         .follow("inventory_reservation_lines", "reservation_id", "inventory_reservations")
         .follow("inventory_fulfilments", "reservation_id", "inventory_reservations")
+        // Suất đặt trước là của biến thể (cả khách): chép sang khách mới khi tách.
+        .copy_on_split(&["inventory_preorder_counters"])
         // Phiếu chuyển kho đi theo kho gửi.
         .table(
             "inventory_transfers",
@@ -32,6 +38,13 @@ pub(crate) fn relocation() -> Relocation {
         )
         .follow("inventory_transfer_lines", "transfer_id", "inventory_transfers")
         .follow("inventory_count_lines", "count_id", "inventory_counts")
+        .follow("inventory_purchase_order_lines", "purchase_order_id", "inventory_purchase_orders")
+        .follow("inventory_receipt_lines", "receipt_id", "inventory_receipts")
+        .follow(
+            "inventory_supplier_return_lines",
+            "supplier_return_id",
+            "inventory_supplier_returns",
+        )
         // Serial: ở kho nào đi theo kho đó; serial đã bán (không kho) ở lại khách gốc.
         .table(
             "inventory_serials",

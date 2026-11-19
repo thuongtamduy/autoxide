@@ -21,6 +21,7 @@ impl RoleService {
             .column((user_role::Entity, user_role::Column::OrgId))
             .column((role_permission::Entity, role_permission::Column::Permission))
             .column((role_permission::Entity, role_permission::Column::Scope))
+            .column((role_permission::Entity, role_permission::Column::Effect))
             .from(user_role::Entity)
             .inner_join(
                 role::Entity,
@@ -38,7 +39,7 @@ impl RoleService {
                     .eq(tenant.id().as_uuid()),
             );
         let rows = tenant.database().read().query_all(&select).await?;
-        principal_from_rows(tenant, user_id, &rows).await
+        principal_from_rows(tenant, user_id, &rows, &self.catalog).await
     }
 
     /// Người dùng `user_id` cùng quyền của họ trong MỘT câu — đường nóng của mọi request đã đăng
@@ -63,6 +64,7 @@ impl RoleService {
             .column((user_role::Entity, user_role::Column::OrgId))
             .column((role_permission::Entity, role_permission::Column::Permission))
             .column((role_permission::Entity, role_permission::Column::Scope))
+            .column((role_permission::Entity, role_permission::Column::Effect))
             .from(user::Entity)
             .left_join(
                 user_role::Entity,
@@ -87,7 +89,7 @@ impl RoleService {
             return Ok(None);
         };
         let user = User::from(user::Model::from_query_result(first, "")?);
-        let principal = principal_from_rows(tenant, user_id, &rows).await?;
+        let principal = principal_from_rows(tenant, user_id, &rows, &self.catalog).await?;
         Ok(Some((user, principal)))
     }
 
@@ -127,22 +129,38 @@ impl RoleService {
     }
 }
 
-/// Permission (kèm độ sâu) của từng role trong `role_ids`, một câu truy vấn cho cả danh sách.
+/// Giá trị cột `effect` của `auth_role_permission`.
+pub(super) const ALLOW: &str = "allow";
+pub(super) const DENY: &str = "deny";
+
+/// Luật của một role: permission cấp (kèm độ sâu) và permission cấm, theo thứ tự tên.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct RoleRules {
+    pub grants: Vec<(String, Scope)>,
+    pub denies: Vec<String>,
+}
+
+/// Luật của từng role trong `role_ids`, một câu truy vấn cho cả danh sách.
 pub(super) async fn permissions_of<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     role_ids: impl IntoIterator<Item = Uuid>,
-) -> Result<HashMap<Uuid, Vec<(String, Scope)>>, Error> {
+) -> Result<HashMap<Uuid, RoleRules>, Error> {
     let rows = role_permission::Entity::find()
         .filter(role_permission::Column::RoleId.is_in(role_ids))
         .scoped(tenant)
         .order_by_asc(role_permission::Column::Permission)
         .all(connection)
         .await?;
-    let mut by_role: HashMap<Uuid, Vec<(String, Scope)>> = HashMap::new();
+    let mut by_role: HashMap<Uuid, RoleRules> = HashMap::new();
     for row in rows {
+        let rules = by_role.entry(row.role_id).or_default();
+        if row.effect == DENY {
+            rules.denies.push(row.permission);
+            continue;
+        }
         let scope = Scope::parse(&row.scope).unwrap_or(Scope::Tenant);
-        by_role.entry(row.role_id).or_default().push((row.permission, scope));
+        rules.grants.push((row.permission, scope));
     }
     Ok(by_role)
 }
@@ -152,7 +170,7 @@ pub(super) async fn permissions_of<C: ConnectionTrait>(
 pub(crate) async fn role_grants(
     tenant: &TenantContext,
     ids: &[Uuid],
-) -> Result<std::collections::HashMap<Uuid, (bool, Vec<(String, Scope)>)>, Error> {
+) -> Result<std::collections::HashMap<Uuid, (bool, RoleRules)>, Error> {
     if ids.is_empty() {
         return Ok(std::collections::HashMap::new());
     }
@@ -174,11 +192,14 @@ pub(crate) async fn role_grants(
 
 /// Quyền của người dùng `user_id` từ các dòng (role, permission) của [`RoleService::principal`]
 /// hay [`RoleService::user_principal`]. Dòng không có role (`all_permissions` NULL, do LEFT JOIN)
-/// được bỏ qua.
+/// được bỏ qua. Permission bị một role cấm (`effect = deny`) bị bỏ khỏi kết quả, kể cả khi role
+/// khác cấp hay người dùng có role toàn quyền (bước 54) — kể cả role cấm đang chờ MFA: cấm luôn
+/// có hiệu lực.
 pub(super) async fn principal_from_rows(
     tenant: &TenantContext,
     user_id: Uuid,
     rows: &[sea_orm::QueryResult],
+    catalog: &PermissionCatalog,
 ) -> Result<Principal, Error> {
     // Role bắt buộc MFA (D-308): chỉ khi có role như vậy mới tra MFA của tài khoản — đường
     // nóng của mọi người khác giữ một câu.
@@ -191,19 +212,27 @@ pub(super) async fn principal_from_rows(
     }
     let root = root_of(tenant.id());
     let mut grants = Vec::with_capacity(rows.len());
+    let mut denied = Vec::new();
+    let mut everything = false;
     for row in rows {
         let Some(all_permissions) = row.try_get::<Option<bool>>("", "all_permissions")? else {
             continue;
         };
+        let permission = row.try_get::<Option<String>>("", "permission")?;
+        if row.try_get::<Option<String>>("", "effect")?.as_deref() == Some(DENY) {
+            denied.extend(permission);
+            continue;
+        }
         if row.try_get::<Option<bool>>("", "requires_mfa")? == Some(true) && has_mfa == Some(false)
         {
             continue;
         }
         // Role `admin` chỉ gán được ở nút gốc (`set_memberships` chặn chỗ khác).
         if all_permissions {
-            return Ok(Principal::with_all_permissions(user_id).in_tenant(tenant.id()));
+            everything = true;
+            continue;
         }
-        let Some(permission) = row.try_get::<Option<String>>("", "permission")? else {
+        let Some(permission) = permission else {
             continue;
         };
         let org = row.try_get::<Option<Uuid>>("", "org_id")?.map_or(root, OrgId::from_uuid);
@@ -213,7 +242,13 @@ pub(super) async fn principal_from_rows(
             .unwrap_or(Scope::Tenant);
         grants.push((permission, Grant::new(org, scope)));
     }
-    Ok(Principal::with_grants(user_id, grants).in_tenant(tenant.id()))
+    let principal = if everything {
+        Principal::with_all_permissions(user_id)
+    } else {
+        Principal::with_grants(user_id, grants)
+    };
+    // `in_tenant` trước `without`: người toàn quyền mở ra grant ở nút gốc của đúng khách.
+    Ok(principal.in_tenant(tenant.id()).without(denied, catalog))
 }
 
 /// Tài khoản `user_id` đã bật MFA: TOTP đã xác nhận, hay có ít nhất một passkey.

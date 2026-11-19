@@ -29,8 +29,8 @@ pub(crate) use admins::*;
 pub(crate) use members::*;
 pub(crate) use principal::*;
 
-/// Role đã kiểm: tên, mô tả, permission kèm độ sâu.
-type CheckedRole = (String, String, Vec<(String, Scope)>);
+/// Role đã kiểm: tên, mô tả, permission cấp (kèm độ sâu) và permission cấm.
+type CheckedRole = (String, String, RoleRules);
 
 const NAME_MAX_LENGTH: usize = 64;
 const DESCRIPTION_MAX_LENGTH: usize = 500;
@@ -53,6 +53,8 @@ pub(crate) struct Role {
     pub permissions: Vec<String>,
     /// Permission kèm độ sâu (bước 34), theo thứ tự tên.
     pub grants: Vec<(String, Scope)>,
+    /// Permission role cấm (bước 54), theo thứ tự tên: thắng mọi role khác của người dùng.
+    pub denies: Vec<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -68,6 +70,8 @@ pub(crate) struct RoleInput {
     pub grants: Vec<(String, Scope)>,
     /// Xem [`Role::requires_mfa`].
     pub requires_mfa: bool,
+    /// Permission cấm (bước 54); không trùng permission cấp của chính role.
+    pub denies: Vec<String>,
 }
 
 /// Bộ lọc danh sách membership.
@@ -324,11 +328,19 @@ impl RoleService {
         let only_mfa = current.all_permissions
             && name == current.name
             && description == current.description
-            && permissions.is_empty();
+            && permissions.grants.is_empty()
+            && permissions.denies.is_empty();
         if current.all_permissions && !only_mfa {
             return Err(builtin_role());
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
+        // Thêm permission cấm cho role đang được quản trị viên cuối cùng giữ thì không còn ai đủ
+        // mọi permission (bước 54): chặn như bỏ role `admin` của họ.
+        let admins_before = if permissions.denies.is_empty() {
+            0
+        } else {
+            count_active_admins(&transaction, tenant).await?
+        };
         let mut update = role::Entity::update_many()
             .col_expr(role::Column::RequiresMfa, Expr::value(requires_mfa))
             .col_expr(role::Column::Name, Expr::value(name.clone()))
@@ -352,6 +364,10 @@ impl RoleService {
             .exec(&transaction)
             .await?;
         insert_permissions(&transaction, tenant, id, &permissions).await?;
+        if admins_before > 0 && count_active_admins(&transaction, tenant).await? == 0 {
+            transaction.rollback().await?;
+            return Err(last_admin());
+        }
         let mut after = role_json(&name, &description, &permissions);
         after["requires_mfa"] = json!(requires_mfa);
         let event = events::RoleUpdated { before: Some(before), after: Some(after) };
@@ -452,7 +468,7 @@ impl RoleService {
                 .with_param("description_max_length", DESCRIPTION_MAX_LENGTH),
             );
         }
-        if input.permissions.len() + input.grants.len() > MAX_PERMISSIONS {
+        if input.permissions.len() + input.grants.len() + input.denies.len() > MAX_PERMISSIONS {
             problems.push(
                 FieldError::new(
                     "permissions",
@@ -503,13 +519,38 @@ impl RoleService {
                 );
             }
         }
+        let mut denied = BTreeSet::new();
+        for (index, permission) in input.denies.iter().enumerate() {
+            if !self.catalog.contains(permission) {
+                problems.push(FieldError::new(
+                    format!("denies[{index}]"),
+                    "unknown",
+                    "is not a permission of this system",
+                ));
+            } else if input.permissions.contains(permission) || seen.contains(permission.as_str()) {
+                problems.push(
+                    FieldError::new(
+                        format!("denies[{index}]"),
+                        "conflict",
+                        "`{permission}` is also granted by this role; a role either grants or \
+                         denies a permission",
+                    )
+                    .with_param("permission", permission),
+                );
+            }
+            denied.insert(permission.clone());
+        }
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
         let mut granted: std::collections::BTreeMap<String, Scope> =
             input.permissions.into_iter().map(|permission| (permission, Scope::Tenant)).collect();
         granted.extend(input.grants);
-        Ok((name, description, granted.into_iter().collect()))
+        let rules = RoleRules {
+            grants: granted.into_iter().collect(),
+            denies: denied.into_iter().collect(),
+        };
+        Ok((name, description, rules))
     }
 }
 
@@ -579,13 +620,19 @@ async fn role_snapshot<C: ConnectionTrait>(
 }
 
 /// Role cho audit: tên, mô tả, permission (tên) và độ sâu của từng permission.
-fn role_json(name: &str, description: &str, grants: &[(String, Scope)]) -> serde_json::Value {
-    let names: Vec<&str> = grants.iter().map(|(permission, _)| permission.as_str()).collect();
-    let scopes: serde_json::Map<String, serde_json::Value> = grants
+fn role_json(name: &str, description: &str, rules: &RoleRules) -> serde_json::Value {
+    let names: Vec<&str> = rules.grants.iter().map(|(permission, _)| permission.as_str()).collect();
+    let scopes: serde_json::Map<String, serde_json::Value> = rules
+        .grants
         .iter()
         .map(|(permission, scope)| (permission.clone(), json!(scope.as_str())))
         .collect();
-    json!({"name": name, "description": description, "permissions": names, "scopes": scopes})
+    let mut json =
+        json!({"name": name, "description": description, "permissions": names, "scopes": scopes});
+    if !rules.denies.is_empty() {
+        json["denies"] = json!(rules.denies);
+    }
+    json
 }
 
 /// Tên các role, cho audit.
@@ -605,15 +652,18 @@ async fn insert_permissions(
     transaction: &DatabaseTransaction,
     tenant: &TenantContext,
     role_id: Uuid,
-    permissions: &[(String, Scope)],
+    rules: &RoleRules,
 ) -> Result<(), Error> {
-    for (permission, scope) in permissions {
+    let allows = rules.grants.iter().map(|(permission, scope)| (permission, *scope, ALLOW));
+    let denies = rules.denies.iter().map(|permission| (permission, Scope::Tenant, DENY));
+    for (permission, scope, effect) in allows.chain(denies) {
         role_permission::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
             role_id: Set(role_id),
             permission: Set(permission.clone()),
             scope: Set(scope.as_str().to_owned()),
+            effect: Set(effect.to_owned()),
         }
         .insert(transaction)
         .await?;
@@ -621,7 +671,8 @@ async fn insert_permissions(
     Ok(())
 }
 
-fn to_role(row: role::Model, grants: Vec<(String, Scope)>) -> Role {
+fn to_role(row: role::Model, rules: RoleRules) -> Role {
+    let RoleRules { grants, denies } = rules;
     Role {
         id: row.id,
         name: row.name,
@@ -630,6 +681,7 @@ fn to_role(row: role::Model, grants: Vec<(String, Scope)>) -> Role {
         requires_mfa: row.requires_mfa,
         permissions: grants.iter().map(|(permission, _)| permission.clone()).collect(),
         grants,
+        denies,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -732,6 +784,7 @@ pub(crate) async fn grant_problems<C: ConnectionTrait>(
             grants
                 .remove(&row.id)
                 .unwrap_or_default()
+                .grants
                 .iter()
                 .all(|(permission, _)| actor.allows(permission))
         };

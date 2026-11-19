@@ -67,7 +67,7 @@ reserved + q WHERE reserved + q <= limit` (không đọc rồi ghi) — 0 dòng 
 Trả chỗ khi huỷ / hết hạn thì trừ lại `reserved`. Hàng về (nhập kho, chuyển kho tới): job
 `inventory.allocate_preorders` chia tồn mới cho các dòng đặt trước **theo thứ tự đặt** (id UUIDv7) và phát
 `inventory.preorder_allocated` từng dòng để `orders` chuyển đơn sang chuẩn bị hàng; nhận lại event nhập
-kho không chia hai lần (khoá theo id biến động kho). Đặt trước không làm mức công khai thành "còn hàng":
+kho không chia hai lần (job tính lại từ trạng thái, D-20261119-step42-preorders). Đặt trước không làm mức công khai thành "còn hàng":
 mức công khai là `preorder`.
 
 ### Kiểu và trait

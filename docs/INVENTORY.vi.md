@@ -73,6 +73,17 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
 Chỗ giữ chưa xác nhận quá `expires_at` được job `inventory.expire_reservations` (mỗi phút) trả lại. Mỗi phần giữ trừ
 tồn bằng một câu `UPDATE` có điều kiện, theo thứ tự cố định, nên 100 người cùng mua cái cuối chỉ đúng một người được.
 
+### Hàng đặt trước
+
+Biến thể bán theo `preorder` giữ chỗ được trước khi có hàng. Khi biến thể có `preorder_limit` (khai ở `catalog`), tổng
+đặt trước đang giữ và đã xác nhận không bao giờ vượt giới hạn, kể cả khi nhiều người đặt cùng lúc: người đặt thừa nhận
+409 `inventory.preorder_sold_out`. Huỷ hoặc hết hạn đặt trước thì trả lại suất.
+
+Khi hàng về kho có đơn đặt trước đang chờ (nhập hàng, chuyển kho, trả về, điều chỉnh tăng), job
+`inventory.allocate_preorders` chia hàng rảnh cho các dòng đặt trước **theo thứ tự đặt** và phát
+`inventory.preorder_allocated` cho từng dòng (`quantity` lần này, `allocated_quantity` cộng dồn) để `orders` chuyển đơn
+sang bước tiếp. Chạy lại job không bao giờ chia hai lần.
+
 Quản trị xem chỗ giữ bằng `GET /reservations` (`inventory.reservations.read`) và gỡ chỗ bị kẹt bằng
 `POST /reservations/{id}/release` (`inventory.adjust`; ghi lại người gỡ).
 
@@ -119,6 +130,19 @@ Bật theo sản phẩm ở `catalog` (`lot_tracked`, `serial_tracked`).
 - Biến thể theo dõi serial cần đúng một số serial cho mỗi đơn vị khi thêm, xuất (`FulfilLine::serials`), điều chỉnh
   giảm hay chuyển kho; một serial chỉ bán được một lần, kể cả khi hai lần xuất chạy cùng lúc.
 - Chuyển kho mang theo lô và serial: kho nhận có cùng mã lô và hạn dùng.
+
+## Nhập hàng
+
+- `POST /suppliers` (`inventory.purchasing.manage`): nhà cung cấp thuộc một nút mua hàng; `GET /suppliers` có `payable`
+  — nút đó đang nợ từng nhà cung cấp bao nhiêu, đọc từ module `ledger` (không có thì vắng).
+- Đơn đặt hàng (`PO-…`): nháp → `POST /purchase-orders/{id}/order` (hàng tính vào `incoming`) → phiếu nhập, nhận từng
+  phần → `close` (phần không về rời `incoming`) hay `cancel`.
+- `POST /receipts` (`inventory.receive`, `PN-…`): theo đơn đặt hàng (không quá số đặt) hay nhập thẳng; mỗi dòng cập nhật
+  giá vốn bình quân và có thể kèm lô, serial. Có nhà cung cấp và module `ledger` thì một job ghi Nợ `inventory.stock` /
+  Có `payable.supplier` đúng một lần (`ledger_status`: `pending`, `posted`, `failed` — ghi lại bằng
+  `POST /receipts/{id}/retry-ledger` — hay `not_applicable`). Tool MCP `inventory.create_receipt`.
+- `POST /supplier-returns` (`TH-…`): trả hàng cho nhà cung cấp theo giá vốn bình quân hiện tại (hay giá nêu); bút toán
+  được đảo lại.
 
 ## Kiểm số liệu
 

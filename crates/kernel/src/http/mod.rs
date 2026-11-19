@@ -75,6 +75,7 @@ use crate::idempotency::IdempotencyStore;
 
 pub use body_limit::{BodyLimit, is_too_large};
 pub use client::ClientInfo;
+pub(crate) use client::ClientIp;
 pub(crate) use client::ForwardedHost;
 pub use deprecation::Deprecation;
 pub use disposition::{Disposition, content_disposition};
@@ -387,6 +388,8 @@ pub fn build(
         // (CDN, reverse proxy) phải tách bản lưu theo header này, không thì trả nội dung của khách
         // này cho khách khác. Đặt ngoài lớp 304 để cả 304 cũng mang nó.
         .layer(middleware::map_response(vary_tenant))
+        // Response của sandbox mang `Autoxide-Sandbox` và `noindex` (D-232); cả 304 cũng vậy.
+        .layer(middleware::from_fn(crate::tenancy::sandbox::headers::mark))
         // Giới hạn mặc định của axum (2 MiB cho extractor) tắt đi: lớp `body_limit`
         // đã giới hạn theo từng route.
         .layer(DefaultBodyLimit::disable())

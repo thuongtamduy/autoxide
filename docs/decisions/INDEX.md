@@ -82,6 +82,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
 - **[D-20261118-no-codegraph](D-20261118-no-codegraph.md)** Không dùng CodeGraph để agent tìm code; mục lục quyết định bỏ số đếm — 2026-11-18
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
+- **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel
 
@@ -166,6 +167,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-374** MCP resources, prompts và `/llms.txt` (bước 40 P2, D-068, D-109, D-245) — 2026-11-18
 - **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
 - **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
+- **[D-20261119-step53-ai-mail](D-20261119-step53-ai-mail.md)** `support`: bản nháp AI lưu riêng, khoá trả lời email là HMAC theo phiếu, tool MCP dùng trường phẳng — 2026-11-19
+- **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
 
 ## Xác thực, phân quyền, bảo mật
 
@@ -220,6 +223,9 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
 - **[D-20261118-step39-key-rotation](D-20261118-step39-key-rotation.md)** Đổi khoá ký access token không đăng xuất ai — 2026-11-18
+- **[D-20261118-step54-one-decision](D-20261118-step54-one-decision.md)** Bước 54 mục 1: một hàm quyết định quyền; cache theo phiên bản quyền tách thành mục riêng, chờ số đo — 2026-11-18
+- **[D-20261118-step54-role-denies](D-20261118-step54-role-denies.md)** Bước 54: role cấm permission (deny thắng allow) — 2026-11-18
+- **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
 
 ## Đa khách, tổ chức, gói
 
@@ -259,8 +265,10 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-358** "Bán trước khi thông báo website" (A-3.5): nhãn "bắt buộc theo luật", không chặn — 2026-11-17
 - **D-370** Nhật ký request theo khách và nhật ký lệnh của agent (bước 52 mục 1, D-202) — 2026-11-18
 - **[D-20261118-step38-distribution](D-20261118-step38-distribution.md)** Phân phối cha → con và vào ngữ cảnh con xuyên database — 2026-11-18
+- **[D-20261118-step38-groups](D-20261118-step38-groups.md)** Nhóm nút ngoài cây cho báo cáo: số nút bị bỏ ở chi tiết nhóm, `group_by=group` cần `group_ids` — 2026-11-18
 - **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
+- **[D-20261118-step38-sandbox](D-20261118-step38-sandbox.md)** Khách thử nghiệm, phần nền: cột của `kernel_tenants`, cùng placement, hạn mức mặc định 1, uỷ quyền vào bằng event — 2026-11-18
 
 ## Hợp đồng cho giao diện
 
@@ -459,6 +467,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
 - **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 - **[D-20261119-step42-lots-serials](D-20261119-step42-lots-serials.md)** Lô, hạn dùng và serial của `inventory`: giữ ở mức dòng tồn, chọn lô lúc xuất, hàng không gắn lô được phép — 2026-11-19
+- **[D-20261119-step42-preorders](D-20261119-step42-preorders.md)** Hàng đặt trước của `inventory`: bộ đếm suất có trần, job chia hàng về tính lại từ trạng thái — 2026-11-19
+- **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
 
 ## Vận hành và hiệu năng
 

@@ -58,6 +58,7 @@ async fn role(
     grants: &[(&str, Scope)],
 ) -> Role {
     let input = RoleInput {
+        denies: Vec::new(),
         requires_mfa: false,
         name: name.to_owned(),
         description: String::new(),
@@ -91,6 +92,7 @@ async fn role_cap_permission_kem_do_sau() {
         );
         // Permission không theo nút chỉ cấp cho cả khách; nêu một permission hai lần là sai.
         let input = RoleInput {
+            denies: Vec::new(),
             requires_mfa: false,
             name: "bad".to_owned(),
             description: String::new(),
@@ -300,6 +302,7 @@ async fn api_key_ngoai_nhanh_bi_tu_choi() {
             .unwrap();
         let owner = services.roles.principal(tenant, ann).await.unwrap();
         let new_key = |org: Option<OrgId>| NewApiKey {
+            allowed_ips: Vec::new(),
             kind: autoxide_kernel::access::ActorKind::Human,
             name: "agent".to_owned(),
             permissions: vec!["notes.read".to_owned()],

@@ -49,6 +49,9 @@ event!(TransferShipped, "inventory.transfer_shipped");
 event!(TransferReceived, "inventory.transfer_received");
 event!(CountApplied, "inventory.count_applied");
 event!(LotExpired, "inventory.lot_expired");
+event!(PreorderAllocated, names::PREORDER_ALLOCATED);
+event!(GoodsReceived, "inventory.goods_received");
+event!(SupplierReturned, "inventory.supplier_returned");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -101,6 +104,15 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "inventory.lot_expired",
             "A lot passed its expiry date and its units were written off the stock.",
         ),
+        EventInfo::new(
+            names::PREORDER_ALLOCATED,
+            "Arrived stock was allocated to a pre-order line, in the order pre-orders were placed.",
+        ),
+        EventInfo::new(
+            "inventory.goods_received",
+            "Goods were received into a warehouse with a goods receipt.",
+        ),
+        EventInfo::new("inventory.supplier_returned", "Goods were returned to a supplier."),
     ]
 }
 

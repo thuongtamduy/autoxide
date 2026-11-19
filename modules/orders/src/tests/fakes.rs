@@ -66,7 +66,8 @@ impl FakeInventory {
             .map(|(key, variant, quantity)| {
                 json!({"line_key": key, "variant_id": variant, "bundle_variant_id": null,
                     "warehouse_org_id": hold.0, "quantity": quantity, "fulfilled_quantity": 0,
-                    "released_quantity": 0, "backordered": false, "preordered": false})
+                    "released_quantity": 0, "backordered": false, "preordered": false,
+                    "allocated_quantity": quantity})
             })
             .collect();
         serde_json::from_value(json!({

@@ -637,12 +637,22 @@
       "input_schema": {
         "description": "A key to create.",
         "properties": {
+          "allowed_ips": {
+            "description": "IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be\nused from, at most 50. Omit for any address.",
+            "example": [
+              "203.0.113.0/24"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "current_password": {
             "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) or a `reauth_token` instead — exactly one of them.",
             "type": "string"
           },
           "expires_at": {
-            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
+            "description": "When the key stops working (RFC 3339, in the future, at most\n`AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest\nlifetime: every key expires.",
             "format": "date-time",
             "type": [
               "string",
@@ -919,6 +929,14 @@
       "input_schema": {
         "description": "The full content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "example": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
@@ -1456,6 +1474,13 @@
         "additionalProperties": false,
         "description": "The full new content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for.",
             "type": "string"
@@ -6209,6 +6234,108 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Receive goods into a warehouse, against a purchase order or directly from a supplier; each line updates the average cost. The same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A goods receipt.",
+        "properties": {
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a goods receipt.",
+              "properties": {
+                "expires_on": {
+                  "description": "`YYYY-MM-DD`.",
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "lot_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "serials": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost in minor units as a string, e.g. `\"150000\"`.",
+                  "type": "string"
+                },
+                "unit_cost_currency": {
+                  "description": "e.g. `VND`.",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "unit_cost_amount",
+                "unit_cost_currency"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "purchase_order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this receipt, e.g. the delivery note number.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.create_receipt",
+      "output_schema": null,
+      "permissions": [
+        "inventory.receive"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Create a stock transfer between two warehouses as a draft (one line per variant); ship it with the REST endpoint `POST /api/v1/inventory/transfers/{id}/ship`.",
       "input_schema": {
         "additionalProperties": false,
@@ -6960,6 +7087,52 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a sandbox of your tenant: a test copy with its configuration and no personal data, where partners are simulated and mail and webhooks do not leave. Enter it with the header `Autoxide-Tenant: <id>` once it is active.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new sandbox of your tenant.",
+        "properties": {
+          "name": {
+            "description": "1 to 200 characters.",
+            "type": "string"
+          },
+          "products": {
+            "description": "Products to copy (0 by default).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "role_id": {
+            "description": "Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.create_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -7042,6 +7215,36 @@
       "output_schema": null,
       "permissions": [
         "kernel.data.export"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Extend a sandbox of your tenant: it is then deleted `AUTOXIDE_TENANCY_SANDBOX_DAYS` days from now.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A sandbox to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the sandbox.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.extend_sandbox",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.manage"
       ]
     },
     {
@@ -7328,6 +7531,51 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the sandboxes (test copies) of your tenant, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which sandboxes to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_sandboxes",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.read"
       ]
     },
     {
@@ -9915,6 +10163,45 @@
     },
     {
       "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add units of the tenant (any branch) to a unit group; units already in it are skipped.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Units to add to a group.",
+        "properties": {
+          "id": {
+            "description": "Id of the group.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_ids": {
+            "description": "1 to 200 unit ids of this tenant; units already in the group are skipped.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "org_ids"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.add_group_members",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": true,
         "read_only": false,
         "requires_approval_for_agent": false,
@@ -9953,6 +10240,43 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a unit group for reports. A group grants no access to its units.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A new unit group.",
+        "properties": {
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters, unique in the tenant (accents and case ignored).",
+            "example": "Stores in the north",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.create_group",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
       ]
     },
     {
@@ -10072,6 +10396,58 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "List the unit groups of the tenant (free sets of units such as \"stores in the north\", used to filter and group reports). `member_count` counts only units in your scope.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which unit groups to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the name; accents and case are ignored.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "organizations.list_groups",
+      "output_schema": null,
+      "permissions": [
+        "organizations.units.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the organization units in your scope (head office, regions, stores…), newest first; filter by parent, type, status or name; follow `pagination.next_cursor`.",
       "input_schema": {
         "additionalProperties": false,
@@ -10172,6 +10548,42 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Remove one unit from a unit group (nothing happens when it is not in the group).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A unit to remove from a group.",
+        "properties": {
+          "id": {
+            "description": "Id of the group.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Id of the unit.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id"
+        ],
+        "type": "object"
+      },
+      "name": "organizations.remove_group_member",
+      "output_schema": null,
+      "permissions": [
+        "organizations.groups.manage"
       ]
     },
     {
@@ -11456,6 +11868,13 @@
               "null"
             ]
           },
+          "group_ids": {
+            "description": "Only the units of these unit groups, comma-separated ids (your own tenant only).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "kind": {
             "description": "The fact kind, e.g. `invoices.issued_total`.",
             "type": [
@@ -11557,7 +11976,14 @@
             ]
           },
           "group_by": {
-            "description": "`day` (default, at most 366 days), `week`, `month`, `tenant` or `org`.",
+            "description": "`day` (default, at most 366 days), `week`, `month`, `tenant`, `org` or `group` (needs\n`group_ids`; a unit in two groups counts in both).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_ids": {
+            "description": "Only the units of these unit groups, comma-separated ids (your own tenant only; units\noutside your scope are left out and counted in `excluded_org_count`).",
             "type": [
               "string",
               "null"
@@ -11598,6 +12024,354 @@
       "output_schema": null,
       "permissions": [
         "reporting.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add an internal note (staff only) to a support ticket; mentioned colleagues are notified.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A message to add.",
+        "properties": {
+          "body": {
+            "description": "Plain text.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the ticket.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "mentions": {
+            "description": "Colleagues to notify (internal notes only).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "support.add_internal_note",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a support ticket with its messages, internal notes and linked records.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A ticket to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the ticket.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "support.get_ticket",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Link a support ticket to a record of another module (an order, a product…).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A record to link.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "target": {
+            "description": "`<module>.<type>:<id>`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "target"
+        ],
+        "type": "object"
+      },
+      "name": "support.link_ticket",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the support tickets in your scope, newest first; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Filters of the ticket list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of tickets, 1 to 200 (default 50).",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "link": {
+            "description": "Only tickets linked to this record, `<module>.<type>:<id>`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mine": {
+            "description": "`true`: only tickets assigned to you.",
+            "type": "boolean"
+          },
+          "q": {
+            "description": "Text in the number or subject.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open`, `pending_agent`, `pending_customer`, `solved` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "support.list_tickets",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Try the automatic answer on a question without sending anything: tells whether it would send an approved answer (and its exact text), leave it to staff, or hand over.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A question to try against the automatic answer.",
+        "properties": {
+          "locale": {
+            "description": "`vi` (default) or `en`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The unit whose policy and approved answers apply.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "text"
+        ],
+        "type": "object"
+      },
+      "name": "support.preview_auto_reply",
+      "output_schema": null,
+      "permissions": [
+        "support.auto_reply.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Answer the customer on a support ticket (they are notified; the ticket waits for them).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A message to add.",
+        "properties": {
+          "body": {
+            "description": "Plain text.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Id of the ticket.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "mentions": {
+            "description": "Colleagues to notify (internal notes only).",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "body"
+        ],
+        "type": "object"
+      },
+      "name": "support.reply_ticket",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Draft an answer for a support ticket with AI. Nothing is sent: review the draft, then send it with `reply_ticket`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A ticket to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the ticket.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "support.suggest_reply",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.reply"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Change status, priority, category or assignee of a support ticket.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Changes to a ticket; omitted fields stay as they are.",
+        "properties": {
+          "assignee_user_id": {
+            "description": "Assign to this user (yourself, or someone who answers tickets of the unit).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "priority": {
+            "description": "`low`, `normal`, `high` or `urgent`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resolution": {
+            "description": "With `solved` / `closed`: `answered`, `duplicate`, `spam` or `no_reply`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`open`, `pending_agent`, `pending_customer`, `solved` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "support.update_ticket",
+      "output_schema": null,
+      "permissions": [
+        "support.tickets.reply"
       ]
     },
     {

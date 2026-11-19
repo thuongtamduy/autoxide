@@ -17,6 +17,20 @@ endpoints are marked deprecated with a sunset date first.
   confirms on `ledger.payment_succeeded`, cancels unpaid orders at the ledger's payment deadline and refunds late
   payments; public payment status for the QR screen (`GET /public/payments/{token}`); `GET /me/orders`,
   `GET /` and `GET /{id}` for staff.
+- Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
+  limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
+  stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
+- Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
+  receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
+  posting; MCP tool `inventory.create_receipt`.
+- `auth`: API keys take `allowed_ips` (addresses or CIDR ranges, at most 50); a request from elsewhere gets 403
+  `network_not_allowed`. Every key now expires: omitting `expires_at` gives the longest lifetime,
+  `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` (365 days by default), and a later date is refused (`too_far`). **Upgrade note:**
+  existing keys without an expiry date get one 365 days after the upgrade.
+- `auth`: roles take `denies`, permissions the role forbids. A denied permission wins over every grant of the user's
+  other roles, even the built-in `admin` role; `permission_denied` answers `reason: denied_by_role` (or `missing`).
+- Kernel: `Principal::check` decides one record (`Decision::Allow` / `Missing` / `OutOfScope`) from the same rule
+  that builds the list filter (`scope_condition`); a randomized test proves both agree on SQLite and Postgres.
 - Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
   `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
   sold only once; transfers keep lots and serial numbers.
@@ -131,6 +145,16 @@ endpoints are marked deprecated with a sunset date first.
 - `compliance`: new trait `ComplaintIntake` opens a consumer complaint from another module's record (one case per record).
 - `support::api`: attach point `SupportFacts` where later modules (`shipping`, `orders`) attach a `FactSource` that
   answers simple questions from exact data (used by automatic answers, D-230).
+- `support`: MCP tools (`support.list_tickets`, `get_ticket`, `reply_ticket`, `add_internal_note`, `update_ticket`,
+  `link_ticket`, `suggest_reply`) with the REST permissions; AI reply drafts (`/tickets/{id}/reply-suggestions`, never
+  sent by themselves); email replies into tickets through the trait `InboundMail` (off by default); guide
+  `docs/SUPPORT.md` (EN + VI).
+- `support`: automatic answers to simple questions (off by default, per unit): the AI only classifies; Rust rules send
+  either an approved saved reply word for word (`PUT /macros/{id}/auto-reply`, with a review day) or a sentence built
+  from exact data by a `FactSource`; never for complaints, refunds, cancellations, payment problems, personal data,
+  legal questions, angry customers or blocked words. "Talk to a person" (`…/handoff`), feedback that retires wrong
+  answers, `POST /auto-reply/preview`, `GET /auto-replies`, MCP tool `support.preview_auto_reply`; `AutoResponder` for
+  chat (step 61). Setting `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions
@@ -200,6 +224,20 @@ endpoints are marked deprecated with a sunset date first.
   written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
   `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
   `kernel.relocation_finished`, `kernel.relocation_failed`.
+- Unit groups for reports (step 38): free sets of units of a tenant, from any branch (e.g. "stores in the north"),
+  under `/api/v1/organizations/groups` (`member_count` and `excluded_org_count` only count units within your scope)
+  and MCP tools `organizations.list_groups`, `organizations.create_group`, `organizations.add_group_members`,
+  `organizations.remove_group_member`; permission `organizations.groups.manage` (whole tenant only); events
+  `organizations.group_*`. A group grants no access: `GET /api/v1/reporting/summary` and `/facts` take `group_ids`
+  and `group_by=group`, always cut down to the caller's scope, and report `excluded_org_count`.
+- Sandboxes, first part (step 38): `POST /api/v1/kernel/tenants/{id}/sandboxes` makes a test copy of a tenant on the
+  same database (no personal data), ready when its job is done; staff of the tenant enter it with
+  `Autoxide-Tenant: <sandbox id>` through an automatic delegation. `GET …/sandboxes`, `POST /sandboxes/{id}/extend`,
+  `DELETE /sandboxes/{id}`; MCP tools `kernel.list_sandboxes`, `kernel.create_sandbox`, `kernel.extend_sandbox`;
+  permissions `kernel.sandboxes.read`, `kernel.sandboxes.manage`; plan limit `kernel.sandboxes` (1 when the plan does
+  not say). Every response of a sandbox carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`;
+  `GET /api/v1/kernel/tenant` adds `kind`, `sandbox_of`, `sandbox_expires_at`. Sandboxes are deleted after
+  `AUTOXIDE_TENANCY_SANDBOX_DAYS` (default 30) unless extended. Setting `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).

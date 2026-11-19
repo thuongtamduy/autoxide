@@ -190,6 +190,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_receipt` | `inventory.receive` | writes |
 | `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
@@ -204,9 +205,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `invoices.issue` | `invoices.issue` | writes |
 | `invoices.print` | `invoices.read` | read-only |
 | `kernel.add_domain` | `kernel.domains.manage` | writes |
+| `kernel.create_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.decide_approval` | — | writes |
 | `kernel.export_tenant` | `kernel.data.export` | writes |
+| `kernel.extend_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.get_migration_run` | `kernel.tenants.operate` | read-only |
 | `kernel.get_module` | `kernel.modules.read` | read-only |
 | `kernel.get_tenant` | `kernel.tenants.read` | read-only |
@@ -216,6 +219,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
 | `kernel.migrate_placements` | `kernel.tenants.operate` | writes |
@@ -270,12 +274,16 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |
 | `notifications.send_notification` | `notifications.send` | writes |
 | `notifications.update_template_draft` | `notifications.templates.manage` | writes |
+| `organizations.add_group_members` | `organizations.groups.manage` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
+| `organizations.create_group` | `organizations.groups.manage` | writes |
 | `organizations.create_unit` | `organizations.units.write` | writes |
 | `organizations.get_settings` | `organizations.units.read` | read-only |
 | `organizations.get_unit` | `organizations.units.read` | read-only |
+| `organizations.list_groups` | `organizations.units.read` | read-only |
 | `organizations.list_units` | `organizations.units.read` | read-only |
 | `organizations.move_unit` | `organizations.units.write` | writes |
+| `organizations.remove_group_member` | `organizations.groups.manage` | writes |
 | `organizations.set_setting` | `organizations.settings.write` | writes |
 | `organizations.update_unit` | `organizations.units.write` | writes |
 | `plans.assign_subscription` | `plans.subscriptions.manage` | writes |
@@ -304,6 +312,14 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |
+| `support.add_internal_note` | `support.tickets.reply` | writes |
+| `support.get_ticket` | `support.tickets.read` | read-only |
+| `support.link_ticket` | `support.tickets.reply` | writes |
+| `support.list_tickets` | `support.tickets.read` | read-only |
+| `support.preview_auto_reply` | `support.auto_reply.manage` | writes |
+| `support.reply_ticket` | `support.tickets.reply` | writes |
+| `support.suggest_reply` | `support.tickets.reply` | writes |
+| `support.update_ticket` | `support.tickets.reply` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
 | `webhooks.list_deliveries` | `webhooks.manage` | read-only |

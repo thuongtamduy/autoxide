@@ -324,14 +324,26 @@ impl SupportService {
         principal: &Principal,
         org: Uuid,
     ) -> Result<Vec<SavedReply>, Error> {
+        let node = OrgId::from_uuid(org);
+        principal
+            .require_at(tenant.database().read(), &TICKETS_READ, OrgTarget::new(node, None))
+            .await?;
+        self.replies_at(tenant, org).await
+    }
+
+    /// Câu trả lời mẫu của nút `org` và mọi nút trên nó (không kiểm quyền: bên gọi đã kiểm).
+    pub(crate) async fn replies_at(
+        &self,
+        tenant: &TenantContext,
+        org: Uuid,
+    ) -> Result<Vec<SavedReply>, Error> {
+        use sea_orm::QuerySelect;
         let read = tenant.database().read();
         let node = OrgId::from_uuid(org);
-        principal.require_at(read, &TICKETS_READ, OrgTarget::new(node, None)).await?;
         let mut lineage = OrgTree::ancestors(read, tenant.id(), node).await?;
         if lineage.is_empty() {
             lineage.push(node);
         }
-        use sea_orm::QuerySelect;
         Ok(saved_reply::Entity::find()
             .filter(saved_reply::Column::OrgId.is_in(lineage.iter().map(OrgId::as_uuid)))
             .scoped(tenant)
@@ -476,23 +488,30 @@ impl SupportService {
 
 /// Chọn ngôn ngữ và điền biến.
 pub(crate) fn fill(reply: &SavedReply, ticket: &Ticket) -> String {
+    let locale = ticket.locale.clone().unwrap_or_else(|| "en".to_owned());
+    fill_for(reply, &locale, &ticket.requester_name, &ticket.number, &ticket.subject)
+}
+
+/// Như [`fill`] khi không có phiếu (xem thử, chat): ngôn ngữ và giá trị biến cho sẵn.
+pub(crate) fn fill_for(
+    reply: &SavedReply,
+    locale: &str,
+    name: &str,
+    number: &str,
+    subject: &str,
+) -> String {
     let bodies: std::collections::BTreeMap<String, String> =
         serde_json::from_str(&reply.bodies).unwrap_or_default();
-    let locale = ticket.locale.clone().unwrap_or_else(|| "en".to_owned());
     let text = bodies
-        .get(&locale)
+        .get(locale)
         .or_else(|| bodies.get("en"))
         .or_else(|| bodies.values().next())
         .cloned()
         .unwrap_or_default();
-    let name = if ticket.requester_name.trim().is_empty() {
-        "Customer"
-    } else {
-        ticket.requester_name.trim()
-    };
+    let name = if name.trim().is_empty() { "Customer" } else { name.trim() };
     text.replace("{customer_name}", name)
-        .replace("{ticket_number}", &ticket.number)
-        .replace("{subject}", &ticket.subject)
+        .replace("{ticket_number}", number)
+        .replace("{subject}", subject)
 }
 
 pub(crate) fn link_not_found(target: &str) -> Error {

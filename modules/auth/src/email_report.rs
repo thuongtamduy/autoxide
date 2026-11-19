@@ -367,6 +367,7 @@ mod tests {
                 .await
                 .unwrap();
             let key = crate::api_key::NewApiKey {
+                allowed_ips: Vec::new(),
                 kind: autoxide_kernel::access::ActorKind::Human,
                 org_id: None,
                 name: "agent".to_owned(),

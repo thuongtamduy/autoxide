@@ -203,6 +203,18 @@ pub(crate) fn registrations(service: &Arc<InventoryService>) -> Vec<JobRegistrat
     vec![
         JobRegistration::new(EXPIRE_RESERVATIONS, Arc::new(ExpireReservations(service.clone()))),
         JobRegistration::new(EXPIRE_LOTS, Arc::new(ExpireLots(service.clone()))),
+        JobRegistration::new(
+            crate::preorders::ALLOCATE_PREORDERS,
+            Arc::new(crate::preorders::Allocate(service.clone())),
+        ),
+        JobRegistration::new(
+            crate::receipts::POST_RECEIPT,
+            Arc::new(PostToLedger(service.clone(), false)),
+        ),
+        JobRegistration::new(
+            crate::receipts::POST_SUPPLIER_RETURN,
+            Arc::new(PostToLedger(service.clone(), true)),
+        ),
     ]
 }
 
@@ -211,6 +223,26 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(EXPIRE_RESERVATIONS, EXPIRE_RESERVATIONS, Duration::from_secs(60)),
         Schedule::new(EXPIRE_LOTS, EXPIRE_LOTS, Duration::from_secs(24 * 60 * 60)),
     ]
+}
+
+/// Ghi phiếu nhập (`false`) hay trả hàng nhà cung cấp (`true`) vào sổ cái.
+struct PostToLedger(Arc<InventoryService>, bool);
+
+#[async_trait::async_trait]
+impl JobHandler for PostToLedger {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let tenant =
+            job.tenant.as_ref().ok_or_else(|| Error::internal("ledger job without a tenant"))?;
+        let id = job.payload["id"]
+            .as_str()
+            .and_then(|id| id.parse::<Uuid>().ok())
+            .ok_or_else(|| Error::internal("ledger job without a document id"))?;
+        if self.1 {
+            self.0.post_supplier_return(tenant, id).await
+        } else {
+            self.0.post_receipt(tenant, id).await
+        }
+    }
 }
 
 struct ExpireLots(Arc<InventoryService>);
