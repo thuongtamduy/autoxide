@@ -3241,8 +3241,7 @@
             "type": "string"
           },
           "value": {
-            "description": "By the attribute's type: text, a whole number, a decimal written as text (`\"12.5\"`),\n`true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.",
-            "type": "object"
+            "description": "By the attribute's type: text, a whole number, a decimal written as text (`\"12.5\"`),\n`true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes."
           }
         },
         "required": [
@@ -3873,6 +3872,33 @@
                   "null"
                 ]
               },
+              "net_quantity": {
+                "description": "Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit\n(per kg, l, m or piece). Give both or neither.",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "net_unit": {
+                "oneOf": [
+                  {
+                    "description": "Unit of a variant's net content.",
+                    "enum": [
+                      "g",
+                      "kg",
+                      "ml",
+                      "l",
+                      "m",
+                      "piece"
+                    ],
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "option_value_ids": {
                 "description": "One value id of each option of the product; empty when the product has no options.",
                 "items": {
@@ -4127,6 +4153,23 @@
         "required": [
           "names",
           "values"
+        ],
+        "type": "object"
+      },
+      "CatalogOptionSummary": {
+        "description": "An option of a product and how many values it has.",
+        "properties": {
+          "count": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "count"
         ],
         "type": "object"
       },
@@ -5036,8 +5079,7 @@
             ]
           },
           "value": {
-            "description": "As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option\ncode or a list of option codes.",
-            "type": "object"
+            "description": "As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option\ncode or a list of option codes."
           }
         },
         "required": [
@@ -5298,6 +5340,13 @@
             "description": "Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial\nIntelligence 134/2025/QH15).",
             "type": "boolean"
           },
+          "brand": {
+            "description": "Brand (the attribute with code `brand`); `null` without one.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "compare_at": {
             "oneOf": [
               {
@@ -5383,10 +5432,28 @@
           "slug": {
             "type": "string"
           },
+          "unit_price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CatalogUnitPrice",
+                "description": "Price per base unit of the cheapest variant with a net content (per kg, l, m or piece);\n`null` without one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "variant_count": {
             "description": "Number of variants on sale.",
             "format": "int32",
             "type": "integer"
+          },
+          "variant_summary": {
+            "description": "The product's options and how many values each has, e.g. `[{\"name\": \"Size\", \"count\": 3}]`\n(\"3 sizes\").",
+            "items": {
+              "$ref": "#/components/schemas/CatalogOptionSummary"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -5401,7 +5468,8 @@
           "variant_count",
           "rating_count",
           "seller",
-          "ai_assisted"
+          "ai_assisted",
+          "variant_summary"
         ],
         "type": "object"
       },
@@ -5489,6 +5557,10 @@
             },
             "type": "array"
           },
+          "path": {
+            "description": "Address of the product page with this variant chosen (for each `Offer` of a\n`ProductGroup`).",
+            "type": "string"
+          },
           "preorder_available_on": {
             "description": "For `preorder`: the expected date it is available.",
             "format": "date",
@@ -5515,18 +5587,49 @@
               }
             ]
           },
+          "price_valid_until": {
+            "description": "When `price` ends (a temporary price), for `priceValidUntil`; `null`: no end set.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "regular_price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "When `price` is a temporary reduced price: the price in effect just before it (the price to\nstrike through in structured data); `null` otherwise."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sale_mode": {
             "description": "`in_stock`, `backorder` or `preorder`.",
             "type": "string"
           },
           "sku": {
             "type": "string"
+          },
+          "unit_price": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/CatalogUnitPrice",
+                "description": "Price per base unit when the variant has a net content; `null` otherwise."
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
           "id",
           "sku",
           "option_value_ids",
+          "path",
           "sale_mode"
         ],
         "type": "object"
@@ -5964,6 +6067,23 @@
         ],
         "type": "object"
       },
+      "CatalogUnitPrice": {
+        "description": "A price per base unit, e.g. 50 000 VND per kg.",
+        "properties": {
+          "per": {
+            "description": "`kg`, `l`, `m` or `piece`.",
+            "type": "string"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "price",
+          "per"
+        ],
+        "type": "object"
+      },
       "CatalogUpdateAttribute": {
         "additionalProperties": false,
         "description": "Changes to an attribute; its code and type cannot change.",
@@ -6141,6 +6261,33 @@
               "null"
             ]
           },
+          "net_quantity": {
+            "description": "Net content, with `net_unit`; `null` on both removes it.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "net_unit": {
+            "oneOf": [
+              {
+                "description": "Unit of a variant's net content.",
+                "enum": [
+                  "g",
+                  "kg",
+                  "ml",
+                  "l",
+                  "m",
+                  "piece"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "option_value_ids": {
             "items": {
               "format": "uuid",
@@ -6272,6 +6419,20 @@
               "null"
             ]
           },
+          "net_quantity": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "net_unit": {
+            "description": "`g`, `kg`, `ml`, `l`, `m` or `piece`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "option_value_ids": {
             "items": {
               "format": "uuid",
@@ -6394,6 +6555,33 @@
             "type": [
               "integer",
               "null"
+            ]
+          },
+          "net_quantity": {
+            "description": "Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit\n(per kg, l, m or piece). Give both or neither.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "net_unit": {
+            "oneOf": [
+              {
+                "description": "Unit of a variant's net content.",
+                "enum": [
+                  "g",
+                  "kg",
+                  "ml",
+                  "l",
+                  "m",
+                  "piece"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ]
           },
           "option_value_ids": {
@@ -17173,6 +17361,20 @@
                 "format": "int64",
                 "type": [
                   "integer",
+                  "null"
+                ]
+              },
+              "net_quantity": {
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "net_unit": {
+                "description": "`g`, `kg`, `ml`, `l`, `m` or `piece`.",
+                "type": [
+                  "string",
                   "null"
                 ]
               },
@@ -37520,6 +37722,20 @@
                   "format": "int64",
                   "type": [
                     "integer",
+                    "null"
+                  ]
+                },
+                "net_quantity": {
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "net_unit": {
+                  "description": "`g`, `kg`, `ml`, `l`, `m` or `piece`.",
+                  "type": [
+                    "string",
                     "null"
                   ]
                 },
@@ -59095,6 +59311,13 @@
                   "description": "Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial\nIntelligence 134/2025/QH15).",
                   "type": "boolean"
                 },
+                "brand": {
+                  "description": "Brand (the attribute with code `brand`); `null` without one.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "compare_at": {
                   "oneOf": [
                     {
@@ -59180,10 +59403,28 @@
                 "slug": {
                   "type": "string"
                 },
+                "unit_price": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CatalogUnitPrice",
+                      "description": "Price per base unit of the cheapest variant with a net content (per kg, l, m or piece);\n`null` without one."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "variant_count": {
                   "description": "Number of variants on sale.",
                   "format": "int32",
                   "type": "integer"
+                },
+                "variant_summary": {
+                  "description": "The product's options and how many values each has, e.g. `[{\"name\": \"Size\", \"count\": 3}]`\n(\"3 sizes\").",
+                  "items": {
+                    "$ref": "#/components/schemas/CatalogOptionSummary"
+                  },
+                  "type": "array"
                 }
               },
               "required": [
@@ -59198,7 +59439,8 @@
                 "variant_count",
                 "rating_count",
                 "seller",
-                "ai_assisted"
+                "ai_assisted",
+                "variant_summary"
               ],
               "type": "object"
             },

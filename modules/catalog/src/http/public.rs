@@ -176,6 +176,39 @@ pub(crate) struct PublicCardResponse {
     /// Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
     /// Intelligence 134/2025/QH15).
     pub ai_assisted: bool,
+    /// The product's options and how many values each has, e.g. `[{"name": "Size", "count": 3}]`
+    /// ("3 sizes").
+    pub variant_summary: Vec<OptionSummary>,
+    /// Brand (the attribute with code `brand`); `null` without one.
+    pub brand: Option<String>,
+    /// Price per base unit of the cheapest variant with a net content (per kg, l, m or piece);
+    /// `null` without one.
+    pub unit_price: Option<UnitPrice>,
+}
+
+/// An option of a product and how many values it has.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = CatalogOptionSummary)]
+pub(crate) struct OptionSummary {
+    pub name: String,
+    pub count: usize,
+}
+
+/// A price per base unit, e.g. 50 000 VND per kg.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = CatalogUnitPrice)]
+pub(crate) struct UnitPrice {
+    pub price: Money,
+    /// `kg`, `l`, `m` or `piece`.
+    pub per: String,
+}
+
+/// Dữ liệu đọc theo lô cho cả trang thẻ.
+struct CardData {
+    media: HashMap<Uuid, autoxide_media::api::MediaRef>,
+    sellers: HashMap<Uuid, String>,
+    options: HashMap<Uuid, Vec<crate::card::OptionCount>>,
+    brands: HashMap<Uuid, String>,
 }
 
 /// Dựng thẻ sản phẩm từ dữ liệu đã đọc.
@@ -183,9 +216,10 @@ fn card(
     service: &CatalogService,
     site: &Site,
     card: &PublicCard,
-    media: &HashMap<Uuid, autoxide_media::api::MediaRef>,
-    sellers: &HashMap<Uuid, String>,
+    data: &CardData,
 ) -> Result<PublicCardResponse, Error> {
+    let media = &data.media;
+    let sellers = &data.sellers;
     let entry = &card.entry;
     let money = |minor: i64| {
         Money::from_columns(minor, &entry.currency)
@@ -216,6 +250,21 @@ fn card(
             own: site.lineage_ids().contains(&owner),
         },
         ai_assisted: card.product.ai_assisted,
+        variant_summary: data
+            .options
+            .get(&card.product.id)
+            .map(|options| {
+                options
+                    .iter()
+                    .map(|option| OptionSummary { name: option.name.clone(), count: option.count })
+                    .collect()
+            })
+            .unwrap_or_default(),
+        brand: data.brands.get(&card.product.id).cloned(),
+        unit_price: match (entry.unit_price_minor, &entry.unit_price_unit) {
+            (Some(minor), Some(per)) => Some(UnitPrice { price: money(minor)?, per: per.clone() }),
+            _ => None,
+        },
     })
 }
 
@@ -224,14 +273,20 @@ async fn cards(
     service: &CatalogService,
     tenant: &TenantContext,
     site: &Site,
+    locale: &str,
     rows: &[PublicCard],
 ) -> Result<Vec<PublicCardResponse>, Error> {
-    let ids: Vec<Uuid> =
+    let images: Vec<Uuid> =
         rows.iter().filter_map(|row| row.image.as_ref().map(|image| image.media_id)).collect();
-    let media = service.public_media(tenant, &ids).await?;
     let owners: Vec<Uuid> = rows.iter().map(|row| row.entry.owner_org_id).collect();
-    let sellers = service.seller_names(tenant, &owners).await?;
-    rows.iter().map(|row| card(service, site, row, &media, &sellers)).collect()
+    let products: Vec<Uuid> = rows.iter().map(|row| row.product.id).collect();
+    let data = CardData {
+        media: service.public_media(tenant, &images).await?,
+        sellers: service.seller_names(tenant, &owners).await?,
+        options: service.option_counts(tenant, &products, locale).await?,
+        brands: service.brands(tenant, &products, locale).await?,
+    };
+    rows.iter().map(|row| card(service, site, row, &data)).collect()
 }
 
 /// Order of the public product list.
@@ -326,7 +381,7 @@ async fn list_public_products(
     let filter = parse_filter(&service, query, raw, &mut paging)?;
     let page = PageRequest::try_from(paging)?;
     let Page { data, pagination } = service.public_products(&tenant, &site, &filter, &page).await?;
-    let data = cards(&service, &tenant, &site, &data).await?;
+    let data = cards(&service, &tenant, &site, &filter.locale, &data).await?;
     cached(&tenant, Page { data, pagination })
 }
 
@@ -434,6 +489,16 @@ pub(crate) struct PublicVariant {
     pub price: Option<Money>,
     /// Price before the current reduction; `null` without one.
     pub compare_at: Option<Money>,
+    /// When `price` is a temporary reduced price: the price in effect just before it (the price to
+    /// strike through in structured data); `null` otherwise.
+    pub regular_price: Option<Money>,
+    /// When `price` ends (a temporary price), for `priceValidUntil`; `null`: no end set.
+    pub price_valid_until: Option<DateTime<Utc>>,
+    /// Price per base unit when the variant has a net content; `null` otherwise.
+    pub unit_price: Option<UnitPrice>,
+    /// Address of the product page with this variant chosen (for each `Offer` of a
+    /// `ProductGroup`).
+    pub path: String,
     /// `in_stock`, `backorder` or `preorder`.
     pub sale_mode: String,
     /// For `preorder`: the expected date it is available.
@@ -452,7 +517,6 @@ pub(crate) struct PublicAttributeResponse {
     pub unit: Option<String>,
     /// As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option
     /// code or a list of option codes.
-    #[schema(value_type = Object)]
     pub value: Value,
     /// Ready to show, in the language asked.
     pub label: String,
@@ -508,13 +572,21 @@ pub(crate) struct LocaleQuery {
     pub locale: String,
 }
 
+/// Dữ liệu đọc thêm cho trang sản phẩm.
+struct PageData {
+    media: HashMap<Uuid, autoxide_media::api::MediaRef>,
+    /// Giá ngay trước giá giảm tạm thời, theo biến thể.
+    regular: HashMap<Uuid, crate::api::PriceSnapshot>,
+}
+
 fn product_page(
     service: &CatalogService,
     product: PublicProduct,
     card: PublicCardResponse,
-    media: &HashMap<Uuid, autoxide_media::api::MediaRef>,
+    data: &PageData,
     locale: &str,
 ) -> PublicProductResponse {
+    let media = &data.media;
     let money = |minor: i64, currency: &str| Money::from_columns(minor, currency).ok();
     let prefix = &service.config.product_path_prefix;
     let text: &translation::Model = &product.card.text;
@@ -560,6 +632,21 @@ fn product_page(
                         .collect(),
                     price: price.map(|price| price.amount),
                     compare_at: price.and_then(|price| price.compare_at),
+                    regular_price: data.regular.get(&row.id).map(|before| before.amount),
+                    price_valid_until: price.and_then(|price| price.valid_to),
+                    unit_price: price.and_then(|price| {
+                        let (minor, per) = crate::variants::unit_price(
+                            price.amount.minor(),
+                            row.net_quantity?,
+                            row.net_unit.as_deref()?,
+                        )?;
+                        Some(UnitPrice {
+                            price: Money::from_columns(minor, price.amount.currency().code())
+                                .ok()?,
+                            per: per.to_owned(),
+                        })
+                    }),
+                    path: format!("/{prefix}/{}?variant={}", text.slug, row.id),
                     sale_mode: row.sale_mode.clone(),
                     preorder_available_on: row.preorder_available_on,
                     preorder_message: messages.get(locale).cloned(),
@@ -644,9 +731,13 @@ async fn get_public_product(
     let product = service.public_product(&tenant, &site, &locale, &slug).await?;
     let ids: Vec<Uuid> = product.media.iter().map(|row| row.media_id).collect();
     let media = service.public_media(&tenant, &ids).await?;
-    let mut rows = cards(&service, &tenant, &site, std::slice::from_ref(&product.card)).await?;
+    let mut rows =
+        cards(&service, &tenant, &site, &locale, std::slice::from_ref(&product.card)).await?;
+    let pricing = autoxide_kernel::tenancy::OrgId::from_uuid(product.card.entry.org_id);
+    let regular = service.regular_prices(&tenant, pricing, &product.prices).await?;
     let card = rows.pop().ok_or_else(|| crate::errors::product_slug_not_found(&slug))?;
-    cached(&tenant, Data { data: product_page(&service, product, card, &media, &locale) })
+    let page = product_page(&service, product, card, &PageData { media, regular }, &locale);
+    cached(&tenant, Data { data: page })
 }
 
 /// List the category tree (public).

@@ -48,6 +48,10 @@ pub(crate) struct NewVariant {
     pub preorder_ends_at: Option<DateTime<Utc>>,
     pub preorder_messages: BTreeMap<String, String>,
     pub weight_grams: Option<i64>,
+    /// Lượng tịnh (cùng `net_unit`): tính đơn giá theo đơn vị cơ sở (D-201).
+    pub net_quantity: Option<i64>,
+    /// `g`, `kg`, `ml`, `l`, `m` hay `piece`.
+    pub net_unit: Option<String>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
@@ -68,6 +72,10 @@ pub(crate) struct VariantChecked {
     pub preorder_ends_at: Option<DateTime<Utc>>,
     pub preorder_messages: Option<String>,
     pub weight_grams: Option<i64>,
+    /// Lượng tịnh (cùng `net_unit`): tính đơn giá theo đơn vị cơ sở (D-201).
+    pub net_quantity: Option<i64>,
+    /// `g`, `kg`, `ml`, `l`, `m` hay `piece`.
+    pub net_unit: Option<String>,
     pub length_mm: Option<i64>,
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
@@ -133,6 +141,39 @@ pub(crate) fn gtin_valid(code: &str) -> bool {
     (10 - sum % 10) % 10 == check[0]
 }
 
+/// Đơn vị của lượng tịnh.
+pub(crate) const NET_UNITS: [&str; 6] = ["g", "kg", "ml", "l", "m", "piece"];
+
+/// Đơn vị cơ sở của đơn giá và hệ số đổi từ đơn vị của lượng tịnh: 500 `g` tính theo `kg`.
+pub(crate) fn base_unit(unit: &str) -> Option<(&'static str, i64)> {
+    match unit {
+        "g" => Some(("kg", 1000)),
+        "kg" => Some(("kg", 1)),
+        "ml" => Some(("l", 1000)),
+        "l" => Some(("l", 1)),
+        "m" => Some(("m", 1)),
+        "piece" => Some(("piece", 1)),
+        _ => None,
+    }
+}
+
+/// Đơn giá theo đơn vị cơ sở (làm tròn nửa lên tới đơn vị tiền nhỏ nhất): giá 25 000 cho 500 g →
+/// 50 000 / kg. Tính bằng `i128` để không tràn.
+pub(crate) fn unit_price(
+    price_minor: i64,
+    quantity: i64,
+    unit: &str,
+) -> Option<(i64, &'static str)> {
+    let (base, factor) = base_unit(unit)?;
+    if quantity <= 0 {
+        return None;
+    }
+    let numerator = i128::from(price_minor) * i128::from(factor);
+    let quantity = i128::from(quantity);
+    let rounded = (numerator * 2 + quantity) / (quantity * 2);
+    i64::try_from(rounded).ok().map(|value| (value, base))
+}
+
 fn check_measure(problems: &mut Vec<FieldError>, field: &str, value: Option<i64>) {
     if value.is_some_and(|value| !(0..=10_000_000).contains(&value)) {
         problems.push(FieldError::new(field, "range", "must be 0 to 10000000"));
@@ -170,6 +211,26 @@ pub(crate) fn check_variant(
         ("height_mm", input.height_mm),
     ] {
         check_measure(problems, field, value);
+    }
+    match (input.net_quantity, input.net_unit.as_deref()) {
+        (None, None) => {}
+        (Some(quantity), Some(unit)) => {
+            if !(1..=10_000_000).contains(&quantity) {
+                problems.push(FieldError::new("net_quantity", "range", "must be 1 to 10000000"));
+            }
+            if !NET_UNITS.contains(&unit) {
+                problems.push(FieldError::new(
+                    "net_unit",
+                    "one_of",
+                    "must be `g`, `kg`, `ml`, `l`, `m` or `piece`",
+                ));
+            }
+        }
+        _ => problems.push(FieldError::new(
+            "net_quantity",
+            "pair",
+            "give `net_quantity` and `net_unit` together, or neither",
+        )),
     }
     let mode = input.sale_mode.unwrap_or(SaleMode::InStock);
     let shipped = matches!(kind, ProductKind::Physical | ProductKind::Bundle);
@@ -216,6 +277,8 @@ pub(crate) fn check_variant(
         preorder_messages: (preorder && !input.preorder_messages.is_empty())
             .then(|| texts_json(&input.preorder_messages)),
         weight_grams: input.weight_grams.filter(|_| shipped),
+        net_quantity: input.net_quantity,
+        net_unit: input.net_unit.clone(),
         length_mm: input.length_mm.filter(|_| shipped),
         width_mm: input.width_mm.filter(|_| shipped),
         height_mm: input.height_mm.filter(|_| shipped),
@@ -266,6 +329,8 @@ pub(crate) async fn insert_variant<C: ConnectionTrait>(
         preorder_ends_at: Set(checked.preorder_ends_at),
         preorder_messages: Set(checked.preorder_messages.clone()),
         weight_grams: Set(checked.weight_grams),
+        net_quantity: Set(checked.net_quantity),
+        net_unit: Set(checked.net_unit.clone()),
         length_mm: Set(checked.length_mm),
         width_mm: Set(checked.width_mm),
         height_mm: Set(checked.height_mm),
@@ -404,6 +469,8 @@ pub(crate) struct VariantChanges {
     pub preorder_ends_at: Option<Option<DateTime<Utc>>>,
     pub preorder_messages: Option<BTreeMap<String, String>>,
     pub weight_grams: Option<Option<i64>>,
+    pub net_quantity: Option<Option<i64>>,
+    pub net_unit: Option<Option<String>>,
     pub length_mm: Option<Option<i64>>,
     pub width_mm: Option<Option<i64>>,
     pub height_mm: Option<Option<i64>>,
@@ -429,6 +496,8 @@ impl VariantChanges {
                 row.preorder_messages.as_deref().map(texts_of).unwrap_or_default()
             }),
             weight_grams: self.weight_grams.unwrap_or(row.weight_grams),
+            net_quantity: self.net_quantity.unwrap_or(row.net_quantity),
+            net_unit: self.net_unit.unwrap_or_else(|| row.net_unit.clone()),
             length_mm: self.length_mm.unwrap_or(row.length_mm),
             width_mm: self.width_mm.unwrap_or(row.width_mm),
             height_mm: self.height_mm.unwrap_or(row.height_mm),
@@ -682,6 +751,8 @@ impl CatalogService {
         row.preorder_ends_at = Set(checked.preorder_ends_at);
         row.preorder_messages = Set(checked.preorder_messages.clone());
         row.weight_grams = Set(checked.weight_grams);
+        row.net_quantity = Set(checked.net_quantity);
+        row.net_unit = Set(checked.net_unit.clone());
         row.length_mm = Set(checked.length_mm);
         row.width_mm = Set(checked.width_mm);
         row.height_mm = Set(checked.height_mm);

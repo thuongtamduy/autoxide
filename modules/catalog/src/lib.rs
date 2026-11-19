@@ -6,6 +6,7 @@
 pub mod api;
 mod attributes;
 mod bulk;
+mod card;
 mod categories;
 mod config;
 mod derived;

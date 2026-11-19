@@ -1156,7 +1156,7 @@ export type CatalogAttributeValue = {
    * By the attribute's type: text, a whole number, a decimal written as text (`"12.5"`),
    * `true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.
    */
-  value: Record<string, unknown>;
+  value: unknown;
 };
 
 /** A category of the tenant's tree. */
@@ -1378,6 +1378,12 @@ export type CatalogCreateProduct = {
     /** Main image of the variant (public media). */
     image_media_id?: string | null;
     length_mm?: number | null;
+    /**
+     * Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit
+     * (per kg, l, m or piece). Give both or neither.
+     */
+    net_quantity?: number | null;
+    net_unit?: "g" | "kg" | "ml" | "l" | "m" | "piece" | null;
     /** One value id of each option of the product; empty when the product has no options. */
     option_value_ids?: string[];
     /**
@@ -1461,6 +1467,12 @@ export type CatalogOption = {
     [key: string]: string;
   };
   values: CatalogOptionValue[];
+};
+
+/** An option of a product and how many values it has. */
+export type CatalogOptionSummary = {
+  count: number;
+  name: string;
 };
 
 /** A value of an option, e.g. "Red". */
@@ -1735,7 +1747,7 @@ export type CatalogPublicAttribute = {
    * As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option
    * code or a list of option codes.
    */
-  value: Record<string, unknown>;
+  value: unknown;
 };
 
 /** A category, in the language asked. */
@@ -1808,6 +1820,8 @@ export type CatalogPublicProductCard = {
    * Intelligence 134/2025/QH15).
    */
   ai_assisted: boolean;
+  /** Brand (the attribute with code `brand`); `null` without one. */
+  brand?: string | null;
   compare_at?: Money | null;
   id: string;
   image?: CatalogPublicImage | null;
@@ -1829,8 +1843,14 @@ export type CatalogPublicProductCard = {
   seller: CatalogPublicSeller;
   short_description: string;
   slug: string;
+  unit_price?: CatalogUnitPrice | null;
   /** Number of variants on sale. */
   variant_count: number;
+  /**
+   * The product's options and how many values each has, e.g. `[{"name": "Size", "count": 3}]`
+   * ("3 sizes").
+   */
+  variant_summary: CatalogOptionSummary[];
 };
 
 /** Who sells a product. */
@@ -1862,14 +1882,23 @@ export type CatalogPublicVariant = {
   image_media_id?: string | null;
   /** One value of each option, in the options' order. */
   option_value_ids: string[];
+  /**
+   * Address of the product page with this variant chosen (for each `Offer` of a
+   * `ProductGroup`).
+   */
+  path: string;
   /** For `preorder`: the expected date it is available. */
   preorder_available_on?: string | null;
   /** For `preorder`: the message to show, in the language asked. */
   preorder_message?: string | null;
   price?: Money | null;
+  /** When `price` ends (a temporary price), for `priceValidUntil`; `null`: no end set. */
+  price_valid_until?: string | null;
+  regular_price?: Money | null;
   /** `in_stock`, `backorder` or `preorder`. */
   sale_mode: string;
   sku: string;
+  unit_price?: CatalogUnitPrice | null;
 };
 
 /** The price of a variant and why. */
@@ -2033,6 +2062,13 @@ export type CatalogTranslation = {
   slug: string;
 };
 
+/** A price per base unit, e.g. 50 000 VND per kg. */
+export type CatalogUnitPrice = {
+  /** `kg`, `l`, `m` or `piece`. */
+  per: string;
+  price: Money;
+};
+
 /** Changes to an attribute; its code and type cannot change. */
 export type CatalogUpdateAttribute = {
   filterable?: boolean | null;
@@ -2080,6 +2116,9 @@ export type CatalogUpdateVariant = {
   height_mm?: number | null;
   image_media_id?: string | null;
   length_mm?: number | null;
+  /** Net content, with `net_unit`; `null` on both removes it. */
+  net_quantity?: number | null;
+  net_unit?: "g" | "kg" | "ml" | "l" | "m" | "piece" | null;
   option_value_ids?: string[] | null;
   /** Display order among the product's variants. */
   position?: number | null;
@@ -2104,6 +2143,9 @@ export type CatalogVariant = {
   id: string;
   image_media_id?: string | null;
   length_mm?: number | null;
+  net_quantity?: number | null;
+  /** `g`, `kg`, `ml`, `l`, `m` or `piece`. */
+  net_unit?: string | null;
   option_value_ids: string[];
   position: number;
   preorder_available_on?: string | null;
@@ -2133,6 +2175,12 @@ export type CatalogVariantInput = {
   /** Main image of the variant (public media). */
   image_media_id?: string | null;
   length_mm?: number | null;
+  /**
+   * Net content, with `net_unit` (e.g. 500 and `g`): public pages show the price per base unit
+   * (per kg, l, m or piece). Give both or neither.
+   */
+  net_quantity?: number | null;
+  net_unit?: "g" | "kg" | "ml" | "l" | "m" | "piece" | null;
   /** One value id of each option of the product; empty when the product has no options. */
   option_value_ids?: string[];
   /**
@@ -5756,6 +5804,9 @@ export type Data_CatalogVariant = {
     id: string;
     image_media_id?: string | null;
     length_mm?: number | null;
+    net_quantity?: number | null;
+    /** `g`, `kg`, `ml`, `l`, `m` or `piece`. */
+    net_unit?: string | null;
     option_value_ids: string[];
     position: number;
     preorder_available_on?: string | null;
@@ -12299,6 +12350,9 @@ export type Data_Vec_CatalogVariant = {
     id: string;
     image_media_id?: string | null;
     length_mm?: number | null;
+    net_quantity?: number | null;
+    /** `g`, `kg`, `ml`, `l`, `m` or `piece`. */
+    net_unit?: string | null;
     option_value_ids: string[];
     position: number;
     preorder_available_on?: string | null;
@@ -19317,6 +19371,8 @@ export type Page_CatalogPublicProductCard = {
      * Intelligence 134/2025/QH15).
      */
     ai_assisted: boolean;
+    /** Brand (the attribute with code `brand`); `null` without one. */
+    brand?: string | null;
     compare_at?: Money | null;
     id: string;
     image?: CatalogPublicImage | null;
@@ -19338,8 +19394,14 @@ export type Page_CatalogPublicProductCard = {
     seller: CatalogPublicSeller;
     short_description: string;
     slug: string;
+    unit_price?: CatalogUnitPrice | null;
     /** Number of variants on sale. */
     variant_count: number;
+    /**
+     * The product's options and how many values each has, e.g. `[{"name": "Size", "count": 3}]`
+     * ("3 sizes").
+     */
+    variant_summary: CatalogOptionSummary[];
   }[];
   pagination: Pagination;
 };

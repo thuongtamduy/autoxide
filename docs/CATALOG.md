@@ -123,6 +123,12 @@ Every answer has an `ETag` (send it back in `If-None-Match` to get 304) and
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | visible categories (a category under a hidden one is hidden) |
 | `GET /public/sitemap` | every product address in every language, at most 200 per page |
 
+Product cards carry `variant_summary` ("3 sizes"), `brand` (the attribute with code `brand`) and
+`unit_price` (price per kg, l, m or piece) when a variant has a net content (`net_quantity` +
+`net_unit`, e.g. 500 and `g`). Product pages give each variant a `path` with `?variant=<id>`,
+`unit_price`, and for a temporary price `price_valid_until` and `regular_price` (the price just before
+it) — what structured data (`Product`, `ProductGroup`, `Offer`) needs; the GTIN is `barcode`.
+
 Search helpers:
 
 - `GET /public/search/suggest?q=…&locale=vi` — suggestions as the shopper types (products,

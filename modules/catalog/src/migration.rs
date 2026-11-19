@@ -6,6 +6,7 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod net_content;
 mod search;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
@@ -28,6 +29,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreatePriceChanges),
         Box::new(CreateStorefront),
         Box::new(search::CreateSearch),
+        Box::new(net_content::AddNetContent),
     ]
 }
 

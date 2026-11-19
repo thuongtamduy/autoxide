@@ -114,6 +114,12 @@ lại trong `If-None-Match` để nhận 304) và `Cache-Control: public, no-cac
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | danh mục đang hiện (danh mục nằm dưới danh mục ẩn cũng ẩn) |
 | `GET /public/sitemap` | mọi đường dẫn sản phẩm ở mọi ngôn ngữ, tối đa 200 mỗi trang |
 
+Thẻ sản phẩm có `variant_summary` ("3 cỡ"), `brand` (thuộc tính mã `brand`) và `unit_price` (giá mỗi
+kg, l, m hay cái) khi biến thể có lượng tịnh (`net_quantity` + `net_unit`, vd 500 và `g`). Trang sản
+phẩm cho mỗi biến thể một `path` kèm `?variant=<id>`, `unit_price`, và với giá tạm thời có
+`price_valid_until` và `regular_price` (giá ngay trước nó) — đủ cho dữ liệu có cấu trúc (`Product`,
+`ProductGroup`, `Offer`); GTIN là `barcode`.
+
 Hỗ trợ tìm:
 
 - `GET /public/search/suggest?q=…&locale=vi` — gợi ý khi người mua gõ (sản phẩm, danh mục, và thứ

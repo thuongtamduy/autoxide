@@ -252,6 +252,23 @@ impl CatalogService {
                 entry.max_price_minor = Set(max);
                 entry.compare_at_minor = Set(compare_at);
                 entry.variant_count = Set(i32::try_from(own.len()).unwrap_or(i32::MAX));
+                // Đơn giá theo đơn vị cơ sở (D-201): của biến thể rẻ nhất có lượng tịnh.
+                let unit = own
+                    .iter()
+                    .filter_map(|row| {
+                        let price = by_variant.get(&row.id)?;
+                        let quantity = row.net_quantity?;
+                        crate::variants::unit_price(
+                            price.amount.minor(),
+                            quantity,
+                            row.net_unit.as_deref()?,
+                        )
+                        .map(|unit| (price.amount.minor(), unit))
+                    })
+                    .min_by_key(|(price, _)| *price)
+                    .map(|(_, unit)| unit);
+                entry.unit_price_minor = Set(unit.map(|(value, _)| value));
+                entry.unit_price_unit = Set(unit.map(|(_, base)| base.to_owned()));
                 if let Some(sales) = &sales {
                     // Giá giảm thấp nhất trên các biến thể, và lúc nó hết.
                     let best = own
@@ -414,6 +431,8 @@ fn empty_entry(
         variant_count: Set(0),
         published_at: Set(product.activated_at.unwrap_or(product.created_at)),
         refreshed_at: Set(now()),
+        unit_price_minor: Set(None),
+        unit_price_unit: Set(None),
     }
 }
 
