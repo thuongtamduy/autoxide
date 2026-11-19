@@ -15,7 +15,8 @@
           "artifactVersion": "0.14.0",
           "packageName": "dev.autoxide.sdk",
           "serializationLibrary": "kotlinx_serialization",
-          "enumUnknownDefaultCase": true
+          "enumUnknownDefaultCase": true,
+          "enumPropertyNaming": "UPPERCASE"
         }
       },
       "dart": {
