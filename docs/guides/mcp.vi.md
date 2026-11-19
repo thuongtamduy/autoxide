@@ -316,6 +316,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `support.get_ticket` | `support.tickets.read` | read-only |
 | `support.link_ticket` | `support.tickets.reply` | writes |
 | `support.list_tickets` | `support.tickets.read` | read-only |
+| `support.preview_auto_reply` | `support.auto_reply.manage` | writes |
 | `support.reply_ticket` | `support.tickets.reply` | writes |
 | `support.suggest_reply` | `support.tickets.reply` | writes |
 | `support.update_ticket` | `support.tickets.reply` | writes |

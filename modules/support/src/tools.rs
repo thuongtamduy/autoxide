@@ -80,6 +80,18 @@ pub(crate) struct UpdateInput {
     assignee_user_id: Option<Uuid>,
 }
 
+/// A question to try against the automatic answer.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(as = PreviewSupportAutoReplyInput)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PreviewInput {
+    /// The unit whose policy and approved answers apply.
+    org_id: Uuid,
+    text: String,
+    /// `vi` (default) or `en`.
+    locale: Option<String>,
+}
+
 /// A record to link.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = LinkSupportTicketInput)]
@@ -94,6 +106,7 @@ pub(crate) fn all(service: &Arc<SupportService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (list, get, reply, note, update, link, suggest) = (s(), s(), s(), s(), s(), s(), s());
+    let preview = s();
     vec![
         Tool::new(
             "list_tickets",
@@ -209,6 +222,19 @@ pub(crate) fn all(service: &Arc<SupportService>) -> Vec<Tool> {
             },
         )
         .requires(TICKETS_REPLY),
+        Tool::new(
+            "preview_auto_reply",
+            "Try the automatic answer on a question without sending anything: tells whether it would send an approved answer (and its exact text), leave it to staff, or hand over.",
+            move |tenant: TenantContext, principal: Principal, input: PreviewInput| {
+                let service = preview.clone();
+                async move {
+                    let locale = input.locale.unwrap_or_else(|| "vi".to_owned());
+                    let decision = service.preview(&tenant, &principal, input.org_id, &input.text, &locale).await?;
+                    Ok::<_, Error>(crate::http::auto::DecisionResponse::from(decision))
+                }
+            },
+        )
+        .requires(crate::permissions::AUTO_REPLY_MANAGE),
     ]
 }
 

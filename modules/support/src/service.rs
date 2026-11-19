@@ -48,6 +48,10 @@ pub(crate) struct Parts {
     pub complaints: Option<Arc<dyn autoxide_compliance::api::ComplaintIntake>>,
     /// Mô hình soạn bản nháp (module `ai`); `None` khi không cài.
     pub ai: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
+    /// Sổ nguồn câu trả lời từ dữ liệu (điểm cắm `SupportFacts`).
+    pub facts: crate::facts::FactRegistry,
+    /// Hàng đợi job (trả lời tự động).
+    pub jobs: autoxide_kernel::job::JobQueue,
 }
 
 // Service không giữ database: database là của khách, đi theo `TenantContext` của từng lời gọi.
@@ -71,11 +75,13 @@ pub(crate) enum Viewer<'a> {
     Customer(Uuid),
     /// Người mua vãng lai đã đưa đúng token của phiếu.
     Guest,
+    /// Chính module (job, bản nháp AI): thấy như nhân viên, không qua permission.
+    Internal,
 }
 
 impl Viewer<'_> {
     pub(crate) fn is_staff(&self) -> bool {
-        matches!(self, Viewer::Staff(_))
+        matches!(self, Viewer::Staff(_) | Viewer::Internal)
     }
 }
 
