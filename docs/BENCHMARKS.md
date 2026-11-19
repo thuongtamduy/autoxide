@@ -570,3 +570,19 @@ theo API key) / `memory` / `database`; khi bật: 1 000 000 request/phút (khôn
 ghi khác, và các request cùng key chờ lần lấy lô đó. Vượt ngưỡng 10% của đặc tả ở một bài, nên **`memory` vẫn là mặc
 định** và `database` là lựa chọn cho nhiều máy chủ PostgreSQL (D-375). Nhiều key khác nhau không chờ nhau (mỗi key một
 lô); lô lớn hơn (tăng burst) thì ít câu ghi hơn, đổi lại sai số `lô × số máy chủ` lớn hơn.
+
+## Tính khuyến mại cho một giỏ (bước 43, D-222) — 19/11/2026
+
+`cargo bench -p autoxide-promotions` (`modules/promotions/benches/evaluate.rs`; Postgres: đặt `TEST_DATABASE_URL`).
+500 chương trình giảm 10% đang chạy, mỗi chương trình nhắm 10 biến thể, mỗi biến thể thuộc hai chương trình; giỏ 50
+dòng xoay vòng qua các biến thể nên chạm nhiều chương trình khác nhau. Đo 2000 lần `dyn Promotions::evaluate` (sau 200
+lần chạy nóng) — đúng lời gọi của `orders`: gồm phần tính trong bộ nhớ trên `CompiledPromotions` và vài câu đọc nhỏ (bản
+sửa của chương trình, cài đặt cửa hàng); catalog là bản giả trong bộ nhớ để chỉ đo `promotions`. Build release, máy 4
+nhân dùng chung, database cùng máy.
+
+| Database | Việc / giây | p50 | p95 | p99 |
+| --- | ---: | ---: | ---: | ---: |
+| SQLite | 661 | 1.463 ms | 1.822 ms | 3.073 ms |
+| PostgreSQL 16 | 559 | 1.673 ms | 2.231 ms | 3.826 ms |
+
+Đạt mục tiêu p99 < 5 ms của đặc tả trên cả hai database, kể cả khi tính cả các câu đọc chứ không chỉ phần tính.
