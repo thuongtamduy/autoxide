@@ -1483,6 +1483,154 @@ export type CatalogProductMedia = {
   variant_id?: string | null;
 };
 
+/** An attribute of the product, in the language asked. */
+export type CatalogPublicAttribute = {
+  code: string;
+  /** Ready to show, in the language asked. */
+  label: string;
+  name: string;
+  unit?: string | null;
+  /**
+   * As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option
+   * code or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
+/** A category, in the language asked. */
+export type CatalogPublicCategory = {
+  /** Depth in the tree (top level is 0). */
+  depth: number;
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  position: number;
+  slug: string;
+};
+
+/** An image, as readers load it. */
+export type CatalogPublicImage = {
+  /** Text alternative: the product's own, or the media library's. */
+  alt: string;
+  height?: number | null;
+  media_id: string;
+  /** Smaller copies, narrowest first, for `srcset`. */
+  sizes: CatalogPublicImageSize[];
+  /** Where to load it (versioned: cache it for long). */
+  url: string;
+  /** The image shows this variant. */
+  variant_id?: string | null;
+  width?: number | null;
+};
+
+/** A smaller copy of an image. */
+export type CatalogPublicImageSize = {
+  height: number;
+  url: string;
+  /** The same copy as WebP; `null` while it is not made yet. */
+  webp_url?: string | null;
+  width: number;
+};
+
+/** A choice of a product option, in the language asked. */
+export type CatalogPublicOption = {
+  id: string;
+  name: string;
+  values: CatalogPublicOptionValue[];
+};
+
+/** A value of a product option. */
+export type CatalogPublicOptionValue = {
+  id: string;
+  label: string;
+};
+
+/** A product page. */
+export type CatalogPublicProduct = CatalogPublicProductCard & {
+  attributes: CatalogPublicAttribute[];
+  categories: CatalogPublicCategory[];
+  description: string;
+  images: CatalogPublicImage[];
+  meta_description?: string | null;
+  meta_title?: string | null;
+  options: CatalogPublicOption[];
+  /** Other languages of the product, for `hreflang`. */
+  translations: CatalogPublicTranslation[];
+  variants: CatalogPublicVariant[];
+  warranty_months?: number | null;
+};
+
+/** A product on a public list. */
+export type CatalogPublicProductCard = {
+  /**
+   * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+   * Intelligence 134/2025/QH15).
+   */
+  ai_assisted: boolean;
+  compare_at?: Money | null;
+  id: string;
+  image?: CatalogPublicImage | null;
+  /** `physical`, `digital`, `service` or `bundle`. */
+  kind: string;
+  name: string;
+  /** Address of the product page on the website, without language prefix. */
+  path: string;
+  /** Lowest current price over the variants (no customer group, no code needed). */
+  price_from: Money;
+  /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+  price_to: Money;
+  /** Average rating out of 5 (two decimals); `null` before the first rating. */
+  rating?: number | null;
+  rating_count: number;
+  /** When `sale_price` ends; `null`: no end set. */
+  sale_ends_at?: string | null;
+  sale_price?: Money | null;
+  seller: CatalogPublicSeller;
+  short_description: string;
+  slug: string;
+  /** Number of variants on sale. */
+  variant_count: number;
+};
+
+/** Who sells a product. */
+export type CatalogPublicSeller = {
+  /** Its name; empty when the organization module is not installed. */
+  name: string;
+  /** The organization unit selling it (filter with `seller=`). */
+  org_id: string;
+  /**
+   * `true` when it is the website's own unit or one above it; `false` for a seller below the
+   * website (a marketplace seller).
+   */
+  own: boolean;
+};
+
+/** The same product in another language. */
+export type CatalogPublicTranslation = {
+  locale: string;
+  path: string;
+  slug: string;
+};
+
+/** A variant on sale. */
+export type CatalogPublicVariant = {
+  /** GTIN / EAN barcode, for structured data. */
+  barcode?: string | null;
+  compare_at?: Money | null;
+  id: string;
+  image_media_id?: string | null;
+  /** One value of each option, in the options' order. */
+  option_value_ids: string[];
+  /** For `preorder`: the expected date it is available. */
+  preorder_available_on?: string | null;
+  /** For `preorder`: the message to show, in the language asked. */
+  preorder_message?: string | null;
+  price?: Money | null;
+  /** `in_stock`, `backorder` or `preorder`. */
+  sale_mode: string;
+  sku: string;
+};
+
 /** The price of a variant and why. */
 export type CatalogResolvedPrice = {
   /** The lists that apply, in selection order; the first with a price wins. */
@@ -1529,6 +1677,15 @@ export type CatalogRoundingRule = {
  */
 export type CatalogSaleMode = "in_stock" | "backorder" | "preorder";
 
+/** A product in the sitemap. */
+export type CatalogSitemapItem = {
+  id: string;
+  /** Last change of the product, its texts or its price on this website. */
+  modified_at: string;
+  /** Address of the product in each of its languages. */
+  translations: CatalogPublicTranslation[];
+};
+
 /** Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`. */
 export type CatalogStatus = "draft" | "active" | "inactive" | "archived";
 
@@ -1539,6 +1696,23 @@ export type CatalogStatusChange = {
    * `draft`.
    */
   status: CatalogStatus;
+};
+
+/** A store's choice for a product. */
+export type CatalogStoreOverride = {
+  hidden: boolean;
+  org_id: string;
+  product_id: string;
+  updated_at: string;
+};
+
+/** Whether a store shows a product. */
+export type CatalogStoreOverrideInput = {
+  /**
+   * `true`: the store's website (and the websites of units below it) does not show the
+   * product; `false`: shows it again.
+   */
+  hidden: boolean;
 };
 
 /** A stored attribute value (decimals are stored scaled by the attribute's `scale`). */
@@ -4787,6 +4961,38 @@ export type Data_CatalogProductDocument = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogPublicCategory = {
+  /** A category, in the language asked. */
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicProduct = {
+  /** A product page. */
+  data: CatalogPublicProductCard & {
+    attributes: CatalogPublicAttribute[];
+    categories: CatalogPublicCategory[];
+    description: string;
+    images: CatalogPublicImage[];
+    meta_description?: string | null;
+    meta_title?: string | null;
+    options: CatalogPublicOption[];
+    /** Other languages of the product, for `hreflang`. */
+    translations: CatalogPublicTranslation[];
+    variants: CatalogPublicVariant[];
+    warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogResolvedPrice = {
   /** The price of a variant and why. */
   data: {
@@ -4811,6 +5017,17 @@ export type Data_CatalogRoundingRule = {
     mode: string;
     name: string;
     step_minor: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogStoreOverride = {
+  /** A store's choice for a product. */
+  data: {
+    hidden: boolean;
+    org_id: string;
+    product_id: string;
+    updated_at: string;
   };
 };
 
@@ -10319,6 +10536,19 @@ export type Data_Vec_CatalogProductDocument = {
     issued_by: string;
     issued_on: string;
     number: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogPublicCategory = {
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
   }[];
 };
 
@@ -16092,6 +16322,55 @@ export type Page_CatalogProductListItem = {
     status: CatalogStatus;
     updated_at: string;
     variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPublicProductCard = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+     * Intelligence 134/2025/QH15).
+     */
+    ai_assisted: boolean;
+    compare_at?: Money | null;
+    id: string;
+    image?: CatalogPublicImage | null;
+    /** `physical`, `digital`, `service` or `bundle`. */
+    kind: string;
+    name: string;
+    /** Address of the product page on the website, without language prefix. */
+    path: string;
+    /** Lowest current price over the variants (no customer group, no code needed). */
+    price_from: Money;
+    /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+    price_to: Money;
+    /** Average rating out of 5 (two decimals); `null` before the first rating. */
+    rating?: number | null;
+    rating_count: number;
+    /** When `sale_price` ends; `null`: no end set. */
+    sale_ends_at?: string | null;
+    sale_price?: Money | null;
+    seller: CatalogPublicSeller;
+    short_description: string;
+    slug: string;
+    /** Number of variants on sale. */
+    variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogSitemapItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    /** Last change of the product, its texts or its price on this website. */
+    modified_at: string;
+    /** Address of the product in each of its languages. */
+    translations: CatalogPublicTranslation[];
   }[];
   pagination: Pagination;
 };
@@ -26944,6 +27223,69 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/categories": {
+    /** List the category tree (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string }; };
+      responses: {
+        200: Data_Vec_CatalogPublicCategory;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/categories/{slug}": {
+    /** Get a category by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string }; };
+      responses: {
+        200: Data_CatalogPublicCategory;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products": {
+    /** List products on sale (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogPublicProductCard;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products/by-slug/{slug}": {
+    /** Get a product page by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string; site?: string }; };
+      responses: {
+        200: Data_CatalogPublicProduct;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/sitemap": {
+    /** List product addresses for the sitemap (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogSitemapItem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/restriction-rules": {
     /** List the rules of prohibited and conditional goods. */
     get: {
@@ -26975,6 +27317,21 @@ export interface paths {
         201: Data_CatalogRoundingRule;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/stores/{org_id}/overrides/{product_id}": {
+    /** Hide or show a product on a store's website. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string; product_id: string }; };
+      requestBody: CatalogStoreOverrideInput;
+      responses: {
+        200: Data_CatalogStoreOverride;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
