@@ -422,3 +422,56 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
     .await
     .unwrap();
 }
+
+/// Nguồn giá giảm giả: giảm 20% mọi biến thể, hết sau một ngày.
+struct TwentyOff;
+
+#[async_trait::async_trait]
+impl crate::api::SalePriceSource for TwentyOff {
+    async fn sale_prices(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+        _org_id: OrgId,
+        at: chrono::DateTime<chrono::Utc>,
+        prices: &[(uuid::Uuid, autoxide_kernel::money::Money)],
+    ) -> Result<Vec<crate::api::SalePrice>, autoxide_kernel::error::Error> {
+        Ok(prices
+            .iter()
+            .map(|(id, price)| {
+                let sale =
+                    autoxide_kernel::money::Money::new(price.minor() * 8 / 10, price.currency());
+                crate::api::SalePrice::new(*id, sale, at + chrono::Duration::days(1))
+            })
+            .collect())
+    }
+}
+
+/// Giá giảm tự động (nguồn do `promotions` cắm qua `CatalogExtensions`) vào storefront: thẻ có
+/// `sale_price` và `sale_ends_at`, `on_sale=true` chỉ trả hàng đang giảm.
+#[tokio::test]
+async fn gia_giam_tu_dong_va_loc_on_sale() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let list = price_list(&app, tree.chain).await;
+        on_sale(&app, &list, tree.chain, "G-1", "Không giảm", 100_000).await;
+        drain(&app).await;
+        let extensions = app.api::<dyn crate::api::CatalogExtensions>().unwrap();
+        assert!(extensions.set_sale_price_source(std::sync::Arc::new(TwentyOff)));
+        assert!(
+            !extensions.set_sale_price_source(std::sync::Arc::new(TwentyOff)),
+            "one source only"
+        );
+        on_sale(&app, &list, tree.chain, "G-2", "Đang giảm", 200_000).await;
+        drain(&app).await;
+        let site = tree.chain.as_uuid();
+        let (_, sale, _) =
+            public(&app, &format!("/products?locale=vi&site={site}&on_sale=true"), None).await;
+        assert_eq!(names(&sale), vec!["Đang giảm"]);
+        assert_eq!(sale["data"][0]["sale_price"], vnd(160_000));
+        assert!(sale["data"][0]["sale_ends_at"].is_string());
+        let (_, all, _) = public(&app, &format!("/products?locale=vi&site={site}"), None).await;
+        assert_eq!(all["data"].as_array().unwrap().len(), 2);
+    })
+    .await
+    .unwrap();
+}

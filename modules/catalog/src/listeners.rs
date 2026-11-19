@@ -32,6 +32,10 @@ pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> 
         Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
         Subscription::optional(INVENTORY_COST_CHANGED, service.clone()),
         Subscription::optional(UNIT_MOVED, service.clone()),
+        Subscription::optional(
+            crate::api::events::PROMOTIONS_AUTOMATIC_PRICES_CHANGED,
+            service.clone(),
+        ),
         Subscription::optional(UNIT_STATUS_CHANGED, service.clone()),
     ]
 }
@@ -55,6 +59,19 @@ impl EventHandler for CatalogService {
                 return Ok(());
             };
             return self.record_cost(&event.tenant, org, variant, cost).await;
+        }
+        if event.name == crate::api::events::PROMOTIONS_AUTOMATIC_PRICES_CHANGED {
+            let variants: Vec<Uuid> = event.payload["after"]["variant_ids"]
+                .as_array()
+                .map(|ids| ids.iter().filter_map(|id| id.as_str()?.parse().ok()).collect())
+                .unwrap_or_default();
+            if variants.is_empty() {
+                tracing::warn!(event_id = %event.id, "promotions.automatic_prices_changed without variant_ids; ignored");
+                return Ok(());
+            }
+            // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
+            let write = event.tenant.database().write();
+            return self.queue_variants(write, &event.tenant, variants).await;
         }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
