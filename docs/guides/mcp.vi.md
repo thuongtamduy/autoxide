@@ -190,6 +190,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_receipt` | `inventory.receive` | writes |
 | `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |

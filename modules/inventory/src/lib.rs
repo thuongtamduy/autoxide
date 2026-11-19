@@ -16,6 +16,8 @@ mod lots;
 mod migration;
 mod orders_events;
 mod permissions;
+mod purchasing;
+mod receipts;
 mod relocation;
 mod reservations;
 mod service;
@@ -124,6 +126,8 @@ impl Module for InventoryModule {
             // `organizations` không bắt buộc: thiếu thì không kiểm loại nút kho.
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reasons: context.reason_codes(),
+            // `ledger` không bắt buộc: thiếu thì phiếu nhập không ghi sổ cái (`not_applicable`).
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
         };
         let service = Arc::new(InventoryService::new(parts, config));
         self.service = Some(service.clone());

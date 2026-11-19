@@ -20626,6 +20626,172 @@
         ],
         "type": "object"
       },
+      "Data_InventoryPurchaseOrder": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A purchase order to a supplier.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expected_on": {
+                "format": "date",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryPurchaseOrderLine"
+                },
+                "type": "array"
+              },
+              "note": {
+                "type": "string"
+              },
+              "number": {
+                "description": "Document number, e.g. `PO-2026-000001`.",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The receiving warehouse.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "status": {
+                "description": "`draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.",
+                "type": "string"
+              },
+              "supplier_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "total": {
+                "$ref": "#/components/schemas/Money"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "org_id",
+              "supplier_id",
+              "status",
+              "total",
+              "note",
+              "created_at",
+              "updated_at",
+              "lines"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventoryReceipt": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A goods receipt.",
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "ledger_entry_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ledger_error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ledger_posted_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ledger_status": {
+                "description": "`pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or\n`not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/InventoryReceiptLine"
+                },
+                "type": "array"
+              },
+              "number": {
+                "description": "Document number, e.g. `PN-2026-000001`.",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "posted_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "purchase_order_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reference": {
+                "type": "string"
+              },
+              "supplier_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "total": {
+                "$ref": "#/components/schemas/Money"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "org_id",
+              "reference",
+              "posted_at",
+              "total",
+              "ledger_status",
+              "lines"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_InventoryReservation": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -20721,6 +20887,188 @@
             "required": [
               "prefer_nearby",
               "allow_split"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventorySupplier": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A supplier.",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "address": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "code": {
+                "type": "string"
+              },
+              "contact_name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "currency": {
+                "type": "string"
+              },
+              "email": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The purchasing unit; the supplier's payable is kept in its ledger book.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "payable": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money",
+                    "description": "What the unit owes the supplier (from module `ledger`); absent when `ledger` is not\ninstalled."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "payment_terms_days": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "phone": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "tax_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "code",
+              "name",
+              "payment_terms_days",
+              "currency",
+              "active",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_InventorySupplierReturn": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A return of goods to a supplier.",
+            "properties": {
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "ledger_entry_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ledger_error_code": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "ledger_status": {
+                "description": "`pending`, `posted`, `failed` or `not_applicable`.",
+                "type": "string"
+              },
+              "lines": {
+                "items": {
+                  "$ref": "#/components/schemas/InventorySupplierReturnLine"
+                },
+                "type": "array"
+              },
+              "number": {
+                "description": "Document number, e.g. `TH-2026-000001`.",
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "posted_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "receipt_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reference": {
+                "type": "string"
+              },
+              "supplier_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "total": {
+                "$ref": "#/components/schemas/Money"
+              }
+            },
+            "required": [
+              "id",
+              "number",
+              "org_id",
+              "supplier_id",
+              "reference",
+              "posted_at",
+              "total",
+              "ledger_status",
+              "lines"
             ],
             "type": "object"
           }
@@ -41214,6 +41562,31 @@
         ],
         "type": "object"
       },
+      "InventoryCostLine": {
+        "additionalProperties": false,
+        "description": "A variant, a quantity and a unit cost.",
+        "properties": {
+          "quantity": {
+            "description": "1 to 1 000 000.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_cost": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Unit cost; every line in the same currency."
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity",
+          "unit_cost"
+        ],
+        "type": "object"
+      },
       "InventoryCount": {
         "description": "A stock count of one warehouse.",
         "properties": {
@@ -41611,6 +41984,141 @@
         ],
         "type": "object"
       },
+      "InventoryPurchaseOrder": {
+        "description": "A purchase order to a supplier.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expected_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryPurchaseOrderLine"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": "string"
+          },
+          "number": {
+            "description": "Document number, e.g. `PO-2026-000001`.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "status": {
+            "description": "`draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "org_id",
+          "supplier_id",
+          "status",
+          "total",
+          "note",
+          "created_at",
+          "updated_at",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryPurchaseOrderLine": {
+        "description": "One line of a purchase order.",
+        "properties": {
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "received_quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "unit_cost": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity",
+          "received_quantity",
+          "unit_cost"
+        ],
+        "type": "object"
+      },
+      "InventoryPurchaseOrderRequest": {
+        "additionalProperties": false,
+        "description": "A purchase order to create or change (while a draft).",
+        "properties": {
+          "expected_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lines": {
+            "description": "1 to 500 lines, one per variant.",
+            "items": {
+              "$ref": "#/components/schemas/InventoryCostLine"
+            },
+            "type": "array"
+          },
+          "note": {
+            "description": "Up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "supplier_id",
+          "lines"
+        ],
+        "type": "object"
+      },
       "InventoryQuantityLine": {
         "additionalProperties": false,
         "description": "A variant and a quantity.",
@@ -41628,6 +42136,219 @@
         "required": [
           "variant_id",
           "quantity"
+        ],
+        "type": "object"
+      },
+      "InventoryReceipt": {
+        "description": "A goods receipt.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ledger_entry_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger_posted_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger_status": {
+            "description": "`pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or\n`not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryReceiptLine"
+            },
+            "type": "array"
+          },
+          "number": {
+            "description": "Document number, e.g. `PN-2026-000001`.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "posted_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "purchase_order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "org_id",
+          "reference",
+          "posted_at",
+          "total",
+          "ledger_status",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryReceiptLine": {
+        "description": "One line of a goods receipt.",
+        "properties": {
+          "expires_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lot_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "serials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unit_cost": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity",
+          "unit_cost",
+          "serials"
+        ],
+        "type": "object"
+      },
+      "InventoryReceiptLineRequest": {
+        "additionalProperties": false,
+        "description": "One line of a goods receipt.",
+        "properties": {
+          "expires_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lot_code": {
+            "description": "Required when the variant tracks lots.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "1 to 1 000 000.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "serials": {
+            "description": "Exactly `quantity` serial numbers when the variant tracks serials.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unit_cost": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Unit cost; every line in the same currency. It updates the average cost."
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity",
+          "unit_cost"
+        ],
+        "type": "object"
+      },
+      "InventoryReceiptRequest": {
+        "additionalProperties": false,
+        "description": "A goods receipt.",
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventoryReceiptLineRequest"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The receiving warehouse.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "purchase_order_id": {
+            "description": "The purchase order received (the supplier comes from it).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this receipt (e.g. the delivery note number); the same reference and content\nagain returns the receipt already made.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "description": "The supplier, for a receipt without a purchase order.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
         ],
         "type": "object"
       },
@@ -41819,6 +42540,432 @@
           "prefer_nearby",
           "allow_split"
         ],
+        "type": "object"
+      },
+      "InventorySupplier": {
+        "description": "A supplier.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": "string"
+          },
+          "contact_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The purchasing unit; the supplier's payable is kept in its ledger book.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "payable": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "What the unit owes the supplier (from module `ledger`); absent when `ledger` is not\ninstalled."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "payment_terms_days": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "code",
+          "name",
+          "payment_terms_days",
+          "currency",
+          "active",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierRequest": {
+        "additionalProperties": false,
+        "description": "A supplier to create.",
+        "properties": {
+          "address": {
+            "description": "Postal address as text, up to 500 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "description": "Your code, unique in the tenant, up to 64 characters.",
+            "type": "string"
+          },
+          "contact_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "description": "ISO 4217 code; default `VND`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Up to 200 characters.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The purchasing unit; default the tenant's root unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payment_terms_days": {
+            "description": "Days to pay, 0 to 365; default 0.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "description": "Tax registration number, up to 20 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "name"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierReturn": {
+        "description": "A return of goods to a supplier.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "ledger_entry_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ledger_status": {
+            "description": "`pending`, `posted`, `failed` or `not_applicable`.",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventorySupplierReturnLine"
+            },
+            "type": "array"
+          },
+          "number": {
+            "description": "Document number, e.g. `TH-2026-000001`.",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "posted_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "receipt_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "total": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "id",
+          "number",
+          "org_id",
+          "supplier_id",
+          "reference",
+          "posted_at",
+          "total",
+          "ledger_status",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierReturnLine": {
+        "description": "One line of a supplier return.",
+        "properties": {
+          "lot_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "serials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unit_cost": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity",
+          "unit_cost",
+          "serials"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierReturnLineRequest": {
+        "additionalProperties": false,
+        "description": "One line of a supplier return.",
+        "properties": {
+          "lot_code": {
+            "description": "The lot returned; default the lots that expire first.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "quantity": {
+            "description": "1 to 1 000 000.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "serials": {
+            "description": "Exactly `quantity` serial numbers when the variant tracks serials.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unit_cost": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Unit price credited by the supplier; default the current average cost."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierReturnRequest": {
+        "additionalProperties": false,
+        "description": "A return of goods to a supplier.",
+        "properties": {
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/InventorySupplierReturnLineRequest"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse the goods leave.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "receipt_id": {
+            "description": "The receipt the goods came with, if known.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "description": "Your id of this return; the same reference and content again returns it.",
+            "type": "string"
+          },
+          "supplier_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "supplier_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InventorySupplierUpdate": {
+        "additionalProperties": false,
+        "description": "Changes to a supplier; `null` clears an optional field.",
+        "properties": {
+          "active": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "contact_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "currency": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "payment_terms_days": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "phone": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "InventoryTransfer": {
@@ -54682,6 +55829,188 @@
         ],
         "type": "object"
       },
+      "Page_InventoryPurchaseOrder": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A purchase order to a supplier.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expected_on": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryPurchaseOrderLine"
+                  },
+                  "type": "array"
+                },
+                "note": {
+                  "type": "string"
+                },
+                "number": {
+                  "description": "Document number, e.g. `PO-2026-000001`.",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The receiving warehouse.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.",
+                  "type": "string"
+                },
+                "supplier_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "total": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "org_id",
+                "supplier_id",
+                "status",
+                "total",
+                "note",
+                "created_at",
+                "updated_at",
+                "lines"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryReceipt": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A goods receipt.",
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ledger_entry_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_posted_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_status": {
+                  "description": "`pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or\n`not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/InventoryReceiptLine"
+                  },
+                  "type": "array"
+                },
+                "number": {
+                  "description": "Document number, e.g. `PN-2026-000001`.",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "posted_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "purchase_order_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "supplier_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "total": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "org_id",
+                "reference",
+                "posted_at",
+                "total",
+                "ledger_status",
+                "lines"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_InventoryReservation": {
         "description": "One page of a list.",
         "properties": {
@@ -54726,6 +56055,204 @@
                 "order_id",
                 "selling_org_id",
                 "status",
+                "lines"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventorySupplier": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A supplier.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "address": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "code": {
+                  "type": "string"
+                },
+                "contact_name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "currency": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "The purchasing unit; the supplier's payable is kept in its ledger book.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "payable": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money",
+                      "description": "What the unit owes the supplier (from module `ledger`); absent when `ledger` is not\ninstalled."
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "payment_terms_days": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "phone": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tax_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "code",
+                "name",
+                "payment_terms_days",
+                "currency",
+                "active",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventorySupplierReturn": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A return of goods to a supplier.",
+              "properties": {
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "ledger_entry_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_error_code": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "ledger_status": {
+                  "description": "`pending`, `posted`, `failed` or `not_applicable`.",
+                  "type": "string"
+                },
+                "lines": {
+                  "items": {
+                    "$ref": "#/components/schemas/InventorySupplierReturnLine"
+                  },
+                  "type": "array"
+                },
+                "number": {
+                  "description": "Document number, e.g. `TH-2026-000001`.",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "posted_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "receipt_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "supplier_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "total": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              },
+              "required": [
+                "id",
+                "number",
+                "org_id",
+                "supplier_id",
+                "reference",
+                "posted_at",
+                "total",
+                "ledger_status",
                 "lines"
               ],
               "type": "object"
@@ -131459,6 +132986,1393 @@
         ]
       }
     },
+    "/api/v1/inventory/purchase-orders": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read`. Newest first unless `order=asc`.",
+        "operationId": "inventory_list_inventory_purchase_orders",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "supplier_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "`draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "One page of purchase orders."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List purchase orders in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "kind": "uuid",
+            "name": "supplier_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_purchase_orders",
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse and the plan feature\n`inventory.purchasing`. Retry safely with an `Idempotency-Key` header.",
+        "operationId": "inventory_create_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryPurchaseOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The draft purchase order.",
+            "headers": {
+              "Location": {
+                "description": "Path of the purchase order.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan lacks purchasing (`feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such supplier (`inventory.supplier_not_found`) or variant (`inventory.variant_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), the unit holds no stock (`inventory.not_a_warehouse`) or a variant tracks no stock (`inventory.not_tracked`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a purchase order as a draft.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/purchase-orders/{id}": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read` covering the receiving warehouse.",
+        "operationId": "inventory_get_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Id of the purchase order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The purchase order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No purchase order with this id in your scope; code `inventory.purchase_order_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a purchase order.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse. The warehouse and\nsupplier cannot change.",
+        "operationId": "inventory_update_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Id of the purchase order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryPurchaseOrderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The purchase order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No purchase order with this id in your scope; code `inventory.purchase_order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a draft; code `inventory.invalid_transition`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a draft purchase order (its lines are replaced).",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/purchase-orders/{id}/cancel": {
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse.",
+        "operationId": "inventory_cancel_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Id of the purchase order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The purchase order, now `cancelled`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No purchase order with this id in your scope; code `inventory.purchase_order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Goods were received already; code `inventory.invalid_transition`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel a purchase order that is a draft, or ordered with nothing received.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/purchase-orders/{id}/close": {
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse.",
+        "operationId": "inventory_close_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Id of the purchase order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The purchase order, now `closed`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No purchase order with this id in your scope; code `inventory.purchase_order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not ordered; code `inventory.invalid_transition`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a purchase order: what has not arrived stops counting as `incoming`.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/purchase-orders/{id}/order": {
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the receiving warehouse.",
+        "operationId": "inventory_order_inventory_purchase_order",
+        "parameters": [
+          {
+            "description": "Id of the purchase order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryPurchaseOrder"
+                }
+              }
+            },
+            "description": "The purchase order, now `ordered`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No purchase order with this id in your scope; code `inventory.purchase_order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a draft; code `inventory.invalid_transition`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a draft purchase order to the supplier: its units count as `incoming`.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/receipts": {
+      "get": {
+        "description": "Requires `inventory.receive`. Newest first unless `order=asc`.",
+        "operationId": "inventory_list_inventory_receipts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "supplier_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryReceipt"
+                }
+              }
+            },
+            "description": "One page of goods receipts."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.receive`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List goods receipts in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "kind": "uuid",
+            "name": "supplier_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_receipts",
+        "x-permissions": [
+          "inventory.receive"
+        ]
+      },
+      "post": {
+        "description": "Requires `inventory.receive` covering the warehouse (and the plan feature\n`inventory.purchasing` when a supplier or purchase order is given). Each line updates the\naverage cost; a purchase order can be received in parts, never beyond what was ordered. With\na supplier and module `ledger`, a job posts Debit inventory / Credit supplier payable. Send the\nsame `reference` and content again to get the receipt already made (`200`).",
+        "operationId": "inventory_create_inventory_receipt",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventoryReceiptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReceipt"
+                }
+              }
+            },
+            "description": "The receipt was made before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReceipt"
+                }
+              }
+            },
+            "description": "The receipt.",
+            "headers": {
+              "Location": {
+                "description": "Path of the receipt.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.receive` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan does not allow it (`feature_not_enabled`, `limit_exceeded`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such supplier, purchase order or variant (`inventory.supplier_not_found`, `inventory.purchase_order_not_found`, `inventory.variant_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "More than ordered (`inventory.over_receipt`), the order is not open (`inventory.invalid_transition`), or a serial number is in stock already (`inventory.serial_unavailable`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), the cost currency differs (`inventory.currency_mismatch`), the unit holds no stock (`inventory.not_a_warehouse`), or the reference was used for other content (`reference_reused`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Receive goods into a warehouse, against a purchase order or directly.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.receive"
+        ]
+      }
+    },
+    "/api/v1/inventory/receipts/{id}": {
+      "get": {
+        "description": "Requires `inventory.receive` or `inventory.read` covering the warehouse.",
+        "operationId": "inventory_get_inventory_receipt",
+        "parameters": [
+          {
+            "description": "Id of the receipt.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReceipt"
+                }
+              }
+            },
+            "description": "The receipt."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.receive` and `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No receipt with this id in your scope; code `inventory.receipt_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a goods receipt.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.receive"
+        ]
+      }
+    },
+    "/api/v1/inventory/receipts/{id}/retry-ledger": {
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the warehouse. The receipt goes back to\n`pending` and the posting job runs again.",
+        "operationId": "inventory_retry_inventory_receipt_ledger",
+        "parameters": [
+          {
+            "description": "Id of the receipt.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventoryReceipt"
+                }
+              }
+            },
+            "description": "The receipt, now `pending`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No receipt with this id in your scope; code `inventory.receipt_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The posting did not fail; code `inventory.invalid_transition`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Post a receipt whose ledger posting failed again.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
     "/api/v1/inventory/reports/valuation": {
       "get": {
         "description": "Requires `inventory.read`; only warehouses in your scope. Units without a known cost are\nleft out.",
@@ -132233,6 +135147,907 @@
         ],
         "x-permissions": [
           "inventory.settings.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/supplier-returns": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read`. Newest first unless `order=asc`.",
+        "operationId": "inventory_list_inventory_supplier_returns",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventorySupplierReturn"
+                }
+              }
+            },
+            "description": "One page of supplier returns."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List supplier returns in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_supplier_returns",
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` covering the warehouse. Takes only stock not reserved\nfor orders; with module `ledger`, a job reverses the receipt posting (Debit supplier payable /\nCredit inventory). Send the same `reference` and content again to get the return already made\n(`200`).",
+        "operationId": "inventory_create_inventory_supplier_return",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySupplierReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplierReturn"
+                }
+              }
+            },
+            "description": "The return was made before with this `reference` and content."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplierReturn"
+                }
+              }
+            },
+            "description": "The return.",
+            "headers": {
+              "Location": {
+                "description": "Path of the return.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan lacks purchasing (`feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such supplier (`inventory.supplier_not_found`) or variant (`inventory.variant_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not enough available stock (`inventory.insufficient_stock`), lot (`inventory.lot_unavailable`) or serial (`inventory.serial_unavailable`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`) or the reference was used for other content (`reference_reused`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Return goods to a supplier.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/supplier-returns/{id}": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read` covering the warehouse.",
+        "operationId": "inventory_get_inventory_supplier_return",
+        "parameters": [
+          {
+            "description": "Id of the supplier return.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplierReturn"
+                }
+              }
+            },
+            "description": "The supplier return."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No supplier return with this id in your scope; code `inventory.supplier_return_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a supplier return.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/suppliers": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read`. `payable` comes from module `ledger` in one call for the\nwhole page.",
+        "operationId": "inventory_list_inventory_suppliers",
+        "parameters": [
+          {
+            "description": "Words of the name, with or without Vietnamese accents.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "active",
+            "required": false,
+            "schema": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventorySupplier"
+                }
+              }
+            },
+            "description": "One page of suppliers."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List suppliers in your scope with what you owe each one.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Words of the name, with or without Vietnamese accents.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "kind": "boolean",
+            "name": "active",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_suppliers",
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `inventory.purchasing.manage` on the unit and the plan feature `inventory.purchasing`.",
+        "operationId": "inventory_create_inventory_supplier",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySupplierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplier"
+                }
+              }
+            },
+            "description": "The supplier.",
+            "headers": {
+              "Location": {
+                "description": "Path of the supplier.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`), the unit is outside your scope (`org_out_of_scope`) or frozen (`org_frozen`), or the plan lacks purchasing (`feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is used already; code `inventory.supplier_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a supplier.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
+        ]
+      }
+    },
+    "/api/v1/inventory/suppliers/{id}": {
+      "get": {
+        "description": "Requires `inventory.purchasing.read` covering the supplier's unit.",
+        "operationId": "inventory_get_inventory_supplier",
+        "parameters": [
+          {
+            "description": "Id of the supplier.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplier"
+                }
+              }
+            },
+            "description": "The supplier."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No supplier with this id in your scope; code `inventory.supplier_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a supplier with what you owe it.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `inventory.purchasing.manage` covering the supplier's unit.",
+        "operationId": "inventory_update_inventory_supplier",
+        "parameters": [
+          {
+            "description": "Id of the supplier.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InventorySupplierUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_InventorySupplier"
+                }
+              }
+            },
+            "description": "The supplier."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.purchasing.manage` (`permission_denied`) or the unit is frozen (`org_frozen`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No supplier with this id in your scope; code `inventory.supplier_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The code is used already; code `inventory.supplier_code_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a supplier.",
+        "tags": [
+          "inventory"
+        ],
+        "x-permissions": [
+          "inventory.purchasing.manage"
         ]
       }
     },

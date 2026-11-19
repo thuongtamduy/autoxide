@@ -120,6 +120,19 @@ Bật theo sản phẩm ở `catalog` (`lot_tracked`, `serial_tracked`).
   giảm hay chuyển kho; một serial chỉ bán được một lần, kể cả khi hai lần xuất chạy cùng lúc.
 - Chuyển kho mang theo lô và serial: kho nhận có cùng mã lô và hạn dùng.
 
+## Nhập hàng
+
+- `POST /suppliers` (`inventory.purchasing.manage`): nhà cung cấp thuộc một nút mua hàng; `GET /suppliers` có `payable`
+  — nút đó đang nợ từng nhà cung cấp bao nhiêu, đọc từ module `ledger` (không có thì vắng).
+- Đơn đặt hàng (`PO-…`): nháp → `POST /purchase-orders/{id}/order` (hàng tính vào `incoming`) → phiếu nhập, nhận từng
+  phần → `close` (phần không về rời `incoming`) hay `cancel`.
+- `POST /receipts` (`inventory.receive`, `PN-…`): theo đơn đặt hàng (không quá số đặt) hay nhập thẳng; mỗi dòng cập nhật
+  giá vốn bình quân và có thể kèm lô, serial. Có nhà cung cấp và module `ledger` thì một job ghi Nợ `inventory.stock` /
+  Có `payable.supplier` đúng một lần (`ledger_status`: `pending`, `posted`, `failed` — ghi lại bằng
+  `POST /receipts/{id}/retry-ledger` — hay `not_applicable`). Tool MCP `inventory.create_receipt`.
+- `POST /supplier-returns` (`TH-…`): trả hàng cho nhà cung cấp theo giá vốn bình quân hiện tại (hay giá nêu); bút toán
+  được đảo lại.
+
 ## Kiểm số liệu
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<nút>]` so mọi dòng tồn với sổ và chỗ giữ của nó,
