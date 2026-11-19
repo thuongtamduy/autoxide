@@ -185,3 +185,56 @@ async fn catalog_lay_gia_giam_tu_dong_qua_nguon_da_cam() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn ma_cong_khai_cho_trang_san_pham() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
+        let product = setup.catalog.variants.lock().unwrap()[&variant].0;
+        let id = running(
+            &setup,
+            body(setup.tree.a, json!({"trigger": "code", "public": true, "usage_limit": 5})),
+        )
+        .await;
+        call(
+            &setup.app,
+            "POST",
+            &format!("/promotions/{id}/codes"),
+            "boss",
+            Some(json!({"purpose": "redeem", "code": "GIAM10"})),
+        )
+        .await;
+        // Mã của chương trình không công khai: không hiện.
+        let hidden = running(&setup, body(setup.tree.a, json!({"trigger": "code"}))).await;
+        call(
+            &setup.app,
+            "POST",
+            &format!("/promotions/{hidden}/codes"),
+            "boss",
+            Some(json!({"purpose": "redeem", "code": "BIMAT"})),
+        )
+        .await;
+        let uri = |product: Uuid| {
+            format!(
+                "/api/v1/promotions/public/promotions/for-product/{product}?variant_id={variant}&site={}",
+                setup.tree.a.as_uuid()
+            )
+        };
+        let answer = setup.app.request(axum::http::Method::GET, &uri(product)).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let found: serde_json::Value = serde_json::from_slice(answer.body()).unwrap();
+        let rows = found["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{found}");
+        assert_eq!(rows[0]["code"], "GIAM10");
+        assert_eq!(rows[0]["price_with_code"]["amount"], "90000");
+        assert_eq!(rows[0]["uses_left"], 5);
+
+        // Biến thể không thuộc sản phẩm: 404.
+        let answer =
+            setup.app.request(axum::http::Method::GET, &uri(Uuid::now_v7())).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::NOT_FOUND);
+    })
+    .await
+    .unwrap();
+}

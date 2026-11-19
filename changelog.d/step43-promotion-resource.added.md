@@ -1,0 +1,1 @@
+- Resource type `promotions.promotion` (website menus can link to a running public promotion, path `/promotions/<id>`).

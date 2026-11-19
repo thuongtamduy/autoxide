@@ -409,3 +409,243 @@ async fn xuat_thong_bao_theo_noi_nhan_json_va_csv() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn danh_sach_cong_khai_kem_thong_bao_va_tran_theo_luat() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        // Chuỗi (nút cha của A): hiện ở website của A. Cửa hàng B: không. Không `public`: không.
+        let chain = running(&setup, body(setup.tree.chain, json!({"public": true}))).await;
+        running(&setup, body(setup.tree.b, json!({"public": true}))).await;
+        running(&setup, body(setup.tree.a, json!({"public": false}))).await;
+        let uri = format!(
+            "/api/v1/promotions/public/promotions?site={}&locale=vi",
+            setup.tree.a.as_uuid()
+        );
+        let answer = setup.app.request(axum::http::Method::GET, &uri).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let etag = answer.header("etag").to_owned();
+        let found: serde_json::Value = serde_json::from_slice(answer.body()).unwrap();
+        let rows = found["data"].as_array().unwrap();
+        assert_eq!(rows.len(), 1, "{found}");
+        let row = &rows[0];
+        assert_eq!(row["id"], chain.to_string());
+        assert_eq!((row["title"].clone(), row["locale"].clone()), (json!("Giảm giá"), json!("vi")));
+        assert_eq!(row["notices"][0]["reference"], "TB-1");
+        assert_eq!(row["legal_limit"]["max_bp"], 5000);
+        assert_eq!(row["legal_limit"]["promotion_kind"], "price_reduction");
+
+        // Không đổi gì: cùng ETag → 304.
+        let again = setup
+            .app
+            .request(axum::http::Method::GET, &uri)
+            .header("if-none-match", &etag)
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(again.status(), StatusCode::NOT_MODIFIED);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn flash_sale_cong_khai_voi_suat_con_that() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let id = create(
+            &setup,
+            body(setup.tree.a, json!({"kind": "flash_sale", "value_bp": null, "public": true})),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000, "quantity_limit": 5}]})),
+        )
+        .await;
+        let (status, activated) = activate(&setup, &id).await;
+        assert_eq!(status, StatusCode::OK, "{activated}");
+        // Một người giữ 2 suất: còn 3.
+        let request = crate::api::ReserveRequest::new(
+            uuid::Uuid::now_v7(),
+            setup.cart(&[(variant, 2)]),
+            Utc::now() + Duration::hours(1),
+        );
+        setup.promotions().reserve(&setup.tenant(), &request).await.unwrap();
+        let uri = format!(
+            "/api/v1/promotions/public/promotions/flash-sales?site={}",
+            setup.tree.a.as_uuid()
+        );
+        let answer = setup.app.request(axum::http::Method::GET, &uri).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let found: serde_json::Value = serde_json::from_slice(answer.body()).unwrap();
+        let sale = &found["data"][0];
+        assert_eq!(sale["state"], "running");
+        assert_eq!(sale["items"][0]["sale_price_minor"], 120_000);
+        assert_eq!(sale["items"][0]["quantity_left"], 3);
+    })
+    .await
+    .unwrap();
+}
+
+/// Job theo lịch `promotions.send_reminders` chạy ngay.
+#[derive(Debug, serde::Serialize)]
+struct SendRemindersNow {}
+
+impl autoxide_kernel::job::Job for SendRemindersNow {
+    const KIND: &'static str = crate::jobs::SEND_REMINDERS;
+}
+
+#[tokio::test]
+async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let starts = Utc::now() + Duration::hours(1);
+        let id = create(
+            &setup,
+            body(
+                setup.tree.a,
+                json!({"kind": "flash_sale", "value_bp": null, "public": true, "starts_at": starts}),
+            ),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000}]})),
+        )
+        .await;
+        let (status, activated) = activate(&setup, &id).await;
+        assert_eq!(status, StatusCode::OK, "{activated}");
+        let uri = format!("/public/promotions/{id}/reminders");
+        let (status, made) = call(&setup.app, "POST", &uri, "buyer0", None).await;
+        assert_eq!(status, StatusCode::CREATED, "{made}");
+        let (status, _) = call(&setup.app, "POST", &uri, "buyer0", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(&setup.app, "POST", &uri, "buyer1", None).await;
+        assert_eq!(status, StatusCode::CREATED);
+        // Đồng ý riêng cho lời nhắc, không phải quảng cáo.
+        let consents = setup.consents.0.lock().unwrap().clone();
+        assert!(consents.iter().all(|row| row.0.purpose == "promotions.flash_sale_reminder"));
+        // buyer1 đổi ý: bỏ lời nhắc, rút đồng ý.
+        let (status, _) = call(&setup.app, "DELETE", &uri, "buyer1", None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert!(setup.consents.0.lock().unwrap().iter().any(|row| !row.2));
+
+        // Tới hạn: job gửi đúng một lần, chạy lại không gửi thêm.
+        {
+            use sea_orm::sea_query::Expr;
+            use sea_orm::EntityTrait;
+            crate::entity::reminder::Entity::update_many()
+                .col_expr(
+                    crate::entity::reminder::Column::RemindAt,
+                    Expr::value(Utc::now() - Duration::seconds(1)),
+                )
+                .exec(setup.app.database().write())
+                .await
+                .unwrap();
+        }
+        for _ in 0..2 {
+            autoxide_kernel::job::JobQueue::new("promotions")
+                .enqueue_database(
+                    setup.app.database().write(),
+                    &SendRemindersNow {},
+                    autoxide_kernel::job::EnqueueOptions::default(),
+                )
+                .await
+                .unwrap();
+            super::drain(&setup.app).await;
+        }
+        let sent = setup.notifier.0.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0].kind, "promotions.flash_sale_starting");
+        assert_eq!(sent[0].params["title"], "Giảm giá");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn bam_nhac_toi_dong_thoi_chi_mot_loi_nhac() {
+    TestDatabase::run(async |test| {
+        let setup = std::sync::Arc::new(setup(test, true).await);
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let starts = Utc::now() + Duration::hours(2);
+        let id = create(
+            &setup,
+            body(
+                setup.tree.a,
+                json!({"kind": "flash_sale", "value_bp": null, "public": true, "starts_at": starts}),
+            ),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000}]})),
+        )
+        .await;
+        activate(&setup, &id).await;
+        let uri = format!("/public/promotions/{id}/reminders");
+        let tasks: Vec<_> = (0..8)
+            .map(|_| {
+                let setup = setup.clone();
+                let uri = uri.clone();
+                tokio::spawn(async move { call(&setup.app, "POST", &uri, "buyer0", None).await.0 })
+            })
+            .collect();
+        let mut statuses = Vec::new();
+        for task in tasks {
+            statuses.push(task.await.unwrap());
+        }
+        assert!(statuses.iter().all(|status| status.is_success()), "{statuses:?}");
+        use sea_orm::{EntityTrait, PaginatorTrait};
+        let rows = crate::entity::reminder::Entity::find()
+            .count(setup.app.database().read())
+            .await
+            .unwrap();
+        assert_eq!(rows, 1);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn so_doi_tuong_chi_cong_khai_khi_dang_chay() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let live = running(&setup, body(setup.tree.a, json!({"public": true}))).await;
+        let hidden = running(&setup, body(setup.tree.a, json!({"public": false}))).await;
+        let draft = create(&setup, body(setup.tree.a, json!({"public": true}))).await;
+        let resources = setup.app.modules().resources();
+        assert!(resources.knows("promotions.promotion"));
+        let found = resources
+            .resolve_many(
+                &setup.tenant(),
+                "promotions.promotion",
+                &[live.to_string(), hidden.to_string(), draft.clone()],
+                Some("vi"),
+            )
+            .await
+            .unwrap();
+        let shown = &found[&live.to_string()];
+        assert!(shown.public);
+        assert_eq!(shown.title, "Giảm giá");
+        assert_eq!(shown.url.as_deref(), Some(format!("/promotions/{live}").as_str()));
+        for id in [hidden.to_string(), draft] {
+            assert!(!found[&id].public);
+            assert_eq!(found[&id].title, "");
+        }
+    })
+    .await
+    .unwrap();
+}

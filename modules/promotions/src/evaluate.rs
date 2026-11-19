@@ -506,7 +506,7 @@ impl PromotionsService {
                     reason: program_reason.clone(),
                     capped_by_law: part.capped_by_law,
                     capped_by_floor: part.capped_by_floor,
-                    funding: funding(program, amount)?,
+                    funding: funding(program, Some(cart.lines[part.line].variant_id), amount)?,
                 });
             }
             if applied.shipping > 0 {
@@ -515,7 +515,7 @@ impl PromotionsService {
                     promotion_id: program.id,
                     amount,
                     reason: program_reason.clone(),
-                    funding: funding(program, amount)?,
+                    funding: funding(program, None, amount)?,
                 });
             }
             for (variant, quantity) in &applied.gifts {
@@ -581,7 +581,19 @@ impl PromotionsService {
 }
 
 /// Chia `amount` cho người trả tiền theo `share_bp` (`Money::allocate`, tổng khớp từng đồng).
-fn funding(program: &Program, amount: Money) -> Result<Vec<FundingShare>, Error> {
+fn funding(
+    program: &Program,
+    variant: Option<Uuid>,
+    amount: Money,
+) -> Result<Vec<FundingShare>, Error> {
+    // Sản phẩm người bán góp vào chương trình của sàn: phần giảm do chính người bán trả.
+    if let Some(seller) = variant.and_then(|variant| program.sponsors.get(&variant)) {
+        return Ok(vec![FundingShare {
+            payer_kind: crate::api::PayerKind::Seller,
+            payer_org_id: Some(OrgId::from_uuid(*seller)),
+            amount,
+        }]);
+    }
     if program.funding.is_empty() {
         return Ok(vec![FundingShare {
             payer_kind: crate::api::PayerKind::Seller,
