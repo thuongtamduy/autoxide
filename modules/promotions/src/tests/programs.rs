@@ -448,3 +448,46 @@ async fn danh_sach_cong_khai_kem_thong_bao_va_tran_theo_luat() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn flash_sale_cong_khai_voi_suat_con_that() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let id = create(
+            &setup,
+            body(setup.tree.a, json!({"kind": "flash_sale", "value_bp": null, "public": true})),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000, "quantity_limit": 5}]})),
+        )
+        .await;
+        let (status, activated) = activate(&setup, &id).await;
+        assert_eq!(status, StatusCode::OK, "{activated}");
+        // Một người giữ 2 suất: còn 3.
+        let request = crate::api::ReserveRequest::new(
+            uuid::Uuid::now_v7(),
+            setup.cart(&[(variant, 2)]),
+            Utc::now() + Duration::hours(1),
+        );
+        setup.promotions().reserve(&setup.tenant(), &request).await.unwrap();
+        let uri = format!(
+            "/api/v1/promotions/public/promotions/flash-sales?site={}",
+            setup.tree.a.as_uuid()
+        );
+        let answer = setup.app.request(axum::http::Method::GET, &uri).send().await.unwrap();
+        assert_eq!(answer.status(), StatusCode::OK, "{}", answer.text());
+        let found: serde_json::Value = serde_json::from_slice(answer.body()).unwrap();
+        let sale = &found["data"][0];
+        assert_eq!(sale["state"], "running");
+        assert_eq!(sale["items"][0]["sale_price_minor"], 120_000);
+        assert_eq!(sale["items"][0]["quantity_left"], 3);
+    })
+    .await
+    .unwrap();
+}

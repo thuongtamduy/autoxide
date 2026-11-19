@@ -110,6 +110,9 @@ giá không mã — hiện "còn X với mã …", không trình bày như giá 
 phục vụ) trả mã và voucher dùng được, mã chưa đủ điều kiện kèm lý do ("thêm X để dùng") và tổ hợp tốt nhất, để bộ
 chọn thay ô nhập mã.
 
+`GET /public/promotions/flash-sales?site=` liệt kê flash sale công khai đang chạy hay bắt đầu trong một ngày, kèm sản
+phẩm, giá sale và số suất còn ở giá đó (số thật: đã trừ suất đang giữ và đã bán).
+
 ## Trả hàng
 
 `api::returns` có quy tắc cho `orders`: tiền hoàn của một dòng = tiền đã trả × số trả / số mua, đơn vị cuối nhận

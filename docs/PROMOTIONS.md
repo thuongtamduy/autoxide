@@ -114,6 +114,9 @@ there is a real limit). The listed price stays the price without a coupon — sh
 discounted price. For a cart, `Promotions::eligible` (served by `orders`) gives the coupons and vouchers that work,
 those that do not yet with a reason ("add X to use"), and the best selection, so a picker can replace the code box.
 
+`GET /public/promotions/flash-sales?site=` lists the public flash sales running now or starting within a day, with
+their products, sale prices and the units left at the sale price (a real count: held and sold units are taken off).
+
 ## Returns
 
 `api::returns` has the rules for `orders`: the refund of a line is the amount paid × returned / bought,

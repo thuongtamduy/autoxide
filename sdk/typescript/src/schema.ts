@@ -19321,6 +19321,25 @@ export type Page_PromotionsPromotionListItem = {
 };
 
 /** One page of a list. */
+export type Page_PromotionsPublicFlashSale = {
+  /** The items of this page, in the requested order. */
+  data: {
+    currency: string;
+    ends_at: string;
+    id: string;
+    items: PromotionsPublicFlashItem[];
+    org_id: string;
+    starts_at: string;
+    /** `running` or `upcoming`. */
+    state: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PromotionsPublicPromotion = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21614,6 +21633,34 @@ export type PromotionsPromotionListItem = {
   status: PromotionsStatus;
   title: string;
   usage_count: number;
+};
+
+/** One product of a flash sale. */
+export type PromotionsPublicFlashItem = {
+  /** Most units one buyer can get at the sale price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units left at the sale price: a real count, `null` when not limited. */
+  quantity_left?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp` off the price). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points (1000 = 10%), when the sale is a percentage. */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A public flash sale, running or starting within a day. */
+export type PromotionsPublicFlashSale = {
+  currency: string;
+  ends_at: string;
+  id: string;
+  items: PromotionsPublicFlashItem[];
+  org_id: string;
+  starts_at: string;
+  /** `running` or `upcoming`. */
+  state: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
 };
 
 /** The legal discount limit in force. */
@@ -37906,6 +37953,19 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
       responses: {
         200: Page_PromotionsPublicPromotion;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/flash-sales": {
+    /** List the public flash sales running now or starting within a day (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicFlashSale;
         403: Problem;
         404: Problem;
         422: Problem;
