@@ -1,0 +1,37 @@
+[package]
+name = "autoxide-inventory"
+description = "Autoxide inventory module: stock per variant and warehouse, append-only movement ledger, reservations that never oversell, transfers, counts, purchasing."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-catalog.workspace = true
+autoxide-kernel.workspace = true
+autoxide-organizations.workspace = true
+axum.workspace = true
+chrono.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+futures-util.workspace = true
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
+tokio.workspace = true
+
+[lints]
+workspace = true

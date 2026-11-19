@@ -41,12 +41,21 @@ pub mod events {
     pub const VARIANT_DELETED: &str = "catalog.variant_deleted";
     /// Thêm dòng giá: bảng giá, biến thể, giá mới, `valid_from`.
     pub const PRICE_CHANGED: &str = "catalog.price_changed";
+    /// Giá hẹn giờ vừa bắt đầu hay giá tạm thời vừa hết hạn (lịch mỗi phút): `after` có
+    /// `variant_ids` và khoảng `from` / `to` đã xét. Giá đang áp của các biến thể đó có thể đã đổi.
+    pub const PRICE_EFFECTIVE: &str = "catalog.price_effective";
 
     /// Event của module `inventory` (bước 42) mà `catalog` nghe để có giá vốn cho sàn giá
     /// (D-222). `catalog` đọc payload `{"after": {"org_id": "<uuid>", "variant_id": "<uuid>",
     /// "unit_cost": {"amount": "<số nguyên đơn vị nhỏ nhất>", "currency": "VND"}}}` (dạng JSON của
     /// `Money`); thiếu trường thì bỏ qua event.
     pub const INVENTORY_COST_CHANGED: &str = "inventory.cost_changed";
+
+    /// Event của module `promotions` (bước 43): giá sau giảm tự động của các biến thể đổi.
+    /// `catalog` đọc `after.variant_ids` rồi dựng lại storefront, hỏi giá qua
+    /// [`SalePriceSource`](super::SalePriceSource) mà `promotions` cắm vào bằng
+    /// [`CatalogExtensions`](super::CatalogExtensions). Thiếu trường thì bỏ qua event.
+    pub const PROMOTIONS_AUTOMATIC_PRICES_CHANGED: &str = "promotions.automatic_prices_changed";
 }
 
 /// Loại sản phẩm.
@@ -315,4 +324,44 @@ pub trait Catalog: Send + Sync {
         tenant: &TenantContext,
         variant_ids: &[Uuid],
     ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error>;
+}
+
+/// Giá sau giảm tự động của một biến thể (từ khuyến mại không cần mã, không điều kiện giỏ).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SalePrice {
+    pub variant_id: Uuid,
+    /// Giá một đơn vị sau giảm, cùng tiền tệ với giá niêm yết đã gửi.
+    pub sale_price: Money,
+    /// Lúc giá giảm hết.
+    pub ends_at: DateTime<Utc>,
+}
+
+impl SalePrice {
+    pub fn new(variant_id: Uuid, sale_price: Money, ends_at: DateTime<Utc>) -> Self {
+        SalePrice { variant_id, sale_price, ends_at }
+    }
+}
+
+/// Nguồn giá sau giảm tự động cho storefront công khai. `promotions` đăng ký SAU `catalog` và phụ
+/// thuộc vào `catalog`, nên `catalog` không gọi thẳng trait của nó được (vòng phụ thuộc): module
+/// khuyến mại cài trait này và cắm vào bằng [`CatalogExtensions::set_sale_price_source`].
+#[async_trait::async_trait]
+pub trait SalePriceSource: Send + Sync {
+    /// Giá sau giảm của các biến thể ở nút bán `org_id` lúc `at`, từ giá niêm yết `prices`
+    /// (biến thể, giá). Biến thể không được giảm thì vắng. Gọi ngoài transaction.
+    async fn sale_prices(
+        &self,
+        tenant: &TenantContext,
+        org_id: OrgId,
+        at: DateTime<Utc>,
+        prices: &[(Uuid, Money)],
+    ) -> Result<Vec<SalePrice>, Error>;
+}
+
+/// Điểm cắm của module đăng ký sau `catalog`: lấy bằng
+/// `context.require::<dyn CatalogExtensions>()` trong `Module::start`.
+pub trait CatalogExtensions: Send + Sync {
+    /// Cắm nguồn giá sau giảm tự động (một nguồn; cắm lần hai thì giữ nguồn đầu và trả `false`).
+    fn set_sale_price_source(&self, source: std::sync::Arc<dyn SalePriceSource>) -> bool;
 }

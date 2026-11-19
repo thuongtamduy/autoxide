@@ -53,19 +53,24 @@ pub(crate) struct CatalogService {
     /// `dyn TaxEngine` của module `tax` khi đã cài: luật giá bán cho người tiêu dùng Việt Nam.
     pub(crate) tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
     pub(crate) config: CatalogConfig,
+    /// Sổ database: database điều khiển (dữ liệu luật dùng chung) và ngữ cảnh khách cho job.
+    pub(crate) databases: autoxide_kernel::tenancy::DatabaseRegistry,
+    /// Hàng đợi job: ghi giá suy ra, ghi giá của lần đổi hàng loạt.
+    pub(crate) jobs: autoxide_kernel::job::JobQueue,
+    /// `dyn OrgDirectory` của `organizations` khi đã cài: đọc cài đặt kế thừa theo nút.
+    pub(crate) organizations: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
+    /// Nguồn giá sau giảm tự động, do `promotions` cắm vào sau khi khởi động
+    /// (`CatalogExtensions`). `OnceLock`: ghi một lần, đọc không cần khoá.
+    pub(crate) sale_prices: std::sync::OnceLock<Arc<dyn crate::api::SalePriceSource>>,
+}
+
+impl crate::api::CatalogExtensions for CatalogService {
+    fn set_sale_price_source(&self, source: Arc<dyn crate::api::SalePriceSource>) -> bool {
+        self.sale_prices.set(source).is_ok()
+    }
 }
 
 impl CatalogService {
-    pub(crate) fn new(
-        outbox: Outbox,
-        entitlements: EntitlementsHandle,
-        media: Option<Arc<dyn autoxide_media::api::Media>>,
-        tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
-        config: CatalogConfig,
-    ) -> Self {
-        CatalogService { outbox, entitlements, media, tax, config }
-    }
-
     /// Bật tính năng `feature` của gói cho khách, hay lỗi `feature_not_enabled`.
     pub(crate) async fn require_feature(
         &self,

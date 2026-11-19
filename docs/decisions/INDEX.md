@@ -4,9 +4,9 @@
 
 Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>.md` (một mục một file, ID theo ngày và tên nên hai phiên song song không chọn trùng), rồi chạy `cargo xtask decisions`. Mẫu và luật: skill `record-decision`. `docs/DECISIONS.md` là nhật ký cũ (D-001…), không thêm mục vào đó.
 
-404 mục, gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
+Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán từ tiêu đề). Mỗi dòng: số, tiêu đề, ngày, ai quyết — mục **chủ dự án quyết** agent không tự đảo. "Thay bởi" nghĩa là mục sau đã đổi mục này: đọc mục sau trước. Nội dung đầy đủ của mục cũ: `grep -n '^## D-123 ' docs/DECISIONS.md`; mục mới có link tới file của nó.
 
-## Phạm vi và mục tiêu (12)
+## Phạm vi và mục tiêu
 
 - **D-006** Phạm vi core — 2026-11-11 · **chủ dự án quyết** · *thay một phần bởi D-185*
 - **D-010** Tên, chỗ đặt, deploy — 2026-11-11 · **chủ dự án quyết**
@@ -21,7 +21,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
 
-## Quy trình, gate, lộ trình (58)
+## Quy trình, gate, lộ trình
 
 - **D-004** GraphQL để sau, OpenAPI từ đầu — 2026-11-11 · **chủ dự án quyết**
 - **D-012** Rust edition 2024, toolchain ghim — 2026-11-11
@@ -80,9 +80,10 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **[D-20261118-ci-pr-affected-tests](D-20261118-ci-pr-affected-tests.md)** CI của pull request chỉ test crate bị sửa, trên cả SQLite và Postgres, không doc-test (`./gate.sh --pr`; D-299, D-300, D-20261118-public-ci-openapi-dup) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-decision-ids](D-20261118-decision-ids.md)** Quyết định mới mỗi mục một file, ID theo ngày và tên; mục lục tự sinh — 2026-11-18
 - **[D-20261118-file-length](D-20261118-file-length.md)** Độ dài file `.rs`: cảnh báo trên 800 dòng, chặn trên 1200, danh sách miễn không được dài thêm — 2026-11-18
+- **[D-20261118-no-codegraph](D-20261118-no-codegraph.md)** Không dùng CodeGraph để agent tìm code; mục lục quyết định bỏ số đếm — 2026-11-18
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 
-## Kiến trúc module và kernel (11)
+## Kiến trúc module và kernel
 
 - **D-005** Một binary, ranh giới module chặt — 2026-11-11 · **chủ dự án quyết**
 - **D-025** Không foreign key xuyên module, không ngoại lệ — 2026-11-11 · **chủ dự án quyết**
@@ -96,7 +97,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
 - **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 
-## Database, dữ liệu, job, event (26)
+## Database, dữ liệu, job, event
 
 - **D-001** Database: SQLite và Postgres — 2026-11-11 · **chủ dự án quyết**
 - **D-002** UUIDv7 cho mọi ID — 2026-11-11 · **chủ dự án quyết**
@@ -125,7 +126,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
 
-## HTTP, REST, OpenAPI (14)
+## HTTP, REST, OpenAPI
 
 - **D-008** Cách làm mặc định của các dịch vụ core — 2026-11-11 · **chủ dự án quyết**
 - **D-039** Kiểu lỗi, hình dạng response, pagination — 2026-11-11
@@ -142,7 +143,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 
-## MCP, AI, agent dùng API (21)
+## MCP, AI, agent dùng API
 
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
@@ -166,7 +167,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **[D-20261118-module-contracts](D-20261118-module-contracts.md)** OpenAPI và MCP theo từng module, trỏ từ `/llms.txt` — 2026-11-18
 - **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 
-## Xác thực, phân quyền, bảo mật (53)
+## Xác thực, phân quyền, bảo mật
 
 - **D-024** Email, đặt lại mật khẩu, xác minh email nằm trong core — 2026-11-11 · **chủ dự án quyết**
 - **D-028** Tạo tài khoản: quản trị viên tạo, tự đăng ký là tuỳ chọn — 2026-11-11 · **chủ dự án quyết**
@@ -218,11 +219,12 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-375** Rate limit theo API key đếm chung qua database, theo lô; `memory` vẫn mặc định (bước 40 P6, D-109, D-116) — 2026-11-18
 - **D-376** Giải thích quyền theo gói và "đang dùng ở đâu" (bước 51 P11, D-267) — 2026-11-18
 - **D-380** Đăng nhập OIDC / OAuth 2.0: JWT tự viết bằng `ring` + `p256`, liên kết chỉ khi hai phía đã xác minh email (bước 40 P3, D-045, D-077, D-149, D-257) — 2026-11-18
+- **[D-20261118-step39-key-rotation](D-20261118-step39-key-rotation.md)** Đổi khoá ký access token không đăng xuất ai — 2026-11-18
 - **[D-20261118-step54-one-decision](D-20261118-step54-one-decision.md)** Bước 54 mục 1: một hàm quyết định quyền; cache theo phiên bản quyền tách thành mục riêng, chờ số đo — 2026-11-18
 - **[D-20261118-step54-role-denies](D-20261118-step54-role-denies.md)** Bước 54: role cấm permission (deny thắng allow) — 2026-11-18
 - **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
 
-## Đa khách, tổ chức, gói (38)
+## Đa khách, tổ chức, gói
 
 - **D-210** Tách nhánh thành khách riêng, chuyển database: chỉ nhân sự nền tảng (H3) — 2026-11-14
 - **D-211** Khách tự thu hồi quyền vào hỗ trợ (H4) — 2026-11-14
@@ -263,7 +265,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 
-## Hợp đồng cho giao diện (31)
+## Hợp đồng cho giao diện
 
 - **D-096** Module đầu tiên là `cms` (nội dung); giao diện là dự án riêng, công khai; chưa làm app — 2026-11-12 · **chủ dự án quyết** · *thay một phần bởi D-098, D-099, D-238*
 - **D-097** Stack của dự án giao diện — 2026-11-12
@@ -297,7 +299,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-382** Trả nợ giao diện đợt 2: tổng số của danh sách và các chỗ thiếu trên module đã xong — 2026-11-18
 - **[D-20261118-ui-debt-batch-3](D-20261118-ui-debt-batch-3.md)** Trả nợ giao diện đợt 3: công cụ kế toán, tổng quan tuân thủ, hồ sơ định danh, sổ loại đối tượng — 2026-11-18
 
-## Module nội dung, file, liên lạc (90)
+## Module nội dung, file, liên lạc
 
 - **D-027** Thông báo mặc định bằng tiếng Anh — 2026-11-11 · **chủ dự án quyết**
 - **D-060** Không dịch thông báo của từng trường ở máy chủ — 2026-11-11
@@ -390,7 +392,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
 
-## Tiền, thuế, chứng từ (18)
+## Tiền, thuế, chứng từ
 
 - **D-007** Quy ước tiền và thời gian — 2026-11-11 · **chủ dự án quyết**
 - **D-180** Tiền là `autoxide_kernel::money::Money`: `i64` đơn vị nhỏ nhất + mã ISO 4217 — 2026-11-13
@@ -411,7 +413,7 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-353** Mẫu in chứng từ: HTML từ mẫu của khách, PDF bố cục cố định bằng `krilla`; in qua `dyn Invoices::render` (bước 36 mục 11) — 2026-11-17
 - **D-354** Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17
 
-## Pháp luật và tuân thủ (11)
+## Pháp luật và tuân thủ
 
 - **D-183** Audit log là chuỗi băm; xoá dữ liệu cá nhân vẫn giữ được chuỗi — 2026-11-13
 - **D-186** Tuân thủ pháp luật Việt Nam là luật thường trực của dự án — 2026-11-13 · **chủ dự án quyết**
@@ -424,8 +426,9 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-361** Mã theo dõi quảng cáo và đồng ý cookie trong `compliance` (bước 37, D-235) — 2026-11-17
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
+- **[D-20261118-step43-legal-data](D-20261118-step43-legal-data.md)** Khuyến mại: hạn mức pháp luật là dữ liệu, chặn khi chưa thông báo — 2026-11-18
 
-## Thương mại (12)
+## Thương mại
 
 - **D-191** Module thương mại: sáu module, bước 41–46 — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-193*
 - **D-203** Nút "Đánh giá này hữu ích" cho đánh giá sản phẩm (bước 45) — 2026-11-13 · **chủ dự án quyết**
@@ -437,10 +440,26 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-226** Che số điện thoại, email của khách; cơ sở tính điểm thưởng — 2026-11-14
 - **D-236** Kiểu vị trí banner, bộ vị trí chuẩn, chọn trang hiện, banner dạng chữ, khối vùng banner — 2026-11-14 · **chủ dự án quyết**
 - **[D-20261118-step41-catalog-design](D-20261118-step41-catalog-design.md)** `catalog`: giá chỉ thêm, thứ tự chọn bảng giá, hợp đồng `api` cho bước 42–44 — 2026-11-18
+- **[D-20261118-step41-price-rules](D-20261118-step41-price-rules.md)** `catalog`: bảng giá suy ra, làm tròn giá đẹp, đổi giá hàng loạt — 2026-11-18
+- **[D-20261118-step41-readiness](D-20261118-step41-readiness.md)** `catalog`: thuộc tính bắt buộc, hàng cấm / có điều kiện và `readiness` — 2026-11-18
+- **[D-20261118-step41-storefront](D-20261118-step41-storefront.md)** `catalog`: storefront dẫn xuất và đọc công khai — 2026-11-18
+- **[D-20261118-step42-order-events](D-20261118-step42-order-events.md)** `inventory` nhận event của `orders` qua `Subscription::optional`, lỗi nghiệp vụ chỉ ghi log — 2026-11-18
+- **[D-20261118-step42-reservations](D-20261118-step42-reservations.md)** Giữ chỗ tồn của `inventory`: chọn kho bằng số đọc rồi `adjust` làm trọng tài, khoá dòng chỗ giữ cho mọi chuyển trạng thái — 2026-11-18
+- **[D-20261118-step42-stock-model](D-20261118-step42-stock-model.md)** Mô hình tồn của `inventory`: `on_hand` / `available`, sổ chỉ thêm, giá vốn bình quân làm tròn nửa lên, nút giữ tồn — 2026-11-18
+- **[D-20261118-step42-transfers-counts](D-20261118-step42-transfers-counts.md)** Chuyển kho và kiểm kê của `inventory`: giá vốn đi theo hàng, kiểm kê áp chênh lệch vào tồn hiện tại — 2026-11-18
+- **[D-20261118-step43-calculation](D-20261118-step43-calculation.md)** Khuyến mại: thứ tự tính, cộng dồn, làm tròn và chia tiền — 2026-11-18
+- **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
+- **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
+- **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
+- **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
+- **[D-20261118-step53-escalation](D-20261118-step53-escalation.md)** `support`: chuyển khiếu nại qua `ComplaintIntake` (đích là phiếu), liên kết qua sổ đối tượng, câu trả lời mẫu — 2026-11-18
+- **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
+- **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
+- **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 
-## Vận hành và hiệu năng (9)
+## Vận hành và hiệu năng
 
 - **D-034** Quy ước cấu hình — 2026-11-11
 - **D-043** Log, metrics, tracing — 2026-11-11
@@ -451,3 +470,5 @@ Ghi quyết định mới: tạo file `docs/decisions/D-<YYYYMMDD>-<tên-ngắn>
 - **D-317** Số đo đường nóng sau bước 34 — 2026-11-16
 - **[D-20261118-step39-backlog-gauges](D-20261118-step39-backlog-gauges.md)** Gauge tồn đọng của job, event và pool kết nối — 2026-11-18
 - **[D-20261118-step39-monitoring-files](D-20261118-step39-monitoring-files.md)** Luật cảnh báo, dashboard và sổ tay sự cố nằm trong repo, `xtask` giữ khớp — 2026-11-18
+- **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
+- **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18

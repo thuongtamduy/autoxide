@@ -2134,6 +2134,293 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Find free start times of a service between `from` and `to` (at most 31 days), with the price, deposit and cancellation terms to tell the customer before booking.",
+      "input_schema": {
+        "description": "Which free times to find.",
+        "properties": {
+          "from": {
+            "description": "Start of the range.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Only staff of this unit, and its time zone; omitted: the service's unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "description": "Only this staff member (or court, room…); omitted: anyone who gives the service.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "service_id": {
+            "description": "The service.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "to": {
+            "description": "End of the range, at most 31 days after `from`.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.availability",
+      "output_schema": null,
+      "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Cancel a booking for the shop: the place is freed and any deposit paid is refunded in full through the payment partner.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A booking to cancel.",
+        "properties": {
+          "id": {
+            "description": "Id of the booking.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.cancel_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Book a free time for a customer (phone call, walk-in). Confirmed at once, no deposit. Fails with `bookings.slot_taken` if the time was just taken.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A booking made for a customer (phone call, walk-in): confirmed at once, no deposit.",
+        "properties": {
+          "customer_email": {
+            "description": "Customer's email.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "customer_name": {
+            "description": "Customer's name, 1 to 200 characters.",
+            "type": "string"
+          },
+          "customer_phone": {
+            "description": "Customer's phone, e.g. `0912345678`; give a phone or an email.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "description": "Up to 500 characters; no health information.",
+            "type": "string"
+          },
+          "resource_id": {
+            "description": "Omitted: the first free staff member who gives the service.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "seats": {
+            "description": "Places (classes); default 1.",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "service_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "starts_at": {
+            "description": "A `starts_at` from `bookings.availability`.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "starts_at",
+          "customer_name"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.create_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the bookings of your units, newest first; filter by status, staff member and start time.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which bookings to list.",
+        "properties": {
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Starting at or after this moment.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "resource_id": {
+            "description": "Only this staff member (or court, room…).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Only this status: `held`, `pending`, `confirmed`, `checked_in`, `completed`, `cancelled`,\n`no_show` or `expired`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Starting before this moment.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "bookings.list_bookings",
+      "output_schema": null,
+      "permissions": [
+        "bookings.read",
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a booking to another free time (and optionally another staff member). If the new time was just taken, the booking keeps its old time.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The new time of a booking.",
+        "properties": {
+          "id": {
+            "description": "Id of the booking.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "resource_id": {
+            "description": "Another staff member who gives the service; omitted: the same one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "description": "The new start, on a 5-minute mark.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "starts_at"
+        ],
+        "type": "object"
+      },
+      "name": "bookings.reschedule_booking",
+      "output_schema": null,
+      "permissions": [
+        "bookings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -5840,6 +6127,443 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Adjust stock in one warehouse; every line needs a reason code from the list `inventory.adjustment`. Sending the same `reference` and content again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A stock adjustment in one warehouse.",
+        "properties": {
+          "lines": {
+            "description": "1 to 500 lines.",
+            "items": {
+              "additionalProperties": false,
+              "description": "One line of a stock adjustment.",
+              "properties": {
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quantity": {
+                  "description": "Units to add (positive) or remove (negative); not 0.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason_code": {
+                  "description": "Code from the reason list `inventory.adjustment`, e.g. `damaged`.",
+                  "type": "string"
+                },
+                "unit_cost_amount": {
+                  "description": "Unit cost of added units, integer minor units as a string, e.g. `\"150000\"`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "unit_cost_currency": {
+                  "description": "Currency of `unit_cost_amount`, e.g. `VND`.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity",
+                "reason_code"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "The warehouse or store.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your id of this adjustment; the same reference and content again changes nothing.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "reference",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.adjust_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a stock transfer between two warehouses as a draft (one line per variant); ship it with the REST endpoint `POST /api/v1/inventory/transfers/{id}/ship`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A stock transfer to create.",
+        "properties": {
+          "from_org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "A variant and a quantity.",
+              "properties": {
+                "quantity": {
+                  "description": "1 to 1 000 000.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_org_id",
+          "to_org_id",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.create_transfer",
+      "output_schema": null,
+      "permissions": [
+        "inventory.transfer"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels (variant × warehouse) in your scope with on hand, available, reserved and average cost; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.get_levels",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List stock levels whose available stock is at or below their reorder point.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Stock levels to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of levels, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Only this warehouse or store.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "description": "Only this variant.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_low_stock",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the append-only stock movement ledger in your scope, newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Ledger lines to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "from": {
+            "description": "Lines written at or after this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of a movement ledger line.",
+                "enum": [
+                  "receipt",
+                  "sale",
+                  "return",
+                  "adjustment",
+                  "count",
+                  "transfer_out",
+                  "transfer_in",
+                  "expiry",
+                  "supplier_return"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of lines, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "Lines written before this time.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "inventory.list_movements",
+      "output_schema": null,
+      "permissions": [
+        "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Receive goods of a stock transfer in transit, all (no lines) or part.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Goods of a transfer to receive.",
+        "properties": {
+          "id": {
+            "description": "Id of the transfer.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Units received now; empty or omitted: everything still in transit.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A variant and a quantity.",
+              "properties": {
+                "quantity": {
+                  "description": "1 to 1 000 000.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.receive_transfer",
+      "output_schema": null,
+      "permissions": [
+        "inventory.transfer"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Release a stuck stock reservation by its id: units not shipped yet go back to the available stock. Releasing again changes nothing.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A reservation to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the reservation.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.release_reservation",
+      "output_schema": null,
+      "permissions": [
+        "inventory.adjust"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "Write a draft document; taxes are computed from the tax categories. A draft has no number until it is issued.",
       "input_schema": {
         "additionalProperties": false,
@@ -6796,6 +7520,26 @@
       "name": "kernel.navigation",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "See the job and event backlogs, the dead-letter queue, the database connections and the newest backup of every database (platform staff only). Use it to find out why mail, webhooks or reports are late.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "The tool takes no arguments.",
+        "type": "object"
+      },
+      "name": "kernel.ops_backlog",
+      "output_schema": null,
+      "permissions": [
+        "kernel.ops.read"
+      ]
     },
     {
       "annotations": {
@@ -10273,6 +11017,405 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Turn a draft promotion on after the legal checks (discount limit and days in force, notices to authorities, price floors). Failed checks come back as errors.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.activate_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a promotion as a draft (rule, window with a required end, limits, title and terms). Turn it on with `activate_promotion`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to create.",
+        "properties": {
+          "promotion": {
+            "description": "The promotion, as the body of `POST /api/v1/promotions` (`PromotionsPromotionInput`).",
+            "type": "object"
+          }
+        },
+        "required": [
+          "promotion"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.create_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.write"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "End a promotion now; usage already held for orders stays valid.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.end_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Compute the promotions of a cart without holding anything: discounts per line with reasons, gifts, codes and vouchers that do not apply, and the fingerprint.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A cart to compute.",
+        "properties": {
+          "cart": {
+            "description": "The cart, as the body of `POST /api/v1/promotions/evaluate` (`PromotionsCart`).",
+            "type": "object"
+          }
+        },
+        "required": [
+          "cart"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.evaluate_cart",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Add one chosen code or a batch of random codes to a promotion: `redeem` coupons for `code` promotions, `claim` codes for `voucher` promotions.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Codes to add to a promotion.",
+        "properties": {
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "prefix": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "purpose": {
+            "enum": [
+              "redeem",
+              "claim"
+            ],
+            "type": "string"
+          },
+          "usage_limit": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "purpose"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.generate_codes",
+      "output_schema": null,
+      "permissions": [
+        "promotions.codes.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get a promotion with its rule, texts, targets, flash-sale prices and counters.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A promotion to act on.",
+        "properties": {
+          "id": {
+            "description": "Id of the promotion.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.get_promotion",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Put a voucher of a `voucher` promotion into a user's wallet, with a reason. The same `reference` again returns the voucher already given.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A voucher to give by hand.",
+        "properties": {
+          "promotion_id": {
+            "description": "Id of the `voucher` promotion.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why, 3 to 500 characters (kept in the audit log).",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your reference; the same one again returns the same voucher.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "promotion_id",
+          "user_id",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.grant_voucher",
+      "output_schema": null,
+      "permissions": [
+        "promotions.vouchers.grant"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the promotions in your scope, newest first; filter by status, kind, unit or words in the title; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Promotions to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "oneOf": [
+              {
+                "description": "Kind of promotion.",
+                "enum": [
+                  "percent_off",
+                  "amount_off",
+                  "fixed_price",
+                  "buy_x_get_y",
+                  "free_shipping",
+                  "flash_sale",
+                  "tiered",
+                  "bundle_price",
+                  "add_on",
+                  "gift_choice"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of promotions, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "Words in the title.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "oneOf": [
+              {
+                "enum": [
+                  "draft",
+                  "scheduled",
+                  "active",
+                  "paused",
+                  "ended",
+                  "cancelled"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "promotions.list_promotions",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the vouchers in a user's wallet, soonest to expire first (for support staff).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Whose wallet to read.",
+        "properties": {
+          "status": {
+            "oneOf": [
+              {
+                "description": "State of a voucher in a wallet.",
+                "enum": [
+                  "available",
+                  "held",
+                  "used",
+                  "expired",
+                  "revoked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "user_id"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.list_vouchers_of_user",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
       ]
     },
     {

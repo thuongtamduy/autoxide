@@ -1,0 +1,38 @@
+[package]
+name = "autoxide-promotions"
+description = "Autoxide promotions module: automatic discounts, coupons and vouchers, flash sales, stacking rules, usage holds and legal limits as dated data."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-catalog.workspace = true
+autoxide-kernel.workspace = true
+autoxide-organizations.workspace = true
+axum.workspace = true
+chrono.workspace = true
+chrono-tz.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+# MCP client thật cho test tool của module.
+rmcp = { workspace = true, features = [
+  "client",
+  "transport-streamable-http-client-reqwest",
+  "reqwest-tls-no-provider",
+] }
+tokio.workspace = true
+
+[lints]
+workspace = true

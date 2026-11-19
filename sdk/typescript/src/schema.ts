@@ -84,6 +84,11 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** A record to link, as `<module>.<type>:<id>`. */
+export type AddSupportLinkRequest = {
+  target: string;
+};
+
 /** A message to add. */
 export type AddSupportMessageRequest = {
   /** The text comes from an AI suggestion (shown with a label). */
@@ -547,6 +552,14 @@ export type BookingCheckout = {
   qr_payload?: string | null;
 };
 
+/** A code was sent. */
+export type BookingCodeSent = {
+  /** Send it back with the code. */
+  challenge_id: string;
+  /** The code works until this moment, once. */
+  expires_at: string;
+};
+
 /** A booking just made, with the deposit checkout when one is due. */
 export type BookingCreated = {
   booking: BookingRecord;
@@ -615,6 +628,14 @@ export type BookingOpening = {
   /** Places left (always 1 for one-to-one services). */
   seats_left: number;
   starts_at: string;
+};
+
+/** A one-time code sent by SMS, to prove a guest owns the phone number. */
+export type BookingPhoneCode = {
+  /** The `challenge_id` from `POST /api/v1/bookings/public/phone-codes`. */
+  challenge_id: string;
+  /** The 6 digits received by SMS. */
+  code: string;
 };
 
 /** A booking. */
@@ -877,6 +898,52 @@ export type CatalogAddedPrices = {
   warnings: CatalogPriceWarning[];
 };
 
+/** An attribute products can have (origin, material, size of the box…). */
+export type CatalogAttribute = {
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  /** Offered as a storefront filter. */
+  filterable: boolean;
+  id: string;
+  /** Law the attribute comes from, for legally required label contents. */
+  legal_basis?: string | null;
+  names: {
+    [key: string]: string;
+  };
+  options: CatalogAttributeOption[];
+  /** Decimal places of a `decimal` attribute. */
+  scale: number;
+  unit?: string | null;
+  updated_at: string;
+};
+
+/** A choosable value of an `option` / `options` attribute. */
+export type CatalogAttributeOption = {
+  /** 1 to 64 lower-case letters, digits, `_` or `-`; unique in the attribute. */
+  code: string;
+  /** Label per language, e.g. `{"en": "Cotton"}`. */
+  labels: {
+    [key: string]: string;
+  };
+};
+
+/** The whole set of options of an attribute. */
+export type CatalogAttributeOptions = {
+  /** Up to 500 options, in display order. Options are matched by `code`. */
+  options: CatalogAttributeOption[];
+};
+
+/** A value of an attribute on a product. */
+export type CatalogAttributeValue = {
+  attribute_id: string;
+  /**
+   * By the attribute's type: text, a whole number, a decimal written as text (`"12.5"`),
+   * `true` / `false`, a date `YYYY-MM-DD`, an option code, or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
 /** A category of the tenant's tree. */
 export type CatalogCategory = {
   /** 0 for a top category. */
@@ -892,6 +959,32 @@ export type CatalogCategory = {
   updated_at: string;
   /** Shown on the storefront. */
   visible: boolean;
+};
+
+/** An attribute of a category. */
+export type CatalogCategoryAttribute = {
+  /** Also for products of the subcategories. */
+  applies_to_descendants?: boolean;
+  attribute_id: string;
+  /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+  effective_from: string;
+  /** The rule stops applying on this day. */
+  effective_to?: string | null;
+  /** Law the rule comes from. */
+  legal_basis?: string | null;
+  /** Products in the category cannot go on sale without a value. */
+  required?: boolean;
+};
+
+/** The whole set of attributes of a category. */
+export type CatalogCategoryAttributes = {
+  attributes: CatalogCategoryAttribute[];
+};
+
+/** The restricted-goods rules linked to a category. */
+export type CatalogCategoryRestrictions = {
+  /** Rule codes of `GET /restriction-rules`. */
+  rule_codes: string[];
 };
 
 /** Name and slug of a category in one language. */
@@ -914,6 +1007,26 @@ export type CatalogComponents = {
   components: CatalogComponent[];
 };
 
+/** A new attribute. */
+export type CatalogCreateAttribute = {
+  /**
+   * 1 to 64 lower-case letters, digits or `_`; unique in the tenant
+   * (`catalog.attribute_code_taken`).
+   */
+  code: string;
+  /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+  data_type: string;
+  filterable?: boolean;
+  legal_basis?: string | null;
+  /** Name per language. */
+  names: {
+    [key: string]: string;
+  };
+  /** Decimal places of a `decimal` attribute, 0 to 6. Default 0. */
+  scale?: number;
+  unit?: string | null;
+};
+
 /** A new category. */
 export type CatalogCreateCategory = {
   /** Omitted: a top category. Categories nest at most 7 levels deep. */
@@ -926,6 +1039,34 @@ export type CatalogCreateCategory = {
   };
   /** Shown on the storefront; default `true`. */
   visible?: boolean;
+};
+
+/** A new document. */
+export type CatalogCreateDocument = {
+  /** A document type a rule requires, e.g. `alcohol_retail_licence`. */
+  document_type: string;
+  expires_on?: string | null;
+  /** Key of a scanned file already stored. */
+  file_key?: string | null;
+  issued_by: string;
+  issued_on: string;
+  number: string;
+};
+
+/** A new bulk price change. */
+export type CatalogCreatePriceChange = {
+  filter?: CatalogPriceChangeFilter;
+  /**
+   * `set` (the new price is `value`), `percent` (`value` in basis points, signed: `-1000` =
+   * 10% off) or `amount` (`value` minor units added, signed).
+   */
+  operation: string;
+  rounding_rule_id?: string | null;
+  /** When the new prices start; omitted: now. A future time schedules them. */
+  valid_from?: string | null;
+  /** End of a temporary change. */
+  valid_to?: string | null;
+  value: number;
 };
 
 /** A new price floor. */
@@ -944,17 +1085,28 @@ export type CatalogCreatePriceGuard = {
 
 /** A new price list. */
 export type CatalogCreatePriceList = {
+  /** Adjustment of a derived list in basis points, signed (`-1500` = 15% off), -10000 to 100000. */
+  adjust_bp?: number;
+  /** Amount added after the percentage, in minor units, signed. */
+  adjust_minor?: number | null;
   /** `consumer` (default) or `business`. */
   audience?: string;
   /** ISO 4217 code. Consumer prices in Viet Nam must be `VND`. */
   currency: string;
   /** Only for this customer group (a free code until customer groups exist, step 47). */
   customer_group?: string | null;
+  /**
+   * Make a derived list: its prices are written from this source list (which cannot itself be
+   * derived; `catalog.derived_chain`), adjusted and rounded. Same currency as the source.
+   */
+  derived_from?: string | null;
   name: string;
   /** The store or chain unit; prices apply there and below. Omit when you work in one unit. */
   org_id?: string | null;
   /** Higher wins among lists that tie on unit and filters. Default 0. */
   priority?: number;
+  /** Rounding rule of a derived list (`GET /rounding-rules`). */
+  rounding_rule_id?: string | null;
   /** Prices include tax; consumer prices in Viet Nam must. */
   tax_inclusive: boolean;
 };
@@ -1041,6 +1193,17 @@ export type CatalogCreateProduct = {
   warranty_months?: number | null;
 };
 
+/** A new rounding rule. */
+export type CatalogCreateRoundingRule = {
+  /** Ending in minor units, 0 or more and below `step_minor`, e.g. `9000`. */
+  ending_minor?: number | null;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  /** Step in minor units, above 0, e.g. `10000`. */
+  step_minor: number;
+};
+
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
 export type CatalogFloorAction = "warn" | "block";
 
@@ -1098,6 +1261,44 @@ export type CatalogPrice = {
   variant_id: string;
 };
 
+/** A bulk price change. */
+export type CatalogPriceChange = {
+  /** Variants changed (known after the preview). */
+  affected: number;
+  approved_by?: string | null;
+  created_at: string;
+  created_by?: string | null;
+  filter: CatalogPriceChangeFilter;
+  id: string;
+  /** `set`, `percent` or `amount`. */
+  operation: string;
+  /**
+   * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+   * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+   */
+  preview?: Record<string, unknown> | null;
+  price_list_id: string;
+  rounding_rule_id?: string | null;
+  /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+  status: string;
+  updated_at: string;
+  valid_from: string;
+  /** End of a temporary change; the earlier prices apply again after it. */
+  valid_to?: string | null;
+  /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+  value: number;
+};
+
+/**
+ * Which variants a bulk change covers: the union of the categories (with their subcategories),
+ * products and variants listed. All empty: every variant with a price in the list.
+ */
+export type CatalogPriceChangeFilter = {
+  category_ids?: string[];
+  product_ids?: string[];
+  variant_ids?: string[];
+};
+
 /** A price floor rule. */
 export type CatalogPriceGuard = {
   action: CatalogFloorAction;
@@ -1143,6 +1344,9 @@ export type CatalogPriceInput = {
 /** A price list. */
 export type CatalogPriceList = {
   active: boolean;
+  /** Adjustment of a derived list, basis points. */
+  adjust_bp: number;
+  adjust_minor?: number | null;
   /** `consumer` or `business`. */
   audience: string;
   /** Only for this sales channel (step 48). */
@@ -1153,6 +1357,8 @@ export type CatalogPriceList = {
   currency: string;
   /** Only for this customer group. */
   customer_group?: string | null;
+  /** Source list of a derived list. */
+  derived_from?: string | null;
   id: string;
   /** Only for this market (step 63). */
   market?: string | null;
@@ -1161,6 +1367,7 @@ export type CatalogPriceList = {
   org_id: string;
   /** Higher wins among lists that tie on unit and filters. */
   priority: number;
+  rounding_rule_id?: string | null;
   tax_inclusive: boolean;
   updated_at: string;
 };
@@ -1218,10 +1425,39 @@ export type CatalogProduct = {
   warranty_months?: number | null;
 };
 
+/** The whole set of attribute values of a product. */
+export type CatalogProductAttributes = {
+  attributes: CatalogAttributeValue[];
+};
+
 /** The whole set of categories of a product. */
 export type CatalogProductCategories = {
   /** The first is the main category. */
   category_ids: string[];
+};
+
+/** A count of products. */
+export type CatalogProductCount = {
+  count: number;
+  /**
+   * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+   * `missing_attributes`, `missing_documents`, `restricted`).
+   */
+  key: string;
+};
+
+/** A licence or certificate of a conditional product. */
+export type CatalogProductDocument = {
+  created_at: string;
+  document_type: string;
+  /** The document is valid until the end of this day; `null`: no end. */
+  expires_on?: string | null;
+  /** Key of the scanned file in storage. */
+  file_key?: string | null;
+  id: string;
+  issued_by: string;
+  issued_on: string;
+  number: string;
 };
 
 /** The whole set of images of a product. */
@@ -1255,6 +1491,154 @@ export type CatalogProductMedia = {
   variant_id?: string | null;
 };
 
+/** An attribute of the product, in the language asked. */
+export type CatalogPublicAttribute = {
+  code: string;
+  /** Ready to show, in the language asked. */
+  label: string;
+  name: string;
+  unit?: string | null;
+  /**
+   * As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option
+   * code or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
+/** A category, in the language asked. */
+export type CatalogPublicCategory = {
+  /** Depth in the tree (top level is 0). */
+  depth: number;
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  position: number;
+  slug: string;
+};
+
+/** An image, as readers load it. */
+export type CatalogPublicImage = {
+  /** Text alternative: the product's own, or the media library's. */
+  alt: string;
+  height?: number | null;
+  media_id: string;
+  /** Smaller copies, narrowest first, for `srcset`. */
+  sizes: CatalogPublicImageSize[];
+  /** Where to load it (versioned: cache it for long). */
+  url: string;
+  /** The image shows this variant. */
+  variant_id?: string | null;
+  width?: number | null;
+};
+
+/** A smaller copy of an image. */
+export type CatalogPublicImageSize = {
+  height: number;
+  url: string;
+  /** The same copy as WebP; `null` while it is not made yet. */
+  webp_url?: string | null;
+  width: number;
+};
+
+/** A choice of a product option, in the language asked. */
+export type CatalogPublicOption = {
+  id: string;
+  name: string;
+  values: CatalogPublicOptionValue[];
+};
+
+/** A value of a product option. */
+export type CatalogPublicOptionValue = {
+  id: string;
+  label: string;
+};
+
+/** A product page. */
+export type CatalogPublicProduct = CatalogPublicProductCard & {
+  attributes: CatalogPublicAttribute[];
+  categories: CatalogPublicCategory[];
+  description: string;
+  images: CatalogPublicImage[];
+  meta_description?: string | null;
+  meta_title?: string | null;
+  options: CatalogPublicOption[];
+  /** Other languages of the product, for `hreflang`. */
+  translations: CatalogPublicTranslation[];
+  variants: CatalogPublicVariant[];
+  warranty_months?: number | null;
+};
+
+/** A product on a public list. */
+export type CatalogPublicProductCard = {
+  /**
+   * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+   * Intelligence 134/2025/QH15).
+   */
+  ai_assisted: boolean;
+  compare_at?: Money | null;
+  id: string;
+  image?: CatalogPublicImage | null;
+  /** `physical`, `digital`, `service` or `bundle`. */
+  kind: string;
+  name: string;
+  /** Address of the product page on the website, without language prefix. */
+  path: string;
+  /** Lowest current price over the variants (no customer group, no code needed). */
+  price_from: Money;
+  /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+  price_to: Money;
+  /** Average rating out of 5 (two decimals); `null` before the first rating. */
+  rating?: number | null;
+  rating_count: number;
+  /** When `sale_price` ends; `null`: no end set. */
+  sale_ends_at?: string | null;
+  sale_price?: Money | null;
+  seller: CatalogPublicSeller;
+  short_description: string;
+  slug: string;
+  /** Number of variants on sale. */
+  variant_count: number;
+};
+
+/** Who sells a product. */
+export type CatalogPublicSeller = {
+  /** Its name; empty when the organization module is not installed. */
+  name: string;
+  /** The organization unit selling it (filter with `seller=`). */
+  org_id: string;
+  /**
+   * `true` when it is the website's own unit or one above it; `false` for a seller below the
+   * website (a marketplace seller).
+   */
+  own: boolean;
+};
+
+/** The same product in another language. */
+export type CatalogPublicTranslation = {
+  locale: string;
+  path: string;
+  slug: string;
+};
+
+/** A variant on sale. */
+export type CatalogPublicVariant = {
+  /** GTIN / EAN barcode, for structured data. */
+  barcode?: string | null;
+  compare_at?: Money | null;
+  id: string;
+  image_media_id?: string | null;
+  /** One value of each option, in the options' order. */
+  option_value_ids: string[];
+  /** For `preorder`: the expected date it is available. */
+  preorder_available_on?: string | null;
+  /** For `preorder`: the message to show, in the language asked. */
+  preorder_message?: string | null;
+  price?: Money | null;
+  /** `in_stock`, `backorder` or `preorder`. */
+  sale_mode: string;
+  sku: string;
+};
+
 /** The price of a variant and why. */
 export type CatalogResolvedPrice = {
   /** The lists that apply, in selection order; the first with a price wins. */
@@ -1263,11 +1647,52 @@ export type CatalogResolvedPrice = {
   variant_id: string;
 };
 
+/** A rule of prohibited or conditional goods (shared data, read only). */
+export type CatalogRestrictionRule = {
+  code: string;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  /** `prohibited` or `conditional`. */
+  level: string;
+  names: {
+    [key: string]: string;
+  };
+  pack_version: string;
+  /** Document types a conditional product needs, valid on the day. */
+  required_documents: string[];
+  source_url: string;
+};
+
+/**
+ * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+ * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+ */
+export type CatalogRoundingRule = {
+  created_at: string;
+  ending_minor?: number | null;
+  id: string;
+  /** `up`, `down` or `nearest`. */
+  mode: string;
+  name: string;
+  step_minor: number;
+};
+
 /**
  * How a variant sells: `in_stock` (only while in stock), `backorder` (also when out of stock),
  * `preorder` (before it arrives, see `preorder_available_on`).
  */
 export type CatalogSaleMode = "in_stock" | "backorder" | "preorder";
+
+/** A product in the sitemap. */
+export type CatalogSitemapItem = {
+  id: string;
+  /** Last change of the product, its texts or its price on this website. */
+  modified_at: string;
+  /** Address of the product in each of its languages. */
+  translations: CatalogPublicTranslation[];
+};
 
 /** Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`. */
 export type CatalogStatus = "draft" | "active" | "inactive" | "archived";
@@ -1279,6 +1704,33 @@ export type CatalogStatusChange = {
    * `draft`.
    */
   status: CatalogStatus;
+};
+
+/** A store's choice for a product. */
+export type CatalogStoreOverride = {
+  hidden: boolean;
+  org_id: string;
+  product_id: string;
+  updated_at: string;
+};
+
+/** Whether a store shows a product. */
+export type CatalogStoreOverrideInput = {
+  /**
+   * `true`: the store's website (and the websites of units below it) does not show the
+   * product; `false`: shows it again.
+   */
+  hidden: boolean;
+};
+
+/** A stored attribute value (decimals are stored scaled by the attribute's `scale`). */
+export type CatalogStoredAttributeValue = {
+  attribute_id: string;
+  option_id?: string | null;
+  value_boolean?: boolean | null;
+  value_date?: string | null;
+  value_integer?: number | null;
+  value_text?: string | null;
 };
 
 /** Texts of a product in one language. */
@@ -1308,8 +1760,23 @@ export type CatalogTranslation = {
   meta_description?: string | null;
   meta_title?: string | null;
   name: string;
+  /**
+   * Public address of the product in this language, computed by the server:
+   * `/<AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX>/<slug>`, without a language prefix.
+   */
+  path: string;
   short_description: string;
   slug: string;
+};
+
+/** Changes to an attribute; its code and type cannot change. */
+export type CatalogUpdateAttribute = {
+  filterable?: boolean | null;
+  legal_basis?: string | null;
+  names?: {
+    [key: string]: string;
+  } | null;
+  unit?: string | null;
 };
 
 /** Changes to a category. Omitted fields stay as they are. */
@@ -3622,6 +4089,26 @@ export type CreateSiteMenuRequest = {
   org_id?: string | null;
 };
 
+/** A new routing rule. */
+export type CreateSupportRoutingRuleRequest = {
+  /** Only tickets of this category; omitted: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  org_id: string;
+  /** Order among the unit's rules (lower first). */
+  position?: number;
+  /** A team of the unit or of a unit above it. */
+  team_id: string;
+};
+
+/** A new team. */
+export type CreateSupportTeamRequest = {
+  /** 1 to 100 characters; unique in the unit. */
+  name: string;
+  /** Unit of the team. */
+  org_id: string;
+};
+
 /** A ticket staff open for a customer (a phone call, a visit…). */
 export type CreateSupportTicketRequest = {
   /** What the customer asked. */
@@ -3790,6 +4277,7 @@ export type CustomerBookingRequest = {
   note?: string;
   /** How to pay the deposit, e.g. `card`, `wallet` or `vietqr`; default `card`. */
   payment_method?: string | null;
+  phone_code?: BookingPhoneCode | null;
   /** A staff member (or court, room…) from the availability; omitted: the first one free. */
   resource_id?: string | null;
   /** Page of the shop to open after paying the deposit. */
@@ -4089,6 +4577,17 @@ export type Data_BookingAvailability = {
 };
 
 /** Envelope of a single result. */
+export type Data_BookingCodeSent = {
+  /** A code was sent. */
+  data: {
+    /** Send it back with the code. */
+    challenge_id: string;
+    /** The code works until this moment, once. */
+    expires_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BookingCreated = {
   /** A booking just made, with the deposit checkout when one is due. */
   data: {
@@ -4288,6 +4787,29 @@ export type Data_CatalogAddedPrices = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogAttribute = {
+  /** An attribute products can have (origin, material, size of the box…). */
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogCategory = {
   /** A category of the tenant's tree. */
   data: {
@@ -4304,6 +4826,46 @@ export type Data_CatalogCategory = {
     updated_at: string;
     /** Shown on the storefront. */
     visible: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogCategoryRestrictions = {
+  /** The restricted-goods rules linked to a category. */
+  data: {
+    /** Rule codes of `GET /restriction-rules`. */
+    rule_codes: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPriceChange = {
+  /** A bulk price change. */
+  data: {
+    /** Variants changed (known after the preview). */
+    affected: number;
+    approved_by?: string | null;
+    created_at: string;
+    created_by?: string | null;
+    filter: CatalogPriceChangeFilter;
+    id: string;
+    /** `set`, `percent` or `amount`. */
+    operation: string;
+    /**
+     * The preview: `samples` (up to 20 rows of `variant_id`, `before`, `after`), `floor_violations`,
+     * `blocked` and `warned` counts. Prices below a `block` floor are not written.
+     */
+    preview?: Record<string, unknown> | null;
+    price_list_id: string;
+    rounding_rule_id?: string | null;
+    /** `draft`, `previewed`, `approved`, `applied` or `cancelled`. */
+    status: string;
+    updated_at: string;
+    valid_from: string;
+    /** End of a temporary change; the earlier prices apply again after it. */
+    valid_to?: string | null;
+    /** New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed). */
+    value: number;
   };
 };
 
@@ -4329,6 +4891,9 @@ export type Data_CatalogPriceList = {
   /** A price list. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -4339,6 +4904,8 @@ export type Data_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -4347,6 +4914,7 @@ export type Data_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   };
@@ -4390,6 +4958,55 @@ export type Data_CatalogProduct = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogProductDocument = {
+  /** A licence or certificate of a conditional product. */
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicCategory = {
+  /** A category, in the language asked. */
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicProduct = {
+  /** A product page. */
+  data: CatalogPublicProductCard & {
+    attributes: CatalogPublicAttribute[];
+    categories: CatalogPublicCategory[];
+    description: string;
+    images: CatalogPublicImage[];
+    meta_description?: string | null;
+    meta_title?: string | null;
+    options: CatalogPublicOption[];
+    /** Other languages of the product, for `hreflang`. */
+    translations: CatalogPublicTranslation[];
+    variants: CatalogPublicVariant[];
+    warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogResolvedPrice = {
   /** The price of a variant and why. */
   data: {
@@ -4397,6 +5014,34 @@ export type Data_CatalogResolvedPrice = {
     candidates: CatalogPriceList[];
     price?: CatalogPriceSnapshot | null;
     variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogRoundingRule = {
+  /**
+   * A rule that rounds prices to nice values: multiples of `step_minor`, or `k × step_minor +
+   * ending_minor` (step 10000 and ending 9000 give 129000, 199000…).
+   */
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogStoreOverride = {
+  /** A store's choice for a product. */
+  data: {
+    hidden: boolean;
+    org_id: string;
+    product_id: string;
+    updated_at: string;
   };
 };
 
@@ -6071,6 +6716,119 @@ export type Data_Ingested = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryAdjustment = {
+  /** A stock adjustment with the ledger lines it wrote. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    movements: InventoryMovement[];
+    org_id: string;
+    reference: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryCount = {
+  /** A stock count of one warehouse. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryLevel = {
+  /** The stock of one variant in one warehouse or store. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryReservation = {
+  /** Stock held for one order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventorySources = {
+  /** Warehouses serving a store. */
+  data: {
+    sources: InventorySource[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryStoreSettings = {
+  /** How a store picks warehouses. */
+  data: {
+    /**
+     * Split an order over several warehouses when no single one has every line. Default
+     * `false`: one order, one warehouse.
+     */
+    allow_split: boolean;
+    /** Try warehouses in the buyer's province first (province from the units' public profile). */
+    prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryTransfer = {
+  /** A stock transfer between two warehouses. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InvitationResponse = {
   /** An invitation to work in this tenant. */
   data: {
@@ -7326,6 +8084,15 @@ export type Data_NotificationWebPushKey = {
 };
 
 /** Envelope of a single result. */
+export type Data_OpsBacklog = {
+  /** Backlogs of every database this server handles. */
+  data: {
+    checked_at: string;
+    databases: DatabaseBacklog[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -7649,6 +8416,119 @@ export type Data_PreviewToken = {
     expires_at: string;
     /** Give it to `GET /api/v1/content/public/preview?token=…`. */
     token: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsActivated = {
+  /** A promotion just turned on, with the warnings of its checks. */
+  data: {
+    promotion: PromotionsPromotion;
+    /** Checks that did not pass but do not block (e.g. conflicts). */
+    warnings: PromotionsActivationCheck[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsActivationChecks = {
+  /** Results of the checks made before turning a promotion on. */
+  data: {
+    /** Every check; errors (`severity = error`, `ok = false`) block turning on. */
+    checks: PromotionsActivationCheck[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsCodesAdded = {
+  /** Codes added: listed when created at once, counted when generated in the background. */
+  data: {
+    codes: PromotionsCode[];
+    /** Codes being generated in the background (`promotions.generate_codes`). */
+    queued: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsEvaluation = {
+  /** Promotions computed for a cart; orders store it as a snapshot. */
+  data: {
+    applied: PromotionsAppliedPromotion[];
+    clawback_on_return: PromotionsClawbackMode;
+    currency: Currency;
+    fingerprint: string;
+    gift_choices: PromotionsGiftChoice[];
+    gifts: PromotionsGiftLine[];
+    lines: PromotionsLineDiscount[];
+    rejected_codes: PromotionsRejectedCode[];
+    shipping: PromotionsShippingDiscount[];
+    shipping_discount: Money;
+    total_discount: Money;
+    withheld: PromotionsWithheldDiscount[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsNotice = {
+  /** A notice of a promotion to one authority. */
+  data: {
+    authority_code: string;
+    reference?: string | null;
+    status: string;
+    submitted_at?: string | null;
+    submitted_by?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsPromotion = {
+  /** A promotion with its rule, counters and texts. */
+  data: {
+    activated_at?: string | null;
+    budget_used?: Money | null;
+    created_at: string;
+    flash_items: PromotionsFlashItem[];
+    id: string;
+    /** Vouchers given out. */
+    issued_count: number;
+    /** The rule as given when created (and changed since). */
+    rule: PromotionsPromotionInput;
+    status: PromotionsStatus;
+    targets: PromotionsTargetInput[];
+    texts: PromotionsText[];
+    updated_at: string;
+    /** Uses held or confirmed. */
+    usage_count: number;
+    /** Version of the audit trail (0 before it is turned on). */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsRedemption = {
+  /** The promotion usage held for an order. */
+  data: {
+    evaluation: PromotionsEvaluation;
+    expires_at?: string | null;
+    id: string;
+    order_id: string;
+    status: PromotionsRedemptionStatus;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsVoucher = {
+  /** A one-time voucher in a user's wallet. */
+  data: {
+    expires_at: string;
+    holder_user_id?: string | null;
+    id: string;
+    issued_at: string;
+    promotion_id: string;
+    source: PromotionsVoucherSource;
+    source_ref: string;
+    status: PromotionsVoucherStatus;
+    used_order_id?: string | null;
+    valid_from: string;
   };
 };
 
@@ -7991,6 +8871,18 @@ export type Data_RelocationPlan = {
 };
 
 /** Envelope of a single result. */
+export type Data_RenderedSupportMacro = {
+  /** A saved reply filled in for one ticket. */
+  data: {
+    /**
+     * Text in the customer's language with the variables filled in; edit it, then send it as a
+     * message.
+     */
+    body: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Resolution = {
   /** What lives at an address. */
   data: {
@@ -8270,6 +9162,179 @@ export type Data_SetupView = {
 };
 
 /** Envelope of a single result. */
+export type Data_ShippingAddress = {
+  /** An address of a buyer's address book. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCarrierAccount = {
+  /** A carrier account. Credentials are never returned: only the names of the fields set. */
+  data: {
+    active: boolean;
+    carrier_code: string;
+    check_error_code?: string | null;
+    /**
+     * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+     * carrier refused for bad credentials.
+     */
+    check_status: string;
+    checked_at?: string | null;
+    credential_fields: string[];
+    id: string;
+    name: string;
+    org_id: string;
+    sandbox: boolean;
+    settings: unknown;
+    updated_at: string;
+    /**
+     * Only in the answer of the create call: the address the carrier posts status updates to.
+     * Keep it; it cannot be shown again.
+     */
+    webhook_path?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodDiscrepancy = {
+  /** A difference between a carrier statement and the shipments. */
+  data: {
+    created_at: string;
+    /** Amount of the shipment request. */
+    expected: Money;
+    id: string;
+    /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+    kind: string;
+    /** Amount on the statement. */
+    reported: Money;
+    resolution_code?: string | null;
+    resolution_note: string;
+    resolved_at?: string | null;
+    resolved_by?: string | null;
+    shipment_id?: string | null;
+    statement_line_id?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodStatement = {
+  /** A carrier statement. */
+  data: {
+    carrier_account_id: string;
+    id: string;
+    imported_at: string;
+    net_paid: Money;
+    period_from: string;
+    period_to: string;
+    reference: string;
+    /** `reconciled` or `has_mismatch`. */
+    status: string;
+    total_cod: Money;
+    total_fee: Money;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingCodStatementDetail = {
+  /** A carrier statement with its lines. */
+  data: ShippingCodStatement & {
+    lines: ShippingCodStatementLine[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingMethod = {
+  /** A shipping method. */
+  data: {
+    active: boolean;
+    auto_book: boolean;
+    calendar_id?: string | null;
+    carrier_account_id?: string | null;
+    code: string;
+    countries: string[];
+    currency: string;
+    cutoff_minute?: number | null;
+    default_item_weight_grams?: number | null;
+    estimated_days?: ShippingDays | null;
+    free_over?: Money | null;
+    handling_fee: Money;
+    hold_days?: number | null;
+    id: string;
+    kind: ShippingMethodKind;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    pickup_points: ShippingPickupPoint[];
+    position: number;
+    /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+    rates: ShippingRateTier[];
+    same_day: boolean;
+    service_code?: string | null;
+    tax_category: string;
+    updated_at: string;
+    volumetric_divisor: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingQuote = {
+  /** Shipping options of a cart. */
+  data: {
+    /** Cheapest first; empty when nothing in the cart needs shipping. */
+    options: ShippingOption[];
+    unavailable: ShippingUnavailableMethod[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingShipment = {
+  /** A shipment with its parcels, items and tracking history. */
+  data: ShippingShipmentSummary & {
+    events: ShippingTrackingEvent[];
+    items: ShippingShipmentItem[];
+    parcels: ShippingParcel[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingWebhookReceipt = {
+  /** Receipt of a carrier webhook. */
+  data: {
+    id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ShippingZone = {
+  /** A shipping zone. */
+  data: {
+    id: string;
+    name: string;
+    org_id: string;
+    regions: ShippingRegion[];
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SignupAccepted = {
   /** The answer to a sign-up: always the same. */
   data: {
@@ -8515,6 +9580,28 @@ export type Data_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportMacro = {
+  /** A saved reply staff insert into answers. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportMessage = {
   /**
    * One message of a ticket. Messages are never edited; a hidden message keeps its place with
@@ -8551,6 +9638,85 @@ export type Data_SupportOpenedTicket = {
   data: SupportTicket & {
     /** Guests only, shown only here: send it as `token` to the `/public/tickets/{id}` endpoints. */
     access_token?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportPolicyInForce = {
+  /** The policy in force at a unit, and where it comes from. */
+  data: SupportPolicy & {
+    /** The unit whose own policy applies; empty: the defaults. */
+    defined_at?: string | null;
+    /** The unit asked about. */
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportReport = {
+  /** Support figures for tickets created in a period. */
+  data: {
+    /** `breached` per 10000 tickets. */
+    breach_rate_bp: number;
+    /** Of those, that missed a response-time target. */
+    breached: number;
+    /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+    median_first_response_minutes?: number | null;
+    /** Median minutes from opening to solved (wall clock), of solved tickets. */
+    median_resolve_minutes?: number | null;
+    /** Average rating × 100 (e.g. 450 = 4.5). */
+    satisfaction_avg_x100?: number | null;
+    /** Ratings given (1 to 5). */
+    satisfaction_count: number;
+    /** Of those, solved or closed. */
+    solved: number;
+    /** Tickets created in the period. */
+    tickets: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportRoutingRule = {
+  /** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeam = {
+  /** A support team of an organization unit; it covers tickets of the unit and the units below. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamDetail = {
+  /** A team with its members. */
+  data: SupportTeam & {
+    members: SupportTeamMember[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportTeamMember = {
+  /** A member of a support team. */
+  data: {
+    /** Takes new tickets in round-robin assignment. */
+    accepting: boolean;
+    last_assigned_at?: string | null;
+    user_id: string;
   };
 };
 
@@ -8599,6 +9765,8 @@ export type Data_SupportTicket = {
 export type Data_SupportTicketDetail = {
   /** A ticket with its messages, oldest first. */
   data: SupportTicket & {
+    /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+    links: string[];
     messages: SupportMessage[];
   };
 };
@@ -9333,6 +10501,28 @@ export type Data_Vec_CanAnswer = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogAttribute = {
+  data: {
+    code: string;
+    /** `text`, `integer`, `decimal`, `boolean`, `date`, `option` or `options`. */
+    data_type: string;
+    /** Offered as a storefront filter. */
+    filterable: boolean;
+    id: string;
+    /** Law the attribute comes from, for legally required label contents. */
+    legal_basis?: string | null;
+    names: {
+      [key: string]: string;
+    };
+    options: CatalogAttributeOption[];
+    /** Decimal places of a `decimal` attribute. */
+    scale: number;
+    unit?: string | null;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogCategory = {
   data: {
     /** 0 for a top category. */
@@ -9352,11 +10542,114 @@ export type Data_Vec_CatalogCategory = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogCategoryAttribute = {
+  data: {
+    /** Also for products of the subcategories. */
+    applies_to_descendants?: boolean;
+    attribute_id: string;
+    /** The rule applies from this day (e.g. when a new labelling rule takes effect). */
+    effective_from: string;
+    /** The rule stops applying on this day. */
+    effective_to?: string | null;
+    /** Law the rule comes from. */
+    legal_basis?: string | null;
+    /** Products in the category cannot go on sale without a value. */
+    required?: boolean;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
     variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductCount = {
+  data: {
+    count: number;
+    /**
+     * A status (`draft`, `active`, `inactive`, `archived`) or a readiness (`ready`,
+     * `missing_attributes`, `missing_documents`, `restricted`).
+     */
+    key: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogProductDocument = {
+  data: {
+    created_at: string;
+    document_type: string;
+    /** The document is valid until the end of this day; `null`: no end. */
+    expires_on?: string | null;
+    /** Key of the scanned file in storage. */
+    file_key?: string | null;
+    id: string;
+    issued_by: string;
+    issued_on: string;
+    number: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogPublicCategory = {
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRestrictionRule = {
+  data: {
+    code: string;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** `prohibited` or `conditional`. */
+    level: string;
+    names: {
+      [key: string]: string;
+    };
+    pack_version: string;
+    /** Document types a conditional product needs, valid on the day. */
+    required_documents: string[];
+    source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogRoundingRule = {
+  data: {
+    created_at: string;
+    ending_minor?: number | null;
+    id: string;
+    /** `up`, `down` or `nearest`. */
+    mode: string;
+    name: string;
+    step_minor: number;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogStoredAttributeValue = {
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
   }[];
 };
 
@@ -10173,6 +11466,56 @@ export type Data_Vec_PlanResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotionsLegalLimit = {
+  data: {
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** Most discount, in basis points of the price just before the promotion. */
+    max_bp: number;
+    max_days_per_program?: number | null;
+    max_days_per_year?: number | null;
+    /** Notes, including "to be checked against the original text". */
+    note: string;
+    /** `regular` or `national_focus`. */
+    program_kind: string;
+    /** `price_reduction`, `gift_value`, `free_shipping`. */
+    promotion_kind: string;
+    source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsNoticeRule = {
+  data: {
+    /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
+    authority: string;
+    days_before: number;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    note: string;
+    notice_required: boolean;
+    promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsVersion = {
+  data: {
+    /** `activated`, `updated`, `translation`, `paused`, `ended`… */
+    action: string;
+    changed_at: string;
+    changed_by?: string | null;
+    /** The promotion as it was after the change. */
+    snapshot: Record<string, unknown>;
+    version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ProviderResponse = {
   data: {
     /** Whether someone without an account may get one by signing in. */
@@ -10561,6 +11904,11 @@ export type Data_Vec_SettingResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_String = {
+  data: string[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_SupportGrantResponse = {
   data: {
     /**
@@ -10592,6 +11940,41 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportMacro = {
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportRoutingRule = {
+  data: {
+    /** Only tickets of this category; empty: any. */
+    category?: string | null;
+    channel?: SupportChannel | null;
+    id: string;
+    org_id: string;
+    /** Rules of one unit are tried in this order; rules of nearer units first. */
+    position: number;
+    team_id: string;
   }[];
 };
 
@@ -10904,6 +12287,18 @@ export type Data_WorkView = {
     /** Most urgent first (`blocking`, `attention`, `info`), then soonest due. */
     items: WorkItemView[];
   };
+};
+
+/** Backlog of one database. */
+export type DatabaseBacklog = {
+  /** `main`, or the placement of tenants with their own database. */
+  database: string;
+  /** When the newest successful scheduled backup of this database finished; `null` when none. */
+  last_backup_at?: string | null;
+  /** Modules with a job queue or events, in start order of their names. */
+  modules: ModuleQueue[];
+  /** The `read` and `write` connection pools. */
+  pools: Pool[];
 };
 
 /** One day of the overview. */
@@ -11305,6 +12700,13 @@ export type ErasedResponse = {
   deleted: number;
 };
 
+/** Where to hand the ticket over. */
+export type EscalateSupportTicketRequest = {
+  /** The complaint in the customer's words (10 to 5000 characters); omitted: their first message. */
+  note?: string | null;
+  to: SupportEscalation;
+};
+
 /** A batch of events from a page. */
 export type EventBatch = {
   /**
@@ -11625,6 +13027,14 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A guest cancels a booking. */
+export type GuestCancelRequest = {
+  /** A fresh code sent to the phone number of the booking. */
+  phone_code: BookingPhoneCode;
+  /** Up to 200 characters. */
+  reason?: string | null;
+};
+
 /** Health of the service. */
 export type Health = {
   /** Always `ok`; a service that is not healthy answers with an error instead. */
@@ -11706,6 +13116,27 @@ export type ImportRequest = {
   subscribers: ImportPersonRequest[];
 };
 
+/**
+ * A carrier statement to import: either the CSV file (columns `tracking_number`, `cod_amount`,
+ * `fee` in minor units) or `fetch: true` to read it from the carrier's API.
+ */
+export type ImportShippingCodStatement = {
+  carrier_account_id: string;
+  /** The CSV text. */
+  csv?: string | null;
+  /** ISO 4217 code of the amounts in the CSV (default `VND`). */
+  currency?: string | null;
+  /** Read the statement from the carrier's API instead. */
+  fetch?: boolean;
+  period_from: string;
+  period_to: string;
+  /**
+   * The carrier's reference of the statement; importing it again with the same content does
+   * nothing.
+   */
+  reference?: string | null;
+};
+
 /** A menu of the import, by key and language. */
 export type ImportedMenu = {
   key: string;
@@ -11742,6 +13173,267 @@ export type Ingested = {
   accepted: number;
   /** Events dropped (unknown type, wrong props, bot, foreign page, too many). */
   dropped: number;
+};
+
+/** A stock adjustment with the ledger lines it wrote. */
+export type InventoryAdjustment = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  movements: InventoryMovement[];
+  org_id: string;
+  reference: string;
+};
+
+/** One line of a stock adjustment. */
+export type InventoryAdjustmentLine = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Units to add (positive) or remove (negative); not 0. */
+  quantity: number;
+  /**
+   * Code from the reason list `inventory.adjustment` (see
+   * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
+   */
+  reason_code?: string | null;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock adjustment to make in one warehouse. */
+export type InventoryAdjustmentRequest = {
+  /** 1 to 500 lines. */
+  lines: InventoryAdjustmentLine[];
+  /** The warehouse or store. */
+  org_id: string;
+  /**
+   * Your id of this adjustment (1 to 100 visible ASCII characters). Sending the same
+   * reference and content again returns the adjustment already made.
+   */
+  reference: string;
+};
+
+/** A stock count of one warehouse. */
+export type InventoryCount = {
+  applied_at?: string | null;
+  created_at: string;
+  id: string;
+  lines: InventoryCountLine[];
+  note: string;
+  /** Document number, e.g. `KK-2026-000001`. */
+  number: string;
+  org_id: string;
+  /** `open`, `applied` or `cancelled`. */
+  status: string;
+};
+
+/** Counted quantities as CSV text. */
+export type InventoryCountImportRequest = {
+  /**
+   * CSV with a header row and the columns `sku` (or barcode), `counted` and optionally
+   * `reason_code`; up to 5000 rows.
+   */
+  csv: string;
+};
+
+/** One counted line of a stock count. */
+export type InventoryCountLine = {
+  counted: number;
+  counted_at: string;
+  /** On hand when this line was counted; the difference applied is `counted − expected_at_count`. */
+  expected_at_count: number;
+  reason_code?: string | null;
+  variant_id: string;
+};
+
+/** Counted quantities to record (replacing earlier counts of the same variants). */
+export type InventoryCountLinesRequest = {
+  /** 1 to 5000 lines. */
+  lines: InventoryCountedLine[];
+};
+
+/** A stock count to open. */
+export type InventoryCountRequest = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** The warehouse or store counted. */
+  org_id: string;
+};
+
+/** One counted quantity. */
+export type InventoryCountedLine = {
+  /** Units counted, 0 to 1 000 000. */
+  counted: number;
+  /** Reason for a difference, from the list `inventory.adjustment`; default `count_variance`. */
+  reason_code?: string | null;
+  variant_id: string;
+};
+
+/** The stock of one variant in one warehouse or store. */
+export type InventoryLevel = {
+  /**
+   * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+   * may be sold out of stock is oversold.
+   */
+  available: number;
+  average_cost?: Money | null;
+  id: string;
+  /** Units on the way (transfers in transit, purchase orders). */
+  incoming: number;
+  /** Units physically in the warehouse: the sum of the movement ledger. */
+  on_hand: number;
+  /** The warehouse or store (organization unit). */
+  org_id: string;
+  /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+  reorder_point?: number | null;
+  /** Units held for orders not shipped yet. */
+  reserved: number;
+  updated_at: string;
+  variant_id: string;
+};
+
+/** Settings of a stock level. */
+export type InventoryLevelUpdate = {
+  /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
+  reorder_point?: number | null;
+};
+
+/** One line of the stock movement ledger. Lines are only ever added. */
+export type InventoryMovement = {
+  actor_id?: string | null;
+  created_at: string;
+  id: string;
+  /**
+   * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+   * `expiry` or `supplier_return`.
+   */
+  kind: string;
+  level_id: string;
+  lot_id?: string | null;
+  note: string;
+  org_id: string;
+  /** Signed: positive came in, negative went out. */
+  quantity: number;
+  /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+  reason_code?: string | null;
+  source_id: string;
+  /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+  source_type: string;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A variant and a quantity. */
+export type InventoryQuantityLine = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  variant_id: string;
+};
+
+/** Units received now; no lines receives everything still in transit. */
+export type InventoryReceiveRequest = {
+  lines?: InventoryQuantityLine[];
+};
+
+/** Stock held for one order. */
+export type InventoryReservation = {
+  expires_at?: string | null;
+  id: string;
+  lines: InventoryReservedLine[];
+  order_id: string;
+  /** The store or channel that sold. */
+  selling_org_id: string;
+  /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+  status: string;
+};
+
+/** Part of an order line reserved in one warehouse. */
+export type InventoryReservedLine = {
+  /** Reserved beyond the available stock (the product may be sold out of stock). */
+  backordered: boolean;
+  /** The bundle variant of the order line, when it is a bundle. */
+  bundle_variant_id?: string | null;
+  fulfilled_quantity: number;
+  /** The order's line key. */
+  line_key: string;
+  /** Pre-order line. */
+  preordered: boolean;
+  quantity: number;
+  released_quantity: number;
+  /** The variant taken from stock (a component when the line is a bundle). */
+  variant_id: string;
+  warehouse_org_id: string;
+};
+
+/** One warehouse serving a store or channel. */
+export type InventorySource = {
+  /** `false` keeps the row but stops using the warehouse. */
+  active: boolean;
+  /** Lower is tried first. */
+  priority: number;
+  /** The warehouse or store whose stock is sold. */
+  warehouse_org_id: string;
+};
+
+/** Warehouses serving a store. */
+export type InventorySources = {
+  sources: InventorySource[];
+};
+
+/** The warehouses serving a store, replacing the current list. */
+export type InventorySourcesRequest = {
+  /** Up to 100 warehouses; empty: the store sells only its own stock. */
+  sources: InventorySource[];
+};
+
+/** How a store picks warehouses. */
+export type InventoryStoreSettings = {
+  /**
+   * Split an order over several warehouses when no single one has every line. Default
+   * `false`: one order, one warehouse.
+   */
+  allow_split: boolean;
+  /** Try warehouses in the buyer's province first (province from the units' public profile). */
+  prefer_nearby: boolean;
+};
+
+/** A stock transfer between two warehouses. */
+export type InventoryTransfer = {
+  created_at: string;
+  from_org_id: string;
+  id: string;
+  lines: InventoryTransferLine[];
+  note: string;
+  /** Document number, e.g. `CK-2026-000001`. */
+  number: string;
+  reference?: string | null;
+  shipped_at?: string | null;
+  /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+  status: string;
+  to_org_id: string;
+  updated_at: string;
+};
+
+/** One line of a stock transfer. */
+export type InventoryTransferLine = {
+  quantity: number;
+  received_quantity: number;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock transfer to create (as a draft). */
+export type InventoryTransferRequest = {
+  /** The warehouse the goods leave. */
+  from_org_id: string;
+  /** 1 to 500 lines, one per variant. */
+  lines: InventoryQuantityLine[];
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Your own reference, up to 100 characters. */
+  reference?: string | null;
+  /** The warehouse the goods go to. */
+  to_org_id: string;
 };
 
 /** A new invitation. */
@@ -13611,6 +15303,23 @@ export type ModulePromptArgument = {
   required: boolean;
 };
 
+/** Jobs and events of one module on one database. */
+export type ModuleQueue = {
+  /** Events whose delivery failed for good. */
+  events_dead: number;
+  /** How long the oldest undelivered event has waited, in seconds; 0 when none. */
+  events_oldest_pending_seconds: number;
+  /** Events not delivered yet. */
+  events_pending: number;
+  /** Jobs that failed for good (the dead-letter queue: `autoxide jobs failed`). */
+  jobs_dead: number;
+  /** How long the oldest job that is due has waited, in seconds; 0 when none. */
+  jobs_oldest_pending_seconds: number;
+  /** Jobs not done yet, scheduled ones included. */
+  jobs_pending: number;
+  module: string;
+};
+
 /** An MCP resource: a read-only document an agent reads with `resources/read`. */
 export type ModuleResource = {
   description: string;
@@ -13787,6 +15496,71 @@ export type NewRecordNote = {
   body: string;
   /** Up to 20 users to notify; each must be able to read the record. */
   mentions?: string[];
+};
+
+/** A new address in the address book. */
+export type NewShippingAddress = {
+  address: ShippingPostalAddress;
+  /** Make it the default address. The first address is always the default. */
+  is_default?: boolean;
+  /** Your name for it, e.g. `Home` (up to 100 characters). */
+  label?: string;
+  /** Phone number of the recipient, for the carrier. */
+  phone: string;
+  /** Who receives the parcel (1 to 200 characters). */
+  recipient_name: string;
+};
+
+/** A new carrier account. */
+export type NewShippingCarrierAccount = {
+  /** Code of an installed carrier connector, e.g. `ghn`. */
+  carrier_code: string;
+  /**
+   * Login fields the connector needs (e.g. `token`, `shop_id`, `webhook_secret`). Stored
+   * encrypted; never returned.
+   */
+  credentials: {
+    [key: string]: string;
+  };
+  /** Your name for the account (1 to 200 characters). */
+  name: string;
+  /** Organization unit owning the account; defaults to where you work when that is one unit. */
+  org_id?: string | null;
+  /** Test account of the carrier. */
+  sandbox?: boolean;
+  /** Settings that are not secret (pickup warehouse at the carrier…). */
+  settings?: unknown;
+};
+
+/** A shipment created by staff (e.g. a counter sale delivered later). */
+export type NewShippingShipment = {
+  address: ShippingPostalAddress;
+  buyer_id?: string | null;
+  cod_amount?: Money | null;
+  declared_value: Money;
+  direction?: ShippingDirection;
+  items: ShippingRequestItem[];
+  method_id: string;
+  note?: string;
+  order_id: string;
+  order_number: string;
+  /** The selling store. */
+  org_id: string;
+  /** The warehouse shipping (default: the store). */
+  origin_org_id?: string | null;
+  recipient_name: string;
+  recipient_phone: string;
+  /** Retry-safe key of this delivery within the order. */
+  request_key: string;
+};
+
+/** A new shipping zone. */
+export type NewShippingZone = {
+  /** 1 to 200 characters, e.g. `Inner Hanoi`. */
+  name: string;
+  /** Organization unit owning the zone; defaults to where you work when that is one unit. */
+  org_id?: string | null;
+  regions?: ShippingRegion[];
 };
 
 /** A tag to create. */
@@ -14324,6 +16098,12 @@ export type OpenSupportTicketRequest = {
   trap?: string | null;
 };
 
+/** Backlogs of every database this server handles. */
+export type OpsBacklog = {
+  checked_at: string;
+  databases: DatabaseBacklog[];
+};
+
 /** An override to set; it replaces one of the same kind and key. */
 export type OverrideRequest = {
   /** Required with `module` / `feature`. */
@@ -14673,6 +16453,9 @@ export type Page_CatalogPriceList = {
   /** The items of this page, in the requested order. */
   data: {
     active: boolean;
+    /** Adjustment of a derived list, basis points. */
+    adjust_bp: number;
+    adjust_minor?: number | null;
     /** `consumer` or `business`. */
     audience: string;
     /** Only for this sales channel (step 48). */
@@ -14683,6 +16466,8 @@ export type Page_CatalogPriceList = {
     currency: string;
     /** Only for this customer group. */
     customer_group?: string | null;
+    /** Source list of a derived list. */
+    derived_from?: string | null;
     id: string;
     /** Only for this market (step 63). */
     market?: string | null;
@@ -14691,6 +16476,7 @@ export type Page_CatalogPriceList = {
     org_id: string;
     /** Higher wins among lists that tie on unit and filters. */
     priority: number;
+    rounding_rule_id?: string | null;
     tax_inclusive: boolean;
     updated_at: string;
   }[];
@@ -14712,6 +16498,55 @@ export type Page_CatalogProductListItem = {
     status: CatalogStatus;
     updated_at: string;
     variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogPublicProductCard = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+     * Intelligence 134/2025/QH15).
+     */
+    ai_assisted: boolean;
+    compare_at?: Money | null;
+    id: string;
+    image?: CatalogPublicImage | null;
+    /** `physical`, `digital`, `service` or `bundle`. */
+    kind: string;
+    name: string;
+    /** Address of the product page on the website, without language prefix. */
+    path: string;
+    /** Lowest current price over the variants (no customer group, no code needed). */
+    price_from: Money;
+    /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+    price_to: Money;
+    /** Average rating out of 5 (two decimals); `null` before the first rating. */
+    rating?: number | null;
+    rating_count: number;
+    /** When `sale_price` ends; `null`: no end set. */
+    sale_ends_at?: string | null;
+    sale_price?: Money | null;
+    seller: CatalogPublicSeller;
+    short_description: string;
+    slug: string;
+    /** Number of variants on sale. */
+    variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogSitemapItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    /** Last change of the product, its texts or its price on this website. */
+    modified_at: string;
+    /** Address of the product in each of its languages. */
+    translations: CatalogPublicTranslation[];
   }[];
   pagination: Pagination;
 };
@@ -15431,6 +17266,117 @@ export type Page_FormResponse = {
      * the version it was sent with, and is shown with that version's labels.
      */
     version: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryCount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryLevel = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Units that can still be sold: `on_hand` minus `reserved`. Negative when a product that
+     * may be sold out of stock is oversold.
+     */
+    available: number;
+    average_cost?: Money | null;
+    id: string;
+    /** Units on the way (transfers in transit, purchase orders). */
+    incoming: number;
+    /** Units physically in the warehouse: the sum of the movement ledger. */
+    on_hand: number;
+    /** The warehouse or store (organization unit). */
+    org_id: string;
+    /** `inventory.low_stock` fires when `available` falls to this or below; `null`: never. */
+    reorder_point?: number | null;
+    /** Units held for orders not shipped yet. */
+    reserved: number;
+    updated_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryMovement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actor_id?: string | null;
+    created_at: string;
+    id: string;
+    /**
+     * `receipt`, `sale`, `return`, `adjustment`, `count`, `transfer_out`, `transfer_in`,
+     * `expiry` or `supplier_return`.
+     */
+    kind: string;
+    level_id: string;
+    lot_id?: string | null;
+    note: string;
+    org_id: string;
+    /** Signed: positive came in, negative went out. */
+    quantity: number;
+    /** Code from the reason list `inventory.adjustment`, for adjustments and counts. */
+    reason_code?: string | null;
+    source_id: string;
+    /** What caused the line: `adjustment`, `reservation`, `transfer`, `receipt`… */
+    source_type: string;
+    unit_cost?: Money | null;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryReservation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_at?: string | null;
+    id: string;
+    lines: InventoryReservedLine[];
+    order_id: string;
+    /** The store or channel that sold. */
+    selling_org_id: string;
+    /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryTransfer = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -16284,6 +18230,70 @@ export type Page_PlanSubscription = {
 };
 
 /** One page of a list. */
+export type Page_PromotionsCode = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    created_at: string;
+    id: string;
+    purpose: PromotionsPurpose;
+    usage_count: number;
+    usage_limit?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsPromotionListItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    ends_at: string;
+    id: string;
+    kind: PromotionsKind;
+    org_id: string;
+    starts_at: string;
+    status: PromotionsStatus;
+    title: string;
+    usage_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsRedemptionItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    currency: string;
+    expires_at?: string | null;
+    id: string;
+    order_id: string;
+    org_id: string;
+    status: string;
+    total_discount_minor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsVoucher = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_at: string;
+    holder_user_id?: string | null;
+    id: string;
+    issued_at: string;
+    promotion_id: string;
+    source: PromotionsVoucherSource;
+    source_ref: string;
+    status: PromotionsVoucherStatus;
+    used_order_id?: string | null;
+    valid_from: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ProvisioningResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -16709,6 +18719,182 @@ export type Page_SessionResponse = {
 };
 
 /** One page of a list. */
+export type Page_ShippingAddress = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The address, with the names of the province and commune when it was saved. Outside
+     * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+     * `commune_code` is empty.
+     */
+    address: Address;
+    buyer_id: string;
+    id: string;
+    is_default: boolean;
+    label: string;
+    phone: string;
+    postal_code?: string | null;
+    recipient_name: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCarrierAccount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    carrier_code: string;
+    check_error_code?: string | null;
+    /**
+     * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+     * carrier refused for bad credentials.
+     */
+    check_status: string;
+    checked_at?: string | null;
+    credential_fields: string[];
+    id: string;
+    name: string;
+    org_id: string;
+    sandbox: boolean;
+    settings: unknown;
+    updated_at: string;
+    /**
+     * Only in the answer of the create call: the address the carrier posts status updates to.
+     * Keep it; it cannot be shown again.
+     */
+    webhook_path?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCodDiscrepancy = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** Amount of the shipment request. */
+    expected: Money;
+    id: string;
+    /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+    kind: string;
+    /** Amount on the statement. */
+    reported: Money;
+    resolution_code?: string | null;
+    resolution_note: string;
+    resolved_at?: string | null;
+    resolved_by?: string | null;
+    shipment_id?: string | null;
+    statement_line_id?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingCodStatement = {
+  /** The items of this page, in the requested order. */
+  data: {
+    carrier_account_id: string;
+    id: string;
+    imported_at: string;
+    net_paid: Money;
+    period_from: string;
+    period_to: string;
+    reference: string;
+    /** `reconciled` or `has_mismatch`. */
+    status: string;
+    total_cod: Money;
+    total_fee: Money;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingMethod = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    auto_book: boolean;
+    calendar_id?: string | null;
+    carrier_account_id?: string | null;
+    code: string;
+    countries: string[];
+    currency: string;
+    cutoff_minute?: number | null;
+    default_item_weight_grams?: number | null;
+    estimated_days?: ShippingDays | null;
+    free_over?: Money | null;
+    handling_fee: Money;
+    hold_days?: number | null;
+    id: string;
+    kind: ShippingMethodKind;
+    names: {
+      [key: string]: string;
+    };
+    org_id: string;
+    pickup_points: ShippingPickupPoint[];
+    position: number;
+    /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+    rates: ShippingRateTier[];
+    same_day: boolean;
+    service_code?: string | null;
+    tax_category: string;
+    updated_at: string;
+    volumetric_divisor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingShipmentSummary = {
+  /** The items of this page, in the requested order. */
+  data: {
+    actual_fee?: Money | null;
+    address: Address;
+    carrier_code?: string | null;
+    cod_amount?: Money | null;
+    /** `none`, `pending`, `collected`, `settled` or `mismatch`. */
+    cod_status: string;
+    created_at: string;
+    declared_value: Money;
+    direction: ShippingDirection;
+    id: string;
+    /** Last refusal of the carrier when booking (`shipping.carrier_error`…). */
+    last_error_code?: string | null;
+    method_id: string;
+    order_id: string;
+    order_number: string;
+    org_id: string;
+    origin_org_id: string;
+    quoted_fee?: Money | null;
+    recipient_name: string;
+    recipient_phone: string;
+    request_key: string;
+    service_code?: string | null;
+    status: ShippingStatus;
+    status_at: string;
+    tracking_number?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ShippingZone = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    name: string;
+    org_id: string;
+    regions: ShippingRegion[];
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SignupResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -16860,6 +19046,18 @@ export type Page_SubscriberResponse = {
      */
     suppressed?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SupportTeam = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    name: string;
+    org_id: string;
   }[];
   pagination: Pagination;
 };
@@ -17504,6 +19702,15 @@ export type PlatformNoticeRequest = {
   title: string;
 };
 
+/** Connections of one pool. */
+export type Pool = {
+  idle: number;
+  in_use: number;
+  max: number;
+  /** `read` or `write`. */
+  pool: string;
+};
+
 /** A comment just posted, for its author. */
 export type PostedComment = PublicComment & {
   /**
@@ -17686,6 +19893,600 @@ export type ProfileRequest = {
    * moderators; no two users share a name.
    */
   display_name: string;
+};
+
+/** A promotion just turned on, with the warnings of its checks. */
+export type PromotionsActivated = {
+  promotion: PromotionsPromotion;
+  /** Checks that did not pass but do not block (e.g. conflicts). */
+  warnings: PromotionsActivationCheck[];
+};
+
+/** One check made before a promotion is turned on. */
+export type PromotionsActivationCheck = {
+  /**
+   * What was checked, or the error code when it failed: `legal_limit` /
+   * `promotions.exceeds_legal_limit`, `duration` / `promotions.exceeds_duration_limit`,
+   * `notice` / `promotions.notice_required`, `legal_data` / `promotions.no_legal_data`,
+   * `targets`, `window`, `price_floor`, `conflicts`.
+   */
+  code: string;
+  ok: boolean;
+  /** Values of the check (limit, legal basis, authority…). */
+  params: {
+    [key: string]: string;
+  };
+  severity: PromotionsCheckSeverity;
+};
+
+/** Results of the checks made before turning a promotion on. */
+export type PromotionsActivationChecks = {
+  /** Every check; errors (`severity = error`, `ok = false`) block turning on. */
+  checks: PromotionsActivationCheck[];
+};
+
+/** A promotion applied to the cart. */
+export type PromotionsAppliedPromotion = {
+  amount: Money;
+  class: PromotionsPromotionClass;
+  code?: string | null;
+  gift_return_policy: PromotionsGiftReturnPolicy;
+  min_order?: Money | null;
+  promotion_id: string;
+  return_usage_on_cancel: boolean;
+  terms: string;
+  title: string;
+  voucher_id?: string | null;
+};
+
+/** A cart to compute promotions for. */
+export type PromotionsCart = {
+  at: string;
+  buyer_id?: string | null;
+  buyer_keys: string[];
+  carrier?: string | null;
+  channel?: string | null;
+  client?: string | null;
+  codes: string[];
+  currency: Currency;
+  customer_groups: string[];
+  first_order: boolean;
+  gift_selections: PromotionsGiftSelection[];
+  lines: PromotionsCartLine[];
+  locale: string;
+  membership_tier?: string | null;
+  org_id: string;
+  payment_method?: string | null;
+  ship_to_province_code?: string | null;
+  shipping_fee?: Money | null;
+  voucher_ids: string[];
+};
+
+/** One line of a cart. */
+export type PromotionsCartLine = {
+  has_compare_at: boolean;
+  line_key: string;
+  quantity: number;
+  unit_price: Money;
+  variant_id: string;
+};
+
+/** How serious a failed check is. */
+export type PromotionsCheckSeverity = "error" | "warning";
+
+/** A claim code to enter. */
+export type PromotionsClaimCodeRequest = {
+  /** The code, spaces and case do not matter. */
+  code: string;
+};
+
+/** Stacking class: `product`, `order` or `shipping`. */
+export type PromotionsClassName = "product" | "order" | "shipping";
+
+/** Whether order discounts are taken back when a return drops the order below the minimum. */
+export type PromotionsClawbackMode = "none" | "proportional";
+
+/** A coupon or claim code. */
+export type PromotionsCode = {
+  code: string;
+  created_at: string;
+  id: string;
+  purpose: PromotionsPurpose;
+  usage_count: number;
+  usage_limit?: number | null;
+};
+
+/** Codes added: listed when created at once, counted when generated in the background. */
+export type PromotionsCodesAdded = {
+  codes: PromotionsCode[];
+  /** Codes being generated in the background (`promotions.generate_codes`). */
+  queued: number;
+};
+
+/** An extra condition of a promotion. */
+export type PromotionsConditionInput = {
+  kind: PromotionsConditionKind;
+  /**
+   * `in` / `not_in` compare a text of the cart with `values`; `gte` / `lte` compare a number
+   * (`min_items`).
+   */
+  operator: PromotionsOperator;
+  /**
+   * Values to compare with: payment methods, carriers, province codes, tiers, clients (`web`,
+   * `app`, `pos`), seller unit ids, or `variant:<id>` / `product:<id>` / `category:<id>` for
+   * `exclude_targets`. Up to 200.
+   */
+  values?: string[];
+};
+
+/** Kind of extra condition. */
+export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
+
+/** Promotions computed for a cart; orders store it as a snapshot. */
+export type PromotionsEvaluation = {
+  applied: PromotionsAppliedPromotion[];
+  clawback_on_return: PromotionsClawbackMode;
+  currency: Currency;
+  fingerprint: string;
+  gift_choices: PromotionsGiftChoice[];
+  gifts: PromotionsGiftLine[];
+  lines: PromotionsLineDiscount[];
+  rejected_codes: PromotionsRejectedCode[];
+  shipping: PromotionsShippingDiscount[];
+  shipping_discount: Money;
+  total_discount: Money;
+  withheld: PromotionsWithheldDiscount[];
+};
+
+export type PromotionsExclusivity = "none" | "class" | "global";
+
+/** The sale price of a variant in a flash sale, with the units sold. */
+export type PromotionsFlashItem = {
+  per_customer_quantity_limit?: number | null;
+  quantity_limit?: number | null;
+  /** Units held or sold — a real number. */
+  quantity_used: number;
+  sale_price_minor?: number | null;
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** The sale price of a variant in a flash sale or the deal price of an add-on. */
+export type PromotionsFlashItemInput = {
+  /** Units one buyer may get at this price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units sold at this price; none = no limit. */
+  quantity_limit?: number | null;
+  /** Sale price per unit (minor units of the promotion's currency); or give `value_bp`. */
+  sale_price_minor?: number | null;
+  /** Percent off in basis points. */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** The whole set of flash-sale (or add-on deal) prices of a promotion. */
+export type PromotionsFlashItemsRequest = {
+  /** Up to 1000. */
+  items: PromotionsFlashItemInput[];
+};
+
+/** A share of who pays the discount. */
+export type PromotionsFundingInput = {
+  payer_kind: PromotionsPayer;
+  /** Unit that pays (the seller, brand or partner unit), when known. */
+  payer_org_id?: string | null;
+  /** Share in basis points; all shares add up to 10000. */
+  share_bp: number;
+};
+
+/** The part of a discount one payer pays. */
+export type PromotionsFundingShare = {
+  amount: Money;
+  payer_kind: PromotionsPayerKind;
+  payer_org_id?: string | null;
+};
+
+/** A `gift_choice` promotion the cart reached without choosing a gift yet. */
+export type PromotionsGiftChoice = {
+  options: string[];
+  promotion_id: string;
+  quantity: number;
+};
+
+/** A free item or gift: add it as its own line at price 0. */
+export type PromotionsGiftLine = {
+  promotion_id: string;
+  quantity: number;
+  reason: PromotionsReason;
+  variant_id: string;
+};
+
+/** A gift a buyer may choose (`gift_choice`). */
+export type PromotionsGiftOptionInput = {
+  /** Gifts of this variant that can be given; none = no limit. */
+  stock_limit?: number | null;
+  variant_id: string;
+};
+
+export type PromotionsGiftPolicy = "return_gift" | "deduct_gift_value" | "keep";
+
+/** What happens to the gift when the qualifying item is returned. */
+export type PromotionsGiftReturnPolicy = "return_gift" | "deduct_gift_value" | "keep";
+
+/** A gift the buyer chose for a `gift_choice` promotion. */
+export type PromotionsGiftSelection = {
+  promotion_id: string;
+  quantity: number;
+  variant_id: string;
+};
+
+/** A voucher given by hand. */
+export type PromotionsGrantVoucherRequest = {
+  /** Why (kept in the audit log), 3 to 500 characters. */
+  reason: string;
+  /**
+   * Your reference; sending the same one again returns the same voucher. Defaults to a new
+   * value each time.
+   */
+  reference?: string | null;
+  /** User whose wallet gets the voucher. */
+  user_id: string;
+};
+
+/** Kind of promotion. */
+export type PromotionsKind = "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+
+/** A legal limit on promotions in force on a date (shared legal data). */
+export type PromotionsLegalLimit = {
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  /** Most discount, in basis points of the price just before the promotion. */
+  max_bp: number;
+  max_days_per_program?: number | null;
+  max_days_per_year?: number | null;
+  /** Notes, including "to be checked against the original text". */
+  note: string;
+  /** `regular` or `national_focus`. */
+  program_kind: string;
+  /** `price_reduction`, `gift_value`, `free_shipping`. */
+  promotion_kind: string;
+  source_url: string;
+};
+
+/** A discount shared out to one cart line (amount for the whole line). */
+export type PromotionsLineDiscount = {
+  amount: Money;
+  capped_by_floor: boolean;
+  capped_by_law: boolean;
+  class: PromotionsPromotionClass;
+  funding: PromotionsFundingShare[];
+  line_key: string;
+  promotion_id: string;
+  reason: PromotionsReason;
+};
+
+/** Codes to add to a promotion. */
+export type PromotionsNewCodes = {
+  /** One code you choose (4 to 64 letters, digits, `-` or `_`). Or give `count`. */
+  code?: string | null;
+  /** Random codes to generate, 1 to 10000. More than 500 are generated in the background. */
+  count?: number | null;
+  /** Start of every generated code (up to 16 letters or digits). */
+  prefix?: string | null;
+  /**
+   * `redeem` (coupon of a `code` promotion) or `claim` (puts a voucher of a `voucher`
+   * promotion in the wallet).
+   */
+  purpose: PromotionsPurpose;
+  /** Uses of each code; none = only the promotion's limits. */
+  usage_limit?: number | null;
+};
+
+/** A notice of a promotion to one authority. */
+export type PromotionsNotice = {
+  authority_code: string;
+  reference?: string | null;
+  status: string;
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+};
+
+/** A promotion notice recorded for one authority. */
+export type PromotionsNoticeRequest = {
+  /** Receipt number of the authority, up to 100 characters. */
+  reference?: string | null;
+  /** `submitted` or `not_required`. */
+  status: string;
+  submitted_at?: string | null;
+};
+
+/** A promotion notice rule in force on a date (shared legal data). */
+export type PromotionsNoticeRule = {
+  /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
+  authority: string;
+  days_before: number;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  note: string;
+  notice_required: boolean;
+  promotion_kind: string;
+};
+
+export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
+
+export type PromotionsPayer = "platform" | "seller" | "brand" | "payment_partner";
+
+/** Who pays for a discount. */
+export type PromotionsPayerKind = "platform" | "seller" | "brand" | "payment_partner";
+
+/** Period of the per-customer limit. */
+export type PromotionsPeriod = "lifetime" | "day" | "week" | "month";
+
+/** Legal kind of programme: `regular` or a `national_focus` promotion programme. */
+export type PromotionsProgramKind = "regular" | "national_focus";
+
+/** A promotion with its rule, counters and texts. */
+export type PromotionsPromotion = {
+  activated_at?: string | null;
+  budget_used?: Money | null;
+  created_at: string;
+  flash_items: PromotionsFlashItem[];
+  id: string;
+  /** Vouchers given out. */
+  issued_count: number;
+  /** The rule as given when created (and changed since). */
+  rule: PromotionsPromotionInput;
+  status: PromotionsStatus;
+  targets: PromotionsTargetInput[];
+  texts: PromotionsText[];
+  updated_at: string;
+  /** Uses held or confirmed. */
+  usage_count: number;
+  /** Version of the audit trail (0 before it is turned on). */
+  version: number;
+};
+
+/** Stacking class of a promotion: `product` (line items), `order` (whole order, shared out to lines) or `shipping`. */
+export type PromotionsPromotionClass = "product" | "order" | "shipping";
+
+/** A promotion: the rule, its window, limits and texts. */
+export type PromotionsPromotionInput = {
+  budget?: Money | null;
+  bundle_price?: Money | null;
+  bundle_quantity?: number | null;
+  buy_quantity?: number | null;
+  channels?: string[];
+  claim_requires_verified_phone?: boolean;
+  /** Buyers can save the voucher themselves ("Save" button). */
+  claimable?: boolean;
+  /** Classes this promotion may stack with; defaults to all three. */
+  combines_with?: PromotionsClassName[] | null;
+  conditions?: PromotionsConditionInput[];
+  /** Currency of every amount and of the carts it applies to, e.g. `VND`. */
+  currency: string;
+  customer_groups?: string[];
+  daily_usage_limit?: number | null;
+  /** Required: every promotion announces its end (Commercial Law, art. 97). */
+  ends_at: string;
+  exclusivity?: PromotionsExclusivity | null;
+  first_order_only?: boolean;
+  /** Who pays; defaults to the unit running the promotion, 100%. */
+  funding?: PromotionsFundingInput[];
+  get_quantity?: number | null;
+  gift_options?: PromotionsGiftOptionInput[];
+  gift_quantity?: number | null;
+  gift_return_policy?: PromotionsGiftPolicy | null;
+  kind: PromotionsKind;
+  /** Language of `title` and `terms`, e.g. `vi`. */
+  locale: string;
+  max_add_on_quantity?: number | null;
+  max_applications?: number | null;
+  max_discount?: Money | null;
+  min_order?: Money | null;
+  min_quantity?: number | null;
+  /**
+   * Unit that runs the promotion (the store, chain or seller). Defaults to your unit when you
+   * work in only one.
+   */
+  org_id?: string | null;
+  per_customer_limit?: number | null;
+  per_customer_period?: PromotionsPeriod | null;
+  per_user_claim_limit?: number | null;
+  /** Higher first. Defaults to 0. */
+  priority?: number;
+  program_kind?: PromotionsProgramKind | null;
+  /** Shown on the public promotion list. */
+  public?: boolean;
+  /** Give the usage back when a confirmed order is cancelled. Defaults to `true`. */
+  return_usage_on_cancel?: boolean | null;
+  reward_selection?: PromotionsRewardSelection | null;
+  /** Discount on the reward items in basis points; 10000 = free. */
+  reward_value_bp?: number | null;
+  schedules?: PromotionsWindowInput[];
+  scope?: PromotionsScope | null;
+  starts_at: string;
+  stop_after?: boolean;
+  /** Conditions the buyer reads (Consumer Protection Law 19/2023), up to 5000 characters. */
+  terms?: string;
+  tiers?: PromotionsTierInput[];
+  /** 1 to 200 characters. */
+  title: string;
+  trigger?: PromotionsTrigger | null;
+  usage_limit?: number | null;
+  value?: Money | null;
+  /** Percent off in basis points (1% = 100), for `percent_off`, `flash_sale` defaults… */
+  value_bp?: number | null;
+  voucher_quota?: number | null;
+  /** Days a voucher stays valid after it is issued; none = until `ends_at`. */
+  voucher_valid_days?: number | null;
+};
+
+/** A promotion in a list. */
+export type PromotionsPromotionListItem = {
+  ends_at: string;
+  id: string;
+  kind: PromotionsKind;
+  org_id: string;
+  starts_at: string;
+  status: PromotionsStatus;
+  title: string;
+  usage_count: number;
+};
+
+export type PromotionsPurpose = "redeem" | "claim";
+
+/** Why a discount applies or not, for the buyer: `code` (i18n key), `params` and the translated `text`. */
+export type PromotionsReason = {
+  code: string;
+  params: {
+    [key: string]: string;
+  };
+  text: string;
+};
+
+/** The promotion usage held for an order. */
+export type PromotionsRedemption = {
+  evaluation: PromotionsEvaluation;
+  expires_at?: string | null;
+  id: string;
+  order_id: string;
+  status: PromotionsRedemptionStatus;
+};
+
+/** Promotion usage held for an order. */
+export type PromotionsRedemptionItem = {
+  created_at: string;
+  currency: string;
+  expires_at?: string | null;
+  id: string;
+  order_id: string;
+  org_id: string;
+  status: string;
+  total_discount_minor: number;
+};
+
+/** State of the promotion usage held for an order. */
+export type PromotionsRedemptionStatus = "held" | "confirmed" | "released" | "expired";
+
+/** A code or voucher that does not apply to the cart, with the reason (the cart still works). */
+export type PromotionsRejectedCode = {
+  code?: string | null;
+  reason: PromotionsReason;
+  voucher_id?: string | null;
+};
+
+export type PromotionsRewardSelection = "cheapest" | "same_item" | "specified";
+
+export type PromotionsRole = "condition" | "reward";
+
+/** What the promotion discounts: `items` (product class), `order` or `shipping`. */
+export type PromotionsScope = "items" | "order" | "shipping";
+
+/** A discount on the shipping fee. */
+export type PromotionsShippingDiscount = {
+  amount: Money;
+  funding: PromotionsFundingShare[];
+  promotion_id: string;
+  reason: PromotionsReason;
+};
+
+export type PromotionsStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+
+/** A product, variant or category a promotion targets. */
+export type PromotionsTargetInput = {
+  role?: PromotionsRole | null;
+  target_id: string;
+  target_type: PromotionsTargetType;
+};
+
+export type PromotionsTargetType = "product" | "variant" | "category";
+
+/** The whole set of targets of a promotion. */
+export type PromotionsTargetsRequest = {
+  /** Up to 1000; empty = every item of the unit. */
+  targets: PromotionsTargetInput[];
+};
+
+/** Title and terms of a promotion in one language. */
+export type PromotionsText = {
+  locale: string;
+  terms: string;
+  title: string;
+};
+
+export type PromotionsThresholdKind = "quantity" | "amount";
+
+/** One tier of a `tiered` promotion. */
+export type PromotionsTierInput = {
+  /** Items (`quantity`) or minor units of money (`amount`) to reach. */
+  threshold: number;
+  threshold_kind: PromotionsThresholdKind;
+  value?: Money | null;
+  /** Percent off in basis points (1% = 100); or give `value`. */
+  value_bp?: number | null;
+};
+
+/** Title and terms in one language. */
+export type PromotionsTranslationRequest = {
+  /** Conditions the buyer reads, up to 5000 characters. */
+  terms?: string;
+  /** 1 to 200 characters. */
+  title: string;
+};
+
+/** How the promotion reaches buyers: automatically, by coupon code or by wallet voucher. */
+export type PromotionsTrigger = "automatic" | "code" | "voucher";
+
+/** One entry of a promotion's audit trail. */
+export type PromotionsVersion = {
+  /** `activated`, `updated`, `translation`, `paused`, `ended`… */
+  action: string;
+  changed_at: string;
+  changed_by?: string | null;
+  /** The promotion as it was after the change. */
+  snapshot: Record<string, unknown>;
+  version: number;
+};
+
+/** A one-time voucher in a user's wallet. */
+export type PromotionsVoucher = {
+  expires_at: string;
+  holder_user_id?: string | null;
+  id: string;
+  issued_at: string;
+  promotion_id: string;
+  source: PromotionsVoucherSource;
+  source_ref: string;
+  status: PromotionsVoucherStatus;
+  used_order_id?: string | null;
+  valid_from: string;
+};
+
+/** How a voucher came into the wallet. */
+export type PromotionsVoucherSource = "claim" | "claim_code" | "grant" | "loyalty" | "purchase_reward" | "birthday" | "referral" | "compensation" | "automation";
+
+/** State of a voucher in a wallet. */
+export type PromotionsVoucherStatus = "available" | "held" | "used" | "expired" | "revoked";
+
+/** A time window in the store's time zone. */
+export type PromotionsWindowInput = {
+  /** End (not included), in minutes after midnight (1 to 1440), after `start_minute`. */
+  end_minute: number;
+  /** Start, in minutes after midnight (0 to 1439). */
+  start_minute: number;
+  /** Days of the week, 1 (Monday) to 7 (Sunday). */
+  weekdays: number[];
+};
+
+/** A discount withheld on a line by the legal limit or the price floor. */
+export type PromotionsWithheldDiscount = {
+  line_key: string;
+  promotion_id: string;
+  reason: PromotionsReason;
 };
 
 /** A prop an event type takes. */
@@ -18366,6 +21167,16 @@ export type Ranked = {
   visitors: number;
 };
 
+/** A rating of the support. */
+export type RateSupportTicketRequest = {
+  /** Up to 1000 characters. */
+  note?: string | null;
+  /** 1 (bad) to 5 (very good). */
+  rating: number;
+  /** Guests: the ticket token. Signed-in customers omit it. */
+  token?: string | null;
+};
+
 /**
  * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
  * one tenant's shop, without permissions).
@@ -18741,6 +21552,15 @@ export type RenameTagRequest = {
   name: string;
 };
 
+/** A saved reply filled in for one ticket. */
+export type RenderedSupportMacro = {
+  /**
+   * Text in the customer's language with the variables filled in; edit it, then send it as a
+   * message.
+   */
+  body: string;
+};
+
 /** The whole weekly schedule of a resource. */
 export type ReplaceBookingScheduleRequest = {
   /** At most 70 ranges; ranges of the same day must not overlap. Empty: never available (staff). */
@@ -18795,6 +21615,17 @@ export type Resolution = {
   type: "redirect";
 } | {
   type: "gone";
+};
+
+/** How a discrepancy was resolved. */
+export type ResolveShippingCodDiscrepancy = {
+  /** Required (1 to 1000 characters): what was checked. */
+  note: string;
+  /**
+   * An active code of the reason list `shipping.cod_resolution` (`carrier_corrected`,
+   * `delivered_confirmed`, `returned_confirmed`, `written_off`, or the tenant's own).
+   */
+  resolution_code: string;
 };
 
 /** The record a code opens. */
@@ -19013,6 +21844,15 @@ export type RunRuleRequest = {
   input?: Record<string, unknown> | null;
 };
 
+/** A saved reply to write. */
+export type SaveSupportMacroRequest = {
+  /** Text per language; variables `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  /** 1 to 100 characters. */
+  name: string;
+  org_id: string;
+};
+
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
 export type SavedMenuTarget = {
   id: string;
@@ -19113,6 +21953,12 @@ export type SecretResponse = {
   secret: string;
 };
 
+/** The phone number to send a code to. */
+export type SendBookingCodeRequest = {
+  /** E.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
 /** Something to fix or review. */
 export type SeoFinding = {
   /**
@@ -19185,6 +22031,15 @@ export type SetPasswordRequest = {
   password: string;
 };
 
+/** A policy to set on a unit (every field; units below without their own policy inherit it). */
+export type SetSupportPolicyRequest = SupportPolicy;
+
+/** A member's setting. */
+export type SetSupportTeamMemberRequest = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+};
+
 /** A setting that units can set and the units below them inherit. */
 export type SettingResponse = {
   /** The value when no unit sets it; `null`: none. */
@@ -19233,6 +22088,509 @@ export type SetupView = {
 
 /** How urgent a piece of work is. */
 export type Severity = "blocking" | "attention" | "info";
+
+/** An address of a buyer's address book. */
+export type ShippingAddress = {
+  /**
+   * The address, with the names of the province and commune when it was saved. Outside
+   * Vietnam: `province_code` / `province_name` is the region, `commune_name` the city and
+   * `commune_code` is empty.
+   */
+  address: Address;
+  buyer_id: string;
+  id: string;
+  is_default: boolean;
+  label: string;
+  phone: string;
+  postal_code?: string | null;
+  recipient_name: string;
+  updated_at: string;
+};
+
+/** Fields to change; leave out what stays. */
+export type ShippingAddressChanges = {
+  address?: ShippingPostalAddress | null;
+  label?: string | null;
+  phone?: string | null;
+  recipient_name?: string | null;
+};
+
+/** A carrier account. Credentials are never returned: only the names of the fields set. */
+export type ShippingCarrierAccount = {
+  active: boolean;
+  carrier_code: string;
+  check_error_code?: string | null;
+  /**
+   * `never`, `ok` or `failed`: result of the last connection test, or of the last call the
+   * carrier refused for bad credentials.
+   */
+  check_status: string;
+  checked_at?: string | null;
+  credential_fields: string[];
+  id: string;
+  name: string;
+  org_id: string;
+  sandbox: boolean;
+  settings: unknown;
+  updated_at: string;
+  /**
+   * Only in the answer of the create call: the address the carrier posts status updates to.
+   * Keep it; it cannot be shown again.
+   */
+  webhook_path?: string | null;
+};
+
+/** Changes of a carrier account; leave out what stays. `credentials` replaces every field. */
+export type ShippingCarrierAccountChanges = {
+  active?: boolean | null;
+  credentials?: {
+    [key: string]: string;
+  } | null;
+  name?: string | null;
+  sandbox?: boolean | null;
+  settings?: unknown;
+};
+
+/** A difference between a carrier statement and the shipments. */
+export type ShippingCodDiscrepancy = {
+  created_at: string;
+  /** Amount of the shipment request. */
+  expected: Money;
+  id: string;
+  /** `amount_mismatch`, `unknown_tracking`, `not_delivered` or `overdue`. */
+  kind: string;
+  /** Amount on the statement. */
+  reported: Money;
+  resolution_code?: string | null;
+  resolution_note: string;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  shipment_id?: string | null;
+  statement_line_id?: string | null;
+  /** `open` or `resolved`. */
+  status: string;
+};
+
+/** A carrier statement. */
+export type ShippingCodStatement = {
+  carrier_account_id: string;
+  id: string;
+  imported_at: string;
+  net_paid: Money;
+  period_from: string;
+  period_to: string;
+  reference: string;
+  /** `reconciled` or `has_mismatch`. */
+  status: string;
+  total_cod: Money;
+  total_fee: Money;
+};
+
+/** A carrier statement with its lines. */
+export type ShippingCodStatementDetail = ShippingCodStatement & {
+  lines: ShippingCodStatementLine[];
+};
+
+/** A line of a carrier statement. */
+export type ShippingCodStatementLine = {
+  cod: Money;
+  fee: Money;
+  /** `matched`, `amount_mismatch`, `unknown_tracking` or `not_delivered`. */
+  match: string;
+  shipment_id?: string | null;
+  tracking_number: string;
+};
+
+/** Days a delivery takes, as declared by the method. */
+export type ShippingDays = {
+  max: number;
+  min: number;
+};
+
+/** Direction of a shipment: `outbound` (to the buyer) or `return` (picked up from the buyer). */
+export type ShippingDirection = "outbound" | "return";
+
+/** Expected delivery dates. */
+export type ShippingEta = {
+  earliest_date: string;
+  latest_date: string;
+  /** Order before this time to make today's dispatch. */
+  order_by?: string | null;
+  time_zone: string;
+};
+
+/** A shipping method. */
+export type ShippingMethod = {
+  active: boolean;
+  auto_book: boolean;
+  calendar_id?: string | null;
+  carrier_account_id?: string | null;
+  code: string;
+  countries: string[];
+  currency: string;
+  cutoff_minute?: number | null;
+  default_item_weight_grams?: number | null;
+  estimated_days?: ShippingDays | null;
+  free_over?: Money | null;
+  handling_fee: Money;
+  hold_days?: number | null;
+  id: string;
+  kind: ShippingMethodKind;
+  names: {
+    [key: string]: string;
+  };
+  org_id: string;
+  pickup_points: ShippingPickupPoint[];
+  position: number;
+  /** Weight tiers (only in `GET /methods/{id}` and after changes). */
+  rates: ShippingRateTier[];
+  same_day: boolean;
+  service_code?: string | null;
+  tax_category: string;
+  updated_at: string;
+  volumetric_divisor: number;
+};
+
+/**
+ * Fields of a shipping method. On create `code`, `kind`, `names` and `currency` are required;
+ * on change, leave out what stays (`code`, `kind`, `org_id`, `currency` cannot change).
+ */
+export type ShippingMethodFields = {
+  active?: boolean | null;
+  /**
+   * `carrier` methods: book the carrier as soon as an order asks for a shipment (default off:
+   * staff check the goods first).
+   */
+  auto_book?: boolean | null;
+  /** Delivery calendar (working days, holidays, cut-off times). */
+  calendar_id?: string | null;
+  /** `carrier` methods: the carrier account quoting the fee. */
+  carrier_account_id?: string | null;
+  /** Stable code, lower-case letters, digits and `-`, e.g. `standard`. */
+  code?: string | null;
+  /** Countries shipped to (ISO codes), default `["VN"]`. */
+  countries?: string[] | null;
+  /** ISO 4217 code of every amount of the method, e.g. `VND`. */
+  currency?: string | null;
+  /** Orders before this minute of the day (calendar time zone; 660 = 11:00) leave the same day. */
+  cutoff_minute?: number | null;
+  /**
+   * `table_rate` methods: weight of an item that has none, in grams; `null`: such items make the
+   * method unavailable (`shipping.weight_missing`).
+   */
+  default_item_weight_grams?: number | null;
+  estimated_days?: ShippingDays | null;
+  free_over?: Money | null;
+  handling_fee?: Money | null;
+  /** `pickup` methods: days the parcel waits for the buyer. */
+  hold_days?: number | null;
+  kind?: ShippingMethodKind | null;
+  /** Name per language, e.g. `{"vi": "Giao tieu chuan", "en": "Standard"}`. */
+  names?: {
+    [key: string]: string;
+  } | null;
+  /**
+   * Organization unit owning the method; units below inherit it unless they have a method with
+   * the same `code`.
+   */
+  org_id?: string | null;
+  /** Display order, smaller first. */
+  position?: number | null;
+  /** Delivered the same day when ordered before the cut-off. */
+  same_day?: boolean | null;
+  /** `carrier` methods: the carrier's service code; `null` for every service. */
+  service_code?: string | null;
+  /** Tax category of the shipping fee in the tax engine, default `vat.standard`. */
+  tax_category?: string | null;
+  /** Volumetric divisor: volumetric grams = length × width × height (mm³) / divisor. Default 6000. */
+  volumetric_divisor?: number | null;
+};
+
+/**
+ * Kind of shipping method: `table_rate` (the shop's own weight tiers per zone), `carrier` (the fee
+ * a carrier account quotes), `pickup` (collect in store).
+ */
+export type ShippingMethodKind = "table_rate" | "carrier" | "pickup";
+
+/** A way to ship the cart. */
+export type ShippingOption = {
+  /** Fee the buyer pays, VAT included; zero when free. */
+  amount: Money;
+  carrier_code?: string | null;
+  chargeable_weight_grams: number;
+  /** Days, as declared by the method: `[min, max]`. */
+  estimated_days?: number[] | null;
+  eta?: ShippingEta | null;
+  free_over?: Money | null;
+  free_shipping_applied: boolean;
+  /** Store pickup: days the parcel waits. */
+  hold_days?: number | null;
+  kind: ShippingMethodKind;
+  method_code: string;
+  method_id: string;
+  name: string;
+  /**
+   * Send back when placing the order; a different fee or destination answers
+   * `shipping.option_changed`.
+   */
+  option_key: string;
+  /** Store pickup: the store. */
+  pickup_org_id?: string | null;
+  /** Store pickup: when the order is ready. */
+  ready_at?: string | null;
+  service_code?: string | null;
+  /** Tax category of the fee (VAT line on the invoice). */
+  tax_category: string;
+};
+
+/** A parcel of a shipment. */
+export type ShippingParcel = {
+  height_mm?: number | null;
+  id: string;
+  length_mm?: number | null;
+  position: number;
+  tracking_number?: string | null;
+  weight_grams: number;
+  width_mm?: number | null;
+};
+
+/** A parcel. */
+export type ShippingParcelInput = {
+  height_mm?: number | null;
+  /** Order line keys packed in this parcel; lines not listed go in the first parcel. */
+  items?: string[];
+  length_mm?: number | null;
+  weight_grams: number;
+  width_mm?: number | null;
+};
+
+/** The parcels of a shipment. */
+export type ShippingParcels = {
+  parcels: ShippingParcelInput[];
+};
+
+/** A store where buyers collect their parcels. */
+export type ShippingPickupPoint = {
+  /** Shown to the buyer, e.g. where to park. */
+  instructions?: string;
+  /** The store: the method's unit or a unit below it. */
+  org_id: string;
+  /** Hours to get the order ready (0 to 720). */
+  prep_hours?: number;
+};
+
+/** The full list of pickup points of a `pickup` method. */
+export type ShippingPickupPoints = {
+  pickup_points: ShippingPickupPoint[];
+};
+
+/**
+ * A postal address. In Vietnam: `province_code` and `commune_code` from the official list of
+ * administrative units (`GET /api/v1/address/provinces`). Elsewhere: `province_code` is the
+ * region (state, province…), `city` the city, with an optional `postal_code`.
+ */
+export type ShippingPostalAddress = {
+  /** Outside Vietnam: the city (required). */
+  city?: string | null;
+  /** Vietnam: code of the commune, ward or special zone (required). */
+  commune_code?: string | null;
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /** House number, street, village… (1 to 300 characters). */
+  line: string;
+  /** Postal code, mostly for addresses outside Vietnam. */
+  postal_code?: string | null;
+  /** Vietnam: code of the province. Elsewhere: the region. */
+  province_code: string;
+};
+
+/** Shipping options of a cart. */
+export type ShippingQuote = {
+  /** Cheapest first; empty when nothing in the cart needs shipping. */
+  options: ShippingOption[];
+  unavailable: ShippingUnavailableMethod[];
+};
+
+/** One line of the cart, with the figures of the variant (from the catalog). */
+export type ShippingQuoteItem = {
+  height_mm?: number | null;
+  length_mm?: number | null;
+  quantity: number;
+  /** `false` for digital goods and services: not weighed, not shipped. */
+  requires_shipping?: boolean;
+  sku?: string;
+  variant_id: string;
+  /** Weight of one item, grams. */
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A cart to quote. */
+export type ShippingQuoteRequest = {
+  /** Time of the order (default: now). */
+  at?: string | null;
+  destination?: ShippingPostalAddress | null;
+  items: ShippingQuoteItem[];
+  /** Language of method names (default `en`). */
+  locale?: string | null;
+  /** Order value after discounts, for free shipping. */
+  order_value: Money;
+  /** The selling store; methods of the units above it apply too. */
+  org_id: string;
+  /** The warehouse shipping, when known. */
+  origin_org_id?: string | null;
+};
+
+/** A weight tier of a method in one zone. */
+export type ShippingRateTier = {
+  amount: Money;
+  /** Longest side allowed, in mm; `null` for any size. */
+  max_side_mm?: number | null;
+  /** …up to, not including, this weight; `null` for no upper limit. */
+  max_weight_grams?: number | null;
+  /** The tier applies from this chargeable weight (grams)… */
+  min_weight_grams: number;
+  step_amount?: Money | null;
+  /** Each `step_grams` (or part) above `min_weight_grams` adds `step_amount`. */
+  step_grams?: number | null;
+  zone_id: string;
+};
+
+/** The full list of weight tiers of a method. */
+export type ShippingRates = {
+  rates: ShippingRateTier[];
+};
+
+/** One region of a zone: a country, or one province of it. */
+export type ShippingRegion = {
+  /** ISO 3166-1 alpha-2 country code. */
+  country: string;
+  /**
+   * Code of the province; `null` for the whole country. A zone listing the province of the
+   * destination wins over a zone for the whole country.
+   */
+  province_code?: string | null;
+};
+
+/** One line of a shipment request. */
+export type ShippingRequestItem = {
+  height_mm?: number | null;
+  length_mm?: number | null;
+  name?: string;
+  order_line_key: string;
+  quantity: number;
+  sku?: string;
+  variant_id: string;
+  weight_grams?: number | null;
+  width_mm?: number | null;
+};
+
+/** A shipment with its parcels, items and tracking history. */
+export type ShippingShipment = ShippingShipmentSummary & {
+  events: ShippingTrackingEvent[];
+  items: ShippingShipmentItem[];
+  parcels: ShippingParcel[];
+};
+
+/** An item of a shipment. */
+export type ShippingShipmentItem = {
+  name: string;
+  order_line_key: string;
+  parcel_id?: string | null;
+  quantity: number;
+  sku: string;
+  variant_id: string;
+};
+
+/** A shipment without its parcels, items and history. */
+export type ShippingShipmentSummary = {
+  actual_fee?: Money | null;
+  address: Address;
+  carrier_code?: string | null;
+  cod_amount?: Money | null;
+  /** `none`, `pending`, `collected`, `settled` or `mismatch`. */
+  cod_status: string;
+  created_at: string;
+  declared_value: Money;
+  direction: ShippingDirection;
+  id: string;
+  /** Last refusal of the carrier when booking (`shipping.carrier_error`…). */
+  last_error_code?: string | null;
+  method_id: string;
+  order_id: string;
+  order_number: string;
+  org_id: string;
+  origin_org_id: string;
+  quoted_fee?: Money | null;
+  recipient_name: string;
+  recipient_phone: string;
+  request_key: string;
+  service_code?: string | null;
+  status: ShippingStatus;
+  status_at: string;
+  tracking_number?: string | null;
+};
+
+/** Lines to move to a new shipment: order line key → quantity. */
+export type ShippingSplitRequest = {
+  lines: {
+    [key: string]: number;
+  };
+};
+
+/** Common status of a shipment, mapped from each carrier's own statuses. */
+export type ShippingStatus = "pending" | "booking" | "ready_to_ship" | "picked_up" | "in_transit" | "out_for_delivery" | "delivered" | "delivery_failed" | "returning" | "returned" | "ready_for_pickup" | "picked_up_by_buyer" | "cancelled" | "lost";
+
+/** A status set by staff. */
+export type ShippingStatusRequest = {
+  note?: string;
+  status: ShippingStatus;
+};
+
+/** A step of the tracking history (only added, never changed). */
+export type ShippingTrackingEvent = {
+  /** The carrier's own wording. */
+  carrier_status: string;
+  note: string;
+  occurred_at: string;
+  /** `carrier`, `staff` or `system`. */
+  source: string;
+  status: ShippingStatus;
+};
+
+/** A method that cannot ship this cart, and why. */
+export type ShippingUnavailableMethod = {
+  method_code: string;
+  /**
+   * `shipping.weight_missing`, `shipping.no_rate`, `shipping.country_not_served`,
+   * `shipping.no_pickup_point`, `shipping.carrier_unavailable`…
+   */
+  reason_code: string;
+};
+
+/** Receipt of a carrier webhook. */
+export type ShippingWebhookReceipt = {
+  id: string;
+};
+
+/** A shipping zone. */
+export type ShippingZone = {
+  id: string;
+  name: string;
+  org_id: string;
+  regions: ShippingRegion[];
+  updated_at: string;
+};
+
+/** Changes of a zone; leave out what stays. */
+export type ShippingZoneChanges = {
+  name?: string | null;
+};
+
+/** The full list of regions of a zone. */
+export type ShippingZoneRegions = {
+  regions: ShippingRegion[];
+};
 
 /** The answer to a sign-up: always the same. */
 export type SignupAccepted = {
@@ -19749,6 +23107,9 @@ export type SupportAuthorKind = "customer" | "agent" | "system";
 /** Where a ticket came from. */
 export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
 
+/** Where to hand a ticket over. */
+export type SupportEscalation = "consumer_complaint" | "platform";
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -19803,6 +23164,25 @@ export type SupportGrantResponse = {
   tenant_id: string;
 };
 
+/** A saved reply staff insert into answers. */
+export type SupportMacro = {
+  approved_at?: string | null;
+  approved_by?: string | null;
+  /** Approved for automatic answers. */
+  auto_reply: boolean;
+  /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  id: string;
+  name: string;
+  /** The unit it belongs to; units below use it too. */
+  org_id: string;
+  /** Ways customers ask the question, per language (automatic answers). */
+  questions: Record<string, unknown>;
+  /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+  review_due_on?: string | null;
+  updated_at: string;
+};
+
 /**
  * One message of a ticket. Messages are never edited; a hidden message keeps its place with
  * `hidden: true` (staff still see its text and the reason).
@@ -19840,8 +23220,72 @@ export type SupportOpenedTicket = SupportTicket & {
   access_token?: string | null;
 };
 
+/**
+ * Support policy of an organization unit. Units without their own policy use the nearest unit
+ * above that has one, else the defaults.
+ */
+export type SupportPolicy = {
+  /** A solved ticket closes after this many days without a new message (1 to 90). */
+  auto_close_days: number;
+  /** Automatic answers to simple questions (off by default). */
+  auto_reply: boolean;
+  /** Words that always stop an automatic answer. */
+  auto_reply_blocked_terms: string[];
+  /** At most this many automatic answers in a row on one ticket, then a person takes over. */
+  auto_reply_max_per_thread: number;
+  /** Lowest confidence (basis points, 0 to 10000) of the classification to answer automatically. */
+  auto_reply_min_confidence_bp: number;
+  /** When staff work. */
+  business_hours: SupportWorkingHours[];
+  /** Ticket categories customers choose from (codes; labels are translated by the website). */
+  categories: string[];
+  /** Business minutes to the first answer, per priority (`low`, `normal`, `high`, `urgent`). */
+  first_response_minutes: Record<string, unknown>;
+  /** Guests (no account) may open tickets. */
+  guest_tickets: boolean;
+  /** Days off (`YYYY-MM-DD`, local date). */
+  holidays: string[];
+  /** Email replies to ticket notifications go back into the ticket (needs an inbound mail module). */
+  inbound_email: boolean;
+  /**
+   * Business minutes to solve the ticket, per priority; time waiting for the customer does not
+   * count.
+   */
+  resolve_minutes: Record<string, unknown>;
+  /** Offset of the unit's local time from UTC, in minutes (Vietnam: 420). */
+  utc_offset_minutes: number;
+};
+
+/** The policy in force at a unit, and where it comes from. */
+export type SupportPolicyInForce = SupportPolicy & {
+  /** The unit whose own policy applies; empty: the defaults. */
+  defined_at?: string | null;
+  /** The unit asked about. */
+  org_id: string;
+};
+
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** Support figures for tickets created in a period. */
+export type SupportReport = {
+  /** `breached` per 10000 tickets. */
+  breach_rate_bp: number;
+  /** Of those, that missed a response-time target. */
+  breached: number;
+  /** Median minutes from opening to the first answer (wall clock), of answered tickets. */
+  median_first_response_minutes?: number | null;
+  /** Median minutes from opening to solved (wall clock), of solved tickets. */
+  median_resolve_minutes?: number | null;
+  /** Average rating × 100 (e.g. 450 = 4.5). */
+  satisfaction_avg_x100?: number | null;
+  /** Ratings given (1 to 5). */
+  satisfaction_count: number;
+  /** Of those, solved or closed. */
+  solved: number;
+  /** Tickets created in the period. */
+  tickets: number;
+};
 
 /** Who asked. Customers and guests see their own email or phone number masked. */
 export type SupportRequester = {
@@ -19866,6 +23310,39 @@ export type SupportRequesterInput = {
 
 /** How a ticket ended. */
 export type SupportResolution = "answered" | "escalated" | "duplicate" | "spam" | "no_reply";
+
+/** A routing rule: new tickets of the unit (and the units below) that match go to the team. */
+export type SupportRoutingRule = {
+  /** Only tickets of this category; empty: any. */
+  category?: string | null;
+  channel?: SupportChannel | null;
+  id: string;
+  org_id: string;
+  /** Rules of one unit are tried in this order; rules of nearer units first. */
+  position: number;
+  team_id: string;
+};
+
+/** A support team of an organization unit; it covers tickets of the unit and the units below. */
+export type SupportTeam = {
+  created_at: string;
+  id: string;
+  name: string;
+  org_id: string;
+};
+
+/** A team with its members. */
+export type SupportTeamDetail = SupportTeam & {
+  members: SupportTeamMember[];
+};
+
+/** A member of a support team. */
+export type SupportTeamMember = {
+  /** Takes new tickets in round-robin assignment. */
+  accepting: boolean;
+  last_assigned_at?: string | null;
+  user_id: string;
+};
 
 /** A support ticket. */
 export type SupportTicket = {
@@ -19907,11 +23384,23 @@ export type SupportTicket = {
 
 /** A ticket with its messages, oldest first. */
 export type SupportTicketDetail = SupportTicket & {
+  /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+  links: string[];
   messages: SupportMessage[];
 };
 
 /** Where a ticket stands. */
 export type SupportTicketStatus = "open" | "pending_agent" | "pending_customer" | "solved" | "closed";
+
+/** One range of working time on a day of the week. */
+export type SupportWorkingHours = {
+  /** Local time `HH:MM`, after `opens`. */
+  closes: string;
+  /** 1 = Monday … 7 = Sunday. */
+  day: number;
+  /** Local time `HH:MM`. */
+  opens: string;
+};
 
 /** An address that gets no campaign mail. */
 export type SuppressionResponse = {
@@ -23010,6 +26499,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/bookings/{id}/calendar.ics": {
+    /** Download a booking as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/bookings/{id}/cancel": {
     /** Cancel a booking. */
     post: {
@@ -23137,6 +26639,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/bookings/me/bookings": {
+    /** List my bookings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; resource_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BookingRecord;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/me/bookings/{id}/calendar.ics": {
+    /** Download one of my bookings as a calendar file. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/bookings/public/availability": {
     /** Find free times (public). */
     get: {
@@ -23157,11 +26685,40 @@ export interface paths {
       requestBody: CustomerBookingRequest;
       responses: {
         201: Data_BookingCreated;
-        401: Problem;
         403: Problem;
         404: Problem;
         409: Problem;
         422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/bookings/{id}/cancel": {
+    /** Cancel a guest booking (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: GuestCancelRequest;
+      responses: {
+        200: Data_BookingRecord;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/bookings/public/phone-codes": {
+    /** Send a booking code by SMS (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SendBookingCodeRequest;
+      responses: {
+        200: Data_BookingCodeSent;
+        403: Problem;
+        422: Problem;
+        429: Problem;
         503: Problem;
         default: Problem;
       };
@@ -23306,6 +26863,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/attributes": {
+    /** List every attribute of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create an attribute. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateAttribute;
+      responses: {
+        201: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}": {
+    /** Change an attribute. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogUpdateAttribute;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/attributes/{id}/options": {
+    /** Replace the options of an `option` / `options` attribute. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAttributeOptions;
+      responses: {
+        200: Data_CatalogAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories": {
     /** List every category of the tenant. */
     get: {
@@ -23360,6 +26973,31 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/categories/{id}/attributes": {
+    /** List the attributes of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attributes of a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryAttributes;
+      responses: {
+        200: Data_Vec_CatalogCategoryAttribute;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/categories/{id}/move": {
     /** Move a category with everything below it. */
     post: {
@@ -23372,6 +27010,30 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/categories/{id}/restrictions": {
+    /** List the restricted-goods rules of a category. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Link restricted-goods rules to a category. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCategoryRestrictions;
+      responses: {
+        200: Data_CatalogCategoryRestrictions;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -23435,6 +27097,7 @@ export interface paths {
         201: Data_CatalogPriceList;
         401: Problem;
         403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -23451,6 +27114,63 @@ export interface paths {
         403: Problem;
         404: Problem;
         412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes": {
+    /** Create a bulk price change for a price list, as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreatePriceChange;
+      responses: {
+        201: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}": {
+    /** Get a bulk price change. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/approve": {
+    /** Approve a previewed bulk price change; a job writes the prices. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/price-lists/{id}/changes/{change_id}/preview": {
+    /** Preview a bulk price change. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; change_id: string }; };
+      responses: {
+        200: Data_CatalogPriceChange;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
@@ -23510,6 +27230,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/counts": {
+    /** Count the products in your scope by status or readiness. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by?: string | null }; };
+      responses: {
+        200: Data_Vec_CatalogProductCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}": {
     /** Get a product with its texts, options, variants, categories and images. */
     get: {
@@ -23549,6 +27282,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/{id}/attributes": {
+    /** List the attribute values of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attribute values of a product. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogProductAttributes;
+      responses: {
+        200: Data_Vec_CatalogStoredAttributeValue;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}/categories": {
     /** Replace the categories of a product. */
     put: {
@@ -23560,6 +27319,45 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents": {
+    /** List the documents of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a document to a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogCreateDocument;
+      responses: {
+        201: Data_CatalogProductDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/{id}/documents/{document_id}": {
+    /** Remove a document from a product. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; document_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -23651,6 +27449,120 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/categories": {
+    /** List the category tree (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string }; };
+      responses: {
+        200: Data_Vec_CatalogPublicCategory;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/categories/{slug}": {
+    /** Get a category by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string }; };
+      responses: {
+        200: Data_CatalogPublicCategory;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products": {
+    /** List products on sale (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogPublicProductCard;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products/by-slug/{slug}": {
+    /** Get a product page by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string; site?: string }; };
+      responses: {
+        200: Data_CatalogPublicProduct;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/sitemap": {
+    /** List product addresses for the sitemap (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogSitemapItem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/restriction-rules": {
+    /** List the rules of prohibited and conditional goods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRestrictionRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/rounding-rules": {
+    /** List the rounding rules of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a rounding rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogCreateRoundingRule;
+      responses: {
+        201: Data_CatalogRoundingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/stores/{org_id}/overrides/{product_id}": {
+    /** Hide or show a product on a store's website. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string; product_id: string }; };
+      requestBody: CatalogStoreOverrideInput;
+      responses: {
+        200: Data_CatalogStoreOverride;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -26546,6 +30458,356 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/adjustments": {
+    /** Adjust stock in one warehouse, each line with a reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryAdjustmentRequest;
+      responses: {
+        200: Data_InventoryAdjustment;
+        201: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/adjustments/{id}": {
+    /** Get a stock adjustment with the ledger lines it wrote. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryAdjustment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts": {
+    /** List stock counts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open a stock count in one warehouse. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryCountRequest;
+      responses: {
+        201: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}": {
+    /** Get a stock count with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/apply": {
+    /** Apply a stock count: each difference becomes a `count` ledger line with its reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/cancel": {
+    /** Cancel an open stock count. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/import": {
+    /** Record counted quantities from a CSV file. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountImportRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/lines": {
+    /** Record counted quantities. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountLinesRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels": {
+    /** List stock levels (variant × warehouse) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; below_reorder?: boolean | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/levels/{id}": {
+    /** Get one stock level. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change the reorder point of a stock level. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryLevelUpdate;
+      responses: {
+        200: Data_InventoryLevel;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/movements": {
+    /** List the stock movement ledger in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; kind?: "receipt" | "sale" | "return" | "adjustment" | "count" | "transfer_out" | "transfer_in" | "expiry" | "supplier_return" | null; from?: string | null; to?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryMovement;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reservations": {
+    /** List stock reservations of orders sold by units in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string | null; status?: "held" | "confirmed" | "fulfilled" | "released" | "expired" | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reservations/{id}/release": {
+    /** Release a stuck reservation by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryReservation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/settings/{org_id}": {
+    /** Get how a store picks warehouses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change how a store picks warehouses. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: InventoryStoreSettings;
+      responses: {
+        200: Data_InventoryStoreSettings;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/sources/{selling_org_id}": {
+    /** List the warehouses serving a store or channel, in the order they are tried. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { selling_org_id: string }; };
+      responses: {
+        200: Data_InventorySources;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the warehouses serving a store or channel. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { selling_org_id: string }; };
+      requestBody: InventorySourcesRequest;
+      responses: {
+        200: Data_InventorySources;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers": {
+    /** List stock transfers from or to warehouses in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string | null; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a stock transfer as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryTransferRequest;
+      responses: {
+        201: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}": {
+    /** Get a stock transfer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/cancel": {
+    /** Cancel a draft transfer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/close": {
+    /** Close a transfer in transit: what has not arrived is written off from `incoming`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/receive": {
+    /** Receive goods of a transfer in transit, all or part. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryReceiveRequest;
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/ship": {
+    /** Ship a draft transfer: the goods leave the source and are in transit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/invoices/archives": {
     /** List archive copies of the accounting records. */
     get: {
@@ -27424,6 +31686,18 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { refresh?: boolean }; };
       responses: {
         200: Data_AlertsResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/ops/backlog": {
+    /** See the job and event backlogs of every database. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_OpsBacklog;
         401: Problem;
         403: Problem;
         default: Problem;
@@ -31078,6 +35352,396 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/evaluate": {
+    /** Compute the promotions of a cart, without holding or changing anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsCart;
+      responses: {
+        200: Data_PromotionsEvaluation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/legal-limits": {
+    /** List the legal promotion limits in force on a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      responses: {
+        200: Data_Vec_PromotionsLegalLimit;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/me/vouchers": {
+    /** List the vouchers in your wallet, soonest to expire first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: PromotionsVoucherStatus | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/me/vouchers/claim-code": {
+    /** Enter a claim code to put its voucher into your wallet. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsClaimCodeRequest;
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/notice-rules": {
+    /** List the promotion notice rules in force on a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      responses: {
+        200: Data_Vec_PromotionsNoticeRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions": {
+    /** List the promotions in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: PromotionsStatus | null; kind?: PromotionsKind | null; org_id?: string | null; q?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsPromotionListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a promotion as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsPromotionInput;
+      responses: {
+        201: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}": {
+    /** Get a promotion with its rule, texts, targets and counters. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a promotion. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: Record<string, unknown>;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a draft promotion. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/activate": {
+    /** Turn a draft promotion on. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsActivated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/activation-check": {
+    /** Check a promotion before turning it on, without changing anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsActivationChecks;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/cancel": {
+    /** Cancel a promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/codes": {
+    /** List the codes of a promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsCode;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add codes to a promotion: one code you choose, or a batch of random codes. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsNewCodes;
+      responses: {
+        201: Data_PromotionsCodesAdded;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/codes/export": {
+    /** Download every code of a promotion as CSV. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/end": {
+    /** End a promotion now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/flash-items": {
+    /** Replace the flash-sale prices of a draft promotion. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsFlashItemsRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/notices/{authority_code}": {
+    /** Record that a promotion notice was submitted to an authority. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; authority_code: string }; };
+      requestBody: PromotionsNoticeRequest;
+      responses: {
+        200: Data_PromotionsNotice;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/pause": {
+    /** Pause a running or scheduled promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/resume": {
+    /** Resume a paused promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/targets": {
+    /** Replace the targets (products, variants, categories) of a draft promotion. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsTargetsRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/translations/{locale}": {
+    /** Set the title and terms of a promotion in one language. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; locale: string }; };
+      requestBody: PromotionsTranslationRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/versions": {
+    /** Get the audit trail of a promotion: one entry per change after it was turned on. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsVersion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/vouchers": {
+    /** Put a voucher of a `voucher` promotion into a user's wallet by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsGrantVoucherRequest;
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/{id}/claim": {
+    /** Save the voucher of a public promotion into your wallet ("Save" button). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/redemptions": {
+    /** List the promotion usage held for orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsRedemptionItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/redemptions/{id}/release": {
+    /** Give back the promotion usage held for an order by hand (unstick it). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsRedemption;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/reporting/facts": {
     /** List report facts. */
     get: {
@@ -31147,6 +35811,618 @@ export interface paths {
       };
     };
   };
+  "/api/v1/shipping/buyers/{buyer_id}/addresses": {
+    /** List the saved addresses of a buyer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { buyer_id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/carrier-accounts": {
+    /** List carrier accounts. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Connect a carrier account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingCarrierAccount;
+      responses: {
+        201: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/carrier-accounts/{id}": {
+    /** Change a carrier account. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingCarrierAccountChanges;
+      responses: {
+        200: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/carrier-accounts/{id}/test": {
+    /** Test a carrier account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCarrierAccount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies": {
+    /** List cash-on-delivery discrepancies. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies/{id}/refresh-tracking": {
+    /** Ask the carrier again for the tracking history of a discrepancy's shipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/discrepancies/{id}/resolve": {
+    /** Resolve a cash-on-delivery discrepancy. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ResolveShippingCodDiscrepancy;
+      responses: {
+        200: Data_ShippingCodDiscrepancy;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/statements": {
+    /** List imported cash-on-delivery statements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingCodStatement;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Import a cash-on-delivery statement of a carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ImportShippingCodStatement;
+      responses: {
+        200: Data_ShippingCodStatement;
+        201: Data_ShippingCodStatement;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/cod/statements/{id}": {
+    /** Get a cash-on-delivery statement with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingCodStatementDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses": {
+    /** List your saved delivery addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Save a delivery address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingAddress;
+      responses: {
+        201: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}": {
+    /** Get one of your saved addresses. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change one of your saved addresses. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingAddressChanges;
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete one of your saved addresses. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/me/addresses/{id}/default": {
+    /** Make one of your saved addresses the default. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingAddress;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods": {
+    /** List shipping methods. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipping method. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingMethodFields;
+      responses: {
+        201: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}": {
+    /** Get a shipping method with its tiers and pickup points. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a shipping method. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingMethodFields;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a shipping method with its tiers and pickup points. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}/pickup-points": {
+    /** Replace the pickup points of a `pickup` shipping method. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingPickupPoints;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/methods/{id}/rates": {
+    /** Replace the weight tiers of a shipping method. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingRates;
+      responses: {
+        200: Data_ShippingMethod;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/quote": {
+    /** Quote shipping options for a cart. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ShippingQuoteRequest;
+      responses: {
+        200: Data_ShippingQuote;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments": {
+    /** List shipments. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string; status?: ShippingStatus; org_id?: string; tracking?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingShipmentSummary;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipment by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingShipment;
+      responses: {
+        200: Data_ShippingShipment;
+        201: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}": {
+    /** Get a shipment with its parcels, items and tracking history. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/book": {
+    /** Book a shipment with its carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/cancel": {
+    /** Cancel a shipment. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/label": {
+    /** Download the carrier label of a shipment. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/parcels": {
+    /** Replace the parcels of a shipment. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingParcels;
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/split": {
+    /** Split a shipment (partial delivery). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingSplitRequest;
+      responses: {
+        201: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/shipments/{id}/status": {
+    /** Set the status of a shipment by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingStatusRequest;
+      responses: {
+        200: Data_ShippingShipment;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/webhooks/{carrier_code}/{token}": {
+    /** Receive a status webhook from a carrier. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { carrier_code: string; token: string }; };
+      requestBody: string;
+      responses: {
+        202: Data_ShippingWebhookReceipt;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        413: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones": {
+    /** List shipping zones. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ShippingZone;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a shipping zone. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: NewShippingZone;
+      responses: {
+        201: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones/{id}": {
+    /** Get a shipping zone. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Rename a shipping zone. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingZoneChanges;
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a shipping zone. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/shipping/zones/{id}/regions": {
+    /** Replace the regions of a shipping zone. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ShippingZoneRegions;
+      responses: {
+        200: Data_ShippingZone;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/macros": {
+    /** List the saved replies usable at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportMacro;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a saved reply. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        201: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/macros/{id}": {
+    /** Replace a saved reply. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        200: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a saved reply. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -31203,6 +36479,56 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/me/tickets/{id}/satisfaction": {
+    /** Rate the support of your ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/policies/{org_id}": {
+    /** Get the support policy in force at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set the support policy of a unit. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      requestBody: SetSupportPolicyRequest;
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the own support policy of a unit. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
+      responses: {
+        200: Data_SupportPolicyInForce;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/public/tickets": {
     /** Open a support ticket from the website. */
     post: {
@@ -31245,6 +36571,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/public/tickets/{id}/satisfaction": {
+    /** Rate the support of a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/public/tickets/{id}/verify": {
     /** Confirm the email or phone number of a guest ticket. */
     post: {
@@ -31257,6 +36598,132 @@ export interface paths {
         422: Problem;
         429: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/reports/summary": {
+    /** Support figures for a period. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string }; };
+      responses: {
+        200: Data_SupportReport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules": {
+    /** List the routing rules of a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a routing rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportRoutingRuleRequest;
+      responses: {
+        201: Data_SupportRoutingRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/routing-rules/{id}": {
+    /** Delete a routing rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams": {
+    /** List support teams in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportTeam;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a support team. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateSupportTeamRequest;
+      responses: {
+        201: Data_SupportTeam;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}": {
+    /** Get a support team with its members. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportTeamDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/teams/{id}/members/{user_id}": {
+    /** Add a member to a support team, or change whether they take new tickets. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      requestBody: SetSupportTeamMemberRequest;
+      responses: {
+        200: Data_SupportTeamMember;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a member from a support team. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; user_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -31310,6 +36777,64 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/escalate": {
+    /** Hand a ticket over as a consumer complaint or to the marketplace. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: EscalateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links": {
+    /** Link a ticket to a record (an order, a product…). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddSupportLinkRequest;
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links/{target}": {
+    /** Remove a link from a ticket. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; target: string }; };
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/macros/{macro_id}/render": {
+    /** Fill a saved reply in for a ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; macro_id: string }; };
+      responses: {
+        200: Data_RenderedSupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

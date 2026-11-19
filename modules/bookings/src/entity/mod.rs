@@ -2,6 +2,7 @@
 
 pub(crate) mod booking;
 pub(crate) mod exception;
+pub(crate) mod guest_challenge;
 pub(crate) mod resource;
 pub(crate) mod schedule;
 pub(crate) mod service;

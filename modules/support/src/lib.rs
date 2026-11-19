@@ -8,16 +8,23 @@ pub mod api;
 mod config;
 mod entity;
 mod events;
+mod extras;
+mod facts;
 mod guest;
+mod hours;
 mod http;
 mod intake;
 mod messages;
 mod migration;
 mod notify;
 mod permissions;
+mod policy;
 mod privacy;
+mod report;
 mod service;
+mod sla;
 mod status;
+mod teams;
 mod tickets;
 
 mod relocation;
@@ -49,6 +56,8 @@ struct SupportModule {
     config: Option<SupportConfig>,
     /// Có sau `start`.
     service: Option<Arc<SupportService>>,
+    /// Sổ database: job theo lịch tra ngữ cảnh từng khách có phiếu trên database của job.
+    databases: Option<autoxide_kernel::tenancy::DatabaseRegistry>,
 }
 
 impl Module for SupportModule {
@@ -100,10 +109,21 @@ impl Module for SupportModule {
             notifier,
             media: context.require::<dyn autoxide_media::api::Media>().ok(),
             accounts: context.require::<dyn autoxide_compliance::api::AccountVerification>().ok(),
+            // Hỏi quyền của người được giao (`principal_of`); không có thì không tự giao cho ai.
+            authenticator: context.require::<dyn autoxide_kernel::access::Authenticator>().ok(),
+            resources: Some(context.resources()),
+            complaints: context.require::<dyn autoxide_compliance::api::ComplaintIntake>().ok(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;
         context.provide::<dyn api::SupportIntake>(service.clone())?;
+        // Điểm cắm cho module đăng ký sau (`shipping`, `orders`): nguồn câu trả lời từ dữ liệu (D-230).
+        context.provide::<dyn api::SupportFacts>(Arc::new(facts::FactRegistry::default()))?;
+        // Phiếu là một loại đối tượng (D-123): vụ việc khiếu nại của `compliance` trỏ tới nó.
+        context.resource_type("support.ticket", Arc::new(intake::TicketResolver))?;
+        // Hộp việc (bước 51): phiếu đang chờ nhân viên.
+        context.work_source(Arc::new(sla::Waiting))?;
+        self.databases = Some(context.tenancy());
         self.service = Some(service);
         Ok(())
     }
@@ -120,6 +140,33 @@ impl Module for SupportModule {
                 events::MessageAdded::NAME,
                 Arc::new(notify::MessageNotices(service)),
             ),
+        ]
+    }
+
+    fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
+        use autoxide_kernel::job::JobRegistration;
+        let (Some(service), Some(databases)) = (self.service.clone(), self.databases.clone())
+        else {
+            return Vec::new();
+        };
+        [sla::SLA_CHECK, sla::AUTO_CLOSE]
+            .into_iter()
+            .map(|kind| {
+                let sweep =
+                    sla::Sweep { service: service.clone(), databases: databases.clone(), kind };
+                JobRegistration::new(kind, Arc::new(sweep))
+            })
+            .collect()
+    }
+
+    fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
+        use autoxide_kernel::job::Schedule;
+        use std::time::Duration;
+        vec![
+            // Mỗi phút: đánh dấu phiếu quá hạn.
+            Schedule::new(sla::SLA_CHECK, sla::SLA_CHECK, Duration::from_secs(60)),
+            // Mỗi giờ: đóng phiếu đã xử lý quá số ngày tự đóng (hạn tính theo ngày, một giờ là đủ).
+            Schedule::new(sla::AUTO_CLOSE, sla::AUTO_CLOSE, Duration::from_secs(3600)),
         ]
     }
 

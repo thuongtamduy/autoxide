@@ -14,6 +14,15 @@ pub(crate) const TOKEN_SECRET: Setting = Setting::new(
 .secret()
 .with_example("change-me-to-a-long-random-value-from-openssl-rand");
 
+pub(crate) const TOKEN_SECRET_PREVIOUS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS",
+    "Old values of AUTOXIDE_AUTH_TOKEN_SECRET, separated by commas, while you change it: access \
+     tokens are signed with the new key and still accepted when signed with one of these, so \
+     nobody is signed out. Remove them once AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS has passed. Do not \
+     list a leaked key here.",
+)
+.secret();
+
 pub(crate) const ACCESS_TOKEN_SECONDS: Setting = Setting::new(
     "AUTOXIDE_AUTH_ACCESS_TOKEN_SECONDS",
     "How long an access token stays valid, in seconds (60 to 86400). Short is safer: a stolen \
@@ -189,6 +198,8 @@ const MIN_SECRET_LENGTH: usize = 32;
 pub(crate) struct AuthConfig {
     /// `None`: chưa cấu hình, sinh khoá ngẫu nhiên lúc khởi động.
     pub token_secret: Option<Vec<u8>>,
+    /// Khoá ký cũ, chỉ để kiểm token trong lúc đổi khoá (bước 39).
+    pub token_secret_previous: Vec<Vec<u8>>,
     pub access_token_ttl: Duration,
     pub refresh_token_ttl: Duration,
     /// Số lần đăng nhập sai cho phép trong `login_lock`.
@@ -247,6 +258,22 @@ impl AuthConfig {
             } else {
                 Ok(raw.as_bytes().to_vec())
             }
+        });
+        let token_secret_previous = reader.optional_with(&TOKEN_SECRET_PREVIOUS, |raw| {
+            raw.split(',')
+                .map(str::trim)
+                .filter(|key| !key.is_empty())
+                .map(|key| {
+                    if key.len() < MIN_SECRET_LENGTH {
+                        Err(format!(
+                            "every key must be at least {MIN_SECRET_LENGTH} characters long, like \
+                             AUTOXIDE_AUTH_TOKEN_SECRET"
+                        ))
+                    } else {
+                        Ok(key.as_bytes().to_vec())
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()
         });
         let access =
             reader.get_with(&ACCESS_TOKEN_SECONDS, |raw| parse_in_range(raw, 60u64, 86_400));
@@ -329,6 +356,7 @@ impl AuthConfig {
         });
         Ok(AuthConfig {
             token_secret: token_secret?,
+            token_secret_previous: token_secret_previous?.unwrap_or_default(),
             access_token_ttl: Duration::from_secs(access?),
             refresh_token_ttl: Duration::from_secs(refresh? * 24 * 60 * 60),
             login_max_failures: max_failures?,
@@ -431,6 +459,21 @@ mod tests {
         assert_eq!(config.passkey, None);
         assert!(read(&[("AUTOXIDE_AUTH_TOTP_ISSUER", "A:B")]).is_err());
         assert!(read(&[("AUTOXIDE_AUTH_SELF_REGISTRATION", "true")]).unwrap().self_registration);
+    }
+
+    #[test]
+    fn khoa_cu_doc_thanh_danh_sach_va_khoa_ngan_bi_tu_choi() {
+        let old_a = "old-key-old-key-old-key-old-key-a";
+        let old_b = "old-key-old-key-old-key-old-key-b";
+        let config =
+            read(&[("AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS", &format!("{old_a}, {old_b},"))])
+                .unwrap();
+        assert_eq!(config.token_secret_previous, [old_a.as_bytes(), old_b.as_bytes()]);
+        assert!(read(&[]).unwrap().token_secret_previous.is_empty());
+        let error =
+            read(&[("AUTOXIDE_AUTH_TOKEN_SECRET_PREVIOUS", "short-old-s3cr3t")]).unwrap_err();
+        assert!(error.contains("must be at least 32"), "{error}");
+        assert!(!error.contains("s3cr3t"), "{error}");
     }
 
     #[test]

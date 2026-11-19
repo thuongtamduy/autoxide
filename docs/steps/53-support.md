@@ -63,8 +63,8 @@ hàm của service (máy trạng thái, như `orders`).
 - **Ưu tiên:** `low` / `normal` / `high` / `urgent`. **Loại** (`category`): danh sách do khách cấu hình
   (mã + nhãn i18n), mặc định `order`, `product`, `payment`, `account`, `other`.
 - **Hạn trả lời (SLA):** chính sách theo nút, kế thừa theo cây (khuôn cài đặt bước 34): thời gian phản hồi
-  đầu tiên và thời gian giải quyết theo ưu tiên, tính theo **giờ làm việc** của nút (giờ mở cửa ở hồ sơ
-  công khai của nút, D-200; ngày nghỉ là dữ liệu). Phiếu lưu `first_response_due_at`, `resolve_due_at`
+  đầu tiên và thời gian giải quyết theo ưu tiên, tính theo **giờ làm việc** của nút (giờ làm và ngày nghỉ khai trong chính sách hỗ trợ của nút,
+  D-20261118-step53-sla). Phiếu lưu `first_response_due_at`, `resolve_due_at`
   tính sẵn lúc tạo / đổi ưu tiên; đồng hồ dừng khi chờ người mua. Job đánh dấu quá hạn và phát event.
 - **Phân công:** `assignee_user_id` (người) và / hoặc `team_id` (nhóm nhân viên của nút). Quy tắc tự phân
   công là dữ liệu: theo loại / nút / kênh → nhóm; trong nhóm chia vòng (round-robin) cho người đang bật
@@ -200,11 +200,11 @@ pub enum AutoSource { Macro(Uuid), Fact { intent: String } }
 | `support_messages` | `id`, `tenant_id`, `ticket_id`, `kind` (`public/internal/system`), `author_kind` (`customer/agent/system`), `author_user_id` NULL, `body`, `media_ids` text, `hidden_at` NULL, `hidden_by` NULL, `hidden_reason` NULL, `ai_assisted` BOOL, `created_at` | index (`tenant_id`, `ticket_id`, `id`) — chỉ thêm |
 | `support_links` | `tenant_id`, `ticket_id`, `target` (`<kind>:<id>`), `created_at` | pk (`tenant_id`, `ticket_id`, `target`); index (`tenant_id`, `target`) |
 | `support_teams` · `support_team_members` | nhóm theo nút; thành viên, cờ `accepting` | unique (`tenant_id`, `org_id`, `name`) |
-| `support_policies` | `tenant_id`, `org_id`, `categories` JSON, `first_response_minutes` JSON (theo ưu tiên), `resolve_minutes` JSON, `auto_close_days`, `holidays` JSON, `guest_tickets` BOOL, `inbound_email` BOOL, `auto_reply` BOOL (mặc định tắt), `auto_reply_min_confidence_bp` (9000), `auto_reply_max_per_thread` (2), `auto_reply_blocked_terms` JSON, `updated_at` | pk (`tenant_id`, `org_id`); kế thừa theo cây |
+| `support_policies` | `tenant_id`, `org_id`, `body` JSON (D-20261118-step53-sla: loại, phút phản hồi đầu / giải quyết theo ưu tiên, giờ làm, ngày nghỉ, `utc_offset_minutes`, `auto_close_days`, `guest_tickets`, `inbound_email`, `auto_reply` (mặc định tắt), `auto_reply_min_confidence_bp` (9000), `auto_reply_max_per_thread` (2), `auto_reply_blocked_terms`), `updated_at` | pk (`tenant_id`, `org_id`); kế thừa theo cây |
 | `support_macros` | `id`, `tenant_id`, `org_id`, `name`, `bodies` JSON (theo ngôn ngữ), `auto_reply` BOOL, `questions` JSON (cách hỏi mẫu theo ngôn ngữ), `approved_by` NULL, `approved_at` NULL, `review_due_on` NULL, `created_by`, `updated_at` | index (`tenant_id`, `org_id`), (`tenant_id`, `org_id`, `auto_reply`) |
 | `support_auto_replies` | `id`, `tenant_id`, `org_id`, `thread` (`support.ticket:<id>` / `conversations.thread:<id>`), `message_ref`, `source_kind` (`macro`/`fact`), `macro_id` NULL, `intent` NULL, `confidence_bp`, `feedback` NULL (`helpful`/`wrong`), `created_at` | index (`tenant_id`, `org_id`, `created_at`), (`tenant_id`, `macro_id`, `feedback`) |
 | `support_reply_drafts` | `id`, `tenant_id`, `ticket_id`, `body`, `ai_assisted`, `created_at`, `used_at` NULL | index (`tenant_id`, `ticket_id`) |
-| `support_routing_rules` | `id`, `tenant_id`, `org_id`, `match` JSON (loại, kênh), `team_id`, `position` | index (`tenant_id`, `org_id`, `position`) |
+| `support_routing_rules` | `id`, `tenant_id`, `org_id`, `category` NULL, `channel` NULL (D-20261118-step53-teams), `team_id`, `position` | index (`tenant_id`, `org_id`, `position`) |
 
 Cộng bảng `support_events` (outbox), `support_jobs`, `support_throttle`, `support_tokens` của kernel.
 

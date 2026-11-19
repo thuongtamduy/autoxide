@@ -121,7 +121,9 @@ impl SupportService {
         let body = self.check_body("body", &opening.body, &mut problems);
         let name = opening.requester_name.trim().chars().take(NAME_MAX).collect::<String>();
         let category = opening.category.trim().to_owned();
-        if !self.category_known(tenant, &category).await? {
+        let org_uuid = opening.org_id.unwrap_or_else(|| root_of(tenant.id()).as_uuid());
+        let policy = self.policy(tenant, org_uuid).await?.policy;
+        if !policy.categories.contains(&category) {
             problems.push(category_unknown());
         }
         if opening.links.len() > LINKS_MAX {
@@ -150,6 +152,7 @@ impl SupportService {
             Who::Phone(phone) => (None, None, Some(phone.clone())),
         };
         let priority = opening.priority.unwrap_or(Priority::Normal);
+        let (first_due, resolve_due) = crate::sla::due_dates(&policy, at, priority, 0);
         let id = Uuid::now_v7();
         let transaction = tenant.database().begin_write().await?;
         // Số phiếu cấp ở cuối, ngay trước khi ghi (giữ khoá dãy số ngắn nhất).
@@ -177,10 +180,11 @@ impl SupportService {
             channel: Set(opening.channel.as_str().to_owned()),
             assignee_user_id: Set(None),
             team_id: Set(None),
-            first_response_due_at: Set(None),
-            resolve_due_at: Set(None),
+            first_response_due_at: Set(first_due),
+            resolve_due_at: Set(resolve_due),
             first_responded_at: Set(None),
             sla_paused_at: Set(None),
+            sla_paused_minutes: Set(0),
             solved_at: Set(None),
             closed_at: Set(None),
             breached: Set(false),
@@ -265,7 +269,20 @@ impl SupportService {
         outbox.record(&transaction, tenant, actor, subject, &added).await?;
         transaction.commit().await?;
         tracing::info!(ticket_id = %id, channel = opening.channel.as_str(), "support ticket opened");
-        Ok(Opened { ticket: inserted, access_token: token, created: true })
+        // Tự phân công theo quy tắc của nút (ngoài transaction tạo: hỏi quyền người nhận). Lỗi chỉ
+        // ghi log — phiếu đã có, nhân viên giao tay được.
+        let ticket = match self.auto_assign(tenant, &inserted).await {
+            Ok(()) => ticket::Entity::find_by_id(id)
+                .scoped(tenant)
+                .one(tenant.database().read())
+                .await?
+                .unwrap_or(inserted),
+            Err(error) => {
+                tracing::warn!(ticket_id = %id, code = error.code(), "support ticket not routed");
+                inserted
+            }
+        };
+        Ok(Opened { ticket, access_token: token, created: true })
     }
 
     /// Nhân viên mở phiếu thay người mua (ghi hộ cuộc gọi): cần `support.tickets.reply` ở nút của
@@ -334,13 +351,14 @@ impl SupportService {
         required_text(field, body, self.config.max_body_chars, problems)
     }
 
-    /// Loại phiếu có trong danh sách của khách (mặc định [`DEFAULT_CATEGORIES`]).
+    /// Loại phiếu có trong danh sách của chính sách đang hiệu lực ở nút `org`.
     pub(crate) async fn category_known(
         &self,
-        _tenant: &TenantContext,
+        tenant: &TenantContext,
+        org: Uuid,
         category: &str,
     ) -> Result<bool, Error> {
-        Ok(DEFAULT_CATEGORIES.contains(&category))
+        Ok(self.policy(tenant, org).await?.policy.categories.iter().any(|known| known == category))
     }
 
     /// Một trang phiếu trong phạm vi `support.tickets.read` của nhân viên, mới trước (mặc định).
@@ -446,16 +464,15 @@ impl SupportService {
         expected: Option<DateTime<Utc>>,
     ) -> Result<Ticket, Error> {
         let actor = Actor::from(principal);
-        let mut problems = Vec::new();
-        if let Some(category) = &changes.category
-            && !self.category_known(tenant, category).await?
-        {
-            problems.push(category_unknown());
-        }
-        finish(problems)?;
         let before = self.get(tenant, Viewer::Staff(principal), id).await?;
+        let policy = self.policy(tenant, before.org_id).await?.policy;
+        if let Some(category) = &changes.category
+            && !policy.categories.contains(category)
+        {
+            return Err(Error::validation(vec![category_unknown()]));
+        }
         if let Some(Some(assignee)) = changes.assignee_user_id {
-            self.check_assignee(tenant, &before, principal, assignee, changes.team_id).await?;
+            self.check_assignee(tenant, &before, principal, assignee).await?;
         }
         if let Some(Some(team)) = changes.team_id {
             self.check_team(tenant, &before, team).await?;
@@ -474,7 +491,7 @@ impl SupportService {
         if let Some(to) = changes.status {
             status::transition(from, to)?;
             if to != from {
-                apply_status(&mut row, &before, to, changes.resolution, at);
+                crate::sla::transition(&mut row, &before, to, changes.resolution, &policy, at);
                 lines.push(format!("status:{}", to.as_str()));
             }
         }
@@ -482,6 +499,15 @@ impl SupportService {
             && priority.as_str() != before.priority
         {
             row.priority = Set(priority.as_str().to_owned());
+            // Đổi ưu tiên: tính lại hạn từ lúc tạo, giữ phút đã chờ người mua.
+            let (first, resolve) = crate::sla::due_dates(
+                &policy,
+                before.created_at,
+                priority,
+                before.sla_paused_minutes,
+            );
+            row.first_response_due_at = Set(first);
+            row.resolve_due_at = Set(resolve);
             lines.push(format!("priority:{}", priority.as_str()));
         }
         if let Some(category) = changes.category
@@ -572,36 +598,6 @@ impl SupportService {
         .insert(connection)
         .await?;
         Ok(())
-    }
-
-    /// Người được giao phải làm việc ở nút của phiếu: chính người gọi (đã có quyền trả lời ở đó).
-    /// Nhóm nhân viên (bước 53 mục 2) mở rộng thêm thành viên của nhóm phủ nút của phiếu.
-    pub(crate) async fn check_assignee(
-        &self,
-        tenant: &TenantContext,
-        ticket: &Ticket,
-        principal: &autoxide_kernel::access::Principal,
-        assignee: Uuid,
-        _team: Option<Option<Uuid>>,
-    ) -> Result<(), Error> {
-        let _ = (tenant, ticket);
-        if assignee == principal.user_id() {
-            return Ok(());
-        }
-        Err(assignee_out_of_scope(assignee))
-    }
-
-    /// Nhóm phải thuộc nút của phiếu hay tổ tiên của nó (bước 53 mục 2).
-    pub(crate) async fn check_team(
-        &self,
-        _tenant: &TenantContext,
-        _ticket: &Ticket,
-        team: Uuid,
-    ) -> Result<(), Error> {
-        Err(Error::validation(vec![
-            FieldError::new("team_id", "unknown", "is not a support team of this unit")
-                .with_param("team_id", team),
-        ]))
     }
 }
 

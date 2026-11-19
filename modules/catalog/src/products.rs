@@ -1,7 +1,7 @@
 //! Sản phẩm: tạo (kèm biến thể đầu tiên), đọc, sửa, xoá / lưu trữ, chuyển trạng thái, nội dung
 //! theo ngôn ngữ, danh mục và ảnh của sản phẩm.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
@@ -95,6 +95,8 @@ pub(crate) struct ProductDetail {
     pub variants: Vec<variant::Model>,
     pub category_ids: Vec<Uuid>,
     pub media: Vec<product_media::Model>,
+    /// Đoạn đầu của đường dẫn công khai (`AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX`).
+    pub path_prefix: String,
 }
 
 /// Một dòng của danh sách: sản phẩm và nội dung bằng ngôn ngữ mặc định của nó.
@@ -288,7 +290,7 @@ pub(crate) fn translation_row(
     }
 }
 
-fn slug_conflict(error: sea_orm::DbErr, slug: &str) -> Error {
+pub(crate) fn slug_conflict(error: sea_orm::DbErr, slug: &str) -> Error {
     match unique_violation(&error) {
         Some(_) => errors::slug_taken(slug),
         None => Error::from(error),
@@ -411,6 +413,7 @@ impl CatalogService {
             .insert(&transaction)
             .await?;
         }
+        self.refresh_readiness(&transaction, tenant, &[id]).await?;
         let event = events::ProductCreated(Change { before: None, after: Some(snapshot(&row)) });
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
@@ -422,9 +425,10 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
             .await?;
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, "catalog product created");
-        self.detail(tenant, row).await
+        self.get_row(tenant, id).await
     }
 
     /// Một trang sản phẩm trong phạm vi `catalog.products.read`, mới tạo trước (mặc định).
@@ -523,6 +527,20 @@ impl CatalogService {
         self.detail(tenant, row).await
     }
 
+    /// Sản phẩm `id` đầy đủ, không kiểm quyền (dùng ngay sau khi chính service đã ghi).
+    pub(crate) async fn get_row(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<ProductDetail, Error> {
+        let row = product::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(tenant.database().write())
+            .await?
+            .ok_or_else(|| errors::product_not_found(id))?;
+        self.detail(tenant, row).await
+    }
+
     /// Đọc đủ phần của sản phẩm `row` (nội dung, tuỳ chọn, biến thể, danh mục, ảnh).
     pub(crate) async fn detail(
         &self,
@@ -560,7 +578,15 @@ impl CatalogService {
             .all(read)
             .await?;
         let options = crate::variants::options_of(read, tenant, id).await?;
-        Ok(ProductDetail { product: row, translations, options, variants, category_ids, media })
+        Ok(ProductDetail {
+            product: row,
+            translations,
+            options,
+            variants,
+            category_ids,
+            media,
+            path_prefix: self.config.product_path_prefix.clone(),
+        })
     }
 
     /// Đọc sản phẩm `id` trong transaction ghi và kiểm quyền ghi `permission` của người gọi.
@@ -598,7 +624,7 @@ impl CatalogService {
         self.save_product(transaction, tenant, actor, before, row, expected).await
     }
 
-    async fn save_product<C: ConnectionTrait>(
+    pub(crate) async fn save_product<C: ConnectionTrait>(
         &self,
         transaction: &C,
         tenant: &TenantContext,
@@ -624,6 +650,7 @@ impl CatalogService {
         self.outbox
             .record(transaction, tenant, actor, events::product_subject(after.id), &event)
             .await?;
+        self.queue_products(transaction, tenant, vec![after.id]).await?;
         Ok(after)
     }
 
@@ -716,6 +743,7 @@ impl CatalogService {
         self.outbox
             .record(&transaction, tenant, actor, events::product_subject(id), &event)
             .await?;
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         self.entitlements.release(tenant.id(), &PRODUCTS_LIMIT, &reference(id)).await?;
         Ok(())
@@ -771,6 +799,7 @@ impl CatalogService {
             let event = events::ProductArchived(change());
             self.outbox.record(&transaction, tenant, actor, subject, &event).await?;
         }
+        self.queue_products(&transaction, tenant, vec![id]).await?;
         transaction.commit().await?;
         tracing::info!(product_id = %id, status = status_str(to), "catalog product status changed");
         self.detail(tenant, after).await
@@ -805,212 +834,46 @@ impl CatalogService {
             problems.push(FieldError::new("variants", "required", "turn on at least one variant"));
         }
         fail_if_any(problems)?;
-        crate::readiness::require_ready(product)
+        self.check_tax_category_known(tenant, product).await?;
+        // Tính lại tại chỗ (không tin cột dẫn xuất): báo đúng thuộc tính / giấy tờ còn thiếu.
+        self.readiness_of(connection, tenant, product).await?.require()
     }
 
-    /// Đặt (thêm hay thay) nội dung bằng ngôn ngữ `locale`.
-    pub(crate) async fn put_translation(
+    /// Nhóm thuế của sản phẩm phải có trong engine thuế (bước 36) ở vùng thuế của nút bán. Chưa
+    /// cài `tax` hay nút chưa có hồ sơ thuế thì không kiểm được — bỏ qua (D-20261118-step41-readiness).
+    async fn check_tax_category_known(
         &self,
         tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        locale: &str,
-        text: TextInput,
-    ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
-        let mut problems = Vec::new();
-        let text = check_text(&mut problems, &text, id);
-        fail_if_any(problems)?;
-        let actor = Actor::from(principal);
-        let transaction = tenant.database().begin_write().await?;
-        let before =
-            self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_WRITE).await?;
-        let skus: Vec<String> = variant::Entity::find()
-            .filter(variant::Column::ProductId.eq(id))
-            .scoped(tenant)
-            .all(&transaction)
-            .await?
-            .into_iter()
-            .map(|row| row.sku)
-            .collect();
-        translation::Entity::delete_many()
-            .filter(translation::Column::ProductId.eq(id))
-            .filter(translation::Column::Locale.eq(locale.as_str()))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        let mut text = text;
-        if text.slug_generated {
-            let base = text.slug.clone().unwrap_or_default();
-            text.slug = Some(free_slug(&transaction, tenant, &locale, &base, id).await?);
-        }
-        let slug = text.slug.clone().unwrap_or_default();
-        translation_row(tenant, id, &locale, &text, &skus)
-            .insert(&transaction)
-            .await
-            .map_err(|error| slug_conflict(error, &slug))?;
-        let after = self.touch(&transaction, tenant, actor, &before, None).await?;
-        transaction.commit().await?;
-        self.detail(tenant, after).await
-    }
-
-    /// Bỏ nội dung bằng ngôn ngữ `locale`; không bỏ được ngôn ngữ mặc định của sản phẩm.
-    pub(crate) async fn delete_translation(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        locale: &str,
-    ) -> Result<ProductDetail, Error> {
-        let locale = self.locale(locale)?;
-        let actor = Actor::from(principal);
-        let transaction = tenant.database().begin_write().await?;
-        let before =
-            self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_WRITE).await?;
-        if before.default_locale == locale {
-            return Err(Error::validation(vec![FieldError::new(
-                "locale",
-                "default_locale",
-                "is the default language of the product; change `default_locale` first",
-            )]));
-        }
-        translation::Entity::delete_many()
-            .filter(translation::Column::ProductId.eq(id))
-            .filter(translation::Column::Locale.eq(locale.as_str()))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        let after = self.touch(&transaction, tenant, actor, &before, None).await?;
-        transaction.commit().await?;
-        self.detail(tenant, after).await
-    }
-
-    /// Thay cả tập danh mục của sản phẩm (danh mục đầu là danh mục chính).
-    pub(crate) async fn put_categories(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        category_ids: Vec<Uuid>,
-    ) -> Result<ProductDetail, Error> {
-        let actor = Actor::from(principal);
-        let transaction = tenant.database().begin_write().await?;
-        let before =
-            self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_WRITE).await?;
-        let categories = self.existing_categories(&transaction, tenant, &category_ids).await?;
-        product_category::Entity::delete_many()
-            .filter(product_category::Column::ProductId.eq(id))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        for category in &categories {
-            product_category::ActiveModel {
-                id: Set(Uuid::now_v7()),
-                tenant_id: Set(tenant.id().as_uuid()),
-                product_id: Set(id),
-                category_id: Set(*category),
-            }
-            .insert(&transaction)
-            .await?;
-        }
-        let mut row = before.clone().into_active_model();
-        row.primary_category_id = Set(categories.first().copied());
-        let after = self.save_product(&transaction, tenant, actor, &before, row, None).await?;
-        transaction.commit().await?;
-        self.detail(tenant, after).await
-    }
-
-    /// Thay cả tập ảnh của sản phẩm. Ảnh phải là media công khai của khách
-    /// (`catalog.media_not_public`); biến thể nêu kèm phải thuộc sản phẩm.
-    pub(crate) async fn put_media(
-        &self,
-        tenant: &TenantContext,
-        principal: &Principal,
-        id: Uuid,
-        items: Vec<MediaInput>,
-    ) -> Result<ProductDetail, Error> {
-        let mut problems = Vec::new();
-        if items.len() > 50 {
-            problems.push(FieldError::new("media", "length", "must have at most 50 images"));
-        }
-        for (index, item) in items.iter().enumerate() {
-            check_length(&mut problems, &format!("media[{index}].alt"), &item.alt, 0, 500);
-        }
-        fail_if_any(problems)?;
-        // Kiểm media TRƯỚC transaction ghi: đó là lời gọi sang module khác.
-        let ids: Vec<Uuid> = items.iter().map(|item| item.media_id).collect();
-        self.check_public_media(tenant, &ids).await?;
-        let actor = Actor::from(principal);
-        let transaction = tenant.database().begin_write().await?;
-        let before =
-            self.product_for_write(&transaction, tenant, principal, id, &PRODUCTS_WRITE).await?;
-        let variants: Vec<Uuid> = variant::Entity::find()
-            .filter(variant::Column::ProductId.eq(id))
-            .scoped(tenant)
-            .all(&transaction)
-            .await?
-            .into_iter()
-            .map(|row| row.id)
-            .collect();
-        if let Some(bad) = items
-            .iter()
-            .filter_map(|item| item.variant_id)
-            .find(|variant| !variants.contains(variant))
-        {
-            return Err(errors::variant_not_found(bad));
-        }
-        product_media::Entity::delete_many()
-            .filter(product_media::Column::ProductId.eq(id))
-            .scoped(tenant)
-            .exec(&transaction)
-            .await?;
-        for (position, item) in items.iter().enumerate() {
-            product_media::ActiveModel {
-                id: Set(Uuid::now_v7()),
-                tenant_id: Set(tenant.id().as_uuid()),
-                product_id: Set(id),
-                media_id: Set(item.media_id),
-                variant_id: Set(item.variant_id),
-                position: Set(i32::try_from(position).unwrap_or(i32::MAX)),
-                alt: Set(item.alt.trim().to_owned()),
-            }
-            .insert(&transaction)
-            .await?;
-        }
-        let after = self.touch(&transaction, tenant, actor, &before, None).await?;
-        transaction.commit().await?;
-        self.detail(tenant, after).await
-    }
-
-    /// Mọi ID trong `ids` là media công khai của khách. Chưa cài `media` thì không gắn ảnh được.
-    pub(crate) async fn check_public_media(
-        &self,
-        tenant: &TenantContext,
-        ids: &[Uuid],
+        product: &product::Model,
     ) -> Result<(), Error> {
-        if ids.is_empty() {
-            return Ok(());
-        }
-        let Some(media) = &self.media else {
-            return Err(errors::media_not_public(ids[0]));
-        };
-        let found = media.find_many(tenant, ids).await?;
-        let public: BTreeMap<Uuid, bool> = found
-            .iter()
-            .map(|item| (item.id, item.visibility == autoxide_media::api::MediaVisibility::Public))
-            .collect();
-        match ids.iter().find(|id| !public.get(id).copied().unwrap_or(false)) {
-            Some(bad) => Err(errors::media_not_public(*bad)),
-            None => Ok(()),
+        use autoxide_tax::api::{PriceMode, TaxQuoteRequest, TaxableLine};
+        let Some(tax) = &self.tax else { return Ok(()) };
+        let org = OrgId::from_uuid(product.org_id);
+        let Some(profile) = tax.profile(tenant, org).await? else { return Ok(()) };
+        let currency = autoxide_kernel::money::Currency::VND;
+        let line = TaxableLine::new(
+            "catalog-check",
+            product.tax_category.clone(),
+            autoxide_kernel::money::Money::zero(currency),
+        );
+        let request = TaxQuoteRequest::new(
+            profile.jurisdiction,
+            chrono::Utc::now().date_naive(),
+            org,
+            PriceMode::Inclusive,
+            currency,
+            vec![line],
+        );
+        match tax.quote(tenant, request).await {
+            Err(error) if error.code() == "tax.category_unknown" => Err(Error::new(
+                autoxide_kernel::error::ErrorKind::Validation,
+                "catalog.tax_category_unknown",
+                "The tax category `{code}` is not in the tax engine.",
+            )
+            .with_param("code", &product.tax_category)),
+            // Thiếu thuế suất hay lỗi khác của engine không chặn việc mở bán ở đây: chứng từ sẽ
+            // báo khi tính thuế thật.
+            _ => Ok(()),
         }
     }
-}
-
-/// Một ảnh của sản phẩm.
-#[derive(Debug, Clone)]
-pub(crate) struct MediaInput {
-    pub media_id: Uuid,
-    pub variant_id: Option<Uuid>,
-    /// `alt` bằng ngôn ngữ mặc định của sản phẩm; trống thì dùng `alt` của media.
-    pub alt: String,
 }

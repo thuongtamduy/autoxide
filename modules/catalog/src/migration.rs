@@ -22,6 +22,9 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0006_tenancy_jobs",
             vec![autoxide_kernel::job::tenant_table("catalog")],
         ),
+        Box::new(CreateAttributes),
+        Box::new(CreatePriceChanges),
+        Box::new(CreateStorefront),
     ]
 }
 
@@ -496,5 +499,297 @@ impl MigrationTrait for CreateCatalog {
             manager.drop_table(Table::drop().table(Alias::new(*name)).to_owned()).await?;
         }
         Ok(())
+    }
+}
+
+struct CreateAttributes;
+
+impl MigrationName for CreateAttributes {
+    fn name(&self) -> &str {
+        "m0007_attributes_restrictions"
+    }
+}
+
+const ATTRIBUTE_TABLES: [&str; 7] = [
+    "catalog_attributes",
+    "catalog_attribute_options",
+    "catalog_category_attributes",
+    "catalog_product_attributes",
+    "catalog_restriction_rules",
+    "catalog_category_restrictions",
+    "catalog_product_documents",
+];
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateAttributes {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Thuộc tính của khách (xuất xứ, chất liệu…). `decimal` lưu nguyên theo `scale`.
+        let mut attributes = table("catalog_attributes");
+        attributes
+            .col(schema::string_len("code", 64))
+            .col(schema::string_len("data_type", 16))
+            .col(schema::integer("scale"))
+            .col(schema::string_len_null("unit", 16))
+            .col(schema::text("names"))
+            .col(schema::boolean("filterable"))
+            .col(schema::string_len_null("legal_basis", 300))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(attributes).await?;
+        index(
+            manager,
+            "catalog_attributes",
+            "catalog_attributes_code_unique",
+            &["tenant_id", "code"],
+            true,
+        )
+        .await?;
+        let mut options = table("catalog_attribute_options");
+        options
+            .col(schema::uuid("attribute_id"))
+            .col(schema::string_len("code", 64))
+            .col(schema::text("labels"))
+            .col(schema::integer("position"));
+        manager.create_table(options).await?;
+        index(
+            manager,
+            "catalog_attribute_options",
+            "catalog_attribute_options_unique",
+            &["tenant_id", "attribute_id", "code"],
+            true,
+        )
+        .await?;
+        // Thuộc tính của danh mục; bắt buộc là dữ liệu có ngày hiệu lực (D-223…D-227).
+        let mut category_attributes = table("catalog_category_attributes");
+        category_attributes
+            .col(schema::uuid("category_id"))
+            .col(schema::uuid("attribute_id"))
+            .col(schema::boolean("required"))
+            .col(schema::boolean("applies_to_descendants"))
+            .col(schema::date("effective_from"))
+            .col(schema::date_null("effective_to"))
+            .col(schema::string_len_null("legal_basis", 300));
+        manager.create_table(category_attributes).await?;
+        index(
+            manager,
+            "catalog_category_attributes",
+            "catalog_category_attributes_idx",
+            &["tenant_id", "category_id"],
+            false,
+        )
+        .await?;
+        let mut values = table("catalog_product_attributes");
+        values
+            .col(schema::uuid("product_id"))
+            .col(schema::uuid("attribute_id"))
+            .col(schema::text_null("value_text"))
+            .col(schema::big_integer_null("value_integer"))
+            .col(schema::boolean_null("value_boolean"))
+            .col(schema::date_null("value_date"))
+            .col(schema::uuid_null("option_id"));
+        manager.create_table(values).await?;
+        let t = "catalog_product_attributes";
+        index(
+            manager,
+            t,
+            "catalog_product_attr_option_idx",
+            &["tenant_id", "attribute_id", "option_id", "product_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_product_attr_integer_idx",
+            &["tenant_id", "attribute_id", "value_integer"],
+            false,
+        )
+        .await?;
+        index(manager, t, "catalog_product_attr_product_idx", &["tenant_id", "product_id"], false)
+            .await?;
+        // Dữ liệu luật dùng chung mọi khách (mặt điều khiển, D-198): không có `tenant_id`.
+        manager
+            .create_table(
+                Table::create()
+                    .table(Alias::new("catalog_restriction_rules"))
+                    .col(schema::pk_uuid("id"))
+                    .col(schema::string_len("jurisdiction", 8))
+                    .col(schema::string_len("code", 64))
+                    .col(schema::string_len("level", 16))
+                    .col(schema::text("names"))
+                    .col(schema::text("required_documents"))
+                    .col(schema::string_len("legal_basis", 300))
+                    .col(schema::string_len("source_url", 300))
+                    .col(schema::date("effective_from"))
+                    .col(schema::date_null("effective_to"))
+                    .col(schema::string_len("pack_version", 32))
+                    .to_owned(),
+            )
+            .await?;
+        index(
+            manager,
+            "catalog_restriction_rules",
+            "catalog_restriction_rules_unique",
+            &["jurisdiction", "code", "effective_from"],
+            true,
+        )
+        .await?;
+        let mut links = table("catalog_category_restrictions");
+        links.col(schema::uuid("category_id")).col(schema::string_len("rule_code", 64));
+        manager.create_table(links).await?;
+        index(
+            manager,
+            "catalog_category_restrictions",
+            "catalog_category_restrictions_unique",
+            &["tenant_id", "category_id", "rule_code"],
+            true,
+        )
+        .await?;
+        let mut documents = table("catalog_product_documents");
+        documents
+            .col(schema::uuid("product_id"))
+            .col(schema::uuid("org_id"))
+            .col(schema::string_len("document_type", 64))
+            .col(schema::string_len("number", 100))
+            .col(schema::string_len("issued_by", 200))
+            .col(schema::date("issued_on"))
+            .col(schema::date_null("expires_on"))
+            .col(schema::string_len_null("file_key", 300))
+            .col(schema::timestamp_with_time_zone("created_at"));
+        manager.create_table(documents).await?;
+        index(
+            manager,
+            "catalog_product_documents",
+            "catalog_product_documents_idx",
+            &["tenant_id", "product_id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for name in ATTRIBUTE_TABLES.iter().rev() {
+            manager.drop_table(Table::drop().table(Alias::new(*name)).to_owned()).await?;
+        }
+        Ok(())
+    }
+}
+
+struct CreatePriceChanges;
+
+impl MigrationName for CreatePriceChanges {
+    fn name(&self) -> &str {
+        "m0008_price_changes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreatePriceChanges {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Đổi giá hàng loạt (D-222): nháp → xem trước → duyệt → job ghi dòng giá `bulk`.
+        let mut changes = table("catalog_price_changes");
+        changes
+            .col(schema::uuid("price_list_id"))
+            .col(schema::text("filter"))
+            .col(schema::string_len("operation", 16))
+            .col(schema::big_integer("value"))
+            .col(schema::uuid_null("rounding_rule_id"))
+            .col(schema::timestamp_with_time_zone("valid_from"))
+            .col(schema::timestamp_with_time_zone_null("valid_to"))
+            .col(schema::string_len("status", 16))
+            .col(schema::big_integer("affected"))
+            .col(schema::text_null("preview"))
+            .col(schema::uuid_null("created_by"))
+            .col(schema::uuid_null("approved_by"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(changes).await?;
+        index(
+            manager,
+            "catalog_price_changes",
+            "catalog_price_changes_list_idx",
+            &["tenant_id", "price_list_id", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Alias::new("catalog_price_changes")).to_owned())
+            .await
+    }
+}
+
+struct CreateStorefront;
+
+impl MigrationName for CreateStorefront {
+    fn name(&self) -> &str {
+        "m0009_storefront"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateStorefront {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Bảng dẫn xuất cho đọc công khai: một dòng mỗi (nút bán có giá riêng, sản phẩm). Giá,
+        // hiện / ẩn và cột sắp xếp ghi sẵn để lọc và sắp có index; job dựng lại (chạy lại được).
+        let mut entries = table("catalog_storefront_entries");
+        entries
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid("product_id"))
+            .col(schema::uuid("owner_org_id"))
+            .col(schema::boolean("visible"))
+            .col(schema::string_len("currency", 3))
+            .col(schema::big_integer("min_price_minor"))
+            .col(schema::big_integer("max_price_minor"))
+            .col(schema::big_integer_null("compare_at_minor"))
+            .col(schema::big_integer_null("sale_price_minor"))
+            .col(schema::timestamp_with_time_zone_null("sale_ends_at"))
+            .col(schema::big_integer("best_selling"))
+            .col(schema::integer("rating_x100"))
+            .col(schema::big_integer("rating_count"))
+            .col(schema::integer("variant_count"))
+            .col(schema::timestamp_with_time_zone("published_at"))
+            .col(schema::timestamp_with_time_zone("refreshed_at"));
+        manager.create_table(entries).await?;
+        let t = "catalog_storefront_entries";
+        index(
+            manager,
+            t,
+            "catalog_storefront_unique",
+            &["tenant_id", "org_id", "product_id"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_price_idx",
+            &["tenant_id", "org_id", "visible", "min_price_minor", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_newest_idx",
+            &["tenant_id", "org_id", "visible", "published_at", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "catalog_storefront_selling_idx",
+            &["tenant_id", "org_id", "visible", "best_selling", "id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_table(Table::drop().table(Alias::new("catalog_storefront_entries")).to_owned())
+            .await
     }
 }

@@ -39,6 +39,7 @@ event!(VariantCreated, names::VARIANT_CREATED);
 event!(VariantUpdated, names::VARIANT_UPDATED);
 event!(VariantDeleted, names::VARIANT_DELETED);
 event!(PriceChanged, names::PRICE_CHANGED);
+event!(PriceEffective, names::PRICE_EFFECTIVE);
 event!(CategoryChanged, "catalog.category_changed");
 event!(PreorderDateChanged, "catalog.preorder_date_changed");
 event!(PriceListChanged, "catalog.price_list_changed");
@@ -62,6 +63,10 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::PRICE_CHANGED,
             "Prices were added to a price list (price list, variant, new price, start).",
+        ),
+        EventInfo::new(
+            names::PRICE_EFFECTIVE,
+            "A scheduled price started or a temporary price ended (variants, time window).",
         ),
         EventInfo::new(
             "catalog.category_changed",

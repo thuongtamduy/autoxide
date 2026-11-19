@@ -93,9 +93,20 @@ pub(crate) struct KernelModule {
     request_timeout: std::time::Duration,
     /// Bản dịch của mọi module (dịch mô tả permission, event trong sổ module); có sau `start`.
     translations: crate::i18n::Translations,
+    /// Backup theo lịch (bước 39): cấu hình, và bộ chạy có sau `start`.
+    backup_config: crate::backup::scheduled::BackupConfig,
+    backups: Option<Arc<crate::backup::scheduled::ScheduledBackups>>,
+    /// Module có bảng job / event, cho `GET /kernel/ops/backlog` (bước 39).
+    backlog: crate::job::backlog::BacklogModules,
 }
 
 impl KernelModule {
+    /// Thứ `GET /kernel/ops/backlog` cần; có sau `start`.
+    fn backlog_state(&self) -> Option<crate::job::backlog_api::BacklogState> {
+        let registry = self.registry.clone()?;
+        Some(crate::job::backlog_api::BacklogState { registry, modules: self.backlog.clone() })
+    }
+
     pub(crate) fn new(
         catalog: ModuleCatalog,
         client_configs: crate::ops::client_config::ClientConfigs,
@@ -103,6 +114,7 @@ impl KernelModule {
         keys: crate::secret::KeyConfig,
         tenant_settings: crate::tenancy::settings::Catalog,
         slots: crate::tenancy::Slots,
+        backlog: crate::job::backlog::BacklogModules,
     ) -> Self {
         let crate::tenancy::Slots { seeds, dns, orgs, moves: move_setup } = slots;
         KernelModule {
@@ -140,6 +152,9 @@ impl KernelModule {
             templates: crate::template::TemplateEngine::default(),
             flags,
             translations: crate::i18n::Translations::default(),
+            backup_config: crate::backup::scheduled::BackupConfig::default(),
+            backups: None,
+            backlog,
         }
     }
 
@@ -285,6 +300,8 @@ impl Module for KernelModule {
             Box::new(crate::search::database::CreateSearchDocs),
             // Lượt tách / gộp khách (bước 38, mặt điều khiển).
             Box::new(crate::tenancy::relocate::CreateRelocations),
+            // Sổ các lượt backup theo lịch (bước 39, mặt điều khiển).
+            Box::new(crate::backup::scheduled::CreateBackups),
         ]
     }
 
@@ -303,6 +320,7 @@ impl Module for KernelModule {
             "kernel_tenant_exports",
             "kernel_migration_runs",
             "kernel_relocations",
+            "kernel_backups",
         ]
     }
 
@@ -347,9 +365,11 @@ impl Module for KernelModule {
             .get_with(&crate::ops::list_exports::FILE_RETENTION_DAYS, |raw| {
                 crate::config::parse_in_range(raw, 1u32, 365)
             });
+        let backup_config = crate::backup::scheduled::BackupConfig::read(reader);
         if let Some(seconds) = request_timeout(reader) {
             self.request_timeout = std::time::Duration::from_secs(seconds);
         }
+        self.backup_config = backup_config?;
         self.keys.set(secret?, previous?);
         self.public_url = public_url?;
         self.max_flags = max_flags?;
@@ -386,6 +406,7 @@ impl Module for KernelModule {
             crate::job::runs::JOBS_MANAGE,
             crate::ops::request_log::DEVTOOLS_READ,
             crate::ops::request_log::DEVTOOLS_MANAGE,
+            crate::job::backlog_api::OPS_READ,
         ]
     }
 
@@ -430,6 +451,9 @@ impl Module for KernelModule {
             .merge(crate::ops::client_config::routes(self.client_configs.clone()))
             .merge(crate::ops::whats_new::routes())
             .merge(crate::ops::alerts::routes(self.alerts.clone()));
+        if let Some(state) = self.backlog_state() {
+            routes = routes.merge(crate::job::backlog_api::routes(state));
+        }
         if let Some(state) = self.navigation_state() {
             routes = routes.merge(crate::ops::navigation::routes(state));
         }
@@ -595,6 +619,9 @@ impl Module for KernelModule {
 
     fn tools(&self) -> Vec<crate::mcp::Tool> {
         let mut tools = self.catalog_state().map_or_else(Vec::new, module_catalog::tools);
+        if let Some(state) = self.backlog_state() {
+            tools.extend(crate::job::backlog_api::tools(state));
+        }
         if let Some(state) = self.navigation_state() {
             tools.extend(crate::ops::navigation::tools(state));
         }
@@ -681,7 +708,30 @@ impl Module for KernelModule {
             ));
         }
         jobs.extend(self.relocations.jobs());
+        if let Some(backups) = &self.backups {
+            jobs.push(
+                crate::job::JobRegistration::new(
+                    crate::backup::scheduled::BACKUP_JOB,
+                    Arc::new(crate::backup::scheduled::BackupRunner(backups.clone())),
+                )
+                .timeout(crate::backup::scheduled::BACKUP_TIMEOUT),
+            );
+        }
         jobs
+    }
+
+    fn checks(&self) -> Vec<crate::doctor::Check> {
+        match &self.registry {
+            Some(registry) => vec![crate::doctor::Check::new(
+                "backup_age",
+                "Every database has a recent scheduled backup.",
+                Arc::new(crate::backup::scheduled::BackupAge {
+                    registry: registry.clone(),
+                    config: self.backup_config,
+                }),
+            )],
+            None => Vec::new(),
+        }
     }
 
     fn tasks(&self) -> Vec<crate::task::Task> {
@@ -704,6 +754,12 @@ impl Module for KernelModule {
         }
         if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some()) {
             schedules.push(crate::ops::list_exports::schedule());
+        }
+        // Không có nơi lưu file (module `files`) thì không có chỗ ghi: `autoxide doctor` báo.
+        if self.registry.as_ref().is_some_and(|registry| registry.shared_storage().is_some())
+            && let Some(schedule) = self.backup_config.schedule()
+        {
+            schedules.push(schedule);
         }
         schedules
     }
@@ -786,6 +842,13 @@ impl Module for KernelModule {
         ));
         self.exports = Some(exports.clone());
         context.provide::<crate::tenancy::TenantExports>(exports)?;
+        let backups = Arc::new(crate::backup::scheduled::ScheduledBackups::new(
+            context.tenancy().clone(),
+            self.move_setup.clone(),
+            self.backup_config,
+        ));
+        self.backups = Some(backups.clone());
+        context.provide::<crate::backup::scheduled::ScheduledBackups>(backups)?;
         self.migration_runs = Some(Arc::new(crate::tenancy::migration_runs::MigrationRuns::new(
             context.tenancy().clone(),
             self.move_setup.clone(),

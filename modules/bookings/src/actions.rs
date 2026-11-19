@@ -34,12 +34,15 @@ pub(crate) enum Caller<'a> {
     /// Người đăng nhập: cửa hàng (`bookings.manage`), nhân viên của lịch (`bookings.staff`), hay
     /// chính khách có tài khoản.
     Principal(&'a Principal),
+    /// Khách vãng lai đã xác nhận số điện thoại (E.164) bằng mã một lần.
+    Guest(&'a str),
 }
 
 impl Caller<'_> {
     fn actor(self) -> Actor {
         match self {
             Caller::Principal(principal) => Actor::from(principal),
+            Caller::Guest(_) => Actor::public(),
         }
     }
 }
@@ -112,6 +115,11 @@ impl BookingsService {
         row: &Booking,
     ) -> Result<Role, Error> {
         match caller {
+            Caller::Guest(phone) => {
+                if row.customer_user_id.is_none() && row.customer_phone.as_deref() == Some(phone) {
+                    return Ok(Role::Customer);
+                }
+            }
             Caller::Principal(principal) => {
                 if principal.require_at(connection, &BOOKINGS_MANAGE, at(row.org_id)).await.is_ok()
                 {
