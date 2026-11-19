@@ -141,6 +141,9 @@ impl PromotionsService {
             )
             .await?;
         if next == Status::Active {
+            if let Some(prices) = events::automatic_prices_changed(&after) {
+                self.outbox.record(&transaction, tenant, actor, subject.clone(), &prices).await?;
+            }
             self.outbox
                 .record(
                     &transaction,
@@ -205,6 +208,12 @@ impl PromotionsService {
         bump_revision(&transaction, tenant).await?;
         let change = Change::after(json!({"id": id, "from": from.as_str(), "to": to.as_str()}));
         let subject = events::promotion_subject(id);
+        // Giá giảm tự động chỉ có khi chương trình `active`: vào hay rời trạng thái đó là giá đổi.
+        if (from == Status::Active || to == Status::Active)
+            && let Some(prices) = events::automatic_prices_changed(&after)
+        {
+            self.outbox.record(&transaction, tenant, actor, subject.clone(), &prices).await?;
+        }
         match to {
             Status::Paused => {
                 self.outbox
@@ -291,6 +300,15 @@ impl PromotionsService {
             let change =
                 Change::after(json!({"id": row.id, "from": from.as_str(), "to": to.as_str()}));
             let subject = events::promotion_subject(row.id);
+            // Bắt đầu hay hết hạn khi đang chạy: giá giảm tự động đổi (catalog tính lại giá).
+            if from == Status::Active || to == Status::Active {
+                let view = super::store::load(&transaction, tenant, row.id).await?;
+                if let Some(prices) = view.as_ref().and_then(events::automatic_prices_changed) {
+                    self.outbox
+                        .record(&transaction, tenant, Actor::system(), subject.clone(), &prices)
+                        .await?;
+                }
+            }
             if to == Status::Active {
                 self.outbox
                     .record(

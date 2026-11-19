@@ -456,6 +456,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step53-support](D-20261118-step53-support.md)** Module `support` (bước 53): phiếu, khách vãng lai, quyền của người mua, số phiếu, mặc định — 2026-11-18
 - **[D-20261118-step53-teams](D-20261118-step53-teams.md)** `support`: nhóm nhân viên riêng, quy tắc phân công theo cột, chia vòng hỏi quyền hiện tại — 2026-11-18
 - **[D-20261118-step60-bookings](D-20261118-step60-bookings.md)** Module `bookings`: ô giờ 5 phút, giờ bắt đầu theo lưới 15 phút, "nhân viên bất kỳ", cache giờ trống bằng HTTP, cọc qua `ledger`, nhắc lịch qua `notifications` — 2026-11-18
+- **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 
 ## Vận hành và hiệu năng
 
@@ -470,3 +471,4 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-monitoring-files](D-20261118-step39-monitoring-files.md)** Luật cảnh báo, dashboard và sổ tay sự cố nằm trong repo, `xtask` giữ khớp — 2026-11-18
 - **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
 - **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18
+- **[D-20261118-step39-sqlite-optimize](D-20261118-step39-sqlite-optimize.md)** SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18

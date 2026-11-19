@@ -300,3 +300,60 @@ async fn ro_ri_giua_hai_cua_hang_anh_em() {
     .await
     .unwrap();
 }
+
+/// Payload của mọi event `promotions.automatic_prices_changed` đã ghi, cũ trước.
+async fn price_events(setup: &super::Setup) -> Vec<serde_json::Value> {
+    use sea_orm::{ConnectionTrait, Statement};
+    let read = setup.app.database().read();
+    let sql = "SELECT payload FROM promotions_events \
+               WHERE name = 'promotions.automatic_prices_changed' ORDER BY id";
+    let rows =
+        read.query_all_raw(Statement::from_string(read.get_database_backend(), sql)).await.unwrap();
+    rows.iter()
+        .map(|row| {
+            let payload: String = row.try_get("", "payload").unwrap();
+            serde_json::from_str(&payload).unwrap()
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn gia_tu_dong_doi_khi_bat_dau_va_ket_thuc() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
+        let id = create(&setup, body(setup.tree.a, json!({}))).await;
+        let (status, put) = call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/targets"),
+            "boss",
+            Some(json!({"targets": [{"target_type": "variant", "target_id": variant}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{put}");
+        assert!(price_events(&setup).await.is_empty(), "bản nháp chưa có giá");
+        let (status, activated) = activate(&setup, &id).await;
+        assert_eq!(status, StatusCode::OK, "{activated}");
+        let (status, ended) =
+            call(&setup.app, "POST", &format!("/promotions/{id}/end"), "boss", None).await;
+        assert_eq!(status, StatusCode::OK, "{ended}");
+        let found = price_events(&setup).await;
+        assert_eq!(found.len(), 2, "{found:?}");
+        for event in &found {
+            assert_eq!(event["after"]["promotion_id"], id.as_str());
+            assert_eq!(event["after"]["variant_ids"], json!([variant]));
+            assert_eq!(event["after"]["whole_store"], false);
+        }
+
+        // Có điều kiện theo giỏ (đơn tối thiểu): giá chỉ biết lúc tính giỏ, không phát event.
+        running(
+            &setup,
+            body(setup.tree.a, json!({"min_order": {"amount": "500000", "currency": "VND"}})),
+        )
+        .await;
+        assert_eq!(price_events(&setup).await.len(), 2);
+    })
+    .await
+    .unwrap();
+}
