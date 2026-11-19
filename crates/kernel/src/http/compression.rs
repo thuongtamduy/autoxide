@@ -1,4 +1,4 @@
-//! Nén response (gzip, brotli) ngay trong app (bước 39 B4, D-20261118-step39-compression).
+//! Nén response (gzip, brotli) ngay trong app (bước 39 B4, D-20261119-step39-compression).
 //!
 //! Đo trên JSON thật (`docs/BENCHMARKS.md`, mục "Nén response"): trang 20 bài công khai 136 KB còn
 //! ~26–32 KB, `openapi.json` 3 MB còn ~370 KB, ở mức nén nhanh nhất mỗi trang dưới 1 ms CPU. Mức cao

@@ -552,7 +552,7 @@ ghi bên dưới — không hạ ngưỡng cho vừa.
 
 ## Nén response (bước 39 B4) — 19/11/2026
 
-Quyết định: D-20261118-step39-compression. Cùng máy như mục trên (4 nhân Xeon 2,1 GHz dùng chung).
+Quyết định: D-20261119-step39-compression. Cùng máy như mục trên (4 nhân Xeon 2,1 GHz dùng chung).
 
 **Cỡ và thời gian nén** — mẫu JSON thật lấy từ máy chủ chạy bộ `small`, đo bằng chính thư viện
 `tower-http` dùng (`flate2`, `brotli`; một chương trình đo tạm ngoài repo), build release, một thread,

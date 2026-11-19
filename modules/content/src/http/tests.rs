@@ -112,7 +112,8 @@ async fn vong_doi_va_endpoint_cong_khai() {
         let found = send(&app, "GET", path, None, &[], None).await;
         assert_eq!(found.status(), StatusCode::OK, "{}", found.json());
         assert_eq!((found.json()["data"]["type"].as_str(), found.json()["data"]["entry"]["excerpt"].as_str()), (Some("entry"), Some("Một chuyến đi")));
-        assert_eq!(found.header(header::CACHE_CONTROL), "public, no-cache");
+        // Lớp cache của kernel (D-20261119-step39-cdn-cache) đổi `public, no-cache` thành chỉ thị cho CDN.
+        assert_eq!(found.header(header::CACHE_CONTROL), "public, max-age=0, s-maxage=60, stale-while-revalidate=300");
         let public_etag = found.header(header::ETAG).to_owned();
         let again = send(&app, "GET", path, None, &[("if-none-match", &public_etag)], None).await;
         assert_eq!(again.status(), StatusCode::NOT_MODIFIED);

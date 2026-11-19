@@ -1,5 +1,5 @@
 //! `Cache-Control`, `ETag`, `Vary` cho cache dùng chung (CDN, reverse proxy) — bước 39 B5,
-//! D-20261118-step39-cdn-cache.
+//! D-20261119-step39-cdn-cache.
 //!
 //! Handler vẫn quyết `Cache-Control` của mình; lớp này chỉ chốt ba luật để không response nào bị
 //! cache sai chỗ:
@@ -12,7 +12,7 @@
 //!    công khai: nội dung đổi được bất cứ lúc nào): thành
 //!    `public, max-age=0, s-maxage=<AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS>, stale-while-revalidate=300`
 //!    — trình duyệt luôn hỏi lại (rẻ nhờ `ETag` / `304`), CDN giữ tối đa chừng đó giây; thêm
-//!    `Vary: Accept-Language` (thông báo lỗi theo ngôn ngữ); thiếu `ETag` thì thêm ETag yếu là
+//!    `Vary: Accept-Language, Accept-Encoding` (thông báo lỗi theo ngôn ngữ, bản nén); thiếu `ETag` thì thêm ETag yếu là
 //!    dấu vân tay của thân (JSON tới 4 MiB), để lớp `304` ngoài cùng trả được `304`.
 //!
 //! Những gì handler đặt chặt hơn giữ nguyên: `no-store` của bản xem trước, file media có `?v=` đúng
@@ -21,11 +21,11 @@
 use std::sync::Arc;
 
 use axum::body::Body;
+use axum::body::HttpBody as _;
 use axum::extract::Request;
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::middleware::Next;
 use axum::response::Response;
-use axum::body::HttpBody as _;
 use sha2::{Digest, Sha256};
 
 /// Thân lớn hơn chừng này không đọc vào bộ nhớ để làm ETag.
@@ -95,7 +95,10 @@ async fn finish(
     if !marked_public {
         return response;
     }
-    response.headers_mut().append(header::VARY, HeaderValue::from_static("accept-language"));
+    // `accept-encoding` cả khi thân nhỏ không nén: CDN cần biết trước bản lưu tách theo cách nén.
+    response
+        .headers_mut()
+        .append(header::VARY, HeaderValue::from_static("accept-language, accept-encoding"));
     if let Some(value) = &policy.public {
         response.headers_mut().insert(header::CACHE_CONTROL, value.clone());
     }

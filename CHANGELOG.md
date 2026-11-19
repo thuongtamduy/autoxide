@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Caching by a CDN (step 39): public reads of a website now say `public, max-age=0, s-maxage=60,
+  stale-while-revalidate=300` with an `ETag` and `Vary: Accept-Language, Accept-Encoding`, so a CDN keeps them for
+  `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` (default 60; `0` to always ask again). A request with `Authorization` or a
+  cookie never gets a `public` response, writes get `no-store`. `docs/DEPLOY.md` explains how to set up the CDN.
 - Response compression (step 39): JSON and text responses of 1 KiB or more are compressed with brotli or gzip
   when the client accepts it (a page of 20 posts goes from 136 KB to about 26 KB). Images and other files are never
   compressed again. `AUTOXIDE_HTTP_COMPRESSION=false` turns it off when a reverse proxy or CDN already compresses.

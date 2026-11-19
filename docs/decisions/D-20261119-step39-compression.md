@@ -1,4 +1,4 @@
-## D-20261118-step39-compression · Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19 — agent quyết
+## D-20261119-step39-compression · Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19 — agent quyết
 
 Chủ đề: Vận hành và hiệu năng
 

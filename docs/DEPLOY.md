@@ -347,11 +347,33 @@ into a new database.
 | `AUTOXIDE_HTTP_DRAIN_SECONDS` | Behind a load balancer: how long to keep serving while `/health/ready` says `503` on shutdown, see [below](#updating-without-dropping-requests) |
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (default): compress JSON and text with gzip or brotli; `false` when a reverse proxy or CDN in front already compresses |
+| `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | How long a CDN may keep a public read (default `60`), see [A CDN in front of Autoxide](#a-cdn-in-front-of-autoxide) |
 | `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, on the API port: when you turn it on, block `/metrics` in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
 
 Check the configuration without starting anything: `autoxide config`. It lists every
 setting with its value (secrets hidden) and reports every problem at once.
+
+## A CDN in front of Autoxide
+
+Public reads of a website (`/api/v1/content/public/…`, `/api/v1/catalog/public/…`) answer with
+`Cache-Control: public, max-age=0, s-maxage=60, stale-while-revalidate=300`, an `ETag` and
+`Vary: Accept-Language, Accept-Encoding, Origin, autoxide-tenant`. A CDN (Cloudflare, CloudFront, Fastly…) keeps
+such a response for `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` seconds (default `60`; `0` makes it ask every time);
+browsers always ask again and get `304 Not Modified` when nothing changed. A changed post reaches visitors
+within that many seconds. Media files with `?v=` in the address never change and are kept for a year
+(`immutable`).
+
+Autoxide never lets a shared cache keep anything personal: a request with `Authorization` or a cookie gets
+`private` (or `no-store`), writes get `no-store`, and draft previews get `no-store`. Set the CDN to:
+
+- **respect the origin's cache headers** (Cloudflare: Cache Rules → "Use cache-control header if present";
+  CloudFront: a cache policy with minimum TTL `0`, honouring `Cache-Control`);
+- **never cache a request that has `Authorization`** — Cloudflare and CloudFront skip it by default when the
+  origin says `private`; check that no rule overrides it;
+- include the **host** in the cache key (it chooses the tenant) and forward `Accept-Language`, `Origin` and
+  the `autoxide-tenant` header if your websites send it;
+- not compress again if it already does — then set `AUTOXIDE_HTTP_COMPRESSION=false`.
 
 ## Settings and state of each tenant
 

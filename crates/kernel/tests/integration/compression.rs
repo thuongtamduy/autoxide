@@ -1,4 +1,4 @@
-//! Nén response (bước 39 B4, D-20261118-step39-compression): lớp HTTP của kernel nén JSON và chữ
+//! Nén response (bước 39 B4, D-20261119-step39-compression): lớp HTTP của kernel nén JSON và chữ
 //! khi client nhận, không nén file đã nén / nhị phân, response một khúc và stream sự kiện, và `ETag`
 //! vẫn cho `304`. Không chạm database.
 
