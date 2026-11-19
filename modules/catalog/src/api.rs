@@ -412,6 +412,11 @@ pub trait CatalogExtensions: Send + Sync {
     /// Cắm nguồn giá sau giảm tự động (một nguồn; cắm lần hai thì giữ nguồn đầu và trả `false`).
     fn set_sale_price_source(&self, source: std::sync::Arc<dyn SalePriceSource>) -> bool;
 
-    /// Cắm điều kiện mở bán (một điều kiện; cắm lần hai thì giữ cái đầu và trả `false`).
-    fn set_listing_gate(&self, gate: std::sync::Arc<dyn ListingGate>) -> bool;
+    /// Cắm điều kiện mở bán (một điều kiện; cắm lần hai thì giữ cái đầu và trả `false`). Có cài
+    /// đặt mặc định (không nhận, trả `false`) để bản cài đặt sẵn có — vd bản giả trong test của
+    /// module khác — không phải sửa khi trait có thêm hàm.
+    fn set_listing_gate(&self, gate: std::sync::Arc<dyn ListingGate>) -> bool {
+        let _ = gate;
+        false
+    }
 }
