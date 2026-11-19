@@ -19,6 +19,9 @@
 #                         sqlite    bước 7 (kèm doc-test ở gate đầy đủ);
 #                         postgres  bước 8.
 #                       Không có `--only` thì chạy cả ba, như cũ.
+#   --shard k/n         đi kèm gate đầy đủ hoặc `--pr`: bước test (7, 8) chỉ chạy phần thứ k trong n
+#                       phần của mọi test (`cargo xtask … --shard`); n phần cộng lại đúng bằng mọi
+#                       test, doc-test chạy ở phần 1. CI chạy mỗi phần trên một máy (D-20261119-ci-faster).
 #
 # CI trên GitHub (.github/workflows/ci.yml): pull request chạy `--pr`, push lên main chạy gate đầy
 # đủ (D-175, D-197), mỗi lần tách thành ba job `--only …` chạy song song; gate trên máy vẫn là định
@@ -74,8 +77,9 @@ cd "$(dirname "$0")"
 QUICK=0
 PR=0
 ONLY=""
+SHARD=()
 usage() {
-  echo "usage: ./gate.sh [--quick | --pr] [--only lint|sqlite|postgres]" >&2
+  echo "usage: ./gate.sh [--quick | --pr] [--only lint|sqlite|postgres] [--shard k/n]" >&2
   exit 2
 }
 while [ $# -gt 0 ]; do
@@ -85,6 +89,12 @@ while [ $# -gt 0 ]; do
     --only)
       [ $# -ge 2 ] || usage
       ONLY="$2"
+      shift
+      ;;
+    --shard)
+      [ $# -ge 2 ] || usage
+      [[ "$2" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]] || usage
+      SHARD=(--shard "$2")
       shift
       ;;
     *) usage ;;
@@ -98,6 +108,7 @@ case "$ONLY" in
 esac
 # Gate nhanh vốn chỉ có SQLite và đã nhanh: không chia.
 [ "$QUICK" = 1 ] && [ -n "$ONLY" ] && usage
+[ "$QUICK" = 1 ] && [ ${#SHARD[@]} -gt 0 ] && usage
 # Phần `part` có được chạy không (không có `--only` thì mọi phần đều chạy).
 runs() { [ -z "$ONLY" ] || [ "$ONLY" = "$1" ]; }
 
@@ -255,10 +266,10 @@ if ! runs sqlite; then
   :
 elif [ "$PR" = 1 ]; then
   step "tests on SQLite, crates changed since $BASE only (cargo xtask test-affected)"
-  env -u TEST_DATABASE_URL cargo xtask test-affected --base "$BASE" --keep-env
+  env -u TEST_DATABASE_URL cargo xtask test-affected --base "$BASE" --keep-env "${SHARD[@]}"
 else
   step "tests on SQLite"
-  env -u TEST_DATABASE_URL cargo xtask test-all --doc
+  env -u TEST_DATABASE_URL cargo xtask test-all --doc "${SHARD[@]}"
 fi
 
 if [ "$ONLY" = sqlite ]; then
@@ -311,7 +322,7 @@ else
   start_postgres
 fi
 if [ "$PR" = 1 ]; then
-  TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env
+  TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env "${SHARD[@]}"
   if [ "$ONLY" = postgres ]; then
     printf '\n\033[32mgate --pr --only postgres: green — tests of crates changed since %s on Postgres\033[0m\n' "$BASE"
     exit 0
@@ -320,7 +331,7 @@ if [ "$PR" = 1 ]; then
   printf 'Not checked: doc tests, crates the change does not reach. The push to main runs the full gate.\n'
   exit 0
 fi
-TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all
+TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all "${SHARD[@]}"
 if [ "$ONLY" = postgres ]; then
   printf '\n\033[32mgate --only postgres: green — tests on Postgres (files also on S3)\033[0m\n'
   exit 0

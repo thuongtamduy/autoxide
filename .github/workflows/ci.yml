@@ -24,8 +24,9 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Gate tách thành ba phần chạy song song trên ba máy (`./gate.sh --only lint|sqlite|postgres`, cộng
-# lại đúng bằng gate một máy), rồi job `gate` gộp kết quả dưới tên check cũ (D-20261119-ci-faster).
+# Gate tách thành nhiều phần chạy song song, mỗi phần một máy (`./gate.sh --only lint|sqlite|postgres
+# --shard k/n`, cộng lại đúng bằng gate một máy), rồi job `gate` gộp kết quả dưới tên check cũ
+# (D-20261119-ci-faster).
 #
 # Cache (Swatinem/rust-cache): chỉ main ghi (`save-if`), pull request chỉ đọc. Cache của pull request
 # chỉ nhánh đó đọc được, nên ghi chỉ tốn chỗ trong 10 GB của repo và đẩy cache của main ra. Hai job
@@ -64,17 +65,23 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # `part`: phần của `./gate.sh --only`. Postgres thấp nhất được hỗ trợ (STACK.md) và mới nhất:
-        # pull request chỉ chạy bản thấp nhất (dễ hỏng nhất) để có kết quả sớm; push lên main và chạy
-        # tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
+        # `part`: phần của `./gate.sh --only`; `shard`: phần của `./gate.sh --shard` — test đầu-cuối
+        # của `autoxide` (~7–10 phút trên một máy) chia đôi ra hai máy. Postgres thấp nhất được hỗ
+        # trợ (STACK.md) và mới nhất: pull request chỉ chạy bản thấp nhất (dễ hỏng nhất) để có kết quả
+        # sớm; push lên main và chạy tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
         target: >-
           ${{ github.event_name == 'pull_request' && fromJSON('[
-            {"name": "sqlite", "part": "sqlite", "postgres": "16"},
-            {"name": "postgres 16", "part": "postgres", "postgres": "16"}
+            {"name": "sqlite 1/2", "part": "sqlite", "shard": "1/2", "postgres": "16"},
+            {"name": "sqlite 2/2", "part": "sqlite", "shard": "2/2", "postgres": "16"},
+            {"name": "postgres 16 1/2", "part": "postgres", "shard": "1/2", "postgres": "16"},
+            {"name": "postgres 16 2/2", "part": "postgres", "shard": "2/2", "postgres": "16"}
           ]') || fromJSON('[
-            {"name": "sqlite", "part": "sqlite", "postgres": "16"},
-            {"name": "postgres 16", "part": "postgres", "postgres": "16"},
-            {"name": "postgres 18", "part": "postgres", "postgres": "18"}
+            {"name": "sqlite 1/2", "part": "sqlite", "shard": "1/2", "postgres": "16"},
+            {"name": "sqlite 2/2", "part": "sqlite", "shard": "2/2", "postgres": "16"},
+            {"name": "postgres 16 1/2", "part": "postgres", "shard": "1/2", "postgres": "16"},
+            {"name": "postgres 16 2/2", "part": "postgres", "shard": "2/2", "postgres": "16"},
+            {"name": "postgres 18 1/2", "part": "postgres", "shard": "1/2", "postgres": "18"},
+            {"name": "postgres 18 2/2", "part": "postgres", "shard": "2/2", "postgres": "18"}
           ]') }}
     services:
       # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
@@ -107,7 +114,7 @@ jobs:
         with:
           shared-key: test
           # Một job ghi là đủ: các job test build ra cùng một bộ file.
-          save-if: ${{ (github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster') && matrix.target.part == 'sqlite' }}
+          save-if: ${{ (github.ref == 'refs/heads/main' || github.head_ref == 'claude/ci-faster') && matrix.target.name == 'sqlite 1/2' }}
       # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
       # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
       # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
@@ -138,7 +145,7 @@ jobs:
       # main và chạy tay: gate đầy đủ (D-20261118-ci-pr-affected-tests).
       - run: >-
           ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
-          --only ${{ matrix.target.part }}
+          --only ${{ matrix.target.part }} --shard ${{ matrix.target.shard }}
 
   # Tên check cũ, có thể là check bắt buộc của branch protection: chỉ xanh khi mọi phần của gate
   # xanh. `always()`: phần nào đỏ thì job này vẫn chạy và báo đỏ, không bị bỏ qua (check bị bỏ qua

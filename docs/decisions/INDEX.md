@@ -83,7 +83,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-no-codegraph](D-20261118-no-codegraph.md)** Không dùng CodeGraph để agent tìm code; mục lục quyết định bỏ số đếm — 2026-11-18
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261119-changelog-fragments](D-20261119-changelog-fragments.md)** Thay đổi cho changelog ghi bằng file mảnh trong `changelog.d/`, gộp lúc phát hành — 2026-11-19
-- **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành ba job song song, main lưu cache, Postgres chia suất có sàn — 2026-11-19
+- **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành nhiều job song song (theo phần và shard), main lưu cache, Postgres chia suất có sàn — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 
 ## Kiến trúc module và kernel
