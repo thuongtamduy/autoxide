@@ -141,7 +141,7 @@ async fn don_tron_hang_san_va_dat_truoc_tach_hai_lan_giao() {
         drain(&shop).await;
         let (status, second) = ship(&shop, id).await;
         assert_eq!(status, StatusCode::ACCEPTED, "{second}");
-        assert_eq!(second["data"]["request_key"].as_str().unwrap() == key, false);
+        assert_ne!(second["data"]["request_key"].as_str().unwrap(), key);
         assert_eq!(minor(&second["data"]["cod_amount"]), 230_000);
         let key2 = second["data"]["request_key"].as_str().unwrap().to_owned();
         deliver(&shop, id, &key2, Some(230_000)).await;
