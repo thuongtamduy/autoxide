@@ -89,6 +89,14 @@ birthday, compensation…; the same `source` + `source_ref` never gives twice) o
 (`POST /promotions/{id}/vouchers`). `GET /me/vouchers` lists the wallet. The wallet is in the personal
 data export; deleting an account revokes unused vouchers.
 
+## On the website
+
+`GET /public/promotions?locale=&site=` (no sign-in) lists the promotions marked `public` running now on a
+website: those of its unit and of the units above it, with their full conditions, the notices recorded with
+the Departments of Industry and Trade (authority and reference) and the largest discount the law in force today
+allows (`legal_limit`, from the law data). Pages with `limit` / `cursor`; send the `ETag` back in
+`If-None-Match` to get `304`.
+
 ## Returns
 
 `api::returns` has the rules for `orders`: the refund of a line is the amount paid × returned / bought,

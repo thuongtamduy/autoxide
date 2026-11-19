@@ -86,6 +86,13 @@ bù lỗi…; cùng `source` + `source_ref` không bao giờ cấp hai lần) ho
 (`POST /promotions/{id}/vouchers`). `GET /me/vouchers` liệt kê ví. Ví có trong bản xuất dữ liệu cá nhân; xoá tài
 khoản thì voucher chưa dùng bị thu hồi.
 
+## Trên website
+
+`GET /public/promotions?locale=&site=` (không cần đăng nhập) liệt kê chương trình `public` đang chạy trên một
+website: của nút đó và các nút cấp trên, kèm điều kiện đầy đủ, các thông báo đã ghi nhận với Sở Công Thương (nơi
+nhận và số tiếp nhận) và mức giảm tối đa luật đang áp hôm nay cho phép (`legal_limit`, lấy từ dữ liệu luật). Chia
+trang bằng `limit` / `cursor`; gửi lại `ETag` trong `If-None-Match` để nhận `304`.
+
 ## Trả hàng
 
 `api::returns` có quy tắc cho `orders`: tiền hoàn của một dòng = tiền đã trả × số trả / số mua, đơn vị cuối nhận

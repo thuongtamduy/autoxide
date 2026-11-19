@@ -19256,6 +19256,45 @@ export type Page_PromotionsPromotionListItem = {
 };
 
 /** One page of a list. */
+export type Page_PromotionsPublicPromotion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+    claimable: boolean;
+    currency: string;
+    ends_at: string;
+    /** Only for the buyer's first order. */
+    first_order_only: boolean;
+    id: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    legal_limit?: PromotionsPublicLegalLimit | null;
+    /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+    locale: string;
+    /** Smallest order, in minor units of `currency`. */
+    min_order_minor?: number | null;
+    /**
+     * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+     * Trade of that province), with their reference.
+     */
+    notices: PromotionsPublicNotice[];
+    /** Unit that runs it. */
+    org_id: string;
+    starts_at: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+    /** `automatic`, `code` or `voucher`. */
+    trigger: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_PromotionsRedemptionItem = {
   /** The items of this page, in the requested order. */
   data: {
@@ -21466,6 +21505,58 @@ export type PromotionsPromotionListItem = {
   status: PromotionsStatus;
   title: string;
   usage_count: number;
+};
+
+/** The legal discount limit in force. */
+export type PromotionsPublicLegalLimit = {
+  /** Legal basis, with its date in force. */
+  legal_basis: string;
+  /** Largest discount, in basis points of the price just before the promotion (5000 = 50%). */
+  max_bp: number;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`…). */
+  promotion_kind: string;
+};
+
+/** A promotion notice recorded with an authority. */
+export type PromotionsPublicNotice = {
+  authority_code: string;
+  /** Reference given by the authority. */
+  reference?: string | null;
+};
+
+/** A running promotion, as buyers see it. */
+export type PromotionsPublicPromotion = {
+  /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+  claimable: boolean;
+  currency: string;
+  ends_at: string;
+  /** Only for the buyer's first order. */
+  first_order_only: boolean;
+  id: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  legal_limit?: PromotionsPublicLegalLimit | null;
+  /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+  locale: string;
+  /** Smallest order, in minor units of `currency`. */
+  min_order_minor?: number | null;
+  /**
+   * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+   * Trade of that province), with their reference.
+   */
+  notices: PromotionsPublicNotice[];
+  /** Unit that runs it. */
+  org_id: string;
+  starts_at: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
+  /** `automatic`, `code` or `voucher`. */
+  trigger: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
 };
 
 export type PromotionsPurpose = "redeem" | "claim";
@@ -37621,6 +37712,19 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions": {
+    /** List the promotions running now on this website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicPromotion;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

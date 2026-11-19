@@ -589,7 +589,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 - [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
-- [ ] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
+- [x] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
       mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
 
 ## 44. Vận chuyển (`shipping`)
