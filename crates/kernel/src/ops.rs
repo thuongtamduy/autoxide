@@ -4,6 +4,7 @@
 pub(crate) mod alerts;
 pub(crate) mod approvals;
 pub mod automation;
+pub mod bench_seed;
 pub(crate) mod builtin;
 pub mod bulk;
 pub(crate) mod can;

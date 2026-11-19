@@ -470,6 +470,86 @@ Mọi bài trong ±5% (dao động ±20%, D-179). Lớp chặn theo gói ở m�
 bộ nhớ đệm) không đo được trên đường nóng; khách có gói và khách không gói chạy ngang nhau. Bảng đầu là người dùng
 của khách nền tảng (luôn không giới hạn: tay cầm không hỏi `plans`).
 
+## Đọc công khai trên bộ dữ liệu cỡ thật (bước 39 B1, B2) — 19/11/2026
+
+Các bài đo ở trên chạy trên database gần như trống. Bài này đo **đường đọc của website** (không
+đăng nhập, như trình duyệt hay CDN gọi) trên bộ dữ liệu cỡ thật do `scripts/bench-seed.sh` sinh.
+
+### Sinh bộ dữ liệu
+
+```bash
+cargo build --release -p autoxide --features bench-seed     # lệnh sinh chỉ có trong bản build này
+autoxide migrate up
+scripts/bench-seed.sh small    # 50 người dùng, 500 ảnh, 1 000 bài, 10 000 bình luận
+scripts/bench-seed.sh full     # 5 000 người dùng, 50 000 ảnh, 100 000 bài, 1 000 000 bình luận
+```
+
+Bốn lệnh `autoxide task <module>.bench_seed` (`auth`, `media`, `content`, `comments`), mỗi module tự
+ghi bảng của mình theo lô (`insert_many`, 1 000 dòng mỗi transaction), đúng định dạng như khi ghi qua
+API. Bài viết: 100 000 bài, nửa số bài chẵn có bản dịch `vi` (50 000 `en`, 50 000 `vi`), ~500 từ mỗi
+bài, 1 danh mục (20 danh mục) + 3 thẻ (200 thẻ) + 1 tác giả (50) + ảnh đại diện. Ảnh: 480×360 JPEG,
+mỗi ảnh có bản nhỏ 320 px JPEG + WebP, file thật trên đĩa. Bình luận: 60% bình luận gốc, 40% trả lời,
+70% của người dùng đăng nhập; chia lệch giữa các bài (cặp bài một nhiều một ít), trung bình 10 mỗi bài.
+Lệnh từ chối chạy khi thiếu `confirm=yes-this-is-a-benchmark-database` hay khách đã có dữ liệu.
+
+Thời gian sinh bộ `full` (máy dưới đây): SQLite ~3 phút 30 giây (người dùng 1 s, ảnh 27–39 s, bài
+64–85 s, bình luận 96–134 s), 6,3 GB (database + file ảnh); PostgreSQL 16 ~6 phút (1 s, 44 s, 118 s,
+187 s).
+
+### Cách đo
+
+```bash
+LOADTEST_DATASET=full LOADTEST_ONLY=public scripts/loadtest.sh
+LOADTEST_DATASET=full LOADTEST_ONLY=public LOADTEST_DATABASE_URL=postgres://…/loadtest scripts/loadtest.sh
+```
+
+Máy: 4 nhân Intel Xeon 2,1 GHz dùng chung, 15 GB RAM; máy tạo tải (`oha`) chạy cùng máy nên tranh
+CPU — số là cận dưới. SQLite: file trên đĩa, WAL. PostgreSQL 16 cài thường, chưa tinh chỉnh, cùng máy.
+Build release, 64 kết nối, 10 s mỗi bài. Đường dẫn lấy từ chính API: bài thứ 10 của trang đầu, danh
+mục đầu tiên, ảnh đại diện của bài đó, luồng bình luận của bài đó.
+
+### Kết quả (sau D-20261118-step39-sqlite-optimize)
+
+| Bài đo | Ngưỡng p95 | SQLite req/s | SQLite p95 | Postgres req/s | Postgres p95 |
+| ------ | ---------: | -----------: | ---------: | -------------: | -----------: |
+| `GET /content/public/resolve` (một bài) | 100 ms | 1 249 | 63 ms ✅ | 906 | 89 ms ✅ |
+| `GET /content/public/posts` (trang đầu, 20 bài) | 300 ms | 156 | 458 ms ❌ | 280 | 284 ms ✅ |
+| `GET /content/public/posts?term_id=` (theo danh mục) | 300 ms | 18 | 6 200 ms ❌ | 230 | 326 ms ❌ |
+| `GET /content/public/terms/category/{slug}` | 100 ms | 2 750 | 30 ms ✅ | 2 929 | 28 ms ✅ |
+| `GET /content/public/sitemap` (trang đầu) | 300 ms | 118 | 636 ms ❌ | 250 | 297 ms ✅ |
+| `GET /content/public/feed` | 300 ms | 135 | 518 ms ❌ | 274 | 278 ms ✅ |
+| `GET /content/public/search?q=` (theo từ) | 500 ms | 6 | quá 10 s ❌ | 6 | quá 10 s ❌ |
+| `GET /media/{id}/content` (ảnh gốc 480×360) | 50 ms | 2 981 | 27 ms ✅ | 3 443 | 28 ms ✅ |
+| `GET /media/{id}/content?w=320&format=webp` | 50 ms | 2 439 | 33 ms ✅ | 2 987 | 28 ms ✅ |
+| `GET /comments/public/threads` (20 gốc + trả lời) | 200 ms | 422 | 177 ms ✅ | 1 074 | 75 ms ✅ |
+| `GET /comments/public/comments/{id}` | 100 ms | 2 278 | 35 ms ✅ | 3 572 | 24 ms ✅ |
+
+Ngưỡng: đặc tả khuyến nghị ≤ 50 ms cho đọc JSON, ≤ 200 ms cho sitemap / feed, ≤ 150 ms cho tìm ở 64
+kết nối. Nới theo số đo vì máy tạo tải chạy chung 4 nhân với máy chủ (một request đơn lẻ, SQLite, máy
+rảnh: trang 20 bài 62 ms, sitemap 30 ms, feed 34 ms): một đối tượng ≤ 100 ms, danh sách 20 bài đầy đủ thân
+bài (~137 KB JSON) ≤ 300 ms, luồng bình luận ≤ 200 ms, file ≤ 50 ms, tìm ≤ 500 ms. Bài đỏ là việc còn mở,
+ghi bên dưới — không hạ ngưỡng cho vừa.
+
+### Tìm thấy và đã sửa
+
+- **SQLite không có thống kê cho bộ lập kế hoạch truy vấn** (D-20261118-step39-sqlite-optimize): trước
+  khi sửa, luồng bình luận quét theo index `(tenant_id, id)` — 3,7 s một request, dưới tải 64 kết nối
+  không request nào xong trong 10 s (6 req/s, 0% thành công); một bình luận p95 9,2 s. Sau khi kết nối
+  ghi chạy `PRAGMA optimize`: 422 req/s, p95 177 ms; một bình luận 2 278 req/s, p95 35 ms.
+
+### Còn mở (đỏ ở trên)
+
+- **Danh sách bài theo danh mục trên SQLite** (module `content`): có thống kê, SQLite lấy hết ~2 500
+  bài của danh mục (`IN (SELECT …)`) rồi sắp xếp cả dòng (có thân bài) trong bộ nhớ tạm — 29 ms một
+  câu, 6,2 s p95 dưới tải. Viết điều kiện bằng `EXISTS` thì đi theo index ngày đăng: 7 ms. Đã báo phiên
+  giữ module `content`; rà lại ở mục index (B3).
+- **Tìm công khai theo từ** (module `content`): `LIKE '%…%'` trên `search_key` của mọi bài một ngôn ngữ
+  (~50 000 bài × ~3 KB) — 1,4 s một request đơn lẻ trên SQLite. Cần index tìm toàn văn (FTS5 / `tsvector`
+  sau một trait, Luật số một) — thay đổi thiết kế của `content`, đã báo phiên giữ module.
+- **Danh sách 20 bài, sitemap, feed trên SQLite** (~460–640 ms p95): câu SQL dưới 2 ms; thời gian nằm ở
+  dựng JSON đầy đủ thân bài và các lần tra ảnh / term / tác giả theo lô. Đo lại sau mục nén (B4) và cache
+  CDN (B5) — trước CDN các đường này đáng lẽ hiếm khi tới máy chủ.
+
 ## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
 
 Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,
