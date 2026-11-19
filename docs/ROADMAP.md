@@ -756,10 +756,10 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
 - [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
       khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
       tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
-- [ ] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
+- [x] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
       hội) là cài đặt kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè); địa chỉ, giờ mở cửa, ngày nghỉ lấy từ hồ sơ
       địa điểm của bước 34, không lưu hai chỗ (D-237); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công
-      Thương từ bước 37
+      Thương từ bước 37 — chân trang pháp lý lấy từ endpoint công khai của `compliance` (D-20261119-step55-store-info)
 - [ ] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
       `ContentLinks` trong `content::api`: module đó gắn bộ dựng đường dẫn và bộ kiểm "còn hiển thị
       không"; thiếu module thì link loại đó bị từ chối khi lưu

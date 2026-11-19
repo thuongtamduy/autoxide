@@ -505,7 +505,14 @@ impl Module for AuthModule {
 
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
-        relocation::relocation()
+        let relocation = relocation::relocation();
+        // Rào quyền chép sang khách mới ngay trong bước mở nó (gọi sau `start`).
+        match &self.state {
+            Some(state) => {
+                relocation.on_switch(Arc::new(guardrail::GuardrailSwitch(state.guardrails.clone())))
+            }
+            None => relocation,
+        }
     }
 
     // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.

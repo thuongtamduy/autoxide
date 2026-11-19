@@ -13,4 +13,4 @@
 pub(crate) mod entity;
 mod service;
 
-pub(crate) use service::{GuardrailService, GuardrailView, subscriptions};
+pub(crate) use service::{GuardrailService, GuardrailSwitch, GuardrailView, subscriptions};
