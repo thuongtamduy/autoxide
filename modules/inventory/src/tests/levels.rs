@@ -130,6 +130,10 @@ async fn gia_von_binh_quan_gia_quyen() {
         // Hàng thêm không giá (vd tìm thấy) giữ nguyên giá vốn.
         stock_in(&shop, shop.tree.a, item, 1, None).await;
         assert_eq!(level(&shop, shop.tree.a, item).await["average_cost"]["amount"], "1079");
+        // Giá trị tồn: 20 × 1079 = 21 580.
+        let (_, report) = call(&shop, "GET", "/reports/valuation", "boss", None).await;
+        assert_eq!(report["data"][0]["units"], 20, "{report}");
+        assert_eq!(report["data"][0]["value"], json!({"amount": "21580", "currency": "VND"}));
         // Ba lần đổi giá vốn → ba event `inventory.cost_changed` cho `catalog`.
         assert_eq!(events_named(&shop, "inventory.cost_changed").await, 3);
         // Khác tiền tệ khi đang có tồn.

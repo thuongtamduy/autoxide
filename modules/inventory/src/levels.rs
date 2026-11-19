@@ -72,6 +72,12 @@ pub(crate) struct AdjustLine {
     pub note: Option<String>,
     /// Giá vốn đơn vị của hàng thêm vào (vd nhập tồn đầu kỳ); chỉ khi `quantity > 0`.
     pub unit_cost: Option<Money>,
+    /// Lô: bắt buộc khi thêm hàng của biến thể theo dõi lô; khi bớt thì trống = lô hết hạn trước.
+    pub lot_code: Option<String>,
+    /// Hạn dùng của lô khi thêm hàng.
+    pub expires_on: Option<chrono::NaiveDate>,
+    /// Đủ `|quantity|` số serial khi biến thể theo dõi serial.
+    pub serials: Vec<String>,
 }
 
 /// Lệnh điều chỉnh tồn ở một kho.
@@ -306,13 +312,41 @@ impl InventoryService {
         {
             return Err(errors::not_tracked(line.variant_id));
         }
+        let mut problems = Vec::new();
+        for (index, line) in input.lines.iter().enumerate() {
+            let Some(variant) = variants.get(&line.variant_id) else { continue };
+            if variant.lot_tracked && line.quantity > 0 && line.lot_code.is_none() {
+                problems.push(FieldError::new(
+                    format!("lines[{index}].lot_code"),
+                    "required",
+                    "this variant tracks lots: give the lot of the units added",
+                ));
+            }
+            if let Some(code) = &line.lot_code {
+                crate::lots::check_lot_code(
+                    &mut problems,
+                    &format!("lines[{index}].lot_code"),
+                    code,
+                );
+            }
+            if variant.serial_tracked {
+                crate::lots::check_serials(
+                    &mut problems,
+                    &format!("lines[{index}].serials"),
+                    &line.serials,
+                    line.quantity.abs(),
+                );
+            }
+        }
+        fail_if_any(problems)?;
         self.ensure_warehouse(tenant, input.org_id).await?;
         let fingerprint = reference::fingerprint(&AdjustFingerprint {
             org_id: input.org_id,
             lines: &input.lines,
         })?;
         let database = tenant.database();
-        let (input, reference, fingerprint) = (&input, &reference, &fingerprint);
+        let (input, reference, fingerprint, variants) =
+            (&input, &reference, &fingerprint, &variants);
         reference::submit_once(database, move || async move {
             let transaction = database.begin_write().await?;
             writable(principal, &transaction, &ADJUST, input.org_id).await?;
@@ -365,7 +399,35 @@ impl InventoryService {
                     source_id: row.id,
                     actor: Some(principal.user_id()),
                 };
-                movements.push(stock::record(&transaction, tenant, &mut touched, new).await?);
+                let variant = variants.get(&line.variant_id);
+                let serial_tracked = variant.is_some_and(|v| v.serial_tracked);
+                if line.quantity > 0 {
+                    let lot = line.lot_code.as_deref().map(|code| (code, line.expires_on));
+                    let serials: &[String] = if serial_tracked { &line.serials } else { &[] };
+                    movements.push(
+                        crate::lots::record_in(
+                            &transaction,
+                            tenant,
+                            &mut touched,
+                            new,
+                            lot,
+                            serials,
+                        )
+                        .await?,
+                    );
+                } else {
+                    let tracking = crate::lots::Tracking {
+                        lot_tracked: variant.is_some_and(|v| v.lot_tracked),
+                        lot_code: line.lot_code.as_deref(),
+                        serials: serial_tracked.then_some(line.serials.as_slice()),
+                        serial_status: "written_off",
+                        order: None,
+                    };
+                    let (rows, _) =
+                        crate::lots::record_out(&transaction, tenant, &mut touched, new, &tracking)
+                            .await?;
+                    movements.extend(rows);
+                }
             }
             stock::publish(&transaction, tenant, &self.outbox, &Actor::from(principal), touched)
                 .await?;
@@ -390,4 +452,55 @@ pub(crate) async fn movements_of<C: ConnectionTrait>(
         .order_by_asc(movement::Column::Id)
         .all(connection)
         .await?)
+}
+
+/// Giá trị tồn của một kho theo một tiền tệ: Σ `on_hand` × giá vốn bình quân.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Valuation {
+    pub org_id: Uuid,
+    pub currency: String,
+    pub units: i64,
+    pub value_minor: i64,
+}
+
+impl InventoryService {
+    /// Giá trị tồn hiện tại theo kho và tiền tệ, trong phạm vi `inventory.read` của người gọi.
+    pub(crate) async fn valuation(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        org: Option<Uuid>,
+    ) -> Result<Vec<Valuation>, Error> {
+        use sea_orm::QuerySelect;
+        let scope = principal.scope_condition(&READ, level::Column::OrgId, None)?;
+        let mut select = level::Entity::find()
+            .select_only()
+            .column(level::Column::OrgId)
+            .column(level::Column::AverageCostCurrency)
+            // Postgres trả `numeric` cho `SUM(bigint)`: ép về BIGINT cho cả hai database.
+            .column_as(Expr::cust("CAST(COALESCE(SUM(on_hand), 0) AS BIGINT)"), "units")
+            .column_as(
+                Expr::cust("CAST(COALESCE(SUM(on_hand * average_cost_minor), 0) AS BIGINT)"),
+                "value_minor",
+            )
+            .filter(level::Column::AverageCostCurrency.is_not_null())
+            .filter(level::Column::OnHand.gt(0))
+            .filter(scope)
+            .scoped(tenant)
+            .group_by(level::Column::OrgId)
+            .group_by(level::Column::AverageCostCurrency);
+        if let Some(org) = org {
+            select = select.filter(level::Column::OrgId.eq(org));
+        }
+        let rows: Vec<(Uuid, Option<String>, i64, i64)> =
+            select.into_tuple().all(tenant.database().read()).await?;
+        let mut found: Vec<Valuation> = rows
+            .into_iter()
+            .filter_map(|(org_id, currency, units, value_minor)| {
+                currency.map(|currency| Valuation { org_id, currency, units, value_minor })
+            })
+            .collect();
+        found.sort_by(|a, b| (a.org_id, &a.currency).cmp(&(b.org_id, &b.currency)));
+        Ok(found)
+    }
 }

@@ -17,6 +17,9 @@ endpoints are marked deprecated with a sunset date first.
   confirms on `ledger.payment_succeeded`, cancels unpaid orders at the ledger's payment deadline and refunds late
   payments; public payment status for the QR screen (`GET /public/payments/{token}`); `GET /me/orders`,
   `GET /` and `GET /{id}` for staff.
+- Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
+  `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
+  sold only once; transfers keep lots and serial numbers.
 - Module `orders` (step 45, first part): carts for signed-in buyers and guests (`Cart-Token`, returned once, only
   its hash kept), one active cart per buyer and shop, guest carts merged on sign-in (`POST /carts/{id}/merge`);
   prices, discounts, shipping fees and taxes always computed again by the server from `catalog`, `promotions`,
