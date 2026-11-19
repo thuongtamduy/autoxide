@@ -8,6 +8,7 @@ mod checkout;
 mod fake_ledger;
 mod fakes;
 mod lifecycle;
+mod pickups;
 mod returns;
 
 pub(crate) use fake_ledger::FakeLedger;
@@ -183,18 +184,32 @@ impl FakeShipping {
 #[async_trait::async_trait]
 impl ShippingRates for FakeShipping {
     async fn quote(&self, _tenant: &TenantContext, request: &QuoteRequest) -> Result<Quote, Error> {
-        Ok(serde_json::from_value(json!({"options": [self.option(request)], "unavailable": []}))
-            .unwrap())
+        let options = [serde_json::to_value(self.option(request)).unwrap(), store_option(request)];
+        Ok(serde_json::from_value(json!({"options": options, "unavailable": []})).unwrap())
     }
 
     async fn confirm_option(
         &self,
         _tenant: &TenantContext,
         request: &QuoteRequest,
-        _option_key: &str,
+        option_key: &str,
     ) -> Result<ShippingOption, Error> {
+        if option_key == "store" {
+            return Ok(serde_json::from_value(store_option(request)).unwrap());
+        }
         Ok(self.option(request))
     }
+}
+
+/// Nhận tại chính cửa hàng bán, miễn phí, giữ hàng 2 ngày.
+fn store_option(request: &QuoteRequest) -> Value {
+    json!({
+        "method_id": Uuid::from_u128(7), "method_code": "store", "name": "In store",
+        "kind": "pickup", "amount": money(0), "free_shipping_applied": false, "free_over": null,
+        "tax_category": "vat.standard", "carrier_code": null, "service_code": null,
+        "pickup_org_id": request.org_id, "chargeable_weight_grams": 0, "estimated_days": null,
+        "eta": null, "ready_at": null, "hold_days": 2, "option_key": "store",
+    })
 }
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
@@ -430,6 +445,7 @@ now_job!(ExpireUnpaidNow, crate::jobs::EXPIRE_UNPAID);
 now_job!(RecoverNow, crate::jobs::RECOVER_CHECKOUTS);
 now_job!(CompleteNow, crate::jobs::COMPLETE_DELIVERED);
 now_job!(UnacceptedNow, crate::jobs::EXPIRE_UNACCEPTED);
+now_job!(PickupsNow, crate::jobs::EXPIRE_PICKUPS);
 
 /// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
 pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
@@ -451,6 +467,9 @@ pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
         }
         crate::jobs::EXPIRE_UNACCEPTED => {
             queue.enqueue_database(write, &UnacceptedNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_PICKUPS => {
+            queue.enqueue_database(write, &PickupsNow {}, options()).await
         }
         other => panic!("no test job for `{other}`"),
     }

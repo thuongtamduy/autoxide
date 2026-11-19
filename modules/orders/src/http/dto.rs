@@ -386,6 +386,24 @@ pub(crate) struct OrderResponse {
     cancel_reason: Option<String>,
     /// Changes on every update (for `If-Match`).
     version: i32,
+    /// Collecting in store: the shop, and the pickup once the order is ready.
+    pickup_org_id: Option<Uuid>,
+    pickup: Option<PickupResponse>,
+}
+
+/// An order waiting in store.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersPickup)]
+pub(crate) struct PickupResponse {
+    /// `ready`, `picked_up` or `expired`.
+    status: String,
+    /// The 6-digit code to show at the counter; only in your own order.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
+    ready_at: DateTime<Utc>,
+    /// Held until then.
+    hold_until: DateTime<Utc>,
+    handed_over_at: Option<DateTime<Utc>>,
 }
 
 impl OrderResponse {
@@ -423,6 +441,8 @@ impl OrderResponse {
             cancelled_at: row.cancelled_at,
             cancel_reason: row.cancel_reason,
             version: row.version,
+            pickup_org_id: row.pickup_org_id,
+            pickup: None,
         })
     }
 
@@ -452,8 +472,28 @@ impl OrderResponse {
                 })
             })
             .collect::<Result<Vec<_>, autoxide_kernel::error::Error>>()?;
+        let pickup = view.pickup.map(|pickup| PickupResponse {
+            status: pickup.status,
+            code: None,
+            ready_at: pickup.ready_at,
+            hold_until: pickup.hold_until,
+            handed_over_at: pickup.handed_over_at,
+        });
         let mut response = OrderResponse::summary(view.order)?;
         response.lines = lines;
+        response.pickup = pickup;
+        Ok(response)
+    }
+
+    /// Đơn của chính người mua: kèm mã nhận tại cửa hàng.
+    pub(crate) fn for_buyer(
+        view: crate::orders_read::OrderView,
+    ) -> Result<Self, autoxide_kernel::error::Error> {
+        let code = view.pickup.as_ref().map(|pickup| pickup.code.clone());
+        let mut response = OrderResponse::new(view)?;
+        if let Some(pickup) = response.pickup.as_mut() {
+            pickup.code = code;
+        }
         Ok(response)
     }
 }

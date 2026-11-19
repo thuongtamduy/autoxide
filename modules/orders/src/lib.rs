@@ -24,6 +24,7 @@ mod migration;
 mod orders_read;
 mod payments;
 mod permissions;
+mod pickups;
 mod policy;
 mod pricing;
 mod reasons;

@@ -46,6 +46,9 @@ event!(OrderCompleted, names::ORDER_COMPLETED);
 event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
+event!(PickupReady, names::PICKUP_READY);
+event!(PickupReminder, names::PICKUP_REMINDER);
+event!(PickupExpired, names::PICKUP_EXPIRED);
 event!(ReturnRequested, names::RETURN_REQUESTED);
 event!(ReturnPickupRequested, names::RETURN_PICKUP_REQUESTED);
 event!(ReturnReceived, names::RETURN_RECEIVED);
@@ -88,6 +91,18 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::RETURN_STATUS_CHANGED,
             "A return changed status (approved, rejected, received, refunded or closed).",
+        ),
+        EventInfo::new(
+            names::PICKUP_READY,
+            "An order to collect in store is ready; `after.pickup_code` is the code to show.",
+        ),
+        EventInfo::new(
+            names::PICKUP_REMINDER,
+            "An order waiting in store will stop being held within 24 hours.",
+        ),
+        EventInfo::new(
+            names::PICKUP_EXPIRED,
+            "An order waiting in store was not collected in time.",
         ),
         EventInfo::new(names::INVOICE_LINKED, "An electronic invoice was linked to an order."),
         EventInfo::new(names::CART_ABANDONED, "A buyer left a cart without placing an order."),

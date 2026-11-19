@@ -62,6 +62,13 @@ pub mod events {
     pub const RETURN_RECEIVED: &str = "orders.return_received";
     /// Một yêu cầu trả hàng đổi trạng thái (duyệt, từ chối, nhận hàng, hoàn tiền, đóng).
     pub const RETURN_STATUS_CHANGED: &str = "orders.return_status_changed";
+    /// Đơn nhận tại cửa hàng đã sẵn sàng: `after.pickup_code` (mã nhận 6 số gửi người mua),
+    /// `hold_until`, `pickup_org_id`.
+    pub const PICKUP_READY: &str = "orders.pickup_ready";
+    /// Còn dưới 24 giờ là hết hạn giữ hàng chờ nhận (gửi một lần).
+    pub const PICKUP_REMINDER: &str = "orders.pickup_reminder";
+    /// Hết hạn giữ hàng chờ nhận (`after.action`: `cancel_refund` hay `keep_waiting`).
+    pub const PICKUP_EXPIRED: &str = "orders.pickup_expired";
     /// Một hoá đơn điện tử đã gắn vào đơn.
     pub const INVOICE_LINKED: &str = "orders.invoice_linked";
     /// Giỏ bị bỏ dở (người mua, tóm tắt giỏ) — cho bước 47.

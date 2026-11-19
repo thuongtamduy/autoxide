@@ -6,6 +6,7 @@ mod carts;
 pub(crate) mod dto;
 mod lifecycle;
 mod orders;
+mod pickups;
 pub(crate) mod returns;
 
 use std::sync::Arc;
@@ -37,6 +38,8 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(lifecycle::cancel_mine))
         .routes(routes!(lifecycle::request_shipment))
         .routes(routes!(lifecycle::payment_link))
+        .routes(routes!(pickups::ready))
+        .routes(routes!(pickups::handover))
         .routes(routes!(returns::request_return))
         .routes(routes!(returns::preview_return))
         .routes(routes!(returns::my_return))

@@ -37,6 +37,10 @@ pub(crate) struct ContactRequest {
     /// Mobile number; delivery and order lookup use it.
     phone: String,
     email: Option<String>,
+    /// Picking up in store: name of someone else who may collect the order.
+    proxy_name: Option<String>,
+    /// Picking up in store: phone number of that person (both or neither).
+    proxy_phone: Option<String>,
 }
 
 /// Place the order of a cart.
@@ -117,6 +121,8 @@ pub(crate) async fn checkout(
             name: input.contact.name,
             phone: input.contact.phone,
             email: input.contact.email,
+            proxy_name: input.contact.proxy_name,
+            proxy_phone: input.contact.proxy_phone,
         },
         note: input.note,
         accept_terms_version: input.accept_terms_version,
@@ -222,7 +228,7 @@ pub(crate) async fn my_order(
     Path(id): Path<Uuid>,
 ) -> Result<Data<OrderResponse>, Error> {
     let view = service.my_order(&tenant, principal.user_id(), id).await?;
-    Ok(Data { data: OrderResponse::new(view)? })
+    Ok(Data { data: OrderResponse::for_buyer(view)? })
 }
 
 /// Filter of the staff order list.
@@ -240,6 +246,10 @@ pub(crate) struct OrderListQuery {
     channel: Option<String>,
     /// The order number.
     number: Option<String>,
+    /// Only orders collected at this shop.
+    pickup_org_id: Option<Uuid>,
+    /// Only orders collected in store in this state: `ready`, `picked_up` or `expired`.
+    pickup_status: Option<String>,
 }
 
 /// List orders.
@@ -271,6 +281,8 @@ pub(crate) async fn list_orders(
         org_id: query.org_id,
         channel: query.channel,
         number: query.number,
+        pickup_org_id: query.pickup_org_id,
+        pickup_status: query.pickup_status,
     };
     let page = PageRequest::try_from(page)?;
     let found = service.list_orders(&tenant, &principal, &filter, &page).await?;

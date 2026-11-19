@@ -227,3 +227,27 @@ pub(crate) fn return_invalid_transition(from: &str, to: &str) -> Error {
     .with_param("from", from.to_owned())
     .with_param("to", to.to_owned())
 }
+
+pub(crate) fn pickup_not_allowed(status: crate::api::OrderStatus) -> Error {
+    Error::conflict(
+        "orders.pickup_not_allowed",
+        "This order is not collected in store, or it cannot be handed over while it is {status}.",
+    )
+    .with_param("status", status)
+}
+
+pub(crate) fn pickup_not_ready() -> Error {
+    Error::conflict(
+        "orders.pickup_not_ready",
+        "The order is not ready for collection yet; mark it ready first.",
+    )
+}
+
+pub(crate) fn pickup_code_invalid() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.pickup_code_invalid",
+        "The pickup code, or the name and phone number of the person collecting, do not match the \
+         order.",
+    )
+}
