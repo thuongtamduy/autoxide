@@ -20,7 +20,7 @@ use super::{
 use crate::entity::order;
 
 /// Đơn COD của `buyer1` ở cửa hàng A (2 món × 100.000 + phí giao 30.000); trả ID.
-async fn cod_order(shop: &Shop) -> Uuid {
+pub(super) async fn cod_order(shop: &Shop) -> Uuid {
     let shirt = shop.catalog.add(shop.tree.a, 100_000);
     shop.inventory.stock(shop.tree.a, shirt, 10);
     let buyer = Call::as_user(shop, "buyer1");
@@ -55,12 +55,12 @@ async fn etag(shop: &Shop, id: Uuid) -> String {
     answer.header("etag").to_owned()
 }
 
-async fn status_of(shop: &Shop, id: Uuid) -> String {
+pub(super) async fn status_of(shop: &Shop, id: Uuid) -> String {
     let (_, found) = Call::as_user(shop, "boss").send("GET", &format!("/{id}"), None).await;
     found["data"]["status"].as_str().unwrap().to_owned()
 }
 
-async fn count_events(shop: &Shop, name: &str) -> i64 {
+pub(super) async fn count_events(shop: &Shop, name: &str) -> i64 {
     let read = shop.database().read();
     let sql = format!("SELECT COUNT(*) FROM orders_events WHERE name = '{name}'");
     let row = read

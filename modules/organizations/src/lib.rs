@@ -18,6 +18,8 @@ mod permissions;
 mod profile;
 mod service;
 mod settings;
+mod storefront;
+mod suggest;
 mod tools;
 mod tools_groups;
 mod unit_resource;
@@ -136,6 +138,8 @@ impl Module for OrganizationsModule {
         let service = Arc::new(service);
         context.resource_type(profile::STORE, Arc::new(profile::StoreResolver))?;
         context.resource_type(unit_resource::UNIT, Arc::new(unit_resource::UnitResolver))?;
+        // Gợi ý tìm của website (D-201): cửa hàng công khai.
+        context.suggest_source(Arc::new(suggest::Stores(service.clone())))?;
         self.service = Some(service.clone());
         // Kernel hỏi "nút này có thuộc khách không" (gắn tên miền với một cửa hàng…).
         context.provide::<dyn autoxide_kernel::tenancy::OrgNodes>(service.clone())?;

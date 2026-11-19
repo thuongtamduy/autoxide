@@ -4,7 +4,7 @@ Mỗi bước xong khi `./gate.sh --quick` xanh; agent đánh dấu `[x]`, commi
 và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi tiết
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
-Trạng thái: **bước 0–37 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
+Trạng thái: **bước 0–38 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
 **kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.14.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
@@ -229,41 +229,6 @@ Linear, GitHub, Odoo); mỗi mục chạy và có test trên cả hai database.
       - [x] Gợi ý `mobile` trên `NavItem`, `GET /kernel/navigation?device=mobile`, tool MCP nhận `device` (D-369)
 
 ## Giai đoạn C — Vận hành
-
-## 38. Cây khách hàng xuyên database và báo cáo gộp (D-185)
-
-Đặc tả: [`docs/steps/38-cross-database-reporting.md`](steps/38-cross-database-reporting.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
-
-Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 36 (báo cáo gộp cần số liệu tiền).
-
-- [x] Kho báo cáo gộp: event của các khách con đổ về khách cha (hay một database báo cáo) gần thời
-      gian thực, mang `tenant_id`, `org_id`; báo cáo gộp nhiều cửa hàng, nhiều tiền tệ; người có quyền
-      ở cha mới xem — xong (18/11, D-20261118-step38-report-facts): kernel `report` + `Module::facts`, module
-      `reporting` (rút ở database nguồn, lịch đẩy lên kho ở database của khách gốc, cộng dồn ngày, dọn),
-      `invoices` / `ledger` khai số liệu, `/api/v1/reporting/*` + tool MCP, phạm vi theo cây khách và cây tổ chức,
-      quy đổi theo tỉ giá của người xem; test cha / con khác database trên cả hai database
-- [x] Cha thao tác trên con: vào ngữ cảnh con bằng cùng API (uỷ quyền của bước 34); job phân phối dữ
-      liệu cha → con (vd danh mục, bảng giá) gọi service của con, chạy lại được, không trùng — xong (18/11,
-      D-20261118-step38-distribution): test đầu-cuối uỷ quyền vào con có database riêng (audit hai phía, thu hồi);
-      kernel `tenancy::distribution` (`Distributor`, `DistributionApply`, `distribution_migration`) với module mẫu
-- [x] Tách một nhánh tổ chức thành khách riêng (database riêng) và gộp ngược lại, giữ ID và lịch sử;
-      test trên cả hai database — xong (18/11, D-20261118-step38-relocation): kernel `tenancy::relocate` (chính sách theo
-      bảng `Module::relocation` cho mọi module, kế hoạch / dry-run với xung đột tham chiếu và unique, chép có lọc + đổi
-      `tenant_id` giữ khoá chính, trạng thái chạy lại được, chuyển mặt điều khiển, dọn, file theo khách), audit ghi lại vào
-      chuỗi của đích, `reporting.rehome`, CLI `autoxide tenant split|merge|relocation-status`; test khứ hồi so mọi bảng
-- [x] Đối chiếu thiết kế 2 (D-210): tách / gộp khách qua API chỉ cho nhân sự nền tảng, khách chỉ gửi yêu cầu — xong
-      (18/11, D-20261118-step38-relocation): `POST /api/v1/kernel/relocations` (dry-run mặc định, job) +
-      `GET …/{id}`; khách gửi `POST /api/v1/kernel/tenant/relocation-requests`, yêu cầu vào hộp việc của nhân sự nền tảng
-- [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
-      chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
-      — đang làm: phần nền xong (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
-      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); cách ly xong (19/11,
-      D-20261119-step38-sandbox-isolation: kernel bọc hợp đồng đối tác lúc công bố → bộ giả, mail chỉ tới nhân viên,
-      webhook theo `kernel.sandbox.webhook_urls`, hộp thư giả `kernel_sandbox_messages` + REST / MCP); còn sao / đẩy
-      (`Module::sandbox_copy` / `promotable`, API promote)
-- [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
-      D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
-      `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
@@ -572,7 +537,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [x] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
       dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
       mỗi bên trả tiền (D-222)
-- [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
+- [x] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
       dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày (D-222)
 - [x] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
       xác nhận → trả lại), test đồng thời; chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện
@@ -585,15 +550,15 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       D-222) và sàn giá; giới hạn số ngày giảm giá là dữ liệu; kiểm trước khi bật, không ghi (D-225)
 - [x] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
       chức, ghi nhận đã nộp từng nơi; lưu vết chương trình đã chạy
-- [ ] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
+- [x] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
       dùng"), bộ chọn thay ô nhập mã (D-201); trang sản phẩm hiện "còn X với mã …", giá niêm yết vẫn là giá
       không mã (D-200); số lượt còn lại chỉ hiện khi là số thật
-- [ ] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
+- [x] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
       còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
-- [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
+- [x] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 - [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
-- [ ] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
+- [x] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
       mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
 
 ## 44. Vận chuyển (`shipping`)
@@ -644,10 +609,10 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Nhận tại cửa hàng và hàng đặt trước: mã nhận 6 số, người nhận hộ, giữ hàng chờ nhận có hạn rồi huỷ /
       hoàn theo chính sách; đặt trước (D-204): tách lần giao, đồng ý điều kiện và thấy ngày giao trước khi
       đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt trước thì huỷ và hoàn tiền tự động
-- [ ] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
+- [x] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
       nhận về (nhập kho), hoàn qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi
       NĐ 70/2025 — cần đối chiếu); hoàn theo tỉ lệ khoản giảm, xử lý quà, voucher về ví (D-222)
-- [ ] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
+- [x] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
       theo phương thức thanh toán; ảnh kèm (lý do bắt buộc ảnh là chính sách theo nút); `returns/preview`
       trả tiền hoàn, cách gửi và phí, thời gian hoàn, hạn — không ghi
 - [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc
@@ -781,20 +746,20 @@ liên kết (bước 37).
 Bắt đầu SAU bước 41. Website và app của khách tự vẽ giao diện (D-026: core chỉ có API); bước này cho
 họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà không phải sửa code giao diện mỗi lần đổi.
 
-- [ ] Vị trí hiển thị và banner (`content`): vị trí theo khoá (vd `home_hero`), banner có ảnh máy tính
+- [x] Vị trí hiển thị và banner (`content`): vị trí theo khoá (vd `home_hero`), banner có ảnh máy tính
       và điện thoại qua `Media`, tiêu đề, nút, link (địa chỉ, bài, danh mục, sản phẩm, bộ sưu tập,
       chương trình khuyến mại), ngôn ngữ, khung giờ hiển thị, thứ tự, áp cho cửa hàng / nhánh (bước 34)
-- [ ] Đọc công khai `GET /api/v1/content/public/placements/{key}`: banner đang hiệu lực lúc gọi, ảnh có
+- [x] Đọc công khai `GET /api/v1/content/public/placements/{key}`: banner đang hiệu lực lúc gọi, ảnh có
       `srcset` và WebP, cache tới mốc bắt đầu / kết thúc gần nhất; banner trỏ tới chương trình khuyến
       mại tự ẩn khi chương trình kết thúc (event tuỳ chọn của `promotions`) — quảng cáo không được hứa
       ưu đãi đã hết (Luật 19/2023, Luật Quảng cáo — cần đối chiếu)
 - [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
       khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
       tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
-- [ ] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
+- [x] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
       hội) là cài đặt kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè); địa chỉ, giờ mở cửa, ngày nghỉ lấy từ hồ sơ
       địa điểm của bước 34, không lưu hai chỗ (D-237); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công
-      Thương từ bước 37
+      Thương từ bước 37 — chân trang pháp lý lấy từ endpoint công khai của `compliance` (D-20261119-step55-store-info)
 - [ ] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
       `ContentLinks` trong `content::api`: module đó gắn bộ dựng đường dẫn và bộ kiểm "còn hiển thị
       không"; thiếu module thì link loại đó bị từ chối khi lưu
@@ -805,6 +770,8 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
       giữa trang chủ, đầu danh mục, cột trái / phải, giữa nội dung, trên chân trang, popup); banner chọn trang hiện
       (loại trang, danh mục / sản phẩm / bài cụ thể); banner dạng chữ màu theo theme; đọc nhiều vị trí một lần;
       khối `content.placement` cho trang dựng từ khối và đầu trang
+      — xong trừ khối `content.placement` (chờ sổ khối của bước 67); link và trang được chọn dùng sổ đối tượng thay
+      `ContentLinks` (D-20261119-step55-banners)
 - [ ] Banner trong gian hàng người bán trên sàn (D-233): người bán tự quản trong nút của mình, sàn duyệt theo
       chính sách, link chỉ tới hàng của chính người bán, không phải quảng cáo trong sàn
 

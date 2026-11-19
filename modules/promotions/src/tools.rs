@@ -98,6 +98,18 @@ fn parse<T: serde::de::DeserializeOwned>(
     })
 }
 
+/// Sample carts to try a promotion on.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = PromotionsSimulateInput)]
+pub(crate) struct SimulateInput {
+    /// Id of the promotion (a draft works too).
+    pub id: Uuid,
+    /// 1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate` (`PromotionsCart`).
+    #[schema(value_type = Vec<Object>)]
+    pub carts: Vec<serde_json::Value>,
+}
+
 /// A voucher to give by hand.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
@@ -132,7 +144,7 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (list, get, create, activate, end, codes) = (s(), s(), s(), s(), s(), s());
-    let (evaluate, grant, wallet, notice) = (s(), s(), s(), s());
+    let (evaluate, grant, wallet, notice, simulate) = (s(), s(), s(), s(), s());
     vec![
         Tool::new(
             "list_promotions",
@@ -147,6 +159,7 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
                         kind: input.kind,
                         org_id: input.org_id,
                         q: input.q,
+                        window: None,
                     };
                     let found =
                         service.list_promotions(&tenant, &principal, &filter, &page).await?;
@@ -296,6 +309,23 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
                     let vouchers =
                         service.vouchers_of(&tenant, input.user_id, input.status).await?;
                     Ok::<_, Error>(Wallet { vouchers })
+                }
+            },
+        )
+        .requires(READ)
+        .read_only(),
+        Tool::new(
+            "simulate",
+            "Try a promotion on sample carts: each cart computed with it (even as a draft) and \
+             without it, and what it adds to the discount. Nothing is written or held.",
+            move |tenant: TenantContext, principal: Principal, input: SimulateInput| {
+                let service = simulate.clone();
+                async move {
+                    let mut carts = Vec::with_capacity(input.carts.len());
+                    for (index, cart) in input.carts.into_iter().enumerate() {
+                        carts.push(parse::<Cart>(&format!("carts[{index}]"), cart)?);
+                    }
+                    service.simulate(&tenant, &principal, input.id, &carts).await
                 }
             },
         )

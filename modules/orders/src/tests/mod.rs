@@ -8,6 +8,7 @@ mod checkout;
 mod fake_ledger;
 mod fakes;
 mod lifecycle;
+mod returns;
 
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
@@ -216,6 +217,7 @@ pub(crate) struct Shop {
     /// Outbox của module giả `shipping` (phát event vận đơn).
     pub shipping_outbox: Arc<Mutex<Option<Outbox>>>,
     pub orgs: Arc<FakeOrgs>,
+    pub media: Arc<fakes::FakeMedia>,
     pub tree: Tree,
 }
 
@@ -242,6 +244,7 @@ pub(crate) async fn shop_with<'a>(
     let (emitter, ledger_outbox) = Emitter::new("ledger", &[PAYMENT_SUCCEEDED]);
     let (shipping_emitter, shipping_outbox) = Emitter::new("shipping", &SHIPPING_EVENTS);
     let orgs = Arc::new(FakeOrgs::default());
+    let media = Arc::new(fakes::FakeMedia::default());
     let builder = TestApp::builder(test)
         .principal("boss", Principal::with_all_permissions(Uuid::from_u128(1)))
         .member("staff_a", 2, tree.a, &[("orders.read", autoxide_kernel::access::Scope::Unit)])
@@ -253,6 +256,7 @@ pub(crate) async fn shop_with<'a>(
         .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
         .provide::<dyn autoxide_ledger::api::Ledger>(ledger.clone())
         .provide::<dyn autoxide_organizations::api::OrgDirectory>(orgs.clone())
+        .provide::<dyn autoxide_media::api::Media>(media.clone())
         .module(emitter)
         .module(shipping_emitter);
     let app = extra(builder, &tree).module(crate::module()).build().await.unwrap();
@@ -272,6 +276,7 @@ pub(crate) async fn shop_with<'a>(
         ledger_outbox,
         shipping_outbox,
         orgs,
+        media,
         tree,
     }
 }

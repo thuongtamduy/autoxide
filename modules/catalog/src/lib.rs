@@ -12,6 +12,7 @@ mod derived;
 mod entity;
 mod errors;
 mod events;
+mod facets;
 mod floors;
 mod http;
 mod listeners;
@@ -21,6 +22,7 @@ mod pricing;
 mod product_parts;
 mod products;
 mod public;
+mod public_filter;
 mod readiness;
 mod restrictions;
 mod rounding;
@@ -28,6 +30,8 @@ mod rules_pack;
 mod service;
 mod snapshots;
 mod storefront;
+mod suggest;
+mod synonyms;
 mod tools;
 mod variants;
 
@@ -117,7 +121,10 @@ impl Module for CatalogModule {
             jobs: context.jobs(),
             organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             sale_prices: std::sync::OnceLock::new(),
+            suggestions: context.suggest_sources(),
         });
+        context.suggest_source(Arc::new(suggest::ProductSuggestions(service.clone())))?;
+        context.suggest_source(Arc::new(suggest::CategorySuggestions(service.clone())))?;
         context.usage_counter(&service::PRODUCTS_LIMIT, Arc::new(service::ProductCounter))?;
         self.service = Some(service.clone());
         // `Arc<CatalogService>` tự đổi thành `Arc<dyn Catalog>`: module khác chỉ thấy trait.

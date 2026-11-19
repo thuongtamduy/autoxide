@@ -201,13 +201,62 @@ pub struct SealedColumn {
 }
 
 /// Chính sách tách / gộp của một module ([`Module::relocation`](crate::module::Module::relocation)).
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Default)]
 pub struct Relocation {
     tables: Vec<(&'static str, TablePolicy)>,
     sealed: Vec<SealedColumn>,
+    switch_hooks: Vec<Arc<dyn SwitchHook>>,
+}
+
+impl std::fmt::Debug for Relocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Relocation")
+            .field("tables", &self.tables)
+            .field("sealed", &self.sealed)
+            .field("switch_hooks", &self.switch_hooks.len())
+            .finish()
+    }
+}
+
+/// Lượt tách / gộp đang chuyển (bước `switch`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct RelocationSwitch {
+    pub kind: RelocationKind,
+    /// Khách có dữ liệu đi (khách bị tách nhánh; khách bị gộp).
+    pub source: TenantId,
+    /// Khách nhận (khách mới khi tách; khách nhận khi gộp).
+    pub target: TenantId,
+}
+
+/// Việc module phải làm ĐỒNG BỘ khi một lượt tách / gộp chuyển (D-20261119-relocation-switch-hook):
+/// chạy trong transaction của bước `switch` ở database điều khiển, TRƯỚC khi khách mới hoạt động.
+/// Lỗi thì cả transaction bỏ: khách mới không mở, lượt dừng ở bước trước và chạy lại được. Dùng cho
+/// chính sách bảo mật đặt theo ID khách ở database điều khiển (vd rào quyền của `auth`), thứ phải
+/// có hiệu lực ngay từ request đầu tiên tới khách mới. Phải chạy lại được.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait SwitchHook: Send + Sync {
+    async fn switch(
+        &self,
+        control: &DatabaseTransaction,
+        relocation: &RelocationSwitch,
+    ) -> Result<(), Error>;
 }
 
 impl Relocation {
+    /// Chạy `hook` trong bước chuyển của mọi lượt tách / gộp ([`SwitchHook`]).
+    pub fn on_switch(mut self, hook: Arc<dyn SwitchHook>) -> Self {
+        self.switch_hooks.push(hook);
+        self
+    }
+
+    /// Hook của bước chuyển đã khai.
+    pub fn switch_hooks(&self) -> &[Arc<dyn SwitchHook>] {
+        &self.switch_hooks
+    }
+
     /// Không khai gì: mọi bảng suy từ cột (cảnh báo trong kế hoạch). Cài đặt mặc định của
     /// `Module::relocation`.
     pub fn inferred() -> Self {

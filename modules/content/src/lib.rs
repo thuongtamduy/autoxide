@@ -12,6 +12,7 @@
 
 mod ai;
 pub mod api;
+mod banners;
 #[cfg(any(test, feature = "bench-seed"))]
 mod bench_seed;
 mod client_config;
@@ -30,8 +31,10 @@ mod publishing;
 mod relocation;
 mod resource;
 mod restriction;
+mod sandbox;
 mod service;
 mod setup;
+mod suggest;
 mod taxonomy;
 mod templates;
 mod tools;
@@ -224,6 +227,8 @@ impl Module for ContentModule {
         context.work_source(Arc::new(work::Review))?;
         context.summary_metric(Arc::new(work::Review))?;
         context.finder_source(Arc::new(find::Entries))?;
+        // Gợi ý tìm của website (D-201): bài viết và trang đang công khai.
+        context.suggest_source(Arc::new(suggest::Entries))?;
         context.code_resolver(Arc::new(find::BySlug))?;
         context.setup_step(Arc::new(setup::FirstPage))?;
         // Nhãn nội bộ (bước 51 P20): gắn / gỡ cần quyền sửa bài.
@@ -241,10 +246,16 @@ impl Module for ContentModule {
         Ok(())
     }
 
+    fn seed_tenant(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::TenantSeed>> {
+        // Bộ vị trí banner chuẩn cho khách mới (bước 55, D-236).
+        Some(banners::presets::seed())
+    }
+
     fn subscriptions(&self) -> Vec<Subscription> {
         // Tài khoản bị xoá: gỡ hồ sơ tác giả, bỏ liên kết, huỷ lịch (xem `privacy.rs`).
         self.service.clone().map_or_else(Vec::new, |service| {
-            vec![
+            let mut list = banners::promotions::subscriptions(&service);
+            list.extend(vec![
                 Subscription::new(autoxide_kernel::privacy::USER_DELETED, service),
                 // Vụ việc của `compliance` ẩn / hiện lại mục (D-363, `restriction.rs`).
                 Subscription::new(
@@ -255,7 +266,8 @@ impl Module for ContentModule {
                     autoxide_kernel::moderation::TARGET_RESTORED,
                     Arc::new(restriction::Listener),
                 ),
-            ]
+            ]);
+            list
         })
     }
 
@@ -317,6 +329,16 @@ impl Module for ContentModule {
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         relocation::relocation()
+    }
+
+    // Trang trong sandbox (bước 38, D-232): sao từ khách thật, đẩy về thành bản nháp.
+    fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+        let service = self.service.clone()?;
+        Some(Arc::new(sandbox::Pages { service }))
+    }
+
+    fn promotable(&self) -> Vec<autoxide_kernel::tenancy::sandbox::Promotable> {
+        self.service.clone().map_or_else(Vec::new, sandbox::promotable)
     }
 }
 

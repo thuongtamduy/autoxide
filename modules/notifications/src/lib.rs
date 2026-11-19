@@ -29,6 +29,7 @@ mod platform;
 mod privacy;
 mod provider;
 mod registry;
+mod sandbox;
 mod service;
 mod templates;
 mod tools;
@@ -89,6 +90,12 @@ impl Module for NotificationsModule {
 
     fn name(&self) -> &'static str {
         "notifications"
+    }
+
+    // Mẫu thông báo trong sandbox (bước 38, D-232).
+    fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+        let service = self.service.clone()?;
+        Some(Arc::new(sandbox::Templates { service }))
     }
 
     // Tách / gộp khách (bước 38, D-20261118-step38-relocation).

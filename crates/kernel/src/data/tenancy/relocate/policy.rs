@@ -53,6 +53,7 @@ pub(crate) struct Resolved {
 pub(crate) struct Policies {
     tables: HashMap<&'static str, TablePolicy>,
     sealed: Vec<SealedColumn>,
+    switch_hooks: Vec<std::sync::Arc<dyn super::SwitchHook>>,
 }
 
 impl Policies {
@@ -81,8 +82,14 @@ impl Policies {
                 }
                 policies.sealed.push(*sealed);
             }
+            policies.switch_hooks.extend(relocation.switch_hooks().iter().cloned());
         }
         if problems.is_empty() { Ok(policies) } else { Err(problems) }
+    }
+
+    /// Hook của bước chuyển, mọi module.
+    pub(crate) fn switch_hooks(&self) -> &[std::sync::Arc<dyn super::SwitchHook>] {
+        &self.switch_hooks
     }
 
     /// Cột secret của `table`.

@@ -394,3 +394,38 @@ impl Promotions for FakePromotions {
         Ok(Vec::new())
     }
 }
+
+/// `media` giả: ai đã tải lên ảnh nào.
+#[derive(Default)]
+pub(crate) struct FakeMedia {
+    pub owners: Mutex<HashMap<Uuid, Uuid>>,
+}
+
+impl FakeMedia {
+    /// Ảnh mới do `user` tải lên.
+    pub(crate) fn upload(&self, user: Uuid) -> Uuid {
+        let id = Uuid::now_v7();
+        self.owners.lock().unwrap().insert(id, user);
+        id
+    }
+}
+
+#[async_trait::async_trait]
+impl autoxide_media::api::Media for FakeMedia {
+    async fn find_many(
+        &self,
+        _: &TenantContext,
+        _: &[Uuid],
+    ) -> Result<Vec<autoxide_media::api::MediaRef>, Error> {
+        Ok(Vec::new())
+    }
+
+    async fn uploaders(
+        &self,
+        _: &TenantContext,
+        ids: &[Uuid],
+    ) -> Result<Vec<(Uuid, Option<Uuid>)>, Error> {
+        let owners = self.owners.lock().unwrap();
+        Ok(ids.iter().filter_map(|id| owners.get(id).map(|owner| (*id, Some(*owner)))).collect())
+    }
+}

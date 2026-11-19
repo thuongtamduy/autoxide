@@ -14,12 +14,13 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
 use crate::codes::{GenerateCodes, GenerateCodesJob};
-use crate::entity::{promotion, redemption, voucher};
+use crate::entity::{promotion, redemption, reminder, voucher};
 use crate::service::{PromotionsService, now};
 
 pub(crate) const TICK: &str = "promotions.tick";
 pub(crate) const EXPIRE_HOLDS: &str = "promotions.expire_holds";
 pub(crate) const EXPIRE_VOUCHERS: &str = "promotions.expire_vouchers";
+pub(crate) const SEND_REMINDERS: &str = "promotions.send_reminders";
 
 pub(crate) fn registrations(service: &Arc<PromotionsService>) -> Vec<JobRegistration> {
     use autoxide_kernel::job::Job;
@@ -27,6 +28,7 @@ pub(crate) fn registrations(service: &Arc<PromotionsService>) -> Vec<JobRegistra
         JobRegistration::new(TICK, Arc::new(Tick(service.clone()))),
         JobRegistration::new(EXPIRE_HOLDS, Arc::new(ExpireHolds(service.clone()))),
         JobRegistration::new(EXPIRE_VOUCHERS, Arc::new(ExpireVouchers(service.clone()))),
+        JobRegistration::new(SEND_REMINDERS, Arc::new(SendReminders(service.clone()))),
         JobRegistration::new(GenerateCodes::KIND, Arc::new(GenerateCodesJob(service.clone()))),
     ]
 }
@@ -36,6 +38,7 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(TICK, TICK, Duration::from_secs(60)),
         Schedule::new(EXPIRE_HOLDS, EXPIRE_HOLDS, Duration::from_secs(60)),
         Schedule::new(EXPIRE_VOUCHERS, EXPIRE_VOUCHERS, Duration::from_secs(3600)),
+        Schedule::new(SEND_REMINDERS, SEND_REMINDERS, Duration::from_secs(60)),
     ]
 }
 
@@ -148,6 +151,30 @@ impl JobHandler for ExpireVouchers {
         service
             .for_each_tenant(ids, EXPIRE_VOUCHERS, |tenant| async move {
                 service.expire_vouchers(&tenant).await
+            })
+            .await
+    }
+}
+
+struct SendReminders(Arc<PromotionsService>);
+
+#[async_trait::async_trait]
+impl JobHandler for SendReminders {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        let rows: Vec<Uuid> = reminder::Entity::find()
+            .select_only()
+            .column(reminder::Column::TenantId)
+            .filter(reminder::Column::SentAt.is_null())
+            .filter(reminder::Column::RemindAt.lte(now()))
+            .limit(1000)
+            .into_tuple()
+            .all(job.database.read())
+            .await?;
+        let ids = tenants(&job.database, rows).await;
+        let service = &self.0;
+        service
+            .for_each_tenant(ids, SEND_REMINDERS, |tenant| async move {
+                service.send_reminders(&tenant).await
             })
             .await
     }

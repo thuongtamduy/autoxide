@@ -28,6 +28,9 @@ pub(crate) const PURPOSE_ORDER: &str = "order";
 pub(crate) const PENDING: &str = "pending";
 pub(crate) const SUCCEEDED: &str = "succeeded";
 pub(crate) const REFUNDED: &str = "refunded";
+pub(crate) const REFUNDED_PARTIAL: &str = "refunded_partial";
+/// Khoản đã thu (kể cả đã hoàn một phần / toàn bộ).
+pub(crate) const COLLECTED: [&str; 3] = [SUCCEEDED, REFUNDED_PARTIAL, REFUNDED];
 pub(crate) const UNPAID: &str = "unpaid";
 pub(crate) const COD_PENDING: &str = "cod_pending";
 pub(crate) const PAID: &str = "paid";

@@ -485,6 +485,71 @@ export type BanRequest = {
   value: string;
 };
 
+/** Where a banner links to: give `url`, or `kind` and `id`. */
+export type BannerLink = {
+  /** Id of that object. */
+  id?: string | null;
+  /**
+   * A type of the object directory, e.g. `content.entry`, `content.term`,
+   * `catalog.product`, `catalog.collection`, `promotions.promotion` — whatever the installed
+   * modules provide (`GET /api/v1/kernel/resources` lists them). A banner pointing to a
+   * promotion is archived when the promotion ends.
+   */
+  kind?: string | null;
+  /** An `https://` or `http://` address, or a path on the website starting with `/`. */
+  url?: string | null;
+};
+
+/** A page the banner shows on: an object of the object directory (e.g. a product category). */
+export type BannerPage = {
+  id: string;
+  kind: string;
+};
+
+/** A banner of a display placement. */
+export type BannerResponse = {
+  /**
+   * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+   * 134/2025/QH15): label it.
+   */
+  ai_assisted: boolean;
+  alt: string;
+  created_at: string;
+  created_by?: string | null;
+  /** Text of the button. */
+  cta_label: string;
+  /** Shown until (excluded); `null`: no end. */
+  ends_at?: string | null;
+  id: string;
+  /** `image` or `text`. */
+  kind: string;
+  link?: BannerLink | null;
+  locale: string;
+  /** Picture (media item id). */
+  media_id?: string | null;
+  /** Picture for phones; `null`: the same picture. */
+  mobile_media_id?: string | null;
+  /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+  org_id: string;
+  /** Only on these kinds of pages; empty: every kind of its placement. */
+  page_kinds: string[];
+  /** Only on these pages; empty: every page. */
+  page_targets: BannerPage[];
+  /** Key of its placement. */
+  placement: string;
+  /** Order in the placement, smallest first. */
+  position: number;
+  /** Shown from (included); `null`: at once. */
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`. */
+  status: string;
+  subtitle: string;
+  title: string;
+  /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+  tone?: string | null;
+  updated_at: string;
+};
+
 /** HTTP method of a write. */
 export type BatchMethod = "POST" | "PUT" | "PATCH" | "DELETE";
 
@@ -846,6 +911,22 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/** The brand of a website, inherited down the organization tree. */
+export type BrandResponse = {
+  email?: string | null;
+  /** Site icon (favicon): a public media item. */
+  icon_media_id?: string | null;
+  /** Logo: a public media item; load it from `/api/v1/media/{id}/content`. */
+  logo_media_id?: string | null;
+  /** Brand name (setting `organizations.brand_name`, else the unit's display name). */
+  name: string;
+  phone?: string | null;
+  social_links: {
+    network: string;
+    url: string;
+  }[];
+};
+
 /** What a bulk request would act on. */
 export type BulkPreview = {
   count: number;
@@ -865,16 +946,6 @@ export type BulkRequest = {
   filter?: Record<string, unknown> | null;
   /** Up to 500 record ids. */
   ids?: string[] | null;
-};
-
-/** A range of call-back hours, in the local time of the line. */
-export type CallbackHoursRange = {
-  /** Day of the week, 1 (Monday) to 7 (Sunday). */
-  day: number;
-  /** Opening time, `HH:MM`. */
-  from: string;
-  /** Closing time, `HH:MM`, after `from`. */
-  to: string;
 };
 
 /** What the provider sent back to `redirect_uri`. */
@@ -1041,6 +1112,15 @@ export type CatalogAttribute = {
   scale: number;
   unit?: string | null;
   updated_at: string;
+};
+
+/** Counts of one filterable attribute. */
+export type CatalogAttributeFacet = {
+  /** Filter with `attr.<code>=<value>`. */
+  code: string;
+  name: string;
+  /** At most 50, most products first. */
+  values: CatalogFacetValue[];
 };
 
 /** A choosable value of an `option` / `options` attribute. */
@@ -1327,6 +1407,24 @@ export type CatalogCreateRoundingRule = {
   name: string;
   /** Step in minor units, above 0, e.g. `10000`. */
   step_minor: number;
+};
+
+/** A filter value and how many products match it. */
+export type CatalogFacetValue = {
+  count: number;
+  label: string;
+  /** Value to send back in the filter: an option code, `true` / `false`, or a seller unit id. */
+  value: string;
+};
+
+/** Filter counts of a public product list. */
+export type CatalogFacets = {
+  /** Filterable attributes of type option, options or boolean. */
+  attributes: CatalogAttributeFacet[];
+  /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+  sellers: CatalogFacetValue[];
+  /** Products matching every filter. */
+  total: number;
 };
 
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
@@ -1856,6 +1954,37 @@ export type CatalogStoredAttributeValue = {
   value_date?: string | null;
   value_integer?: number | null;
   value_text?: string | null;
+};
+
+/** A search suggestion. */
+export type CatalogSuggestion = {
+  /** Short context, e.g. the parent category; may be empty. */
+  context: string;
+  /**
+   * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+   * are ignored.
+   */
+  exact: boolean;
+  id?: string | null;
+  /**
+   * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+   * `organizations.unit`… (any module may add its own).
+   */
+  kind: string;
+  /** Text to show. */
+  label: string;
+  /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+  path?: string | null;
+};
+
+/** The tenant's search synonyms. */
+export type CatalogSynonyms = {
+  /**
+   * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+   * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+   * stored without accents, in lower case.
+   */
+  groups: string[][];
 };
 
 /** Texts of a product in one language. */
@@ -3928,52 +4057,9 @@ export type Conversation = {
   updated_at: string;
 };
 
-/** A WebRTC session for an agent. */
-export type ConversationAgentSession = {
-  expires_at: string;
-  token: string;
-};
-
 /** Whether the customer of a conversation is blocked. */
 export type ConversationBlock = {
   blocked: boolean;
-};
-
-/** A call. Phone numbers are never included. */
-export type ConversationCall = {
-  agent_user_id?: string | null;
-  answered_at?: string | null;
-  callback_id?: string | null;
-  created_at: string;
-  /** `inbound` (the customer called) or `outbound` (the shop called back). */
-  direction: string;
-  duration_seconds?: number | null;
-  ended_at?: string | null;
-  id: string;
-  /** A recording is stored; listen at `GET /calls/{id}/recording`. */
-  recorded: boolean;
-  recording_enabled: boolean;
-  recording_expires_at?: string | null;
-  /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
-  status: string;
-  thread_id: string;
-};
-
-/** A call-back request. The phone number is masked (`090•••567`). */
-export type ConversationCallback = {
-  assigned_user_id?: string | null;
-  attempts: number;
-  client_id: string;
-  created_at: string;
-  id: string;
-  last_call_id?: string | null;
-  org_id: string;
-  phone_masked: string;
-  /** `open`, `calling`, `done`, `cancelled` or `expired`. */
-  status: string;
-  thread_id: string;
-  window_end: string;
-  window_start: string;
 };
 
 /** A conversation with how far each person has read it. */
@@ -4050,45 +4136,6 @@ export type ConversationReport = {
   thread_id: string;
 };
 
-/** What the customer sees before calling. */
-export type ConversationVoiceInfo = {
-  /** The shop takes calls; otherwise hide every call button. */
-  available: boolean;
-  /** Calling from the browser or app works. */
-  browser_calls: boolean;
-  /** When the shop calls back (local time of the shop). */
-  callback_hours: CallbackHoursRange[];
-  /** "Call me back" works. */
-  callbacks: boolean;
-  /** Calls are recorded: show `recording_notice` and send `recording_ack: true`. */
-  recording: boolean;
-  recording_notice?: string | null;
-  utc_offset_minutes?: number | null;
-};
-
-/** The phone line of a unit. */
-export type ConversationVoiceLine = {
-  active: boolean;
-  callback_hours: CallbackHoursRange[];
-  hotline: string;
-  org_id: string;
-  provider: string;
-  recording_enabled: boolean;
-  updated_at: string;
-  utc_offset_minutes: number;
-  /**
-   * Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a
-   * new token was made — keep it, it is not shown again.
-   */
-  webhook_path?: string | null;
-};
-
-/** How many notifications were stored. */
-export type ConversationVoiceWebhookReceipt = {
-  /** New notifications stored (repeats are not counted). */
-  stored: number;
-};
-
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
@@ -4143,6 +4190,46 @@ export type CreateApiKeyRequest = {
    * on). Wrong codes count towards the same limit as at sign-in.
    */
   totp_code?: string | null;
+};
+
+/** A new banner. */
+export type CreateBannerRequest = {
+  /** Set when the text came from an AI suggestion. */
+  ai_assisted?: boolean;
+  /** At most 300 characters; empty: the picture's own `alt`. */
+  alt?: string;
+  /** Text of the button, at most 60 characters. */
+  cta_label?: string;
+  ends_at?: string | null;
+  /** `image` (default) or `text`; the placement must take it. */
+  kind?: string | null;
+  link?: BannerLink | null;
+  /** Omitted: the default language. */
+  locale?: string | null;
+  /** Image banners: a public picture with the placement's ratio and size. */
+  media_id?: string | null;
+  /** Optional picture for phones (the placement's `mobile_ratio`). */
+  mobile_media_id?: string | null;
+  /** Organization unit (store) it belongs to; omitted: every store of the tenant. */
+  org_id?: string | null;
+  /** Only on these kinds of pages (within those of the placement). */
+  page_kinds?: string[];
+  /** Only on these pages, at most 50; each must exist. */
+  page_targets?: BannerPage[];
+  /** Key of the placement, e.g. `home_hero`. */
+  placement: string;
+  starts_at?: string | null;
+  /** `draft` (default) or `active`. */
+  status?: string | null;
+  /** At most 300 characters. */
+  subtitle?: string;
+  /** At most 120 characters; required for a text banner. */
+  title?: string;
+  /**
+   * Text banners only: `primary`, `secondary`, `accent` or `neutral` (default) — never a
+   * colour code, so a new theme recolours it.
+   */
+  tone?: string | null;
 };
 
 /** Time off or extra working hours of a resource. */
@@ -4382,6 +4469,12 @@ export type CreateOrdersCartRequest = {
   locale?: string | null;
   /** The shop (or marketplace store) selling; omitted: the root unit of the tenant. */
   org_id?: string | null;
+};
+
+/** A new placement. */
+export type CreatePlacementRequest = PlacementFields & {
+  /** 1 to 64 lower-case letters, digits or `_`, e.g. `home_hero`. */
+  key: string;
 };
 
 /**
@@ -4943,6 +5036,53 @@ export type Data_BTreeMap_String_String = {
 };
 
 /** Envelope of a single result. */
+export type Data_BannerResponse = {
+  /** A banner of a display placement. */
+  data: {
+    /**
+     * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+     * 134/2025/QH15): label it.
+     */
+    ai_assisted: boolean;
+    alt: string;
+    created_at: string;
+    created_by?: string | null;
+    /** Text of the button. */
+    cta_label: string;
+    /** Shown until (excluded); `null`: no end. */
+    ends_at?: string | null;
+    id: string;
+    /** `image` or `text`. */
+    kind: string;
+    link?: BannerLink | null;
+    locale: string;
+    /** Picture (media item id). */
+    media_id?: string | null;
+    /** Picture for phones; `null`: the same picture. */
+    mobile_media_id?: string | null;
+    /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+    org_id: string;
+    /** Only on these kinds of pages; empty: every kind of its placement. */
+    page_kinds: string[];
+    /** Only on these pages; empty: every page. */
+    page_targets: BannerPage[];
+    /** Key of its placement. */
+    placement: string;
+    /** Order in the placement, smallest first. */
+    position: number;
+    /** Shown from (included); `null`: at once. */
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`. */
+    status: string;
+    subtitle: string;
+    title: string;
+    /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+    tone?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_BillingPeriodResponse = {
   /** A billing period of a subscription: what is charged for which time, and whether it is paid. */
   data: {
@@ -5270,6 +5410,19 @@ export type Data_CatalogCategoryRestrictions = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogFacets = {
+  /** Filter counts of a public product list. */
+  data: {
+    /** Filterable attributes of type option, options or boolean. */
+    attributes: CatalogAttributeFacet[];
+    /** Sellers (filter with `seller=<value>`), at most 50, most products first. */
+    sellers: CatalogFacetValue[];
+    /** Products matching every filter. */
+    total: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogPriceChange = {
   /** A bulk price change. */
   data: {
@@ -5473,6 +5626,19 @@ export type Data_CatalogStoreOverride = {
     org_id: string;
     product_id: string;
     updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogSynonyms = {
+  /** The tenant's search synonyms. */
+  data: {
+    /**
+     * Groups of words meaning the same thing, e.g. `[["áo thun", "áo phông", "tee"]]`: searching
+     * any word of a group also finds the others. At most 500 groups of 2 to 20 words; words are
+     * stored without accents, in lower case.
+     */
+    groups: string[][];
   };
 };
 
@@ -6605,62 +6771,10 @@ export type Data_Conversation = {
 };
 
 /** Envelope of a single result. */
-export type Data_ConversationAgentSession = {
-  /** A WebRTC session for an agent. */
-  data: {
-    expires_at: string;
-    token: string;
-  };
-};
-
-/** Envelope of a single result. */
 export type Data_ConversationBlock = {
   /** Whether the customer of a conversation is blocked. */
   data: {
     blocked: boolean;
-  };
-};
-
-/** Envelope of a single result. */
-export type Data_ConversationCall = {
-  /** A call. Phone numbers are never included. */
-  data: {
-    agent_user_id?: string | null;
-    answered_at?: string | null;
-    callback_id?: string | null;
-    created_at: string;
-    /** `inbound` (the customer called) or `outbound` (the shop called back). */
-    direction: string;
-    duration_seconds?: number | null;
-    ended_at?: string | null;
-    id: string;
-    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
-    recorded: boolean;
-    recording_enabled: boolean;
-    recording_expires_at?: string | null;
-    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
-    status: string;
-    thread_id: string;
-  };
-};
-
-/** Envelope of a single result. */
-export type Data_ConversationCallback = {
-  /** A call-back request. The phone number is masked (`090•••567`). */
-  data: {
-    assigned_user_id?: string | null;
-    attempts: number;
-    client_id: string;
-    created_at: string;
-    id: string;
-    last_call_id?: string | null;
-    org_id: string;
-    phone_masked: string;
-    /** `open`, `calling`, `done`, `cancelled` or `expired`. */
-    status: string;
-    thread_id: string;
-    window_end: string;
-    window_start: string;
   };
 };
 
@@ -6726,54 +6840,6 @@ export type Data_ConversationReport = {
     /** `open` or `resolved`. */
     status: string;
     thread_id: string;
-  };
-};
-
-/** Envelope of a single result. */
-export type Data_ConversationVoiceInfo = {
-  /** What the customer sees before calling. */
-  data: {
-    /** The shop takes calls; otherwise hide every call button. */
-    available: boolean;
-    /** Calling from the browser or app works. */
-    browser_calls: boolean;
-    /** When the shop calls back (local time of the shop). */
-    callback_hours: CallbackHoursRange[];
-    /** "Call me back" works. */
-    callbacks: boolean;
-    /** Calls are recorded: show `recording_notice` and send `recording_ack: true`. */
-    recording: boolean;
-    recording_notice?: string | null;
-    utc_offset_minutes?: number | null;
-  };
-};
-
-/** Envelope of a single result. */
-export type Data_ConversationVoiceLine = {
-  /** The phone line of a unit. */
-  data: {
-    active: boolean;
-    callback_hours: CallbackHoursRange[];
-    hotline: string;
-    org_id: string;
-    provider: string;
-    recording_enabled: boolean;
-    updated_at: string;
-    utc_offset_minutes: number;
-    /**
-     * Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a
-     * new token was made — keep it, it is not shown again.
-     */
-    webhook_path?: string | null;
-  };
-};
-
-/** Envelope of a single result. */
-export type Data_ConversationVoiceWebhookReceipt = {
-  /** How many notifications were stored. */
-  data: {
-    /** New notifications stored (repeats are not counted). */
-    stored: number;
   };
 };
 
@@ -8988,6 +9054,82 @@ export type Data_OrdersPublicPayment = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersRefund = {
+  /** A refund of an order. */
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReturn = {
+  /** A return. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReturnPreview = {
+  /** What a return would give. */
+  data: {
+    /** Last moment to ask. */
+    deadline_at: string;
+    /** Lines to send back, gifts included when the promotion wants them back. */
+    lines: OrdersReturnLine[];
+    methods: OrdersReturnMethodOption[];
+    /** Whether this reason needs photos. */
+    photos_required: boolean;
+    /** Money you would get back. */
+    refund: Money;
+    refund_breakdown: OrdersReturnRefundBreakdown;
+    refund_eta?: OrdersRefundEta | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersShipmentRequested = {
   /** A shipment requested from the shipping module. */
   data: {
@@ -9136,6 +9278,53 @@ export type Data_Pin = {
      * `<record kind>:<id>` for a record (e.g. `content.entry:0190…`).
      */
     target: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PlacementResponse = {
+  /** A display placement: where banners go on the website and how the website draws them. */
+  data: {
+    /** Banners it takes: `image`, `text` or `any`. */
+    accepts: string;
+    /** Off: public reads leave it out. */
+    active: boolean;
+    /** `site` (the website of the tenant). */
+    audience: string;
+    created_at: string;
+    description: string;
+    /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+    devices: string;
+    /**
+     * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+     * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+     * button and never shows on cart, checkout, sign-in or account pages).
+     */
+    display: string;
+    /**
+     * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+     * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+     * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+     */
+    display_settings: Record<string, unknown>;
+    id: string;
+    key: string;
+    /** Most banners shown at once (per organization unit and language). */
+    max_items: number;
+    min_height?: number | null;
+    /** Smallest picture accepted, in pixels. */
+    min_width?: number | null;
+    mobile_ratio?: Ratio | null;
+    name: string;
+    /**
+     * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+     * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+     */
+    page_kinds: string[];
+    /** Key in the standard set of placements, when the row came from it. */
+    preset_key?: string | null;
+    ratio?: Ratio | null;
+    updated_at: string;
   };
 };
 
@@ -9326,6 +9515,17 @@ export type Data_PreviewToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromoteResult = {
+  /**
+   * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+   * in the real tenant: people there publish the drafts themselves.
+   */
+  data: {
+    items: PromoteOutcome[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsActivated = {
   /** A promotion just turned on, with the warnings of its checks. */
   data: {
@@ -9426,6 +9626,23 @@ export type Data_PromotionsNoticeExport = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsParticipation = {
+  /** A seller's application, as it stands. */
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsPromotion = {
   /** A promotion with its rule, counters and texts. */
   data: {
@@ -9458,6 +9675,18 @@ export type Data_PromotionsRedemption = {
     id: string;
     order_id: string;
     status: PromotionsRedemptionStatus;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsReminder = {
+  /** A reminder of a flash sale. */
+  data: {
+    promotion_id: string;
+    /** When the reminder is sent. */
+    remind_at: string;
+    /** When it was sent; `null` until then. */
+    sent_at?: string | null;
   };
 };
 
@@ -9645,6 +9874,40 @@ export type Data_PublicMenu = {
     key: string;
     /** The language actually returned (the default language when the menu is not translated). */
     locale: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PublicPlacement = {
+  /** A placement ready to draw, with its banners for the page asked about. */
+  data: {
+    /** `image`, `text` or `any`. */
+    accepts: string;
+    /** Banners to show, in this order (never shuffle them). */
+    banners: PublicBanner[];
+    /** `all`, `desktop` or `mobile`. */
+    devices: string;
+    /**
+     * `single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`
+     * says (a popup always has a close button; no autoplay when the viewer asks for reduced
+     * motion).
+     */
+    display: string;
+    display_settings: Record<string, unknown>;
+    key: string;
+    mobile_ratio?: Ratio | null;
+    ratio?: Ratio | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PublicPlacementsResponse = {
+  /** Several placements of one page. */
+  data: {
+    /** The language returned. */
+    locale: string;
+    /** The placements asked for that exist and are on, in the order asked. */
+    placements: PublicPlacement[];
   };
 };
 
@@ -10451,13 +10714,19 @@ export type Data_StartedConversation = {
 };
 
 /** Envelope of a single result. */
-export type Data_StartedConversationCall = {
-  /** A call just started from the browser, with the token for the provider's WebRTC SDK. */
+export type Data_StorefrontResponse = {
+  /** What a website shows about its store: the brand and the location. */
   data: {
-    call: ConversationCall;
-    expires_at: string;
-    /** Short-lived token for the voice provider's SDK; do not store it. */
-    token: string;
+    brand: BrandResponse;
+    /** The unit's public profile: address, opening hours, special days, pickup, cover picture. */
+    location: PublicProfileResponse;
+    /**
+     * Open right now, in the unit's time zone (special days first); `null` when no opening
+     * hours are set.
+     */
+    open_now?: boolean | null;
+    /** IANA time zone of the unit; opening hours are local times in it. */
+    timezone: string;
   };
 };
 
@@ -11770,6 +12039,29 @@ export type Data_Vec_CatalogStoredAttributeValue = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogSuggestion = {
+  data: {
+    /** Short context, e.g. the parent category; may be empty. */
+    context: string;
+    /**
+     * Matches with the exact Vietnamese accents (listed first); `false`: matches only once accents
+     * are ignored.
+     */
+    exact: boolean;
+    id?: string | null;
+    /**
+     * Type, `<module>.<type>`: `catalog.product`, `catalog.category`, `content.entry`,
+     * `organizations.unit`… (any module may add its own).
+     */
+    kind: string;
+    /** Text to show. */
+    label: string;
+    /** Address on the website (no domain, no language prefix); `null`: open the record by `id`. */
+    path?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogVariant = {
   data: {
     active: boolean;
@@ -11994,28 +12286,6 @@ export type Data_Vec_ContentTemplate = {
     /** Title per language, e.g. `{"en": "…", "vi": "…"}`. */
     titles: Record<string, unknown>;
     variables: ContentTemplateVariable[];
-  }[];
-};
-
-/** Envelope of a single result. */
-export type Data_Vec_ConversationCall = {
-  data: {
-    agent_user_id?: string | null;
-    answered_at?: string | null;
-    callback_id?: string | null;
-    created_at: string;
-    /** `inbound` (the customer called) or `outbound` (the shop called back). */
-    direction: string;
-    duration_seconds?: number | null;
-    ended_at?: string | null;
-    id: string;
-    /** A recording is stored; listen at `GET /calls/{id}/recording`. */
-    recorded: boolean;
-    recording_enabled: boolean;
-    recording_expires_at?: string | null;
-    /** `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`. */
-    status: string;
-    thread_id: string;
   }[];
 };
 
@@ -12512,6 +12782,28 @@ export type Data_Vec_OrdersPaymentAction = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_OrdersRefund = {
+  data: {
+    amount: Money;
+    created_at: string;
+    id: string;
+    order_id: string;
+    /** The payment of the order it comes from. */
+    payment_id: string;
+    reason: string;
+    reference: string;
+    /** The return it pays back, if any. */
+    return_id?: string | null;
+    /**
+     * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+     * back by the shop outside the payment partner, e.g. cash).
+     */
+    status: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_OverrideResponse = {
   data: {
     created_at: string;
@@ -12598,6 +12890,52 @@ export type Data_Vec_Placement = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PlacementResponse = {
+  data: {
+    /** Banners it takes: `image`, `text` or `any`. */
+    accepts: string;
+    /** Off: public reads leave it out. */
+    active: boolean;
+    /** `site` (the website of the tenant). */
+    audience: string;
+    created_at: string;
+    description: string;
+    /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+    devices: string;
+    /**
+     * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+     * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+     * button and never shows on cart, checkout, sign-in or account pages).
+     */
+    display: string;
+    /**
+     * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+     * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+     * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+     */
+    display_settings: Record<string, unknown>;
+    id: string;
+    key: string;
+    /** Most banners shown at once (per organization unit and language). */
+    max_items: number;
+    min_height?: number | null;
+    /** Smallest picture accepted, in pixels. */
+    min_width?: number | null;
+    mobile_ratio?: Ratio | null;
+    name: string;
+    /**
+     * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+     * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+     */
+    page_kinds: string[];
+    /** Key in the standard set of placements, when the row came from it. */
+    preset_key?: string | null;
+    ratio?: Ratio | null;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PlanResponse = {
   data: {
     code: string;
@@ -12651,6 +12989,45 @@ export type Data_Vec_PlanResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotableKind = {
+  data: {
+    description: string;
+    /** `<module>.<kind>`, e.g. `content.page`. */
+    kind: string;
+    /** The module that owns it. */
+    module: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsConflict = {
+  data: {
+    ends_at: string;
+    exclusivity: "none" | "class" | "global";
+    id: string;
+    /** Kind of promotion. */
+    kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+    starts_at: string;
+    status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsDailyStats = {
+  data: {
+    day: string;
+    /** Discount given, in minor units. */
+    discount_minor: number;
+    /** Value of the orders that used it, in minor units. */
+    order_value_minor: number;
+    platform_funded_minor: number;
+    /** Confirmed uses. */
+    redemptions: number;
+    seller_funded_minor: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PromotionsLegalLimit = {
   data: {
     effective_from: string;
@@ -12684,6 +13061,59 @@ export type Data_Vec_PromotionsNoticeRule = {
     note: string;
     notice_required: boolean;
     promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsParticipation = {
+  data: {
+    created_at: string;
+    id: string;
+    items: PromotionsParticipationItem[];
+    promotion_id: string;
+    reviewed_at?: string | null;
+    reviewed_by?: string | null;
+    seller_org_id: string;
+    /** `pending`, `approved` or `rejected`. */
+    status: string;
+    updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsProductCode = {
+  data: {
+    /** The coupon to enter at checkout. */
+    code: string;
+    /** Discount on one unit. */
+    discount: Money;
+    ends_at: string;
+    /**
+     * Price of one unit with the coupon. The listed price stays the price without it: show
+     * this as "X with code …", not as a discounted price.
+     */
+    price_with_code: Money;
+    promotion_id: string;
+    /** Conditions, in full (the same as in `GET /public/promotions`). */
+    terms: string;
+    title: string;
+    /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+    uses_left?: number | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsSimulation = {
+  data: {
+    /**
+     * What the promotion adds to the discount of this cart, in minor units (can be negative
+     * when it pushes out a better promotion).
+     */
+    difference_minor: number;
+    /** With the promotion (counted even while it is a draft or paused). */
+    with: PromotionsEvaluation;
+    /** Without it. */
+    without: PromotionsEvaluation;
   }[];
 };
 
@@ -17656,6 +18086,15 @@ export type OpsBacklog = {
   databases: DatabaseBacklog[];
 };
 
+/** The new order of the banners of a placement. */
+export type OrderRequest = {
+  /**
+   * Banners of the placement, first shown first. Banners left out keep their order after
+   * them.
+   */
+  banner_ids: string[];
+};
+
 /** Referral of the cart. */
 export type OrdersAttribution = {
   click_id?: string | null;
@@ -17919,6 +18358,177 @@ export type OrdersPublicPayment = {
   status: string;
 };
 
+/** A line received back. */
+export type OrdersReceivedLineRequest = {
+  /** `restock` (sellable again) or `damaged`. */
+  condition: string;
+  line_id: string;
+  /** Units received (0 when missing). */
+  quantity: number;
+};
+
+/** A refund of an order. */
+export type OrdersRefund = {
+  amount: Money;
+  created_at: string;
+  id: string;
+  order_id: string;
+  /** The payment of the order it comes from. */
+  payment_id: string;
+  reason: string;
+  reference: string;
+  /** The return it pays back, if any. */
+  return_id?: string | null;
+  /**
+   * `pending` (the payment partner is refunding), `succeeded`, `failed`, or `manual` (paid
+   * back by the shop outside the payment partner, e.g. cash).
+   */
+  status: string;
+  updated_at: string;
+};
+
+/** When the refund should reach you. */
+export type OrdersRefundEta = {
+  /** `original_payment` (back to the card or wallet you paid with) or `bank_transfer`. */
+  channel: string;
+  max_days: number;
+  min_days: number;
+};
+
+/** Refund part or all of an order. */
+export type OrdersRefundRequest = {
+  /** In the currency of the order; at most what is left to refund of one payment. */
+  amount: Money;
+  /** Why (no personal data; sent to the payment partner). */
+  reason: string;
+  /** Your unique key of this refund: sending it again returns the same refund. */
+  reference: string;
+};
+
+/** A return. */
+export type OrdersReturn = {
+  /** End of the return window of the order. */
+  deadline_at: string;
+  decided_at?: string | null;
+  id: string;
+  lines: OrdersReturnLine[];
+  /** Photos sent with the request. */
+  media_ids: string[];
+  note?: string | null;
+  number: string;
+  order_id: string;
+  /** The shop of the order. */
+  org_id: string;
+  reason_code: string;
+  received_at?: string | null;
+  refund?: Money | null;
+  refund_breakdown?: OrdersReturnRefundBreakdown | null;
+  /** Code of the `orders.return_rejected` list when rejected. */
+  reject_reason?: string | null;
+  requested_at: string;
+  /** `refund` or `exchange`. */
+  resolution: string;
+  /** `pickup`, `drop_off` or `in_store`. */
+  return_method: string;
+  /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+  status: string;
+  updated_at: string;
+  /** Warehouse that received the items. */
+  warehouse_org_id?: string | null;
+};
+
+/** One line of a return. */
+export type OrdersReturnLine = {
+  /** `restock` or `damaged`, once received. */
+  condition?: string | null;
+  /** A free gift sent back because the promotion's condition is no longer met. */
+  gift: boolean;
+  line_id: string;
+  quantity: number;
+  /** Units received back, once received. */
+  received?: number | null;
+  variant_id: string;
+};
+
+/** One line to return. */
+export type OrdersReturnLineRequest = {
+  /** Id of the order line. */
+  line_id: string;
+  /** Units to return (at most what is left of the line). */
+  quantity: number;
+};
+
+/** A way to send items back. */
+export type OrdersReturnMethodOption = {
+  available: boolean;
+  fee?: Money | null;
+  /** `pickup`, `drop_off` or `in_store`. */
+  method: string;
+};
+
+/** What a return would give. */
+export type OrdersReturnPreview = {
+  /** Last moment to ask. */
+  deadline_at: string;
+  /** Lines to send back, gifts included when the promotion wants them back. */
+  lines: OrdersReturnLine[];
+  methods: OrdersReturnMethodOption[];
+  /** Whether this reason needs photos. */
+  photos_required: boolean;
+  /** Money you would get back. */
+  refund: Money;
+  refund_breakdown: OrdersReturnRefundBreakdown;
+  refund_eta?: OrdersRefundEta | null;
+};
+
+/** How the refund of a return was computed. */
+export type OrdersReturnRefundBreakdown = {
+  /**
+   * Order discount taken back because the rest of the order is below the promotion minimum
+   * (negative: given back from an earlier return).
+   */
+  clawback: Money;
+  /** Value of free gifts kept although their condition is no longer met. */
+  gift_deduction: Money;
+  /** What was paid for the returned units (after discounts). */
+  goods: Money;
+  /** Share of the shipping fee (only when the seller is at fault). */
+  shipping: Money;
+  total: Money;
+};
+
+/** Ask to return items of a delivered order. */
+export type OrdersReturnRequest = {
+  lines: OrdersReturnLineRequest[];
+  /** Photos uploaded by you (at most 6). */
+  media_ids?: string[];
+  note?: string | null;
+  /**
+   * A code of the shop's allowed return reasons (list `orders.return_reason`, see
+   * `GET /api/v1/kernel/reasons/orders.return_reason`).
+   */
+  reason_code: string;
+  /** `refund` (default) or `exchange`. */
+  resolution?: string | null;
+  /**
+   * How the items go back: `pickup` (a carrier picks them up), `drop_off` (default: at a
+   * post office) or `in_store`.
+   */
+  return_method?: string | null;
+};
+
+/** A step of a return. */
+export type OrdersReturnTransitionRequest = {
+  /** `approve`, `reject`, `receive`, `refund` or `close`. */
+  action: string;
+  /** `receive`: what arrived; lines left out count as received in full and sellable. */
+  lines?: OrdersReceivedLineRequest[] | null;
+  /** `reject`: a code of the `orders.return_rejected` list. */
+  reason?: string | null;
+  /** `receive`: warehouse that received the items (default: the warehouse that shipped them). */
+  warehouse_org_id?: string | null;
+};
+
 /** A shipment requested from the shipping module. */
 export type OrdersShipmentRequested = {
   cod_amount?: Money | null;
@@ -18152,6 +18762,54 @@ export type Page_AuthorResponse = {
     /** The user account behind the profile, if any. */
     user_id?: string | null;
     website_url: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_BannerResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * The text was written from an AI suggestion (Vietnam's Law on Artificial Intelligence
+     * 134/2025/QH15): label it.
+     */
+    ai_assisted: boolean;
+    alt: string;
+    created_at: string;
+    created_by?: string | null;
+    /** Text of the button. */
+    cta_label: string;
+    /** Shown until (excluded); `null`: no end. */
+    ends_at?: string | null;
+    id: string;
+    /** `image` or `text`. */
+    kind: string;
+    link?: BannerLink | null;
+    locale: string;
+    /** Picture (media item id). */
+    media_id?: string | null;
+    /** Picture for phones; `null`: the same picture. */
+    mobile_media_id?: string | null;
+    /** Organization unit it belongs to; the tenant's id means every store of the tenant. */
+    org_id: string;
+    /** Only on these kinds of pages; empty: every kind of its placement. */
+    page_kinds: string[];
+    /** Only on these pages; empty: every page. */
+    page_targets: BannerPage[];
+    /** Key of its placement. */
+    placement: string;
+    /** Order in the placement, smallest first. */
+    position: number;
+    /** Shown from (included); `null`: at once. */
+    starts_at?: string | null;
+    /** `draft`, `active` or `archived`. */
+    status: string;
+    subtitle: string;
+    title: string;
+    /** Text banners: a colour token of the theme (`primary`, `secondary`, `accent`, `neutral`). */
+    tone?: string | null;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -18894,27 +19552,6 @@ export type Page_Conversation = {
      */
     unread: number;
     updated_at: string;
-  }[];
-  pagination: Pagination;
-};
-
-/** One page of a list. */
-export type Page_ConversationCallback = {
-  /** The items of this page, in the requested order. */
-  data: {
-    assigned_user_id?: string | null;
-    attempts: number;
-    client_id: string;
-    created_at: string;
-    id: string;
-    last_call_id?: string | null;
-    org_id: string;
-    phone_masked: string;
-    /** `open`, `calling`, `done`, `cancelled` or `expired`. */
-    status: string;
-    thread_id: string;
-    window_end: string;
-    window_start: string;
   }[];
   pagination: Pagination;
 };
@@ -20278,6 +20915,42 @@ export type Page_OrdersOrder = {
 };
 
 /** One page of a list. */
+export type Page_OrdersReturn = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** End of the return window of the order. */
+    deadline_at: string;
+    decided_at?: string | null;
+    id: string;
+    lines: OrdersReturnLine[];
+    /** Photos sent with the request. */
+    media_ids: string[];
+    note?: string | null;
+    number: string;
+    order_id: string;
+    /** The shop of the order. */
+    org_id: string;
+    reason_code: string;
+    received_at?: string | null;
+    refund?: Money | null;
+    refund_breakdown?: OrdersReturnRefundBreakdown | null;
+    /** Code of the `orders.return_rejected` list when rejected. */
+    reject_reason?: string | null;
+    requested_at: string;
+    /** `refund` or `exchange`. */
+    resolution: string;
+    /** `pickup`, `drop_off` or `in_store`. */
+    return_method: string;
+    /** `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`. */
+    status: string;
+    updated_at: string;
+    /** Warehouse that received the items. */
+    warehouse_org_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_OverrideResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -20444,6 +21117,64 @@ export type Page_PromotionsPromotionListItem = {
     status: PromotionsStatus;
     title: string;
     usage_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsPublicFlashSale = {
+  /** The items of this page, in the requested order. */
+  data: {
+    currency: string;
+    ends_at: string;
+    id: string;
+    items: PromotionsPublicFlashItem[];
+    org_id: string;
+    starts_at: string;
+    /** `running` or `upcoming`. */
+    state: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsPublicPromotion = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+    claimable: boolean;
+    currency: string;
+    ends_at: string;
+    /** Only for the buyer's first order. */
+    first_order_only: boolean;
+    id: string;
+    /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+    kind: string;
+    legal_limit?: PromotionsPublicLegalLimit | null;
+    /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+    locale: string;
+    /** Smallest order, in minor units of `currency`. */
+    min_order_minor?: number | null;
+    /**
+     * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+     * Trade of that province), with their reference.
+     */
+    notices: PromotionsPublicNotice[];
+    /** Unit that runs it. */
+    org_id: string;
+    starts_at: string;
+    /** Conditions, in full. */
+    terms: string;
+    title: string;
+    /** `automatic`, `code` or `voucher`. */
+    trigger: string;
+    /** Discount in basis points (1000 = 10%), when the promotion has one. */
+    value_bp?: number | null;
+    /** Discount amount in minor units of `currency`, when the promotion has one. */
+    value_minor?: number | null;
   }[];
   pagination: Pagination;
 };
@@ -21800,11 +22531,82 @@ export type Placement = {
   storage?: PlacementStorage | null;
 };
 
+/** The fields of a placement. `PUT` sends the whole placement; the key never changes. */
+export type PlacementFields = {
+  /** `image`, `text` or `any`; omitted: `text` for a `strip`, else `image`. */
+  accepts?: string | null;
+  /** Omitted: `true`. */
+  active?: boolean | null;
+  /** At most 500 characters. */
+  description?: string;
+  /** `all` (default), `desktop` or `mobile`. */
+  devices?: string | null;
+  /** `single`, `carousel`, `grid`, `stack`, `strip` or `popup`. */
+  display: string;
+  /** See the placement schema; omitted: the defaults of the display. */
+  display_settings?: Record<string, unknown>;
+  /** 1 to 50; omitted: 10. */
+  max_items?: number | null;
+  min_height?: number | null;
+  /** 1 to 10000 pixels. */
+  min_width?: number | null;
+  mobile_ratio?: Ratio | null;
+  /** 1 to 120 characters. */
+  name: string;
+  /** Omitted: `["any"]`. */
+  page_kinds?: string[];
+  ratio?: Ratio | null;
+};
+
 /** Migrations of one placement. */
 export type PlacementMigrationList = {
   /** `<module>/<migration>`: pending ones for a dry run, applied ones for a run. */
   migrations: string[];
   placement: string;
+};
+
+/** A display placement: where banners go on the website and how the website draws them. */
+export type PlacementResponse = {
+  /** Banners it takes: `image`, `text` or `any`. */
+  accepts: string;
+  /** Off: public reads leave it out. */
+  active: boolean;
+  /** `site` (the website of the tenant). */
+  audience: string;
+  created_at: string;
+  description: string;
+  /** `all`, `desktop` or `mobile`: call the placement only on these devices. */
+  devices: string;
+  /**
+   * How to draw it: `single`, `carousel`, `grid`, `stack`, `strip` (a thin text bar) or
+   * `popup`. See `docs/CONTENT.md` for what each one must do (e.g. a popup always has a close
+   * button and never shows on cart, checkout, sign-in or account pages).
+   */
+  display: string;
+  /**
+   * Settings of the display: `carousel` — `autoplay_seconds` (0 = off, else at least 4);
+   * `grid` — `columns` (2–4); `popup` — `frequency` (`once_per_session`, `once_per_day`,
+   * `once_per_week`) and `delay_seconds` (0–60). Other displays have none.
+   */
+  display_settings: Record<string, unknown>;
+  id: string;
+  key: string;
+  /** Most banners shown at once (per organization unit and language). */
+  max_items: number;
+  min_height?: number | null;
+  /** Smallest picture accepted, in pixels. */
+  min_width?: number | null;
+  mobile_ratio?: Ratio | null;
+  name: string;
+  /**
+   * Kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`,
+   * `cart`, `content_entry`, `content_type`, `landing`, or `any`.
+   */
+  page_kinds: string[];
+  /** Key in the standard set of placements, when the row came from it. */
+  preset_key?: string | null;
+  ratio?: Ratio | null;
+  updated_at: string;
 };
 
 /** Where a placement keeps its tenants' files. Access keys are never shown. */
@@ -22185,6 +22987,61 @@ export type ProfileRequest = {
   display_name: string;
 };
 
+/** A kind of record that can be promoted from a sandbox to the real tenant. */
+export type PromotableKind = {
+  description: string;
+  /** `<module>.<kind>`, e.g. `content.page`. */
+  kind: string;
+  /** The module that owns it. */
+  module: string;
+};
+
+/** Why a record could not be promoted. */
+export type PromoteConflict = {
+  /** The field that clashes, e.g. `slug`. */
+  field: string;
+  message: string;
+};
+
+/** What to promote. */
+export type PromoteInput = {
+  /** 1 to 100 records of the sandbox. */
+  items: PromoteItem[];
+};
+
+/** One record of the sandbox to promote. */
+export type PromoteItem = {
+  /** Id of the record in the sandbox. */
+  id: string;
+  /** A kind from `GET /api/v1/kernel/sandboxes/promotable`. */
+  kind: string;
+};
+
+/** Outcome of one promoted record. */
+export type PromoteOutcome = {
+  conflict?: PromoteConflict | null;
+  /** Id of the record in the sandbox. */
+  id: string;
+  kind: string;
+  /**
+   * `created_draft` (a new draft in the real tenant), `updated_draft` (the draft or pending
+   * change of the record in the real tenant was replaced; what is live is untouched),
+   * `unchanged` (already promoted with the same content) or `conflict` (a name, path or code
+   * is taken in the real tenant; see `conflict`).
+   */
+  outcome: string;
+  /** The record in the real tenant; `null` on `conflict`. */
+  target_id?: string | null;
+};
+
+/**
+ * Result of a promotion: one outcome per item, in the order sent. Nothing is published or enabled
+ * in the real tenant: people there publish the drafts themselves.
+ */
+export type PromoteResult = {
+  items: PromoteOutcome[];
+};
+
 /** A promotion just turned on, with the warnings of its checks. */
 export type PromotionsActivated = {
   promotion: PromotionsPromotion;
@@ -22311,6 +23168,30 @@ export type PromotionsConditionInput = {
 
 /** Kind of extra condition. */
 export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
+
+/** Another promotion that may clash with this one. */
+export type PromotionsConflict = {
+  ends_at: string;
+  exclusivity: "none" | "class" | "global";
+  id: string;
+  /** Kind of promotion. */
+  kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+  starts_at: string;
+  status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+};
+
+/** Counts of one day (Vietnam date). */
+export type PromotionsDailyStats = {
+  day: string;
+  /** Discount given, in minor units. */
+  discount_minor: number;
+  /** Value of the orders that used it, in minor units. */
+  order_value_minor: number;
+  platform_funded_minor: number;
+  /** Confirmed uses. */
+  redemptions: number;
+  seller_funded_minor: number;
+};
 
 /** Codes and vouchers usable for a cart, those not yet, and the best combination. */
 export type PromotionsEligibility = {
@@ -22591,6 +23472,41 @@ export type PromotionsOffer = {
 
 export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
 
+/** A seller's application, as it stands. */
+export type PromotionsParticipation = {
+  created_at: string;
+  id: string;
+  items: PromotionsParticipationItem[];
+  promotion_id: string;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  seller_org_id: string;
+  /** `pending`, `approved` or `rejected`. */
+  status: string;
+  updated_at: string;
+};
+
+/** One product a seller puts into a platform promotion. */
+export type PromotionsParticipationItem = {
+  /** Most units one buyer can get at that price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units offered at that price; omitted: not limited. */
+  quantity_limit?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp`). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points, 1 to 10000 (or `sale_price_minor`). */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A seller's application to join a platform promotion. */
+export type PromotionsParticipationRequest = {
+  /** 1 to 500 of your products. */
+  items: PromotionsParticipationItem[];
+  /** Your unit (the seller), below the unit that runs the promotion. */
+  org_id: string;
+};
+
 export type PromotionsPayer = "platform" | "seller" | "brand" | "payment_partner";
 
 /** Who pays for a discount. */
@@ -22598,6 +23514,26 @@ export type PromotionsPayerKind = "platform" | "seller" | "brand" | "payment_par
 
 /** Period of the per-customer limit. */
 export type PromotionsPeriod = "lifetime" | "day" | "week" | "month";
+
+/** A public coupon that lowers the price of a product. */
+export type PromotionsProductCode = {
+  /** The coupon to enter at checkout. */
+  code: string;
+  /** Discount on one unit. */
+  discount: Money;
+  ends_at: string;
+  /**
+   * Price of one unit with the coupon. The listed price stays the price without it: show
+   * this as "X with code …", not as a discounted price.
+   */
+  price_with_code: Money;
+  promotion_id: string;
+  /** Conditions, in full (the same as in `GET /public/promotions`). */
+  terms: string;
+  title: string;
+  /** Uses left, only when the coupon or promotion has a real limit; `null` otherwise. */
+  uses_left?: number | null;
+};
 
 /** Legal kind of programme: `regular` or a `national_focus` promotion programme. */
 export type PromotionsProgramKind = "regular" | "national_focus";
@@ -22710,6 +23646,86 @@ export type PromotionsPromotionListItem = {
   usage_count: number;
 };
 
+/** One product of a flash sale. */
+export type PromotionsPublicFlashItem = {
+  /** Most units one buyer can get at the sale price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units left at the sale price: a real count, `null` when not limited. */
+  quantity_left?: number | null;
+  /** Sale price of one unit, in minor units (or `value_bp` off the price). */
+  sale_price_minor?: number | null;
+  /** Discount in basis points (1000 = 10%), when the sale is a percentage. */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** A public flash sale, running or starting within a day. */
+export type PromotionsPublicFlashSale = {
+  currency: string;
+  ends_at: string;
+  id: string;
+  items: PromotionsPublicFlashItem[];
+  org_id: string;
+  starts_at: string;
+  /** `running` or `upcoming`. */
+  state: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
+};
+
+/** The legal discount limit in force. */
+export type PromotionsPublicLegalLimit = {
+  /** Legal basis, with its date in force. */
+  legal_basis: string;
+  /** Largest discount, in basis points of the price just before the promotion (5000 = 50%). */
+  max_bp: number;
+  /** Kind of promotion under the law (`price_reduction`, `gift_value`…). */
+  promotion_kind: string;
+};
+
+/** A promotion notice recorded with an authority. */
+export type PromotionsPublicNotice = {
+  authority_code: string;
+  /** Reference given by the authority. */
+  reference?: string | null;
+};
+
+/** A running promotion, as buyers see it. */
+export type PromotionsPublicPromotion = {
+  /** Buyers can save a voucher of it (`POST /public/promotions/{id}/claim`). */
+  claimable: boolean;
+  currency: string;
+  ends_at: string;
+  /** Only for the buyer's first order. */
+  first_order_only: boolean;
+  id: string;
+  /** Kind of the promotion (`percent_off`, `flash_sale`…). */
+  kind: string;
+  legal_limit?: PromotionsPublicLegalLimit | null;
+  /** Language of `title` and `terms` (the one asked for, else the first the promotion has). */
+  locale: string;
+  /** Smallest order, in minor units of `currency`. */
+  min_order_minor?: number | null;
+  /**
+   * Notices recorded with the authorities (e.g. `province:79`, the Department of Industry and
+   * Trade of that province), with their reference.
+   */
+  notices: PromotionsPublicNotice[];
+  /** Unit that runs it. */
+  org_id: string;
+  starts_at: string;
+  /** Conditions, in full. */
+  terms: string;
+  title: string;
+  /** `automatic`, `code` or `voucher`. */
+  trigger: string;
+  /** Discount in basis points (1000 = 10%), when the promotion has one. */
+  value_bp?: number | null;
+  /** Discount amount in minor units of `currency`, when the promotion has one. */
+  value_minor?: number | null;
+};
+
 export type PromotionsPurpose = "redeem" | "claim";
 
 /** Why a discount applies or not, for the buyer: `code` (i18n key), `params` and the translated `text`. */
@@ -22752,6 +23768,15 @@ export type PromotionsRejectedCode = {
   voucher_id?: string | null;
 };
 
+/** A reminder of a flash sale. */
+export type PromotionsReminder = {
+  promotion_id: string;
+  /** When the reminder is sent. */
+  remind_at: string;
+  /** When it was sent; `null` until then. */
+  sent_at?: string | null;
+};
+
 export type PromotionsRewardSelection = "cheapest" | "same_item" | "specified";
 
 export type PromotionsRole = "condition" | "reward";
@@ -22771,6 +23796,25 @@ export type PromotionsShippingDiscount = {
   funding: PromotionsFundingShare[];
   promotion_id: string;
   reason: PromotionsReason;
+};
+
+/** Carts to compute with and without the promotion. */
+export type PromotionsSimulateRequest = {
+  /** 1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate`. */
+  carts: PromotionsCart[];
+};
+
+/** One cart computed with and without the promotion. */
+export type PromotionsSimulation = {
+  /**
+   * What the promotion adds to the discount of this cart, in minor units (can be negative
+   * when it pushes out a better promotion).
+   */
+  difference_minor: number;
+  /** With the promotion (counted even while it is a draft or paused). */
+  with: PromotionsEvaluation;
+  /** Without it. */
+  without: PromotionsEvaluation;
 };
 
 export type PromotionsStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
@@ -23044,6 +24088,24 @@ export type PublicAuthorPage = {
   id: string;
   slug: string;
   website_url: string;
+};
+
+/** A banner to show. */
+export type PublicBanner = {
+  /** The text was written from an AI suggestion: label it. */
+  ai_assisted: boolean;
+  cta_label: string;
+  /** Where it links to: a path on the website or an address; `null`: no link. */
+  href?: string | null;
+  id: string;
+  image?: PublicMedia | null;
+  /** `image` or `text`. */
+  kind: string;
+  mobile_image?: PublicMedia | null;
+  subtitle: string;
+  title: string;
+  /** Text banners: a colour token of the theme. */
+  tone?: string | null;
 };
 
 /** A service customers can book. */
@@ -23337,6 +24399,34 @@ export type PublicOption = {
   value: string;
 };
 
+/** A placement ready to draw, with its banners for the page asked about. */
+export type PublicPlacement = {
+  /** `image`, `text` or `any`. */
+  accepts: string;
+  /** Banners to show, in this order (never shuffle them). */
+  banners: PublicBanner[];
+  /** `all`, `desktop` or `mobile`. */
+  devices: string;
+  /**
+   * `single`, `carousel`, `grid`, `stack`, `strip` or `popup`; draw it as `docs/CONTENT.md`
+   * says (a popup always has a close button; no autoplay when the viewer asks for reduced
+   * motion).
+   */
+  display: string;
+  display_settings: Record<string, unknown>;
+  key: string;
+  mobile_ratio?: Ratio | null;
+  ratio?: Ratio | null;
+};
+
+/** Several placements of one page. */
+export type PublicPlacementsResponse = {
+  /** The language returned. */
+  locale: string;
+  /** The placements asked for that exist and are on, in the order asked. */
+  placements: PublicPlacement[];
+};
+
 /** Changes to a public profile. Omitted fields stay as they are; `null` clears. */
 export type PublicProfileRequest = {
   address?: AddressInput | null;
@@ -23554,6 +24644,12 @@ export type RateSupportTicketRequest = {
   rating: number;
   /** Guests: the ticket token. Signed-in customers omit it. */
   token?: string | null;
+};
+
+/** A picture ratio, width to height (e.g. 3:1). */
+export type Ratio = {
+  h: number;
+  w: number;
 };
 
 /** How far you have read. */
@@ -23970,20 +25066,6 @@ export type ReportRequest = {
   /** What is wrong, for the moderators (at most 500 characters). */
   note?: string | null;
   reason: CommentReportReason;
-};
-
-/** When to call the customer back. */
-export type RequestConversationCallbackRequest = {
-  /** An id your app makes up (1 to 100 characters): sending again returns the same request. */
-  client_id: string;
-  /** `account`: the verified phone number of your account. */
-  phone_source: string;
-  /** Required (`true`) when calls are recorded. */
-  recording_ack?: boolean;
-  /** End of the window, the same day. */
-  window_end: string;
-  /** Start of the window, within the shop's call-back hours. */
-  window_start: string;
 };
 
 /** A shipment to request. */
@@ -24569,23 +25651,6 @@ export type SessionResponse = {
    * none was sent.
    */
   user_agent?: string | null;
-};
-
-/** The phone line of a unit. */
-export type SetConversationVoiceLineRequest = {
-  active?: boolean;
-  /** Call-back hours (default 08:00–20:00 every day). */
-  callback_hours?: CallbackHoursRange[] | null;
-  /** Public number of the shop; customers see it when called back. */
-  hotline: string;
-  /** A voice provider installed on this server (`provider()` of its connector, e.g. `stringee`). */
-  provider: string;
-  /** Record calls (off by default). Only when the provider plays a recording notice. */
-  recording_enabled?: boolean;
-  /** Make a new webhook token (the old one stops working). */
-  rotate_token?: boolean;
-  /** Minutes from UTC of the hours (default 420, Vietnam). */
-  utc_offset_minutes?: number | null;
 };
 
 /** Referral of the cart. */
@@ -25456,12 +26521,6 @@ export type SitemapItem = {
   translations: PublicTranslation[];
 };
 
-/** Confirmation that the customer knows the call is recorded. */
-export type StartConversationCallRequest = {
-  /** Required (`true`) when `GET …/voice` says `recording`. */
-  recording_ack?: boolean;
-};
-
 /** The first message of a conversation. */
 export type StartConversationRequest = {
   /** Plain text; may be empty when you send images. */
@@ -25562,14 +26621,6 @@ export type StartedConversation = {
   thread: Conversation;
 };
 
-/** A call just started from the browser, with the token for the provider's WebRTC SDK. */
-export type StartedConversationCall = {
-  call: ConversationCall;
-  expires_at: string;
-  /** Short-lived token for the voice provider's SDK; do not store it. */
-  token: string;
-};
-
 /** Where an entry is in its life. */
 export type Status = "draft" | "published" | "archived";
 
@@ -25594,6 +26645,20 @@ export type StepLog = {
    * that held) or `rejected`.
    */
   status: string;
+};
+
+/** What a website shows about its store: the brand and the location. */
+export type StorefrontResponse = {
+  brand: BrandResponse;
+  /** The unit's public profile: address, opening hours, special days, pickup, cover picture. */
+  location: PublicProfileResponse;
+  /**
+   * Open right now, in the unit's time zone (special days first); `null` when no opening
+   * hours are set.
+   */
+  open_now?: boolean | null;
+  /** IANA time zone of the unit; opening hours are local times in it. */
+  timezone: string;
 };
 
 /** Submissions of a form by status. */
@@ -27026,6 +28091,26 @@ export type UnsubscribeRequest = {
 export type UnsubscribeResponse = {
   /** Always `true`. */
   unsubscribed: boolean;
+};
+
+/** Changes to a banner: fields left out stay; `null` clears a field that may be empty. */
+export type UpdateBannerRequest = {
+  ai_assisted?: boolean | null;
+  alt?: string | null;
+  cta_label?: string | null;
+  ends_at?: string | null;
+  kind?: string | null;
+  link?: BannerLink | null;
+  media_id?: string | null;
+  mobile_media_id?: string | null;
+  page_kinds?: string[] | null;
+  page_targets?: BannerPage[] | null;
+  starts_at?: string | null;
+  /** `draft`, `active` or `archived`. */
+  status?: string | null;
+  subtitle?: string | null;
+  title?: string | null;
+  tone?: string | null;
 };
 
 /** Changes to a resource. */
@@ -30373,6 +31458,30 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/products/facets": {
+    /** Count products per filter value (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; site?: string }; };
+      responses: {
+        200: Data_CatalogFacets;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/search/suggest": {
+    /** Suggest as the shopper types (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q: string; locale: string; limit?: number; site?: string }; };
+      responses: {
+        200: Data_Vec_CatalogSuggestion;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/public/sitemap": {
     /** List product addresses for the sitemap (public). */
     get: {
@@ -30431,6 +31540,30 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/synonyms": {
+    /** List search synonyms. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace search synonyms. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogSynonyms;
+      responses: {
+        200: Data_CatalogSynonyms;
+        401: Problem;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -32230,6 +33363,74 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/banners": {
+    /** List banners. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { placement?: string; org_id?: string; status?: string; locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a banner. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateBannerRequest;
+      responses: {
+        201: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/banners/{id}": {
+    /** Get a banner. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a banner. */
+    patch: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateBannerRequest;
+      responses: {
+        200: Data_BannerResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a banner. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/entries": {
     /** List posts and pages (drafts included). */
     get: {
@@ -32641,6 +33842,100 @@ export interface paths {
       };
     };
   };
+  "/api/v1/content/placements": {
+    /** List display placements. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a display placement. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreatePlacementRequest;
+      responses: {
+        201: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/presets": {
+    /** Add the standard placements. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      responses: {
+        200: Data_Vec_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/{key}": {
+    /** Get a display placement. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; };
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace a display placement. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: PlacementFields;
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a display placement. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/placements/{key}/order": {
+    /** Order the banners of a placement. */
+    put: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { key: string }; };
+      requestBody: OrderRequest;
+      responses: {
+        200: Data_PlacementResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/content/public/authors/{slug}": {
     /** Get an author by slug (public). */
     get: {
@@ -32671,6 +33966,33 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale: string }; };
       responses: {
         200: Data_PublicMenu;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/placements": {
+    /** Read several placements of a page (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { keys: string; locale?: string; page_kind?: string; page_ref?: string; site?: string }; };
+      responses: {
+        200: Data_PublicPlacementsResponse;
+        304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/content/public/placements/{key}": {
+    /** Read one placement (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { key: string }; query: { locale?: string; page_kind?: string; page_ref?: string; site?: string }; };
+      responses: {
+        200: Data_PublicPlacement;
+        304: void;
         403: Problem;
         404: Problem;
         422: Problem;
@@ -32981,72 +34303,6 @@ export interface paths {
       };
     };
   };
-  "/api/v1/conversations/callbacks": {
-    /** List call-back requests in your scope. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; from?: string; to?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
-      responses: {
-        200: Page_ConversationCallback;
-        401: Problem;
-        403: Problem;
-        422: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/callbacks/{id}/call": {
-    /** Call a customer back. */
-    post: {
-      parameters: { header: { "Idempotency-Key": string; "Accept-Language"?: string }; path: { id: string }; };
-      responses: {
-        201: Data_ConversationCall;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        409: Problem;
-        503: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/callbacks/{id}/close": {
-    /** Close a call-back request. */
-    post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
-      responses: {
-        200: Data_ConversationCallback;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        409: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/calls/{id}/recording": {
-    /** Listen to a call recording. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
-      responses: {
-        200: Blob;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        default: Problem;
-      };
-    };
-    /** Delete a call recording. */
-    delete: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
-      responses: {
-        200: Data_ConversationCall;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        default: Problem;
-      };
-    };
-  };
   "/api/v1/conversations/me/threads": {
     /** List your conversations. */
     get: {
@@ -33083,56 +34339,6 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/me/threads/{id}/callbacks": {
-    /** Ask the shop to call you back. */
-    post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
-      requestBody: RequestConversationCallbackRequest;
-      responses: {
-        200: Data_ConversationCallback;
-        201: Data_ConversationCallback;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        409: Problem;
-        422: Problem;
-        429: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/me/threads/{id}/callbacks/{callback_id}": {
-    /** Cancel your call-back request. */
-    delete: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; callback_id: string }; };
-      responses: {
-        200: Data_ConversationCallback;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        409: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/me/threads/{id}/calls": {
-    /** Call the shop from the browser. */
-    post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
-      requestBody: StartConversationCallRequest;
-      responses: {
-        201: Data_StartedConversationCall;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        409: Problem;
-        422: Problem;
-        429: Problem;
-        503: Problem;
         default: Problem;
       };
     };
@@ -33252,19 +34458,6 @@ export interface paths {
       };
     };
   };
-  "/api/v1/conversations/me/threads/{id}/voice": {
-    /** Get what is needed before calling the shop. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
-      responses: {
-        200: Data_ConversationVoiceInfo;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        default: Problem;
-      };
-    };
-  };
   "/api/v1/conversations/reports": {
     /** List reports of abuse in your scope. */
     get: {
@@ -33351,19 +34544,6 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
       responses: {
         200: Data_ConversationBlock;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/threads/{id}/calls": {
-    /** List the calls of a conversation. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
-      responses: {
-        200: Data_Vec_ConversationCall;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -33497,60 +34677,6 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/voice/agent-session": {
-    /** Get a WebRTC session to answer calls. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string }; };
-      responses: {
-        200: Data_ConversationAgentSession;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        503: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/voice/lines/{org_id}": {
-    /** Get the phone line of a unit. */
-    get: {
-      parameters: { header: { "Accept-Language"?: string }; path: { org_id: string }; };
-      responses: {
-        200: Data_ConversationVoiceLine;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        default: Problem;
-      };
-    };
-    /** Set the phone line of a unit. */
-    put: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string }; };
-      requestBody: SetConversationVoiceLineRequest;
-      responses: {
-        200: Data_ConversationVoiceLine;
-        401: Problem;
-        403: Problem;
-        422: Problem;
-        default: Problem;
-      };
-    };
-  };
-  "/api/v1/conversations/voice/webhooks/{provider}/{line_token}": {
-    /** Receive a call status notification from the voice provider. */
-    post: {
-      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { provider: string; line_token: string }; };
-      requestBody: string;
-      responses: {
-        200: Data_ConversationVoiceWebhookReceipt;
-        401: Problem;
-        403: Problem;
-        404: Problem;
-        413: Problem;
         default: Problem;
       };
     };
@@ -35710,6 +36836,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/sandboxes/promotable": {
+    /** List the kinds of records that can be promoted from a sandbox. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_PromotableKind;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/sandboxes/{id}": {
     /** Delete a sandbox. */
     delete: {
@@ -35732,6 +36870,21 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandboxes/{id}/promote": {
+    /** Promote records tried in a sandbox to the real tenant, as drafts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromoteInput;
+      responses: {
+        200: Data_PromoteResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38638,6 +39791,51 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/returns": {
+    /** Ask to return items. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        201: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/returns/preview": {
+    /** Preview a return. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        200: Data_OrdersReturnPreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/returns/{id}": {
+    /** One of your returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/payments/{token}": {
     /** Status of a payment, for the QR code screen. */
     get: {
@@ -38646,6 +39844,48 @@ export interface paths {
         200: Data_OrdersPublicPayment;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns": {
+    /** List returns. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; org_id?: string; order_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersReturn;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}": {
+    /** Read a return. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/returns/{id}/transitions": {
+    /** Move a return forward. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnTransitionRequest;
+      responses: {
+        200: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38673,6 +39913,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/refunds": {
+    /** Refunds of an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Refund an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersRefundRequest;
+      responses: {
+        200: Data_OrdersRefund;
+        201: Data_OrdersRefund;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -38822,6 +40090,18 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
       responses: {
         200: Data_PublicProfileResponse;
+        400: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/public/storefront": {
+    /** Get the store information of a website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
+      responses: {
+        200: Data_StorefrontResponse;
         400: Problem;
         404: Problem;
         default: Problem;
@@ -39714,6 +40994,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/calendar": {
+    /** List the promotions running on some days (calendar). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsPromotionListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}": {
     /** Get a promotion with its rule, texts, targets and counters. */
     get: {
@@ -39835,6 +41128,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/conflicts": {
+    /** List the promotions that may clash with this one. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsConflict;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/end": {
     /** End a promotion now. */
     post: {
@@ -39893,6 +41199,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/participations": {
+    /** List the applications to a platform promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Apply to join a platform flash sale with your products. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsParticipationRequest;
+      responses: {
+        200: Data_PromotionsParticipation;
+        201: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/approve": {
+    /** Approve a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/participations/{participation_id}/reject": {
+    /** Reject a seller's application. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; participation_id: string }; };
+      responses: {
+        200: Data_PromotionsParticipation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/pause": {
     /** Pause a running or scheduled promotion. */
     post: {
@@ -39917,6 +41279,35 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/simulate": {
+    /** Try a promotion on sample carts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsSimulateRequest;
+      responses: {
+        200: Data_Vec_PromotionsSimulation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/stats": {
+    /** Get the daily counts of a promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { from: string; to: string }; };
+      responses: {
+        200: Data_Vec_PromotionsDailyStats;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -39983,6 +41374,44 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/public/promotions": {
+    /** List the promotions running now on this website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicPromotion;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/flash-sales": {
+    /** List the public flash sales running now or starting within a day (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_PromotionsPublicFlashSale;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/for-product/{product_id}": {
+    /** List the public coupons that lower the price of a product (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { variant_id: string; locale?: string; site?: string }; };
+      responses: {
+        200: Data_Vec_PromotionsProductCode;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/public/promotions/{id}/claim": {
     /** Save the voucher of a public promotion into your wallet ("Save" button). */
     post: {
@@ -39994,6 +41423,31 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/{id}/reminders": {
+    /** Ask to be reminded when a flash sale starts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsReminder;
+        201: Data_PromotionsReminder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Cancel your reminder of a flash sale. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };

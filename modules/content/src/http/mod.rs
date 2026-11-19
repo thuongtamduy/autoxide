@@ -4,16 +4,21 @@
 
 mod actions;
 mod assist;
+mod banners;
 pub(crate) mod entries;
 mod history;
 mod library;
 mod links;
 mod menus;
+mod placements;
 mod public;
+mod public_banners;
 mod redirects;
 mod templates;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_banners;
 #[cfg(test)]
 mod tests_compliance;
 #[cfg(test)]
@@ -36,6 +41,7 @@ use uuid::Uuid;
 use crate::service::ContentService;
 
 pub(crate) use assist::{SearchHit, SeoReport, SeoSuggestion, TranslationRequestResponse};
+pub(crate) use banners::{BannerResponse, banner_response};
 pub(crate) use entries::{EntriesQuery, EntryResponse, describe};
 pub(crate) use history::{RevisionResponse, revision};
 pub(crate) use public::{Resolution, resolution};
@@ -64,6 +70,18 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(library::get_term, library::update_term, library::delete_term))
         .routes(routes!(library::list_authors, library::create_author))
         .routes(routes!(library::get_author, library::update_author, library::delete_author))
+        .routes(routes!(placements::list_placements, placements::create_placement))
+        .routes(routes!(placements::install_presets))
+        .routes(routes!(
+            placements::get_placement,
+            placements::put_placement,
+            placements::delete_placement
+        ))
+        .routes(routes!(placements::order_placement))
+        .routes(routes!(banners::list_banners, banners::create_banner))
+        .routes(routes!(banners::get_banner, banners::update_banner, banners::delete_banner))
+        .routes(routes!(public_banners::list_public_placements))
+        .routes(routes!(public_banners::get_public_placement))
         .routes(routes!(menus::list_menus))
         .routes(routes!(menus::get_menu, menus::put_menu))
         .routes(routes!(history::list_revisions))

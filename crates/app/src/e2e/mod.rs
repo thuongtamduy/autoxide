@@ -30,6 +30,7 @@ pub(crate) mod relocation;
 pub(crate) mod reporting;
 pub(crate) mod restore_drill;
 pub(crate) mod sandbox;
+pub(crate) mod sandbox_copy;
 pub(crate) mod sandbox_isolation;
 pub(crate) mod signup;
 pub(crate) mod support;

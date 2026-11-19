@@ -172,3 +172,94 @@ async fn nguoi_tao_khong_tu_duyet() {
     .await
     .unwrap();
 }
+
+/// Gợi ý tìm của website gom nguồn của nhiều module (D-201): bài viết đã đăng (`content`) và cửa
+/// hàng công khai (`organizations`) cùng có mặt; khớp đúng dấu xếp trước khớp không dấu.
+#[tokio::test]
+async fn goi_y_tim_gom_bai_viet_va_cua_hang() {
+    TestDatabase::run(async |test| {
+        let dir = std::env::temp_dir().join(format!("autoxide-catalog-{}", Uuid::now_v7()));
+        let storage = [("AUTOXIDE_FILES_DIR", dir.display().to_string())];
+        let runtime = start(test.url(), &storage).await;
+        let auth = format!("Bearer {}", admin_token(&runtime, "suggest@example.com").await);
+        let headers = [("authorization", auth.as_str()), ("content-type", "application/json")];
+        let with_match = [
+            ("authorization", auth.as_str()),
+            ("content-type", "application/json"),
+            ("if-match", "*"),
+        ];
+
+        // Hai bài: một khớp đúng dấu "dầu", một chỉ khớp khi bỏ dấu ("dâu"); một bài nháp không hiện.
+        let mut published = Vec::new();
+        for (title, publish) in
+            [("Dầu gội thảo dược", true), ("Dâu tây Đà Lạt", true), ("Dầu nháp", false)]
+        {
+            let body = json!({"kind": "post", "locale": "vi", "title": title});
+            let (status, _, made) = call(
+                &runtime,
+                "POST",
+                "/api/v1/content/entries",
+                &headers,
+                body.to_string().into_bytes(),
+            )
+            .await;
+            assert_eq!(status, StatusCode::CREATED, "{made}");
+            let id = made["data"]["id"].as_str().unwrap().to_owned();
+            if publish {
+                let uri = format!("/api/v1/content/entries/{id}/publish");
+                let (status, _, done) = call(&runtime, "POST", &uri, &with_match, Vec::new()).await;
+                assert!(status.is_success(), "{done}");
+                published.push(id);
+            }
+        }
+
+        // Cửa hàng công khai ở nút gốc, tên có "Dầu".
+        let root = root_of(DEFAULT_TENANT).as_uuid();
+        let profile = json!({"public": true, "display_name": "Cửa hàng Dầu Giây"});
+        let (status, _, shown) = call(
+            &runtime,
+            "PATCH",
+            &format!("/api/v1/organizations/units/{root}/public-profile"),
+            &with_match,
+            profile.to_string().into_bytes(),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{shown}");
+
+        let uri = "/api/v1/catalog/public/search/suggest?locale=vi&q=d%E1%BA%A7u";
+        let (status, _, found) = call(&runtime, "GET", uri, &[], Vec::new()).await;
+        assert_eq!(status, StatusCode::OK, "{found}");
+        let items: Vec<(String, String, bool)> = found["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|item| {
+                (
+                    item["kind"].as_str().unwrap().to_owned(),
+                    item["label"].as_str().unwrap().to_owned(),
+                    item["exact"].as_bool().unwrap(),
+                )
+            })
+            .collect();
+        let has = |kind: &str, label: &str, exact: bool| {
+            items.iter().any(|item| item == &(kind.to_owned(), label.to_owned(), exact))
+        };
+        assert!(has("content.entry", "Dầu gội thảo dược", true), "{found}");
+        assert!(has("content.entry", "Dâu tây Đà Lạt", false), "{found}");
+        assert!(has("organizations.store", "Cửa hàng Dầu Giây", true), "{found}");
+        assert!(!items.iter().any(|item| item.1 == "Dầu nháp"), "{found}");
+        // Mọi gợi ý đúng dấu đứng trước mọi gợi ý không dấu.
+        let first_loose = items.iter().position(|item| !item.2).unwrap();
+        assert!(items[first_loose..].iter().all(|item| !item.2), "{found}");
+        let entry = found["data"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["kind"] == "content.entry" && item["exact"] == true)
+            .unwrap();
+        assert_eq!(entry["id"], published[0].as_str());
+        assert!(entry["path"].as_str().unwrap().starts_with('/'), "{entry}");
+    })
+    .await
+    .unwrap();
+}

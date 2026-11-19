@@ -505,7 +505,14 @@ impl Module for AuthModule {
 
     // Tách / gộp khách (bước 38): chính sách ở `relocation.rs`.
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
-        relocation::relocation()
+        let relocation = relocation::relocation();
+        // Rào quyền chép sang khách mới ngay trong bước mở nó (gọi sau `start`).
+        match &self.state {
+            Some(state) => {
+                relocation.on_switch(Arc::new(guardrail::GuardrailSwitch(state.guardrails.clone())))
+            }
+            None => relocation,
+        }
     }
 
     // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
@@ -514,6 +521,12 @@ impl Module for AuthModule {
         let guardrails = self.state.as_ref().map(|state| state.guardrails.clone());
         subscriptions.extend(guardrail::subscriptions(guardrails));
         subscriptions
+    }
+
+    // Sao role vào sandbox mới (bước 38, D-232).
+    fn sandbox_copy(&self) -> Option<Arc<dyn autoxide_kernel::tenancy::sandbox::SandboxCopy>> {
+        let roles = self.state.as_ref()?.roles.clone();
+        Some(Arc::new(sandbox::RoleCopy { roles }))
     }
 }
 

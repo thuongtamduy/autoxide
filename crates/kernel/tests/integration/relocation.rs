@@ -122,7 +122,33 @@ impl MigrationTrait for CreateShop {
     }
 }
 
-struct Shop;
+#[derive(Default)]
+struct Shop {
+    /// Hook của bước chuyển (D-20261119-relocation-switch-hook), nếu test cần.
+    hook: Option<std::sync::Arc<Gate>>,
+}
+
+/// Hook mẫu: lỗi khi `fail` bật, ghi lại các lượt đã chạy qua.
+#[derive(Default)]
+struct Gate {
+    fail: std::sync::atomic::AtomicBool,
+    seen: std::sync::Mutex<Vec<(RelocationKind, TenantId, TenantId)>>,
+}
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::SwitchHook for Gate {
+    async fn switch(
+        &self,
+        _control: &sea_orm::DatabaseTransaction,
+        relocation: &autoxide_kernel::tenancy::RelocationSwitch,
+    ) -> Result<(), autoxide_kernel::error::Error> {
+        if self.fail.load(std::sync::atomic::Ordering::SeqCst) {
+            return Err(autoxide_kernel::error::Error::internal("the shop is not ready"));
+        }
+        self.seen.lock().unwrap().push((relocation.kind, relocation.source, relocation.target));
+        Ok(())
+    }
+}
 
 impl Module for Shop {
     fn name(&self) -> &'static str {
@@ -147,7 +173,11 @@ impl Module for Shop {
     }
 
     fn relocation(&self) -> Relocation {
-        Relocation::new()
+        let relocation = match &self.hook {
+            Some(hook) => Relocation::new().on_switch(hook.clone()),
+            None => Relocation::new(),
+        };
+        relocation
             .by_org(&["shop_items", "shop_notes"])
             .follow("shop_lines", "item_id", "shop_items")
             .copy_on_split(&["shop_settings"])
@@ -164,10 +194,14 @@ impl Module for Shop {
 const PLATFORM: [&str; 2] = ["kernel.tenants.relocate", "kernel.tenants.read"];
 
 async fn app(test: &TestDatabase) -> TestApp {
+    app_with(test, Shop::default()).await
+}
+
+async fn app_with(test: &TestDatabase, shop: Shop) -> TestApp {
     let app = TestApp::builder(test)
         .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
         .setting("AUTOXIDE_RELOCATION_DRAIN_SECONDS", "5")
-        .module(Shop)
+        .module(shop)
         .tenant("a")
         .tenant("b")
         .placement("spare")
@@ -634,6 +668,53 @@ async fn relocation_api_chi_nhan_su_nen_tang_mac_dinh_dry_run_khach_chi_gui_yeu_
         assert_eq!(mine.json()["data"]["state"], json!("done"));
         let north = tenant(&app, "a-north").await;
         assert_eq!(count(north.database(), "shop_items", north.id()).await, 2);
+    })
+    .await
+    .unwrap();
+}
+
+/// Hook của bước chuyển lỗi thì khách mới KHÔNG mở (vẫn `provisioning`), khách nguồn vẫn khoá, lượt
+/// đứng ở `verified`; hết lỗi thì chạy tiếp và hook thấy đúng loại, nguồn, đích.
+#[tokio::test]
+async fn hook_buoc_chuyen_loi_thi_khach_moi_khong_mo() {
+    TestDatabase::run(async |test| {
+        let gate = std::sync::Arc::new(Gate::default());
+        gate.fail.store(true, std::sync::atomic::Ordering::SeqCst);
+        let app = app_with(test, Shop { hook: Some(gate.clone()) }).await;
+        let seeded = seed(&app).await;
+        let service = app.api::<TenantRelocations>().unwrap();
+        let started =
+            service.start(Actor::system(), &split(seeded.north), None, false).await.unwrap();
+        let mut state = String::new();
+        for attempt in 0..3 {
+            state = service.step(started.id, &format!("runner-{attempt}")).await.unwrap().state;
+        }
+        assert_eq!(state, "verified");
+        let error = service.step(started.id, "runner-switch").await;
+        assert!(error.is_err(), "hook lỗi thì bước chuyển lỗi");
+        let status = |slug: &'static str| {
+            let control = app.database().clone();
+            async move {
+                let select = Query::select()
+                    .column(Alias::new("status"))
+                    .from(Alias::new("kernel_tenants"))
+                    .and_where(Expr::col(Alias::new("slug")).eq(slug))
+                    .to_owned();
+                let row = control.write().query_one(&select).await.unwrap().unwrap();
+                row.try_get::<String>("", "status").unwrap()
+            }
+        };
+        assert_eq!(status("a-north").await, "provisioning", "khách mới chưa mở");
+        assert_eq!(service.get(started.id).await.unwrap().state, "verified");
+        assert!(gate.seen.lock().unwrap().is_empty());
+
+        gate.fail.store(false, std::sync::atomic::Ordering::SeqCst);
+        let step = service.step(started.id, "runner-again").await.unwrap();
+        assert_eq!(step.state, "switched");
+        assert_eq!(status("a-north").await, "active");
+        let a = tenant(&app, "a").await;
+        let north = tenant(&app, "a-north").await;
+        assert_eq!(*gate.seen.lock().unwrap(), [(RelocationKind::Split, a.id(), north.id())]);
     })
     .await
     .unwrap();

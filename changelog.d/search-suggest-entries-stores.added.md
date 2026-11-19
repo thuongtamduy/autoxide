@@ -1,0 +1,1 @@
+- Website search suggestions (`GET /api/v1/catalog/public/search/suggest`) now also include published posts and pages (`content.entry`) and public stores (`organizations.store`), ranked with exact-accent matches first.

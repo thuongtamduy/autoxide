@@ -43,6 +43,13 @@ pub(crate) const CONTENT_DELETE: Permission =
 pub(crate) const CONTENT_MANAGE: Permission =
     Permission::new("content.manage", "Manage categories, tags, authors, menus and redirects.");
 
+pub(crate) const CONTENT_BANNERS: Permission = Permission::new(
+    "content.banners",
+    "Create, edit, schedule, order and archive banners of display placements, for the \
+     organization units in reach.",
+)
+.scoped();
+
 // Theo nút (bước 34, D-208): đọc, viết, đăng, xoá áp theo độ sâu — người của một cửa hàng chỉ làm
 // trên bài của cửa hàng mình. `content.manage` (danh mục, thẻ, tác giả, chuyển hướng) giữ cấp khách.
 
@@ -55,6 +62,7 @@ pub(crate) fn all() -> Vec<Permission> {
         CONTENT_PUBLISH_OWN,
         CONTENT_DELETE,
         CONTENT_MANAGE,
+        CONTENT_BANNERS,
     ]
 }
 

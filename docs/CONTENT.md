@@ -21,7 +21,8 @@ ids, and they must be public before the entry can be published.
 | `content.publish`     | Publishing, taking down, archiving, moving pages, scheduling; the terms and authors of a published entry |
 | `content.publish_own` | Publishing and taking down only entries the caller created; no archive, schedule or moving published pages |
 | `content.delete`      | Deleting entries for good                                                    |
-| `content.manage`      | Categories, tags, authors, menus, redirects                                  |
+| `content.manage`      | Categories, tags, authors, menus, redirects, display placements              |
+| `content.banners`     | Banners of display placements, per organization unit                         |
 
 Give them to a role with `PUT /api/v1/auth/roles/{id}`. The `admin` role has them all.
 Readers of the website need none: everything under `/api/v1/content/public/` is open.
@@ -261,6 +262,107 @@ entry answers **451** `content.restricted` at `GET /public/resolve` (answer 451 
 left out of `/public/posts`, the sitemap, the feed, search and other modules (resource directory). It
 stays hidden when published again. `compliance.target_restored` shows it as before. See
 [`COMPLIANCE.md`](COMPLIANCE.md#reports-of-infringements-and-consumer-complaints).
+
+## Banners and display placements
+
+A **placement** is a named spot of the website (`home_hero`, `top_strip`…) that tells the
+website **how to draw** what is in it and tells editors **what picture fits**, so changing a
+banner never breaks the layout. A **banner** is the content shown there, with a time window and an
+order. Changing banners is a data change (REST or MCP), not a change of the website's code.
+
+### Placements (`content.manage`)
+
+`GET/POST /placements`, `GET/PUT/DELETE /placements/{key}` (`PUT` needs `If-Match`; deleting a
+placement that still has banners answers 409 `content.placement_in_use`). Each has:
+
+| Field | Meaning |
+|---|---|
+| `display` | `single`, `carousel`, `grid` (2–4 cells), `stack` (vertical, for side columns), `strip` (a thin text bar), `popup` |
+| `display_settings` | `carousel`: `autoplay_seconds` (0 = off, else ≥ 4); `grid`: `columns` (2–4); `popup`: `frequency` (`once_per_session`, `once_per_day`, `once_per_week`), `delay_seconds` (0–60) |
+| `accepts` | `image`, `text` or `any`; a `strip` takes only `text` |
+| `ratio`, `mobile_ratio`, `min_width`, `min_height` | picture rules, checked when a banner is saved (2% leeway on the ratio), from the size the media library stored |
+| `devices` | `all`, `desktop`, `mobile`: call the placement only on these |
+| `page_kinds` | kinds of pages it is used on: `home`, `category`, `collection`, `product`, `search`, `cart`, `content_entry`, `content_type`, `landing`, or `any` |
+| `max_items` | most banners at once (1–50) per store and language |
+
+New tenants get a **standard set**: `top_strip` (strip, text), `home_hero` (carousel, 3:1, at least
+1800×600; phones 4:5), `home_middle` (grid of 3, 1:1), `category_top` (4:1), `sidebar_left` and
+`sidebar_right` (stack, 1:2), `inline` (4:1, image or text), `above_footer` (4:1), `popup` (once a day,
+after 5 s, 4:5). Edit, switch off or delete them like your own. A tenant created before this
+feature adds the missing ones with `POST /placements/presets` (it never brings back one you
+deleted unless you call it).
+
+### Banners (`content.banners`)
+
+`GET/POST /banners`, `GET/PATCH/DELETE /banners/{id}` (`PATCH` needs `If-Match`), and
+`PUT /placements/{key}/order` with `{"banner_ids": [...]}` and the placement's `ETag` in `If-Match`
+to order a whole placement at once. `content.banners` is given per organization unit: the staff of
+a store manage only that store's banners; `org_id` left out means every store of the tenant.
+
+- `kind`: `image` (needs `media_id`, a **public** picture; optional `mobile_media_id`) or `text`
+  (`title` required, `tone` = `primary`, `secondary`, `accent` or `neutral` — never a colour code, so
+  a new theme recolours it).
+- `link`: `{"url": "https://…"}` or a path `/…`, or `{"kind": "catalog.product", "id": "…"}` — any type
+  of the object directory (`GET /api/v1/kernel/resources`). Saving checks the object exists; the
+  public read leaves the banner out once the object is no longer public (product off sale, promotion
+  over). A banner linking to a `promotions.promotion` is **archived** when the promotion ends or is
+  cancelled: advertising must not promise an offer that is over (Vietnam's Law on Consumer Protection
+  19/2023/QH15, Law on Advertising — check the original texts).
+- `page_kinds` (within the placement's) and `page_targets` (`[{"kind": "catalog.category", "id": "…"}]`,
+  at most 50): show the banner only on those pages. Example: a left-column banner only on the
+  "Phones" category.
+- `starts_at` / `ends_at`, `status` (`draft`, `active`, `archived`), `ai_assisted`.
+
+### Reading on the website (public)
+
+One call for every placement of a page:
+
+```http
+GET /api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&locale=vi&page_kind=home
+GET /api/v1/content/public/placements?keys=category_top,sidebar_left&page_kind=category&page_ref=catalog.category:0190…
+```
+
+Each placement comes with `display`, `display_settings`, `accepts`, ratios, `devices` and its
+`banners`: active, inside their time window now, of the website (`site`, or the domain) and the
+units above it, in the page's language, in a **fixed order** (`position`). Images come with
+`variants` and `webp_url` for `srcset` / `<picture>`; links come ready as `href`. Banners not limited
+to some pages always show; without `page_kind` only those show. `Cache-Control: public, max-age=…`
+lasts until the next banner starts or ends (at most 60 s), so a CDN never keeps an expired banner;
+`ETag` gives 304. `GET /public/placements/{key}` reads one placement.
+
+**Rules for the website** (part of the contract):
+
+- Draw banners in the order given; never shuffle them (it breaks caching and the page jumps on reload).
+- A `popup` always has a visible close button, respects `frequency`, and never shows on cart, checkout,
+  sign-in or account pages.
+- A `carousel` does not autoplay when the viewer asks for reduced motion
+  (`prefers-reduced-motion`), and has controls to pause and move.
+- Label banners with `ai_assisted: true` as written with AI help.
+
+Example of a home page:
+
+```js
+const res = await fetch(`/api/v1/content/public/placements?keys=top_strip,home_hero,home_middle,popup&page_kind=home&locale=${lang}`);
+const { data } = await res.json();
+for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
+```
+
+### Store information (header and footer)
+
+`GET /api/v1/organizations/public/storefront` (public; the website from `site` or the domain) gives the
+**brand** — name, logo and site icon (ids of public media items: `/api/v1/media/{id}/content`), phone, email,
+social profiles — inherited down the organization tree (a chain sets it, a store overrides what it
+wants), the **location** (address, opening hours, special days, pickup, cover picture of the unit's
+public profile), the unit's time zone and `open_now`. Manage the brand with the unit settings
+`organizations.brand_name`, `organizations.brand_logo`, `organizations.brand_icon`,
+`organizations.contact_phone`, `organizations.contact_email`, `organizations.social_links`
+(`PUT /api/v1/organizations/units/{id}/settings/{key}`). For the legal footer of a shop in Vietnam,
+also show `GET /api/v1/compliance/public/owner` and the badge of `GET /api/v1/compliance/public/badge`.
+
+### MCP tools
+
+`content.list_banners`, `content.save_banner` (drafts only: a person sets a banner `active`; text
+from a tool is marked `ai_assisted` unless told otherwise), `content.order_placement`.
 
 ## Draft preview
 

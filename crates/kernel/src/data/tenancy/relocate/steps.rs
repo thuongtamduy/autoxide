@@ -394,6 +394,16 @@ impl TenantRelocations {
         let mut options = Options::parse(&row.options)?;
         let (source, target) = (prepared.source.id, prepared.target_id);
         let transaction = self.control().begin_write().await?;
+        // Việc đồng bộ của module (vd chép rào quyền) TRƯỚC khi khách mới hoạt động, trong cùng
+        // transaction: lỗi thì không gì đổi, khách mới không mở.
+        let switch = super::RelocationSwitch {
+            kind: prepared.kind,
+            source: TenantId::from_uuid(source),
+            target: TenantId::from_uuid(target),
+        };
+        for hook in self.setup.policies()?.switch_hooks() {
+            hook.switch(&transaction, &switch).await?;
+        }
         let domains: Vec<String>;
         match prepared.kind {
             RelocationKind::Split => {
