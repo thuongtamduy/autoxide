@@ -122,7 +122,7 @@ mrml = { version = "6.0.1", default-features = false, features = ["parse", "rend
 # glyph dựng bằng `skrifa`.
 krilla = { version = "0.8.2", default-features = false }
 # Tra glyph và đo bề rộng chữ cho PDF (cùng phiên bản krilla đã kéo vào).
-skrifa = "0.42"
+skrifa = "0.50"
 # File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
 rust_xlsxwriter = { version = "0.102.0", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["std"] }
