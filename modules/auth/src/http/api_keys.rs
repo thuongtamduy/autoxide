@@ -148,6 +148,9 @@ pub(crate) struct ApiKeyResponse {
     /// from elsewhere gets 403 `network_not_allowed`.
     #[schema(example = json!(["203.0.113.0/24"]))]
     allowed_ips: Vec<String>,
+    /// The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+    /// created from scratch.
+    rotated_from: Option<Uuid>,
     /// Last time the key was used, to the minute; `null`: never used.
     last_used_at: Option<DateTime<Utc>>,
     created_at: DateTime<Utc>,
@@ -167,6 +170,7 @@ impl From<ApiKey> for ApiKeyResponse {
             org_id: key.org_id,
             expires_at: key.expires_at,
             allowed_ips: key.allowed_ips,
+            rotated_from: key.rotated_from,
             last_used_at: key.last_used_at,
             created_at: key.created_at,
             kind: crate::api_key::KeyKind::key_name(key.kind).to_owned(),

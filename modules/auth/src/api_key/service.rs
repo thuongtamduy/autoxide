@@ -70,6 +70,8 @@ pub(crate) struct ApiKey {
     pub expires_at: Option<DateTime<Utc>>,
     /// Dải IP được gọi, dạng CIDR (bước 54); rỗng: mọi địa chỉ.
     pub allowed_ips: Vec<String>,
+    /// Key này thay key nào khi xoay vòng (bước 54).
+    pub rotated_from: Option<Uuid>,
     pub last_used_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     /// `Human`, `Agent` hay `Service` (bước 51 P12).
@@ -150,6 +152,19 @@ impl ApiKeyService {
         creator: &Principal,
         input: NewApiKey,
     ) -> Result<CreatedApiKey, Error> {
+        self.create_replacing(tenant, creator, input, None).await
+    }
+
+    /// Như [`create`](Self::create); `replacing`: key mới thay key cũ (xoay vòng, bước 54) — key cũ
+    /// hết hạn lúc `until` (hay sớm hơn nếu vốn sớm hơn), trong CÙNG transaction tạo key mới: không
+    /// bao giờ có lúc cả hai cùng mất hay key cũ sống mãi.
+    pub(super) async fn create_replacing(
+        &self,
+        tenant: &TenantContext,
+        creator: &Principal,
+        input: NewApiKey,
+        replacing: Option<super::rotate::Replacing>,
+    ) -> Result<CreatedApiKey, Error> {
         // Tính năng theo gói (bước 35): khách bị gói giới hạn cần `auth.api_keys`.
         self.roles.entitlements().require_feature(tenant.id(), &super::API_KEYS_FEATURE).await?;
         if creator.api_key_id().is_some() {
@@ -229,7 +244,8 @@ impl ApiKeyService {
             .scoped(tenant)
             .count(tenant.database().read())
             .await?;
-        if existing >= MAX_KEYS_PER_USER {
+        // Xoay vòng không thêm key lâu dài: key cũ sắp hết hạn, nên không tính vào trần.
+        if existing >= MAX_KEYS_PER_USER && replacing.is_none() {
             return Err(Error::conflict(
                 "auth.api_key_limit",
                 "You already have {limit} API keys. Revoke keys you no longer use first.",
@@ -264,9 +280,13 @@ impl ApiKeyService {
             last_used_at: Set(None),
             created_at: Set(now),
             kind: Set(input.kind.key_name().to_owned()),
+            rotated_from: Set(replacing.as_ref().map(|replacing| replacing.id)),
         }
         .insert(&transaction)
         .await?;
+        if let Some(replacing) = &replacing {
+            super::rotate::retire(&transaction, tenant, user_id, replacing).await?;
+        }
         for permission in &permissions {
             api_key_permission::ActiveModel {
                 id: Set(Uuid::now_v7()),
@@ -286,6 +306,7 @@ impl ApiKeyService {
             "expires_at": expires_at,
             "allowed_ips": allowed_ips,
             "kind": input.kind.key_name(),
+            "rotated_from": replacing.as_ref().map(|replacing| replacing.id),
         });
         let event = events::ApiKeyCreated { before: None, after: Some(after) };
         self.outbox
@@ -302,6 +323,7 @@ impl ApiKeyService {
             org_id,
             expires_at: Some(expires_at),
             allowed_ips: networks.iter().map(ToString::to_string).collect(),
+            rotated_from: replacing.as_ref().map(|replacing| replacing.id),
             last_used_at: None,
             created_at: now,
             kind: input.kind,
@@ -386,10 +408,7 @@ impl ApiKeyService {
         if let Some(owner) = owner {
             find = find.filter(api_key::Column::UserId.eq(owner));
         }
-        let row = find.one(&transaction).await?.ok_or_else(|| {
-            Error::not_found("auth.api_key_not_found", "You have no API key with id `{id}`.")
-                .with_param("id", id)
-        })?;
+        let row = find.one(&transaction).await?.ok_or_else(|| api_key_not_found(id))?;
         let user_id = row.user_id;
         api_key::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
         let before = json!({"user_id": user_id, "name": row.name, "prefix": row.prefix});
@@ -530,8 +549,13 @@ impl ApiKeyService {
     }
 }
 
+pub(super) fn api_key_not_found(id: Uuid) -> Error {
+    Error::not_found("auth.api_key_not_found", "You have no API key with id `{id}`.")
+        .with_param("id", id)
+}
+
 /// Permission của từng key trong `key_ids`, một câu truy vấn cho cả danh sách.
-async fn permissions_of<C: ConnectionTrait>(
+pub(super) async fn permissions_of<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     key_ids: impl IntoIterator<Item = Uuid>,
@@ -562,6 +586,7 @@ fn to_api_key(row: api_key::Model, permissions: Vec<String>) -> ApiKey {
             .iter()
             .map(ToString::to_string)
             .collect(),
+        rotated_from: row.rotated_from,
         last_used_at: row.last_used_at,
         created_at: row.created_at,
         kind: ActorKind::of_key(&row.kind),

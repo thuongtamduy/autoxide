@@ -299,6 +299,11 @@ export type ApiKeyResponse = {
    * their first 12 characters.
    */
   prefix: string;
+  /**
+   * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+   * created from scratch.
+   */
+  rotated_from?: string | null;
 };
 
 /** Records to tag or untag in one call. */
@@ -17008,6 +17013,11 @@ export type Page_ApiKeyResponse = {
      * their first 12 characters.
      */
     prefix: string;
+    /**
+     * The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key
+     * created from scratch.
+     */
+    rotated_from?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -22780,6 +22790,33 @@ export type RoleResponse = {
   updated_at: string;
 };
 
+/** How to replace a key. */
+export type RotateApiKeyRequest = {
+  /**
+   * Your current password, as when creating a key. Or `totp_code`, a passkey
+   * (`passkey_ceremony_id` and `passkey_credential`) or a `reauth_token` instead — exactly one.
+   */
+  current_password?: string;
+  /**
+   * When the new key stops working (RFC 3339), at most `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days
+   * ahead. Omit for that longest lifetime.
+   */
+  expires_at?: string | null;
+  /**
+   * Hours the old key keeps working, 0 to 72 (24 by default): time to switch every program
+   * to the new key. 0 stops the old key at once.
+   */
+  overlap_hours?: number | null;
+  /** One of your passkeys, instead of the password (see `POST /api/v1/auth/api-keys`). */
+  passkey_ceremony_id?: string | null;
+  /** The browser's answer for `passkey_ceremony_id`. */
+  passkey_credential?: Record<string, unknown> | null;
+  /** A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password. */
+  reauth_token?: string | null;
+  /** A code from your authenticator app, instead of the password. */
+  totp_code?: string | null;
+};
+
 /** An automation rule: "when the trigger happens and the conditions hold, run the actions". */
 export type RuleResponse = {
   /**
@@ -26203,6 +26240,23 @@ export interface paths {
         204: void;
         401: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/api-keys/{id}/rotate": {
+    /** Replace one of your API keys with a new one. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RotateApiKeyRequest;
+      responses: {
+        201: Data_CreatedApiKeyResponse;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
         default: Problem;
       };
     };
