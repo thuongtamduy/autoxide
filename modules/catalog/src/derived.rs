@@ -199,6 +199,7 @@ impl CatalogService {
                 .filter_map(|row| row.reference)
                 .collect();
             let variants: Vec<Uuid> = rows.iter().map(|row| row.variant_id).collect();
+            self.queue_variants(&transaction, tenant, variants.clone()).await?;
             let pins = price::Entity::find()
                 .filter(price::Column::PriceListId.eq(target.id))
                 .filter(price::Column::VariantId.is_in(variants))

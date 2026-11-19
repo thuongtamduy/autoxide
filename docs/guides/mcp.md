@@ -190,9 +190,11 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `forms.set_submission_status` | `forms.review` | writes |
 | `forms.update` | `forms.manage` | writes |
 | `inventory.adjust_stock` | `inventory.adjust` | writes |
+| `inventory.create_transfer` | `inventory.transfer` | writes |
 | `inventory.get_levels` | `inventory.read` | read-only |
 | `inventory.list_low_stock` | `inventory.read` | read-only |
 | `inventory.list_movements` | `inventory.read` | read-only |
+| `inventory.receive_transfer` | `inventory.transfer` | writes |
 | `inventory.release_reservation` | `inventory.adjust` | destructive |
 | `invoices.create_draft` | `invoices.write` | writes |
 | `invoices.create_export` | `invoices.export` | writes |
@@ -297,6 +299,15 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `plans.retire_plan` | `plans.plans.manage` | writes |
 | `plans.set_override` | `plans.subscriptions.manage` | writes |
 | `plans.update_plan` | `plans.plans.manage` | writes |
+| `promotions.activate_promotion` | `promotions.publish` | writes |
+| `promotions.create_promotion` | `promotions.write` | writes |
+| `promotions.end_promotion` | `promotions.publish` | writes |
+| `promotions.evaluate_cart` | `promotions.read` | read-only |
+| `promotions.generate_codes` | `promotions.codes.manage` | writes |
+| `promotions.get_promotion` | `promotions.read` | read-only |
+| `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
+| `promotions.list_promotions` | `promotions.read` | read-only |
+| `promotions.list_vouchers_of_user` | `promotions.read` | read-only |
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |

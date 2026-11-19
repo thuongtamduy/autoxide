@@ -14,6 +14,7 @@
 pub mod api;
 mod cases;
 mod checklist;
+mod complaint_intake;
 mod config;
 mod consents;
 mod consumer;
@@ -244,6 +245,8 @@ impl Module for ComplianceModule {
         context.provide::<dyn api::LegalProfiles>(provider.clone())?;
         context.provide::<dyn api::ComplianceFacts>(provider.clone())?;
         context.provide::<dyn api::ModerationPolicy>(provider.clone())?;
+        // Phiếu hỗ trợ chuyển thành khiếu nại người tiêu dùng (bước 53).
+        context.provide::<dyn api::ComplaintIntake>(provider.clone())?;
         // Bộ hỏi "đã xác thực để đăng nội dung chưa" của kernel (D-202) — `comments` hỏi qua nó.
         context.posting_verifier(provider.clone())?;
         context.provide::<dyn api::ComplianceRules>(provider)

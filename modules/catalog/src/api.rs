@@ -41,6 +41,9 @@ pub mod events {
     pub const VARIANT_DELETED: &str = "catalog.variant_deleted";
     /// Thêm dòng giá: bảng giá, biến thể, giá mới, `valid_from`.
     pub const PRICE_CHANGED: &str = "catalog.price_changed";
+    /// Giá hẹn giờ vừa bắt đầu hay giá tạm thời vừa hết hạn (lịch mỗi phút): `after` có
+    /// `variant_ids` và khoảng `from` / `to` đã xét. Giá đang áp của các biến thể đó có thể đã đổi.
+    pub const PRICE_EFFECTIVE: &str = "catalog.price_effective";
 
     /// Event của module `inventory` (bước 42) mà `catalog` nghe để có giá vốn cho sàn giá
     /// (D-222). `catalog` đọc payload `{"after": {"org_id": "<uuid>", "variant_id": "<uuid>",

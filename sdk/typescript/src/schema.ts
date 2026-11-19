@@ -90,6 +90,11 @@ export type AddPasskeyRequest = {
   name: string;
 };
 
+/** A record to link, as `<module>.<type>:<id>`. */
+export type AddSupportLinkRequest = {
+  target: string;
+};
+
 /** A message to add. */
 export type AddSupportMessageRequest = {
   /** The text comes from an AI suggestion (shown with a label). */
@@ -1492,6 +1497,154 @@ export type CatalogProductMedia = {
   variant_id?: string | null;
 };
 
+/** An attribute of the product, in the language asked. */
+export type CatalogPublicAttribute = {
+  code: string;
+  /** Ready to show, in the language asked. */
+  label: string;
+  name: string;
+  unit?: string | null;
+  /**
+   * As written: text, a whole number, a decimal as text, `true` / `false`, a date, an option
+   * code or a list of option codes.
+   */
+  value: Record<string, unknown>;
+};
+
+/** A category, in the language asked. */
+export type CatalogPublicCategory = {
+  /** Depth in the tree (top level is 0). */
+  depth: number;
+  id: string;
+  name: string;
+  parent_id?: string | null;
+  position: number;
+  slug: string;
+};
+
+/** An image, as readers load it. */
+export type CatalogPublicImage = {
+  /** Text alternative: the product's own, or the media library's. */
+  alt: string;
+  height?: number | null;
+  media_id: string;
+  /** Smaller copies, narrowest first, for `srcset`. */
+  sizes: CatalogPublicImageSize[];
+  /** Where to load it (versioned: cache it for long). */
+  url: string;
+  /** The image shows this variant. */
+  variant_id?: string | null;
+  width?: number | null;
+};
+
+/** A smaller copy of an image. */
+export type CatalogPublicImageSize = {
+  height: number;
+  url: string;
+  /** The same copy as WebP; `null` while it is not made yet. */
+  webp_url?: string | null;
+  width: number;
+};
+
+/** A choice of a product option, in the language asked. */
+export type CatalogPublicOption = {
+  id: string;
+  name: string;
+  values: CatalogPublicOptionValue[];
+};
+
+/** A value of a product option. */
+export type CatalogPublicOptionValue = {
+  id: string;
+  label: string;
+};
+
+/** A product page. */
+export type CatalogPublicProduct = CatalogPublicProductCard & {
+  attributes: CatalogPublicAttribute[];
+  categories: CatalogPublicCategory[];
+  description: string;
+  images: CatalogPublicImage[];
+  meta_description?: string | null;
+  meta_title?: string | null;
+  options: CatalogPublicOption[];
+  /** Other languages of the product, for `hreflang`. */
+  translations: CatalogPublicTranslation[];
+  variants: CatalogPublicVariant[];
+  warranty_months?: number | null;
+};
+
+/** A product on a public list. */
+export type CatalogPublicProductCard = {
+  /**
+   * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+   * Intelligence 134/2025/QH15).
+   */
+  ai_assisted: boolean;
+  compare_at?: Money | null;
+  id: string;
+  image?: CatalogPublicImage | null;
+  /** `physical`, `digital`, `service` or `bundle`. */
+  kind: string;
+  name: string;
+  /** Address of the product page on the website, without language prefix. */
+  path: string;
+  /** Lowest current price over the variants (no customer group, no code needed). */
+  price_from: Money;
+  /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+  price_to: Money;
+  /** Average rating out of 5 (two decimals); `null` before the first rating. */
+  rating?: number | null;
+  rating_count: number;
+  /** When `sale_price` ends; `null`: no end set. */
+  sale_ends_at?: string | null;
+  sale_price?: Money | null;
+  seller: CatalogPublicSeller;
+  short_description: string;
+  slug: string;
+  /** Number of variants on sale. */
+  variant_count: number;
+};
+
+/** Who sells a product. */
+export type CatalogPublicSeller = {
+  /** Its name; empty when the organization module is not installed. */
+  name: string;
+  /** The organization unit selling it (filter with `seller=`). */
+  org_id: string;
+  /**
+   * `true` when it is the website's own unit or one above it; `false` for a seller below the
+   * website (a marketplace seller).
+   */
+  own: boolean;
+};
+
+/** The same product in another language. */
+export type CatalogPublicTranslation = {
+  locale: string;
+  path: string;
+  slug: string;
+};
+
+/** A variant on sale. */
+export type CatalogPublicVariant = {
+  /** GTIN / EAN barcode, for structured data. */
+  barcode?: string | null;
+  compare_at?: Money | null;
+  id: string;
+  image_media_id?: string | null;
+  /** One value of each option, in the options' order. */
+  option_value_ids: string[];
+  /** For `preorder`: the expected date it is available. */
+  preorder_available_on?: string | null;
+  /** For `preorder`: the message to show, in the language asked. */
+  preorder_message?: string | null;
+  price?: Money | null;
+  /** `in_stock`, `backorder` or `preorder`. */
+  sale_mode: string;
+  sku: string;
+};
+
 /** The price of a variant and why. */
 export type CatalogResolvedPrice = {
   /** The lists that apply, in selection order; the first with a price wins. */
@@ -1538,6 +1691,15 @@ export type CatalogRoundingRule = {
  */
 export type CatalogSaleMode = "in_stock" | "backorder" | "preorder";
 
+/** A product in the sitemap. */
+export type CatalogSitemapItem = {
+  id: string;
+  /** Last change of the product, its texts or its price on this website. */
+  modified_at: string;
+  /** Address of the product in each of its languages. */
+  translations: CatalogPublicTranslation[];
+};
+
 /** Sale status: `draft`, `active` (on sale), `inactive` (stopped), `archived`. */
 export type CatalogStatus = "draft" | "active" | "inactive" | "archived";
 
@@ -1548,6 +1710,23 @@ export type CatalogStatusChange = {
    * `draft`.
    */
   status: CatalogStatus;
+};
+
+/** A store's choice for a product. */
+export type CatalogStoreOverride = {
+  hidden: boolean;
+  org_id: string;
+  product_id: string;
+  updated_at: string;
+};
+
+/** Whether a store shows a product. */
+export type CatalogStoreOverrideInput = {
+  /**
+   * `true`: the store's website (and the websites of units below it) does not show the
+   * product; `false`: shows it again.
+   */
+  hidden: boolean;
 };
 
 /** A stored attribute value (decimals are stored scaled by the attribute's `scale`). */
@@ -4824,6 +5003,38 @@ export type Data_CatalogProductDocument = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogPublicCategory = {
+  /** A category, in the language asked. */
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogPublicProduct = {
+  /** A product page. */
+  data: CatalogPublicProductCard & {
+    attributes: CatalogPublicAttribute[];
+    categories: CatalogPublicCategory[];
+    description: string;
+    images: CatalogPublicImage[];
+    meta_description?: string | null;
+    meta_title?: string | null;
+    options: CatalogPublicOption[];
+    /** Other languages of the product, for `hreflang`. */
+    translations: CatalogPublicTranslation[];
+    variants: CatalogPublicVariant[];
+    warranty_months?: number | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogResolvedPrice = {
   /** The price of a variant and why. */
   data: {
@@ -4848,6 +5059,17 @@ export type Data_CatalogRoundingRule = {
     mode: string;
     name: string;
     step_minor: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogStoreOverride = {
+  /** A store's choice for a product. */
+  data: {
+    hidden: boolean;
+    org_id: string;
+    product_id: string;
+    updated_at: string;
   };
 };
 
@@ -6566,6 +6788,23 @@ export type Data_InventoryAdjustment = {
 };
 
 /** Envelope of a single result. */
+export type Data_InventoryCount = {
+  /** A stock count of one warehouse. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_InventoryLevel = {
   /** The stock of one variant in one warehouse or store. */
   data: {
@@ -6625,6 +6864,26 @@ export type Data_InventoryStoreSettings = {
     allow_split: boolean;
     /** Try warehouses in the buyer's province first (province from the units' public profile). */
     prefer_nearby: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_InventoryTransfer = {
+  /** A stock transfer between two warehouses. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
   };
 };
 
@@ -8220,6 +8479,119 @@ export type Data_PreviewToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsActivated = {
+  /** A promotion just turned on, with the warnings of its checks. */
+  data: {
+    promotion: PromotionsPromotion;
+    /** Checks that did not pass but do not block (e.g. conflicts). */
+    warnings: PromotionsActivationCheck[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsActivationChecks = {
+  /** Results of the checks made before turning a promotion on. */
+  data: {
+    /** Every check; errors (`severity = error`, `ok = false`) block turning on. */
+    checks: PromotionsActivationCheck[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsCodesAdded = {
+  /** Codes added: listed when created at once, counted when generated in the background. */
+  data: {
+    codes: PromotionsCode[];
+    /** Codes being generated in the background (`promotions.generate_codes`). */
+    queued: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsEvaluation = {
+  /** Promotions computed for a cart; orders store it as a snapshot. */
+  data: {
+    applied: PromotionsAppliedPromotion[];
+    clawback_on_return: PromotionsClawbackMode;
+    currency: Currency;
+    fingerprint: string;
+    gift_choices: PromotionsGiftChoice[];
+    gifts: PromotionsGiftLine[];
+    lines: PromotionsLineDiscount[];
+    rejected_codes: PromotionsRejectedCode[];
+    shipping: PromotionsShippingDiscount[];
+    shipping_discount: Money;
+    total_discount: Money;
+    withheld: PromotionsWithheldDiscount[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsNotice = {
+  /** A notice of a promotion to one authority. */
+  data: {
+    authority_code: string;
+    reference?: string | null;
+    status: string;
+    submitted_at?: string | null;
+    submitted_by?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsPromotion = {
+  /** A promotion with its rule, counters and texts. */
+  data: {
+    activated_at?: string | null;
+    budget_used?: Money | null;
+    created_at: string;
+    flash_items: PromotionsFlashItem[];
+    id: string;
+    /** Vouchers given out. */
+    issued_count: number;
+    /** The rule as given when created (and changed since). */
+    rule: PromotionsPromotionInput;
+    status: PromotionsStatus;
+    targets: PromotionsTargetInput[];
+    texts: PromotionsText[];
+    updated_at: string;
+    /** Uses held or confirmed. */
+    usage_count: number;
+    /** Version of the audit trail (0 before it is turned on). */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsRedemption = {
+  /** The promotion usage held for an order. */
+  data: {
+    evaluation: PromotionsEvaluation;
+    expires_at?: string | null;
+    id: string;
+    order_id: string;
+    status: PromotionsRedemptionStatus;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_PromotionsVoucher = {
+  /** A one-time voucher in a user's wallet. */
+  data: {
+    expires_at: string;
+    holder_user_id?: string | null;
+    id: string;
+    issued_at: string;
+    promotion_id: string;
+    source: PromotionsVoucherSource;
+    source_ref: string;
+    status: PromotionsVoucherStatus;
+    used_order_id?: string | null;
+    valid_from: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_ProviderResponse = {
   /** A sign-in provider of the tenant, as administrators see it. The client secret is never shown. */
   data: {
@@ -8554,6 +8926,18 @@ export type Data_RelocationPlan = {
     /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
     target_tenant_id: string;
     warnings: RelocationWarning[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RenderedSupportMacro = {
+  /** A saved reply filled in for one ticket. */
+  data: {
+    /**
+     * Text in the customer's language with the variables filled in; edit it, then send it as a
+     * message.
+     */
+    body: string;
   };
 };
 
@@ -9287,6 +9671,28 @@ export type Data_SupportGrantResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportMacro = {
+  /** A saved reply staff insert into answers. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportMessage = {
   /**
    * One message of a ticket. Messages are never edited; a hidden message keeps its place with
@@ -9450,6 +9856,8 @@ export type Data_SupportTicket = {
 export type Data_SupportTicketDetail = {
   /** A ticket with its messages, oldest first. */
   data: SupportTicket & {
+    /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+    links: string[];
     messages: SupportMessage[];
   };
 };
@@ -10275,6 +10683,19 @@ export type Data_Vec_CatalogProductDocument = {
     issued_by: string;
     issued_on: string;
     number: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogPublicCategory = {
+  data: {
+    /** Depth in the tree (top level is 0). */
+    depth: number;
+    id: string;
+    name: string;
+    parent_id?: string | null;
+    position: number;
+    slug: string;
   }[];
 };
 
@@ -11136,6 +11557,56 @@ export type Data_Vec_PlanResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotionsLegalLimit = {
+  data: {
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    /** Most discount, in basis points of the price just before the promotion. */
+    max_bp: number;
+    max_days_per_program?: number | null;
+    max_days_per_year?: number | null;
+    /** Notes, including "to be checked against the original text". */
+    note: string;
+    /** `regular` or `national_focus`. */
+    program_kind: string;
+    /** `price_reduction`, `gift_value`, `free_shipping`. */
+    promotion_kind: string;
+    source_url: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsNoticeRule = {
+  data: {
+    /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
+    authority: string;
+    days_before: number;
+    effective_from: string;
+    effective_to?: string | null;
+    jurisdiction: string;
+    legal_basis: string;
+    note: string;
+    notice_required: boolean;
+    promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsVersion = {
+  data: {
+    /** `activated`, `updated`, `translation`, `paused`, `ended`… */
+    action: string;
+    changed_at: string;
+    changed_by?: string | null;
+    /** The promotion as it was after the change. */
+    snapshot: Record<string, unknown>;
+    version: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_ProviderResponse = {
   data: {
     /** Whether someone without an account may get one by signing in. */
@@ -11519,6 +11990,11 @@ export type Data_Vec_SettingResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_String = {
+  data: string[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_SupportGrantResponse = {
   data: {
     /**
@@ -11550,6 +12026,27 @@ export type Data_Vec_SupportGrantResponse = {
     starts_at: string;
     /** The tenant the staff may enter. */
     tenant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportMacro = {
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    /** Approved for automatic answers. */
+    auto_reply: boolean;
+    /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+    bodies: Record<string, unknown>;
+    id: string;
+    name: string;
+    /** The unit it belongs to; units below use it too. */
+    org_id: string;
+    /** Ways customers ask the question, per language (automatic answers). */
+    questions: Record<string, unknown>;
+    /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+    review_due_on?: string | null;
+    updated_at: string;
   }[];
 };
 
@@ -12289,6 +12786,13 @@ export type ErasedResponse = {
   deleted: number;
 };
 
+/** Where to hand the ticket over. */
+export type EscalateSupportTicketRequest = {
+  /** The complaint in the customer's words (10 to 5000 characters); omitted: their first message. */
+  note?: string | null;
+  to: SupportEscalation;
+};
+
 /** A batch of events from a page. */
 export type EventBatch = {
   /**
@@ -12821,6 +13325,62 @@ export type InventoryAdjustmentRequest = {
   reference: string;
 };
 
+/** A stock count of one warehouse. */
+export type InventoryCount = {
+  applied_at?: string | null;
+  created_at: string;
+  id: string;
+  lines: InventoryCountLine[];
+  note: string;
+  /** Document number, e.g. `KK-2026-000001`. */
+  number: string;
+  org_id: string;
+  /** `open`, `applied` or `cancelled`. */
+  status: string;
+};
+
+/** Counted quantities as CSV text. */
+export type InventoryCountImportRequest = {
+  /**
+   * CSV with a header row and the columns `sku` (or barcode), `counted` and optionally
+   * `reason_code`; up to 5000 rows.
+   */
+  csv: string;
+};
+
+/** One counted line of a stock count. */
+export type InventoryCountLine = {
+  counted: number;
+  counted_at: string;
+  /** On hand when this line was counted; the difference applied is `counted − expected_at_count`. */
+  expected_at_count: number;
+  reason_code?: string | null;
+  variant_id: string;
+};
+
+/** Counted quantities to record (replacing earlier counts of the same variants). */
+export type InventoryCountLinesRequest = {
+  /** 1 to 5000 lines. */
+  lines: InventoryCountedLine[];
+};
+
+/** A stock count to open. */
+export type InventoryCountRequest = {
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** The warehouse or store counted. */
+  org_id: string;
+};
+
+/** One counted quantity. */
+export type InventoryCountedLine = {
+  /** Units counted, 0 to 1 000 000. */
+  counted: number;
+  /** Reason for a difference, from the list `inventory.adjustment`; default `count_variance`. */
+  reason_code?: string | null;
+  variant_id: string;
+};
+
 /** The stock of one variant in one warehouse or store. */
 export type InventoryLevel = {
   /**
@@ -12873,6 +13433,18 @@ export type InventoryMovement = {
   source_type: string;
   unit_cost?: Money | null;
   variant_id: string;
+};
+
+/** A variant and a quantity. */
+export type InventoryQuantityLine = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  variant_id: string;
+};
+
+/** Units received now; no lines receives everything still in transit. */
+export type InventoryReceiveRequest = {
+  lines?: InventoryQuantityLine[];
 };
 
 /** Stock held for one order. */
@@ -12935,6 +13507,45 @@ export type InventoryStoreSettings = {
   allow_split: boolean;
   /** Try warehouses in the buyer's province first (province from the units' public profile). */
   prefer_nearby: boolean;
+};
+
+/** A stock transfer between two warehouses. */
+export type InventoryTransfer = {
+  created_at: string;
+  from_org_id: string;
+  id: string;
+  lines: InventoryTransferLine[];
+  note: string;
+  /** Document number, e.g. `CK-2026-000001`. */
+  number: string;
+  reference?: string | null;
+  shipped_at?: string | null;
+  /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+  status: string;
+  to_org_id: string;
+  updated_at: string;
+};
+
+/** One line of a stock transfer. */
+export type InventoryTransferLine = {
+  quantity: number;
+  received_quantity: number;
+  unit_cost?: Money | null;
+  variant_id: string;
+};
+
+/** A stock transfer to create (as a draft). */
+export type InventoryTransferRequest = {
+  /** The warehouse the goods leave. */
+  from_org_id: string;
+  /** 1 to 500 lines, one per variant. */
+  lines: InventoryQuantityLine[];
+  /** Up to 500 characters. */
+  note?: string | null;
+  /** Your own reference, up to 100 characters. */
+  reference?: string | null;
+  /** The warehouse the goods go to. */
+  to_org_id: string;
 };
 
 /** A new invitation. */
@@ -16006,6 +16617,55 @@ export type Page_CatalogProductListItem = {
 };
 
 /** One page of a list. */
+export type Page_CatalogPublicProductCard = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /**
+     * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+     * Intelligence 134/2025/QH15).
+     */
+    ai_assisted: boolean;
+    compare_at?: Money | null;
+    id: string;
+    image?: CatalogPublicImage | null;
+    /** `physical`, `digital`, `service` or `bundle`. */
+    kind: string;
+    name: string;
+    /** Address of the product page on the website, without language prefix. */
+    path: string;
+    /** Lowest current price over the variants (no customer group, no code needed). */
+    price_from: Money;
+    /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+    price_to: Money;
+    /** Average rating out of 5 (two decimals); `null` before the first rating. */
+    rating?: number | null;
+    rating_count: number;
+    /** When `sale_price` ends; `null`: no end set. */
+    sale_ends_at?: string | null;
+    sale_price?: Money | null;
+    seller: CatalogPublicSeller;
+    short_description: string;
+    slug: string;
+    /** Number of variants on sale. */
+    variant_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogSitemapItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    id: string;
+    /** Last change of the product, its texts or its price on this website. */
+    modified_at: string;
+    /** Address of the product in each of its languages. */
+    translations: CatalogPublicTranslation[];
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CommentBan = {
   /** The items of this page, in the requested order. */
   data: {
@@ -16756,6 +17416,24 @@ export type Page_GroupResponse = {
 };
 
 /** One page of a list. */
+export type Page_InventoryCount = {
+  /** The items of this page, in the requested order. */
+  data: {
+    applied_at?: string | null;
+    created_at: string;
+    id: string;
+    lines: InventoryCountLine[];
+    note: string;
+    /** Document number, e.g. `KK-2026-000001`. */
+    number: string;
+    org_id: string;
+    /** `open`, `applied` or `cancelled`. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_InventoryLevel = {
   /** The items of this page, in the requested order. */
   data: {
@@ -16823,6 +17501,27 @@ export type Page_InventoryReservation = {
     selling_org_id: string;
     /** `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`. */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryTransfer = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    from_org_id: string;
+    id: string;
+    lines: InventoryTransferLine[];
+    note: string;
+    /** Document number, e.g. `CK-2026-000001`. */
+    number: string;
+    reference?: string | null;
+    shipped_at?: string | null;
+    /** `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`. */
+    status: string;
+    to_org_id: string;
+    updated_at: string;
   }[];
   pagination: Pagination;
 };
@@ -17671,6 +18370,70 @@ export type Page_PlanSubscription = {
     /** The tenant already had its free trial. */
     trial_used: boolean;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsCode = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    created_at: string;
+    id: string;
+    purpose: PromotionsPurpose;
+    usage_count: number;
+    usage_limit?: number | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsPromotionListItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    ends_at: string;
+    id: string;
+    kind: PromotionsKind;
+    org_id: string;
+    starts_at: string;
+    status: PromotionsStatus;
+    title: string;
+    usage_count: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsRedemptionItem = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    currency: string;
+    expires_at?: string | null;
+    id: string;
+    order_id: string;
+    org_id: string;
+    status: string;
+    total_discount_minor: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PromotionsVoucher = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_at: string;
+    holder_user_id?: string | null;
+    id: string;
+    issued_at: string;
+    promotion_id: string;
+    source: PromotionsVoucherSource;
+    source_ref: string;
+    status: PromotionsVoucherStatus;
+    used_order_id?: string | null;
+    valid_from: string;
   }[];
   pagination: Pagination;
 };
@@ -19295,6 +20058,600 @@ export type ProfileRequest = {
   display_name: string;
 };
 
+/** A promotion just turned on, with the warnings of its checks. */
+export type PromotionsActivated = {
+  promotion: PromotionsPromotion;
+  /** Checks that did not pass but do not block (e.g. conflicts). */
+  warnings: PromotionsActivationCheck[];
+};
+
+/** One check made before a promotion is turned on. */
+export type PromotionsActivationCheck = {
+  /**
+   * What was checked, or the error code when it failed: `legal_limit` /
+   * `promotions.exceeds_legal_limit`, `duration` / `promotions.exceeds_duration_limit`,
+   * `notice` / `promotions.notice_required`, `legal_data` / `promotions.no_legal_data`,
+   * `targets`, `window`, `price_floor`, `conflicts`.
+   */
+  code: string;
+  ok: boolean;
+  /** Values of the check (limit, legal basis, authority…). */
+  params: {
+    [key: string]: string;
+  };
+  severity: PromotionsCheckSeverity;
+};
+
+/** Results of the checks made before turning a promotion on. */
+export type PromotionsActivationChecks = {
+  /** Every check; errors (`severity = error`, `ok = false`) block turning on. */
+  checks: PromotionsActivationCheck[];
+};
+
+/** A promotion applied to the cart. */
+export type PromotionsAppliedPromotion = {
+  amount: Money;
+  class: PromotionsPromotionClass;
+  code?: string | null;
+  gift_return_policy: PromotionsGiftReturnPolicy;
+  min_order?: Money | null;
+  promotion_id: string;
+  return_usage_on_cancel: boolean;
+  terms: string;
+  title: string;
+  voucher_id?: string | null;
+};
+
+/** A cart to compute promotions for. */
+export type PromotionsCart = {
+  at: string;
+  buyer_id?: string | null;
+  buyer_keys: string[];
+  carrier?: string | null;
+  channel?: string | null;
+  client?: string | null;
+  codes: string[];
+  currency: Currency;
+  customer_groups: string[];
+  first_order: boolean;
+  gift_selections: PromotionsGiftSelection[];
+  lines: PromotionsCartLine[];
+  locale: string;
+  membership_tier?: string | null;
+  org_id: string;
+  payment_method?: string | null;
+  ship_to_province_code?: string | null;
+  shipping_fee?: Money | null;
+  voucher_ids: string[];
+};
+
+/** One line of a cart. */
+export type PromotionsCartLine = {
+  has_compare_at: boolean;
+  line_key: string;
+  quantity: number;
+  unit_price: Money;
+  variant_id: string;
+};
+
+/** How serious a failed check is. */
+export type PromotionsCheckSeverity = "error" | "warning";
+
+/** A claim code to enter. */
+export type PromotionsClaimCodeRequest = {
+  /** The code, spaces and case do not matter. */
+  code: string;
+};
+
+/** Stacking class: `product`, `order` or `shipping`. */
+export type PromotionsClassName = "product" | "order" | "shipping";
+
+/** Whether order discounts are taken back when a return drops the order below the minimum. */
+export type PromotionsClawbackMode = "none" | "proportional";
+
+/** A coupon or claim code. */
+export type PromotionsCode = {
+  code: string;
+  created_at: string;
+  id: string;
+  purpose: PromotionsPurpose;
+  usage_count: number;
+  usage_limit?: number | null;
+};
+
+/** Codes added: listed when created at once, counted when generated in the background. */
+export type PromotionsCodesAdded = {
+  codes: PromotionsCode[];
+  /** Codes being generated in the background (`promotions.generate_codes`). */
+  queued: number;
+};
+
+/** An extra condition of a promotion. */
+export type PromotionsConditionInput = {
+  kind: PromotionsConditionKind;
+  /**
+   * `in` / `not_in` compare a text of the cart with `values`; `gte` / `lte` compare a number
+   * (`min_items`).
+   */
+  operator: PromotionsOperator;
+  /**
+   * Values to compare with: payment methods, carriers, province codes, tiers, clients (`web`,
+   * `app`, `pos`), seller unit ids, or `variant:<id>` / `product:<id>` / `category:<id>` for
+   * `exclude_targets`. Up to 200.
+   */
+  values?: string[];
+};
+
+/** Kind of extra condition. */
+export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
+
+/** Promotions computed for a cart; orders store it as a snapshot. */
+export type PromotionsEvaluation = {
+  applied: PromotionsAppliedPromotion[];
+  clawback_on_return: PromotionsClawbackMode;
+  currency: Currency;
+  fingerprint: string;
+  gift_choices: PromotionsGiftChoice[];
+  gifts: PromotionsGiftLine[];
+  lines: PromotionsLineDiscount[];
+  rejected_codes: PromotionsRejectedCode[];
+  shipping: PromotionsShippingDiscount[];
+  shipping_discount: Money;
+  total_discount: Money;
+  withheld: PromotionsWithheldDiscount[];
+};
+
+export type PromotionsExclusivity = "none" | "class" | "global";
+
+/** The sale price of a variant in a flash sale, with the units sold. */
+export type PromotionsFlashItem = {
+  per_customer_quantity_limit?: number | null;
+  quantity_limit?: number | null;
+  /** Units held or sold — a real number. */
+  quantity_used: number;
+  sale_price_minor?: number | null;
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** The sale price of a variant in a flash sale or the deal price of an add-on. */
+export type PromotionsFlashItemInput = {
+  /** Units one buyer may get at this price. */
+  per_customer_quantity_limit?: number | null;
+  /** Units sold at this price; none = no limit. */
+  quantity_limit?: number | null;
+  /** Sale price per unit (minor units of the promotion's currency); or give `value_bp`. */
+  sale_price_minor?: number | null;
+  /** Percent off in basis points. */
+  value_bp?: number | null;
+  variant_id: string;
+};
+
+/** The whole set of flash-sale (or add-on deal) prices of a promotion. */
+export type PromotionsFlashItemsRequest = {
+  /** Up to 1000. */
+  items: PromotionsFlashItemInput[];
+};
+
+/** A share of who pays the discount. */
+export type PromotionsFundingInput = {
+  payer_kind: PromotionsPayer;
+  /** Unit that pays (the seller, brand or partner unit), when known. */
+  payer_org_id?: string | null;
+  /** Share in basis points; all shares add up to 10000. */
+  share_bp: number;
+};
+
+/** The part of a discount one payer pays. */
+export type PromotionsFundingShare = {
+  amount: Money;
+  payer_kind: PromotionsPayerKind;
+  payer_org_id?: string | null;
+};
+
+/** A `gift_choice` promotion the cart reached without choosing a gift yet. */
+export type PromotionsGiftChoice = {
+  options: string[];
+  promotion_id: string;
+  quantity: number;
+};
+
+/** A free item or gift: add it as its own line at price 0. */
+export type PromotionsGiftLine = {
+  promotion_id: string;
+  quantity: number;
+  reason: PromotionsReason;
+  variant_id: string;
+};
+
+/** A gift a buyer may choose (`gift_choice`). */
+export type PromotionsGiftOptionInput = {
+  /** Gifts of this variant that can be given; none = no limit. */
+  stock_limit?: number | null;
+  variant_id: string;
+};
+
+export type PromotionsGiftPolicy = "return_gift" | "deduct_gift_value" | "keep";
+
+/** What happens to the gift when the qualifying item is returned. */
+export type PromotionsGiftReturnPolicy = "return_gift" | "deduct_gift_value" | "keep";
+
+/** A gift the buyer chose for a `gift_choice` promotion. */
+export type PromotionsGiftSelection = {
+  promotion_id: string;
+  quantity: number;
+  variant_id: string;
+};
+
+/** A voucher given by hand. */
+export type PromotionsGrantVoucherRequest = {
+  /** Why (kept in the audit log), 3 to 500 characters. */
+  reason: string;
+  /**
+   * Your reference; sending the same one again returns the same voucher. Defaults to a new
+   * value each time.
+   */
+  reference?: string | null;
+  /** User whose wallet gets the voucher. */
+  user_id: string;
+};
+
+/** Kind of promotion. */
+export type PromotionsKind = "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+
+/** A legal limit on promotions in force on a date (shared legal data). */
+export type PromotionsLegalLimit = {
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  /** Most discount, in basis points of the price just before the promotion. */
+  max_bp: number;
+  max_days_per_program?: number | null;
+  max_days_per_year?: number | null;
+  /** Notes, including "to be checked against the original text". */
+  note: string;
+  /** `regular` or `national_focus`. */
+  program_kind: string;
+  /** `price_reduction`, `gift_value`, `free_shipping`. */
+  promotion_kind: string;
+  source_url: string;
+};
+
+/** A discount shared out to one cart line (amount for the whole line). */
+export type PromotionsLineDiscount = {
+  amount: Money;
+  capped_by_floor: boolean;
+  capped_by_law: boolean;
+  class: PromotionsPromotionClass;
+  funding: PromotionsFundingShare[];
+  line_key: string;
+  promotion_id: string;
+  reason: PromotionsReason;
+};
+
+/** Codes to add to a promotion. */
+export type PromotionsNewCodes = {
+  /** One code you choose (4 to 64 letters, digits, `-` or `_`). Or give `count`. */
+  code?: string | null;
+  /** Random codes to generate, 1 to 10000. More than 500 are generated in the background. */
+  count?: number | null;
+  /** Start of every generated code (up to 16 letters or digits). */
+  prefix?: string | null;
+  /**
+   * `redeem` (coupon of a `code` promotion) or `claim` (puts a voucher of a `voucher`
+   * promotion in the wallet).
+   */
+  purpose: PromotionsPurpose;
+  /** Uses of each code; none = only the promotion's limits. */
+  usage_limit?: number | null;
+};
+
+/** A notice of a promotion to one authority. */
+export type PromotionsNotice = {
+  authority_code: string;
+  reference?: string | null;
+  status: string;
+  submitted_at?: string | null;
+  submitted_by?: string | null;
+};
+
+/** A promotion notice recorded for one authority. */
+export type PromotionsNoticeRequest = {
+  /** Receipt number of the authority, up to 100 characters. */
+  reference?: string | null;
+  /** `submitted` or `not_required`. */
+  status: string;
+  submitted_at?: string | null;
+};
+
+/** A promotion notice rule in force on a date (shared legal data). */
+export type PromotionsNoticeRule = {
+  /** `province_of_store` (department of the province where the promotion runs) or an authority code. */
+  authority: string;
+  days_before: number;
+  effective_from: string;
+  effective_to?: string | null;
+  jurisdiction: string;
+  legal_basis: string;
+  note: string;
+  notice_required: boolean;
+  promotion_kind: string;
+};
+
+export type PromotionsOperator = "in" | "not_in" | "gte" | "lte";
+
+export type PromotionsPayer = "platform" | "seller" | "brand" | "payment_partner";
+
+/** Who pays for a discount. */
+export type PromotionsPayerKind = "platform" | "seller" | "brand" | "payment_partner";
+
+/** Period of the per-customer limit. */
+export type PromotionsPeriod = "lifetime" | "day" | "week" | "month";
+
+/** Legal kind of programme: `regular` or a `national_focus` promotion programme. */
+export type PromotionsProgramKind = "regular" | "national_focus";
+
+/** A promotion with its rule, counters and texts. */
+export type PromotionsPromotion = {
+  activated_at?: string | null;
+  budget_used?: Money | null;
+  created_at: string;
+  flash_items: PromotionsFlashItem[];
+  id: string;
+  /** Vouchers given out. */
+  issued_count: number;
+  /** The rule as given when created (and changed since). */
+  rule: PromotionsPromotionInput;
+  status: PromotionsStatus;
+  targets: PromotionsTargetInput[];
+  texts: PromotionsText[];
+  updated_at: string;
+  /** Uses held or confirmed. */
+  usage_count: number;
+  /** Version of the audit trail (0 before it is turned on). */
+  version: number;
+};
+
+/** Stacking class of a promotion: `product` (line items), `order` (whole order, shared out to lines) or `shipping`. */
+export type PromotionsPromotionClass = "product" | "order" | "shipping";
+
+/** A promotion: the rule, its window, limits and texts. */
+export type PromotionsPromotionInput = {
+  budget?: Money | null;
+  bundle_price?: Money | null;
+  bundle_quantity?: number | null;
+  buy_quantity?: number | null;
+  channels?: string[];
+  claim_requires_verified_phone?: boolean;
+  /** Buyers can save the voucher themselves ("Save" button). */
+  claimable?: boolean;
+  /** Classes this promotion may stack with; defaults to all three. */
+  combines_with?: PromotionsClassName[] | null;
+  conditions?: PromotionsConditionInput[];
+  /** Currency of every amount and of the carts it applies to, e.g. `VND`. */
+  currency: string;
+  customer_groups?: string[];
+  daily_usage_limit?: number | null;
+  /** Required: every promotion announces its end (Commercial Law, art. 97). */
+  ends_at: string;
+  exclusivity?: PromotionsExclusivity | null;
+  first_order_only?: boolean;
+  /** Who pays; defaults to the unit running the promotion, 100%. */
+  funding?: PromotionsFundingInput[];
+  get_quantity?: number | null;
+  gift_options?: PromotionsGiftOptionInput[];
+  gift_quantity?: number | null;
+  gift_return_policy?: PromotionsGiftPolicy | null;
+  kind: PromotionsKind;
+  /** Language of `title` and `terms`, e.g. `vi`. */
+  locale: string;
+  max_add_on_quantity?: number | null;
+  max_applications?: number | null;
+  max_discount?: Money | null;
+  min_order?: Money | null;
+  min_quantity?: number | null;
+  /**
+   * Unit that runs the promotion (the store, chain or seller). Defaults to your unit when you
+   * work in only one.
+   */
+  org_id?: string | null;
+  per_customer_limit?: number | null;
+  per_customer_period?: PromotionsPeriod | null;
+  per_user_claim_limit?: number | null;
+  /** Higher first. Defaults to 0. */
+  priority?: number;
+  program_kind?: PromotionsProgramKind | null;
+  /** Shown on the public promotion list. */
+  public?: boolean;
+  /** Give the usage back when a confirmed order is cancelled. Defaults to `true`. */
+  return_usage_on_cancel?: boolean | null;
+  reward_selection?: PromotionsRewardSelection | null;
+  /** Discount on the reward items in basis points; 10000 = free. */
+  reward_value_bp?: number | null;
+  schedules?: PromotionsWindowInput[];
+  scope?: PromotionsScope | null;
+  starts_at: string;
+  stop_after?: boolean;
+  /** Conditions the buyer reads (Consumer Protection Law 19/2023), up to 5000 characters. */
+  terms?: string;
+  tiers?: PromotionsTierInput[];
+  /** 1 to 200 characters. */
+  title: string;
+  trigger?: PromotionsTrigger | null;
+  usage_limit?: number | null;
+  value?: Money | null;
+  /** Percent off in basis points (1% = 100), for `percent_off`, `flash_sale` defaults… */
+  value_bp?: number | null;
+  voucher_quota?: number | null;
+  /** Days a voucher stays valid after it is issued; none = until `ends_at`. */
+  voucher_valid_days?: number | null;
+};
+
+/** A promotion in a list. */
+export type PromotionsPromotionListItem = {
+  ends_at: string;
+  id: string;
+  kind: PromotionsKind;
+  org_id: string;
+  starts_at: string;
+  status: PromotionsStatus;
+  title: string;
+  usage_count: number;
+};
+
+export type PromotionsPurpose = "redeem" | "claim";
+
+/** Why a discount applies or not, for the buyer: `code` (i18n key), `params` and the translated `text`. */
+export type PromotionsReason = {
+  code: string;
+  params: {
+    [key: string]: string;
+  };
+  text: string;
+};
+
+/** The promotion usage held for an order. */
+export type PromotionsRedemption = {
+  evaluation: PromotionsEvaluation;
+  expires_at?: string | null;
+  id: string;
+  order_id: string;
+  status: PromotionsRedemptionStatus;
+};
+
+/** Promotion usage held for an order. */
+export type PromotionsRedemptionItem = {
+  created_at: string;
+  currency: string;
+  expires_at?: string | null;
+  id: string;
+  order_id: string;
+  org_id: string;
+  status: string;
+  total_discount_minor: number;
+};
+
+/** State of the promotion usage held for an order. */
+export type PromotionsRedemptionStatus = "held" | "confirmed" | "released" | "expired";
+
+/** A code or voucher that does not apply to the cart, with the reason (the cart still works). */
+export type PromotionsRejectedCode = {
+  code?: string | null;
+  reason: PromotionsReason;
+  voucher_id?: string | null;
+};
+
+export type PromotionsRewardSelection = "cheapest" | "same_item" | "specified";
+
+export type PromotionsRole = "condition" | "reward";
+
+/** What the promotion discounts: `items` (product class), `order` or `shipping`. */
+export type PromotionsScope = "items" | "order" | "shipping";
+
+/** A discount on the shipping fee. */
+export type PromotionsShippingDiscount = {
+  amount: Money;
+  funding: PromotionsFundingShare[];
+  promotion_id: string;
+  reason: PromotionsReason;
+};
+
+export type PromotionsStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+
+/** A product, variant or category a promotion targets. */
+export type PromotionsTargetInput = {
+  role?: PromotionsRole | null;
+  target_id: string;
+  target_type: PromotionsTargetType;
+};
+
+export type PromotionsTargetType = "product" | "variant" | "category";
+
+/** The whole set of targets of a promotion. */
+export type PromotionsTargetsRequest = {
+  /** Up to 1000; empty = every item of the unit. */
+  targets: PromotionsTargetInput[];
+};
+
+/** Title and terms of a promotion in one language. */
+export type PromotionsText = {
+  locale: string;
+  terms: string;
+  title: string;
+};
+
+export type PromotionsThresholdKind = "quantity" | "amount";
+
+/** One tier of a `tiered` promotion. */
+export type PromotionsTierInput = {
+  /** Items (`quantity`) or minor units of money (`amount`) to reach. */
+  threshold: number;
+  threshold_kind: PromotionsThresholdKind;
+  value?: Money | null;
+  /** Percent off in basis points (1% = 100); or give `value`. */
+  value_bp?: number | null;
+};
+
+/** Title and terms in one language. */
+export type PromotionsTranslationRequest = {
+  /** Conditions the buyer reads, up to 5000 characters. */
+  terms?: string;
+  /** 1 to 200 characters. */
+  title: string;
+};
+
+/** How the promotion reaches buyers: automatically, by coupon code or by wallet voucher. */
+export type PromotionsTrigger = "automatic" | "code" | "voucher";
+
+/** One entry of a promotion's audit trail. */
+export type PromotionsVersion = {
+  /** `activated`, `updated`, `translation`, `paused`, `ended`… */
+  action: string;
+  changed_at: string;
+  changed_by?: string | null;
+  /** The promotion as it was after the change. */
+  snapshot: Record<string, unknown>;
+  version: number;
+};
+
+/** A one-time voucher in a user's wallet. */
+export type PromotionsVoucher = {
+  expires_at: string;
+  holder_user_id?: string | null;
+  id: string;
+  issued_at: string;
+  promotion_id: string;
+  source: PromotionsVoucherSource;
+  source_ref: string;
+  status: PromotionsVoucherStatus;
+  used_order_id?: string | null;
+  valid_from: string;
+};
+
+/** How a voucher came into the wallet. */
+export type PromotionsVoucherSource = "claim" | "claim_code" | "grant" | "loyalty" | "purchase_reward" | "birthday" | "referral" | "compensation" | "automation";
+
+/** State of a voucher in a wallet. */
+export type PromotionsVoucherStatus = "available" | "held" | "used" | "expired" | "revoked";
+
+/** A time window in the store's time zone. */
+export type PromotionsWindowInput = {
+  /** End (not included), in minutes after midnight (1 to 1440), after `start_minute`. */
+  end_minute: number;
+  /** Start, in minutes after midnight (0 to 1439). */
+  start_minute: number;
+  /** Days of the week, 1 (Monday) to 7 (Sunday). */
+  weekdays: number[];
+};
+
+/** A discount withheld on a line by the legal limit or the price floor. */
+export type PromotionsWithheldDiscount = {
+  line_key: string;
+  promotion_id: string;
+  reason: PromotionsReason;
+};
+
 /** A prop an event type takes. */
 export type PropInfo = {
   /** `text` (up to 100 characters), `number` or `boolean`. */
@@ -19973,6 +21330,16 @@ export type Ranked = {
   visitors: number;
 };
 
+/** A rating of the support. */
+export type RateSupportTicketRequest = {
+  /** Up to 1000 characters. */
+  note?: string | null;
+  /** 1 (bad) to 5 (very good). */
+  rating: number;
+  /** Guests: the ticket token. Signed-in customers omit it. */
+  token?: string | null;
+};
+
 /**
  * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
  * one tenant's shop, without permissions).
@@ -20348,6 +21715,15 @@ export type RenameTagRequest = {
   name: string;
 };
 
+/** A saved reply filled in for one ticket. */
+export type RenderedSupportMacro = {
+  /**
+   * Text in the customer's language with the variables filled in; edit it, then send it as a
+   * message.
+   */
+  body: string;
+};
+
 /** The whole weekly schedule of a resource. */
 export type ReplaceBookingScheduleRequest = {
   /** At most 70 ranges; ranges of the same day must not overlap. Empty: never available (staff). */
@@ -20649,6 +22025,15 @@ export type SandboxCreated = Sandbox & {
    * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
    */
   job_id?: string | null;
+};
+
+/** A saved reply to write. */
+export type SaveSupportMacroRequest = {
+  /** Text per language; variables `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  /** 1 to 100 characters. */
+  name: string;
+  org_id: string;
 };
 
 /** The object a saved item links to. With `include=targets`, also how it stands now. */
@@ -21910,6 +23295,9 @@ export type SupportAuthorKind = "customer" | "agent" | "system";
 /** Where a ticket came from. */
 export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
 
+/** Where to hand a ticket over. */
+export type SupportEscalation = "consumer_complaint" | "platform";
+
 /** A new support access grant. */
 export type SupportGrantRequest = {
   /**
@@ -21962,6 +23350,25 @@ export type SupportGrantResponse = {
   starts_at: string;
   /** The tenant the staff may enter. */
   tenant_id: string;
+};
+
+/** A saved reply staff insert into answers. */
+export type SupportMacro = {
+  approved_at?: string | null;
+  approved_by?: string | null;
+  /** Approved for automatic answers. */
+  auto_reply: boolean;
+  /** Text per language (`vi`, `en`…), with `{customer_name}`, `{ticket_number}`, `{subject}`. */
+  bodies: Record<string, unknown>;
+  id: string;
+  name: string;
+  /** The unit it belongs to; units below use it too. */
+  org_id: string;
+  /** Ways customers ask the question, per language (automatic answers). */
+  questions: Record<string, unknown>;
+  /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
+  review_due_on?: string | null;
+  updated_at: string;
 };
 
 /**
@@ -22165,6 +23572,8 @@ export type SupportTicket = {
 
 /** A ticket with its messages, oldest first. */
 export type SupportTicketDetail = SupportTicket & {
+  /** Linked records, as `<module>.<type>:<id>` (staff only; empty for customers). */
+  links: string[];
   messages: SupportMessage[];
 };
 
@@ -26241,6 +27650,69 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/categories": {
+    /** List the category tree (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string }; };
+      responses: {
+        200: Data_Vec_CatalogPublicCategory;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/categories/{slug}": {
+    /** Get a category by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string }; };
+      responses: {
+        200: Data_CatalogPublicCategory;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products": {
+    /** List products on sale (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale: string; category?: string; price_min?: number; price_max?: number; q?: string; sort?: "newest" | "price_asc" | "price_desc" | "best_selling" | "rating"; on_sale?: boolean; seller?: string; sold_by?: "own" | "marketplace"; min_rating?: number; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogPublicProductCard;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products/by-slug/{slug}": {
+    /** Get a product page by its address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { slug: string }; query: { locale: string; site?: string }; };
+      responses: {
+        200: Data_CatalogPublicProduct;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/sitemap": {
+    /** List product addresses for the sitemap (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { locale?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean; site?: string }; };
+      responses: {
+        200: Page_CatalogSitemapItem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/restriction-rules": {
     /** List the rules of prohibited and conditional goods. */
     get: {
@@ -26272,6 +27744,21 @@ export interface paths {
         201: Data_CatalogRoundingRule;
         401: Problem;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/stores/{org_id}/overrides/{product_id}": {
+    /** Hide or show a product on a store's website. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { org_id: string; product_id: string }; };
+      requestBody: CatalogStoreOverrideInput;
+      responses: {
+        200: Data_CatalogStoreOverride;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
@@ -29197,6 +30684,104 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/counts": {
+    /** List stock counts in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Open a stock count in one warehouse. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryCountRequest;
+      responses: {
+        201: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}": {
+    /** Get a stock count with its lines. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/apply": {
+    /** Apply a stock count: each difference becomes a `count` ledger line with its reason. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/cancel": {
+    /** Cancel an open stock count. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/import": {
+    /** Record counted quantities from a CSV file. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountImportRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/counts/{id}/lines": {
+    /** Record counted quantities. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryCountLinesRequest;
+      responses: {
+        200: Data_InventoryCount;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/levels": {
     /** List stock levels (variant × warehouse) in your scope. */
     get: {
@@ -29318,6 +30903,103 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers": {
+    /** List stock transfers from or to warehouses in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string | null; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a stock transfer as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: InventoryTransferRequest;
+      responses: {
+        201: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}": {
+    /** Get a stock transfer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/cancel": {
+    /** Cancel a draft transfer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/close": {
+    /** Close a transfer in transit: what has not arrived is written off from `incoming`. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/receive": {
+    /** Receive goods of a transfer in transit, all or part. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: InventoryReceiveRequest;
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/transfers/{id}/ship": {
+    /** Ship a draft transfer: the goods leave the source and are in transit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_InventoryTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -34024,6 +35706,396 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/evaluate": {
+    /** Compute the promotions of a cart, without holding or changing anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsCart;
+      responses: {
+        200: Data_PromotionsEvaluation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/legal-limits": {
+    /** List the legal promotion limits in force on a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      responses: {
+        200: Data_Vec_PromotionsLegalLimit;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/me/vouchers": {
+    /** List the vouchers in your wallet, soonest to expire first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: PromotionsVoucherStatus | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/me/vouchers/claim-code": {
+    /** Enter a claim code to put its voucher into your wallet. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsClaimCodeRequest;
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/notice-rules": {
+    /** List the promotion notice rules in force on a day. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { at?: string | null }; };
+      responses: {
+        200: Data_Vec_PromotionsNoticeRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions": {
+    /** List the promotions in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: PromotionsStatus | null; kind?: PromotionsKind | null; org_id?: string | null; q?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsPromotionListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a promotion as a draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PromotionsPromotionInput;
+      responses: {
+        201: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}": {
+    /** Get a promotion with its rule, texts, targets and counters. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a promotion. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: Record<string, unknown>;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a draft promotion. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/activate": {
+    /** Turn a draft promotion on. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsActivated;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/activation-check": {
+    /** Check a promotion before turning it on, without changing anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsActivationChecks;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/cancel": {
+    /** Cancel a promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/codes": {
+    /** List the codes of a promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsCode;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Add codes to a promotion: one code you choose, or a batch of random codes. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsNewCodes;
+      responses: {
+        201: Data_PromotionsCodesAdded;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/codes/export": {
+    /** Download every code of a promotion as CSV. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/end": {
+    /** End a promotion now. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/flash-items": {
+    /** Replace the flash-sale prices of a draft promotion. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsFlashItemsRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/notices/{authority_code}": {
+    /** Record that a promotion notice was submitted to an authority. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; authority_code: string }; };
+      requestBody: PromotionsNoticeRequest;
+      responses: {
+        200: Data_PromotionsNotice;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/pause": {
+    /** Pause a running or scheduled promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/resume": {
+    /** Resume a paused promotion. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/targets": {
+    /** Replace the targets (products, variants, categories) of a draft promotion. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsTargetsRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/translations/{locale}": {
+    /** Set the title and terms of a promotion in one language. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; locale: string }; };
+      requestBody: PromotionsTranslationRequest;
+      responses: {
+        200: Data_PromotionsPromotion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/versions": {
+    /** Get the audit trail of a promotion: one entry per change after it was turned on. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsVersion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/vouchers": {
+    /** Put a voucher of a `voucher` promotion into a user's wallet by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsGrantVoucherRequest;
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/{id}/claim": {
+    /** Save the voucher of a public promotion into your wallet ("Save" button). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsVoucher;
+        201: Data_PromotionsVoucher;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/redemptions": {
+    /** List the promotion usage held for orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { order_id?: string | null; status?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsRedemptionItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/redemptions/{id}/release": {
+    /** Give back the promotion usage held for an order by hand (unstick it). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsRedemption;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/reporting/facts": {
     /** List report facts. */
     get: {
@@ -34655,6 +36727,56 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/macros": {
+    /** List the saved replies usable at a unit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id: string }; };
+      responses: {
+        200: Data_Vec_SupportMacro;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a saved reply. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        201: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/macros/{id}": {
+    /** Replace a saved reply. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SaveSupportMacroRequest;
+      responses: {
+        200: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a saved reply. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -34702,6 +36824,22 @@ export interface paths {
       requestBody: MySupportMessageRequest;
       responses: {
         201: Data_SupportMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/satisfaction": {
+    /** Rate the support of your ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -34779,6 +36917,21 @@ export interface paths {
       requestBody: PublicSupportMessageRequest;
       responses: {
         201: Data_SupportMessage;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/satisfaction": {
+    /** Rate the support of a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: RateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
         403: Problem;
         404: Problem;
         409: Problem;
@@ -34978,6 +37131,64 @@ export interface paths {
         409: Problem;
         412: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/escalate": {
+    /** Hand a ticket over as a consumer complaint or to the marketplace. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: EscalateSupportTicketRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links": {
+    /** Link a ticket to a record (an order, a product…). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AddSupportLinkRequest;
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/links/{target}": {
+    /** Remove a link from a ticket. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; target: string }; };
+      responses: {
+        200: Data_Vec_String;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/macros/{macro_id}/render": {
+    /** Fill a saved reply in for a ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; macro_id: string }; };
+      responses: {
+        200: Data_RenderedSupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

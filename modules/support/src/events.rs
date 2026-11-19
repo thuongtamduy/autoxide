@@ -32,6 +32,16 @@ pub(crate) const TICKET_BREACHED: EventInfo = EventInfo::new(
     "support.ticket_breached",
     "A support ticket missed its first-response or resolution deadline.",
 );
+pub(crate) const TICKET_LINKED: EventInfo = EventInfo::new(
+    "support.ticket_linked",
+    "A record was linked to or unlinked from a support ticket.",
+);
+pub(crate) const TICKET_ESCALATED: EventInfo = EventInfo::new(
+    "support.ticket_escalated",
+    "A support ticket was handed over as a consumer complaint or to the platform.",
+);
+pub(crate) const SATISFACTION_RECORDED: EventInfo =
+    EventInfo::new("support.satisfaction_recorded", "A customer rated the support of a ticket.");
 pub(crate) const TICKETS_CLAIMED: EventInfo = EventInfo::new(
     "support.tickets_claimed",
     "Guest tickets were attached to the account that verified the same email or phone number.",
@@ -65,6 +75,9 @@ event!(TicketAssigned, "support.ticket_assigned");
 event!(MessageAdded, "support.message_added");
 event!(MessageHidden, "support.message_hidden");
 event!(TicketsClaimed, "support.tickets_claimed");
+event!(TicketLinked, "support.ticket_linked");
+event!(TicketEscalated, "support.ticket_escalated");
+event!(SatisfactionRecorded, "support.satisfaction_recorded");
 event!(TicketBreached, "support.ticket_breached");
 event!(SettingsChanged, "support.settings_changed");
 
@@ -77,6 +90,9 @@ pub(crate) fn all() -> Vec<EventInfo> {
         MESSAGE_ADDED,
         MESSAGE_HIDDEN,
         TICKETS_CLAIMED,
+        TICKET_LINKED,
+        TICKET_ESCALATED,
+        SATISFACTION_RECORDED,
         TICKET_BREACHED,
         SETTINGS_CHANGED,
     ]
