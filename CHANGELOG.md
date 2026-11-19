@@ -14,6 +14,14 @@ endpoints are marked deprecated with a sunset date first.
 - Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
   receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
   posting; MCP tool `inventory.create_receipt`.
+- `auth`: API keys take `allowed_ips` (addresses or CIDR ranges, at most 50); a request from elsewhere gets 403
+  `network_not_allowed`. Every key now expires: omitting `expires_at` gives the longest lifetime,
+  `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` (365 days by default), and a later date is refused (`too_far`). **Upgrade note:**
+  existing keys without an expiry date get one 365 days after the upgrade.
+- `auth`: roles take `denies`, permissions the role forbids. A denied permission wins over every grant of the user's
+  other roles, even the built-in `admin` role; `permission_denied` answers `reason: denied_by_role` (or `missing`).
+- Kernel: `Principal::check` decides one record (`Decision::Allow` / `Missing` / `OutOfScope`) from the same rule
+  that builds the list filter (`scope_condition`); a randomized test proves both agree on SQLite and Postgres.
 - Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
   `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
   sold only once; transfers keep lots and serial numbers.

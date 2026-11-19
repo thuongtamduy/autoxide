@@ -637,12 +637,22 @@
       "input_schema": {
         "description": "A key to create.",
         "properties": {
+          "allowed_ips": {
+            "description": "IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be\nused from, at most 50. Omit for any address.",
+            "example": [
+              "203.0.113.0/24"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "current_password": {
             "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) or a `reauth_token` instead — exactly one of them.",
             "type": "string"
           },
           "expires_at": {
-            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
+            "description": "When the key stops working (RFC 3339, in the future, at most\n`AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest\nlifetime: every key expires.",
             "format": "date-time",
             "type": [
               "string",
@@ -919,6 +929,14 @@
       "input_schema": {
         "description": "The full content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "example": [],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for. Optional.",
             "type": "string"
@@ -1456,6 +1474,13 @@
         "additionalProperties": false,
         "description": "The full new content of a role.",
         "properties": {
+          "denies": {
+            "description": "Permissions the role denies. A denied permission wins over every grant: no other role of\nthe user, not even the built-in `admin` role, gives it back. A role either grants or\ndenies a permission, not both.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "description": {
             "description": "What the role is for.",
             "type": "string"

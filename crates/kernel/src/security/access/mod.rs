@@ -22,11 +22,14 @@ use std::sync::Arc;
 use axum::extract::{FromRequestParts, OptionalFromRequestParts};
 use axum::http::header;
 use axum::http::request::Parts;
-use sea_orm::sea_query::Condition;
-use sea_orm::{ColumnTrait, ConnectionTrait};
+use sea_orm::ConnectionTrait;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
+
+mod decision;
+
+pub use decision::Decision;
 
 use crate::error::Error;
 use crate::module::is_identifier;
@@ -396,6 +399,11 @@ pub struct Principal {
     access: AccessPath,
     /// Loại bên làm theo credential (API key `agent`, `service`…).
     kind: ActorKind,
+    /// Permission bị role cấm (bước 54, deny thắng allow): đã bỏ khỏi `grants`; giữ tên để lỗi
+    /// nói rõ lý do (`denied_by_role`) thay vì "thiếu".
+    denied: Arc<BTreeSet<String>>,
+    /// Dải IP được gọi (API key khai `allowed_ips`, bước 54); `None`: mọi địa chỉ.
+    networks: Option<Arc<Vec<crate::config::IpRange>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -423,6 +431,8 @@ pub struct PrincipalSnapshot {
     access: AccessPath,
     #[serde(default)]
     kind: ActorKind,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    denied: Vec<String>,
 }
 
 impl PrincipalSnapshot {
@@ -450,6 +460,9 @@ impl PrincipalSnapshot {
             fence: self.fence.map(OrgId::from_uuid),
             access: self.access,
             kind: self.kind,
+            denied: Arc::new(self.denied.iter().cloned().collect()),
+            // Job chạy không có request nên không có địa chỉ để kiểm: địa chỉ đã kiểm lúc yêu cầu.
+            networks: None,
         }
     }
 
@@ -484,6 +497,7 @@ impl Principal {
             fence: self.fence.map(|fence| fence.as_uuid()),
             access: self.access,
             kind: self.kind,
+            denied: self.denied.iter().cloned().collect(),
         }
     }
 }
@@ -541,6 +555,8 @@ impl Principal {
             fence: None,
             access: AccessPath::Direct,
             kind: ActorKind::Human,
+            denied: Arc::default(),
+            networks: None,
         }
     }
 
@@ -598,6 +614,72 @@ impl Principal {
         self
     }
 
+    /// Bỏ các permission `denied` (bước 54: deny thắng allow — một role cấm thì không role nào
+    /// khác, kể cả role toàn quyền, cấp lại được). Người có mọi permission thành người có mọi
+    /// permission của `catalog` (độ sâu `tenant`) trừ phần bị cấm; quyền nạp lại mỗi request nên
+    /// permission thêm sau vẫn có ở request kế.
+    #[must_use]
+    pub fn without(
+        mut self,
+        denied: impl IntoIterator<Item = String>,
+        catalog: &PermissionCatalog,
+    ) -> Self {
+        let denied: BTreeSet<String> = denied.into_iter().collect();
+        if denied.is_empty() {
+            return self;
+        }
+        let root = root_of(self.tenant);
+        let mut kept: BTreeMap<String, Vec<Grant>> = match &self.grants {
+            Grants::All => catalog
+                .iter()
+                .map(|permission| {
+                    (permission.name.to_owned(), vec![Grant::new(root, Scope::Tenant)])
+                })
+                .collect(),
+            Grants::Only(map) => (**map).clone(),
+        };
+        kept.retain(|name, _| !denied.contains(name));
+        self.grants = Grants::Only(Arc::new(kept));
+        let mut all = (*self.denied).clone();
+        all.extend(denied);
+        self.denied = Arc::new(all);
+        self
+    }
+
+    /// Chỉ nhận request từ các dải `networks` (API key khai `allowed_ips`). Danh sách rỗng là không
+    /// giới hạn.
+    #[must_use]
+    pub fn with_networks(mut self, networks: Vec<crate::config::IpRange>) -> Self {
+        self.networks = (!networks.is_empty()).then(|| Arc::new(networks));
+        self
+    }
+
+    /// `Ok` khi request từ địa chỉ `client` được phép; không thì 403 `network_not_allowed`. Không
+    /// biết địa chỉ (không qua HTTP) mà credential có giới hạn dải thì từ chối: không đoán.
+    pub fn admits(&self, client: Option<std::net::IpAddr>) -> Result<(), Error> {
+        let Some(networks) = &self.networks else { return Ok(()) };
+        if client.is_some_and(|ip| networks.iter().any(|range| range.contains(ip))) {
+            return Ok(());
+        }
+        Err(Error::forbidden(
+            "network_not_allowed",
+            "This credential can only be used from the IP addresses it lists, and this request \
+             comes from another address. Call from an allowed network, or change the key's \
+             allowed addresses.",
+        ))
+    }
+
+    /// Permission `name` bị một role cấm.
+    pub fn is_denied(&self, name: &str) -> bool {
+        self.denied.contains(name)
+    }
+
+    /// Lỗi 403 `permission_denied` cho `permission`, với `reason` `denied_by_role` hay `missing`.
+    fn refuse(&self, permission: &Permission) -> Error {
+        let reason = if self.is_denied(permission.name) { "denied_by_role" } else { "missing" };
+        permission_denied(permission).with_reason(reason)
+    }
+
     /// Nút mặc định cho bản ghi mới khi người tạo không chọn (bước 34): nút gốc nếu họ có
     /// `permission` cho cả khách; nút duy nhất nếu mọi grant của nó ở một nút; `None` khi họ làm ở
     /// nhiều nút (phải chọn) hay không có `permission`.
@@ -650,95 +732,6 @@ impl Principal {
                 Some(list) => list.clone(),
             },
         }
-    }
-
-    /// Điều kiện SeaORM giới hạn một danh sách vào phần `permission` cho phép: cột `org` là nút
-    /// của bản ghi, `owner` là cột người sở hữu (nếu có; không có thì `own` hiểu như `unit`).
-    /// `Condition::all()` (không giới hạn) khi có độ sâu `tenant` và không có hàng rào; lỗi
-    /// `permission_denied` khi không có grant nào. Dùng cùng `.scoped(&tenant)`.
-    pub fn scope_condition<C: ColumnTrait>(
-        &self,
-        permission: &Permission,
-        org: C,
-        owner: Option<C>,
-    ) -> Result<Condition, Error> {
-        let grants = self.grants(permission);
-        if grants.is_empty() {
-            return Err(permission_denied(permission));
-        }
-        let mut condition = Condition::all();
-        if !grants.iter().any(|grant| grant.scope == Scope::Tenant) {
-            let pick = |scope: Scope| -> Vec<OrgId> {
-                grants.iter().filter(|grant| grant.scope == scope).map(|grant| grant.org).collect()
-            };
-            let (subtrees, mut units) = (pick(Scope::Subtree), pick(Scope::Unit));
-            let mut any = Condition::any();
-            if !subtrees.is_empty() {
-                any = any.add(OrgTree::subtree_condition(self.tenant, &subtrees, org));
-            }
-            let owns = pick(Scope::Own);
-            match owner {
-                Some(owner) if !owns.is_empty() => any = any.add(owner.eq(self.user_id)),
-                _ => units.extend(owns),
-            }
-            if !units.is_empty() {
-                any = any.add(org.is_in(units.iter().map(OrgId::as_uuid)));
-            }
-            condition = condition.add(any);
-        }
-        if let Some(fence) = self.fence() {
-            condition = condition.add(OrgTree::subtree_condition(self.tenant, &[fence], org));
-        }
-        Ok(condition)
-    }
-
-    /// Kiểm `permission` trên một bản ghi (đọc / sửa / xoá) hay nút đích của lệnh tạo / dời:
-    /// thiếu permission → `permission_denied`; ngoài phạm vi → `org_out_of_scope`. Đọc ngoài phạm
-    /// vi thì service trả 404 thay vì lỗi này (không lộ bản ghi tồn tại).
-    pub async fn require_at<D: ConnectionTrait>(
-        &self,
-        db: &D,
-        permission: &Permission,
-        target: OrgTarget,
-    ) -> Result<(), Error> {
-        let grants = self.grants(permission);
-        if grants.is_empty() {
-            return Err(permission_denied(permission));
-        }
-        let mut allowed = false;
-        let mut subtrees = Vec::new();
-        for grant in &grants {
-            match grant.scope {
-                Scope::Tenant => allowed = true,
-                Scope::Unit => allowed |= grant.org == target.org,
-                Scope::Own => {
-                    allowed |= match target.owner {
-                        Some(owner) => owner == self.user_id,
-                        None => grant.org == target.org,
-                    }
-                }
-                Scope::Subtree => subtrees.push(grant.org),
-            }
-        }
-        if !allowed && !subtrees.is_empty() {
-            allowed = OrgTree::is_within(db, self.tenant, target.org, &subtrees).await?;
-        }
-        if allowed && let Some(fence) = self.fence() {
-            allowed = OrgTree::is_within(db, self.tenant, target.org, &[fence]).await?;
-        }
-        if allowed { Ok(()) } else { Err(org_out_of_scope(target.org, permission)) }
-    }
-
-    /// Như [`require_at`](Self::require_at), thêm: nút đích và mọi tổ tiên đang hoạt động (không
-    /// thì `org_frozen`). Gọi TRONG transaction ghi của module.
-    pub async fn require_write_at<D: ConnectionTrait>(
-        &self,
-        transaction: &D,
-        permission: &Permission,
-        target: OrgTarget,
-    ) -> Result<(), Error> {
-        self.require_at(transaction, permission, target).await?;
-        OrgTree::ensure_writable(transaction, self.tenant, target.org).await
     }
 
     /// Bên gọi thuộc khách `tenant` (bộ xác thực đặt theo khách trong credential).
@@ -816,7 +809,7 @@ impl Principal {
         if self.has(permission) {
             return Ok(());
         }
-        Err(permission_denied(permission))
+        Err(self.refuse(permission))
     }
 }
 
