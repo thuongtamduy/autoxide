@@ -27,7 +27,10 @@ mod permissions;
 mod policy;
 mod pricing;
 mod reasons;
+mod refunds;
 mod relocation;
+mod return_refund;
+mod returns;
 mod service;
 mod shipping_events;
 mod tools;
@@ -125,11 +128,13 @@ impl Module for OrdersModule {
             secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
             // Chính sách theo nút đọc từ cài đặt kế thừa; chưa cài `organizations`: mặc định.
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            reasons: context.reason_codes(),
         };
         let service = Arc::new(OrdersService::new(parts, config));
         // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Orders>(service.clone())?;
         context.provide::<dyn api::OrderHolds>(service.clone())?;
+        context.provide::<dyn api::OrderRefunds>(service.clone())?;
         self.service = Some(service);
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;
@@ -154,7 +159,12 @@ impl Module for OrdersModule {
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
         all.push(autoxide_kernel::event::Subscription::optional(
             payments::LEDGER_PAYMENT_SUCCEEDED,
-            Arc::new(payments::LedgerEvents(service)),
+            Arc::new(payments::LedgerEvents(service.clone())),
+        ));
+        // Cổng hoàn xong sau (lượt hoàn `pending`).
+        all.push(autoxide_kernel::event::Subscription::optional(
+            refunds::LEDGER_PAYMENT_REFUNDED,
+            Arc::new(refunds::LedgerRefunds(service)),
         ));
         all
     }

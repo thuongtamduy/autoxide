@@ -6,6 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::{PageInput, Tool};
+use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
 use serde::Deserialize;
@@ -15,8 +16,12 @@ use validator::Validate;
 
 use crate::api::OrderStatus;
 use crate::http::dto::OrderResponse;
+use crate::http::returns::{
+    ReceivedLineRequest, RefundResponse, ReturnResponse, ReturnTransitionRequest, return_action,
+};
 use crate::orders_read::OrderFilter;
-use crate::permissions::{MANAGE, READ};
+use crate::permissions::{MANAGE, READ, REFUND, RETURNS_MANAGE};
+use crate::returns::ReturnFilter;
 use crate::service::OrdersService;
 
 /// Orders to list.
@@ -69,10 +74,60 @@ pub(crate) struct RequestShipmentInput {
     pub note: Option<String>,
 }
 
+/// A refund of an order.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrdersRefundOrderInput)]
+pub(crate) struct RefundOrderInput {
+    pub id: Uuid,
+    /// Integer amount in minor units, e.g. `"150000"` for 150,000 VND.
+    pub amount: String,
+    /// Currency of the order, e.g. `VND`.
+    pub currency: String,
+    /// Why (no personal data; sent to the payment partner).
+    pub reason: String,
+    /// Your unique key of this refund: sending it again returns the same refund.
+    pub reference: String,
+}
+
+/// Returns to list.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrdersListReturnsInput)]
+pub(crate) struct ListReturnsInput {
+    /// `requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.
+    pub status: Option<String>,
+    pub org_id: Option<Uuid>,
+    pub order_id: Option<Uuid>,
+    /// Maximum number of returns, 1 to 200. Defaults to 50.
+    pub limit: Option<u32>,
+    /// The `next_cursor` of the previous page.
+    pub cursor: Option<String>,
+}
+
+/// A step of a return.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrdersDecideReturnInput)]
+pub(crate) struct DecideReturnInput {
+    pub id: Uuid,
+    /// `approve`, `reject`, `receive`, `refund` or `close`.
+    pub action: String,
+    /// `reject`: a code of the `orders.return_rejected` list.
+    pub reason: Option<String>,
+    /// `receive`: what arrived (`line_id`, `quantity`, `condition` = `restock` / `damaged`);
+    /// lines left out count as received in full and sellable.
+    #[schema(inline)]
+    pub lines: Option<Vec<ReceivedLineRequest>>,
+    /// `receive`: warehouse that received the items.
+    pub warehouse_org_id: Option<Uuid>,
+}
+
 pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (list, get, transition, ship) = (s(), s(), s(), s());
+    let (refund, returns, decide) = (s(), s(), s());
     vec![
         Tool::new(
             "list_orders",
@@ -155,5 +210,81 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
             },
         )
         .requires(MANAGE),
+        Tool::new(
+            "refund_order",
+            "Refund part or all of an order: through the payment partner when the payment came \
+             through it, otherwise recorded as paid back by the shop (cash). Never more than was \
+             paid; the same `reference` returns the same refund.",
+            move |tenant: TenantContext, principal: Principal, input: RefundOrderInput| {
+                let service = refund.clone();
+                async move {
+                    let amount = Money::parse(&input.amount, &input.currency)?;
+                    let row = service
+                        .staff_refund(
+                            &tenant,
+                            &principal,
+                            input.id,
+                            amount,
+                            input.reason,
+                            input.reference,
+                        )
+                        .await?
+                        .into_inner();
+                    RefundResponse::new(row)
+                }
+            },
+        )
+        .requires(REFUND)
+        .destructive(),
+        Tool::new(
+            "list_returns",
+            "List return requests of shops in your scope, newest first, with lines, photos \
+             (`media_ids`) and the refund once computed; follow `pagination.next_cursor` for more.",
+            move |tenant: TenantContext, principal: Principal, input: ListReturnsInput| {
+                let service = returns.clone();
+                async move {
+                    let page = PageInput::new(input.limit, input.cursor, None).page()?;
+                    let filter = ReturnFilter {
+                        status: input.status,
+                        org_id: input.org_id,
+                        order_id: input.order_id,
+                    };
+                    let found = service.list_returns(&tenant, &principal, &filter, &page).await?;
+                    let pagination = found.pagination;
+                    let data = found
+                        .data
+                        .into_iter()
+                        .map(ReturnResponse::new)
+                        .collect::<Result<_, _>>()?;
+                    Ok::<Page<ReturnResponse>, Error>(Page { data, pagination })
+                }
+            },
+        )
+        .requires(RETURNS_MANAGE)
+        .read_only(),
+        Tool::new(
+            "decide_return",
+            "Move a return forward: `approve` or `reject` (with a reason code of \
+             `orders.return_rejected`) the request, `receive` the items, `refund` the computed \
+             amount, or `close` it. Returns the return with its photos (`media_ids`).",
+            move |tenant: TenantContext, principal: Principal, input: DecideReturnInput| {
+                let service = decide.clone();
+                async move {
+                    let body = ReturnTransitionRequest {
+                        action: input.action,
+                        reason: input.reason,
+                        lines: input.lines,
+                        warehouse_org_id: input.warehouse_org_id,
+                    };
+                    let action =
+                        return_action(&service, &tenant, &principal, input.id, body).await?;
+                    let row =
+                        service.transition_return(&tenant, &principal, input.id, action).await?;
+                    ReturnResponse::new(row)
+                }
+            },
+        )
+        .requires(RETURNS_MANAGE)
+        .destructive(),
     ]
 }

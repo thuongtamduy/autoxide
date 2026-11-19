@@ -59,8 +59,42 @@ pub(crate) const COD_ENABLED: OrgSetting =
             None => Err("must be `true` or `false`".to_owned()),
         });
 
+/// Mã lý do trả hàng người mua được chọn (D-209), lấy từ danh sách `orders.return_reason`.
+pub(crate) const ALLOWED_RETURN_REASONS: OrgSetting = OrgSetting::new(
+    "orders.allowed_return_reasons",
+    "Codes of the `orders.return_reason` list buyers may give when asking to return items.",
+)
+.with_default(
+    r#"["changed_mind","damaged","wrong_item","not_as_described","missing_parts","other"]"#,
+)
+.with_schema(
+    r#"{"type":"array","items":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"maxItems":50}"#,
+)
+.checked(|value| match value.as_array() {
+    Some(codes)
+        if codes.len() <= 50
+            && codes.iter().all(|code| code.as_str().is_some_and(crate::policy::is_code)) =>
+    {
+        Ok(value.clone())
+    }
+    _ => Err("must be a list of at most 50 lower_case reason codes".to_owned()),
+});
+
+/// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
+pub(crate) fn is_code(code: &str) -> bool {
+    code.len() <= 64
+        && code.starts_with(|first: char| first.is_ascii_lowercase())
+        && code.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
 pub(crate) fn all() -> Vec<OrgSetting> {
-    vec![BUYER_CANCEL_UNTIL, ACCEPTANCE_HOURS, RETURN_WINDOW_DAYS, COD_ENABLED]
+    vec![
+        BUYER_CANCEL_UNTIL,
+        ACCEPTANCE_HOURS,
+        RETURN_WINDOW_DAYS,
+        COD_ENABLED,
+        ALLOWED_RETURN_REASONS,
+    ]
 }
 
 /// Chính sách hiệu lực của một nút.
@@ -70,6 +104,7 @@ pub(crate) struct Policy {
     pub acceptance_hours: i64,
     pub return_window_days: i64,
     pub cod_enabled: bool,
+    pub allowed_return_reasons: Vec<String>,
 }
 
 impl Policy {
@@ -110,6 +145,7 @@ impl OrdersService {
         let acceptance = self.setting(tenant, org, &ACCEPTANCE_HOURS).await?;
         let returns = self.setting(tenant, org, &RETURN_WINDOW_DAYS).await?;
         let cod = self.setting(tenant, org, &COD_ENABLED).await?;
+        let reasons = self.setting(tenant, org, &ALLOWED_RETURN_REASONS).await?;
         Ok(Policy {
             buyer_cancel_until: cancel
                 .as_ref()
@@ -119,6 +155,11 @@ impl OrdersService {
             acceptance_hours: acceptance.as_ref().and_then(Value::as_i64).unwrap_or(0),
             return_window_days: returns.as_ref().and_then(Value::as_i64).unwrap_or(7),
             cod_enabled: cod.as_ref().and_then(Value::as_bool).unwrap_or(true),
+            allowed_return_reasons: reasons
+                .as_ref()
+                .and_then(Value::as_array)
+                .map(|codes| codes.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .unwrap_or_default(),
         })
     }
 }
@@ -134,6 +175,7 @@ mod tests {
             acceptance_hours: 0,
             return_window_days: 7,
             cod_enabled: true,
+            allowed_return_reasons: Vec::new(),
         };
         let confirmed = policy(OrderStatus::Confirmed);
         assert!(confirmed.buyer_may_cancel(OrderStatus::PendingPayment));

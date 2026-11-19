@@ -8,6 +8,7 @@ mod checkout;
 mod fake_ledger;
 mod fakes;
 mod lifecycle;
+mod returns;
 
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};

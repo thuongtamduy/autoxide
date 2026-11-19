@@ -10226,6 +10226,87 @@
     },
     {
       "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a return forward: `approve` or `reject` (with a reason code of `orders.return_rejected`) the request, `receive` the items, `refund` the computed amount, or `close` it. Returns the return with its photos (`media_ids`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A step of a return.",
+        "properties": {
+          "action": {
+            "description": "`approve`, `reject`, `receive`, `refund` or `close`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "description": "`receive`: what arrived (`line_id`, `quantity`, `condition` = `restock` / `damaged`);\nlines left out count as received in full and sellable.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A line received back.",
+              "properties": {
+                "condition": {
+                  "description": "`restock` (sellable again) or `damaged`.",
+                  "type": "string"
+                },
+                "line_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "quantity": {
+                  "description": "Units received (0 when missing).",
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "line_id",
+                "quantity",
+                "condition"
+              ],
+              "type": "object"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "reason": {
+            "description": "`reject`: a code of the `orders.return_rejected` list.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "warehouse_org_id": {
+            "description": "`receive`: warehouse that received the items.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "action"
+        ],
+        "type": "object"
+      },
+      "name": "orders.decide_return",
+      "output_schema": null,
+      "permissions": [
+        "orders.returns.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
@@ -10311,6 +10392,114 @@
       "output_schema": null,
       "permissions": [
         "orders.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List return requests of shops in your scope, newest first, with lines, photos (`media_ids`) and the refund once computed; follow `pagination.next_cursor` for more.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Returns to list.",
+        "properties": {
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of returns, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`requested`, `approved`, `rejected`, `received`, `refunded` or `closed`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "orders.list_returns",
+      "output_schema": null,
+      "permissions": [
+        "orders.returns.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Refund part or all of an order: through the payment partner when the payment came through it, otherwise recorded as paid back by the shop (cash). Never more than was paid; the same `reference` returns the same refund.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A refund of an order.",
+        "properties": {
+          "amount": {
+            "description": "Integer amount in minor units, e.g. `\"150000\"` for 150,000 VND.",
+            "type": "string"
+          },
+          "currency": {
+            "description": "Currency of the order, e.g. `VND`.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Why (no personal data; sent to the payment partner).",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your unique key of this refund: sending it again returns the same refund.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "amount",
+          "currency",
+          "reason",
+          "reference"
+        ],
+        "type": "object"
+      },
+      "name": "orders.refund_order",
+      "output_schema": null,
+      "permissions": [
+        "orders.refund"
       ]
     },
     {

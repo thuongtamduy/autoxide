@@ -60,6 +60,8 @@ pub mod events {
     /// Hàng trả đã về kho: `inventory` nhập lại. `after`: `return_id`, `order_id`,
     /// `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]`.
     pub const RETURN_RECEIVED: &str = "orders.return_received";
+    /// Một yêu cầu trả hàng đổi trạng thái (duyệt, từ chối, nhận hàng, hoàn tiền, đóng).
+    pub const RETURN_STATUS_CHANGED: &str = "orders.return_status_changed";
     /// Một hoá đơn điện tử đã gắn vào đơn.
     pub const INVOICE_LINKED: &str = "orders.invoice_linked";
     /// Giỏ bị bỏ dở (người mua, tóm tắt giỏ) — cho bước 47.

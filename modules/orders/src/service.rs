@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::event::Outbox;
+use autoxide_kernel::reasons::ReasonCodes;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::DatabaseRegistry;
 use autoxide_ledger::api::Ledger;
@@ -26,6 +27,7 @@ pub(crate) struct Parts {
     pub ledger: Option<Arc<dyn Ledger>>,
     pub secret: SecretKey,
     pub orgs: Option<Arc<dyn OrgDirectory>>,
+    pub reasons: ReasonCodes,
 }
 
 pub(crate) struct OrdersService {
@@ -38,6 +40,7 @@ pub(crate) struct OrdersService {
     pub ledger: Option<Arc<dyn Ledger>>,
     pub secret: SecretKey,
     pub orgs: Option<Arc<dyn OrgDirectory>>,
+    pub reasons: ReasonCodes,
     pub config: OrdersConfig,
 }
 
@@ -53,6 +56,7 @@ impl OrdersService {
             ledger: parts.ledger,
             secret: parts.secret,
             orgs: parts.orgs,
+            reasons: parts.reasons,
             config,
         }
     }
