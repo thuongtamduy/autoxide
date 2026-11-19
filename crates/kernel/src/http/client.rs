@@ -55,7 +55,7 @@ pub(super) struct ClientAddress {
 
 /// Địa chỉ client đã giải, gắn vào extensions của request (lớp [`attach`]).
 #[derive(Debug, Clone, Copy)]
-pub(super) struct ClientIp(pub(super) Option<IpAddr>);
+pub(crate) struct ClientIp(pub(crate) Option<IpAddr>);
 
 /// Tên miền client gõ, theo `Forwarded: host=…` / `X-Forwarded-Host` của proxy tin cậy (lớp
 /// [`attach`]). Chỉ có khi kết nối đến từ một dải `AUTOXIDE_HTTP_TRUSTED_PROXIES`: client gọi thẳng

@@ -259,13 +259,16 @@ impl Module for AuthModule {
                 .with_entitlements(context.entitlements()),
         );
         context.usage_counter(&crate::role::MEMBERS_LIMIT, Arc::new(crate::role::MemberCounter))?;
-        let api_keys = Arc::new(ApiKeyService::new(
-            roles.clone(),
-            sessions.clone(),
-            outbox.clone(),
-            mfa.clone(),
-            passkeys.clone(),
-        ));
+        let api_keys = Arc::new(
+            ApiKeyService::new(
+                roles.clone(),
+                sessions.clone(),
+                outbox.clone(),
+                mfa.clone(),
+                passkeys.clone(),
+            )
+            .with_max_days(config.api_key_max_days),
+        );
         let resets = Arc::new(reset::PasswordResets {
             jobs: context.jobs(),
             users: users.clone(),

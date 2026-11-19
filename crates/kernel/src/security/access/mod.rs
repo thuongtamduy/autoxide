@@ -402,6 +402,8 @@ pub struct Principal {
     /// Permission bị role cấm (bước 54, deny thắng allow): đã bỏ khỏi `grants`; giữ tên để lỗi
     /// nói rõ lý do (`denied_by_role`) thay vì "thiếu".
     denied: Arc<BTreeSet<String>>,
+    /// Dải IP được gọi (API key khai `allowed_ips`, bước 54); `None`: mọi địa chỉ.
+    networks: Option<Arc<Vec<crate::config::IpRange>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -459,6 +461,8 @@ impl PrincipalSnapshot {
             access: self.access,
             kind: self.kind,
             denied: Arc::new(self.denied.iter().cloned().collect()),
+            // Job chạy không có request nên không có địa chỉ để kiểm: địa chỉ đã kiểm lúc yêu cầu.
+            networks: None,
         }
     }
 
@@ -552,6 +556,7 @@ impl Principal {
             access: AccessPath::Direct,
             kind: ActorKind::Human,
             denied: Arc::default(),
+            networks: None,
         }
     }
 
@@ -639,6 +644,29 @@ impl Principal {
         all.extend(denied);
         self.denied = Arc::new(all);
         self
+    }
+
+    /// Chỉ nhận request từ các dải `networks` (API key khai `allowed_ips`). Danh sách rỗng là không
+    /// giới hạn.
+    #[must_use]
+    pub fn with_networks(mut self, networks: Vec<crate::config::IpRange>) -> Self {
+        self.networks = (!networks.is_empty()).then(|| Arc::new(networks));
+        self
+    }
+
+    /// `Ok` khi request từ địa chỉ `client` được phép; không thì 403 `network_not_allowed`. Không
+    /// biết địa chỉ (không qua HTTP) mà credential có giới hạn dải thì từ chối: không đoán.
+    pub fn admits(&self, client: Option<std::net::IpAddr>) -> Result<(), Error> {
+        let Some(networks) = &self.networks else { return Ok(()) };
+        if client.is_some_and(|ip| networks.iter().any(|range| range.contains(ip))) {
+            return Ok(());
+        }
+        Err(Error::forbidden(
+            "network_not_allowed",
+            "This credential can only be used from the IP addresses it lists, and this request \
+             comes from another address. Call from an allowed network, or change the key's \
+             allowed addresses.",
+        ))
     }
 
     /// Permission `name` bị một role cấm.

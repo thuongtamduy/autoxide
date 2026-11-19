@@ -101,6 +101,13 @@ pub(crate) const SUPPORT_ACCESS_MAX_HOURS: Setting = Setting::new(
 )
 .with_default("8");
 
+pub(crate) const API_KEY_MAX_DAYS: Setting = Setting::new(
+    "AUTOXIDE_AUTH_API_KEY_MAX_DAYS",
+    "Longest lifetime of an API key (1 to 3650 days). Every key expires: a key created without \
+     `expires_at` gets this lifetime.",
+)
+.with_default("365");
+
 pub(crate) const REAUTH_MINUTES: Setting = Setting::new(
     "AUTOXIDE_AUTH_REAUTH_MINUTES",
     "How long a confirmation token from `POST /api/v1/auth/me/reauth` stays usable (1 to 60 \
@@ -216,6 +223,8 @@ pub(crate) struct AuthConfig {
     pub invitation_days: i64,
     /// Trần giờ của quyền vào hỗ trợ (D-211, D-313).
     pub support_max_hours: u32,
+    /// Hạn dài nhất của API key, theo ngày (bước 54).
+    pub api_key_max_days: i64,
 }
 
 /// Cấu hình passkey (WebAuthn).
@@ -257,6 +266,8 @@ impl AuthConfig {
         let invitation_url = reader.optional_with(&INVITATION_URL, token_url);
         let support_max_hours =
             reader.get_with(&SUPPORT_ACCESS_MAX_HOURS, |raw| parse_in_range(raw, 1u32, 72));
+        let api_key_max_days =
+            reader.get_with(&API_KEY_MAX_DAYS, |raw| parse_in_range(raw, 1i64, 3650));
         let invitation_days =
             reader.get_with(&INVITATION_DAYS, |raw| parse_in_range(raw, 1i64, 30));
         let login_link_minutes =
@@ -338,6 +349,7 @@ impl AuthConfig {
             invitation_url: invitation_url?,
             invitation_days: invitation_days?,
             support_max_hours: support_max_hours?,
+            api_key_max_days: api_key_max_days?,
         })
     }
 }

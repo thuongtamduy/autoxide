@@ -665,12 +665,22 @@
       "ApiKeyResponse": {
         "description": "An API key, without its secret.",
         "properties": {
+          "allowed_ips": {
+            "description": "IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request\nfrom elsewhere gets 403 `network_not_allowed`.",
+            "example": [
+              "203.0.113.0/24"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
           },
           "expires_at": {
-            "description": "When the key stops working; `null`: never.",
+            "description": "When the key stops working. Every new key has one; `null` only for data that was never\nupgraded.",
             "format": "date-time",
             "type": [
               "string",
@@ -726,6 +736,7 @@
           "prefix",
           "permissions",
           "org_id",
+          "allowed_ips",
           "created_at",
           "kind"
         ],
@@ -9793,12 +9804,22 @@
       "CreateApiKeyRequest": {
         "description": "A key to create.",
         "properties": {
+          "allowed_ips": {
+            "description": "IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be\nused from, at most 50. Omit for any address.",
+            "example": [
+              "203.0.113.0/24"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "current_password": {
             "description": "Your current password: a stolen access token alone must not create a key that\noutlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and\n`passkey_credential`) or a `reauth_token` instead — exactly one of them.",
             "type": "string"
           },
           "expires_at": {
-            "description": "When the key stops working (RFC 3339, in the future). Omit for a key that does\nnot expire.",
+            "description": "When the key stops working (RFC 3339, in the future, at most\n`AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest\nlifetime: every key expires.",
             "format": "date-time",
             "type": [
               "string",
@@ -43234,12 +43255,22 @@
             "items": {
               "description": "An API key, without its secret.",
               "properties": {
+                "allowed_ips": {
+                  "description": "IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request\nfrom elsewhere gets 403 `network_not_allowed`.",
+                  "example": [
+                    "203.0.113.0/24"
+                  ],
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "created_at": {
                   "format": "date-time",
                   "type": "string"
                 },
                 "expires_at": {
-                  "description": "When the key stops working; `null`: never.",
+                  "description": "When the key stops working. Every new key has one; `null` only for data that was never\nupgraded.",
                   "format": "date-time",
                   "type": [
                     "string",
@@ -43295,6 +43326,7 @@
                 "prefix",
                 "permissions",
                 "org_id",
+                "allowed_ips",
                 "created_at",
                 "kind"
               ],
