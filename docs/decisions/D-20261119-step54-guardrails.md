@@ -13,8 +13,13 @@ nên khách con không nới được rào cha đặt. Kernel thêm `Principal::
 Rào lưu ở bảng `auth_tenant_guardrails` của database nền tảng (migration `m0041`), một dòng mỗi cặp khách bị rào /
 khách đặt rào. Bảng nằm trong module `auth`, không phải kernel; phiên giữ vùng tenancy đã đồng ý. Đọc rào của cả
 chuỗi tổ tiên bằng `DatabaseRegistry::tenant_ancestors` cộng một câu truy vấn. Kết quả cache theo khách 30 giây và
-xoá ngay trên máy đổi rào. Chế độ một khách không đọc gì. Tách / gộp khách không đem rào theo (`ephemeral`), vì rào
-theo ID khách. Khách bị xoá hẳn thì nghe `kernel.tenant_deleted` để xoá rào đặt cho nó và rào nó đặt.
+xoá ngay trên máy đổi rào. Chế độ một khách không đọc gì. Tách / gộp khách: bảng khai `ephemeral`, vì rào nằm
+ở database nền tảng theo ID khách, không đi cùng dữ liệu của khách. Thay vào đó, `auth` nghe
+`kernel.relocation_started`. Khi **tách**, khách mới nhận bản sao mọi rào đang áp cho khách nguồn (của chính nó và
+của tổ tiên), giữ nguyên khách đặt rào. Nhờ vậy khách tách ra làm khách gốc (không giữ cha) không thoát rào, và
+khách đặt rào vẫn sửa / gỡ được rào đã chép dù không còn ở trên khách mới. Khi **gộp**, khách nhận giữ rào của nó;
+khách bị gộp mất cùng rào của nó. Dữ liệu của khách bị gộp từ nay theo rào của khách nhận, kể cả khi rào cũ của
+khách bị gộp chặt hơn: người gộp là nhân sự nền tảng, quyết điều đó khi gộp. Khách bị xoá hẳn thì nghe `kernel.tenant_deleted` để xoá rào đặt cho nó và rào nó đặt.
 
 Lý do: Đặc tả 54 P4, như SCP của AWS. Rào là trần, không phải quyền cấp thêm, nên giao các rào là đủ và dễ giải
 thích. Cache 30 giây đánh đổi thu hồi tức thì trên máy chủ khác lấy việc không thêm truy vấn ở đường nóng. Rào hiếm

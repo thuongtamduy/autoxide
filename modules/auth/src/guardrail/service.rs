@@ -111,6 +111,35 @@ impl GuardrailService {
             .await?)
     }
 
+    /// Tách khách: khách mới nhận bản sao mọi rào đang áp cho khách nguồn (rào đặt cho chính nó và
+    /// cho tổ tiên của nó), giữ nguyên khách đặt rào. Không có bước này, khách mới tách ra làm
+    /// khách gốc sẽ thoát mọi rào. Chạy lại được: cặp đã có thì giữ nguyên.
+    pub(crate) async fn carry_on_split(&self, source: Uuid, target: Uuid) -> Result<(), Error> {
+        let rails = self.rails_over(TenantId::from_uuid(source)).await?;
+        let write = self.platform();
+        for rail in rails {
+            let copy = entity::ActiveModel {
+                id: Set(Uuid::now_v7()),
+                tenant_id: Set(target),
+                set_by_tenant_id: Set(rail.set_by_tenant_id),
+                max_permissions: Set(rail.max_permissions),
+                updated_by: Set(rail.updated_by),
+                updated_at: Set(Utc::now().trunc_subsecs(6)),
+            };
+            entity::Entity::insert(copy)
+                .on_conflict(
+                    OnConflict::columns([entity::Column::TenantId, entity::Column::SetByTenantId])
+                        .do_nothing()
+                        .to_owned(),
+                )
+                .exec_without_returning(write.database().write())
+                .await?;
+        }
+        self.forget();
+        tracing::info!(source = %source, target = %target, "tenant guardrails carried to a split tenant");
+        Ok(())
+    }
+
     fn forget(&self) {
         self.cache.lock().unwrap_or_else(PoisonError::into_inner).clear();
     }
@@ -125,7 +154,17 @@ impl GuardrailService {
             return Err(not_a_child(child));
         }
         let ancestors = self.databases.tenant_ancestors(TenantId::from_uuid(child)).await?;
-        if ancestors.contains(&caller.tenant_id()) { Ok(()) } else { Err(not_a_child(child)) }
+        if ancestors.contains(&caller.tenant_id()) {
+            return Ok(());
+        }
+        // Khách đã đặt rào luôn sửa / gỡ được rào của mình, kể cả khi khách bị rào đã tách ra khỏi
+        // nhánh của nó (rào được chép theo khi tách, xem `carry_on_split`).
+        let own = entity::Entity::find()
+            .filter(entity::Column::TenantId.eq(child))
+            .filter(entity::Column::SetByTenantId.eq(caller.tenant_id().as_uuid()))
+            .one(self.platform().database().read())
+            .await?;
+        if own.is_some() { Ok(()) } else { Err(not_a_child(child)) }
     }
 
     /// Đặt (hay thay) rào của khách bên gọi cho khách `child`.
@@ -284,8 +323,35 @@ fn not_a_child(child: Uuid) -> Error {
 /// Khách bị xoá hẳn: bỏ rào đặt cho nó và rào nó đặt.
 const TENANT_DELETED: &str = "kernel.tenant_deleted";
 
-pub(crate) fn subscriptions() -> Vec<Subscription> {
-    vec![Subscription::new(TENANT_DELETED, Arc::new(ForgetDeletedTenant))]
+/// Bắt đầu tách / gộp khách (kernel ghi trước khi chép dữ liệu).
+const RELOCATION_STARTED: &str = "kernel.relocation_started";
+
+/// `service`: có sau `Module::start` (bộ phát event dựng sau đó).
+pub(crate) fn subscriptions(service: Option<Arc<GuardrailService>>) -> Vec<Subscription> {
+    let mut subscriptions = vec![Subscription::new(TENANT_DELETED, Arc::new(ForgetDeletedTenant))];
+    if let Some(service) = service {
+        subscriptions.push(Subscription::new(RELOCATION_STARTED, Arc::new(CarryOnSplit(service))));
+    }
+    subscriptions
+}
+
+/// Tách khách: chép rào sang khách mới. Gộp: khách bị gộp mất cùng rào của nó; dữ liệu của nó
+/// từ nay theo rào của khách nhận.
+struct CarryOnSplit(Arc<GuardrailService>);
+
+#[async_trait::async_trait]
+impl EventHandler for CarryOnSplit {
+    async fn handle(&self, event: &Delivered) -> Result<(), Error> {
+        if event.payload["kind"].as_str() != Some("split") {
+            return Ok(());
+        }
+        let id =
+            |field: &str| event.payload[field].as_str().and_then(|raw| raw.parse::<Uuid>().ok());
+        let (Some(source), Some(target)) = (id("source_tenant_id"), id("target_tenant_id")) else {
+            return Err(Error::internal("a split event without source or target tenant"));
+        };
+        self.0.carry_on_split(source, target).await
+    }
 }
 
 struct ForgetDeletedTenant;

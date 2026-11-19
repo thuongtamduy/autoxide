@@ -507,7 +507,8 @@ impl Module for AuthModule {
     // Uỷ quyền vào sandbox (bước 38, D-232): nghe event sandbox của kernel.
     fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
         let mut subscriptions = sandbox::subscriptions();
-        subscriptions.extend(guardrail::subscriptions());
+        let guardrails = self.state.as_ref().map(|state| state.guardrails.clone());
+        subscriptions.extend(guardrail::subscriptions(guardrails));
         subscriptions
     }
 }

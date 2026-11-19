@@ -155,3 +155,72 @@ async fn rao_khach_con_chan_ca_admin_va_khach_chau() {
     .await
     .unwrap();
 }
+
+// Tách khách đang bị rào (khách mới thành khách gốc, không còn cha): khách mới nhận bản sao mọi rào
+// đang áp cho khách nguồn, nên không thoát rào; khách đặt rào vẫn sửa được rào đã chép.
+#[tokio::test]
+async fn tach_khach_dang_bi_rao_khach_moi_van_bi_rao() {
+    TestDatabase::run(async |test| {
+        let services = crate::testing::services(test).await;
+        let mailer: Arc<dyn Mailer> = services.mails.clone();
+        let app = TestApp::builder(test)
+            .tenant("parent")
+            .tenant("child")
+            .tenant("spinoff")
+            .provide::<dyn Mailer>(mailer)
+            .module(crate::module())
+            .build()
+            .await
+            .unwrap();
+        let parent = app.tenant("parent").await.unwrap();
+        let child = app.tenant("child").await.unwrap();
+        let spinoff = app.tenant("spinoff").await.unwrap();
+        let control = app.database();
+        control
+            .write()
+            .execute_raw(Statement::from_sql_and_values(
+                control.write().get_database_backend(),
+                "UPDATE kernel_tenants SET parent_id = $1 WHERE id = $2",
+                [parent.id().as_uuid().into(), child.id().as_uuid().into()],
+            ))
+            .await
+            .unwrap();
+        let boss = admin_of(&services, &app, &parent, "parent").await;
+        let rail = |tenant: &TenantContext| format!("/guardrails/{}", tenant.id().as_uuid());
+        let body = json!({"max_permissions": ["auth.roles.read"]});
+        let (status, _) = call(&app, "PUT", &rail(&child), &boss, Some(body)).await;
+        assert_eq!(status, StatusCode::OK);
+
+        // Kernel ghi `kernel.relocation_started` khi tách `child` thành `spinoff` (khách gốc mới).
+        let guardrails = crate::guardrail::GuardrailService::new(
+            app.modules().tenancy().unwrap(),
+            services.roles.catalog().clone(),
+            autoxide_kernel::event::Outbox::standalone("auth"),
+        );
+        let (source, target) = (child.id().as_uuid(), spinoff.id().as_uuid());
+        guardrails.carry_on_split(source, target).await.unwrap();
+        guardrails.carry_on_split(source, target).await.unwrap();
+
+        let young = admin_of(&services, &app, &spinoff, "spinoff").await;
+        let (status, _) = call(&app, "GET", "/roles", &young, None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, refused) = call(&app, "GET", "/users", &young, None).await;
+        assert_eq!(
+            (status, refused["reason"].as_str()),
+            (StatusCode::FORBIDDEN, Some("outside_guardrail"))
+        );
+        let (status, applied) = call(&app, "GET", "/guardrails/applied", &young, None).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            applied["data"]["guardrails"].as_array().unwrap().len(),
+            1,
+            "chạy lại không nhân đôi"
+        );
+
+        // Khách đặt rào không còn ở trên `spinoff` nhưng vẫn gỡ được rào của mình.
+        let (status, _) = call(&app, "DELETE", &rail(&spinoff), &boss, None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+    })
+    .await
+    .unwrap();
+}
