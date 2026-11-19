@@ -1008,6 +1008,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
+- SQLite: the write connection runs `PRAGMA optimize` when it opens and closes, so the query planner has
+  statistics for large tables (step 39). Without them a comment thread on a database with a million comments
+  scanned most of the table (3.7 s a request); now 0.4 ms for the query. PostgreSQL is unchanged (autovacuum).
 - Counting failed attempts (sign-in lockout and other throttles) takes one SQL statement instead of up to four:
   60–75% more attempts per second, except many attempts on one email at once on PostgreSQL, which still queue on
   that email's counter.
