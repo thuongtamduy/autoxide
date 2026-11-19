@@ -63,6 +63,18 @@ pub(crate) fn legal_day(at: DateTime<Utc>) -> NaiveDate {
     at.with_timezone(&chrono_tz::Asia::Ho_Chi_Minh).date_naive()
 }
 
+/// Đầu ngày `day` theo giờ của vùng luật, đổi ra UTC.
+pub(crate) fn day_start(day: NaiveDate) -> DateTime<Utc> {
+    use chrono::TimeZone;
+    let midnight = day.and_time(chrono::NaiveTime::MIN);
+    // Việt Nam không đổi giờ theo mùa: luôn có đúng một thời điểm; nhánh dự phòng chỉ để không
+    // phải `unwrap`.
+    chrono_tz::Asia::Ho_Chi_Minh
+        .from_local_datetime(&midnight)
+        .earliest()
+        .map_or_else(|| midnight.and_utc(), |at| at.with_timezone(&Utc))
+}
+
 /// Số ngày (theo lịch) chương trình chạy trong năm `year`.
 fn days_in_year(starts_at: DateTime<Utc>, ends_at: DateTime<Utc>, year: i32) -> i64 {
     let (Some(first), Some(last)) =
@@ -102,6 +114,12 @@ fn static_percent(program: &Program) -> Option<i32> {
         take(i32::try_from(average).ok());
     }
     best
+}
+
+/// Hai chương trình (đã biết trùng thời gian và mục tiêu) xung đột: cùng lớp và một bên độc quyền.
+pub(crate) fn clashes(program: &Program, other: &Program) -> bool {
+    other.class() == program.class()
+        && (other.exclusivity != Exclusivity::None || program.exclusivity != Exclusivity::None)
 }
 
 impl PromotionsService {
@@ -362,11 +380,7 @@ impl PromotionsService {
         let others = self.overlapping_programs(tenant, program, true).await?;
         let conflicts: Vec<String> = others
             .iter()
-            .filter(|other| {
-                other.class() == program.class()
-                    && (other.exclusivity != Exclusivity::None
-                        || program.exclusivity != Exclusivity::None)
-            })
+            .filter(|other| clashes(program, other))
             .map(|other| other.id.to_string())
             .collect();
         Ok(check("conflicts", conflicts.is_empty(), Severity::Warning)

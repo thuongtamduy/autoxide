@@ -13,18 +13,24 @@ mod engine;
 mod entity;
 mod evaluate;
 mod events;
+mod for_product;
 mod http;
+mod insights;
 mod jobs;
 mod legal;
 mod migration;
 mod model;
 mod notices;
+mod participations;
 mod permissions;
 mod programs;
 mod provider;
+mod public;
 mod reasons;
 mod redemption;
 mod relocation;
+mod reminders;
+mod resource;
 mod service;
 mod settings;
 mod tools;
@@ -112,6 +118,11 @@ impl Module for PromotionsModule {
         // thừa và múi giờ cửa hàng.
         let catalog = context.require::<dyn autoxide_catalog::api::Catalog>()?;
         let orgs = context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok();
+        // `notifications` có thì khai loại thông báo nhắc flash sale (đăng ký trước promotions).
+        let notifier = context.require::<dyn autoxide_notifications::api::Notifier>().ok();
+        if let Some(notifier) = &notifier {
+            notifier.declare(reminders::FLASH_SALE_STARTING)?;
+        }
         let service = Arc::new(PromotionsService {
             databases: context.tenancy(),
             outbox: context.outbox()?,
@@ -123,8 +134,11 @@ impl Module for PromotionsModule {
             legal_cache: legal::LegalCache::default(),
             compiled: compiled::CompiledCache::default(),
             jobs: context.jobs(),
+            consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
+            notifier,
         });
         context.personal_data(service.clone())?;
+        context.resource_type(resource::PROMOTION, Arc::new(resource::PromotionResolver))?;
         self.service = Some(service.clone());
         // `catalog` không gọi thẳng `dyn Promotions` được (promotions phụ thuộc catalog — gọi ngược
         // là vòng phụ thuộc), nên promotions cắm nguồn giá giảm tự động vào catalog. Catalog thật

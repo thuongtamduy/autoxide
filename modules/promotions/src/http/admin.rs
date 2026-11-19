@@ -94,6 +94,7 @@ async fn list_promotions(
         kind: query.kind,
         org_id: query.org_id,
         q: query.q,
+        window: None,
     };
     let found = service.list_promotions(&tenant, &principal, &filter, &page).await?;
     Ok(found.map(|(row, title)| PromotionListItem {

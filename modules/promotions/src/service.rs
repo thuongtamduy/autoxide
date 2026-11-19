@@ -40,6 +40,10 @@ pub(crate) struct PromotionsService {
     pub(crate) legal_cache: LegalCache,
     pub(crate) compiled: CompiledCache,
     pub(crate) jobs: autoxide_kernel::job::JobQueue,
+    /// Sổ đồng ý của `compliance` khi đã cài: bằng chứng đồng ý cho lời nhắc flash sale.
+    pub(crate) consents: Option<Arc<dyn autoxide_compliance::api::ConsentLedger>>,
+    /// `dyn Notifier` của `notifications` khi đã cài: gửi lời nhắc; không có thì không gửi.
+    pub(crate) notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
 }
 
 impl PromotionsService {

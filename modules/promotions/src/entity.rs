@@ -326,6 +326,31 @@ pub(crate) mod funding {
     tenant_scoped!();
 }
 
+pub(crate) mod participation {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "promotions_participations")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub promotion_id: Uuid,
+        pub seller_org_id: Uuid,
+        pub status: String,
+        /// JSON: danh sách `ParticipationItem`.
+        pub items: String,
+        pub reviewed_by: Option<Uuid>,
+        pub reviewed_at: Option<DateTimeUtc>,
+        pub created_at: DateTimeUtc,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
 pub(crate) mod customer_usage {
     use sea_orm::entity::prelude::*;
 

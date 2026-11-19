@@ -5,6 +5,8 @@
 
 pub(crate) mod input;
 mod store;
+
+pub(crate) use store::load as store_load;
 pub(crate) mod transitions;
 
 use autoxide_kernel::access::Principal;
@@ -72,6 +74,8 @@ pub(crate) struct PromotionView {
     pub gifts: Vec<gift_option::Model>,
     pub flash: Vec<flash_item::Model>,
     pub funding: Vec<funding::Model>,
+    /// Người bán đăng ký tham gia (chương trình của sàn).
+    pub participations: Vec<crate::entity::participation::Model>,
 }
 
 impl PromotionView {
@@ -105,6 +109,8 @@ pub(crate) struct PromotionFilter {
     pub kind: Option<crate::model::Kind>,
     pub org_id: Option<Uuid>,
     pub q: Option<String>,
+    /// Chỉ chương trình có thời gian chạy giao với [từ, tới) (lịch), trừ bản nháp và đã huỷ.
+    pub window: Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)>,
 }
 
 pub(crate) fn not_found(id: Uuid) -> Error {
@@ -220,6 +226,15 @@ impl PromotionsService {
         }
         if let Some(org) = filter.org_id {
             condition = condition.add(promotion::Column::OrgId.eq(org));
+        }
+        if let Some((from, to)) = filter.window {
+            condition = condition
+                .add(promotion::Column::StartsAt.lt(to))
+                .add(promotion::Column::EndsAt.gt(from))
+                .add(
+                    promotion::Column::Status
+                        .is_not_in([Status::Draft.as_str(), Status::Cancelled.as_str()]),
+                );
         }
         if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
             let ids: Vec<Uuid> = translation::Entity::find()

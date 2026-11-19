@@ -76,6 +76,7 @@ fn program(org: Uuid) -> Program {
         flash_items: Vec::new(),
         gift_options: Vec::new(),
         funding: Vec::new(),
+        sponsors: Default::default(),
     }
 }
 

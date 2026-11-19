@@ -537,7 +537,7 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
 - [x] Cộng dồn theo ba lớp sản phẩm / đơn / vận chuyển: độc quyền trong lớp hay toàn giỏ, `combines_with`,
       dừng sau chương trình, chế độ ưu tiên hay lợi nhất cho người mua (tất định); 1 voucher mỗi lớp cho
       mỗi bên trả tiền (D-222)
-- [ ] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
+- [x] Ai trả tiền giảm giá (sàn / người bán / nhãn hàng / đối tác thanh toán, chia theo tỉ lệ) chia về từng
       dòng; người bán đăng ký tham gia chương trình của sàn; ngân sách tiền, lượt theo ngày (D-222)
 - [x] Giữ chỗ lượt dùng (tổng, mỗi người, theo ngày, ngân sách), suất flash sale và quà như tồn kho (giữ →
       xác nhận → trả lại), test đồng thời; chống lạm dụng theo nhiều khoá người mua (tài khoản, số điện
@@ -550,15 +550,15 @@ quốc gia; NĐ 239/2026 sửa NĐ 81/2018 — cần đối chiếu văn bản h
       D-222) và sàn giá; giới hạn số ngày giảm giá là dữ liệu; kiểm trước khi bật, không ghi (D-225)
 - [x] Thông báo khuyến mại theo từng nơi nhận (D-225): xuất dữ liệu thông báo gửi Sở Công Thương nơi tổ
       chức, ghi nhận đã nộp từng nơi; lưu vết chương trình đã chạy
-- [ ] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
+- [x] Mã cho người mua thấy: mã / voucher dùng được cho giỏ và mã chưa đủ điều kiện kèm lý do ("thêm X để
       dùng"), bộ chọn thay ô nhập mã (D-201); trang sản phẩm hiện "còn X với mã …", giá niêm yết vẫn là giá
       không mã (D-200); số lượt còn lại chỉ hiện khi là số thật
-- [ ] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
+- [x] Công khai và nhắc: event giá sau giảm tự động cho danh sách công khai; flash sale công khai với suất
       còn là số thật; nhắc khi flash sale bắt đầu (đồng ý riêng cho một lần nhắc, D-225)
-- [ ] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
+- [x] Chạy thử chương trình trên giỏ mẫu, kiểm xung đột, lịch, số liệu chương trình (D-222)
 - [ ] Khối `promotions.flash_sale`, `promotions.voucher_claim` cho trang dựng từ khối (D-229, bước 67);
       `promotions.promotion` trong sổ đối tượng (chỉ công khai khi đang chạy) để menu của website trỏ tới (D-238)
-- [ ] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
+- [x] Website bán hàng (16/11/2026): `GET /public/promotions` trả số thông báo khuyến mại với Sở Công Thương và
       mức giảm tối đa theo luật đang áp (dữ liệu có ngày hiệu lực, luật số hai)
 
 ## 44. Vận chuyển (`shipping`)
