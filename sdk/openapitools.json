@@ -26,7 +26,7 @@
           "pubName": "autoxide_sdk",
           "pubVersion": "0.14.0",
           "pubDescription": "Autoxide API client generated from the OpenAPI document.",
-          "serializationLibrary": "json_serializable",
+          "serializationLibrary": "built_value",
           "enumUnknownDefaultCase": true
         }
       }

@@ -150,7 +150,10 @@ jobs:
       - name: gradle build
         if: matrix.sdk == 'kotlin'
         working-directory: sdk/kotlin/generated
-        run: chmod +x gradlew && ./gradlew --no-daemon assemble
+        # Hàng trăm model: trình biên dịch Kotlin cần nhiều bộ nhớ hơn mặc định.
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx6g -Pkotlin.compiler.execution.strategy=in-process assemble
       - uses: dart-lang/setup-dart@v1
         if: matrix.sdk == 'dart'
         with:
