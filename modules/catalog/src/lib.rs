@@ -116,10 +116,12 @@ impl Module for CatalogModule {
             databases: context.tenancy(),
             jobs: context.jobs(),
             organizations: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+            sale_prices: std::sync::OnceLock::new(),
         });
         context.usage_counter(&service::PRODUCTS_LIMIT, Arc::new(service::ProductCounter))?;
         self.service = Some(service.clone());
         // `Arc<CatalogService>` tự đổi thành `Arc<dyn Catalog>`: module khác chỉ thấy trait.
+        context.provide::<dyn api::CatalogExtensions>(service.clone())?;
         context.provide::<dyn api::Catalog>(service)
     }
 
