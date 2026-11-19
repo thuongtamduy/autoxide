@@ -143,6 +143,24 @@ pub(crate) async fn has_membership(tenant: &TenantContext, user_id: Uuid) -> Res
     Ok(found.is_some())
 }
 
+/// Người dùng `user_id` có giữ một trong các role `roles` ở khách `tenant` không (ở nút nào cũng được).
+pub(crate) async fn holds_any_role(
+    tenant: &TenantContext,
+    user_id: Uuid,
+    roles: &[Uuid],
+) -> Result<bool, Error> {
+    if roles.is_empty() {
+        return Ok(false);
+    }
+    let found = user_role::Entity::find()
+        .filter(user_role::Column::UserId.eq(user_id))
+        .filter(user_role::Column::RoleId.is_in(roles.iter().copied()))
+        .scoped(tenant)
+        .one(tenant.database().read())
+        .await?;
+    Ok(found.is_some())
+}
+
 /// Bộ đếm thật cho job đối soát của `plans`: số người khác nhau giữ role ở khách.
 pub(crate) struct MemberCounter;
 

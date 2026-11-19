@@ -28,7 +28,9 @@
 //! `X-Frame-Options`, CSP chặt (HSTS khi cấu hình) cho mọi response — xem `security_headers`.
 
 mod body_limit;
+mod cache;
 mod client;
+mod compression;
 mod conditional;
 mod deprecation;
 mod disposition;
@@ -411,7 +413,13 @@ pub fn build(
     let security = security_headers::Prepared::new(&config.security_headers);
     // `.layer` bọc thêm một lớp RA NGOÀI các lớp trước đó: lớp khai sau cùng là lớp
     // request gặp đầu tiên. Đọc từ dưới lên sẽ ra thứ tự ở đầu file.
+    let cache_policy = Arc::new(cache::Policy::new(config.public_cache_seconds));
     let router = router
+        // TRONG lớp 304: ETag lớp cache thêm cho đọc công khai cũng cho được `304`
+        // (D-20261119-step39-cdn-cache).
+        .layer(middleware::from_fn(move |request: Request, next: Next| {
+            cache::cache_headers(cache_policy.clone(), request, next)
+        }))
         .layer(middleware::from_fn(conditional::not_modified))
         // Khách có thể chọn bằng header `autoxide-tenant` (bước 33): cache dùng chung đứng trước API
         // (CDN, reverse proxy) phải tách bản lưu theo header này, không thì trả nội dung của khách
@@ -438,7 +446,11 @@ pub fn build(
         // NGOÀI lớp ngôn ngữ: lưu đúng response client nhận lần đầu.
         .layer(middleware::from_fn(move |request: Request, next: Next| {
             idempotency::idempotency(idempotency.clone(), request, next)
-        }))
+        }));
+    // NGOÀI lớp idempotency: bản lưu để trả lại là bản chưa nén (D-20261119-step39-compression).
+    // Tắt bằng cấu hình thì lớp không có mặt.
+    let router = if config.compression { router.layer(compression::layer()) } else { router };
+    let router = router
         // TRONG lớp CORS: request preflight của trình duyệt không bị đếm, còn response
         // 429 vẫn mang header CORS để trang web đọc được lỗi.
         .layer(middleware::from_fn(move |request: Request, next: Next| {

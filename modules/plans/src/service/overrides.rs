@@ -162,12 +162,26 @@ impl PlansService {
         if tenant == DEFAULT_TENANT {
             return Ok(Arc::new(TenantEntitlements::unrestricted()));
         }
+        // Sandbox (D-232): không có thuê bao riêng, dùng quyền dùng của khách gốc (đếm riêng).
+        let tenant = self.entitled_tenant(tenant).await?;
         if let Some(found) = self.cache.get(tenant) {
             return Ok(found);
         }
         let fresh = Arc::new(self.compute(tenant, now()).await?);
         self.cache.put(tenant, fresh.clone());
         Ok(fresh)
+    }
+
+    /// Khách mang quyền dùng của `tenant`: khách gốc khi `tenant` là sandbox, còn lại chính nó.
+    async fn entitled_tenant(&self, tenant: TenantId) -> Result<TenantId, Error> {
+        if self.databases.mode() == autoxide_kernel::tenancy::TenancyMode::Single {
+            return Ok(tenant);
+        }
+        match self.databases.tenant(tenant).await {
+            Ok(context) => Ok(context.sandbox_of().unwrap_or(tenant)),
+            Err(error) if error.code() == "tenant_not_found" => Ok(tenant),
+            Err(error) => Err(error),
+        }
     }
 
     /// Đọc và gộp quyền dùng của khách `tenant` tại `now`, không qua bộ nhớ đệm.

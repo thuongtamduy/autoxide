@@ -290,6 +290,8 @@
   "tenancy.relocation_schema_differs": "Database của vị trí dữ liệu `{placement}` còn thiếu {pending} migration. Chạy `autoxide migrate up --all` trước.",
   "tenancy.relocation_tenant_exists": "Đã có khách mang ID `{id}`, nên nhánh không thành khách với ID đó được.",
   "tenancy.sandbox_forbidden": "Bản thử không làm được việc `{action}`; làm việc này ở khách hàng thật.",
+  "field:every prefix must start with `https://` or `http://`": "mỗi tiền tố phải bắt đầu bằng `https://` hoặc `http://`",
+  "tenancy.sandbox_only": "Việc này chỉ làm được trong một bản thử; gửi header `Autoxide-Tenant: <id bản thử>`.",
   "tenancy.sandbox_nested": "Không tạo được bản thử từ một bản thử; tạo từ khách hàng thật.",
   "tenancy.sandbox_not_found": "Không có bản thử `{id}` của khách hàng này.",
   "tenant_domain_dns_failed": "Tra DNS không được: {error}",

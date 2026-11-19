@@ -306,6 +306,10 @@ impl Module for AuthModule {
         // `Arc<X>` tự đổi thành `Arc<dyn Trait>`: bên dùng chỉ thấy trait.
         context.provide::<dyn Authenticator>(Arc::new(authenticator))?;
         context.provide::<dyn api::Users>(users.clone())?;
+        // Mail của sandbox chỉ tới nhân viên khách gốc vào được sandbox (D-232).
+        context.provide::<dyn autoxide_kernel::tenancy::sandbox::SandboxRecipients>(Arc::new(
+            sandbox::StaffRecipients { databases: databases.clone() },
+        ))?;
         context.provide::<dyn api::TenantAdmins>(users.clone())?;
         // Tên hiển thị của người dùng cho module khác (vd tên người làm trong audit log).
         context.resource_type(resource::USER, Arc::new(resource::UserResolver))?;

@@ -188,6 +188,9 @@ pub fn descriptions(text: &str) -> Vec<(usize, FieldMessage)> {
     found.extend(call_arguments(text, "ReasonDefault::new(", 1));
     // Câu khách đổi được (bước 51 P21).
     found.extend(call_arguments(text, "OverridableText::new(", 1));
+    // Câu trả lời tự động của `FactSource` cho `support` (D-230, bước 44 mục 8): module bọc câu mẫu
+    // trong macro `answer_text!("…")` của mình (macro chỉ trả lại chuỗi) để câu được kiểm bản dịch.
+    found.extend(call_arguments(text, "answer_text!(", 0));
     found.retain(
         |(_, site)| !matches!(site, FieldMessage::Built(expression) if expression.starts_with('$')),
     );

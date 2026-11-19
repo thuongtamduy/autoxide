@@ -76,8 +76,8 @@ pub(crate) struct LastDelivery {
     id: Uuid,
     #[schema(example = "auth.user_created")]
     event_name: String,
-    /// `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
-    /// as a delivery's `status`.
+    /// `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+    /// (kept in the sandbox message box) — the same values as a delivery's `status`.
     #[schema(example = "succeeded")]
     status: String,
     /// HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer.
@@ -186,7 +186,9 @@ pub(crate) struct DeliveryResponse {
     event_id: Uuid,
     #[schema(example = "auth.user_created")]
     event_name: String,
-    /// `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).
+    /// `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+    /// (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+    /// message box, not sent).
     #[schema(example = "succeeded")]
     status: String,
     attempts: i32,
@@ -487,7 +489,7 @@ async fn list_deliveries(
 #[derive(Debug, Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
 pub(crate) struct DeliveriesFilter {
-    /// `pending`, `succeeded` or `failed`.
+    /// `pending`, `succeeded`, `failed` or `sandboxed`.
     #[param(example = "failed")]
     status: Option<String>,
     /// Only deliveries to this endpoint.
@@ -565,7 +567,7 @@ async fn redeliver(
 #[derive(Debug, Default, Deserialize, Validate, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct DeliveriesInput {
-    /// `pending`, `succeeded` or `failed`.
+    /// `pending`, `succeeded`, `failed` or `sandboxed`.
     status: Option<String>,
     /// Only deliveries to this endpoint.
     endpoint_id: Option<Uuid>,
@@ -591,7 +593,7 @@ pub(crate) fn tools(service: Arc<WebhookService>) -> Vec<autoxide_kernel::mcp::T
         Tool::new(
             "list_deliveries",
             "List webhook deliveries of every endpoint, newest first; filter by `status` \
-             (`pending`, `succeeded`, `failed`) or `endpoint_id`.",
+             (`pending`, `succeeded`, `failed`, `sandboxed`) or `endpoint_id`.",
             move |tenant: TenantContext, _: Principal, input: DeliveriesInput| {
                 let service = list.clone();
                 async move {

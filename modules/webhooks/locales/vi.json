@@ -1,6 +1,6 @@
 {
   "field:is not an event of this system; see `GET /api/v1/webhooks/events`": "không phải event của hệ thống này; xem `GET /api/v1/webhooks/events`",
-  "field:must be `pending`, `succeeded` or `failed`": "phải là `pending`, `succeeded` hoặc `failed`",
+  "field:must be `pending`, `succeeded`, `failed` or `sandboxed`": "phải là `pending`, `succeeded`, `failed` hoặc `sandboxed`",
   "field:must be an absolute URL": "phải là URL đầy đủ",
   "field:must be at most {description_max_length} characters long": "phải dài tối đa {description_max_length} ký tự",
   "field:must be at most {max} characters long": "phải dài tối đa {max} ký tự",

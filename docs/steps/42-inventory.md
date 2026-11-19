@@ -200,7 +200,7 @@ Cache ngắn (vài giây) và ETag theo phiên bản sổ biến động.
 
 ### Báo khi có hàng lại (D-201)
 
-`POST /public/restock-alerts {variant_id, store_id?, contact}` — xác nhận hai bước như `newsletter`, đồng
+`POST /public/restock-alerts {variant_id, store_id?, email | phone, consent}` — xác nhận hai bước như `newsletter`, đồng
 ý riêng cho mục đích "thông báo có hàng" (bước 37). Nghe `inventory.level_changed` từ 0 lên trên 0 ở đúng
 cửa hàng (hay bất kỳ kho bán online khi bỏ `store_id`), gửi một lần qua `notifications`, rồi đánh dấu đã
 gửi: một đợt có hàng chỉ gửi một lần dù event đến lại.
@@ -228,7 +228,7 @@ Mọi bảng có `tenant_id`; unique / index bắt đầu bằng `tenant_id`; s�
 | `inventory_reservation_lines` | `id`, `tenant_id`, `reservation_id`, `line_key`, `variant_id`, `bundle_variant_id?`, `per_unit` (đơn vị thành phần trong một đơn vị dòng đơn), `level_id`, `org_id`, `quantity`, `fulfilled_quantity`, `released_quantity`, `backordered`, `preordered` (D-204) | (`tenant_id`,`reservation_id`) |
 | `inventory_preorder_counters` | suất đặt trước (D-204): `tenant_id`, `variant_id`, `reserved`, `limit` (chép từ `preorder_limit` của catalog), `updated_at` | pk (`tenant_id`,`variant_id`) |
 | `inventory_fulfilments` | `id`, `tenant_id`, `reservation_id`, `fulfilment_key`, `fingerprint`, `created_at` | unique (`tenant_id`,`reservation_id`,`fulfilment_key`) |
-| `inventory_restock_alerts` | đăng ký báo khi có hàng lại, cấp khách hàng (D-201): biến thể, cửa hàng (NULL = kho bán online), liên hệ, `user_id?` (khi người đăng ký đã đăng nhập — D-237), trạng thái xác nhận, đã gửi | bắt đầu bằng `tenant_id`; (`tenant_id`,`user_id`,`variant_id`) |
+| `inventory_restock_alerts` | đăng ký báo khi có hàng lại, cấp khách hàng (D-201): `variant_id`, `store_key` (`Uuid::nil()` = kho bán online — không NULL để khoá duy nhất chặn trùng trên cả hai database), `contact_kind` / `contact`, `user_id?` (D-237), `status` (`pending`/`confirmed`/`stopped`), `token_hash`, `consent` (JSON), `locale`, `armed`, `sent_count` (D-20261119-step42-restock-alerts) | unique (`tenant_id`,`variant_id`,`store_key`,`contact_kind`,`contact`); (`tenant_id`,`user_id`,`variant_id`); (`tenant_id`,`token_hash`) |
 | `inventory_restocks` | `id`, `tenant_id`, `reference`, `reference_fingerprint`, `order_id?`, `org_id`, `lines` (JSON; dòng không bán lại được chỉ ghi ở đây), `created_at` | unique (`tenant_id`,`reference`) |
 | `inventory_sources` | `selling_org_id`, `warehouse_org_id`, `priority`, `active` | unique (`tenant_id`,`selling_org_id`,`warehouse_org_id`) |
 | `inventory_settings` | `org_id`, `prefer_nearby`, `allow_split`, `province_code?`, `pickup` (hai cột sau chép từ event `organizations.public_profile_updated`, D-20261118-step42-reservations) | unique (`tenant_id`,`org_id`) |
@@ -274,7 +274,7 @@ Công khai (không cần đăng nhập):
 | Method + path | Ghi chú |
 |---|---|
 | `GET /public/availability?variant_ids&store_id` | mức `in_stock` / `low` / `out` / `preorder` — xem "Tình trạng hàng công khai" (D-200) |
-| `POST /public/restock-alerts` | `{variant_id, store_id?, contact}`, xác nhận hai bước (D-201) |
+| `POST /public/restock-alerts` | `{variant_id, store_id?, email \| phone, consent}`, xác nhận hai bước (D-201); `POST /public/restock-alerts/confirm` · `/stop` `{token}` |
 
 ### Tool MCP
 

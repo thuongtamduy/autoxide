@@ -402,6 +402,8 @@ pub struct StartContext<'a> {
     analytics: &'a crate::analytics::AnalyticsCatalog,
     automations: &'a crate::automation::AutomationDirectory,
     sync_keep: chrono::Duration,
+    /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
+    partners: &'a crate::tenancy::sandbox::PartnerGuard,
 }
 
 impl StartContext<'_> {
@@ -686,13 +688,15 @@ impl StartContext<'_> {
     /// Công bố một trait cho module khác dùng. `T` là kiểu `dyn Trait` khai trong
     /// `api` của module: `context.provide::<dyn UserDirectory>(Arc::new(service))?`.
     ///
-    /// Mỗi trait chỉ có một bên công bố; công bố lần hai là lỗi.
+    /// Mỗi trait chỉ có một bên công bố; công bố lần hai là lỗi. Hợp đồng đối tác của kernel
+    /// (thanh toán, SMS, mail…) được kernel bọc để sandbox luôn dùng bộ giả (D-232).
     //
     // `T: ?Sized`: cho phép `T` là `dyn Trait` (kiểu không có kích thước cố định).
     pub fn provide<T>(&mut self, api: Arc<T>) -> Result<(), Error>
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        let api = self.partners.wrap(api);
         self.apis.provide(self.module, api)
     }
 
@@ -713,6 +717,7 @@ impl StartContext<'_> {
     where
         T: ?Sized + Send + Sync + 'static,
     {
+        let api = self.partners.wrap(api);
         self.apis.contribute(self.module, api)
     }
 

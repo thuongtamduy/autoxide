@@ -86,6 +86,8 @@ struct Setup {
     service: Arc<WebhookService>,
     fanout: Fanout,
     sender: Sender,
+    /// Cài đặt theo khách mà bộ gửi đọc (`kernel.sandbox.webhook_urls`).
+    settings: Arc<autoxide_testkit::FakeTenantSettings>,
 }
 
 async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
@@ -123,9 +125,11 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
     ));
     let fanout = Fanout { jobs: JobQueue::new("webhooks") };
     let client = Sender::client(std::time::Duration::from_secs(5), allow_http).unwrap();
-    let sender = Sender { secrets, client, allow_private_networks: allow_http };
+    let settings = Arc::new(autoxide_testkit::FakeTenantSettings::default());
+    let sender =
+        Sender { secrets, client, allow_private_networks: allow_http, settings: settings.clone() };
     let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
-    Setup { database, tenant, service, fanout, sender }
+    Setup { database, tenant, service, fanout, sender, settings }
 }
 
 fn event(database: &Database, name: &str) -> Delivered {
@@ -682,6 +686,72 @@ async fn gui_lai_lan_giao_da_hong() {
             .await
             .unwrap_err();
         assert_eq!(missing.code(), "webhooks.delivery_not_found");
+    })
+    .await
+    .unwrap();
+}
+
+/// Sandbox (bước 38, D-232): webhook tới URL không có trong `kernel.sandbox.webhook_urls` không được
+/// gửi — lần giao ghi `sandboxed`, nội dung vào hộp thư giả; URL được cho phép thì gửi thật.
+#[tokio::test]
+async fn sandbox_chi_gui_toi_url_duoc_phep() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let receiver = Receiver::default();
+        let url = receiver.start().await;
+        let input = NewEndpoint {
+            url: url.clone(),
+            description: "test".to_owned(),
+            events: vec![DEMO_EVENT.to_owned()],
+        };
+        setup.service.create(&setup.tenant, Actor::system(), input).await.unwrap();
+        // Ngữ cảnh sandbox của cùng khách (test dựng tay, không qua sổ khách).
+        let sandbox = setup
+            .tenant
+            .clone()
+            .with_sandbox_of(autoxide_kernel::tenancy::TenantId::from_uuid(Uuid::now_v7()), None);
+        let send = |id: Uuid| {
+            JobContext::for_tenant(
+                sandbox.clone(),
+                crate::delivery::SEND_KIND,
+                json!({"delivery_id": id}),
+                1,
+            )
+        };
+
+        setup.fanout.handle(&event(&setup.database, DEMO_EVENT)).await.unwrap();
+        let first = deliveries(&setup.database).await[0].id;
+        setup.sender.run(&send(first)).await.unwrap();
+        let row = delivery::Entity::find_by_id(first).one(setup.database.read()).await.unwrap();
+        assert_eq!(row.unwrap().status, "sandboxed");
+        assert!(receiver.requests.lock().unwrap().is_empty(), "không gửi ra ngoài");
+        let backend = setup.database.read().get_database_backend();
+        let sql = "SELECT channel, reason, recipient FROM kernel_sandbox_messages";
+        let held = setup
+            .database
+            .read()
+            .query_all_raw(Statement::from_string(backend, sql))
+            .await
+            .unwrap();
+        assert_eq!(held.len(), 1);
+        let channel: String = held[0].try_get("", "channel").unwrap();
+        let reason: String = held[0].try_get("", "reason").unwrap();
+        let recipient: String = held[0].try_get("", "recipient").unwrap();
+        assert_eq!((channel.as_str(), reason.as_str()), ("webhook", "url_not_allowed"));
+        assert_eq!(recipient, url);
+
+        // Cho phép tiền tố của máy nhận: lần giao sau đi thật.
+        let prefix = url.trim_end_matches("/hook");
+        setup.settings.set(setup.tenant.id(), "kernel.sandbox.webhook_urls", prefix);
+        let mut second = event(&setup.database, DEMO_EVENT);
+        second.id = Uuid::now_v7();
+        setup.fanout.handle(&second).await.unwrap();
+        let next =
+            deliveries(&setup.database).await.into_iter().find(|row| row.id != first).unwrap().id;
+        setup.sender.run(&send(next)).await.unwrap();
+        let row = delivery::Entity::find_by_id(next).one(setup.database.read()).await.unwrap();
+        assert_eq!(row.unwrap().status, "succeeded");
+        assert_eq!(receiver.requests.lock().unwrap().len(), 1);
     })
     .await
     .unwrap();
