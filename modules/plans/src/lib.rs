@@ -29,6 +29,8 @@ mod provisioning;
 mod service;
 mod signup;
 mod signup_http;
+mod store;
+mod store_http;
 mod tools;
 mod usage;
 
@@ -104,6 +106,8 @@ impl Module for PlansModule {
                 "plans_signup",
                 "plans_throttle",
                 "plans_antispam_nonces",
+                // Giao dịch cửa hàng ứng dụng gắn với khách (bước 69 P4).
+                "plans_store_purchase",
             ])
     }
 
@@ -139,6 +143,9 @@ impl Module for PlansModule {
             "plans_billing_profile",
             "plans_provisioning",
             "plans_signup",
+            "plans_store_product",
+            "plans_store_purchase",
+            "plans_store_notification",
         ]
     }
 
@@ -186,6 +193,8 @@ impl Module for PlansModule {
             acceptance: context.require::<dyn autoxide_compliance::api::AcceptanceGate>().ok(),
             guard: context.require::<autoxide_kernel::antispam::SpamGuard>()?,
             signup: config.signup.clone(),
+            // Cửa hàng ứng dụng (bước 69 P4): module kết nối đăng ký TRƯỚC `plans` góp vào.
+            stores: context.contributions::<dyn autoxide_kernel::store::StorePurchases>(),
         });
         if let Some(notifier) = &service.notifier {
             notices::declare(notifier.as_ref())?;
