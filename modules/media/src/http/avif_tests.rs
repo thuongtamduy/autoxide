@@ -102,7 +102,6 @@ async fn avif_bat_thi_job_sinh_dung_mot_lan() {
         assert_eq!(got.header(header::CACHE_CONTROL), "private, max-age=31536000, immutable");
         assert_eq!(&got.body()[4..8], b"ftyp", "an ISO-BMFF (AVIF) file");
         assert_eq!(avif_rows(&app).await, 1);
-
     })
     .await
     .unwrap();

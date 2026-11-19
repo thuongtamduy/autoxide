@@ -308,9 +308,9 @@ where
 }
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod avif_tests;
+#[cfg(test)]
+mod tests;
 
 impl MediaItemResponse {
     /// Người tải lên (để tra tên theo lô).
