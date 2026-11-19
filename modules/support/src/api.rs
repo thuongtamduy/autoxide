@@ -135,3 +135,48 @@ pub trait InboundMail: Send + Sync {
         mail: InboundEmail,
     ) -> Result<InboundOutcome, Error>;
 }
+
+/// Một câu hỏi của người mua cần quyết có trả lời tự động không (phiếu hay chat của bước 61).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InboundQuestion {
+    /// Nút nhận câu hỏi: chính sách trả lời tự động và câu trả lời mẫu của nút này.
+    pub org_id: Uuid,
+    /// Luồng hỏi đáp: `support.ticket:<id>` hay `conversations.thread:<id>`.
+    pub thread: String,
+    pub requester: Requester,
+    pub text: String,
+    /// Ngôn ngữ của người mua (`vi`, `en`).
+    pub locale: String,
+    /// Số câu trả lời tự động liên tiếp đã gửi trong luồng.
+    pub auto_replies_in_row: u32,
+}
+
+/// Nguồn của câu trả lời tự động.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AutoSource {
+    /// Câu trả lời mẫu đã duyệt (nguyên văn, đã điền biến).
+    Macro(Uuid),
+    /// Mẫu câu của một [`FactSource`].
+    Fact { intent: String },
+}
+
+/// Quyết định cho một câu hỏi.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ReplyDecision {
+    /// Gửi nguyên văn `text` (gắn nhãn "Trả lời tự động" và nút "Gặp nhân viên").
+    Send { text: String, source: AutoSource },
+    /// Không đủ điều kiện: để nhân viên trả lời (bên gọi có thể soạn bản nháp AI).
+    Draft { text: String },
+    /// Chuyển người ngay (rủi ro, từ khoá chặn, quá số lần, tắt).
+    Handoff,
+}
+
+/// Bộ trả lời tự động (D-230) — `conversations` (bước 61) gọi cho tin chat.
+#[async_trait::async_trait]
+pub trait AutoResponder: Send + Sync {
+    async fn decide(
+        &self,
+        tenant: &TenantContext,
+        question: InboundQuestion,
+    ) -> Result<ReplyDecision, Error>;
+}

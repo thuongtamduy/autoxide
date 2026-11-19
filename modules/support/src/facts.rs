@@ -12,8 +12,15 @@ use crate::api::{FactSource, SupportFacts};
 pub(crate) struct FactRegistry(Arc<RwLock<Vec<Arc<dyn FactSource>>>>);
 
 impl FactRegistry {
+    /// Mọi ý định của mọi nguồn đã gắn.
+    pub(crate) fn intents(&self) -> Vec<crate::api::FactIntent> {
+        self.0
+            .read()
+            .map(|sources| sources.iter().flat_map(|source| source.intents()).collect())
+            .unwrap_or_default()
+    }
+
     /// Nguồn trả lời ý định `intent`, nếu có.
-    #[allow(dead_code)] // Trả lời tự động (mục 6) dùng.
     pub(crate) fn source_of(&self, intent: &str) -> Option<Arc<dyn FactSource>> {
         let sources = self.0.read().ok()?;
         sources

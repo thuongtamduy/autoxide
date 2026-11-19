@@ -13,6 +13,7 @@ pub(crate) fn relocation() -> Relocation {
             "support_routing_rules",
             "support_policies",
             "support_macros",
+            "support_auto_replies",
         ])
         .follow("support_messages", "ticket_id", "support_tickets")
         .follow("support_team_members", "team_id", "support_teams")

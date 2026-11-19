@@ -14,6 +14,9 @@ endpoints are marked deprecated with a sunset date first.
 - `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
   one of the same name, permissions, unit, allowed addresses and kind; the old key keeps working for `overlap_hours`
   (0 to 72, 24 by default) so programs can switch. Keys show `rotated_from`.
+- Module `inventory`: pre-orders — variants sold as `preorder` with a `preorder_limit` never take more places than the
+  limit, even when many buyers order at once (`inventory.preorder_sold_out`); cancelling gives the place back; arriving
+  stock is allocated to pre-order lines in the order they were placed (event `inventory.preorder_allocated`).
 - Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
   receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
   posting; MCP tool `inventory.create_receipt`.
@@ -143,6 +146,12 @@ endpoints are marked deprecated with a sunset date first.
   `link_ticket`, `suggest_reply`) with the REST permissions; AI reply drafts (`/tickets/{id}/reply-suggestions`, never
   sent by themselves); email replies into tickets through the trait `InboundMail` (off by default); guide
   `docs/SUPPORT.md` (EN + VI).
+- `support`: automatic answers to simple questions (off by default, per unit): the AI only classifies; Rust rules send
+  either an approved saved reply word for word (`PUT /macros/{id}/auto-reply`, with a review day) or a sentence built
+  from exact data by a `FactSource`; never for complaints, refunds, cancellations, payment problems, personal data,
+  legal questions, angry customers or blocked words. "Talk to a person" (`…/handoff`), feedback that retires wrong
+  answers, `POST /auto-reply/preview`, `GET /auto-replies`, MCP tool `support.preview_auto_reply`; `AutoResponder` for
+  chat (step 61). Setting `AUTOXIDE_SUPPORT_AUTO_REPLY_FLAG_LIMIT`.
 - New module `automations` (step 58): "when … then …" rules without code. Triggers: an event of any module, a
   schedule (hourly, daily, weekly in the rule's time zone), a manual call, or a figure leaving its usual range
   (`fact:<kind>` / `summary:<id>` against a threshold or the average of the same weekday over 4 weeks). Conditions

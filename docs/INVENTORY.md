@@ -75,6 +75,17 @@ Unconfirmed reservations past `expires_at` are released by the job `inventory.ex
 Each reservation takes stock with one conditional `UPDATE` per line, in a fixed order, so 100 buyers of the last
 unit get exactly one success.
 
+### Pre-orders
+
+A variant sold as `preorder` may be reserved before stock exists. When the variant has a `preorder_limit` (set in
+`catalog`), held and confirmed pre-orders never exceed it, even when many buyers order at the same moment: the extra
+ones get 409 `inventory.preorder_sold_out`. Cancelling or expiring a pre-order gives its places back.
+
+When stock arrives at a warehouse that has waiting pre-orders (receipt, transfer, return, positive adjustment), the job
+`inventory.allocate_preorders` gives the free units to pre-order lines **in the order they were placed** and publishes
+`inventory.preorder_allocated` for each line (`quantity` this time, `allocated_quantity` in total), so `orders` can
+move the order on. Running the job again never allocates twice.
+
 Admins see reservations with `GET /reservations` (`inventory.reservations.read`) and release a stuck one with
 `POST /reservations/{id}/release` (`inventory.adjust`; recorded with their user id).
 
