@@ -11,7 +11,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenancyMode, TenantContext, TenantId};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set};
+use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -102,12 +102,21 @@ impl GuardrailService {
 
     /// Mọi rào áp cho khách `tenant`: đặt cho chính nó hay cho một khách cấp trên của nó.
     async fn rails_over(&self, tenant: TenantId) -> Result<Vec<entity::Model>, Error> {
+        self.rails_over_in(self.platform().database().read(), tenant).await
+    }
+
+    /// Như [`rails_over`](Self::rails_over), đọc qua `connection` (vd transaction đang mở).
+    async fn rails_over_in<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: TenantId,
+    ) -> Result<Vec<entity::Model>, Error> {
         let mut chain = vec![tenant.as_uuid()];
         chain.extend(self.databases.tenant_ancestors(tenant).await?.iter().map(TenantId::as_uuid));
         Ok(entity::Entity::find()
             .filter(entity::Column::TenantId.is_in(chain))
             .order_by_asc(entity::Column::Id)
-            .all(self.platform().database().read())
+            .all(connection)
             .await?)
     }
 
@@ -115,8 +124,19 @@ impl GuardrailService {
     /// cho tổ tiên của nó), giữ nguyên khách đặt rào. Không có bước này, khách mới tách ra làm
     /// khách gốc sẽ thoát mọi rào. Chạy lại được: cặp đã có thì giữ nguyên.
     pub(crate) async fn carry_on_split(&self, source: Uuid, target: Uuid) -> Result<(), Error> {
-        let rails = self.rails_over(TenantId::from_uuid(source)).await?;
-        let write = self.platform();
+        let platform = self.platform();
+        self.carry_on_split_in(platform.database().write(), source, target).await
+    }
+
+    /// Như [`carry_on_split`](Self::carry_on_split), ghi qua `connection` — transaction của bước
+    /// chuyển khi tách (`SwitchHook`), để rào có hiệu lực cùng lúc khách mới hoạt động.
+    pub(crate) async fn carry_on_split_in<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        source: Uuid,
+        target: Uuid,
+    ) -> Result<(), Error> {
+        let rails = self.rails_over_in(connection, TenantId::from_uuid(source)).await?;
         for rail in rails {
             let copy = entity::ActiveModel {
                 id: Set(Uuid::now_v7()),
@@ -132,7 +152,7 @@ impl GuardrailService {
                         .do_nothing()
                         .to_owned(),
                 )
-                .exec_without_returning(write.database().write())
+                .exec_without_returning(connection)
                 .await?;
         }
         self.forget();
@@ -335,8 +355,27 @@ pub(crate) fn subscriptions(service: Option<Arc<GuardrailService>>) -> Vec<Subsc
     subscriptions
 }
 
-/// Tách khách: chép rào sang khách mới. Gộp: khách bị gộp mất cùng rào của nó; dữ liệu của nó
-/// từ nay theo rào của khách nhận.
+/// Hook đồng bộ của bước chuyển khi tách (D-20261119-relocation-switch-hook): chép rào sang khách
+/// mới trong transaction mở khách mới — không có lúc nào khách mới chạy mà chưa có rào.
+pub(crate) struct GuardrailSwitch(pub(crate) Arc<GuardrailService>);
+
+#[async_trait::async_trait]
+impl autoxide_kernel::tenancy::SwitchHook for GuardrailSwitch {
+    async fn switch(
+        &self,
+        control: &sea_orm::DatabaseTransaction,
+        relocation: &autoxide_kernel::tenancy::RelocationSwitch,
+    ) -> Result<(), Error> {
+        if relocation.kind != autoxide_kernel::tenancy::RelocationKind::Split {
+            return Ok(());
+        }
+        let (source, target) = (relocation.source.as_uuid(), relocation.target.as_uuid());
+        self.0.carry_on_split_in(control, source, target).await
+    }
+}
+
+/// Lưới an toàn sau hook trên (chạy lại được, cặp đã có thì giữ): tách khách thì chép rào sang
+/// khách mới. Gộp: khách bị gộp mất cùng rào của nó; dữ liệu của nó theo rào của khách nhận.
 struct CarryOnSplit(Arc<GuardrailService>);
 
 #[async_trait::async_trait]

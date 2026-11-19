@@ -77,9 +77,9 @@ pub use registry::{
 };
 pub use relocate::{
     Merge, RELOCATIONS_REQUEST, RelocateTable, Relocation, RelocationBlocker, RelocationConflict,
-    RelocationContext, RelocationInput, RelocationKind, RelocationPlan, RelocationTable,
-    RelocationWarning, SealedColumn, Split, TENANTS_RELOCATE, TablePolicy, TableReport,
-    TenantRelocation, TenantRelocations,
+    RelocationContext, RelocationInput, RelocationKind, RelocationPlan, RelocationSwitch,
+    RelocationTable, RelocationWarning, SealedColumn, Split, SwitchHook, TENANTS_RELOCATE,
+    TablePolicy, TableReport, TenantRelocation, TenantRelocations,
 };
 pub use request::{TENANT_HEADER, TenantHint};
 pub use residency::{Residency, parse_country};
