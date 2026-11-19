@@ -262,8 +262,16 @@ export type AnswerResponse = {
 
 /** An API key, without its secret. */
 export type ApiKeyResponse = {
+  /**
+   * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+   * from elsewhere gets 403 `network_not_allowed`.
+   */
+  allowed_ips: string[];
   created_at: string;
-  /** When the key stops working; `null`: never. */
+  /**
+   * When the key stops working. Every new key has one; `null` only for data that was never
+   * upgraded.
+   */
   expires_at?: string | null;
   id: string;
   /**
@@ -3776,14 +3784,20 @@ export type ContentTemplateVariable = {
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
+   * IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be
+   * used from, at most 50. Omit for any address.
+   */
+  allowed_ips?: string[];
+  /**
    * Your current password: a stolen access token alone must not create a key that
    * outlives it. Or confirm with `totp_code` or a passkey (`passkey_ceremony_id` and
    * `passkey_credential`) or a `reauth_token` instead — exactly one of them.
    */
   current_password?: string;
   /**
-   * When the key stops working (RFC 3339, in the future). Omit for a key that does
-   * not expire.
+   * When the key stops working (RFC 3339, in the future, at most
+   * `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest
+   * lifetime: every key expires.
    */
   expires_at?: string | null;
   /**
@@ -9064,6 +9078,11 @@ export type Data_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -9798,6 +9817,19 @@ export type Data_SupportPolicyInForce = {
     defined_at?: string | null;
     /** The unit asked about. */
     org_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportReplyDraft = {
+  /** A draft answer staff review before sending. Never sent by itself. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   };
 };
 
@@ -11976,6 +12008,11 @@ export type Data_Vec_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -12116,6 +12153,18 @@ export type Data_Vec_SupportMacro = {
     /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
     review_due_on?: string | null;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportReplyDraft = {
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   }[];
 };
 
@@ -16569,8 +16618,16 @@ export type Page_AdministrativeUnit = {
 export type Page_ApiKeyResponse = {
   /** The items of this page, in the requested order. */
   data: {
+    /**
+     * IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
+     * from elsewhere gets 403 `network_not_allowed`.
+     */
+    allowed_ips: string[];
     created_at: string;
-    /** When the key stops working; `null`: never. */
+    /**
+     * When the key stops working. Every new key has one; `null` only for data that was never
+     * upgraded.
+     */
     expires_at?: string | null;
     id: string;
     /**
@@ -18956,6 +19013,11 @@ export type Page_RoleResponse = {
      */
     all_permissions: boolean;
     created_at: string;
+    /**
+     * Permissions the role denies, sorted by name; they win over every grant of the user's
+     * other roles.
+     */
+    denies: string[];
     description: string;
     /**
      * The same permissions with their scope in the organization tree. Empty when
@@ -22177,6 +22239,12 @@ export type RoleGrant = {
 
 /** The full content of a role. */
 export type RoleRequest = {
+  /**
+   * Permissions the role denies. A denied permission wins over every grant: no other role of
+   * the user, not even the built-in `admin` role, gives it back. A role either grants or
+   * denies a permission, not both.
+   */
+  denies?: string[];
   /** What the role is for. Optional. */
   description?: string;
   /**
@@ -22216,6 +22284,11 @@ export type RoleResponse = {
    */
   all_permissions: boolean;
   created_at: string;
+  /**
+   * Permissions the role denies, sorted by name; they win over every grant of the user's
+   * other roles.
+   */
+  denies: string[];
   description: string;
   /**
    * The same permissions with their scope in the organization tree. Empty when
@@ -23829,6 +23902,16 @@ export type SupportPolicyInForce = SupportPolicy & {
 
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** A draft answer staff review before sending. Never sent by itself. */
+export type SupportReplyDraft = {
+  /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+  ai_assisted: boolean;
+  body: string;
+  created_at: string;
+  id: string;
+  ticket_id: string;
+};
 
 /** Support figures for tickets created in a period. */
 export type SupportReport = {
@@ -37780,6 +37863,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-drafts": {
+    /** List the drafts of a ticket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-suggestions": {
+    /** Draft an answer with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        502: Problem;
+        503: Problem;
         default: Problem;
       };
     };

@@ -4,6 +4,7 @@
 //! trả lời, theo dõi tới khi xong. Khiếu nại có hạn luật định ở `compliance`, tranh chấp ở
 //! `marketplace`: `support` chỉ chuyển phiếu sang đó, không làm lại. Hướng dẫn: `docs/SUPPORT.md`.
 
+mod ai;
 pub mod api;
 mod config;
 mod entity;
@@ -13,6 +14,7 @@ mod facts;
 mod guest;
 mod hours;
 mod http;
+mod inbound;
 mod intake;
 mod messages;
 mod migration;
@@ -26,6 +28,7 @@ mod sla;
 mod status;
 mod teams;
 mod tickets;
+mod tools;
 
 mod relocation;
 #[cfg(test)]
@@ -113,10 +116,13 @@ impl Module for SupportModule {
             authenticator: context.require::<dyn autoxide_kernel::access::Authenticator>().ok(),
             resources: Some(context.resources()),
             complaints: context.require::<dyn autoxide_compliance::api::ComplaintIntake>().ok(),
+            ai: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
         };
         let service = Arc::new(SupportService::new(parts, config));
         context.personal_data(service.clone())?;
         context.provide::<dyn api::SupportIntake>(service.clone())?;
+        // Email trả lời vào lại phiếu (module nhận thư gọi vào; tắt theo chính sách).
+        context.provide::<dyn api::InboundMail>(service.clone())?;
         // Điểm cắm cho module đăng ký sau (`shipping`, `orders`): nguồn câu trả lời từ dữ liệu (D-230).
         context.provide::<dyn api::SupportFacts>(Arc::new(facts::FactRegistry::default()))?;
         // Phiếu là một loại đối tượng (D-123): vụ việc khiếu nại của `compliance` trỏ tới nó.
@@ -168,6 +174,10 @@ impl Module for SupportModule {
             // Mỗi giờ: đóng phiếu đã xử lý quá số ngày tự đóng (hạn tính theo ngày, một giờ là đủ).
             Schedule::new(sla::AUTO_CLOSE, sla::AUTO_CLOSE, Duration::from_secs(3600)),
         ]
+    }
+
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
     }
 
     fn routes(&self) -> OpenApiRouter {

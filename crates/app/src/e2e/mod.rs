@@ -29,4 +29,5 @@ pub(crate) mod reporting;
 pub(crate) mod restore_drill;
 pub(crate) mod sandbox;
 pub(crate) mod signup;
+pub(crate) mod support;
 pub(crate) mod tenant_move;

@@ -79,6 +79,11 @@ pub(crate) struct ReplaceRoleInput {
     #[serde(default)]
     #[schema(inline)]
     grants: Vec<crate::http::roles::RoleGrant>,
+    /// Permissions the role denies. A denied permission wins over every grant: no other role of
+    /// the user, not even the built-in `admin` role, gives it back. A role either grants or
+    /// denies a permission, not both.
+    #[serde(default)]
+    denies: Vec<String>,
     /// `true`: the role's permissions work only for accounts with two-step sign-in.
     #[serde(default)]
     requires_mfa: bool,
@@ -221,6 +226,7 @@ fn roles(state: &Arc<HttpState>) -> Vec<Tool> {
                             .into_iter()
                             .map(|grant| (grant.permission, grant.scope))
                             .collect(),
+                        denies: input.denies,
                     };
                     let role = state
                         .roles
@@ -453,6 +459,7 @@ mod tests {
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
                 orgs: None,
                 max_hours: 8,
+                catalog: services.roles.catalog().clone(),
             }),
             invitations: Arc::new(crate::invitation::Invitations {
                 users: services.users.clone(),
@@ -489,6 +496,7 @@ mod tests {
                     services.database.clone(),
                 ),
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                catalog: services.roles.catalog().clone(),
             }),
             personal_data: services.personal_data.clone(),
             self_registration: false,

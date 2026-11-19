@@ -311,6 +311,13 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |
+| `support.add_internal_note` | `support.tickets.reply` | writes |
+| `support.get_ticket` | `support.tickets.read` | read-only |
+| `support.link_ticket` | `support.tickets.reply` | writes |
+| `support.list_tickets` | `support.tickets.read` | read-only |
+| `support.reply_ticket` | `support.tickets.reply` | writes |
+| `support.suggest_reply` | `support.tickets.reply` | writes |
+| `support.update_ticket` | `support.tickets.reply` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
 | `webhooks.list_deliveries` | `webhooks.manage` | read-only |

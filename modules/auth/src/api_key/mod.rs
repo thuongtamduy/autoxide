@@ -1,6 +1,7 @@
 //! API key: cách xác thực cho máy và AI agent, không cần đăng nhập bằng mật khẩu.
 
 mod entity;
+mod rules;
 mod service;
 
 pub(crate) use service::{
