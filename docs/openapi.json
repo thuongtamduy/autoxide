@@ -7066,7 +7066,7 @@
             "type": "string"
           },
           "color": {
-            "description": "`blue` or `red`.",
+            "description": "`blue`, `red`, or `none` on a sandbox.",
             "type": "string"
           },
           "domain": {
@@ -7076,7 +7076,7 @@
             "type": "string"
           },
           "kind": {
-            "description": "`sales` or `platform`.",
+            "description": "`sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,\n`link_url` and `image_url` are empty and `snippet` is a \"test copy\" label.",
             "type": "string"
           },
           "link_url": {
@@ -7087,7 +7087,7 @@
             "type": "string"
           },
           "status": {
-            "description": "`notified` (blue logo) or `registered` (red logo).",
+            "description": "`notified` (blue logo), `registered` (red logo) or `sandbox`.",
             "type": "string"
           },
           "website_id": {
@@ -9834,6 +9834,10 @@
               "null"
             ]
           },
+          "sandbox": {
+            "description": "`true` on a sandbox (test copy): the footer should say it is a test copy.",
+            "type": "boolean"
+          },
           "tax_code": {
             "type": [
               "string",
@@ -9849,7 +9853,8 @@
         },
         "required": [
           "entity_type",
-          "legal_name"
+          "legal_name",
+          "sandbox"
         ],
         "type": "object"
       },
@@ -16238,7 +16243,7 @@
                 "type": "string"
               },
               "color": {
-                "description": "`blue` or `red`.",
+                "description": "`blue`, `red`, or `none` on a sandbox.",
                 "type": "string"
               },
               "domain": {
@@ -16248,7 +16253,7 @@
                 "type": "string"
               },
               "kind": {
-                "description": "`sales` or `platform`.",
+                "description": "`sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,\n`link_url` and `image_url` are empty and `snippet` is a \"test copy\" label.",
                 "type": "string"
               },
               "link_url": {
@@ -16259,7 +16264,7 @@
                 "type": "string"
               },
               "status": {
-                "description": "`notified` (blue logo) or `registered` (red logo).",
+                "description": "`notified` (blue logo), `registered` (red logo) or `sandbox`.",
                 "type": "string"
               },
               "website_id": {
@@ -18031,6 +18036,10 @@
                   "null"
                 ]
               },
+              "sandbox": {
+                "description": "`true` on a sandbox (test copy): the footer should say it is a test copy.",
+                "type": "boolean"
+              },
               "tax_code": {
                 "type": [
                   "string",
@@ -18046,7 +18055,8 @@
             },
             "required": [
               "entity_type",
-              "legal_name"
+              "legal_name",
+              "sandbox"
             ],
             "type": "object"
           }
@@ -19142,7 +19152,7 @@
                 ]
               },
               "status": {
-                "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+                "description": "`pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`\n(in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox\nmessage box, not sent).",
                 "example": "succeeded",
                 "type": "string"
               }
@@ -39322,7 +39332,7 @@
             ]
           },
           "status": {
-            "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+            "description": "`pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`\n(in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox\nmessage box, not sent).",
             "example": "succeeded",
             "type": "string"
           }
@@ -44974,7 +44984,7 @@
             ]
           },
           "status": {
-            "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values\nas a delivery's `status`.",
+            "description": "`pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`\n(kept in the sandbox message box) — the same values as a delivery's `status`.",
             "example": "succeeded",
             "type": "string"
           }
@@ -54819,7 +54829,7 @@
                   ]
                 },
                 "status": {
-                  "description": "`pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up).",
+                  "description": "`pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`\n(in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox\nmessage box, not sent).",
                   "example": "succeeded",
                   "type": "string"
                 }
@@ -60770,6 +60780,76 @@
                 "status",
                 "sandbox_of",
                 "products",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_SandboxMessage": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "Something the sandbox would have sent out and kept instead: a partner call (payment, payout,\ne-invoice, identity check), an SMS, a Zalo message, a push notification, a mail to someone who\nis not staff of the tenant, or a webhook to a URL not allowed.",
+              "properties": {
+                "body": {
+                  "description": "Details of the call (amounts, text, payload)."
+                },
+                "channel": {
+                  "description": "`partner`, `sms`, `zns`, `push`, `mail` or `webhook`.",
+                  "example": "mail",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "provider": {
+                  "description": "The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`.",
+                  "type": "string"
+                },
+                "reason": {
+                  "description": "`simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail\nto someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in\nthe tenant setting `kernel.sandbox.webhook_urls`).",
+                  "example": "recipient_not_allowed",
+                  "type": "string"
+                },
+                "recipient": {
+                  "description": "Address, phone number or URL it was meant for.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "subject": {
+                  "description": "Subject or short title.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "channel",
+                "provider",
+                "reason",
+                "body",
                 "created_at"
               ],
               "type": "object"
@@ -70916,6 +70996,59 @@
           }
         ],
         "description": "A new sandbox and the job copying the configuration into it."
+      },
+      "SandboxMessage": {
+        "description": "Something the sandbox would have sent out and kept instead: a partner call (payment, payout,\ne-invoice, identity check), an SMS, a Zalo message, a push notification, a mail to someone who\nis not staff of the tenant, or a webhook to a URL not allowed.",
+        "properties": {
+          "body": {
+            "description": "Details of the call (amounts, text, payload)."
+          },
+          "channel": {
+            "description": "`partner`, `sms`, `zns`, `push`, `mail` or `webhook`.",
+            "example": "mail",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "description": "The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`.",
+            "type": "string"
+          },
+          "reason": {
+            "description": "`simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail\nto someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in\nthe tenant setting `kernel.sandbox.webhook_urls`).",
+            "example": "recipient_not_allowed",
+            "type": "string"
+          },
+          "recipient": {
+            "description": "Address, phone number or URL it was meant for.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "subject": {
+            "description": "Subject or short title.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "channel",
+          "provider",
+          "reason",
+          "body",
+          "created_at"
+        ],
+        "type": "object"
       },
       "SaveSupportMacroRequest": {
         "additionalProperties": false,
@@ -115724,7 +115857,7 @@
     },
     "/api/v1/compliance/public/badge": {
       "get": {
-        "description": "No sign-in (the tenant and website come from the domain, `?domain=` or `?site=`). Only a\nwebsite `notified` / `registered` has a logo; otherwise 404.",
+        "description": "No sign-in (the tenant and website come from the domain, `?domain=` or `?site=`). Only a\nwebsite `notified` / `registered` has a logo; otherwise 404. A sandbox (test copy) never shows\nthe ministry's logo: it gets `kind = \"sandbox\"` and a \"test copy\" label instead.",
         "operationId": "compliance_get_public_compliance_badge",
         "parameters": [
           {
@@ -146909,6 +147042,170 @@
           "kernel"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/kernel/sandbox/messages": {
+      "get": {
+        "description": "Requires `kernel.sandboxes.read`, called inside a sandbox (`Autoxide-Tenant: <sandbox id>`).\nPartners are always simulated in a sandbox: payments succeed, e-invoices get numbers starting\nwith `SANDBOX-`, identity checks pass, and every such call is listed here with SMS, Zalo\nmessages and push notifications. Mail to anyone but staff who may enter the sandbox, and\nwebhooks to URLs not listed in the tenant setting `kernel.sandbox.webhook_urls`, are listed\nhere too instead of being sent. Newest first unless `order=asc`.",
+        "operationId": "kernel_list_sandbox_messages",
+        "parameters": [
+          {
+            "description": "Only this channel: `partner`, `sms`, `zns`, `push`, `mail` or `webhook`.",
+            "in": "query",
+            "name": "channel",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SandboxMessage"
+                }
+              }
+            },
+            "description": "One page of kept messages."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.read`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The current tenant is not a sandbox; code `tenancy.sandbox_only`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List what this sandbox kept instead of sending out.",
+        "tags": [
+          "kernel"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only this channel: `partner`, `sms`, `zns`, `push`, `mail` or `webhook`.",
+            "kind": "string",
+            "name": "channel",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "kernel.list_sandbox_messages",
+        "x-permissions": [
+          "kernel.sandboxes.read"
+        ]
       }
     },
     "/api/v1/kernel/sandboxes/{id}": {
@@ -197438,7 +197735,7 @@
             }
           },
           {
-            "description": "`pending`, `succeeded` or `failed`.",
+            "description": "`pending`, `succeeded`, `failed` or `sandboxed`.",
             "example": "failed",
             "in": "query",
             "name": "status",
@@ -197539,7 +197836,7 @@
             "operator": "eq"
           },
           {
-            "description": "`pending`, `succeeded` or `failed`.",
+            "description": "`pending`, `succeeded`, `failed` or `sandboxed`.",
             "kind": "string",
             "name": "status",
             "operator": "eq"

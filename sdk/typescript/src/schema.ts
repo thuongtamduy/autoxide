@@ -2378,16 +2378,19 @@ export type ComplianceAccountVerification = {
 /** The ministry's logo for a website footer. */
 export type ComplianceBadge = {
   alt: string;
-  /** `blue` or `red`. */
+  /** `blue`, `red`, or `none` on a sandbox. */
   color: string;
   domain: string;
   image_url: string;
-  /** `sales` or `platform`. */
+  /**
+   * `sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,
+   * `link_url` and `image_url` are empty and `snippet` is a "test copy" label.
+   */
   kind: string;
   link_url: string;
   /** Ready-to-insert HTML, rebuilt from the checked addresses. */
   snippet: string;
-  /** `notified` (blue logo) or `registered` (red logo). */
+  /** `notified` (blue logo), `registered` (red logo) or `sandbox`. */
   status: string;
   website_id: string;
 };
@@ -3281,6 +3284,8 @@ export type CompliancePublicOwner = {
   registration_issued_on?: string | null;
   registration_number?: string | null;
   representative_name?: string | null;
+  /** `true` on a sandbox (test copy): the footer should say it is a test copy. */
+  sandbox: boolean;
   tax_code?: string | null;
   trade_name?: string | null;
 };
@@ -5420,16 +5425,19 @@ export type Data_ComplianceBadge = {
   /** The ministry's logo for a website footer. */
   data: {
     alt: string;
-    /** `blue` or `red`. */
+    /** `blue`, `red`, or `none` on a sandbox. */
     color: string;
     domain: string;
     image_url: string;
-    /** `sales` or `platform`. */
+    /**
+     * `sales`, `platform`, or `sandbox` on a sandbox (test copy): then there is no ministry logo,
+     * `link_url` and `image_url` are empty and `snippet` is a "test copy" label.
+     */
     kind: string;
     link_url: string;
     /** Ready-to-insert HTML, rebuilt from the checked addresses. */
     snippet: string;
-    /** `notified` (blue logo) or `registered` (red logo). */
+    /** `notified` (blue logo), `registered` (red logo) or `sandbox`. */
     status: string;
     website_id: string;
   };
@@ -5992,6 +6000,8 @@ export type Data_CompliancePublicOwner = {
     registration_issued_on?: string | null;
     registration_number?: string | null;
     representative_name?: string | null;
+    /** `true` on a sandbox (test copy): the footer should say it is a test copy. */
+    sandbox: boolean;
     tax_code?: string | null;
     trade_name?: string | null;
   };
@@ -6357,7 +6367,11 @@ export type Data_DeliveryResponse = {
     last_error?: string | null;
     /** HTTP status of the last answer; `null` when there was none. */
     response_status?: number | null;
-    /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+    /**
+     * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+     * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+     * message box, not sent).
+     */
     status: string;
   };
 };
@@ -12748,7 +12762,11 @@ export type DeliveryResponse = {
   last_error?: string | null;
   /** HTTP status of the last answer; `null` when there was none. */
   response_status?: number | null;
-  /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+  /**
+   * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+   * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+   * message box, not sent).
+   */
   status: string;
 };
 
@@ -14560,8 +14578,8 @@ export type LastDelivery = {
   /** HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer. */
   response_status?: number | null;
   /**
-   * `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up) — the same values
-   * as a delivery's `status`.
+   * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+   * (kept in the sandbox message box) — the same values as a delivery's `status`.
    */
   status: string;
 };
@@ -17820,7 +17838,11 @@ export type Page_DeliveryResponse = {
     last_error?: string | null;
     /** HTTP status of the last answer; `null` when there was none. */
     response_status?: number | null;
-    /** `pending` (sending or waiting for a retry), `succeeded` or `failed` (gave up). */
+    /**
+     * `pending` (sending or waiting for a retry), `succeeded`, `failed` (gave up) or `sandboxed`
+     * (in a sandbox, to a URL not listed in `kernel.sandbox.webhook_urls`: kept in the sandbox
+     * message box, not sent).
+     */
     status: string;
   }[];
   pagination: Pagination;
@@ -19598,6 +19620,32 @@ export type Page_Sandbox = {
     slug: string;
     /** `provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`. */
     status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_SandboxMessage = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Details of the call (amounts, text, payload). */
+    body: unknown;
+    /** `partner`, `sms`, `zns`, `push`, `mail` or `webhook`. */
+    channel: string;
+    created_at: string;
+    id: string;
+    /** The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`. */
+    provider: string;
+    /**
+     * `simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail
+     * to someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in
+     * the tenant setting `kernel.sandbox.webhook_urls`).
+     */
+    reason: string;
+    /** Address, phone number or URL it was meant for. */
+    recipient?: string | null;
+    /** Subject or short title. */
+    subject?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -22904,6 +22952,32 @@ export type SandboxCreated = Sandbox & {
    * `GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.
    */
   job_id?: string | null;
+};
+
+/**
+ * Something the sandbox would have sent out and kept instead: a partner call (payment, payout,
+ * e-invoice, identity check), an SMS, a Zalo message, a push notification, a mail to someone who
+ * is not staff of the tenant, or a webhook to a URL not allowed.
+ */
+export type SandboxMessage = {
+  /** Details of the call (amounts, text, payload). */
+  body: unknown;
+  /** `partner`, `sms`, `zns`, `push`, `mail` or `webhook`. */
+  channel: string;
+  created_at: string;
+  id: string;
+  /** The partner or operation, e.g. `smtp`, `payment.create`, `einvoice.issue`. */
+  provider: string;
+  /**
+   * `simulated` (partners are always simulated in a sandbox), `recipient_not_allowed` (mail
+   * to someone who cannot enter the sandbox) or `url_not_allowed` (webhook URL not listed in
+   * the tenant setting `kernel.sandbox.webhook_urls`).
+   */
+  reason: string;
+  /** Address, phone number or URL it was meant for. */
+  recipient?: string | null;
+  /** Subject or short title. */
+  subject?: string | null;
 };
 
 /** A saved reply to write. */
@@ -33367,6 +33441,20 @@ export interface paths {
         200: Data_ResolvedView;
         401: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/kernel/sandbox/messages": {
+    /** List what this sandbox kept instead of sending out. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { channel?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SandboxMessage;
+        401: Problem;
+        403: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };

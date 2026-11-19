@@ -7541,6 +7541,58 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Inside a sandbox: list what it kept instead of sending out — simulated partner calls (payments, e-invoices, identity checks), SMS, Zalo and push messages, mail to people who cannot enter the sandbox and webhooks to URLs not allowed. Newest first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which kept messages of the current sandbox to list.",
+        "properties": {
+          "channel": {
+            "description": "Only this channel: `partner`, `sms`, `zns`, `push`, `mail` or `webhook`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "cursor": {
+            "description": "The `next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "order": {
+            "description": "`desc` (newest first, the default) or `asc`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "kernel.list_sandbox_messages",
+      "output_schema": null,
+      "permissions": [
+        "kernel.sandboxes.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List the sandboxes (test copies) of your tenant, newest first.",
       "input_schema": {
         "additionalProperties": false,
@@ -12508,7 +12560,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List webhook deliveries of every endpoint, newest first; filter by `status` (`pending`, `succeeded`, `failed`) or `endpoint_id`.",
+      "description": "List webhook deliveries of every endpoint, newest first; filter by `status` (`pending`, `succeeded`, `failed`, `sandboxed`) or `endpoint_id`.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Which deliveries to list.",
@@ -12538,7 +12590,7 @@
             ]
           },
           "status": {
-            "description": "`pending`, `succeeded` or `failed`.",
+            "description": "`pending`, `succeeded`, `failed` or `sandboxed`.",
             "type": [
               "string",
               "null"

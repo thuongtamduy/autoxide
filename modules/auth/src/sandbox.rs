@@ -7,6 +7,10 @@
 //! - `kernel.sandbox_extended` → dời hạn của uỷ quyền đó;
 //! - `kernel.sandbox_deleted` → thu hồi.
 //!
+//! Công bố `SandboxRecipients` của kernel: mail của sandbox chỉ tới email đã xác minh của nhân viên
+//! khách gốc đang giữ role được uỷ quyền vào sandbox (uỷ quyền còn hiệu lực); người nhận khác vào
+//! hộp thư giả (D-232).
+//!
 //! Nhận lại event không tạo dòng thứ hai (D-054): tìm uỷ quyền còn hiệu lực cho cùng sandbox, cùng
 //! role trước khi ghi. Không sửa `DelegationService::enter`: uỷ quyền vào sandbox là uỷ quyền thường.
 
@@ -14,7 +18,8 @@ use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler, Subscription};
-use autoxide_kernel::tenancy::{ScopeExt, TenantId, root_of};
+use autoxide_kernel::tenancy::sandbox::SandboxRecipients;
+use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, root_of};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -121,5 +126,42 @@ impl EventHandler for SandboxAccess {
             _ => {}
         }
         Ok(())
+    }
+}
+
+/// Ai trong khách gốc nhận được mail thật của sandbox.
+pub(crate) struct StaffRecipients {
+    pub(crate) databases: DatabaseRegistry,
+}
+
+#[async_trait::async_trait]
+impl SandboxRecipients for StaffRecipients {
+    async fn allowed(&self, sandbox: &TenantContext, email: &str) -> Result<bool, Error> {
+        let Some(source_id) = sandbox.sandbox_of() else { return Ok(false) };
+        let source = self.databases.tenant(source_id).await?;
+        let at = now();
+        let roles: Vec<Uuid> = entity::Entity::find()
+            .filter(entity::Column::ChildTenantId.eq(sandbox.id().as_uuid()))
+            .filter(entity::Column::RevokedAt.is_null())
+            .scoped(&source)
+            .all(source.database().read())
+            .await?
+            .into_iter()
+            .filter(|row| row.expires_at.is_none_or(|expires| expires > at))
+            .map(|row| row.role_id)
+            .collect();
+        if roles.is_empty() {
+            return Ok(false);
+        }
+        let user = crate::user::entity::Entity::find()
+            .filter(crate::user::entity::Column::Realm.eq("staff"))
+            .filter(crate::user::entity::Column::Email.eq(autoxide_kernel::email::normalize(email)))
+            .filter(crate::user::entity::Column::EmailVerifiedAt.is_not_null())
+            .filter(crate::user::entity::Column::DisabledAt.is_null())
+            .scoped(&source)
+            .one(source.database().read())
+            .await?;
+        let Some(user) = user else { return Ok(false) };
+        crate::role::holds_any_role(&source, user.id, &roles).await
     }
 }
