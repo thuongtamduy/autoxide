@@ -486,3 +486,4 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-sqlite-optimize](D-20261118-step39-sqlite-optimize.md)** SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18
 - **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
 - **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
+- **[D-20261119-step39-semantic-scan](D-20261119-step39-semantic-scan.md)** Tìm theo ý nghĩa trên dữ liệu lớn: `dot` dùng SIMD, duyệt chia nhiều nhân ngoài thread async — 2026-11-19
