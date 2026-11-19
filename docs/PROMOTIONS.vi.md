@@ -69,6 +69,17 @@ bị dữ liệu và ghi nhận.
 Phần trăm làm tròn nửa lên trên tổng dòng; khoản giảm cấp đơn chia về các dòng theo tiền dòng. Cùng giỏ luôn
 cho cùng kết quả và cùng `fingerprint`.
 
+## Lên kế hoạch
+
+Đều chỉ đọc, permission `promotions.read`:
+
+- `POST /promotions/{id}/simulate` `{"carts": [...]}` (1 tới 20 giỏ, tool MCP `promotions.simulate`): mỗi giỏ tính
+  có chương trình (bản nháp cũng được) và không có, kèm `difference_minor`;
+- `GET /promotions/{id}/conflicts`: chương trình khác của nút, trùng thời gian, chung mục tiêu, cùng lớp, mà một
+  bên độc quyền (chỉ một trong số đó áp cho một dòng);
+- `GET /promotions/calendar?from=&to=&org_id=`: chương trình chạy trong những ngày đó (ngày Việt Nam, tối đa 366);
+- `GET /promotions/{id}/stats?from=&to=`: lượt dùng đã xác nhận, tiền giảm, giá trị đơn và ai trả, theo ngày.
+
 ## Giữ lượt dùng
 
 `Promotions::reserve` tính lại giỏ và giữ, trong một transaction, mọi bộ đếm: lượt của chương trình và của

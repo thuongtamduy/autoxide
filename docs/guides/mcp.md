@@ -311,6 +311,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `promotions.grant_voucher` | `promotions.vouchers.grant` | writes |
 | `promotions.list_promotions` | `promotions.read` | read-only |
 | `promotions.list_vouchers_of_user` | `promotions.read` | read-only |
+| `promotions.simulate` | `promotions.read` | read-only |
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |

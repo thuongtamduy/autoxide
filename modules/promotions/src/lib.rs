@@ -14,6 +14,7 @@ mod entity;
 mod evaluate;
 mod events;
 mod http;
+mod insights;
 mod jobs;
 mod legal;
 mod migration;

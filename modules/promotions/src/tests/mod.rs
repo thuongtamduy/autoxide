@@ -3,6 +3,7 @@
 //! đặt sẵn); gọi qua REST, MCP và `dyn Promotions`.
 
 mod evaluate;
+mod insights;
 mod programs;
 mod redemption;
 mod vouchers;

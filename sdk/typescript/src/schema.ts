@@ -11841,6 +11841,34 @@ export type Data_Vec_PlanResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_PromotionsConflict = {
+  data: {
+    ends_at: string;
+    exclusivity: "none" | "class" | "global";
+    id: string;
+    /** Kind of promotion. */
+    kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+    starts_at: string;
+    status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsDailyStats = {
+  data: {
+    day: string;
+    /** Discount given, in minor units. */
+    discount_minor: number;
+    /** Value of the orders that used it, in minor units. */
+    order_value_minor: number;
+    platform_funded_minor: number;
+    /** Confirmed uses. */
+    redemptions: number;
+    seller_funded_minor: number;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_PromotionsLegalLimit = {
   data: {
     effective_from: string;
@@ -11874,6 +11902,21 @@ export type Data_Vec_PromotionsNoticeRule = {
     note: string;
     notice_required: boolean;
     promotion_kind: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_PromotionsSimulation = {
+  data: {
+    /**
+     * What the promotion adds to the discount of this cart, in minor units (can be negative
+     * when it pushes out a better promotion).
+     */
+    difference_minor: number;
+    /** With the promotion (counted even while it is a draft or paused). */
+    with: PromotionsEvaluation;
+    /** Without it. */
+    without: PromotionsEvaluation;
   }[];
 };
 
@@ -21109,6 +21152,30 @@ export type PromotionsConditionInput = {
 /** Kind of extra condition. */
 export type PromotionsConditionKind = "payment_method" | "carrier" | "ship_to_province" | "membership_tier" | "client" | "brand" | "seller_org" | "attribute" | "new_customer" | "returning_customer" | "min_items" | "exclude_discounted" | "exclude_targets";
 
+/** Another promotion that may clash with this one. */
+export type PromotionsConflict = {
+  ends_at: string;
+  exclusivity: "none" | "class" | "global";
+  id: string;
+  /** Kind of promotion. */
+  kind: "percent_off" | "amount_off" | "fixed_price" | "buy_x_get_y" | "free_shipping" | "flash_sale" | "tiered" | "bundle_price" | "add_on" | "gift_choice";
+  starts_at: string;
+  status: "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
+};
+
+/** Counts of one day (Vietnam date). */
+export type PromotionsDailyStats = {
+  day: string;
+  /** Discount given, in minor units. */
+  discount_minor: number;
+  /** Value of the orders that used it, in minor units. */
+  order_value_minor: number;
+  platform_funded_minor: number;
+  /** Confirmed uses. */
+  redemptions: number;
+  seller_funded_minor: number;
+};
+
 /** Codes and vouchers usable for a cart, those not yet, and the best combination. */
 export type PromotionsEligibility = {
   best_selection: PromotionsSelection;
@@ -21620,6 +21687,25 @@ export type PromotionsShippingDiscount = {
   funding: PromotionsFundingShare[];
   promotion_id: string;
   reason: PromotionsReason;
+};
+
+/** Carts to compute with and without the promotion. */
+export type PromotionsSimulateRequest = {
+  /** 1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate`. */
+  carts: PromotionsCart[];
+};
+
+/** One cart computed with and without the promotion. */
+export type PromotionsSimulation = {
+  /**
+   * What the promotion adds to the discount of this cart, in minor units (can be negative
+   * when it pushes out a better promotion).
+   */
+  difference_minor: number;
+  /** With the promotion (counted even while it is a draft or paused). */
+  with: PromotionsEvaluation;
+  /** Without it. */
+  without: PromotionsEvaluation;
 };
 
 export type PromotionsStatus = "draft" | "scheduled" | "active" | "paused" | "ended" | "cancelled";
@@ -37448,6 +37534,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/calendar": {
+    /** List the promotions running on some days (calendar). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { from: string; to: string; org_id?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PromotionsPromotionListItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}": {
     /** Get a promotion with its rule, texts, targets and counters. */
     get: {
@@ -37569,6 +37668,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/promotions/promotions/{id}/conflicts": {
+    /** List the promotions that may clash with this one. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_PromotionsConflict;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/promotions/promotions/{id}/end": {
     /** End a promotion now. */
     post: {
@@ -37651,6 +37763,35 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/simulate": {
+    /** Try a promotion on sample carts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: PromotionsSimulateRequest;
+      responses: {
+        200: Data_Vec_PromotionsSimulation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/promotions/{id}/stats": {
+    /** Get the daily counts of a promotion. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { from: string; to: string }; };
+      responses: {
+        200: Data_Vec_PromotionsDailyStats;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

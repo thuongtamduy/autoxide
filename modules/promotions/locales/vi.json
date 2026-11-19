@@ -154,5 +154,8 @@
   "text:The automatic sale price of some variants changed (for public product lists).": "Giá sau giảm tự động của một số biến thể đã đổi (cho danh sách sản phẩm công khai).",
   "text:The promotion usage held for an order was confirmed.": "Lượt khuyến mại giữ cho đơn đã được xác nhận.",
   "text:The promotion usage held for an order was given back.": "Lượt khuyến mại giữ cho đơn đã được trả lại.",
-  "text:Turn the promotions in your scope on, pause, resume, end or cancel them; release stuck holds.": "Bật, tạm dừng, chạy lại, kết thúc hay huỷ chương trình trong phạm vi của bạn; gỡ lượt giữ bị kẹt."
+  "text:Turn the promotions in your scope on, pause, resume, end or cancel them; release stuck holds.": "Bật, tạm dừng, chạy lại, kết thúc hay huỷ chương trình trong phạm vi của bạn; gỡ lượt giữ bị kẹt.",
+  "field:must not be after `to`": "không được sau `to`",
+  "field:send 1 to {max} carts": "gửi từ 1 tới {max} giỏ",
+  "field:the range must be at most {max} days": "khoảng ngày dài tối đa {max} ngày"
 }

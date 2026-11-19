@@ -36384,6 +36384,132 @@
         ],
         "type": "object"
       },
+      "Data_Vec_PromotionsConflict": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "Another promotion that may clash with this one.",
+              "properties": {
+                "ends_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "exclusivity": {
+                  "enum": [
+                    "none",
+                    "class",
+                    "global"
+                  ],
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "Kind of promotion.",
+                  "enum": [
+                    "percent_off",
+                    "amount_off",
+                    "fixed_price",
+                    "buy_x_get_y",
+                    "free_shipping",
+                    "flash_sale",
+                    "tiered",
+                    "bundle_price",
+                    "add_on",
+                    "gift_choice"
+                  ],
+                  "type": "string"
+                },
+                "starts_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "status": {
+                  "enum": [
+                    "draft",
+                    "scheduled",
+                    "active",
+                    "paused",
+                    "ended",
+                    "cancelled"
+                  ],
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "status",
+                "exclusivity",
+                "starts_at",
+                "ends_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PromotionsDailyStats": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "Counts of one day (Vietnam date).",
+              "properties": {
+                "day": {
+                  "format": "date",
+                  "type": "string"
+                },
+                "discount_minor": {
+                  "description": "Discount given, in minor units.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "order_value_minor": {
+                  "description": "Value of the orders that used it, in minor units.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "platform_funded_minor": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "redemptions": {
+                  "description": "Confirmed uses.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "seller_funded_minor": {
+                  "format": "int64",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "day",
+                "redemptions",
+                "discount_minor",
+                "order_value_minor",
+                "platform_funded_minor",
+                "seller_funded_minor"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_PromotionsLegalLimit": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -36510,6 +36636,42 @@
                 "effective_from",
                 "legal_basis",
                 "note"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_PromotionsSimulation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "One cart computed with and without the promotion.",
+              "properties": {
+                "difference_minor": {
+                  "description": "What the promotion adds to the discount of this cart, in minor units (can be negative\nwhen it pushes out a better promotion).",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "with": {
+                  "$ref": "#/components/schemas/PromotionsEvaluation",
+                  "description": "With the promotion (counted even while it is a draft or paused)."
+                },
+                "without": {
+                  "$ref": "#/components/schemas/PromotionsEvaluation",
+                  "description": "Without it."
+                }
+              },
+              "required": [
+                "with",
+                "without",
+                "difference_minor"
               ],
               "type": "object"
             },
@@ -65446,6 +65608,108 @@
         ],
         "type": "string"
       },
+      "PromotionsConflict": {
+        "description": "Another promotion that may clash with this one.",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "exclusivity": {
+            "enum": [
+              "none",
+              "class",
+              "global"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Kind of promotion.",
+            "enum": [
+              "percent_off",
+              "amount_off",
+              "fixed_price",
+              "buy_x_get_y",
+              "free_shipping",
+              "flash_sale",
+              "tiered",
+              "bundle_price",
+              "add_on",
+              "gift_choice"
+            ],
+            "type": "string"
+          },
+          "starts_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "draft",
+              "scheduled",
+              "active",
+              "paused",
+              "ended",
+              "cancelled"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "exclusivity",
+          "starts_at",
+          "ends_at"
+        ],
+        "type": "object"
+      },
+      "PromotionsDailyStats": {
+        "description": "Counts of one day (Vietnam date).",
+        "properties": {
+          "day": {
+            "format": "date",
+            "type": "string"
+          },
+          "discount_minor": {
+            "description": "Discount given, in minor units.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "order_value_minor": {
+            "description": "Value of the orders that used it, in minor units.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "platform_funded_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "redemptions": {
+            "description": "Confirmed uses.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "seller_funded_minor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "day",
+          "redemptions",
+          "discount_minor",
+          "order_value_minor",
+          "platform_funded_minor",
+          "seller_funded_minor"
+        ],
+        "type": "object"
+      },
       "PromotionsEligibility": {
         "description": "Codes and vouchers usable for a cart, those not yet, and the best combination.",
         "properties": {
@@ -67313,6 +67577,47 @@
           "amount",
           "reason",
           "funding"
+        ],
+        "type": "object"
+      },
+      "PromotionsSimulateRequest": {
+        "additionalProperties": false,
+        "description": "Carts to compute with and without the promotion.",
+        "properties": {
+          "carts": {
+            "description": "1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate`.",
+            "items": {
+              "$ref": "#/components/schemas/PromotionsCart"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "carts"
+        ],
+        "type": "object"
+      },
+      "PromotionsSimulation": {
+        "description": "One cart computed with and without the promotion.",
+        "properties": {
+          "difference_minor": {
+            "description": "What the promotion adds to the discount of this cart, in minor units (can be negative\nwhen it pushes out a better promotion).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "with": {
+            "$ref": "#/components/schemas/PromotionsEvaluation",
+            "description": "With the promotion (counted even while it is a draft or paused)."
+          },
+          "without": {
+            "$ref": "#/components/schemas/PromotionsEvaluation",
+            "description": "Without it."
+          }
+        },
+        "required": [
+          "with",
+          "without",
+          "difference_minor"
         ],
         "type": "object"
       },
@@ -182523,6 +182828,196 @@
         ]
       }
     },
+    "/api/v1/promotions/promotions/calendar": {
+      "get": {
+        "description": "Requires `promotions.read`. Promotions in your scope whose time overlaps the days, scheduled,\nrunning, paused or ended (not drafts or cancelled ones). Oldest first; follow\n`pagination.next_cursor` for more.",
+        "operationId": "promotions_promotion_calendar",
+        "parameters": [
+          {
+            "description": "First day, `YYYY-MM-DD` (Vietnam date).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day, `YYYY-MM-DD`; at most 366 days after `from`.",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only promotions of this unit.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PromotionsPromotionListItem"
+                }
+              }
+            },
+            "description": "One page of promotions."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`from` is after `to` or the range is longer than 366 days; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the promotions running on some days (calendar).",
+        "tags": [
+          "promotions"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "First day, `YYYY-MM-DD` (Vietnam date).",
+            "kind": "date",
+            "name": "from",
+            "operator": "eq"
+          },
+          {
+            "description": "Last day, `YYYY-MM-DD`; at most 366 days after `from`.",
+            "kind": "date",
+            "name": "to",
+            "operator": "eq"
+          },
+          {
+            "description": "Only promotions of this unit.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "promotions.promotion_calendar",
+        "x-permissions": [
+          "promotions.read"
+        ]
+      }
+    },
     "/api/v1/promotions/promotions/{id}": {
       "delete": {
         "description": "Requires `promotions.write`. Only drafts; end or cancel a promotion that was turned on.",
@@ -183598,6 +184093,100 @@
         ]
       }
     },
+    "/api/v1/promotions/promotions/{id}/conflicts": {
+      "get": {
+        "description": "Requires `promotions.read`. Other promotions of the same unit, at the same time, on shared\ntargets and in the same class, where one side is exclusive: only one of them applies to a\nline. A warning, never a block (`activate` returns it in `warnings`).",
+        "operationId": "promotions_list_promotion_conflicts",
+        "parameters": [
+          {
+            "description": "Id of the promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotionsConflict"
+                }
+              }
+            },
+            "description": "The clashing promotions (empty when none)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion in your scope; code `promotions.not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the promotions that may clash with this one.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.read"
+        ]
+      }
+    },
     "/api/v1/promotions/promotions/{id}/end": {
       "post": {
         "description": "Requires `promotions.publish`. The announced end becomes now; usage held for orders stays valid.",
@@ -184340,6 +184929,257 @@
         ],
         "x-permissions": [
           "promotions.publish"
+        ]
+      }
+    },
+    "/api/v1/promotions/promotions/{id}/simulate": {
+      "post": {
+        "description": "Requires `promotions.read`. Each cart is computed with the promotion (even while it is a\ndraft or paused) and without it. Nothing is written or held.",
+        "operationId": "promotions_simulate_promotion",
+        "parameters": [
+          {
+            "description": "Id of the promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PromotionsSimulateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotionsSimulation"
+                }
+              }
+            },
+            "description": "One result per cart, in the order sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion in your scope; code `promotions.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No cart or more than 20, or a cart is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Try a promotion on sample carts.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.read"
+        ]
+      }
+    },
+    "/api/v1/promotions/promotions/{id}/stats": {
+      "get": {
+        "description": "Requires `promotions.read`. Confirmed uses, discount given, order value and who paid, per\nVietnam date; days without use are left out. Counts only, no buyer data.",
+        "operationId": "promotions_get_promotion_stats",
+        "parameters": [
+          {
+            "description": "Id of the promotion.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "First day, `YYYY-MM-DD`.",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Last day, `YYYY-MM-DD`; at most 366 days after `from`.",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_PromotionsDailyStats"
+                }
+              }
+            },
+            "description": "The counts, oldest day first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such promotion in your scope; code `promotions.not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`from` is after `to` or the range is longer than 366 days; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the daily counts of a promotion.",
+        "tags": [
+          "promotions"
+        ],
+        "x-permissions": [
+          "promotions.read"
         ]
       }
     },

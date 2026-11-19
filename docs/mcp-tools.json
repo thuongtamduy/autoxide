@@ -11935,6 +11935,44 @@
         "returns_secret": false
       },
       "deprecation": null,
+      "description": "Try a promotion on sample carts: each cart computed with it (even as a draft) and without it, and what it adds to the discount. Nothing is written or held.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Sample carts to try a promotion on.",
+        "properties": {
+          "carts": {
+            "description": "1 to 20 carts, each as the body of `POST /api/v1/promotions/evaluate` (`PromotionsCart`).",
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "id": {
+            "description": "Id of the promotion (a draft works too).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "carts"
+        ],
+        "type": "object"
+      },
+      "name": "promotions.simulate",
+      "output_schema": null,
+      "permissions": [
+        "promotions.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
       "description": "List report facts (newest first) with the same visibility as `reporting.summary`; follow `pagination.next_cursor` for more.",
       "input_schema": {
         "additionalProperties": false,

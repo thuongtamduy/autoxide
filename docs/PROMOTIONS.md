@@ -71,6 +71,17 @@ recorded. People submit the notice to the authority; Autoxide only prepares the 
 Percentages are rounded half up on the line total; order discounts are shared to lines in proportion
 to their amounts. The same cart always gives the same result and `fingerprint`.
 
+## Planning
+
+All read-only, permission `promotions.read`:
+
+- `POST /promotions/{id}/simulate` `{"carts": [...]}` (1 to 20 carts, MCP tool `promotions.simulate`): each cart
+  computed with the promotion (a draft works too) and without it, and `difference_minor`;
+- `GET /promotions/{id}/conflicts`: other promotions of the unit at the same time, on shared targets and in the
+  same class, where one side is exclusive (only one of them applies to a line);
+- `GET /promotions/calendar?from=&to=&org_id=`: promotions running on those days (Vietnam dates, up to 366);
+- `GET /promotions/{id}/stats?from=&to=`: confirmed uses, discount, order value and who paid, per day.
+
 ## Holding usage
 
 `Promotions::reserve` recomputes the cart and holds, in one transaction, every counter: uses of the
