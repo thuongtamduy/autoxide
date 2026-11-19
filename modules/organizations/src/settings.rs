@@ -58,7 +58,10 @@ pub(crate) const LANGUAGES: OrgSetting = OrgSetting::new(
 .checked(languages);
 
 pub(crate) fn all() -> Vec<OrgSetting> {
-    vec![TIMEZONE, CURRENCY, LANGUAGE, LANGUAGES]
+    let mut all = vec![TIMEZONE, CURRENCY, LANGUAGE, LANGUAGES];
+    // Thương hiệu của website (bước 55): kế thừa theo cây như mọi cài đặt.
+    all.extend(crate::storefront::settings());
+    all
 }
 
 fn languages(value: &Value) -> Result<Value, String> {

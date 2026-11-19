@@ -334,6 +334,17 @@ const { data } = await res.json();
 for (const p of data.placements) render(p.key, p.display, p.display_settings, p.banners);
 ```
 
+### Thông tin cửa hàng (đầu và chân trang)
+
+`GET /api/v1/organizations/public/storefront` (công khai; website theo `site` hay tên miền) trả **thương hiệu** —
+tên, logo và biểu tượng trang (ID ảnh công khai của media: `/api/v1/media/{id}/content`), điện thoại, email, mạng
+xã hội — kế thừa theo cây tổ chức (chuỗi đặt, cửa hàng ghi đè phần muốn đổi), **địa điểm** (địa chỉ, giờ mở cửa,
+ngày đặc biệt, nhận hàng tại quầy, ảnh bìa trong hồ sơ công khai của nút), múi giờ của nút và `open_now`. Quản lý
+thương hiệu bằng cài đặt của nút `organizations.brand_name`, `organizations.brand_logo`,
+`organizations.brand_icon`, `organizations.contact_phone`, `organizations.contact_email`,
+`organizations.social_links` (`PUT /api/v1/organizations/units/{id}/settings/{key}`). Chân trang pháp lý của
+cửa hàng ở Việt Nam hiện thêm `GET /api/v1/compliance/public/owner` và logo của `GET /api/v1/compliance/public/badge`.
+
 ### Tool MCP
 
 `content.list_banners`, `content.save_banner` (chỉ bản nháp: người dùng bật banner `active`; chữ từ

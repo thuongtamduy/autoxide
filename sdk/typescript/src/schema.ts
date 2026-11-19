@@ -899,6 +899,22 @@ export type BounceRequest = {
   type: BounceKind;
 };
 
+/** The brand of a website, inherited down the organization tree. */
+export type BrandResponse = {
+  email?: string | null;
+  /** Site icon (favicon): a public media item. */
+  icon_media_id?: string | null;
+  /** Logo: a public media item; load it from `/api/v1/media/{id}/content`. */
+  logo_media_id?: string | null;
+  /** Brand name (setting `organizations.brand_name`, else the unit's display name). */
+  name: string;
+  phone?: string | null;
+  social_links: {
+    network: string;
+    url: string;
+  }[];
+};
+
 /** What a bulk request would act on. */
 export type BulkPreview = {
   count: number;
@@ -10427,6 +10443,23 @@ export type Data_StartResponse = {
     authorization_url: string;
     /** Seconds left to finish; after that, start again. */
     expires_in: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_StorefrontResponse = {
+  /** What a website shows about its store: the brand and the location. */
+  data: {
+    brand: BrandResponse;
+    /** The unit's public profile: address, opening hours, special days, pickup, cover picture. */
+    location: PublicProfileResponse;
+    /**
+     * Open right now, in the unit's time zone (special days first); `null` when no opening
+     * hours are set.
+     */
+    open_now?: boolean | null;
+    /** IANA time zone of the unit; opening hours are local times in it. */
+    timezone: string;
   };
 };
 
@@ -25894,6 +25927,20 @@ export type StepLog = {
   status: string;
 };
 
+/** What a website shows about its store: the brand and the location. */
+export type StorefrontResponse = {
+  brand: BrandResponse;
+  /** The unit's public profile: address, opening hours, special days, pickup, cover picture. */
+  location: PublicProfileResponse;
+  /**
+   * Open right now, in the unit's time zone (special days first); `null` when no opening
+   * hours are set.
+   */
+  open_now?: boolean | null;
+  /** IANA time zone of the unit; opening hours are local times in it. */
+  timezone: string;
+};
+
 /** Submissions of a form by status. */
 export type SubmissionCounts = {
   archived: number;
@@ -38945,6 +38992,18 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
       responses: {
         200: Data_PublicProfileResponse;
+        400: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/organizations/public/storefront": {
+    /** Get the store information of a website (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { site?: string }; };
+      responses: {
+        200: Data_StorefrontResponse;
         400: Problem;
         404: Problem;
         default: Problem;

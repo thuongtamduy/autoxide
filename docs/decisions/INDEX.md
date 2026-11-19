@@ -275,6 +275,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step38-sandbox](D-20261118-step38-sandbox.md)** Khách thử nghiệm, phần nền: cột của `kernel_tenants`, cùng placement, hạn mức mặc định 1, uỷ quyền vào bằng event — 2026-11-18
 - **[D-20261119-step38-sandbox-copy](D-20261119-step38-sandbox-copy.md)** Sandbox: sao cấu hình bằng `Module::sandbox_copy`, đẩy về thành bản nháp bằng `Module::promotable`, bảng nối của kernel — 2026-11-19
 - **[D-20261119-step38-sandbox-isolation](D-20261119-step38-sandbox-isolation.md)** Sandbox cách ly: kernel bọc hợp đồng đối tác lúc công bố, hộp thư giả `kernel_sandbox_messages` — 2026-11-19
+- **[D-20261119-step55-store-info](D-20261119-step55-store-info.md)** Bước 55: thông tin cửa hàng công khai — cài đặt `organizations.brand_*`, endpoint `/public/storefront` — 2026-11-19
 
 ## Hợp đồng cho giao diện
 
