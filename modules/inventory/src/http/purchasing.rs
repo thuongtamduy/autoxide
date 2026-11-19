@@ -114,7 +114,7 @@ pub(crate) struct SupplierRequest {
     pub code: String,
     /// Up to 200 characters.
     pub name: String,
-    /// Tax code (mã số thuế), up to 20 characters.
+    /// Tax registration number, up to 20 characters.
     pub tax_code: Option<String>,
     pub contact_name: Option<String>,
     pub phone: Option<String>,
