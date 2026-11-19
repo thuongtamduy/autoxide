@@ -2668,6 +2668,34 @@
         },
         "type": "object"
       },
+      "CallbackHoursRange": {
+        "additionalProperties": false,
+        "description": "A range of call-back hours, in the local time of the line.",
+        "properties": {
+          "day": {
+            "description": "Day of the week, 1 (Monday) to 7 (Sunday).",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "from": {
+            "description": "Opening time, `HH:MM`.",
+            "example": "08:00",
+            "type": "string"
+          },
+          "to": {
+            "description": "Closing time, `HH:MM`, after `from`.",
+            "example": "20:00",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day",
+          "from",
+          "to"
+        ],
+        "type": "object"
+      },
       "CallbackRequest": {
         "additionalProperties": false,
         "description": "What the provider sent back to `redirect_uri`.",
@@ -12046,6 +12074,23 @@
         ],
         "type": "object"
       },
+      "ConversationAgentSession": {
+        "description": "A WebRTC session for an agent.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "expires_at"
+        ],
+        "type": "object"
+      },
       "ConversationBlock": {
         "description": "Whether the customer of a conversation is blocked.",
         "properties": {
@@ -12055,6 +12100,161 @@
         },
         "required": [
           "blocked"
+        ],
+        "type": "object"
+      },
+      "ConversationCall": {
+        "description": "A call. Phone numbers are never included.",
+        "properties": {
+          "agent_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "answered_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "callback_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "direction": {
+            "description": "`inbound` (the customer called) or `outbound` (the shop called back).",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "ended_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "recorded": {
+            "description": "A recording is stored; listen at `GET /calls/{id}/recording`.",
+            "type": "boolean"
+          },
+          "recording_enabled": {
+            "type": "boolean"
+          },
+          "recording_expires_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`.",
+            "type": "string"
+          },
+          "thread_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "thread_id",
+          "direction",
+          "status",
+          "recording_enabled",
+          "recorded",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ConversationCallback": {
+        "description": "A call-back request. The phone number is masked (`090•••567`).",
+        "properties": {
+          "assigned_user_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "attempts": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "client_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_call_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "phone_masked": {
+            "example": "+84•••567",
+            "type": "string"
+          },
+          "status": {
+            "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+            "type": "string"
+          },
+          "thread_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "window_end": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "window_start": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "thread_id",
+          "client_id",
+          "phone_masked",
+          "window_start",
+          "window_end",
+          "status",
+          "attempts",
+          "created_at"
         ],
         "type": "object"
       },
@@ -12278,6 +12478,122 @@
           "reason",
           "status",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "ConversationVoiceInfo": {
+        "description": "What the customer sees before calling.",
+        "properties": {
+          "available": {
+            "description": "The shop takes calls; otherwise hide every call button.",
+            "type": "boolean"
+          },
+          "browser_calls": {
+            "description": "Calling from the browser or app works.",
+            "type": "boolean"
+          },
+          "callback_hours": {
+            "description": "When the shop calls back (local time of the shop).",
+            "items": {
+              "$ref": "#/components/schemas/CallbackHoursRange"
+            },
+            "type": "array"
+          },
+          "callbacks": {
+            "description": "\"Call me back\" works.",
+            "type": "boolean"
+          },
+          "recording": {
+            "description": "Calls are recorded: show `recording_notice` and send `recording_ack: true`.",
+            "type": "boolean"
+          },
+          "recording_notice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "utc_offset_minutes": {
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "browser_calls",
+          "callbacks",
+          "recording",
+          "callback_hours"
+        ],
+        "type": "object"
+      },
+      "ConversationVoiceLine": {
+        "description": "The phone line of a unit.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "callback_hours": {
+            "items": {
+              "$ref": "#/components/schemas/CallbackHoursRange"
+            },
+            "type": "array"
+          },
+          "hotline": {
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "recording_enabled": {
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "utc_offset_minutes": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "webhook_path": {
+            "description": "Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a\nnew token was made — keep it, it is not shown again.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "org_id",
+          "provider",
+          "hotline",
+          "recording_enabled",
+          "callback_hours",
+          "utc_offset_minutes",
+          "active",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ConversationVoiceWebhookReceipt": {
+        "description": "How many notifications were stored.",
+        "properties": {
+          "stored": {
+            "description": "New notifications stored (repeats are not counted).",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "stored"
         ],
         "type": "object"
       },
@@ -20269,6 +20585,32 @@
         ],
         "type": "object"
       },
+      "Data_ConversationAgentSession": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A WebRTC session for an agent.",
+            "properties": {
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "token": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "token",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_ConversationBlock": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -20281,6 +20623,179 @@
             },
             "required": [
               "blocked"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConversationCall": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A call. Phone numbers are never included.",
+            "properties": {
+              "agent_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "answered_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "callback_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "direction": {
+                "description": "`inbound` (the customer called) or `outbound` (the shop called back).",
+                "type": "string"
+              },
+              "duration_seconds": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "ended_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "recorded": {
+                "description": "A recording is stored; listen at `GET /calls/{id}/recording`.",
+                "type": "boolean"
+              },
+              "recording_enabled": {
+                "type": "boolean"
+              },
+              "recording_expires_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`.",
+                "type": "string"
+              },
+              "thread_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "thread_id",
+              "direction",
+              "status",
+              "recording_enabled",
+              "recorded",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConversationCallback": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A call-back request. The phone number is masked (`090•••567`).",
+            "properties": {
+              "assigned_user_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "attempts": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "client_id": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "last_call_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "phone_masked": {
+                "example": "+84•••567",
+                "type": "string"
+              },
+              "status": {
+                "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+                "type": "string"
+              },
+              "thread_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "window_end": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "window_start": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "thread_id",
+              "client_id",
+              "phone_masked",
+              "window_start",
+              "window_end",
+              "status",
+              "attempts",
+              "created_at"
             ],
             "type": "object"
           }
@@ -20490,6 +21005,149 @@
               "reason",
               "status",
               "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConversationVoiceInfo": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What the customer sees before calling.",
+            "properties": {
+              "available": {
+                "description": "The shop takes calls; otherwise hide every call button.",
+                "type": "boolean"
+              },
+              "browser_calls": {
+                "description": "Calling from the browser or app works.",
+                "type": "boolean"
+              },
+              "callback_hours": {
+                "description": "When the shop calls back (local time of the shop).",
+                "items": {
+                  "$ref": "#/components/schemas/CallbackHoursRange"
+                },
+                "type": "array"
+              },
+              "callbacks": {
+                "description": "\"Call me back\" works.",
+                "type": "boolean"
+              },
+              "recording": {
+                "description": "Calls are recorded: show `recording_notice` and send `recording_ack: true`.",
+                "type": "boolean"
+              },
+              "recording_notice": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "utc_offset_minutes": {
+                "format": "int32",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "available",
+              "browser_calls",
+              "callbacks",
+              "recording",
+              "callback_hours"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConversationVoiceLine": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The phone line of a unit.",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "callback_hours": {
+                "items": {
+                  "$ref": "#/components/schemas/CallbackHoursRange"
+                },
+                "type": "array"
+              },
+              "hotline": {
+                "type": "string"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "provider": {
+                "type": "string"
+              },
+              "recording_enabled": {
+                "type": "boolean"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "utc_offset_minutes": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "webhook_path": {
+                "description": "Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a\nnew token was made — keep it, it is not shown again.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "org_id",
+              "provider",
+              "hotline",
+              "recording_enabled",
+              "callback_hours",
+              "utc_offset_minutes",
+              "active",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_ConversationVoiceWebhookReceipt": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How many notifications were stored.",
+            "properties": {
+              "stored": {
+                "description": "New notifications stored (repeats are not counted).",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "stored"
             ],
             "type": "object"
           }
@@ -32539,6 +33197,37 @@
         ],
         "type": "object"
       },
+      "Data_StartedConversationCall": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A call just started from the browser, with the token for the provider's WebRTC SDK.",
+            "properties": {
+              "call": {
+                "$ref": "#/components/schemas/ConversationCall"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "token": {
+                "description": "Short-lived token for the voice provider's SDK; do not store it.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "call",
+              "token",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_StorefrontResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -37511,6 +38200,102 @@
                 "marketplace",
                 "needs_legal_review",
                 "variables"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ConversationCall": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A call. Phone numbers are never included.",
+              "properties": {
+                "agent_user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "answered_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "callback_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "direction": {
+                  "description": "`inbound` (the customer called) or `outbound` (the shop called back).",
+                  "type": "string"
+                },
+                "duration_seconds": {
+                  "format": "int32",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "ended_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "recorded": {
+                  "description": "A recording is stored; listen at `GET /calls/{id}/recording`.",
+                  "type": "boolean"
+                },
+                "recording_enabled": {
+                  "type": "boolean"
+                },
+                "recording_expires_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`.",
+                  "type": "string"
+                },
+                "thread_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "thread_id",
+                "direction",
+                "status",
+                "recording_enabled",
+                "recorded",
+                "created_at"
               ],
               "type": "object"
             },
@@ -59983,6 +60768,94 @@
         ],
         "type": "object"
       },
+      "Page_ConversationCallback": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A call-back request. The phone number is masked (`090•••567`).",
+              "properties": {
+                "assigned_user_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attempts": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "client_id": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "last_call_id": {
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "phone_masked": {
+                  "example": "+84•••567",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+                  "type": "string"
+                },
+                "thread_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "window_end": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "window_start": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "thread_id",
+                "client_id",
+                "phone_masked",
+                "window_start",
+                "window_end",
+                "status",
+                "attempts",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ConversationMessage": {
         "description": "One page of a list.",
         "properties": {
@@ -77656,6 +78529,42 @@
         ],
         "type": "object"
       },
+      "RequestConversationCallbackRequest": {
+        "additionalProperties": false,
+        "description": "When to call the customer back.",
+        "properties": {
+          "client_id": {
+            "description": "An id your app makes up (1 to 100 characters): sending again returns the same request.",
+            "type": "string"
+          },
+          "phone_source": {
+            "description": "`account`: the verified phone number of your account.",
+            "example": "account",
+            "type": "string"
+          },
+          "recording_ack": {
+            "description": "Required (`true`) when calls are recorded.",
+            "type": "boolean"
+          },
+          "window_end": {
+            "description": "End of the window, the same day.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "window_start": {
+            "description": "Start of the window, within the shop's call-back hours.",
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "client_id",
+          "window_start",
+          "window_end",
+          "phone_source"
+        ],
+        "type": "object"
+      },
       "RequestOrderShipmentRequest": {
         "additionalProperties": false,
         "description": "A shipment to request.",
@@ -79101,6 +80010,54 @@
           "started_at",
           "last_active_at",
           "expires_at"
+        ],
+        "type": "object"
+      },
+      "SetConversationVoiceLineRequest": {
+        "additionalProperties": false,
+        "description": "The phone line of a unit.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "callback_hours": {
+            "description": "Call-back hours (default 08:00–20:00 every day).",
+            "items": {
+              "$ref": "#/components/schemas/CallbackHoursRange"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "hotline": {
+            "description": "Public number of the shop; customers see it when called back.",
+            "type": "string"
+          },
+          "provider": {
+            "description": "A voice provider installed on this server (`provider()` of its connector, e.g. `stringee`).",
+            "type": "string"
+          },
+          "recording_enabled": {
+            "description": "Record calls (off by default). Only when the provider plays a recording notice.",
+            "type": "boolean"
+          },
+          "rotate_token": {
+            "description": "Make a new webhook token (the old one stops working).",
+            "type": "boolean"
+          },
+          "utc_offset_minutes": {
+            "description": "Minutes from UTC of the hours (default 420, Vietnam).",
+            "format": "int32",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "provider",
+          "hotline"
         ],
         "type": "object"
       },
@@ -81985,6 +82942,17 @@
         ],
         "type": "object"
       },
+      "StartConversationCallRequest": {
+        "additionalProperties": false,
+        "description": "Confirmation that the customer knows the call is recorded.",
+        "properties": {
+          "recording_ack": {
+            "description": "Required (`true`) when `GET …/voice` says `recording`.",
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "StartConversationRequest": {
         "additionalProperties": false,
         "description": "The first message of a conversation.",
@@ -82207,6 +83175,28 @@
         "required": [
           "thread",
           "message"
+        ],
+        "type": "object"
+      },
+      "StartedConversationCall": {
+        "description": "A call just started from the browser, with the token for the provider's WebRTC SDK.",
+        "properties": {
+          "call": {
+            "$ref": "#/components/schemas/ConversationCall"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "token": {
+            "description": "Short-lived token for the voice provider's SDK; do not store it.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "call",
+          "token",
+          "expires_at"
         ],
         "type": "object"
       },
@@ -139322,6 +140312,661 @@
         ]
       }
     },
+    "/api/v1/conversations/callbacks": {
+      "get": {
+        "description": "Requires `conversations.call`. Phone numbers are masked. Newest first unless `order=asc`.",
+        "operationId": "conversations_list_conversation_callbacks",
+        "parameters": [
+          {
+            "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only requests of this unit.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only windows ending at or after this time.",
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only windows starting at or before this time.",
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ConversationCallback"
+                }
+              }
+            },
+            "description": "One page of requests."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.call`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List call-back requests in your scope.",
+        "tags": [
+          "conversations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`open`, `calling`, `done`, `cancelled` or `expired`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only requests of this unit.",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "description": "Only windows ending at or after this time.",
+            "kind": "date-time",
+            "name": "from",
+            "operator": "eq"
+          },
+          {
+            "description": "Only windows starting at or before this time.",
+            "kind": "date-time",
+            "name": "to",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "conversations.list_conversation_callbacks",
+        "x-permissions": [
+          "conversations.call"
+        ]
+      }
+    },
+    "/api/v1/conversations/callbacks/{id}/call": {
+      "post": {
+        "description": "Requires `conversations.call` at the unit of the request, and an `Idempotency-Key` header. The\ncustomer sees the shop's hotline; the agent answers on their WebRTC session. Two agents pressing\nat once make one call; the other gets `conversations.callback_taken`.",
+        "operationId": "conversations_call_conversation_callback",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Required: a key you make up; sending again returns the same call.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCall"
+                }
+              }
+            },
+            "description": "Calling.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.call`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request in your scope (`conversations.callback_not_found`), or the unit takes no calls (`conversations.voice_unavailable`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another agent is calling; code `conversations.callback_taken`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The voice provider is not answering; the request is open again. Code `voice.provider_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Call a customer back.",
+        "tags": [
+          "conversations"
+        ],
+        "x-idempotency": "required",
+        "x-permissions": [
+          "conversations.call"
+        ]
+      }
+    },
+    "/api/v1/conversations/callbacks/{id}/close": {
+      "post": {
+        "description": "Requires `conversations.call`. Use it when the customer was reached another way.",
+        "operationId": "conversations_close_conversation_callback",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCallback"
+                }
+              }
+            },
+            "description": "Closed (or already finished)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.call`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such request in your scope; code `conversations.callback_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "An agent is calling now; code `conversations.callback_taken`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Close a call-back request.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.call"
+        ]
+      }
+    },
+    "/api/v1/conversations/calls/{id}/recording": {
+      "delete": {
+        "description": "Requires `conversations.voice.manage` at the unit of the call — for example when the customer\nasks. Deleting again changes nothing.",
+        "operationId": "conversations_delete_conversation_call_recording",
+        "parameters": [
+          {
+            "description": "Id of the call.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCall"
+                }
+              }
+            },
+            "description": "Deleted; the call stays."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.voice.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such call in your scope; code `conversations.call_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a call recording.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.voice.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `conversations.recordings.read` at the unit of the call. Every listen is recorded\n(event `conversations.recording_opened`).",
+        "operationId": "conversations_get_conversation_call_recording",
+        "parameters": [
+          {
+            "description": "Id of the call.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "items": {
+                    "format": "int32",
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "The recording, as audio."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.recordings.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such call in your scope (`conversations.call_not_found`) or no recording (`conversations.recording_not_found`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Listen to a call recording.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.recordings.read"
+        ]
+      }
+    },
     "/api/v1/conversations/me/threads": {
       "get": {
         "description": "Any signed-in account. Latest activity first unless `order=asc`.",
@@ -139676,6 +141321,457 @@
           }
         ],
         "summary": "Get one of your conversations.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/conversations/me/threads/{id}/callbacks": {
+      "post": {
+        "description": "Any signed-in account with a verified phone number. One open request per conversation; sending\nagain with the same `client_id` returns it (200). The full number is never shown to staff.",
+        "operationId": "conversations_request_my_conversation_callback",
+        "parameters": [
+          {
+            "description": "Id of the conversation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestConversationCallbackRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCallback"
+                }
+              }
+            },
+            "description": "A request with this `client_id` exists; this is it."
+          },
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCallback"
+                }
+              }
+            },
+            "description": "Requested.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Your account has no verified phone number; code `conversations.phone_unverified`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such conversation (`conversations.thread_not_found`), or the shop takes no calls (`conversations.voice_unavailable`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You already have an open request (`conversations.callback_pending`), or the conversation is closed (`conversations.thread_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The window is outside the call-back hours (`conversations.callback_window_invalid`), `recording_ack` is missing (`conversations.recording_notice_required`), or a value is invalid (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many calls today; code `conversations.calls_too_many`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Ask the shop to call you back.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/conversations/me/threads/{id}/callbacks/{callback_id}": {
+      "delete": {
+        "description": "Any signed-in account. A request the shop is calling right now cannot be cancelled.",
+        "operationId": "conversations_cancel_my_conversation_callback",
+        "parameters": [
+          {
+            "description": "Id of the conversation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "callback_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationCallback"
+                }
+              }
+            },
+            "description": "Cancelled (or already finished)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such conversation or request of yours; code `conversations.thread_not_found` or `conversations.callback_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The shop is calling you now; code `conversations.callback_taken`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Cancel your call-back request.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/conversations/me/threads/{id}/calls": {
+      "post": {
+        "description": "Any signed-in account, on one of your conversations. Returns a short-lived token for the voice\nprovider's WebRTC SDK; the call goes to the shop's hotline and shows in the conversation when it\nends. Counts towards `AUTOXIDE_CONVERSATIONS_CALLS_PER_DAY`.",
+        "operationId": "conversations_start_my_conversation_call",
+        "parameters": [
+          {
+            "description": "Id of the conversation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConversationCallRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_StartedConversationCall"
+                }
+              }
+            },
+            "description": "Call started.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The shop blocked you (`conversations.blocked`) or asks for a verified account (`conversations.verification_required`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such conversation (`conversations.thread_not_found`), or the shop takes no calls (`conversations.voice_unavailable`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The conversation is closed; code `conversations.thread_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The call is recorded and `recording_ack` is missing; code `conversations.recording_notice_required`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many calls today; code `conversations.calls_too_many`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The voice provider is not answering; code `voice.provider_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Call the shop from the browser.",
         "tags": [
           "conversations"
         ],
@@ -140711,6 +142807,98 @@
         "x-permissions": []
       }
     },
+    "/api/v1/conversations/me/threads/{id}/voice": {
+      "get": {
+        "description": "Any signed-in account, on one of your conversations. When `available` is false, hide every call\nbutton.",
+        "operationId": "conversations_get_my_conversation_voice",
+        "parameters": [
+          {
+            "description": "Id of the conversation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationVoiceInfo"
+                }
+              }
+            },
+            "description": "Call options of the shop."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You have no conversation with this id; code `conversations.thread_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get what is needed before calling the shop.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/conversations/reports": {
       "get": {
         "description": "Requires `conversations.manage`. Newest first unless `order=asc`.",
@@ -141653,6 +143841,100 @@
         ],
         "x-permissions": [
           "conversations.manage"
+        ]
+      }
+    },
+    "/api/v1/conversations/threads/{id}/calls": {
+      "get": {
+        "description": "Requires `conversations.call` at the unit of the conversation. Newest first; no phone numbers.",
+        "operationId": "conversations_list_conversation_calls",
+        "parameters": [
+          {
+            "description": "Id of the conversation.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ConversationCall"
+                }
+              }
+            },
+            "description": "The calls."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.call`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No conversation with this id in your scope; code `conversations.thread_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the calls of a conversation.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.call"
         ]
       }
     },
@@ -142826,6 +145108,451 @@
         "x-permissions": [
           "conversations.read"
         ]
+      }
+    },
+    "/api/v1/conversations/voice/agent-session": {
+      "get": {
+        "description": "Requires `conversations.call` at the unit. Returns a short-lived token for the voice provider's\nSDK; calls to the hotline ring on it.",
+        "operationId": "conversations_get_conversation_agent_session",
+        "parameters": [
+          {
+            "description": "Unit of the phone line; omitted: the shop (root unit).",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationAgentSession"
+                }
+              }
+            },
+            "description": "The session."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.call` there; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit takes no calls; code `conversations.voice_unavailable`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The voice provider is not answering; code `voice.provider_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a WebRTC session to answer calls.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.call"
+        ]
+      }
+    },
+    "/api/v1/conversations/voice/lines/{org_id}": {
+      "get": {
+        "description": "Requires `conversations.voice.manage` at the unit.",
+        "operationId": "conversations_get_conversation_voice_line",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationVoiceLine"
+                }
+              }
+            },
+            "description": "The line."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.voice.manage` there; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit has no line; code `conversations.voice_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the phone line of a unit.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.voice.manage"
+        ]
+      },
+      "put": {
+        "description": "Requires `conversations.voice.manage` at the unit. The first time (and with `rotate_token`) the\nresponse carries `webhook_path` to give the voice provider — it is not shown again.",
+        "operationId": "conversations_set_conversation_voice_line",
+        "parameters": [
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetConversationVoiceLineRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationVoiceLine"
+                }
+              }
+            },
+            "description": "The line."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `conversations.voice.manage` there; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`), or recording cannot be switched on with this provider (`conversations.recording_unsupported`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set the phone line of a unit.",
+        "tags": [
+          "conversations"
+        ],
+        "x-permissions": [
+          "conversations.voice.manage"
+        ]
+      }
+    },
+    "/api/v1/conversations/voice/webhooks/{provider}/{line_token}": {
+      "post": {
+        "description": "Public: the provider calls the `webhook_path` given when the line was set up. The signature is\nchecked on the raw body; a wrong signature stores nothing. Repeated or late notifications are\napplied once and never move a call backwards.",
+        "operationId": "conversations_receive_conversation_voice_webhook",
+        "parameters": [
+          {
+            "description": "Name of the voice provider.",
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Token of the phone line (from `webhook_path`).",
+            "in": "path",
+            "name": "line_token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "description": "Body as the provider sends it.",
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ConversationVoiceWebhookReceipt"
+                }
+              }
+            },
+            "description": "Stored; applied shortly."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The signature is not valid; nothing was stored. Code `voice.signature_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No line of this provider has this token; code `conversations.voice_unavailable`."
+          },
+          "413": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is larger than `AUTOXIDE_CONVERSATIONS_VOICE_WEBHOOK_MAX_BYTES`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Receive a call status notification from the voice provider.",
+        "tags": [
+          "conversations"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/files": {
