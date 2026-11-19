@@ -305,6 +305,7 @@ hàm service mà `api` gọi, chịu được nhận lại:
 | `orders.order_confirmed` | `confirm(order_id)` | `order_id` |
 | `orders.order_cancelled` | `release(order_id, Cancelled)` | `order_id` |
 | `orders.return_received` | `restock` với `reference = "return:<return_id>"` | `return_id`, `order_id`, `warehouse_org_id`, `lines[{variant_id, quantity, sellable, lot_code?, serials[]}]` |
+| `orders.preorder_cancelled` | `release_lines` — trả riêng các dòng bị huỷ, chống trùng theo ID event (`inventory_line_releases`, D-20261119-step42-preorder-cancel) | `order_id`, `lines[{line_key, quantity}]` (phần huỷ lần đó) |
 
 `orders` vẫn gọi `api` trực tiếp ở bước đặt hàng (giữ chỗ phải đồng bộ); event là đường an toàn khi
 lời gọi trực tiếp lỗi sau khi `orders` đã commit.

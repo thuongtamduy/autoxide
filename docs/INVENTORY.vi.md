@@ -89,7 +89,9 @@ Quản trị xem chỗ giữ bằng `GET /reservations` (`inventory.reservations
 
 Module `inventory` cũng nghe `orders.order_confirmed`, `orders.order_cancelled` và `orders.return_received` (khi
 đã cài module `orders`) và chạy đúng các hàm đó, nên event đến trước hay sau lời gọi trực tiếp, hay đến hai lần, chỉ
-đổi tồn một lần.
+đổi tồn một lần. Module cũng nghe `orders.preorder_cancelled`: chỉ trả các dòng đặt trước bị huỷ của một đơn vẫn
+còn hiệu lực (tồn và suất đặt trước của các dòng đó trở lại; phần còn lại của đơn vẫn được giữ), mỗi event đúng một
+lần kể cả khi được giao lại.
 
 ## Chọn kho
 

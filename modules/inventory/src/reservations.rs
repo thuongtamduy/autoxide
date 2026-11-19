@@ -112,7 +112,7 @@ fn status_of(row: &reservation::Model) -> Result<ReservationStatus, Error> {
 }
 
 /// Phần còn giữ (chưa xuất, chưa trả) của một dòng.
-fn remaining(line: &reservation_line::Model) -> i64 {
+pub(crate) fn remaining(line: &reservation_line::Model) -> i64 {
     line.quantity - line.fulfilled_quantity - line.released_quantity
 }
 
@@ -177,7 +177,7 @@ fn subject(id: Uuid) -> Option<String> {
     Some(format!("inventory.reservation:{id}"))
 }
 
-async fn find_by_order<C: ConnectionTrait>(
+pub(crate) async fn find_by_order<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     order: Uuid,
