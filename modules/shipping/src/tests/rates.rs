@@ -41,13 +41,18 @@ pub(crate) async fn shop(test: &TestDatabase) -> (TestApp, Tree) {
         .build()
         .await
         .unwrap();
+    insert_tree(&app, &tree).await;
+    (app, tree)
+}
+
+/// Dựng cây gốc → chuỗi → cửa hàng A, B trong khách mặc định.
+pub(crate) async fn insert_tree(app: &TestApp, tree: &Tree) {
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.chain, root, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.a, tree.chain, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.b, tree.chain, 8).await.unwrap();
     write.commit().await.unwrap();
-    (app, tree)
 }
 
 fn vnd(amount: i64) -> Value {
@@ -384,6 +389,35 @@ async fn api_shipping_qua_testapp() {
         let error = rates.confirm_option(&tenant, &request, "stale").await.unwrap_err();
         assert_eq!(error.code(), "shipping.option_changed");
         assert!(app.api::<dyn crate::api::CarrierRegistry>().unwrap().codes().is_empty());
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn tool_mcp_bao_gia_nhu_rest() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = shop(test).await;
+        standard(&app, &tree).await;
+        let client = app.mcp("boss").await.unwrap();
+        let input = json!({"org_id": tree.a.as_uuid(),
+            "destination": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "1"},
+            "items": [{"variant_id": Uuid::now_v7(), "quantity": 1, "weight_grams": 300}],
+            "order_value": "100000"});
+        let answer = client.call_tool(autoxide_testkit::tool("shipping.quote", input)).await.unwrap();
+        assert_eq!(answer.is_error, Some(false), "{answer:?}");
+        let data = answer.structured_content.unwrap();
+        assert_eq!(data["data"]["options"][0]["amount"]["amount"], "20000", "{data}");
+        // Người không có `shipping.read` ở cửa hàng B: như REST, bị từ chối.
+        let client = app.mcp("store_a").await.unwrap();
+        let input = json!({"org_id": tree.b.as_uuid(), "items": [], "order_value": "0"});
+        let refused = client.call_tool(autoxide_testkit::tool("shipping.quote", input)).await.unwrap();
+        assert_eq!(refused.is_error, Some(true));
+        let listed = client
+            .call_tool(autoxide_testkit::tool("shipping.list_shipments", json!({})))
+            .await
+            .unwrap();
+        assert_eq!(listed.is_error, Some(false), "{listed:?}");
     })
     .await
     .unwrap();

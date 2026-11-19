@@ -207,10 +207,19 @@ impl ShippingService {
         tenant: &TenantContext,
         request: &QuoteRequest,
     ) -> Result<Quote, Error> {
+        self.check_destination(request).await?;
+        self.quote_unchecked(tenant, request).await
+    }
+
+    /// Báo giá không kiểm đích (ước tính công khai: đích chỉ có tỉnh).
+    pub(crate) async fn quote_unchecked(
+        &self,
+        tenant: &TenantContext,
+        request: &QuoteRequest,
+    ) -> Result<Quote, Error> {
         if !request.items.iter().any(|item| item.requires_shipping && item.quantity > 0) {
             return Ok(Quote::default());
         }
-        self.check_destination(request).await?;
         let currency = request.order_value.currency();
         let methods = self.effective_methods(tenant, request.org_id).await?;
         let mut quote = Quote::default();
@@ -286,10 +295,24 @@ impl ShippingService {
                 ),
                 _ => None,
             };
+            let calendar =
+                self.calendar_for(tenant, method.calendar_id, request.at.date_naive()).await?;
             for (amount, pickup, service, days) in options {
                 let mut option =
                     self.option(&method, kind, amount, pickup, service, days, load, request)?;
                 option.carrier_code.clone_from(&carrier_code);
+                let days = option.estimated_days;
+                option.eta = crate::eta::estimate(
+                    &calendar,
+                    request.at,
+                    method.cutoff_minute,
+                    method.same_day,
+                    days,
+                );
+                if let Some(store) = pickup {
+                    option.ready_at =
+                        Some(self.ready_at(tenant, &method, store, &calendar, request).await?);
+                }
                 quote.options.push(option);
             }
         }
@@ -492,5 +515,32 @@ impl ShippingRates for ShippingService {
             .into_iter()
             .find(|option| option.option_key == option_key)
             .ok_or_else(errors::option_changed)
+    }
+}
+
+impl ShippingService {
+    /// Giờ hàng sẵn sàng ở cửa hàng `store`: chuẩn bị của điểm nhận + giờ mở cửa (hồ sơ công khai
+    /// của nút qua `OrgDirectory`; chưa khai thì 08:00–21:00 theo lịch của phương thức).
+    async fn ready_at(
+        &self,
+        tenant: &TenantContext,
+        method: &method::Model,
+        store: OrgId,
+        calendar: &crate::eta::Calendar,
+        request: &QuoteRequest,
+    ) -> Result<chrono::DateTime<chrono::Utc>, Error> {
+        let prep = pickup_point::Entity::find()
+            .filter(pickup_point::Column::MethodId.eq(method.id))
+            .filter(pickup_point::Column::OrgId.eq(store.as_uuid()))
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .map_or(0, |point| point.prep_hours);
+        let ranges = match &self.orgs {
+            Some(orgs) => orgs.opening_hours(tenant, store).await?,
+            None => None,
+        };
+        let hours = crate::eta::Hours::from_ranges(ranges);
+        Ok(crate::eta::ready_at(calendar, &hours, request.at, prep))
     }
 }

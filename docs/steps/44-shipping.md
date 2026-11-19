@@ -22,7 +22,8 @@ gọi `autoxide_shipping::api` để báo giá.
 ## Bắt đầu khi
 
 - Bước 41 xong (`autoxide_kernel::csv`, `Subscription::optional`); số liệu cân nặng / kích thước do bên
-  gọi đưa vào (lấy từ `VariantSnapshot` của `catalog`) — `shipping` không gọi `catalog`.
+  gọi đưa vào (lấy từ `VariantSnapshot` của `catalog`); riêng ước tính công khai đọc biến thể qua `dyn Catalog`
+  (D-20261118-step44-shipping-dates).
 - Từ nền: `Address` và `dyn AdministrativeUnits` (`autoxide_address::api`, bước 34), `dyn OrgDirectory`,
   `TenantContext`, `Scope`, kho secret theo khách (bước 33), `dyn Ledger` (bước 36), người mua là tài khoản
   theo khách (bước 34), giờ mở cửa trong hồ sơ công khai của nút (bước 34), nhóm thuế của engine thuế
@@ -421,8 +422,9 @@ hãng bằng `FakeCarrier`.
 ## Tiêu chí xong
 
 - [ ] Mọi mục của bước 44 trong ROADMAP được phủ.
-- [ ] `shipping` không có phụ thuộc Cargo vào `autoxide-orders` hay `autoxide-catalog`; chỉ biết tên
-      event dạng chuỗi.
+- [ ] `shipping` không có phụ thuộc Cargo vào `autoxide-orders`; chỉ biết tên event dạng chuỗi. Chỉ ước tính
+      công khai đọc biến thể qua `autoxide_catalog::api::Catalog`; báo giá cho `orders` nhận số liệu do bên gọi đưa
+      vào (D-20261118-step44-shipping-dates).
 - [ ] Không gọi mạng trong transaction ghi; không lưu / log thông tin đăng nhập hãng.
 - [ ] `docs/SHIPPING.md` + `docs/SHIPPING.vi.md` (gồm lịch giao, giờ chốt, ước tính công khai); OpenAPI,
       `.env.example`; CHANGELOG.
