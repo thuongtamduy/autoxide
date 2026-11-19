@@ -16,6 +16,7 @@ mod levels;
 mod lots;
 mod migration;
 mod orders_events;
+mod partial;
 mod permissions;
 mod preorders;
 mod public;

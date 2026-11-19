@@ -91,7 +91,9 @@ Admins see reservations with `GET /reservations` (`inventory.reservations.read`)
 
 Module `inventory` also listens to `orders.order_confirmed`, `orders.order_cancelled` and `orders.return_received`
 (when module `orders` is installed) and runs the same functions, so an event arriving before or after the direct call,
-or twice, changes stock once.
+or twice, changes stock once. It also listens to `orders.preorder_cancelled`: only the cancelled pre-order lines of an
+order that stays open are released (their stock and pre-order places come back; the rest of the order keeps its
+reservation), once per event even when it is delivered again.
 
 ## Choosing warehouses
 

@@ -620,3 +620,26 @@ pub(crate) mod restock_alert {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+pub(crate) mod line_release {
+    use sea_orm::entity::prelude::*;
+
+    /// Một lần trả riêng một phần chỗ giữ (D-20261119-step42-preorder-cancel); `reference` duy nhất.
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_line_releases")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub reservation_id: Uuid,
+        /// ID của event `orders.preorder_cancelled` đã áp.
+        pub reference: String,
+        /// Các dòng đã huỷ (JSON `[{line_key, quantity}]`).
+        pub lines: String,
+        pub created_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
