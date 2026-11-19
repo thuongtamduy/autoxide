@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Looking into one tenant (step 39): request log lines and the spans of background jobs, event deliveries and
+  MCP tools carry `tenant_id` (also as a trace attribute with OpenTelemetry). Metrics still have no tenant label.
+  `docs/DEPLOY.md` (Monitoring) shows how to filter by it.
 - Caching by a CDN (step 39): public reads of a website now say `public, max-age=0, s-maxage=60,
   stale-while-revalidate=300` with an `ETag` and `Vary: Accept-Language, Accept-Encoding`, so a CDN keeps them for
   `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` (default 60; `0` to always ask again). A request with `Authorization` or a
