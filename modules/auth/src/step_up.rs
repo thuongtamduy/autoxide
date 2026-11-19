@@ -1,5 +1,5 @@
 //! Xác nhận lại cho việc nhạy cảm (bước 54 P5, "sudo mode" như GitHub; D-20261119-step54-step-up):
-//! phiên đăng nhập chỉ dùng được permission `destructive` / `money` / `sensitive_data` trong
+//! phiên đăng nhập chỉ dùng được permission `destructive` / `money` (D-20261119-step-up-writes) trong
 //! `AUTOXIDE_AUTH_STEP_UP_MINUTES` phút sau lần đăng nhập hay `POST /me/reauth` gần nhất. Bật mặc định;
 //! khách tắt bằng cấu hình `auth.step_up` (có audit như mọi cấu hình theo khách). API key không bị
 //! đòi (theo đặc tả 54: việc nhạy cảm của agent đi đường duyệt).
@@ -14,8 +14,8 @@ use chrono::{DateTime, Duration, Utc};
 /// Cấu hình theo khách: đòi xác nhận lại cho việc nhạy cảm.
 pub(crate) const STEP_UP: TenantSetting = TenantSetting::new(
     "auth.step_up",
-    "`true` (default): sensitive actions (deleting for good, money, other people's personal data) \
-     need a sign-in or confirmation (`POST /api/v1/auth/me/reauth`) from the last few minutes \
+    "`true` (default): sensitive actions (deleting for good, money) need a sign-in or \
+     confirmation (`POST /api/v1/auth/me/reauth`) from the last few minutes \
      (`AUTOXIDE_AUTH_STEP_UP_MINUTES`). `false`: any valid session may do them.",
 )
 .checked(check_flag);

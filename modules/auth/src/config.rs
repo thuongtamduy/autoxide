@@ -120,7 +120,7 @@ pub(crate) const API_KEY_MAX_DAYS: Setting = Setting::new(
 pub(crate) const STEP_UP_MINUTES: Setting = Setting::new(
     "AUTOXIDE_AUTH_STEP_UP_MINUTES",
     "How long after signing in or confirming with `POST /api/v1/auth/me/reauth` a session may do \
-     sensitive actions (deleting for good, money, other people's personal data), 1 to 120 \
+     sensitive actions (deleting for good, money), 1 to 120 \
      minutes. Tenants can turn this off with the setting `auth.step_up`.",
 )
 .with_default("15");

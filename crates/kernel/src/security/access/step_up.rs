@@ -1,7 +1,7 @@
 //! Xác nhận lại danh tính cho việc nhạy cảm (bước 54 P5, "sudo mode" như GitHub; RFC 9470;
 //! D-20261119-step54-step-up).
 //!
-//! Permission có `risk` `destructive`, `money` hay `sensitive_data` chỉ dùng được khi lần xác thực
+//! Permission có `risk` `destructive` hay `money` (việc GHI rủi ro cao, D-20261119-step-up-writes) chỉ dùng được khi lần xác thực
 //! gần nhất của phiên (đăng nhập, hay `POST /api/v1/auth/me/reauth`) còn trong cửa sổ. Bộ xác thực
 //! (module `auth`) gắn thời điểm đó và cửa sổ vào `Principal` bằng [`Principal::with_step_up`];
 //! người gọi không gắn (API key, job, test, bộ xác thực khác) thì không bị đòi.
@@ -37,7 +37,7 @@ impl Principal {
     /// không thì 401 `step_up_required` kèm `WWW-Authenticate` của RFC 9470.
     pub(super) fn fresh_for(&self, permission: &Permission) -> Result<(), Error> {
         let Some(step_up) = self.step_up else { return Ok(()) };
-        if !matches!(permission.risk(), Risk::Destructive | Risk::Money | Risk::SensitiveData) {
+        if !matches!(permission.risk(), Risk::Destructive | Risk::Money) {
             return Ok(());
         }
         let fresh = step_up.authenticated_at.is_some_and(|at| Utc::now() - at <= step_up.window);
@@ -84,6 +84,9 @@ mod tests {
         assert_eq!(error.kind(), crate::error::ErrorKind::Unauthenticated);
         assert!(error.challenge().unwrap().contains("max_age=900"));
         assert!(stale.require(&READ).is_ok(), "việc thường không đòi");
+        const PERSONAL: Permission =
+            Permission::new("demo.people", "See people.").with_risk(Risk::SensitiveData);
+        assert!(stale.require(&PERSONAL).is_ok(), "đọc dữ liệu nhạy cảm không đòi");
         let unknown = Principal::with_all_permissions(uuid::Uuid::now_v7())
             .with_step_up(StepUp { authenticated_at: None, window });
         assert!(unknown.require(&DROP).is_err());

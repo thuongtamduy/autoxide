@@ -230,10 +230,11 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-key-rotation](D-20261118-step39-key-rotation.md)** Đổi khoá ký access token không đăng xuất ai — 2026-11-18
 - **[D-20261118-step54-one-decision](D-20261118-step54-one-decision.md)** Bước 54 mục 1: một hàm quyết định quyền; cache theo phiên bản quyền tách thành mục riêng, chờ số đo — 2026-11-18
 - **[D-20261118-step54-role-denies](D-20261118-step54-role-denies.md)** Bước 54: role cấm permission (deny thắng allow) — 2026-11-18
+- **[D-20261119-step-up-writes](D-20261119-step-up-writes.md)** Xác nhận lại chỉ cho việc ghi rủi ro cao — 2026-11-19
 - **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
 - **[D-20261119-step54-guardrails](D-20261119-step54-guardrails.md)** Bước 54: rào quyền tối đa cho khách con — 2026-11-19
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
-- **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19
+- **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 
 ## Đa khách, tổ chức, gói
 
