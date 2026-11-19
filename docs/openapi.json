@@ -203,6 +203,24 @@
         ],
         "type": "object"
       },
+      "AddMembersRequest": {
+        "additionalProperties": false,
+        "description": "Units to add to a group.",
+        "properties": {
+          "org_ids": {
+            "description": "1 to 200 unit ids of this tenant, from any branch. Units already in the group are skipped.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "org_ids"
+        ],
+        "type": "object"
+      },
       "AddPasskeyRequest": {
         "description": "The authenticator's answer to an add-passkey ceremony.",
         "properties": {
@@ -277,6 +295,28 @@
         },
         "required": [
           "body"
+        ],
+        "type": "object"
+      },
+      "AddedResponse": {
+        "description": "Result of adding units to a group.",
+        "properties": {
+          "added": {
+            "description": "Units that were not in the group before.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "member_count": {
+            "description": "Units in the group now (all of them, whatever your scope).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "added",
+          "member_count"
         ],
         "type": "object"
       },
@@ -742,6 +782,14 @@
             "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
             "example": "axk1_…3q9ZbXcV",
             "type": "string"
+          },
+          "rotated_from": {
+            "description": "The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key\ncreated from scratch.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -11986,6 +12034,28 @@
         ],
         "type": "object"
       },
+      "CreateGroupRequest": {
+        "additionalProperties": false,
+        "description": "A new unit group.",
+        "properties": {
+          "description": {
+            "description": "Up to 1000 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 200 characters, unique in the tenant (accents and case ignored).",
+            "example": "Stores in the north",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "CreateListRequest": {
         "additionalProperties": false,
         "description": "A new list.",
@@ -12509,6 +12579,11 @@
             "format": "uuid",
             "type": "string"
           },
+          "kind": {
+            "description": "`production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and\nwebhooks do not leave, nothing done here counts in the real tenant).",
+            "example": "production",
+            "type": "string"
+          },
           "mode": {
             "description": "`single` (one tenant) or `multi` (many tenants on one installation).",
             "example": "single",
@@ -12524,6 +12599,22 @@
           "read_only": {
             "description": "Read-only: data can be read but every change is refused with `403 tenant_read_only`.\nAlways present.",
             "type": "boolean"
+          },
+          "sandbox_expires_at": {
+            "description": "Sandbox only: when it is deleted unless extended.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sandbox_of": {
+            "description": "Sandbox only: the real tenant it was made from.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "slug": {
             "type": "string"
@@ -12828,6 +12919,37 @@
             },
             "required": [
               "user_id"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_AddedResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Result of adding units to a group.",
+            "properties": {
+              "added": {
+                "description": "Units that were not in the group before.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "member_count": {
+                "description": "Units in the group now (all of them, whatever your scope).",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "added",
+              "member_count"
             ],
             "type": "object"
           }
@@ -18642,6 +18764,11 @@
                 "format": "uuid",
                 "type": "string"
               },
+              "kind": {
+                "description": "`production` (a real tenant) or `sandbox` (a test copy: partners are simulated, mail and\nwebhooks do not leave, nothing done here counts in the real tenant).",
+                "example": "production",
+                "type": "string"
+              },
               "mode": {
                 "description": "`single` (one tenant) or `multi` (many tenants on one installation).",
                 "example": "single",
@@ -18657,6 +18784,22 @@
               "read_only": {
                 "description": "Read-only: data can be read but every change is refused with `403 tenant_read_only`.\nAlways present.",
                 "type": "boolean"
+              },
+              "sandbox_expires_at": {
+                "description": "Sandbox only: when it is deleted unless extended.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sandbox_of": {
+                "description": "Sandbox only: the real tenant it was made from.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "slug": {
                 "type": "string"
@@ -20052,6 +20195,63 @@
               "from",
               "to",
               "steps"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_GroupResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "excluded_org_count": {
+                "description": "Units of the group outside your scope: only counted, never listed or named.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "member_count": {
+                "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "name": {
+                "example": "Stores in the north",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "member_count",
+              "excluded_org_count",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -28063,6 +28263,107 @@
               "updated_at"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Sandbox": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are\nalways simulated there and mail and webhooks do not leave it.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "expires_at": {
+                "description": "When it is deleted unless extended.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "description": "Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "products": {
+                "description": "Products asked to copy.",
+                "format": "int32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "role_id": {
+                "description": "Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "sandbox_of": {
+                "description": "The real tenant it was made from.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "slug": {
+                "type": "string"
+              },
+              "status": {
+                "description": "`provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`.",
+                "example": "active",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "slug",
+              "name",
+              "status",
+              "sandbox_of",
+              "products",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_SandboxCreated": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Sandbox"
+              },
+              {
+                "properties": {
+                  "job_id": {
+                    "description": "The background job copying the configuration; follow it at\n`GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.",
+                    "format": "uuid",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "description": "A new sandbox and the job copying the configuration into it."
           }
         },
         "required": [
@@ -40796,6 +41097,73 @@
         ],
         "type": "object"
       },
+      "GroupMemberResponse": {
+        "description": "A unit in a group.",
+        "properties": {
+          "added_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Id of the unit (see `GET /api/v1/organizations/units/{id}`).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "added_at"
+        ],
+        "type": "object"
+      },
+      "GroupResponse": {
+        "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "excluded_org_count": {
+            "description": "Units of the group outside your scope: only counted, never listed or named.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "member_count": {
+            "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "name": {
+            "example": "Stores in the north",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "member_count",
+          "excluded_org_count",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
       "GuestCancelRequest": {
         "additionalProperties": false,
         "description": "A guest cancels a booking.",
@@ -48969,6 +49337,38 @@
         ],
         "type": "object"
       },
+      "NewSandbox": {
+        "additionalProperties": false,
+        "description": "A new sandbox.",
+        "properties": {
+          "name": {
+            "description": "1 to 200 characters.",
+            "example": "Try the new theme",
+            "type": "string"
+          },
+          "products": {
+            "description": "Products to copy (0 by default), at most `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "role_id": {
+            "description": "Role of your tenant whose holders may enter the sandbox; the `admin` role when omitted.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "NewShippingAddress": {
         "additionalProperties": false,
         "description": "A new address in the address book.",
@@ -51575,6 +51975,14 @@
                   "description": "A few characters of the key, to recognize it: `axk1_…` and the first 8 characters of the\nkey's random part (after the tenant part). Keys created in older versions (`axk_…`) show\ntheir first 12 characters.",
                   "example": "axk1_…3q9ZbXcV",
                   "type": "string"
+                },
+                "rotated_from": {
+                  "description": "The key this one replaced (`POST /api/v1/auth/api-keys/{id}/rotate`); `null` for a key\ncreated from scratch.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -55129,6 +55537,107 @@
                 "success_message",
                 "notify_emails",
                 "token_scope",
+                "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GroupMemberResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A unit in a group.",
+              "properties": {
+                "added_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "Id of the unit (see `GET /api/v1/organizations/units/{id}`).",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "org_id",
+                "added_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_GroupResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A unit group: any units of the tenant gathered to filter and group reports (e.g. \"stores in\nthe north\"). A group grants no access.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "description": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "excluded_org_count": {
+                  "description": "Units of the group outside your scope: only counted, never listed or named.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "member_count": {
+                  "description": "Units of the group within your `organizations.units.read` scope; units outside it are not\ncounted.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "name": {
+                  "example": "Stores in the north",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "member_count",
+                "excluded_org_count",
                 "created_at",
                 "updated_at"
               ],
@@ -60199,6 +60708,85 @@
                 "steps",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_Sandbox": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are\nalways simulated there and mail and webhooks do not leave it.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "description": "When it is deleted unless extended.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "description": "Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "products": {
+                  "description": "Products asked to copy.",
+                  "format": "int32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "role_id": {
+                  "description": "Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role.",
+                  "format": "uuid",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "sandbox_of": {
+                  "description": "The real tenant it was made from.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "slug": {
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`.",
+                  "example": "active",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "slug",
+                "name",
+                "status",
+                "sandbox_of",
+                "products",
+                "created_at"
               ],
               "type": "object"
             },
@@ -68477,6 +69065,13 @@
       "PublicVariant": {
         "description": "A smaller copy of an image.",
         "properties": {
+          "avif_url": {
+            "description": "URL of the AVIF copy, usually a third smaller than WebP: offer it in a\n`<source type=\"image/avif\">` before the WebP one. `null` until it is made (the server makes\nthem only when `AUTOXIDE_MEDIA_AVIF` is on).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "height": {
             "format": "int32",
             "type": "integer"
@@ -70021,6 +70616,64 @@
         ],
         "type": "object"
       },
+      "RotateApiKeyRequest": {
+        "description": "How to replace a key.",
+        "properties": {
+          "current_password": {
+            "description": "Your current password, as when creating a key. Or `totp_code`, a passkey\n(`passkey_ceremony_id` and `passkey_credential`) or a `reauth_token` instead — exactly one.",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When the new key stops working (RFC 3339), at most `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days\nahead. Omit for that longest lifetime.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "overlap_hours": {
+            "description": "Hours the old key keeps working, 0 to 72 (24 by default): time to switch every program\nto the new key. 0 stops the old key at once.",
+            "example": 24,
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "passkey_ceremony_id": {
+            "description": "One of your passkeys, instead of the password (see `POST /api/v1/auth/api-keys`).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "passkey_credential": {
+            "description": "The browser's answer for `passkey_ceremony_id`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "reauth_token": {
+            "description": "A confirmation token from `POST /api/v1/auth/me/reauth`, instead of the password.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "totp_code": {
+            "description": "A code from your authenticator app, instead of the password.",
+            "example": "123456",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "RuleResponse": {
         "description": "An automation rule: \"when the trigger happens and the conditions hold, run the actions\".",
         "properties": {
@@ -70261,6 +70914,89 @@
           }
         },
         "type": "object"
+      },
+      "Sandbox": {
+        "description": "A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are\nalways simulated there and mail and webhooks do not leave it.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "description": "When it is deleted unless extended.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the sandbox tenant: send it in `Autoxide-Tenant` to work inside it.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "products": {
+            "description": "Products asked to copy.",
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "role_id": {
+            "description": "Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sandbox_of": {
+            "description": "The real tenant it was made from.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "status": {
+            "description": "`provisioning` (being copied), `active`, `suspended` (expired, being deleted) or `deleted`.",
+            "example": "active",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "name",
+          "status",
+          "sandbox_of",
+          "products",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "SandboxCreated": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Sandbox"
+          },
+          {
+            "properties": {
+              "job_id": {
+                "description": "The background job copying the configuration; follow it at\n`GET /api/v1/kernel/jobs/{id}`. The sandbox becomes `active` when it is done.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "description": "A new sandbox and the job copying the configuration into it."
       },
       "SaveSupportMacroRequest": {
         "additionalProperties": false,
@@ -74158,8 +74894,17 @@
               }
             ]
           },
+          "excluded_org_count": {
+            "description": "With `group_ids` (on `totals`) or `group_by=group` (on each group): units of the asked\ngroups outside your scope, left out of the sums. Absent otherwise.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "key": {
-            "description": "The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id or a unit id;\n`total` for the totals.",
+            "description": "The group: a day `YYYY-MM-DD` (first day of the week or month), a tenant id, a unit id or a\nunit group id; `total` for the totals.",
             "example": "2026-11-18",
             "type": "string"
           }
@@ -78226,6 +78971,27 @@
         },
         "type": "object"
       },
+      "UpdateGroupRequest": {
+        "additionalProperties": false,
+        "description": "Changes to a unit group; omitted fields stay as they are.",
+        "properties": {
+          "description": {
+            "description": "New description, up to 1000 characters; an empty string removes it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "New name, 1 to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "UpdateItemRequest": {
         "additionalProperties": false,
         "description": "Changes to a media item. Omitted fields stay as they are.",
@@ -78906,6 +79672,23 @@
       "VariantResponse": {
         "description": "A smaller copy of an image.",
         "properties": {
+          "avif_size": {
+            "description": "Size of the AVIF copy in bytes; `null` like `avif_url`.",
+            "format": "int64",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "avif_url": {
+            "description": "The same copy as AVIF, usually a third smaller than WebP: `url` with `&format=avif`. Offer\nit in a `<source type=\"image/avif\">` before the WebP one. Made in the background only when\nthe server sets `AUTOXIDE_MEDIA_AVIF=true`; `null` until then.",
+            "example": "/api/v1/media/0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7a/content?v=0190f5a2-7c4e-7d1a-9b3c-2f1e0d9c8b7b&w=640&format=avif",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "content_type": {
             "description": "`image/jpeg`, or `image/png` for images with transparency.",
             "example": "image/jpeg",
@@ -82192,6 +82975,159 @@
           }
         ],
         "summary": "Revoke one of your API keys.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/auth/api-keys/{id}/rotate": {
+      "post": {
+        "description": "The new key has the same name, permissions, organization unit, allowed addresses and kind;\nits `rotated_from` names the old key. The old key keeps working for `overlap_hours` (24 by\ndefault), then expires: switch your programs to the new key in that time. Confirm it is you\nlike when creating a key. Signed in with a password session only: an API key cannot rotate\nkeys. The response carries the new key, shown only once.",
+        "operationId": "auth_rotate_api_key",
+        "parameters": [
+          {
+            "description": "Id of the key to replace.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RotateApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CreatedApiKeyResponse"
+                }
+              }
+            },
+            "description": "The new key; `key` holds its secret.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The current password is wrong; code `auth.wrong_password`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in, or the passkey answer is not valid; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request used an API key; code `auth.api_key_cannot_create_keys`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You have no key with this id; code `auth.api_key_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, e.g. `overlap_hours` above 72, an `expires_at` too far ahead, or a permission of the old key you no longer have (`not_granted`); see `errors`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many wrong passwords or codes; code `auth.login_throttled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace one of your API keys with a new one.",
         "tags": [
           "auth"
         ],
@@ -146226,6 +147162,213 @@
         "x-permissions": []
       }
     },
+    "/api/v1/kernel/sandboxes/{id}": {
+      "delete": {
+        "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. Everything tried in it is\ndeleted now and cannot be recovered; promote what you want to keep first.",
+        "operationId": "kernel_delete_sandbox",
+        "parameters": [
+          {
+            "description": "Id of the sandbox.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such sandbox of your tenant; code `tenancy.sandbox_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.manage"
+        ]
+      }
+    },
+    "/api/v1/kernel/sandboxes/{id}/extend": {
+      "post": {
+        "description": "Requires `kernel.sandboxes.manage`, in the real tenant of the sandbox. It is then deleted\n`AUTOXIDE_TENANCY_SANDBOX_DAYS` days from now.",
+        "operationId": "kernel_extend_sandbox",
+        "parameters": [
+          {
+            "description": "Id of the sandbox.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Sandbox"
+                }
+              }
+            },
+            "description": "The sandbox with its new expiry date."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such sandbox of your tenant; code `tenancy.sandbox_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Extend a sandbox.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.manage"
+        ]
+      }
+    },
     "/api/v1/kernel/settings": {
       "get": {
         "description": "Requires `kernel.settings.manage`. Every setting the installed modules take per tenant, with\nwhether this tenant has set it; unset ones use the server-wide configuration. Values of\nsecret settings are never returned. `?group=connection` lists only the connections to partner\nservices, named `<module>.connection.<kind>.<field>`.",
@@ -149314,6 +150457,298 @@
         ],
         "x-permissions": [
           "kernel.tenants.read"
+        ]
+      }
+    },
+    "/api/v1/kernel/tenants/{id}/sandboxes": {
+      "get": {
+        "description": "Requires `kernel.sandboxes.read`. `{id}` is your own tenant (platform staff with\n`kernel.tenants.manage` may name any tenant). Newest first unless `order=asc`.",
+        "operationId": "kernel_list_tenant_sandboxes",
+        "parameters": [
+          {
+            "description": "Id of the real tenant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_Sandbox"
+                }
+              }
+            },
+            "description": "One page of sandboxes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not your tenant; code `tenant_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the sandboxes of a tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "kernel.list_tenant_sandboxes",
+        "x-permissions": [
+          "kernel.sandboxes.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `kernel.sandboxes.manage`. A sandbox is a test copy with the configuration of the\ntenant and no personal data (no users, buyers, orders, ledger, documents, notifications,\nsecrets or domains). Partners are always simulated in it, mail only reaches staff who may enter\nit, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.\nIt is `provisioning` until the copy job (`job_id`) is done, then holders of `role_id` (the\n`admin` role by default) enter it with the header `Autoxide-Tenant: <sandbox id>`. It is\ndeleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days unless extended. Send an `Idempotency-Key`\nto retry safely.",
+        "operationId": "kernel_create_tenant_sandbox",
+        "parameters": [
+          {
+            "description": "Id of the real tenant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewSandbox"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_SandboxCreated"
+                }
+              }
+            },
+            "description": "Created; the configuration is being copied.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), or the platform tenant (`tenancy.sandbox_forbidden`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not your tenant; code `tenant_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (`validation_failed`, see `errors`), or the tenant is itself a sandbox (`tenancy.sandbox_nested`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a sandbox of a tenant.",
+        "tags": [
+          "kernel"
+        ],
+        "x-permissions": [
+          "kernel.sandboxes.manage"
         ]
       }
     },
@@ -160712,7 +162147,7 @@
             }
           },
           {
-            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "description": "`webp` or `avif`: with `w`, the WebP or AVIF copy of that width (much smaller; the\nvariant's `webp_url`, `avif_url`). Until it is made, the next best copy is sent instead\n(for `avif`: the WebP copy, then the JPEG or PNG one), so the address always shows an\nimage. Ignored without `w`.",
             "example": "webp",
             "in": "query",
             "name": "format",
@@ -160872,7 +162307,7 @@
                 }
               }
             },
-            "description": "`format` is not `webp`; see `errors`."
+            "description": "`format` is not `webp` or `avif`; see `errors`."
           },
           "default": {
             "content": {
@@ -160932,7 +162367,7 @@
             }
           },
           {
-            "description": "`webp`: with `w`, the WebP copy of that width (much smaller; the variant's\n`webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address\nalways shows an image. Ignored without `w`.",
+            "description": "`webp` or `avif`: with `w`, the WebP or AVIF copy of that width (much smaller; the\nvariant's `webp_url`, `avif_url`). Until it is made, the next best copy is sent instead\n(for `avif`: the WebP copy, then the JPEG or PNG one), so the address always shows an\nimage. Ignored without `w`.",
             "example": "webp",
             "in": "query",
             "name": "format",
@@ -160975,7 +162410,7 @@
             "description": "No media item has this id that you may load."
           },
           "422": {
-            "description": "`format` is not `webp`."
+            "description": "`format` is not `webp` or `avif`."
           },
           "default": {
             "content": {
@@ -171738,6 +173173,1042 @@
         "x-permissions": []
       }
     },
+    "/api/v1/organizations/groups": {
+      "get": {
+        "description": "Requires `organizations.units.read` (any scope). `member_count` only counts the units within\nyour scope.",
+        "operationId": "organizations_list_unit_groups",
+        "parameters": [
+          {
+            "description": "Words in the name; accents and case are ignored.",
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GroupResponse"
+                }
+              }
+            },
+            "description": "One page of groups."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the unit groups of the tenant.",
+        "tags": [
+          "organizations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Words in the name; accents and case are ignored.",
+            "kind": "string",
+            "name": "q",
+            "operator": "contains"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "organizations.list_unit_groups",
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.groups.manage` (granted for the whole tenant only). A group only filters\nand groups reports (`group_ids`, `group_by=group` of `GET /api/v1/reporting/summary`); it grants\nno access.",
+        "operationId": "organizations_create_unit_group",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "Created.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another group has this name; code `organizations.group_name_taken`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}": {
+      "delete": {
+        "description": "Requires `organizations.groups.manage`. The units and the report facts stay; only the group and\nits member list go.",
+        "operationId": "organizations_delete_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Deleted."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      },
+      "get": {
+        "description": "Requires `organizations.units.read` (any scope); `member_count` only counts units within it.",
+        "operationId": "organizations_get_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "The group.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a unit group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "patch": {
+        "description": "Requires `organizations.groups.manage`.",
+        "operationId": "organizations_update_unit_group",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `ETag` you read. When given, the change is made only if nobody changed the record since; otherwise `412`.",
+            "in": "header",
+            "name": "If-Match",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGroupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_GroupResponse"
+                }
+              }
+            },
+            "description": "The group after the change.",
+            "headers": {
+              "ETag": {
+                "description": "Version of the record: send it back in `If-Match` when changing it.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Another group has this name; code `organizations.group_name_taken`."
+          },
+          "412": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Rename a unit group or change its description.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}/members": {
+      "get": {
+        "description": "Requires `organizations.units.read`. Units outside your scope are never listed; their number is\n`excluded_org_count` of `GET /groups/{id}`.",
+        "operationId": "organizations_list_unit_group_members",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_GroupMemberResponse"
+                }
+              }
+            },
+            "description": "One page of the units within your scope."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.units.read`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the units of a group that are within your scope.",
+        "tags": [
+          "organizations"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "organizations.list_unit_group_members",
+        "x-permissions": [
+          "organizations.units.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `organizations.groups.manage`. Units already in the group are skipped, so calling again\nis safe. A group has at most 1000 units.",
+        "operationId": "organizations_add_unit_group_members",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddMembersRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_AddedResponse"
+                }
+              }
+            },
+            "description": "How many units were added and how many the group has now."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A unit is not in this tenant (`organizations.group_member_invalid`), the group would pass 1000 units (`organizations.group_too_large`), or `org_ids` is empty or too long (`validation_failed`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add units to a group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
+    "/api/v1/organizations/groups/{id}/members/{org_id}": {
+      "delete": {
+        "description": "Requires `organizations.groups.manage`. Removing a unit that is not in the group also answers\n204.",
+        "operationId": "organizations_remove_unit_group_member",
+        "parameters": [
+          {
+            "description": "Id of the group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the unit.",
+            "in": "path",
+            "name": "org_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The unit is not in the group (any more)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `organizations.groups.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such group in this tenant; code `organizations.group_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a unit from a group.",
+        "tags": [
+          "organizations"
+        ],
+        "x-permissions": [
+          "organizations.groups.manage"
+        ]
+      }
+    },
     "/api/v1/organizations/public/site": {
       "get": {
         "description": "No sign-in needed. The website is the organization unit the domain of the request is bound to\n(see `PATCH /api/v1/kernel/domains/{id}`), or the one named with `site` when the page is not\nserved on its own domain; otherwise the whole tenant (its root unit). A store's own domain thus\nshows the store's name, address and hours, not the head office's. Use `unit_id` as `site` in\nother public calls (menus, content) when they are not made on that domain.",
@@ -182213,6 +184684,15 @@
             }
           },
           {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "in": "query",
+            "name": "group_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Only facts with these dimension values, comma-separated `name:value` pairs, e.g.\n`kind:vat_invoice` (needs `kind`; see `dimensions` in `GET /kinds`).",
             "example": "kind:vat_invoice",
             "in": "query",
@@ -182391,6 +184871,12 @@
             "description": "Only these organization units, comma-separated ids; units outside your scope are left out.",
             "kind": "string",
             "name": "org_ids",
+            "operator": "eq"
+          },
+          {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "kind": "string",
+            "name": "group_ids",
             "operator": "eq"
           },
           {
@@ -182730,6 +185216,15 @@
             }
           },
           {
+            "description": "Only the units of these unit groups (`GET /api/v1/organizations/groups`), comma-separated\nids, and only facts of your own tenant (not of the tenants below it). A group grants no\naccess: its units outside your scope are left out and counted in `excluded_org_count` of\nthe summary. An unknown group answers 404 `reporting.group_not_found`.",
+            "in": "query",
+            "name": "group_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "description": "Only facts with these dimension values, comma-separated `name:value` pairs, e.g.\n`kind:vat_invoice` (needs `kind`; see `dimensions` in `GET /kinds`).",
             "example": "kind:vat_invoice",
             "in": "query",
@@ -182740,7 +185235,7 @@
             }
           },
           {
-            "description": "`day` (the default; at most 366 days), `week` (keyed by its Monday), `month` (keyed by its\nfirst day), `tenant` (keyed by the source tenant id) or `org` (keyed by the unit id).",
+            "description": "`day` (the default; at most 366 days), `week` (keyed by its Monday), `month` (keyed by its\nfirst day), `tenant` (keyed by the source tenant id), `org` (keyed by the unit id) or\n`group` (keyed by the unit group id; needs `group_ids`). With `group`, a unit in two groups\ncounts in both, so the groups can add up to more than `totals`.",
             "example": "day",
             "in": "query",
             "name": "group_by",

@@ -199,6 +199,10 @@ pub(crate) async fn tenant(parts: &mut Parts) -> Result<TenantContext, Error> {
         slot.note_tenant(&tenant);
     }
     crate::http::RequestSpan::note_tenant(&parts.extensions, tenant.id());
+    // Sandbox (D-232): lớp HTTP thêm `Autoxide-Sandbox` và `X-Robots-Tag` vào response.
+    if let Some(slot) = parts.extensions.get::<super::sandbox::headers::SandboxSlot>() {
+        slot.note(&tenant);
+    }
     Ok(tenant)
 }
 
