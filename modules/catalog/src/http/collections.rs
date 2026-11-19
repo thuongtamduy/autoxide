@@ -511,7 +511,7 @@ async fn get_public_collection(
     paging.order = Some(if ascending { "asc" } else { "desc" }.to_owned());
     let page = PageRequest::try_from(paging)?;
     let found = service.public_collection(&tenant, &site, found, &page, now).await?;
-    let products = cards(&service, &tenant, &site, &found.products.data).await?;
+    let products = cards(&service, &tenant, &site, &query.locale, &found.products.data).await?;
     let text = found.text;
     let data = PublicCollectionResponse {
         id: found.collection.id,
