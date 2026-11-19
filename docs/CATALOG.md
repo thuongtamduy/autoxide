@@ -144,6 +144,10 @@ effect just before a time — for "price before the discount"), `price_floors` a
 Every call takes at most 500 ids and runs a fixed number of queries. Events are listed in
 `autoxide_catalog::api::events`.
 
+A module registered after `catalog` plugs in through `dyn CatalogExtensions`: a promotions module gives
+the public lists their automatic sale prices with `set_sale_price_source` (a `SalePriceSource`), and
+emits `promotions.automatic_prices_changed` (`after.variant_ids`) when they change.
+
 ## Settings
 
 | Variable | Default | Meaning |

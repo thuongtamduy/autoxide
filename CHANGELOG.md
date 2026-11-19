@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- `catalog` (step 41): automatic sale prices on the public product lists through the plug-in point
+  `autoxide_catalog::api::CatalogExtensions::set_sale_price_source`; `catalog` listens to
+  `promotions.automatic_prices_changed` and rebuilds the storefront of those variants.
 - `catalog` (step 41): public reads for websites under `/api/v1/catalog/public` — product cards with filters by
   category, attribute, price range, text (with or without accents), seller and rating, product pages by slug,
   the category tree and a sitemap, each with an `ETag` and `Cache-Control: public, no-cache`; stores hide chain
