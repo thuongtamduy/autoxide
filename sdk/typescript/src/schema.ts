@@ -321,6 +321,16 @@ export type ApprovalRequest = {
   url: string;
 };
 
+/** Approval of a saved reply for automatic answers. */
+export type ApproveSupportMacroRequest = {
+  /** `true`: you approve the exact text for automatic answers; `false`: stop using it. */
+  enabled: boolean;
+  /** Ways customers ask the question, per language (1 to 50 in all). */
+  questions?: Record<string, unknown>;
+  /** Automatic use stops after this day unless approved again (today to one year ahead). */
+  review_due_on?: string | null;
+};
+
 /** Put a tenant on a plan. */
 export type AssignRequest = {
   /** Replace the add-ons with these; leave out to keep them. */
@@ -9579,6 +9589,44 @@ export type Data_SupportAllowedResponse = {
      */
     support_access: boolean;
     tenant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportAutoReply = {
+  /** One automatic answer. */
+  data: {
+    created_at: string;
+    /** `helpful`, `wrong`, or empty. */
+    feedback?: string | null;
+    id: string;
+    intent?: string | null;
+    macro_id?: string | null;
+    org_id: string;
+    /** The message sent. */
+    reply_message_id?: string | null;
+    /** `macro` or `fact`. */
+    source: string;
+    /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+    thread: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_SupportAutoReplyDecision = {
+  /** What an automatic answer would do. */
+  data: {
+    intent?: string | null;
+    macro_id?: string | null;
+    /**
+     * `send` (answer automatically), `draft` (staff answer, a draft is prepared) or `handoff`
+     * (staff answer).
+     */
+    outcome: string;
+    /** `macro` or `fact`. */
+    source?: string | null;
+    /** The exact text that would be sent. */
+    text?: string | null;
   };
 };
 
@@ -19336,6 +19384,27 @@ export type Page_SubscriberResponse = {
 };
 
 /** One page of a list. */
+export type Page_SupportAutoReply = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    /** `helpful`, `wrong`, or empty. */
+    feedback?: string | null;
+    id: string;
+    intent?: string | null;
+    macro_id?: string | null;
+    org_id: string;
+    /** The message sent. */
+    reply_message_id?: string | null;
+    /** `macro` or `fact`. */
+    source: string;
+    /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+    thread: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SupportTeam = {
   /** The items of this page, in the requested order. */
   data: {
@@ -20085,6 +20154,14 @@ export type PreviewEntryResponse = {
   /** Last change of the draft. */
   updated_at: string;
   word_count: number;
+};
+
+/** A question to try. */
+export type PreviewSupportAutoReplyRequest = {
+  /** Default `vi`. */
+  locale?: string | null;
+  org_id: string;
+  text: string;
 };
 
 /** A preview link for a draft. */
@@ -23456,6 +23533,46 @@ export type SupportAllowedResponse = {
 /** Who wrote a message. */
 export type SupportAuthorKind = "customer" | "agent" | "system";
 
+/** One automatic answer. */
+export type SupportAutoReply = {
+  created_at: string;
+  /** `helpful`, `wrong`, or empty. */
+  feedback?: string | null;
+  id: string;
+  intent?: string | null;
+  macro_id?: string | null;
+  org_id: string;
+  /** The message sent. */
+  reply_message_id?: string | null;
+  /** `macro` or `fact`. */
+  source: string;
+  /** `support.ticket:<id>` or `conversations.thread:<id>`. */
+  thread: string;
+};
+
+/** What an automatic answer would do. */
+export type SupportAutoReplyDecision = {
+  intent?: string | null;
+  macro_id?: string | null;
+  /**
+   * `send` (answer automatically), `draft` (staff answer, a draft is prepared) or `handoff`
+   * (staff answer).
+   */
+  outcome: string;
+  /** `macro` or `fact`. */
+  source?: string | null;
+  /** The exact text that would be sent. */
+  text?: string | null;
+};
+
+/** Feedback on an automatic answer. */
+export type SupportAutoReplyFeedbackRequest = {
+  /** `true`: it helped; `false`: it was wrong. */
+  helpful: boolean;
+  /** Guests: the ticket token. */
+  token?: string | null;
+};
+
 /** Where a ticket came from. */
 export type SupportChannel = "web" | "guest" | "order_lookup" | "staff" | "email";
 
@@ -23514,6 +23631,11 @@ export type SupportGrantResponse = {
   starts_at: string;
   /** The tenant the staff may enter. */
   tenant_id: string;
+};
+
+/** The ticket token of a guest (empty for signed-in customers). */
+export type SupportHandoffRequest = {
+  token?: string | null;
 };
 
 /** A saved reply staff insert into answers. */
@@ -36920,6 +37042,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/auto-replies": {
+    /** List automatic answers in your scope, with the customers' feedback. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_SupportAutoReply;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/auto-reply/preview": {
+    /** Try the automatic answer without sending anything. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: PreviewSupportAutoReplyRequest;
+      responses: {
+        200: Data_SupportAutoReplyDecision;
+        401: Problem;
+        403: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/macros": {
     /** List the saved replies usable at a unit. */
     get: {
@@ -36970,6 +37119,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/support/macros/{id}/auto-reply": {
+    /** Approve a saved reply for automatic answers, or stop using it. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ApproveSupportMacroRequest;
+      responses: {
+        200: Data_SupportMacro;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/support/me/claim": {
     /** Attach your guest tickets to your account. */
     post: {
@@ -37006,6 +37170,35 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/auto-replies/{reply_id}/feedback": {
+    /** Tell whether an automatic answer on your ticket helped. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; reply_id: string }; };
+      requestBody: SupportAutoReplyFeedbackRequest;
+      responses: {
+        200: Data_SupportAutoReply;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/me/tickets/{id}/handoff": {
+    /** Ask for a person on your ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SupportHandoffRequest;
+      responses: {
+        200: Data_SupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
@@ -37099,6 +37292,33 @@ export interface paths {
         200: Data_SupportTicketDetail;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/auto-replies/{reply_id}/feedback": {
+    /** Tell whether an automatic answer on a guest ticket helped. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; reply_id: string }; };
+      requestBody: SupportAutoReplyFeedbackRequest;
+      responses: {
+        200: Data_SupportAutoReply;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/public/tickets/{id}/handoff": {
+    /** Ask for a person on a guest ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SupportHandoffRequest;
+      responses: {
+        200: Data_SupportTicket;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
