@@ -218,6 +218,20 @@ endpoints are marked deprecated with a sunset date first.
   written again into the target's hash chain; the report store follows (`reporting.rehome`). New setting
   `AUTOXIDE_RELOCATION_DRAIN_SECONDS`; new tenant status `merged`; events `kernel.relocation_started`,
   `kernel.relocation_finished`, `kernel.relocation_failed`.
+- Unit groups for reports (step 38): free sets of units of a tenant, from any branch (e.g. "stores in the north"),
+  under `/api/v1/organizations/groups` (`member_count` and `excluded_org_count` only count units within your scope)
+  and MCP tools `organizations.list_groups`, `organizations.create_group`, `organizations.add_group_members`,
+  `organizations.remove_group_member`; permission `organizations.groups.manage` (whole tenant only); events
+  `organizations.group_*`. A group grants no access: `GET /api/v1/reporting/summary` and `/facts` take `group_ids`
+  and `group_by=group`, always cut down to the caller's scope, and report `excluded_org_count`.
+- Sandboxes, first part (step 38): `POST /api/v1/kernel/tenants/{id}/sandboxes` makes a test copy of a tenant on the
+  same database (no personal data), ready when its job is done; staff of the tenant enter it with
+  `Autoxide-Tenant: <sandbox id>` through an automatic delegation. `GET …/sandboxes`, `POST /sandboxes/{id}/extend`,
+  `DELETE /sandboxes/{id}`; MCP tools `kernel.list_sandboxes`, `kernel.create_sandbox`, `kernel.extend_sandbox`;
+  permissions `kernel.sandboxes.read`, `kernel.sandboxes.manage`; plan limit `kernel.sandboxes` (1 when the plan does
+  not say). Every response of a sandbox carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`;
+  `GET /api/v1/kernel/tenant` adds `kind`, `sandbox_of`, `sandbox_expires_at`. Sandboxes are deleted after
+  `AUTOXIDE_TENANCY_SANDBOX_DAYS` (default 30) unless extended. Setting `AUTOXIDE_TENANCY_SANDBOX_MAX_PRODUCTS`.
 - `autoxide doctor` warns when `AUTOXIDE_AUTH_TOKEN_SECRET` is not set (check `auth.token_secret`), as the
   deployment guide already said; the README's installation steps now include importing the reference data
   (`autoxide task address.import`, `autoxide task tax.import_pack`).

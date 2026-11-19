@@ -38,6 +38,7 @@ pub(crate) fn routes(service: Arc<OrgService>) -> OpenApiRouter {
         .routes(routes!(get_unit_settings))
         .routes(routes!(set_unit_setting, clear_unit_setting))
         .merge(crate::http_profile::routes())
+        .merge(crate::http_groups::routes())
         .with_state(service)
 }
 

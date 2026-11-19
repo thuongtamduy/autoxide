@@ -19,7 +19,7 @@ thuộc đã xong.
 | A. Hợp đồng và nền lõi | 33 → 34 → 35, 36, 37 (song song) → 40 | giữ API không vỡ trước khi sửa mọi bảng; đa khách, tổ chức, tiền, tuân thủ là nền của mọi thứ sau |
 | B. Lớp cho giao diện và phân quyền | 51 → 68 → 54 → 52 | module thương mại khai luôn phần của mình (51 nên xong trước 41); 68 (menu của website) sau P6 của 51, trước 41; 54 cần P12 của 51 |
 | C. Vận hành | 38 → 39 | báo cáo xuyên database, backup, hiệu năng trước khi có dữ liệu thương mại thật |
-| D. Module nền dùng chung | 53, 57, 58, 67, 66, 65 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, trang dựng từ khối và AI tạo trang, SCIM, chợ ứng dụng |
+| D. Module nền dùng chung | 53, 57, 58, 67, 66, 65, 69 | hỗ trợ khách (45 và 61 dùng), phân tích (64 dùng), tự động hoá, trang dựng từ khối và AI tạo trang, SCIM, chợ ứng dụng |
 | E. Thương mại | 41 → 42, 43, 44 → 45 → 46, 47, 48, 49, 55 → 56, 59, 60, 61, 62, 63, 64 | module nghiệp vụ cắm vào core đã xong |
 | Chờ chủ dự án | 50 | chỉ làm khi chủ dự án nói repo đã công khai |
 
@@ -59,6 +59,7 @@ bảng phụ thuộc ngay dưới cho biết bước nào chạy song song đư�
 | 64 Quảng cáo trong sàn (D-221) | 46, 57 | 47–49 |
 | 65 Chợ ứng dụng OAuth (D-221) | 54, 33; bán ứng dụng trả phí: 35, 36 | 41–49 |
 | 66 SCIM (D-221) | 34, 40 (OIDC) | 35–49 |
+| 69 Nền cho ứng dụng đa nền tảng (D-20261119-step69-multiplatform) | SDK, hướng dẫn: ngay; ngoại tuyến: 33–34; WebSocket: 40; mua trong ứng dụng: 35, 36 (đều đã xong) | 41–49, 61 |
 
 Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một người làm, không chia song song.
 
@@ -254,7 +255,12 @@ Thiết kế: trụ 2, phần xuyên database. Bắt đầu SAU bước 34 và 3
       `GET …/{id}`; khách gửi `POST /api/v1/kernel/tenant/relocation-requests`, yêu cầu vào hộp việc của nhân sự nền tảng
 - [ ] Khách thử nghiệm (sandbox, D-232): sao cấu hình không sao dữ liệu cá nhân, đối tác buộc dùng bộ giả, mail
       chỉ tới nhân viên, `noindex`, tự hết hạn; đẩy trang / theme / mẫu / luật sang khách thật thành bản nháp
-- [ ] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền
+      — đang làm: phần nền xong (18/11, D-20261118-step38-sandbox: cột `kernel_tenants`, tạo / gia hạn / xoá / hết hạn,
+      hạn mức, uỷ quyền vào sandbox, header `Autoxide-Sandbox` + `noindex`); còn cách ly (`Partners`, bộ giả, chặn mail /
+      webhook, hộp thư giả) và sao / đẩy (`Module::sandbox_copy` / `promotable`, API promote)
+- [x] Nhóm nút ngoài cây cho báo cáo (D-232): nhóm tự do của `organizations`, nhóm không cấp quyền — xong (18/11,
+      D-20261118-step38-groups): bảng, REST `/api/v1/organizations/groups…`, tool MCP, event, `OrgGroups`; `reporting` nhận
+      `group_ids` / `group_by=group`, giao với phạm vi, `excluded_org_count`
 
 ## 39. Vận hành và hiệu năng (chủ dự án giao ngày 13/11/2026; số cũ 33, D-189)
 
@@ -944,6 +950,26 @@ khai là tự chạy.
 - [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
       `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
 
+## 69. Nền cho ứng dụng đa nền tảng: di động, ngoại tuyến, thời gian thực hai chiều (chủ dự án giao ngày 19/11/2026, D-20261119-step69-multiplatform)
+
+Đặc tả: [`docs/steps/69-multiplatform.md`](steps/69-multiplatform.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
+
+Core chỉ có API nên app điện thoại, app máy tính, máy bán hàng tại quầy đã dùng được phần lớn; bước này lấp phần còn
+thiếu. Các bước nền đã xong: bắt đầu được ngay, song song với 41–49.
+
+- [ ] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
+      sinh lại; gate kiểm khớp OpenAPI, CI biên dịch; đăng lên kho gói cần tài khoản — dừng hỏi chủ dự án
+- [ ] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
+      (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
+      `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
+- [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
+      event, chỉ nhận lệnh điều khiển (đăng ký, đang gõ, online) — ghi dữ liệu vẫn qua REST
+- [ ] Mua trong ứng dụng: trait `StorePurchases` (App Store Server API, Google Play Developer API, thông báo máy chủ
+      có kiểm chữ ký) + bộ giả, `plans` nối vào thuê bao và quyền dùng, gọi lại không cấp trùng; tiền do Apple /
+      Google giữ (D-187); căn cứ thuế ghi trong quyết định; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
+- [ ] Hướng dẫn `docs/guides/mobile.md` + `.vi.md`: đăng nhập và làm mới token, PKCE cho app, thông báo đẩy, tải ảnh
+      thẳng lên S3, nhận event, đồng bộ ngoại tuyến, mua trong ứng dụng, dùng SDK; ví dụ chạy như test
+
 ## Sau core (chưa mở)
 
 GraphQL · tách service — xem bảng "Chưa làm, đã cân nhắc" trong `STACK.md`.
@@ -959,6 +985,9 @@ ký điện tử (59), gọi điện trong chat (61), bán ứng dụng trả ph
 người bán (55), EDI (59), người bán nước ngoài (63). Sau đó: chủ đề theo lịch, đầu / chân trang (67, D-234); trường
 tự định nghĩa, nhãn, đổi câu chữ (51), loại nội dung (67), mã theo dõi và đồng ý cookie (37) (D-235); kiểu vị trí
 banner (55, D-236); rà lộ trình lần hai (D-237); module `menus` cho menu của website (68, D-238).
+
+Đã đưa lên lộ trình (D-20261119-step69-multiplatform): nền cho ứng dụng đa nền tảng — SDK di động, đồng bộ
+ngoại tuyến, WebSocket, mua trong ứng dụng, hướng dẫn cho người làm app (69).
 
 Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
 
