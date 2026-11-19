@@ -7,7 +7,7 @@
   "field:lists the same variant twice": "liệt kê cùng một biến thể hai lần",
   "field:lists the same warehouse twice": "liệt kê cùng một kho hai lần",
   "field:must be 1 to 100 characters and unique in the order": "phải dài 1 tới 100 ký tự và không trùng trong đơn",
-  "field:must be 1 to 64 characters": "phải dài 1 tới 64 ký tự",
+  "field:must be 1 to 64 characters": "phải dài 1 đến 64 ký tự",
   "field:must be `ok`, `expiring` or `expired`": "phải là `ok`, `expiring` hoặc `expired`",
   "field:must be a whole number": "phải là số nguyên",
   "field:must be a whole number from -{max} to {max}, not 0": "phải là số nguyên từ -{max} tới {max}, khác 0",

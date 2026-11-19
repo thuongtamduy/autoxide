@@ -33685,6 +33685,42 @@
         ],
         "type": "object"
       },
+      "Data_Vec_InventoryValuation": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "Value of the stock of one warehouse in one currency.",
+              "properties": {
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "units": {
+                  "description": "Units on hand that have an average cost.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "value": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Sum of on hand × weighted average unit cost."
+                }
+              },
+              "required": [
+                "org_id",
+                "units",
+                "value"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_InvoicesExportProfile": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -40376,6 +40412,21 @@
         "additionalProperties": false,
         "description": "One line of a stock adjustment.",
         "properties": {
+          "expires_on": {
+            "description": "Expiry date of the lot, when adding.",
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lot_code": {
+            "description": "Lot of the units: required when adding units of a variant that tracks lots; when removing,\nomit it to take the lots that expire first.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "note": {
             "description": "Up to 500 characters.",
             "type": [
@@ -40394,6 +40445,13 @@
               "string",
               "null"
             ]
+          },
+          "serials": {
+            "description": "Exactly `|quantity|` serial numbers when the variant tracks serials.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
           },
           "unit_cost": {
             "oneOf": [
@@ -40697,6 +40755,61 @@
             ]
           }
         },
+        "type": "object"
+      },
+      "InventoryLot": {
+        "description": "A lot of a variant in a warehouse.",
+        "properties": {
+          "expires_on": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiry_state": {
+            "description": "`ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read.",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "level_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lot_code": {
+            "type": "string"
+          },
+          "on_hand": {
+            "description": "Units of this lot on hand.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "received_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "level_id",
+          "org_id",
+          "variant_id",
+          "lot_code",
+          "on_hand",
+          "expiry_state",
+          "received_at"
+        ],
         "type": "object"
       },
       "InventoryMovement": {
@@ -41099,6 +41212,33 @@
         ],
         "type": "object"
       },
+      "InventoryTransferLineRequest": {
+        "additionalProperties": false,
+        "description": "One line of a transfer to create.",
+        "properties": {
+          "quantity": {
+            "description": "1 to 1 000 000.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "serials": {
+            "description": "Exactly `quantity` serial numbers when the variant tracks serials.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "quantity"
+        ],
+        "type": "object"
+      },
       "InventoryTransferRequest": {
         "additionalProperties": false,
         "description": "A stock transfer to create (as a draft).",
@@ -41111,7 +41251,7 @@
           "lines": {
             "description": "1 to 500 lines, one per variant.",
             "items": {
-              "$ref": "#/components/schemas/InventoryQuantityLine"
+              "$ref": "#/components/schemas/InventoryTransferLineRequest"
             },
             "type": "array"
           },
@@ -41139,6 +41279,30 @@
           "from_org_id",
           "to_org_id",
           "lines"
+        ],
+        "type": "object"
+      },
+      "InventoryValuation": {
+        "description": "Value of the stock of one warehouse in one currency.",
+        "properties": {
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "units": {
+            "description": "Units on hand that have an average cost.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Sum of on hand × weighted average unit cost."
+          }
+        },
+        "required": [
+          "org_id",
+          "units",
+          "value"
         ],
         "type": "object"
       },
@@ -52912,6 +53076,78 @@
                 "reserved",
                 "incoming",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_InventoryLot": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A lot of a variant in a warehouse.",
+              "properties": {
+                "expires_on": {
+                  "format": "date",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "expiry_state": {
+                  "description": "`ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read.",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "level_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lot_code": {
+                  "type": "string"
+                },
+                "on_hand": {
+                  "description": "Units of this lot on hand.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "received_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "level_id",
+                "org_id",
+                "variant_id",
+                "lot_code",
+                "on_hand",
+                "expiry_state",
+                "received_at"
               ],
               "type": "object"
             },
@@ -128780,6 +129016,199 @@
         ]
       }
     },
+    "/api/v1/inventory/lots": {
+      "get": {
+        "description": "Requires `inventory.read`. Lots that expired are written off by a daily job (ledger lines\n`expiry`); sales take the lots that expire first unless a lot is named.",
+        "operationId": "inventory_list_inventory_lots",
+        "parameters": [
+          {
+            "description": "Only lots in this warehouse or store; its setting `inventory.expiring_days` decides\n`expiring` (else the tenant's root setting, default 30 days).",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "variant_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "`ok`, `expiring` or `expired`.",
+            "in": "query",
+            "name": "expiry_state",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_InventoryLot"
+                }
+              }
+            },
+            "description": "One page of lots."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A filter or paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List lots (with expiry dates) in your scope.",
+        "tags": [
+          "inventory"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only lots in this warehouse or store; its setting `inventory.expiring_days` decides\n`expiring` (else the tenant's root setting, default 30 days).",
+            "kind": "uuid",
+            "name": "org_id",
+            "operator": "eq"
+          },
+          {
+            "kind": "uuid",
+            "name": "variant_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`ok`, `expiring` or `expired`.",
+            "kind": "string",
+            "name": "expiry_state",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "inventory.list_inventory_lots",
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
     "/api/v1/inventory/movements": {
       "get": {
         "description": "Requires `inventory.read`. Newest first unless `order=asc`. The ledger is append-only: each\nreceipt, sale, return, adjustment, count, transfer or expiry adds lines and never changes\nthem.",
@@ -129035,6 +129464,93 @@
           }
         ],
         "x-autoxide-list": "inventory.list_inventory_movements",
+        "x-permissions": [
+          "inventory.read"
+        ]
+      }
+    },
+    "/api/v1/inventory/reports/valuation": {
+      "get": {
+        "description": "Requires `inventory.read`; only warehouses in your scope. Units without a known cost are\nleft out.",
+        "operationId": "inventory_inventory_valuation",
+        "parameters": [
+          {
+            "description": "Only this warehouse or store.",
+            "in": "query",
+            "name": "org_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_InventoryValuation"
+                }
+              }
+            },
+            "description": "The value per warehouse and currency."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `inventory.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Value of the stock now: on hand × weighted average cost, per warehouse and currency.",
+        "tags": [
+          "inventory"
+        ],
         "x-permissions": [
           "inventory.read"
         ]
