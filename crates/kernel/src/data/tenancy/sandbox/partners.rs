@@ -755,7 +755,11 @@ impl VoiceProvider for GuardedVoice {
             return self.inner.fetch_recording(tenant, provider_recording_id).await;
         }
         // Sandbox không có cuộc gọi thật nên không có bản ghi.
-        Err(Error::not_found("voice.recording_not_found", "The sandbox has no call recordings."))
+        Err(Error::not_found(
+            "voice.recording_not_found",
+            "The voice provider has no recording `{id}`.",
+        )
+        .with_param("id", provider_recording_id))
     }
 
     async fn delete_recording(

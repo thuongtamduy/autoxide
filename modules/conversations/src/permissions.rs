@@ -3,7 +3,7 @@
 //! `customer`) không có permission nào: các endpoint `/me/…` chỉ cần đăng nhập và chỉ chạm cuộc trò
 //! chuyện của chính người gọi.
 
-use autoxide_kernel::access::Permission;
+use autoxide_kernel::access::{Permission, Risk};
 
 pub(crate) const READ: Permission = Permission::new(
     "conversations.read",
@@ -31,12 +31,16 @@ pub(crate) const CALL: Permission = Permission::new(
     "Work on call-back requests of the units in your scope, call customers back and see the calls \
      of a conversation (phone numbers stay masked).",
 )
+// Dữ liệu cá nhân của người mua (số đã che, lịch gọi lại): mức nhạy cảm, không phải ghi thường.
+.with_risk(Risk::SensitiveData)
 .scoped();
 
 pub(crate) const RECORDINGS_READ: Permission = Permission::new(
     "conversations.recordings.read",
     "Listen to call recordings of the units in your scope; every listen is recorded.",
 )
+// Giọng nói của người mua: dữ liệu cá nhân nhạy cảm.
+.with_risk(Risk::SensitiveData)
 .scoped();
 
 pub(crate) const VOICE_MANAGE: Permission = Permission::new(
@@ -44,6 +48,8 @@ pub(crate) const VOICE_MANAGE: Permission = Permission::new(
     "Set up the phone line of the units in your scope, switch call recording on or off, and delete \
      recordings when a customer asks.",
 )
+// Xoá bản ghi không lấy lại được.
+.with_risk(Risk::Destructive)
 .scoped();
 
 pub(crate) fn all() -> Vec<Permission> {
