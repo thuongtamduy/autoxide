@@ -320,11 +320,12 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
 - [x] Cache cho CDN: `Cache-Control`, `ETag`, `Vary` đúng cho mọi endpoint công khai; file media có
       địa chỉ mang phiên bản thì cache dài hạn (`immutable`); nội dung riêng tư hay xem trước không
       bao giờ được cache chung; hướng dẫn đặt CDN trước Autoxide trong `docs/DEPLOY.md` (EN + VI) — lớp kernel `http/cache.rs`, D-20261119-step39-cdn-cache
-- [ ] Tìm theo ý nghĩa khi dữ liệu lớn: đo cách duyệt hết vector hiện tại trên bộ dữ liệu lớn so
+- [x] Tìm theo ý nghĩa khi dữ liệu lớn: đo cách duyệt hết vector hiện tại trên bộ dữ liệu lớn so
       với ngưỡng 50 ms của D-110 (`docs/BENCHMARKS.md`, mục "Tìm theo ý nghĩa"); vượt ngưỡng thì
       chọn cách giảm (vector nhỏ hơn, chia nhiều nhân, hay index sau một trait) chạy được trên cả
-      hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên
-- [ ] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
+      hai database, ghi quyết định; không vượt thì ghi số đo và giữ nguyên — vượt (137 ms); `dot` SIMD + chia nhân còn
+      20 ms, D-20261119-step39-semantic-scan
+- [x] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
 - [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
       lượng tương đương, không thì ghi "không làm" kèm số đo

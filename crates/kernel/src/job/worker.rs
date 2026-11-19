@@ -592,7 +592,19 @@ async fn run_job(
                 let limit = timeouts.get(job.kind.as_str()).copied().unwrap_or(short);
                 // Handler panic: ghi như một lần lỗi (thử lại, rồi vào dead-letter queue) thay
                 // vì để job nằm đó tới hết hạn giữ rồi chạy lại mãi (D-158).
-                let run = AssertUnwindSafe(handler.run(&context)).catch_unwind();
+                // Span của job mang khách (bước 39 B7, D-190): mọi log trong lúc chạy tra được theo khách.
+                let span = tracing::info_span!(
+                    "job",
+                    job_id = %job.id,
+                    kind = %job.kind,
+                    tenant_id = tracing::field::Empty,
+                );
+                if let Some(tenant) = &context.tenant {
+                    span.record("tenant_id", tracing::field::display(tenant.id()));
+                }
+                let run =
+                    AssertUnwindSafe(tracing::Instrument::instrument(handler.run(&context), span))
+                        .catch_unwind();
                 let timed = tokio::time::timeout(limit, run);
                 let outcome = if limit > short {
                     // `select!` chạy hai việc cùng lúc và lấy việc xong trước: job xong thì bỏ

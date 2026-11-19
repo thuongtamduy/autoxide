@@ -86,6 +86,7 @@ pub use extract::ValidJson;
 pub(crate) use extract::{contains_nul_escape, nul_refused, value_contains_nul};
 pub use health::{Draining, Health, health_routes};
 pub use llms::LLMS_PATH;
+pub(crate) use log::RequestSpan;
 pub use mcp::MCP_PATH;
 pub(crate) use mcp::{
     call_tool as call_mcp_tool, module_allowed as mcp_module_allowed,

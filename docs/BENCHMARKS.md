@@ -581,6 +581,25 @@ mà response nhỏ đi 4–5 lần. `openapi.json` được nén lại mỗi req
 vẫn hơn 300 request/giây cho một tài liệu ít đổi, có `Cache-Control: max-age=300`; nếu sau này thành điểm
 nóng thì nén sẵn một lần lúc khởi động.
 
+## Tìm theo ý nghĩa trên cỡ thật (bước 39 B6) — 19/11/2026
+
+Quyết định: D-20261119-step39-semantic-scan. Cùng máy và cách như mục "Tìm theo ý nghĩa: duyệt hết vector" ở trên
+(build release, vector chuẩn hoá ngẫu nhiên, trung vị 7 lần), chương trình đo tạm ngoài repo chép đúng phép tính của
+`vector::dot` và vòng duyệt của `content` (mỗi bài 2 đoạn, giữ đoạn tốt nhất mỗi bài trong `HashMap`). Cỡ thật của bộ
+`full`: 50 000 bài một ngôn ngữ, ~500 từ mỗi bài → 2 đoạn (300 từ, chồng 50) → **100 000 đoạn mỗi ngôn ngữ**.
+
+| Đoạn × chiều | `dot` cũ, 1 nhân | `dot` 8 làn, 1 nhân | 8 làn + vòng duyệt thật, 1 nhân | 8 làn + vòng duyệt thật, 4 nhân | Bộ nhớ |
+| ------------ | ---------------: | ------------------: | ------------------------------: | ------------------------------: | -----: |
+| 100 000 × 768   | 108 ms | 38 ms  | 45 ms | **17 ms** | ~307 MB |
+| 100 000 × 1 024 | 137 ms | 52 ms  | 59 ms | **20 ms** | ~410 MB |
+| 100 000 × 1 536 | 209 ms | 78 ms  | 87 ms | **30 ms** | ~614 MB |
+| 200 000 × 1 024 | 281 ms | 105 ms | —     | 35 ms (chỉ `dot`) | ~819 MB |
+
+(`int8`: 38 ms cho 100 000 × 1 024 một nhân — chỉ nhanh hơn `dot` 8 làn ~30%, không chọn.) 50 kết quả đầu của `dot` 8
+làn giống hệt `dot` cũ ở mọi cỡ. Kết luận: dưới ngưỡng 50 ms của D-110 tới ~250 000 đoạn × 1 024 chiều mỗi ngôn ngữ
+trên máy 4 nhân; vòng duyệt không còn chạy trên thread async. Giới hạn kế tiếp là bộ nhớ (cột cuối, mỗi khách mỗi
+ngôn ngữ mỗi bản), không phải thời gian.
+
 ## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
 
 Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,
