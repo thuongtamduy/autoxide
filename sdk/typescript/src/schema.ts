@@ -9711,6 +9711,19 @@ export type Data_SupportPolicyInForce = {
 };
 
 /** Envelope of a single result. */
+export type Data_SupportReplyDraft = {
+  /** A draft answer staff review before sending. Never sent by itself. */
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SupportReport = {
   /** Support figures for tickets created in a period. */
   data: {
@@ -11065,6 +11078,17 @@ export type Data_Vec_IdentityResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_InventoryValuation = {
+  data: {
+    org_id: string;
+    /** Units on hand that have an average cost. */
+    units: number;
+    /** Sum of on hand × weighted average unit cost. */
+    value: Money;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_InvoicesExportProfile = {
   data: {
     description: string;
@@ -12019,6 +12043,18 @@ export type Data_Vec_SupportMacro = {
     /** Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`). */
     review_due_on?: string | null;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_SupportReplyDraft = {
+  data: {
+    /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+    ai_assisted: boolean;
+    body: string;
+    created_at: string;
+    id: string;
+    ticket_id: string;
   }[];
 };
 
@@ -13245,6 +13281,13 @@ export type InventoryAdjustment = {
 
 /** One line of a stock adjustment. */
 export type InventoryAdjustmentLine = {
+  /** Expiry date of the lot, when adding. */
+  expires_on?: string | null;
+  /**
+   * Lot of the units: required when adding units of a variant that tracks lots; when removing,
+   * omit it to take the lots that expire first.
+   */
+  lot_code?: string | null;
   /** Up to 500 characters. */
   note?: string | null;
   /** Units to add (positive) or remove (negative); not 0. */
@@ -13254,6 +13297,8 @@ export type InventoryAdjustmentLine = {
    * `GET /api/v1/kernel/reasons/inventory.adjustment`), e.g. `damaged`.
    */
   reason_code?: string | null;
+  /** Exactly `|quantity|` serial numbers when the variant tracks serials. */
+  serials?: string[];
   unit_cost?: Money | null;
   variant_id: string;
 };
@@ -13354,6 +13399,21 @@ export type InventoryLevel = {
 export type InventoryLevelUpdate = {
   /** Reorder point, 0 to 1 000 000; `null` turns low-stock alerts off. */
   reorder_point?: number | null;
+};
+
+/** A lot of a variant in a warehouse. */
+export type InventoryLot = {
+  expires_on?: string | null;
+  /** `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read. */
+  expiry_state: string;
+  id: string;
+  level_id: string;
+  lot_code: string;
+  /** Units of this lot on hand. */
+  on_hand: number;
+  org_id: string;
+  received_at: string;
+  variant_id: string;
 };
 
 /** One line of the stock movement ledger. Lines are only ever added. */
@@ -13480,18 +13540,36 @@ export type InventoryTransferLine = {
   variant_id: string;
 };
 
+/** One line of a transfer to create. */
+export type InventoryTransferLineRequest = {
+  /** 1 to 1 000 000. */
+  quantity: number;
+  /** Exactly `quantity` serial numbers when the variant tracks serials. */
+  serials?: string[];
+  variant_id: string;
+};
+
 /** A stock transfer to create (as a draft). */
 export type InventoryTransferRequest = {
   /** The warehouse the goods leave. */
   from_org_id: string;
   /** 1 to 500 lines, one per variant. */
-  lines: InventoryQuantityLine[];
+  lines: InventoryTransferLineRequest[];
   /** Up to 500 characters. */
   note?: string | null;
   /** Your own reference, up to 100 characters. */
   reference?: string | null;
   /** The warehouse the goods go to. */
   to_org_id: string;
+};
+
+/** Value of the stock of one warehouse in one currency. */
+export type InventoryValuation = {
+  org_id: string;
+  /** Units on hand that have an average cost. */
+  units: number;
+  /** Sum of on hand × weighted average unit cost. */
+  value: Money;
 };
 
 /** A new invitation. */
@@ -17518,6 +17596,25 @@ export type Page_InventoryLevel = {
     /** Units held for orders not shipped yet. */
     reserved: number;
     updated_at: string;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_InventoryLot = {
+  /** The items of this page, in the requested order. */
+  data: {
+    expires_on?: string | null;
+    /** `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read. */
+    expiry_state: string;
+    id: string;
+    level_id: string;
+    lot_code: string;
+    /** Units of this lot on hand. */
+    on_hand: number;
+    org_id: string;
+    received_at: string;
     variant_id: string;
   }[];
   pagination: Pagination;
@@ -23569,6 +23666,16 @@ export type SupportPolicyInForce = SupportPolicy & {
 
 /** How urgent a ticket is. */
 export type SupportPriority = "low" | "normal" | "high" | "urgent";
+
+/** A draft answer staff review before sending. Never sent by itself. */
+export type SupportReplyDraft = {
+  /** Written by AI: send it with `ai_assisted: true` so it is labelled. */
+  ai_assisted: boolean;
+  body: string;
+  created_at: string;
+  id: string;
+  ticket_id: string;
+};
 
 /** Support figures for tickets created in a period. */
 export type SupportReport = {
@@ -30928,6 +31035,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/lots": {
+    /** List lots (with expiry dates) in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null; variant_id?: string | null; expiry_state?: string | null; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_InventoryLot;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/movements": {
     /** List the stock movement ledger in your scope. */
     get: {
@@ -30937,6 +31057,18 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/inventory/reports/valuation": {
+    /** Value of the stock now: on hand × weighted average cost, per warehouse and currency. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { org_id?: string | null }; };
+      responses: {
+        200: Data_Vec_InventoryValuation;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -37329,6 +37461,34 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-drafts": {
+    /** List the drafts of a ticket. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/support/tickets/{id}/reply-suggestions": {
+    /** Draft an answer with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_SupportReplyDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        502: Problem;
+        503: Problem;
         default: Problem;
       };
     };

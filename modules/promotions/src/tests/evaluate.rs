@@ -149,3 +149,39 @@ async fn evaluate_qua_rest_va_mcp_cung_ket_qua() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn catalog_lay_gia_giam_tu_dong_qua_nguon_da_cam() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
+        let id = super::running(&setup, body(setup.tree.a, json!({}))).await;
+        let source = setup.catalog.sale_source.lock().unwrap().clone().unwrap();
+        let found = source
+            .sale_prices(
+                &setup.tenant(),
+                setup.tree.a,
+                chrono::Utc::now(),
+                &[(variant, super::money(100_000))],
+            )
+            .await
+            .unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].variant_id, variant);
+        assert_eq!(found[0].sale_price, super::money(90_000));
+        let promotion = setup.promotions();
+        let direct = promotion
+            .automatic_prices(
+                &setup.tenant(),
+                setup.tree.a,
+                chrono::Utc::now(),
+                &[(variant, super::money(100_000))],
+            )
+            .await
+            .unwrap();
+        assert_eq!(direct[0].promotion_id, id);
+        assert_eq!(found[0].ends_at, direct[0].ends_at);
+    })
+    .await
+    .unwrap();
+}

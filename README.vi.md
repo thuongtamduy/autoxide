@@ -395,6 +395,8 @@ dùng foreign key xuyên module. Gate tự động kiểm các luật này.
 - [`docs/BOOKINGS.vi.md`](docs/BOOKINGS.vi.md) — đặt lịch dịch vụ: dịch vụ, nhân viên và phòng, lịch
   tuần theo múi giờ của nút, giờ trống, cọc qua đối tác thanh toán, chính sách huỷ, nhắc lịch, khách
   vãng lai đặt bằng mã điện thoại
+- [`docs/SUPPORT.vi.md`](docs/SUPPORT.vi.md) — phiếu hỗ trợ khách hàng: khách vãng lai dùng token phiếu,
+  phạm vi nhân viên theo nút, nhóm và phân công, hạn trả lời theo giờ làm, chuyển khiếu nại, bản nháp AI
 - [`docs/ANALYTICS.vi.md`](docs/ANALYTICS.vi.md) — phân tích truy cập không cookie: gửi sự kiện từ
   website, báo cáo, phễu, đồng ý cho theo dõi theo người, ghi chú pháp lý
 - [`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md) — đơn vị hành chính và địa chỉ: đọc danh mục, nhập

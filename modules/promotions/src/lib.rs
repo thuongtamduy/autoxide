@@ -125,6 +125,12 @@ impl Module for PromotionsModule {
         });
         context.personal_data(service.clone())?;
         self.service = Some(service.clone());
+        // `catalog` không gọi thẳng `dyn Promotions` được (promotions phụ thuộc catalog — gọi ngược
+        // là vòng phụ thuộc), nên promotions cắm nguồn giá giảm tự động vào catalog. Catalog thật
+        // luôn có điểm cắm; bản giả trong test có thể không có thì bỏ qua.
+        if let Ok(extensions) = context.require::<dyn autoxide_catalog::api::CatalogExtensions>() {
+            extensions.set_sale_price_source(Arc::new(provider::SalePrices(service.clone())));
+        }
         // `Arc<Provider>` tự đổi thành `Arc<dyn Promotions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Promotions>(Arc::new(provider::Provider(service)))
     }

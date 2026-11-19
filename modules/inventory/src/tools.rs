@@ -88,6 +88,13 @@ pub(crate) struct AdjustStockLine {
     pub unit_cost_amount: Option<String>,
     /// Currency of `unit_cost_amount`, e.g. `VND`.
     pub unit_cost_currency: Option<String>,
+    /// Lot of the units (required when adding units of a lot-tracked variant).
+    pub lot_code: Option<String>,
+    /// Expiry date of the lot, `YYYY-MM-DD`, when adding.
+    pub expires_on: Option<chrono::NaiveDate>,
+    /// Serial numbers when the variant tracks serials.
+    #[serde(default)]
+    pub serials: Vec<String>,
 }
 
 impl AdjustStockLine {
@@ -109,6 +116,9 @@ impl AdjustStockLine {
             reason_code: Some(self.reason_code),
             note: self.note,
             unit_cost,
+            lot_code: self.lot_code,
+            expires_on: self.expires_on,
+            serials: self.serials,
         })
     }
 }
@@ -231,6 +241,7 @@ pub(crate) fn all(service: &Arc<InventoryService>) -> Vec<Tool> {
                             .map(|line| TransferLineInput {
                                 variant_id: line.variant_id,
                                 quantity: line.quantity,
+                                serials: line.serials,
                             })
                             .collect(),
                     };
@@ -284,7 +295,20 @@ pub(crate) struct CreateTransferInput {
     pub reference: Option<String>,
     pub note: Option<String>,
     #[schema(inline)]
-    pub lines: Vec<ToolQuantityLine>,
+    pub lines: Vec<ToolTransferLine>,
+}
+
+/// One line of a transfer to create.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = InventoryToolTransferLine)]
+pub(crate) struct ToolTransferLine {
+    pub variant_id: Uuid,
+    /// 1 to 1 000 000.
+    pub quantity: i64,
+    /// Exactly `quantity` serial numbers when the variant tracks serials.
+    #[serde(default)]
+    pub serials: Vec<String>,
 }
 
 /// Goods of a transfer to receive.

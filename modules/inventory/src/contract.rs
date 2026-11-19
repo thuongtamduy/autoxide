@@ -22,6 +22,7 @@ use crate::entity::{level, reservation, settings};
 use crate::service::{InventoryService, now};
 
 pub(crate) const EXPIRE_RESERVATIONS: &str = "inventory.expire_reservations";
+pub(crate) const EXPIRE_LOTS: &str = "inventory.expire_lots";
 
 /// Event của `organizations` cho tỉnh và "nhận tại cửa hàng" của nút.
 pub(crate) const PROFILE_UPDATED: &str = "organizations.public_profile_updated";
@@ -199,11 +200,26 @@ impl InventoryService {
 }
 
 pub(crate) fn registrations(service: &Arc<InventoryService>) -> Vec<JobRegistration> {
-    vec![JobRegistration::new(EXPIRE_RESERVATIONS, Arc::new(ExpireReservations(service.clone())))]
+    vec![
+        JobRegistration::new(EXPIRE_RESERVATIONS, Arc::new(ExpireReservations(service.clone()))),
+        JobRegistration::new(EXPIRE_LOTS, Arc::new(ExpireLots(service.clone()))),
+    ]
 }
 
 pub(crate) fn schedules() -> Vec<Schedule> {
-    vec![Schedule::new(EXPIRE_RESERVATIONS, EXPIRE_RESERVATIONS, Duration::from_secs(60))]
+    vec![
+        Schedule::new(EXPIRE_RESERVATIONS, EXPIRE_RESERVATIONS, Duration::from_secs(60)),
+        Schedule::new(EXPIRE_LOTS, EXPIRE_LOTS, Duration::from_secs(24 * 60 * 60)),
+    ]
+}
+
+struct ExpireLots(Arc<InventoryService>);
+
+#[async_trait::async_trait]
+impl JobHandler for ExpireLots {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.expire_lots(&job.database).await.map(|_| ())
+    }
 }
 
 struct ExpireReservations(Arc<InventoryService>);

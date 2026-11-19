@@ -348,7 +348,7 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
       hạn, mức hài lòng
 - [x] Gắn phiếu với đơn, sản phẩm qua sổ đối tượng (D-123); câu trả lời mẫu có biến; chuyển phiếu thành
       khiếu nại người tiêu dùng của `compliance` (gọi lại không tạo hai vụ việc) hay lên sàn
-- [ ] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
+- [x] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
       trên cả hai database
 - [ ] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
@@ -527,7 +527,7 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
       kho theo quy tắc (gần người mua, đủ hàng); test đồng thời "100 người mua 1 cái cuối"
 - [x] Chuyển kho (đang đi đường), kiểm kê (chênh lệch thành bút toán điều chỉnh có lý do; lý do là danh sách
       theo khách, D-223), cảnh báo tồn thấp (event), cho phép bán khi hết hàng hay không theo sản phẩm
-- [ ] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
+- [x] Giá vốn bình quân gia quyền theo kho cho báo cáo lãi gộp; lô và hạn dùng (bán trước hết hạn trước, ngưỡng
       sắp hết hạn theo nút), số serial — bật theo sản phẩm
 - [x] Nhận event của `orders` (xác nhận, huỷ, trả hàng nhập lại kho) — chịu được nhận lại event
 - [ ] Nhập hàng (D-194): nhà cung cấp, đơn đặt hàng nhà cung cấp, nhận hàng một phần, trả hàng cho nhà cung
