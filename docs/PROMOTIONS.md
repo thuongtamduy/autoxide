@@ -71,6 +71,29 @@ recorded. People submit the notice to the authority; Autoxide only prepares the 
 Percentages are rounded half up on the line total; order discounts are shared to lines in proportion
 to their amounts. The same cart always gives the same result and `fingerprint`.
 
+A website menu can point to a promotion: the type `promotions.promotion` in the resource directory is public only
+while a `public` promotion runs, with its title, conditions and the standard path `/promotions/<id>`.
+
+## Sellers in platform promotions
+
+On a marketplace, a seller joins a platform flash sale that has not started: `POST /promotions/{id}/participations`
+(permission `promotions.participate` on the seller's unit, below the unit running the promotion) with the seller's
+own products, each with a sale price or a discount and the units offered. The platform approves or rejects it
+(`POST …/participations/{participation_id}/approve` or `/reject`, permission `promotions.publish`); approved products
+join the flash sale and their discount is paid by the seller (`funding`). `GET …/participations` shows every
+application to the platform and their own to sellers.
+
+## Planning
+
+All read-only, permission `promotions.read`:
+
+- `POST /promotions/{id}/simulate` `{"carts": [...]}` (1 to 20 carts, MCP tool `promotions.simulate`): each cart
+  computed with the promotion (a draft works too) and without it, and `difference_minor`;
+- `GET /promotions/{id}/conflicts`: other promotions of the unit at the same time, on shared targets and in the
+  same class, where one side is exclusive (only one of them applies to a line);
+- `GET /promotions/calendar?from=&to=&org_id=`: promotions running on those days (Vietnam dates, up to 366);
+- `GET /promotions/{id}/stats?from=&to=`: confirmed uses, discount, order value and who paid, per day.
+
 ## Holding usage
 
 `Promotions::reserve` recomputes the cart and holds, in one transaction, every counter: uses of the
@@ -88,6 +111,26 @@ code (`POST /me/vouchers/claim-code`, tries are limited) or receive one through 
 birthday, compensation…; the same `source` + `source_ref` never gives twice) or by hand with a reason
 (`POST /promotions/{id}/vouchers`). `GET /me/vouchers` lists the wallet. The wallet is in the personal
 data export; deleting an account revokes unused vouchers.
+
+## On the website
+
+`GET /public/promotions?locale=&site=` (no sign-in) lists the promotions marked `public` running now on a
+website: those of its unit and of the units above it, with their full conditions, the notices recorded with
+the Departments of Industry and Trade (authority and reference) and the largest discount the law in force today
+allows (`legal_limit`, from the law data). Pages with `limit` / `cursor`; send the `ETag` back in
+`If-None-Match` to get `304`.
+
+`GET /public/promotions/for-product/{product_id}?variant_id=&site=` lists the public coupons that lower the price of
+one variant, cheapest first: the price of one unit with the coupon, its conditions and the uses left (only when
+there is a real limit). The listed price stays the price without a coupon — show "X with code …", not a
+discounted price. For a cart, `Promotions::eligible` (served by `orders`) gives the coupons and vouchers that work,
+those that do not yet with a reason ("add X to use"), and the best selection, so a picker can replace the code box.
+
+`GET /public/promotions/flash-sales?site=` lists the public flash sales running now or starting within a day, with
+their products, sale prices and the units left at the sale price (a real count: held and sold units are taken off).
+A signed-in buyer can ask to be reminded before one starts (`POST /public/promotions/{id}/reminders`, permission
+`promotions.use`; `DELETE` cancels): one reminder is sent through `notifications` ten minutes before the start. Asking
+is recorded in the consent ledger as consent to that one reminder, not to advertising.
 
 ## Returns
 

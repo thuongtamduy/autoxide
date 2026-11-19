@@ -16,8 +16,8 @@ use super::input::{
 };
 use super::{FlashItemInput, PromotionView, TargetInput, locked_after_start};
 use crate::entity::{
-    channel, condition, customer_group, flash_item, funding, gift_option, promotion, schedule,
-    target, tier, translation,
+    channel, condition, customer_group, flash_item, funding, gift_option, participation, promotion,
+    schedule, target, tier, translation,
 };
 use crate::model::{
     ClassName, ConditionKind, Exclusivity, GiftPolicy, Kind, Operator, Payer, Period, ProgramKind,
@@ -65,6 +65,7 @@ pub(crate) async fn load_children<C: ConnectionTrait>(
     let gifts = children!(gift_option);
     let flash = children!(flash_item);
     let funding = children!(funding);
+    let participations = children!(participation);
     macro_rules! of {
         ($list:ident, $id:expr) => {
             $list.iter().filter(|item| item.promotion_id == $id).cloned().collect()
@@ -85,6 +86,7 @@ pub(crate) async fn load_children<C: ConnectionTrait>(
                 gifts: of!(gifts, id),
                 flash: of!(flash, id),
                 funding: of!(funding, id),
+                participations: of!(participations, id),
                 row,
             }
         })

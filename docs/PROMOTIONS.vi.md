@@ -69,6 +69,28 @@ bị dữ liệu và ghi nhận.
 Phần trăm làm tròn nửa lên trên tổng dòng; khoản giảm cấp đơn chia về các dòng theo tiền dòng. Cùng giỏ luôn
 cho cùng kết quả và cùng `fingerprint`.
 
+Menu của website trỏ được tới một chương trình: loại `promotions.promotion` trong sổ đối tượng chỉ công khai khi chương
+trình `public` đang chạy, kèm tiêu đề, điều kiện và đường dẫn chuẩn `/promotions/<id>`.
+
+## Người bán tham gia chương trình của sàn
+
+Trên sàn, người bán tham gia flash sale của sàn chưa bắt đầu: `POST /promotions/{id}/participations` (permission
+`promotions.participate` ở nút của người bán, dưới nút chạy chương trình) với sản phẩm của chính mình, mỗi sản phẩm
+một giá sale hay mức giảm và số suất. Sàn duyệt hay từ chối (`POST …/participations/{participation_id}/approve` hay
+`/reject`, permission `promotions.publish`); sản phẩm được duyệt vào flash sale và phần giảm của chúng do người bán trả
+(`funding`). `GET …/participations`: sàn thấy mọi lần đăng ký, người bán thấy lần của mình.
+
+## Lên kế hoạch
+
+Đều chỉ đọc, permission `promotions.read`:
+
+- `POST /promotions/{id}/simulate` `{"carts": [...]}` (1 tới 20 giỏ, tool MCP `promotions.simulate`): mỗi giỏ tính
+  có chương trình (bản nháp cũng được) và không có, kèm `difference_minor`;
+- `GET /promotions/{id}/conflicts`: chương trình khác của nút, trùng thời gian, chung mục tiêu, cùng lớp, mà một
+  bên độc quyền (chỉ một trong số đó áp cho một dòng);
+- `GET /promotions/calendar?from=&to=&org_id=`: chương trình chạy trong những ngày đó (ngày Việt Nam, tối đa 366);
+- `GET /promotions/{id}/stats?from=&to=`: lượt dùng đã xác nhận, tiền giảm, giá trị đơn và ai trả, theo ngày.
+
 ## Giữ lượt dùng
 
 `Promotions::reserve` tính lại giỏ và giữ, trong một transaction, mọi bộ đếm: lượt của chương trình và của
@@ -85,6 +107,25 @@ Người mua lưu voucher của chương trình `claimable` (`POST /public/promo
 bù lỗi…; cùng `source` + `source_ref` không bao giờ cấp hai lần) hoặc cấp tay kèm lý do
 (`POST /promotions/{id}/vouchers`). `GET /me/vouchers` liệt kê ví. Ví có trong bản xuất dữ liệu cá nhân; xoá tài
 khoản thì voucher chưa dùng bị thu hồi.
+
+## Trên website
+
+`GET /public/promotions?locale=&site=` (không cần đăng nhập) liệt kê chương trình `public` đang chạy trên một
+website: của nút đó và các nút cấp trên, kèm điều kiện đầy đủ, các thông báo đã ghi nhận với Sở Công Thương (nơi
+nhận và số tiếp nhận) và mức giảm tối đa luật đang áp hôm nay cho phép (`legal_limit`, lấy từ dữ liệu luật). Chia
+trang bằng `limit` / `cursor`; gửi lại `ETag` trong `If-None-Match` để nhận `304`.
+
+`GET /public/promotions/for-product/{product_id}?variant_id=&site=` liệt kê mã công khai làm giảm giá một biến thể,
+rẻ nhất trước: giá một đơn vị khi dùng mã, điều kiện và số lượt còn (chỉ khi có giới hạn thật). Giá niêm yết vẫn là
+giá không mã — hiện "còn X với mã …", không trình bày như giá đã giảm. Với một giỏ, `Promotions::eligible` (`orders`
+phục vụ) trả mã và voucher dùng được, mã chưa đủ điều kiện kèm lý do ("thêm X để dùng") và tổ hợp tốt nhất, để bộ
+chọn thay ô nhập mã.
+
+`GET /public/promotions/flash-sales?site=` liệt kê flash sale công khai đang chạy hay bắt đầu trong một ngày, kèm sản
+phẩm, giá sale và số suất còn ở giá đó (số thật: đã trừ suất đang giữ và đã bán). Người mua đã đăng nhập có thể hẹn
+nhắc trước giờ mở (`POST /public/promotions/{id}/reminders`, permission `promotions.use`; `DELETE` để bỏ): một lời
+nhắc gửi qua `notifications` mười phút trước giờ mở. Lần bấm được ghi vào sổ đồng ý là đồng ý cho đúng lời nhắc đó,
+không phải đồng ý nhận quảng cáo.
 
 ## Trả hàng
 

@@ -1,0 +1,1 @@
+- Promotion planning endpoints: `POST /api/v1/promotions/promotions/{id}/simulate` (MCP tool `promotions.simulate`), `GET …/{id}/conflicts`, `GET …/calendar` and `GET …/{id}/stats`.
