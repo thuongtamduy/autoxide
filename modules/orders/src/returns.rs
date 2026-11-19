@@ -22,7 +22,7 @@ use autoxide_kernel::numbering;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_promotions::api::Evaluation;
-use chrono::{Datelike, Duration};
+use chrono::Datelike;
 use sea_orm::sea_query::{Expr, ExprTrait};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
@@ -34,11 +34,14 @@ use uuid::Uuid;
 use crate::api::OrderStatus;
 use crate::entity::{completion_hold, line, order, return_request};
 use crate::errors;
-use crate::events::{Change, ReturnReceived, ReturnRequested, ReturnStatusChanged};
+use crate::events::{
+    Change, ReturnPickupRequested, ReturnReceived, ReturnRequested, ReturnStatusChanged,
+};
 use crate::permissions::{READ, RETURNS_MANAGE};
-use crate::reasons::{RETURN_REASON, RETURN_REJECTED};
+use crate::reasons::RETURN_REJECTED;
 use crate::refunds::RefundRequest;
 use crate::return_refund::{self, Breakdown, Earlier};
+use crate::returns_buyer;
 use crate::service::OrdersService;
 
 pub(crate) const REQUESTED: &str = "requested";
@@ -51,7 +54,6 @@ pub(crate) const CLOSED: &str = "closed";
 const OPEN: [&str; 2] = [REQUESTED, APPROVED];
 /// Ảnh kèm tối đa (D-202).
 pub(crate) const MAX_PHOTOS: usize = 6;
-const MAX_LINES: usize = 100;
 pub(crate) const METHODS: [&str; 3] = ["pickup", "drop_off", "in_store"];
 pub(crate) const RESOLUTIONS: [&str; 2] = ["refund", "exchange"];
 pub(crate) const CONDITIONS: [&str; 2] = ["restock", "damaged"];
@@ -142,7 +144,7 @@ pub(crate) fn evaluation_of(row: &order::Model) -> Option<Evaluation> {
     row.promotions.as_deref().and_then(|raw| serde_json::from_str(raw).ok())
 }
 
-fn breakdown_of(row: &return_request::Model) -> Option<Breakdown> {
+pub(crate) fn breakdown_of(row: &return_request::Model) -> Option<Breakdown> {
     row.breakdown.as_deref().and_then(|raw| serde_json::from_str(raw).ok())
 }
 
@@ -175,7 +177,9 @@ async fn order_returns(
 }
 
 /// Số đơn vị của mỗi dòng đơn đang nằm trong yêu cầu còn mở.
-fn open_quantities(returns: &[return_request::Model]) -> Result<HashMap<Uuid, i64>, Error> {
+pub(crate) fn open_quantities(
+    returns: &[return_request::Model],
+) -> Result<HashMap<Uuid, i64>, Error> {
     let mut open = HashMap::new();
     for row in returns.iter().filter(|row| OPEN.contains(&row.status.as_str())) {
         for line in lines_of(row)? {
@@ -183,6 +187,95 @@ fn open_quantities(returns: &[return_request::Model]) -> Result<HashMap<Uuid, i6
         }
     }
     Ok(open)
+}
+
+/// Dòng của một yêu cầu trả sau khi kiểm: dòng trả (kể cả quà phải gửi kèm), lỗi của từng dòng.
+pub(crate) struct LinePlan {
+    pub lines: Vec<ReturnLine>,
+    /// Đơn vị sẽ trả ở yêu cầu này (dòng → số), không gồm quà.
+    pub wanted: HashMap<Uuid, i64>,
+    pub problems: Vec<FieldError>,
+}
+
+/// Kiểm các dòng người mua muốn trả với dòng đơn và số đang nằm trong yêu cầu mở `open`.
+pub(crate) fn plan_lines(
+    lines: &[line::Model],
+    open: &HashMap<Uuid, i64>,
+    requested: &[(Uuid, i64)],
+    evaluation: Option<&Evaluation>,
+) -> Result<LinePlan, Error> {
+    let mut problems = Vec::new();
+    let mut wanted: HashMap<Uuid, i64> = HashMap::new();
+    for (index, (line_id, quantity)) in requested.iter().enumerate() {
+        let field = format!("lines[{index}].quantity");
+        let Some(line) = lines.iter().find(|line| line.id == *line_id) else {
+            problems.push(FieldError::new(
+                format!("lines[{index}].line_id"),
+                "not_found",
+                "is not a line of this order",
+            ));
+            continue;
+        };
+        if !line.requires_shipping || line.gift_of.is_some() {
+            problems.push(
+                FieldError::new(
+                    format!("lines[{index}].line_id"),
+                    "not_returnable",
+                    "{sku} cannot be returned (digital items, services and gifts are not \
+                     returned by themselves)",
+                )
+                .with_param("sku", line.sku.clone()),
+            );
+            continue;
+        }
+        let left = line.quantity
+            - line.returned_quantity
+            - open.get(&line.id).copied().unwrap_or(0)
+            - wanted.get(&line.id).copied().unwrap_or(0);
+        if *quantity < 1 || *quantity > left {
+            problems.push(
+                FieldError::new(field, "range", "must be from 1 to {left} for {sku}")
+                    .with_param("left", Ord::max(left, 0))
+                    .with_param("sku", line.sku.clone()),
+            );
+            continue;
+        }
+        *wanted.entry(line.id).or_insert(0) += quantity;
+    }
+    let mut plan = LinePlan { lines: Vec::new(), wanted, problems };
+    if !plan.problems.is_empty() {
+        return Ok(plan);
+    }
+    // Tính "mất điều kiện" trên mọi đơn vị sẽ rời đơn (kể cả yêu cầu khác còn mở).
+    let mut leaving = open.clone();
+    for (line_id, quantity) in &plan.wanted {
+        *leaving.entry(*line_id).or_insert(0) += quantity;
+    }
+    for line in lines {
+        if let Some(quantity) = plan.wanted.get(&line.id) {
+            plan.lines.push(ReturnLine {
+                line_id: line.id,
+                variant_id: line.variant_id,
+                quantity: *quantity,
+                gift: false,
+                received: None,
+                condition: None,
+            });
+        }
+    }
+    for (gift_id, quantity) in return_refund::gifts_to_return(lines, &leaving, evaluation)? {
+        if let Some(gift) = lines.iter().find(|line| line.id == gift_id) {
+            plan.lines.push(ReturnLine {
+                line_id: gift.id,
+                variant_id: gift.variant_id,
+                quantity,
+                gift: true,
+                received: None,
+                condition: None,
+            });
+        }
+    }
+    Ok(plan)
 }
 
 impl OrdersService {
@@ -198,62 +291,11 @@ impl OrdersService {
         if row.buyer_user_id != Some(buyer) {
             return Err(errors::order_not_found());
         }
-        let status = OrderStatus::parse(&row.status).unwrap_or(OrderStatus::Cancelled);
-        let policy = self.policy(tenant, OrgId::from_uuid(row.org_id)).await?;
-        if status == OrderStatus::Completed {
-            return Err(errors::return_window_closed(policy.return_window_days));
-        }
-        if status != OrderStatus::Delivered {
-            return Err(errors::return_not_allowed(status));
-        }
-        let delivered_at = row.delivered_at.unwrap_or(row.updated_at);
-        let deadline_at = delivered_at + Duration::days(policy.return_window_days);
-        let now = crate::service::now();
-        if now > deadline_at {
-            return Err(errors::return_window_closed(policy.return_window_days));
-        }
-        let mut problems = Vec::new();
-        let reason_allowed = policy.allowed_return_reasons.contains(&input.reason_code)
-            && self.reasons.ensure(tenant, RETURN_REASON, &input.reason_code).await.is_ok();
-        if !reason_allowed {
-            problems.push(
-                FieldError::new(
-                    "reason_code",
-                    "not_allowed",
-                    "is not a return reason this shop accepts; allowed: {allowed}",
-                )
-                .with_param("allowed", policy.allowed_return_reasons.join(", ")),
-            );
-        }
-        if !RESOLUTIONS.contains(&input.resolution.as_str()) {
-            problems.push(FieldError::new(
-                "resolution",
-                "invalid",
-                "must be `refund` or `exchange`",
-            ));
-        }
-        if !METHODS.contains(&input.return_method.as_str()) {
-            problems.push(FieldError::new(
-                "return_method",
-                "invalid",
-                "must be `pickup`, `drop_off` or `in_store`",
-            ));
-        }
-        if input.media_ids.len() > MAX_PHOTOS {
-            problems.push(
-                FieldError::new("media_ids", "length", "must have at most {max} photos")
-                    .with_param("max", MAX_PHOTOS),
-            );
-        }
-        if input.lines.is_empty() || input.lines.len() > MAX_LINES {
-            problems.push(
-                FieldError::new("lines", "length", "must have 1 to {max} lines")
-                    .with_param("max", MAX_LINES),
-            );
-        }
+        let checked = self.check_return(tenant, buyer, &row, &input).await?;
+        let (deadline_at, now) = (checked.deadline_at, crate::service::now());
         let (database, outbox) = (tenant.database(), &self.outbox);
-        let (input, policy_days) = (&input, policy.return_window_days);
-        let problems = &problems;
+        let (input, policy_days) = (&input, checked.window_days);
+        let problems = &checked.problems;
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -265,80 +307,14 @@ impl OrdersService {
                 }
                 let lines = order_lines(&transaction, tenant, order_id).await?;
                 let open = open_quantities(&order_returns(&transaction, tenant, order_id).await?)?;
+                let evaluation = evaluation_of(&current);
+                let plan = plan_lines(&lines, &open, &input.lines, evaluation.as_ref())?;
                 let mut problems = problems.clone();
-                let mut wanted: HashMap<Uuid, i64> = HashMap::new();
-                for (index, (line_id, quantity)) in input.lines.iter().enumerate() {
-                    let field = format!("lines[{index}].quantity");
-                    let Some(line) = lines.iter().find(|line| line.id == *line_id) else {
-                        problems.push(FieldError::new(
-                            format!("lines[{index}].line_id"),
-                            "not_found",
-                            "is not a line of this order",
-                        ));
-                        continue;
-                    };
-                    if !line.requires_shipping || line.gift_of.is_some() {
-                        problems.push(
-                            FieldError::new(
-                                format!("lines[{index}].line_id"),
-                                "not_returnable",
-                                "{sku} cannot be returned (digital items, services and gifts \
-                                 are not returned by themselves)",
-                            )
-                            .with_param("sku", line.sku.clone()),
-                        );
-                        continue;
-                    }
-                    let left = line.quantity
-                        - line.returned_quantity
-                        - open.get(&line.id).copied().unwrap_or(0)
-                        - wanted.get(&line.id).copied().unwrap_or(0);
-                    if *quantity < 1 || *quantity > left {
-                        problems.push(
-                            FieldError::new(field, "range", "must be from 1 to {left} for {sku}")
-                                .with_param("left", Ord::max(left, 0))
-                                .with_param("sku", line.sku.clone()),
-                        );
-                        continue;
-                    }
-                    *wanted.entry(line.id).or_insert(0) += quantity;
-                }
+                problems.extend(plan.problems);
                 if !problems.is_empty() {
                     return Err(Error::validation(problems));
                 }
-                // Tính "mất điều kiện" trên mọi đơn vị sẽ rời đơn (kể cả yêu cầu khác còn mở).
-                let mut leaving = open.clone();
-                for (line_id, quantity) in &wanted {
-                    *leaving.entry(*line_id).or_insert(0) += quantity;
-                }
-                let evaluation = evaluation_of(&current);
-                let mut return_lines: Vec<ReturnLine> = Vec::new();
-                for line in &lines {
-                    if let Some(quantity) = wanted.get(&line.id) {
-                        return_lines.push(ReturnLine {
-                            line_id: line.id,
-                            variant_id: line.variant_id,
-                            quantity: *quantity,
-                            gift: false,
-                            received: None,
-                            condition: None,
-                        });
-                    }
-                }
-                for (gift_id, quantity) in
-                    return_refund::gifts_to_return(&lines, &leaving, evaluation.as_ref())?
-                {
-                    if let Some(gift) = lines.iter().find(|line| line.id == gift_id) {
-                        return_lines.push(ReturnLine {
-                            line_id: gift.id,
-                            variant_id: gift.variant_id,
-                            quantity,
-                            gift: true,
-                            received: None,
-                            condition: None,
-                        });
-                    }
-                }
+                let return_lines = plan.lines;
                 let id = Uuid::now_v7();
                 let year = now.year();
                 let sequence =
@@ -544,6 +520,29 @@ impl OrdersService {
                     ReturnAction::Approve => {
                         updated.decided_by = Set(decided_by);
                         updated.decided_at = Set(Some(now));
+                        if stored.return_method == "pickup" {
+                            // Hãng tới lấy hàng: `shipping` nghe event, tạo vận đơn chiều về.
+                            let lines = order_lines(&transaction, tenant, current.id).await?;
+                            let wanted: Vec<Uuid> =
+                                lines_of(&stored)?.iter().map(|line| line.line_id).collect();
+                            let warehouse =
+                                returns_buyer::default_warehouse(&current, &lines, &wanted);
+                            let shipment = returns_buyer::pickup_request(
+                                &current,
+                                &stored,
+                                &lines,
+                                OrgId::from_uuid(warehouse),
+                            )?;
+                            updated.warehouse_org_id = Set(Some(warehouse));
+                            let event = ReturnPickupRequested(Change::after(json!({
+                                "return_id": id, "order_id": current.id,
+                                "tenant_id": current.tenant_id, "org_id": current.org_id,
+                                "channel": current.channel, "shipment": shipment,
+                            })));
+                            outbox
+                                .record(&transaction, tenant, actor, subject(current.id), &event)
+                                .await?;
+                        }
                     }
                     ReturnAction::Reject { reason } => {
                         updated.decided_by = Set(decided_by);
@@ -706,6 +705,7 @@ impl OrdersService {
             }));
         }
         let warehouse_org_id = warehouse
+            .or(stored.warehouse_org_id)
             .or_else(|| {
                 order_lines
                     .iter()

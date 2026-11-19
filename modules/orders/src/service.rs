@@ -9,6 +9,7 @@ use autoxide_kernel::reasons::ReasonCodes;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::DatabaseRegistry;
 use autoxide_ledger::api::Ledger;
+use autoxide_media::api::Media;
 use autoxide_organizations::api::OrgDirectory;
 use autoxide_shipping::api::AddressBook;
 
@@ -28,6 +29,7 @@ pub(crate) struct Parts {
     pub secret: SecretKey,
     pub orgs: Option<Arc<dyn OrgDirectory>>,
     pub reasons: ReasonCodes,
+    pub media: Option<Arc<dyn Media>>,
 }
 
 pub(crate) struct OrdersService {
@@ -41,6 +43,7 @@ pub(crate) struct OrdersService {
     pub secret: SecretKey,
     pub orgs: Option<Arc<dyn OrgDirectory>>,
     pub reasons: ReasonCodes,
+    pub media: Option<Arc<dyn Media>>,
     pub config: OrdersConfig,
 }
 
@@ -57,6 +60,7 @@ impl OrdersService {
             secret: parts.secret,
             orgs: parts.orgs,
             reasons: parts.reasons,
+            media: parts.media,
             config,
         }
     }

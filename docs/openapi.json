@@ -25695,6 +25695,69 @@
         ],
         "type": "object"
       },
+      "Data_OrdersReturnPreview": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What a return would give.",
+            "properties": {
+              "deadline_at": {
+                "description": "Last moment to ask.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lines": {
+                "description": "Lines to send back, gifts included when the promotion wants them back.",
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReturnLine"
+                },
+                "type": "array"
+              },
+              "methods": {
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReturnMethodOption"
+                },
+                "type": "array"
+              },
+              "photos_required": {
+                "description": "Whether this reason needs photos.",
+                "type": "boolean"
+              },
+              "refund": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Money you would get back."
+              },
+              "refund_breakdown": {
+                "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+              },
+              "refund_eta": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersRefundEta",
+                    "description": "Estimate from the payment method of the order; absent when unknown."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "refund",
+              "refund_breakdown",
+              "lines",
+              "methods",
+              "deadline_at",
+              "photos_required"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OrdersShipmentRequested": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -52688,6 +52751,31 @@
         ],
         "type": "object"
       },
+      "OrdersRefundEta": {
+        "description": "When the refund should reach you.",
+        "properties": {
+          "channel": {
+            "description": "`original_payment` (back to the card or wallet you paid with) or `bank_transfer`.",
+            "type": "string"
+          },
+          "max_days": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "min_days": {
+            "format": "int32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "min_days",
+          "max_days",
+          "channel"
+        ],
+        "type": "object"
+      },
       "OrdersRefundRequest": {
         "additionalProperties": false,
         "description": "Refund part or all of an order.",
@@ -52908,6 +52996,88 @@
         "required": [
           "line_id",
           "quantity"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnMethodOption": {
+        "description": "A way to send items back.",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "fee": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "What you pay for it (0: the shop pays); absent when it could not be priced."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "method": {
+            "description": "`pickup`, `drop_off` or `in_store`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "method",
+          "available"
+        ],
+        "type": "object"
+      },
+      "OrdersReturnPreview": {
+        "description": "What a return would give.",
+        "properties": {
+          "deadline_at": {
+            "description": "Last moment to ask.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Lines to send back, gifts included when the promotion wants them back.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnLine"
+            },
+            "type": "array"
+          },
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/OrdersReturnMethodOption"
+            },
+            "type": "array"
+          },
+          "photos_required": {
+            "description": "Whether this reason needs photos.",
+            "type": "boolean"
+          },
+          "refund": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Money you would get back."
+          },
+          "refund_breakdown": {
+            "$ref": "#/components/schemas/OrdersReturnRefundBreakdown"
+          },
+          "refund_eta": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersRefundEta",
+                "description": "Estimate from the payment method of the order; absent when unknown."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "refund",
+          "refund_breakdown",
+          "lines",
+          "methods",
+          "deadline_at",
+          "photos_required"
         ],
         "type": "object"
       },
@@ -175761,6 +175931,123 @@
           }
         },
         "summary": "Ask to return items.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/orders/me/orders/{id}/returns/preview": {
+      "post": {
+        "description": "Signed in: same body as asking to return, nothing is saved. Gives the money you would get\nback (with discounts taken back shown), the ways to send items back and their fee, when the\nrefund should arrive and the deadline. Invalid input gets the same errors as asking.",
+        "operationId": "orders_preview_my_return",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReturnRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReturnPreview"
+                }
+              }
+            },
+            "description": "The preview."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order is not delivered (`orders.return_not_allowed`) or the return window ended (`orders.return_window_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid lines, quantities, reason, method or photos (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Preview a return.",
         "tags": [
           "orders"
         ],

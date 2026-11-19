@@ -1,6 +1,8 @@
 {
+  "field:cannot be used for this order; see `methods` of the return preview": "không dùng được cho đơn này; xem `methods` của bản xem trước",
   "field:is not a line of this order": "không phải dòng của đơn này",
   "field:is not a line of this return": "không phải dòng của yêu cầu trả này",
+  "field:is not a photo you uploaded": "không phải ảnh bạn đã tải lên",
   "field:is not a return reason this shop accepts; allowed: {allowed}": "không phải lý do trả hàng cửa hàng nhận; được dùng: {allowed}",
   "field:is not an order status": "không phải trạng thái đơn hàng",
   "field:is only for signed-in buyers; send `address` instead": "chỉ dành cho người mua đã đăng nhập; hãy gửi `address`",
@@ -24,6 +26,7 @@
   "field:must have 1 to {max} lines": "phải có từ 1 tới {max} dòng",
   "field:must have at most {max} photos": "có tối đa {max} ảnh",
   "field:send either `address_id` or `address`, not both": "gửi `address_id` hoặc `address`, không gửi cả hai",
+  "field:this return reason needs photos of the items": "lý do trả này cần kèm ảnh của hàng",
   "field:{sku} cannot be returned (digital items, services and gifts are not returned by themselves)": "{sku} không trả được (hàng số, dịch vụ và quà tặng không trả riêng)",
   "orders.cancel_not_allowed": "Đơn đã qua bước được tự huỷ; hãy liên hệ cửa hàng.",
   "orders.cart_closed": "Giỏ hàng này đã được gộp hoặc đã thành đơn; hãy dùng giỏ hiện tại.",

@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use chrono::{Duration, Utc};
 use futures_util::future::join_all;
 use sea_orm::sea_query::Expr;
-use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -197,7 +197,9 @@ async fn seller_fault_return_refunds_shipping_and_reject_needs_listed_reason() {
         assert_eq!(rejected["data"]["reject_reason"], "outside_policy");
 
         // Hàng hỏng (lỗi người bán), trả cả 2: hoàn đủ tiền hàng và phí giao = đã trả 230.000.
-        let (status, asked) = buyer.send("POST", &uri, Some(return_body(shirt, 2, "damaged"))).await;
+        let mut damaged = return_body(shirt, 2, "damaged");
+        damaged["media_ids"] = json!([shop.media.upload(Uuid::from_u128(101))]);
+        let (status, asked) = buyer.send("POST", &uri, Some(damaged)).await;
         assert_eq!(status, StatusCode::CREATED, "{asked}");
         let second = asked["data"]["id"].as_str().unwrap().to_owned();
         let (status, received) = step(
@@ -287,6 +289,83 @@ async fn concurrent_refunds_never_exceed_what_was_paid() {
             )
             .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn preview_shows_refund_methods_and_eta_without_saving_and_photos_are_checked() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let (id, shirt) = delivered_order(&shop).await;
+        let buyer = Call::as_user(&shop, "buyer1");
+        let preview = format!("/me/orders/{id}/returns/preview");
+        let (status, seen) =
+            buyer.send("POST", &preview, Some(return_body(shirt, 1, "changed_mind"))).await;
+        assert_eq!(status, StatusCode::OK, "{seen}");
+        assert_eq!(minor(&seen["data"]["refund"]), 100_000);
+        assert_eq!(seen["data"]["photos_required"], false);
+        // COD: tiền hoàn chuyển khoản về người mua.
+        assert_eq!(seen["data"]["refund_eta"]["channel"], "bank_transfer");
+        let methods = seen["data"]["methods"].as_array().unwrap();
+        let method = |name: &str| methods.iter().find(|m| m["method"] == name).unwrap().clone();
+        assert_eq!(method("drop_off")["available"], true);
+        // Không phải lỗi người bán: người mua trả phí hãng lấy hàng.
+        assert_eq!(method("pickup")["available"], true);
+        assert_eq!(minor(&method("pickup")["fee"]), 30_000);
+        // Đơn không có cửa hàng nhận: không trả tại cửa hàng được.
+        assert_eq!(method("in_store")["available"], false);
+        // Không ghi gì.
+        let (_, list) = Call::as_user(&shop, "boss")
+            .send("GET", &format!("/returns?order_id={id}"), None)
+            .await;
+        assert!(list["data"].as_array().unwrap().is_empty());
+        assert_eq!(count_events(&shop, "orders.return_requested").await, 0);
+
+        // Hàng hỏng cần ảnh; ảnh của người khác bị từ chối — cùng lỗi ở xem trước và khi gửi.
+        let (status, error) =
+            buyer.send("POST", &preview, Some(return_body(shirt, 1, "damaged"))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{error}");
+        assert_eq!(error["errors"][0]["field"], "media_ids");
+        let mine = shop.media.upload(Uuid::from_u128(101));
+        let theirs = shop.media.upload(Uuid::from_u128(102));
+        let mut body = return_body(shirt, 1, "damaged");
+        body["media_ids"] = json!([mine, theirs]);
+        let (status, error) =
+            buyer.send("POST", &format!("/me/orders/{id}/returns"), Some(body.clone())).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{error}");
+        assert_eq!(error["errors"][0]["field"], "media_ids[1]");
+        // Ảnh của mình, hãng tới lấy: lỗi người bán nên phí lấy hàng 0.
+        body["media_ids"] = json!([mine]);
+        body["return_method"] = json!("pickup");
+        let (status, seen) = buyer.send("POST", &preview, Some(body.clone())).await;
+        assert_eq!(status, StatusCode::OK, "{seen}");
+        assert_eq!(seen["data"]["photos_required"], true);
+        let (status, asked) =
+            buyer.send("POST", &format!("/me/orders/{id}/returns"), Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{asked}");
+        assert_eq!(asked["data"]["media_ids"], json!([mine]));
+        let return_id = asked["data"]["id"].as_str().unwrap().to_owned();
+        let (status, _) = step(&shop, &return_id, json!({"action": "approve"})).await;
+        assert_eq!(status, StatusCode::OK);
+        // Duyệt trả hàng lấy tận nơi: yêu cầu hãng lấy hàng chiều về, đọc được bằng `ShipmentRequest`.
+        let read = shop.database().read();
+        let row = read
+            .query_one_raw(sea_orm::Statement::from_string(
+                read.get_database_backend(),
+                "SELECT payload FROM orders_events WHERE name = 'orders.return_pickup_requested'",
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        let payload: Value =
+            serde_json::from_str(&row.try_get_by_index::<String>(0).unwrap()).unwrap();
+        let shipment: autoxide_shipping::api::ShipmentRequest =
+            serde_json::from_value(payload["after"]["shipment"].clone()).unwrap();
+        assert_eq!(shipment.direction, autoxide_shipping::api::Direction::Return);
+        assert_eq!(shipment.items[0].quantity, 1);
+        assert_eq!(shipment.request_key, format!("return:{return_id}"));
     })
     .await
     .unwrap();

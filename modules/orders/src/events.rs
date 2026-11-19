@@ -47,6 +47,7 @@ event!(PaymentRecorded, names::PAYMENT_RECORDED);
 event!(FulfillmentRequested, names::FULFILLMENT_REQUESTED);
 event!(RefundCompleted, names::REFUND_COMPLETED);
 event!(ReturnRequested, names::RETURN_REQUESTED);
+event!(ReturnPickupRequested, names::RETURN_PICKUP_REQUESTED);
 event!(ReturnReceived, names::RETURN_RECEIVED);
 event!(ReturnStatusChanged, names::RETURN_STATUS_CHANGED);
 

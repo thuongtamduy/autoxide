@@ -8452,6 +8452,24 @@ export type Data_OrdersReturn = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersReturnPreview = {
+  /** What a return would give. */
+  data: {
+    /** Last moment to ask. */
+    deadline_at: string;
+    /** Lines to send back, gifts included when the promotion wants them back. */
+    lines: OrdersReturnLine[];
+    methods: OrdersReturnMethodOption[];
+    /** Whether this reason needs photos. */
+    photos_required: boolean;
+    /** Money you would get back. */
+    refund: Money;
+    refund_breakdown: OrdersReturnRefundBreakdown;
+    refund_eta?: OrdersRefundEta | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersShipmentRequested = {
   /** A shipment requested from the shipping module. */
   data: {
@@ -17216,6 +17234,14 @@ export type OrdersRefund = {
   updated_at: string;
 };
 
+/** When the refund should reach you. */
+export type OrdersRefundEta = {
+  /** `original_payment` (back to the card or wallet you paid with) or `bank_transfer`. */
+  channel: string;
+  max_days: number;
+  min_days: number;
+};
+
 /** Refund part or all of an order. */
 export type OrdersRefundRequest = {
   /** In the currency of the order; at most what is left to refund of one payment. */
@@ -17277,6 +17303,29 @@ export type OrdersReturnLineRequest = {
   line_id: string;
   /** Units to return (at most what is left of the line). */
   quantity: number;
+};
+
+/** A way to send items back. */
+export type OrdersReturnMethodOption = {
+  available: boolean;
+  fee?: Money | null;
+  /** `pickup`, `drop_off` or `in_store`. */
+  method: string;
+};
+
+/** What a return would give. */
+export type OrdersReturnPreview = {
+  /** Last moment to ask. */
+  deadline_at: string;
+  /** Lines to send back, gifts included when the promotion wants them back. */
+  lines: OrdersReturnLine[];
+  methods: OrdersReturnMethodOption[];
+  /** Whether this reason needs photos. */
+  photos_required: boolean;
+  /** Money you would get back. */
+  refund: Money;
+  refund_breakdown: OrdersReturnRefundBreakdown;
+  refund_eta?: OrdersRefundEta | null;
 };
 
 /** How the refund of a return was computed. */
@@ -36884,6 +36933,22 @@ export interface paths {
       requestBody: OrdersReturnRequest;
       responses: {
         201: Data_OrdersReturn;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/returns/preview": {
+    /** Preview a return. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReturnRequest;
+      responses: {
+        200: Data_OrdersReturnPreview;
         401: Problem;
         403: Problem;
         404: Problem;

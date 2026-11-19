@@ -643,7 +643,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,
       nhận về (nhập kho), hoàn qua cổng, bút toán đảo, hoá đơn điều chỉnh / thay thế (NĐ 123/2020 sửa bởi
       NĐ 70/2025 — cần đối chiếu); hoàn theo tỉ lệ khoản giảm, xử lý quà, voucher về ví (D-222)
-- [ ] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
+- [x] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
       theo phương thức thanh toán; ảnh kèm (lý do bắt buộc ảnh là chính sách theo nút); `returns/preview`
       trả tiền hoàn, cách gửi và phí, thời gian hoàn, hạn — không ghi
 - [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc

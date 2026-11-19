@@ -56,6 +56,19 @@ pub(crate) struct ReturnRequestBody {
     media_ids: Vec<Uuid>,
 }
 
+impl ReturnRequestBody {
+    fn into_input(self) -> ReturnInput {
+        ReturnInput {
+            lines: self.lines.iter().map(|line| (line.line_id, line.quantity)).collect(),
+            reason_code: self.reason_code,
+            note: self.note,
+            resolution: self.resolution.unwrap_or_else(|| "refund".to_owned()),
+            return_method: self.return_method.unwrap_or_else(|| "drop_off".to_owned()),
+            media_ids: self.media_ids,
+        }
+    }
+}
+
 /// One line of a return.
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(as = OrdersReturnLine)]
@@ -69,6 +82,19 @@ pub(crate) struct ReturnLineResponse {
     received: Option<i64>,
     /// `restock` or `damaged`, once received.
     condition: Option<String>,
+}
+
+impl From<returns::ReturnLine> for ReturnLineResponse {
+    fn from(line: returns::ReturnLine) -> Self {
+        ReturnLineResponse {
+            line_id: line.line_id,
+            variant_id: line.variant_id,
+            quantity: line.quantity,
+            gift: line.gift,
+            received: line.received,
+            condition: line.condition,
+        }
+    }
 }
 
 /// How the refund of a return was computed.
@@ -85,6 +111,19 @@ pub(crate) struct BreakdownResponse {
     /// Value of free gifts kept although their condition is no longer met.
     gift_deduction: Money,
     total: Money,
+}
+
+impl BreakdownResponse {
+    fn new(found: &Breakdown, currency: &str) -> Result<Self, Error> {
+        let money = |minor: i64| Money::from_columns(minor, currency);
+        Ok(BreakdownResponse {
+            goods: money(found.goods)?,
+            shipping: money(found.shipping)?,
+            clawback: money(found.clawback)?,
+            gift_deduction: money(found.gift_deduction)?,
+            total: money(found.total)?,
+        })
+    }
 }
 
 /// A return.
@@ -125,29 +164,11 @@ pub(crate) struct ReturnResponse {
 impl ReturnResponse {
     pub(crate) fn new(row: return_request::Model) -> Result<Self, Error> {
         let money = |minor: i64| Money::from_columns(minor, &row.currency);
-        let lines = returns::lines_of(&row)?
-            .into_iter()
-            .map(|line| ReturnLineResponse {
-                line_id: line.line_id,
-                variant_id: line.variant_id,
-                quantity: line.quantity,
-                gift: line.gift,
-                received: line.received,
-                condition: line.condition,
-            })
-            .collect();
+        let lines = returns::lines_of(&row)?.into_iter().map(ReturnLineResponse::from).collect();
         let breakdown: Option<Breakdown> =
             row.breakdown.as_deref().and_then(|raw| serde_json::from_str(raw).ok());
-        let refund_breakdown = match breakdown {
-            Some(found) => Some(BreakdownResponse {
-                goods: money(found.goods)?,
-                shipping: money(found.shipping)?,
-                clawback: money(found.clawback)?,
-                gift_deduction: money(found.gift_deduction)?,
-                total: money(found.total)?,
-            }),
-            None => None,
-        };
+        let refund_breakdown =
+            breakdown.map(|found| BreakdownResponse::new(&found, &row.currency)).transpose()?;
         Ok(ReturnResponse {
             media_ids: returns::media_of(&row),
             refund: row.refund_minor.map(money).transpose()?,
@@ -201,17 +222,103 @@ pub(crate) async fn request_return(
     Path(id): Path<Uuid>,
     ValidJson(body): ValidJson<ReturnRequestBody>,
 ) -> Result<Created<ReturnResponse>, Error> {
-    let input = ReturnInput {
-        lines: body.lines.iter().map(|line| (line.line_id, line.quantity)).collect(),
-        reason_code: body.reason_code,
-        note: body.note,
-        resolution: body.resolution.unwrap_or_else(|| "refund".to_owned()),
-        return_method: body.return_method.unwrap_or_else(|| "drop_off".to_owned()),
-        media_ids: body.media_ids,
-    };
+    let input = body.into_input();
     let row = service.request_return(&tenant, principal.user_id(), id, input).await?;
     let location = format!("/orders/me/returns/{}", row.id);
     Ok(Created::new(location, ReturnResponse::new(row)?))
+}
+
+/// A way to send items back.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersReturnMethodOption)]
+pub(crate) struct MethodOptionResponse {
+    /// `pickup`, `drop_off` or `in_store`.
+    method: String,
+    /// What you pay for it (0: the shop pays); absent when it could not be priced.
+    fee: Option<Money>,
+    available: bool,
+}
+
+/// When the refund should reach you.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersRefundEta)]
+pub(crate) struct RefundEtaResponse {
+    min_days: u16,
+    max_days: u16,
+    /// `original_payment` (back to the card or wallet you paid with) or `bank_transfer`.
+    channel: String,
+}
+
+/// What a return would give.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersReturnPreview)]
+pub(crate) struct ReturnPreviewResponse {
+    /// Money you would get back.
+    refund: Money,
+    refund_breakdown: BreakdownResponse,
+    /// Lines to send back, gifts included when the promotion wants them back.
+    lines: Vec<ReturnLineResponse>,
+    methods: Vec<MethodOptionResponse>,
+    /// Estimate from the payment method of the order; absent when unknown.
+    refund_eta: Option<RefundEtaResponse>,
+    /// Last moment to ask.
+    deadline_at: DateTime<Utc>,
+    /// Whether this reason needs photos.
+    photos_required: bool,
+}
+
+/// Preview a return.
+///
+/// Signed in: same body as asking to return, nothing is saved. Gives the money you would get
+/// back (with discounts taken back shown), the ways to send items back and their fee, when the
+/// refund should arrive and the deadline. Invalid input gets the same errors as asking.
+#[utoipa::path(
+    post,
+    path = "/me/orders/{id}/returns/preview",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "preview_my_return",
+    params(("id" = Uuid, Path, description = "Id of the order.")),
+    request_body = ReturnRequestBody,
+    responses(
+        (status = 200, description = "The preview.", body = Data<ReturnPreviewResponse>),
+        (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
+        (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
+        (status = 409, description = "The order is not delivered (`orders.return_not_allowed`) or the return window ended (`orders.return_window_closed`).", body = Problem),
+        (status = 422, description = "Invalid lines, quantities, reason, method or photos (see `errors`).", body = Problem),
+    )
+)]
+pub(crate) async fn preview_return(
+    State(service): State<Arc<OrdersService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+    ValidJson(body): ValidJson<ReturnRequestBody>,
+) -> Result<Data<ReturnPreviewResponse>, Error> {
+    let preview =
+        service.preview_return(&tenant, principal.user_id(), id, &body.into_input()).await?;
+    let methods = preview
+        .methods
+        .into_iter()
+        .map(|option| MethodOptionResponse {
+            method: option.method.to_owned(),
+            fee: option.fee,
+            available: option.available,
+        })
+        .collect();
+    let data = ReturnPreviewResponse {
+        refund: Money::from_columns(preview.breakdown.total, &preview.currency)?,
+        refund_breakdown: BreakdownResponse::new(&preview.breakdown, &preview.currency)?,
+        lines: preview.lines.into_iter().map(ReturnLineResponse::from).collect(),
+        methods,
+        refund_eta: preview.refund_eta.map(|eta| RefundEtaResponse {
+            min_days: eta.min_days,
+            max_days: eta.max_days,
+            channel: eta.channel.to_owned(),
+        }),
+        deadline_at: preview.deadline_at,
+        photos_required: preview.photos_required,
+    };
+    Ok(Data { data })
 }
 
 /// One of your returns.

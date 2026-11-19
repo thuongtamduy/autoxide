@@ -31,6 +31,7 @@ mod refunds;
 mod relocation;
 mod return_refund;
 mod returns;
+mod returns_buyer;
 mod service;
 mod shipping_events;
 mod tools;
@@ -129,6 +130,8 @@ impl Module for OrdersModule {
             // Chính sách theo nút đọc từ cài đặt kế thừa; chưa cài `organizations`: mặc định.
             orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
             reasons: context.reason_codes(),
+            // Ảnh kèm yêu cầu trả: hỏi `media` ai đã tải lên (chưa cài: không nhận ảnh).
+            media: context.require::<dyn autoxide_media::api::Media>().ok(),
         };
         let service = Arc::new(OrdersService::new(parts, config));
         // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.

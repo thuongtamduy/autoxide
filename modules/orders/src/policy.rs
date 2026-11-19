@@ -80,6 +80,25 @@ pub(crate) const ALLOWED_RETURN_REASONS: OrgSetting = OrgSetting::new(
     _ => Err("must be a list of at most 50 lower_case reason codes".to_owned()),
 });
 
+/// Mã lý do trả hàng bắt buộc kèm ảnh (D-202).
+pub(crate) const RETURN_PHOTO_REASONS: OrgSetting = OrgSetting::new(
+    "orders.return_photo_reasons",
+    "Codes of the `orders.return_reason` list for which buyers must send photos of the items.",
+)
+.with_default(r#"["damaged","wrong_item"]"#)
+.with_schema(
+    r#"{"type":"array","items":{"type":"string","pattern":"^[a-z][a-z0-9_]{0,63}$"},"maxItems":50}"#,
+)
+.checked(|value| match value.as_array() {
+    Some(codes)
+        if codes.len() <= 50
+            && codes.iter().all(|code| code.as_str().is_some_and(crate::policy::is_code)) =>
+    {
+        Ok(value.clone())
+    }
+    _ => Err("must be a list of at most 50 lower_case reason codes".to_owned()),
+});
+
 /// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
 pub(crate) fn is_code(code: &str) -> bool {
     code.len() <= 64
@@ -94,6 +113,7 @@ pub(crate) fn all() -> Vec<OrgSetting> {
         RETURN_WINDOW_DAYS,
         COD_ENABLED,
         ALLOWED_RETURN_REASONS,
+        RETURN_PHOTO_REASONS,
     ]
 }
 
@@ -105,6 +125,7 @@ pub(crate) struct Policy {
     pub return_window_days: i64,
     pub cod_enabled: bool,
     pub allowed_return_reasons: Vec<String>,
+    pub return_photo_reasons: Vec<String>,
 }
 
 impl Policy {
@@ -146,6 +167,14 @@ impl OrdersService {
         let returns = self.setting(tenant, org, &RETURN_WINDOW_DAYS).await?;
         let cod = self.setting(tenant, org, &COD_ENABLED).await?;
         let reasons = self.setting(tenant, org, &ALLOWED_RETURN_REASONS).await?;
+        let photos = self.setting(tenant, org, &RETURN_PHOTO_REASONS).await?;
+        let codes = |value: Option<Value>| -> Vec<String> {
+            value
+                .as_ref()
+                .and_then(Value::as_array)
+                .map(|codes| codes.iter().filter_map(Value::as_str).map(str::to_owned).collect())
+                .unwrap_or_default()
+        };
         Ok(Policy {
             buyer_cancel_until: cancel
                 .as_ref()
@@ -155,11 +184,8 @@ impl OrdersService {
             acceptance_hours: acceptance.as_ref().and_then(Value::as_i64).unwrap_or(0),
             return_window_days: returns.as_ref().and_then(Value::as_i64).unwrap_or(7),
             cod_enabled: cod.as_ref().and_then(Value::as_bool).unwrap_or(true),
-            allowed_return_reasons: reasons
-                .as_ref()
-                .and_then(Value::as_array)
-                .map(|codes| codes.iter().filter_map(Value::as_str).map(str::to_owned).collect())
-                .unwrap_or_default(),
+            allowed_return_reasons: codes(reasons),
+            return_photo_reasons: codes(photos),
         })
     }
 }
@@ -176,6 +202,7 @@ mod tests {
             return_window_days: 7,
             cod_enabled: true,
             allowed_return_reasons: Vec::new(),
+            return_photo_reasons: Vec::new(),
         };
         let confirmed = policy(OrderStatus::Confirmed);
         assert!(confirmed.buyer_may_cancel(OrderStatus::PendingPayment));

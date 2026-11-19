@@ -57,6 +57,17 @@ impl Earlier {
     }
 }
 
+/// Giá trị một đơn vị của dòng (tiền đã trả; quà: giá niêm yết) — khai giá trị hàng gửi trả.
+pub(crate) fn unit_value(line: &line::Model) -> i64 {
+    if line.gift_of.is_some() {
+        line.compare_at_minor.unwrap_or(0)
+    } else if line.quantity > 0 {
+        line.total_minor / line.quantity
+    } else {
+        0
+    }
+}
+
 /// Đơn vị còn giữ của từng dòng sau khi trả `returning` (đã trả trước đó: `returned_quantity`).
 fn kept(line: &line::Model, returning: &HashMap<Uuid, i64>) -> i64 {
     line.quantity - line.returned_quantity - returning.get(&line.id).copied().unwrap_or(0)
