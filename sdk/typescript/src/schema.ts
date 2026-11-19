@@ -377,6 +377,12 @@ export type ApproveSupportMacroRequest = {
   review_due_on?: string | null;
 };
 
+/** Who answers a conversation. */
+export type AssignConversationRequest = {
+  /** The colleague to assign; `null` to leave it to the whole team. */
+  assignee_user_id?: string | null;
+};
+
 /** Put a tenant on a plan. */
 export type AssignRequest = {
   /** Replace the add-ons with these; leave out to keep them. */
@@ -652,6 +658,12 @@ export type BillingProfileResponse = {
   updated_at: string;
   /** User who last changed it. */
   updated_by?: string | null;
+};
+
+/** Why a customer is blocked. */
+export type BlockConversationCustomerRequest = {
+  /** Up to 500 characters, kept for colleagues (never shown to the customer). */
+  reason?: string;
 };
 
 /**
@@ -4014,6 +4026,116 @@ export type ContentTemplateVariable = {
   required: boolean;
 };
 
+/** A conversation between a customer and a unit (shop or marketplace store). */
+export type Conversation = {
+  assignee_user_id?: string | null;
+  /** Automatic answers are stopped in this conversation (the customer asked for a person). */
+  auto_reply_paused: boolean;
+  closed_at?: string | null;
+  created_at: string;
+  /** The customer; empty after the customer deleted their account. */
+  customer_user_id?: string | null;
+  /** AI draft for an agent to edit and send (staff only); never sent by itself. */
+  draft_reply?: string | null;
+  id: string;
+  last_message_at: string;
+  /** The customer asked for a person, or an automatic answer handed the conversation over. */
+  needs_agent: boolean;
+  /** The organization unit that answers. */
+  org_id: string;
+  /** `open` or `closed`. A closed conversation takes no more messages. */
+  status: string;
+  /** The record asked about, `<kind>:<id>` (e.g. `catalog.product:<id>`). */
+  subject?: string | null;
+  /** The support ticket this conversation became. */
+  ticket_id?: string | null;
+  /**
+   * Messages from the other side you have not read: for staff, the customer's; for the
+   * customer, the shop's.
+   */
+  unread: number;
+  updated_at: string;
+};
+
+/** Whether the customer of a conversation is blocked. */
+export type ConversationBlock = {
+  blocked: boolean;
+};
+
+/** A conversation with how far each person has read it. */
+export type ConversationDetail = Conversation & {
+  reads: ConversationReadCursor[];
+};
+
+/** The support ticket a conversation became. */
+export type ConversationEscalation = {
+  thread: Conversation;
+  ticket_id: string;
+  /** Ticket number shown to the customer. */
+  ticket_number: string;
+};
+
+/** A chat message. Messages cannot be edited; a recalled message keeps its place without text. */
+export type ConversationMessage = {
+  /** `customer`, `agent` or `system` (automatic answers and call summaries). */
+  author_kind: string;
+  author_user_id?: string | null;
+  /**
+   * Sent automatically from an approved answer: show the label "Automatic answer" and a
+   * "Talk to a person" button.
+   */
+  auto_reply: boolean;
+  /** Plain text; empty when recalled. Show it as text, never as HTML. */
+  body: string;
+  /** The call this system message sums up. */
+  call_id?: string | null;
+  /** The id the sending app gave this message. */
+  client_id: string;
+  created_at: string;
+  id: string;
+  /** Images from the media library. */
+  media_ids: string[];
+  /** The author recalled the message. */
+  recalled: boolean;
+  thread_id: string;
+};
+
+/** A chat message to send. */
+export type ConversationMessageRequest = {
+  /** Plain text; may be empty when you send images. */
+  body?: string;
+  /**
+   * An id your app makes up for this message (1 to 100 characters): sending again with the same
+   * id does not add a second message.
+   */
+  client_id: string;
+  /** Images from the media library (customers: only images they uploaded); at most 5. */
+  media_ids?: string[];
+};
+
+/** How far one person has read. */
+export type ConversationReadCursor = {
+  /** The last message this person has read. */
+  last_read_message_id: string;
+  read_at: string;
+  user_id: string;
+};
+
+/** A report of abuse. */
+export type ConversationReport = {
+  created_at: string;
+  id: string;
+  message_id?: string | null;
+  org_id: string;
+  reason: string;
+  /** `customer` or `agent`. */
+  reporter_kind: string;
+  resolved_at?: string | null;
+  /** `open` or `resolved`. */
+  status: string;
+  thread_id: string;
+};
+
 /** A key to create. */
 export type CreateApiKeyRequest = {
   /**
@@ -6611,6 +6733,113 @@ export type Data_ConnectionTest = {
     error?: string | null;
     ok: boolean;
     tested_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Conversation = {
+  /** A conversation between a customer and a unit (shop or marketplace store). */
+  data: {
+    assignee_user_id?: string | null;
+    /** Automatic answers are stopped in this conversation (the customer asked for a person). */
+    auto_reply_paused: boolean;
+    closed_at?: string | null;
+    created_at: string;
+    /** The customer; empty after the customer deleted their account. */
+    customer_user_id?: string | null;
+    /** AI draft for an agent to edit and send (staff only); never sent by itself. */
+    draft_reply?: string | null;
+    id: string;
+    last_message_at: string;
+    /** The customer asked for a person, or an automatic answer handed the conversation over. */
+    needs_agent: boolean;
+    /** The organization unit that answers. */
+    org_id: string;
+    /** `open` or `closed`. A closed conversation takes no more messages. */
+    status: string;
+    /** The record asked about, `<kind>:<id>` (e.g. `catalog.product:<id>`). */
+    subject?: string | null;
+    /** The support ticket this conversation became. */
+    ticket_id?: string | null;
+    /**
+     * Messages from the other side you have not read: for staff, the customer's; for the
+     * customer, the shop's.
+     */
+    unread: number;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationBlock = {
+  /** Whether the customer of a conversation is blocked. */
+  data: {
+    blocked: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationDetail = {
+  /** A conversation with how far each person has read it. */
+  data: Conversation & {
+    reads: ConversationReadCursor[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationEscalation = {
+  /** The support ticket a conversation became. */
+  data: {
+    thread: Conversation;
+    ticket_id: string;
+    /** Ticket number shown to the customer. */
+    ticket_number: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationMessage = {
+  /** A chat message. Messages cannot be edited; a recalled message keeps its place without text. */
+  data: {
+    /** `customer`, `agent` or `system` (automatic answers and call summaries). */
+    author_kind: string;
+    author_user_id?: string | null;
+    /**
+     * Sent automatically from an approved answer: show the label "Automatic answer" and a
+     * "Talk to a person" button.
+     */
+    auto_reply: boolean;
+    /** Plain text; empty when recalled. Show it as text, never as HTML. */
+    body: string;
+    /** The call this system message sums up. */
+    call_id?: string | null;
+    /** The id the sending app gave this message. */
+    client_id: string;
+    created_at: string;
+    id: string;
+    /** Images from the media library. */
+    media_ids: string[];
+    /** The author recalled the message. */
+    recalled: boolean;
+    thread_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ConversationReport = {
+  /** A report of abuse. */
+  data: {
+    created_at: string;
+    id: string;
+    message_id?: string | null;
+    org_id: string;
+    reason: string;
+    /** `customer` or `agent`. */
+    reporter_kind: string;
+    resolved_at?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+    thread_id: string;
   };
 };
 
@@ -10443,6 +10672,15 @@ export type Data_StartResponse = {
     authorization_url: string;
     /** Seconds left to finish; after that, start again. */
     expires_in: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_StartedConversation = {
+  /** A conversation just started (or continued) with the message just sent. */
+  data: {
+    message: ConversationMessage;
+    thread: Conversation;
   };
 };
 
@@ -16804,6 +17042,11 @@ export type ModuleEvent = {
   description: string;
   name: string;
   /**
+   * The event also reaches, without `stream_permission`, the users it names as its audience
+   * (e.g. the customer and the assigned agent of a conversation).
+   */
+  stream_audience?: boolean;
+  /**
    * Permission needed to receive this event on `GET /api/v1/kernel/events/stream`; absent when
    * the event is not streamed.
    */
@@ -19164,6 +19407,89 @@ export type Page_ComplianceWebsite = {
     status: string;
     submitted_at?: string | null;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_Conversation = {
+  /** The items of this page, in the requested order. */
+  data: {
+    assignee_user_id?: string | null;
+    /** Automatic answers are stopped in this conversation (the customer asked for a person). */
+    auto_reply_paused: boolean;
+    closed_at?: string | null;
+    created_at: string;
+    /** The customer; empty after the customer deleted their account. */
+    customer_user_id?: string | null;
+    /** AI draft for an agent to edit and send (staff only); never sent by itself. */
+    draft_reply?: string | null;
+    id: string;
+    last_message_at: string;
+    /** The customer asked for a person, or an automatic answer handed the conversation over. */
+    needs_agent: boolean;
+    /** The organization unit that answers. */
+    org_id: string;
+    /** `open` or `closed`. A closed conversation takes no more messages. */
+    status: string;
+    /** The record asked about, `<kind>:<id>` (e.g. `catalog.product:<id>`). */
+    subject?: string | null;
+    /** The support ticket this conversation became. */
+    ticket_id?: string | null;
+    /**
+     * Messages from the other side you have not read: for staff, the customer's; for the
+     * customer, the shop's.
+     */
+    unread: number;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ConversationMessage = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `customer`, `agent` or `system` (automatic answers and call summaries). */
+    author_kind: string;
+    author_user_id?: string | null;
+    /**
+     * Sent automatically from an approved answer: show the label "Automatic answer" and a
+     * "Talk to a person" button.
+     */
+    auto_reply: boolean;
+    /** Plain text; empty when recalled. Show it as text, never as HTML. */
+    body: string;
+    /** The call this system message sums up. */
+    call_id?: string | null;
+    /** The id the sending app gave this message. */
+    client_id: string;
+    created_at: string;
+    id: string;
+    /** Images from the media library. */
+    media_ids: string[];
+    /** The author recalled the message. */
+    recalled: boolean;
+    thread_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ConversationReport = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    message_id?: string | null;
+    org_id: string;
+    reason: string;
+    /** `customer` or `agent`. */
+    reporter_kind: string;
+    resolved_at?: string | null;
+    /** `open` or `resolved`. */
+    status: string;
+    thread_id: string;
   }[];
   pagination: Pagination;
 };
@@ -23971,6 +24297,12 @@ export type Ratio = {
   w: number;
 };
 
+/** How far you have read. */
+export type ReadConversationRequest = {
+  /** The last message you have read; omitted: the newest message. */
+  message_id?: string | null;
+};
+
 /**
  * The kind of account: `staff` (has the permissions of their roles) or `customer` (an account of
  * one tenant's shop, without permissions).
@@ -24364,6 +24696,14 @@ export type ReplaceBookingScheduleRequest = {
 /** The whole item tree of a menu. */
 export type ReplaceSiteMenuItemsRequest = {
   items: SiteMenuItemInput[];
+};
+
+/** A report of abuse. */
+export type ReportConversationRequest = {
+  /** The message you report; omitted: the whole conversation. */
+  message_id?: string | null;
+  /** What is wrong, 1 to 1000 characters. */
+  reason: string;
 };
 
 /** A report. */
@@ -25826,6 +26166,25 @@ export type SitemapItem = {
   translations: PublicTranslation[];
 };
 
+/** The first message of a conversation. */
+export type StartConversationRequest = {
+  /** Plain text; may be empty when you send images. */
+  body?: string;
+  /**
+   * An id your app makes up for this message (1 to 100 characters): sending again with the same
+   * id does not add a second message.
+   */
+  client_id: string;
+  /** Your language (`vi`, `en`) for answers and notices. */
+  locale?: string | null;
+  /** Images you uploaded yourself (at most 5). */
+  media_ids?: string[];
+  /** The unit (shop, marketplace store) to write to. Omitted: the shop itself (root unit). */
+  org_id?: string | null;
+  /** The record you ask about, `<kind>:<id>` (e.g. `catalog.product:<id>`, `orders.order:<id>`). */
+  subject?: string | null;
+};
+
 /** A media item to upload straight to storage. */
 export type StartMediaUploadRequest = {
   /**
@@ -25899,6 +26258,12 @@ export type StartUploadRequest = {
   sha256: string;
   /** Exact size in bytes; the link only accepts this size. */
   size: number;
+};
+
+/** A conversation just started (or continued) with the message just sent. */
+export type StartedConversation = {
+  message: ConversationMessage;
+  thread: Conversation;
 };
 
 /** Where an entry is in its life. */
@@ -33579,6 +33944,384 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads": {
+    /** List your conversations. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_Conversation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Start a conversation with a shop. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: StartConversationRequest;
+      responses: {
+        200: Data_StartedConversation;
+        201: Data_StartedConversation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}": {
+    /** Get one of your conversations. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/close": {
+    /** Close one of your conversations. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/handoff": {
+    /** Talk to a person. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/messages": {
+    /** List the messages of one of your conversations. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Write in one of your conversations. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ConversationMessageRequest;
+      responses: {
+        200: Data_ConversationMessage;
+        201: Data_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/messages/{message_id}/recall": {
+    /** Recall a message you sent. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; message_id: string }; };
+      responses: {
+        200: Data_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/read": {
+    /** Mark one of your conversations as read. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReadConversationRequest;
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/reports": {
+    /** Report one of your conversations, or a message in it, as abusive. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReportConversationRequest;
+      responses: {
+        201: Data_ConversationReport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/me/threads/{id}/typing": {
+    /** Tell the shop you are typing. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/reports": {
+    /** List reports of abuse in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ConversationReport;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/reports/{id}/resolve": {
+    /** Mark a report as reviewed. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationReport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads": {
+    /** List the customer conversations in your scope (shared inbox). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; assignee?: string; unread?: boolean; needs_agent?: boolean; org_id?: string; subject?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_Conversation;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}": {
+    /** Get one customer conversation in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationDetail;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/assign": {
+    /** Assign a conversation. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AssignConversationRequest;
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/block": {
+    /** Block the customer of a conversation. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: BlockConversationCustomerRequest;
+      responses: {
+        200: Data_ConversationBlock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Lift the block of the customer of a conversation. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationBlock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/close": {
+    /** Close a conversation. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/escalate": {
+    /** Hand a conversation over as a support ticket. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_ConversationEscalation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/messages": {
+    /** List the messages of a customer conversation in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Answer the customer of a conversation. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ConversationMessageRequest;
+      responses: {
+        200: Data_ConversationMessage;
+        201: Data_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/messages/{message_id}/recall": {
+    /** Recall a message you sent. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; message_id: string }; };
+      responses: {
+        200: Data_ConversationMessage;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/read": {
+    /** Mark a conversation as read. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReadConversationRequest;
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/reports": {
+    /** Report a conversation or a message as abusive. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ReportConversationRequest;
+      responses: {
+        201: Data_ConversationReport;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/suggest-reply": {
+    /** Ask the AI for a draft answer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Conversation;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/conversations/threads/{id}/typing": {
+    /** Tell the customer you are typing. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
