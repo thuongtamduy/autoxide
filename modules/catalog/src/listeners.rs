@@ -22,10 +22,17 @@ use crate::api::events::INVENTORY_COST_CHANGED;
 use crate::entity::{price, price_list, product};
 use crate::service::CatalogService;
 
+/// Nút tổ chức đổi chỗ hay đổi trạng thái (module `organizations`): website nào thấy sản phẩm nào
+/// đổi theo cây, nên dựng lại storefront của khách.
+const UNIT_MOVED: &str = "organizations.unit_moved";
+const UNIT_STATUS_CHANGED: &str = "organizations.unit_status_changed";
+
 pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> {
     vec![
         Subscription::new(autoxide_kernel::privacy::USER_DELETED, service.clone()),
         Subscription::optional(INVENTORY_COST_CHANGED, service.clone()),
+        Subscription::optional(UNIT_MOVED, service.clone()),
+        Subscription::optional(UNIT_STATUS_CHANGED, service.clone()),
     ]
 }
 
@@ -48,6 +55,11 @@ impl EventHandler for CatalogService {
                 return Ok(());
             };
             return self.record_cost(&event.tenant, org, variant, cost).await;
+        }
+        if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
+            // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
+            let write = event.tenant.database().write();
+            return self.queue_all(write, &event.tenant).await;
         }
         Ok(())
     }

@@ -5,6 +5,7 @@ mod categories;
 mod changes;
 mod pricing;
 mod products;
+mod public;
 mod readiness;
 
 use autoxide_kernel::access::Scope;

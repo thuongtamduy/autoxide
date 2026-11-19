@@ -109,6 +109,30 @@ and optionally per category, acting as `warn` (the price is saved with a warning
 (`catalog.price_below_floor`). The rule of the closest unit wins; within a unit, the rule of the
 closest category wins. Unit costs come from the `inventory.cost_changed` event.
 
+## Public reads for websites
+
+No sign-in needed (`/api/v1/catalog/public/…`). Only products that are `active`, have a price on the
+website asking and a text in the language asked; the website comes from the domain or `?site=<unit>`.
+Every answer has an `ETag` (send it back in `If-None-Match` to get 304) and
+`Cache-Control: public, no-cache`.
+
+| Endpoint | What |
+| --- | --- |
+| `GET /public/products?locale=vi` | product cards; filters `category=<slug>` (with sub-categories), `attr.<code>=<value>[,<value>]` (filterable attributes), `price_min` / `price_max`, `q` (with or without accents), `on_sale`, `seller=<unit>`, `sold_by=own\|marketplace`, `min_rating`; `sort=newest\|price_asc\|price_desc\|best_selling\|rating` |
+| `GET /public/products/by-slug/{slug}?locale=vi` | the product page: variants with current prices, images, attributes, categories, other languages |
+| `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | visible categories (a category under a hidden one is hidden) |
+| `GET /public/sitemap` | every product address in every language, at most 200 per page |
+
+Which products a website shows: those of its own unit, of the units above it, and of sellers below
+it (`seller.own = false` on the card). A store hides a product of its chain with
+`PUT /stores/{org_id}/overrides/{product_id}` `{"hidden": true}` (`catalog.products.write` at the store).
+
+Prices on these pages are the current prices of the website's price list (the closest unit with an
+active price list), without customer group. They are kept ready in a derived table rebuilt by a
+background job after every change of price, status, price list or store choice, and every minute for
+scheduled prices that just started or ended (event `catalog.price_effective`). If the public lists ever
+look out of date, run `autoxide task catalog.rebuild_storefront [tenant=<slug>]`.
+
 ## For other modules
 
 ```rust

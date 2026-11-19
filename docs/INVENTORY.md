@@ -95,6 +95,22 @@ its own stock. `PUT /settings/{store}`:
 A reservation tries one warehouse that has every line first; with no candidate at all it answers
 `inventory.no_source`, with not enough stock `inventory.insufficient_stock` naming each line.
 
+## Transfers
+
+`POST /transfers` (`inventory.transfer` at the source) creates a draft with a number such as `CK-2026-000001`.
+`POST /transfers/{id}/ship` takes the units from the source (only stock not reserved for orders) and adds them to
+`incoming` at the destination; `POST /transfers/{id}/receive` (at the destination) receives all or part — the
+destination's average cost uses the source's cost at shipping. `close` writes off what never arrived; `cancel` works
+on drafts. MCP tools `inventory.create_transfer`, `inventory.receive_transfer`.
+
+## Stock counts
+
+`POST /counts` (`inventory.count`) opens a count (`KK-…`) for one warehouse; `PUT /counts/{id}/lines` or
+`POST /counts/{id}/import` (CSV with `sku`, `counted`, optional `reason_code`) records counted quantities. Each line
+keeps the on-hand quantity at the moment it was counted, so selling goes on while counting. `POST /counts/{id}/apply`
+(`inventory.adjust`) writes each difference `counted − expected_at_count` as a `count` ledger line with its reason
+(default `count_variance`).
+
 ## Checking the numbers
 
 `autoxide task inventory.verify_levels [tenant=<slug>] [org_id=<unit>]` compares every level with its ledger and

@@ -24,12 +24,13 @@ use validator::Validate;
 
 use crate::api::{PriceQuery, PriceSnapshot};
 use crate::categories::NewCategory;
+use crate::floors::NewGuard;
 use crate::http::dto::{
     CategoryResponse, CategoryTextDto, FloorActionDto, PriceGuardResponse, PriceListResponse,
     PriceResponse, present,
 };
 use crate::permissions::{CATEGORIES_MANAGE, PRICES_READ, PRICES_WRITE, PRODUCTS_READ};
-use crate::pricing::{NewGuard, NewPriceList, PriceInput, PriceListChanges};
+use crate::pricing::{NewPriceList, PriceInput, PriceListChanges};
 use crate::service::CatalogService;
 
 pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {

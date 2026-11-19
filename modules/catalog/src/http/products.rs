@@ -27,7 +27,8 @@ use crate::http::dto::{
     VariantResponse, present,
 };
 use crate::permissions::{PRODUCTS_PUBLISH, PRODUCTS_READ, PRODUCTS_WRITE};
-use crate::products::{MediaInput, NewProduct, ProductChanges, ProductFilter};
+use crate::product_parts::MediaInput;
+use crate::products::{NewProduct, ProductChanges, ProductFilter};
 use crate::service::CatalogService;
 use crate::variants::{OptionInput, OptionValueInput, VariantChanges};
 
