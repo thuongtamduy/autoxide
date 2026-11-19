@@ -427,7 +427,9 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
     .unwrap();
 }
 
-/// Nguồn giá giảm giả: giảm 20% mọi biến thể, hết sau một ngày.
+/// Nguồn giá giảm giả: giảm 20% biến thể có giá niêm yết từ 150 000 trở lên, hết sau một ngày.
+/// Chỉ giảm theo giá (không theo thứ tự cắm nguồn): job dựng lại storefront cả khách xếp từ trước
+/// có thể chạy sau khi cắm nguồn, và khi đó mọi sản phẩm đều được hỏi lại giá giảm.
 struct TwentyOff;
 
 #[async_trait::async_trait]
@@ -441,6 +443,7 @@ impl crate::api::SalePriceSource for TwentyOff {
     ) -> Result<Vec<crate::api::SalePrice>, autoxide_kernel::error::Error> {
         Ok(prices
             .iter()
+            .filter(|(_, price)| price.minor() >= 150_000)
             .map(|(id, price)| {
                 let sale =
                     autoxide_kernel::money::Money::new(price.minor() * 8 / 10, price.currency());
