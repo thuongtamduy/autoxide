@@ -243,7 +243,8 @@ tracing-opentelemetry = { version = "0.34", default-features = false }
 pulldown-cmark = { version = "0.13", default-features = false }
 
 # --- Chỉ dùng trong test ---
-# `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port.
+# `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port — trong test, và ở lô
+# ghi đồng bộ của kernel (bước 69 P2: chạy từng lệnh qua router con).
 tower = { version = "0.5", features = ["util"] }
 # Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
 # Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
