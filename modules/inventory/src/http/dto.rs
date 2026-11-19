@@ -170,6 +170,14 @@ pub(crate) struct AdjustmentLineRequest {
     /// Unit cost of the units added (e.g. opening stock); updates the average cost. Only with a
     /// positive quantity.
     pub unit_cost: Option<Money>,
+    /// Lot of the units: required when adding units of a variant that tracks lots; when removing,
+    /// omit it to take the lots that expire first.
+    pub lot_code: Option<String>,
+    /// Expiry date of the lot, when adding.
+    pub expires_on: Option<chrono::NaiveDate>,
+    /// Exactly `|quantity|` serial numbers when the variant tracks serials.
+    #[serde(default)]
+    pub serials: Vec<String>,
 }
 
 impl From<AdjustmentLineRequest> for AdjustLine {
@@ -180,6 +188,9 @@ impl From<AdjustmentLineRequest> for AdjustLine {
             reason_code: line.reason_code,
             note: line.note,
             unit_cost: line.unit_cost,
+            lot_code: line.lot_code,
+            expires_on: line.expires_on,
+            serials: line.serials,
         }
     }
 }

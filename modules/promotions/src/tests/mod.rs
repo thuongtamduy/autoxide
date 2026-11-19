@@ -57,6 +57,22 @@ pub(crate) struct FakeCatalog {
     /// Lịch sử giá mỗi biến thể: (từ lúc, giá).
     pub prices: Mutex<HashMap<Uuid, PriceHistory>>,
     pub floors: Mutex<HashMap<Uuid, (Money, FloorAction)>>,
+    /// Nguồn giá giảm tự động promotions cắm vào (`CatalogExtensions`).
+    pub sale_source: Mutex<Option<Arc<dyn autoxide_catalog::api::SalePriceSource>>>,
+}
+
+impl autoxide_catalog::api::CatalogExtensions for FakeCatalog {
+    fn set_sale_price_source(
+        &self,
+        source: Arc<dyn autoxide_catalog::api::SalePriceSource>,
+    ) -> bool {
+        let mut slot = self.sale_source.lock().unwrap();
+        if slot.is_some() {
+            return false;
+        }
+        *slot = Some(source);
+        true
+    }
 }
 
 impl FakeCatalog {
@@ -215,7 +231,8 @@ pub(crate) async fn setup(test: &TestDatabase, legal: bool) -> Setup {
         .member("boss", 1, root_of(DEFAULT_TENANT), &scoped(Scope::Tenant))
         .member("store_a", 2, tree.a, &scoped(Scope::Unit))
         .member("store_b", 3, tree.b, &scoped(Scope::Unit))
-        .provide::<dyn Catalog>(catalog.clone());
+        .provide::<dyn Catalog>(catalog.clone())
+        .provide::<dyn autoxide_catalog::api::CatalogExtensions>(catalog.clone());
     for buyer in 0..4u128 {
         builder = builder.user(&format!("buyer{buyer}"), 100 + buyer, &["promotions.use"]);
     }

@@ -24,6 +24,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         Box::new(CreateReservations),
         Box::new(CreateDocuments),
+        Box::new(CreateLots),
     ]
 }
 
@@ -434,5 +435,99 @@ impl MigrationTrait for CreateDocuments {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &DOCUMENT_TABLES).await
+    }
+}
+
+struct CreateLots;
+
+impl MigrationName for CreateLots {
+    fn name(&self) -> &str {
+        "m0009_create_lots_serials"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLots {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Lô của một dòng tồn. `expiry_state` không lưu: tính lúc đọc từ `expires_on`.
+        let mut lots = table("inventory_lots");
+        lots.col(schema::uuid("level_id"))
+            .col(schema::uuid("org_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::string_len("lot_code", 64))
+            .col(schema::date_null("expires_on"))
+            .col(schema::big_integer("on_hand"))
+            .col(schema::timestamp_with_time_zone("received_at"));
+        manager.create_table(lots).await?;
+        let t = "inventory_lots";
+        index(manager, t, "inventory_lots_key", &["tenant_id", "level_id", "lot_code"], true)
+            .await?;
+        index(
+            manager,
+            t,
+            "inventory_lots_expiry_idx",
+            &["tenant_id", "level_id", "expires_on"],
+            false,
+        )
+        .await?;
+        index(manager, t, "inventory_lots_org_idx", &["tenant_id", "org_id", "expires_on"], false)
+            .await?;
+        // Job hằng ngày quét lô quá hạn của cả database.
+        index(manager, t, "inventory_lots_sweep_idx", &["expires_on", "on_hand"], false).await?;
+
+        let mut serials = table("inventory_serials");
+        serials
+            .col(schema::uuid("variant_id"))
+            .col(schema::string_len("serial", 100))
+            .col(schema::uuid_null("org_id"))
+            .col(schema::string_len("status", 16))
+            .col(schema::uuid_null("order_id"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(serials).await?;
+        index(
+            manager,
+            "inventory_serials",
+            "inventory_serials_key",
+            &["tenant_id", "variant_id", "serial"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            "inventory_serials",
+            "inventory_serials_org_idx",
+            &["tenant_id", "org_id", "status"],
+            false,
+        )
+        .await?;
+
+        // Lô và serial đang đi đường của dòng chuyển kho (JSON), để kho nhận ghi lại đúng lô / serial.
+        for column in ["lots", "serials"] {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alias::new("inventory_transfer_lines"))
+                        .add_column(
+                            ColumnDef::new(Alias::new(column)).text().not_null().default("[]"),
+                        )
+                        .to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        for column in ["serials", "lots"] {
+            manager
+                .alter_table(
+                    Table::alter()
+                        .table(Alias::new("inventory_transfer_lines"))
+                        .drop_column(Alias::new(column))
+                        .to_owned(),
+                )
+                .await?;
+        }
+        drop_all(manager, &["inventory_lots", "inventory_serials"]).await
     }
 }

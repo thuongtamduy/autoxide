@@ -311,6 +311,13 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `shipping.list_shipments` | `shipping.shipments.read` | read-only |
 | `shipping.quote` | `shipping.read` | read-only |
 | `shipping.update_status` | `shipping.shipments.manage` | writes |
+| `support.add_internal_note` | `support.tickets.reply` | writes |
+| `support.get_ticket` | `support.tickets.read` | read-only |
+| `support.link_ticket` | `support.tickets.reply` | writes |
+| `support.list_tickets` | `support.tickets.read` | read-only |
+| `support.reply_ticket` | `support.tickets.reply` | writes |
+| `support.suggest_reply` | `support.tickets.reply` | writes |
+| `support.update_ticket` | `support.tickets.reply` | writes |
 | `tax.quote` | `tax.read` | read-only |
 | `tax.rates` | `tax.read` | read-only |
 | `webhooks.list_deliveries` | `webhooks.manage` | read-only |
