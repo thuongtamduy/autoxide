@@ -28,6 +28,7 @@ mod public;
 mod reasons;
 mod redemption;
 mod relocation;
+mod reminders;
 mod service;
 mod settings;
 mod tools;
@@ -115,6 +116,11 @@ impl Module for PromotionsModule {
         // thừa và múi giờ cửa hàng.
         let catalog = context.require::<dyn autoxide_catalog::api::Catalog>()?;
         let orgs = context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok();
+        // `notifications` có thì khai loại thông báo nhắc flash sale (đăng ký trước promotions).
+        let notifier = context.require::<dyn autoxide_notifications::api::Notifier>().ok();
+        if let Some(notifier) = &notifier {
+            notifier.declare(reminders::FLASH_SALE_STARTING)?;
+        }
         let service = Arc::new(PromotionsService {
             databases: context.tenancy(),
             outbox: context.outbox()?,
@@ -126,6 +132,8 @@ impl Module for PromotionsModule {
             legal_cache: legal::LegalCache::default(),
             compiled: compiled::CompiledCache::default(),
             jobs: context.jobs(),
+            consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
+            notifier,
         });
         context.personal_data(service.clone())?;
         self.service = Some(service.clone());

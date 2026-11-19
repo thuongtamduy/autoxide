@@ -1117,7 +1117,9 @@ version = "0.14.0"
 dependencies = [
  "async-trait",
  "autoxide-catalog",
+ "autoxide-compliance",
  "autoxide-kernel",
+ "autoxide-notifications",
  "autoxide-organizations",
  "autoxide-testkit",
  "axum",

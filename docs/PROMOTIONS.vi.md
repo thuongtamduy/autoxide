@@ -111,7 +111,10 @@ phục vụ) trả mã và voucher dùng được, mã chưa đủ điều kiệ
 chọn thay ô nhập mã.
 
 `GET /public/promotions/flash-sales?site=` liệt kê flash sale công khai đang chạy hay bắt đầu trong một ngày, kèm sản
-phẩm, giá sale và số suất còn ở giá đó (số thật: đã trừ suất đang giữ và đã bán).
+phẩm, giá sale và số suất còn ở giá đó (số thật: đã trừ suất đang giữ và đã bán). Người mua đã đăng nhập có thể hẹn
+nhắc trước giờ mở (`POST /public/promotions/{id}/reminders`, permission `promotions.use`; `DELETE` để bỏ): một lời
+nhắc gửi qua `notifications` mười phút trước giờ mở. Lần bấm được ghi vào sổ đồng ý là đồng ý cho đúng lời nhắc đó,
+không phải đồng ý nhận quảng cáo.
 
 ## Trả hàng
 

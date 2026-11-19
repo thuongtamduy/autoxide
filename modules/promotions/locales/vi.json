@@ -158,5 +158,10 @@
   "field:must not be after `to`": "không được sau `to`",
   "field:send 1 to {max} carts": "gửi từ 1 tới {max} giỏ",
   "field:the range must be at most {max} days": "khoảng ngày dài tối đa {max} ngày",
-  "promotions.product_not_found": "Không có sản phẩm `{product}` với biến thể này đang bán ở đây."
+  "promotions.product_not_found": "Không có sản phẩm `{product}` với biến thể này đang bán ở đây.",
+  "promotions.flash_sale_starting.title": "{title} sắp bắt đầu",
+  "promotions.flash_sale_starting.body": "Flash sale {title} bạn hẹn nhắc sẽ bắt đầu trong vài phút nữa.",
+  "promotions.flash_sale_starting.short": "{title} sắp bắt đầu",
+  "promotions.flash_sale_started": "Flash sale đã bắt đầu; không còn gì để nhắc.",
+  "promotions.too_many_reminders": "Bạn đang có {max} lời nhắc chờ gửi; hãy bỏ bớt một lời nhắc trước khi thêm."
 }

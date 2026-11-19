@@ -116,6 +116,9 @@ those that do not yet with a reason ("add X to use"), and the best selection, so
 
 `GET /public/promotions/flash-sales?site=` lists the public flash sales running now or starting within a day, with
 their products, sale prices and the units left at the sale price (a real count: held and sold units are taken off).
+A signed-in buyer can ask to be reminded before one starts (`POST /public/promotions/{id}/reminders`, permission
+`promotions.use`; `DELETE` cancels): one reminder is sent through `notifications` ten minutes before the start. Asking
+is recorded in the consent ledger as consent to that one reminder, not to advertising.
 
 ## Returns
 

@@ -491,3 +491,130 @@ async fn flash_sale_cong_khai_voi_suat_con_that() {
     .await
     .unwrap();
 }
+
+/// Job theo lịch `promotions.send_reminders` chạy ngay.
+#[derive(Debug, serde::Serialize)]
+struct SendRemindersNow {}
+
+impl autoxide_kernel::job::Job for SendRemindersNow {
+    const KIND: &'static str = crate::jobs::SEND_REMINDERS;
+}
+
+#[tokio::test]
+async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let starts = Utc::now() + Duration::hours(1);
+        let id = create(
+            &setup,
+            body(
+                setup.tree.a,
+                json!({"kind": "flash_sale", "value_bp": null, "public": true, "starts_at": starts}),
+            ),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000}]})),
+        )
+        .await;
+        let (status, activated) = activate(&setup, &id).await;
+        assert_eq!(status, StatusCode::OK, "{activated}");
+        let uri = format!("/public/promotions/{id}/reminders");
+        let (status, made) = call(&setup.app, "POST", &uri, "buyer0", None).await;
+        assert_eq!(status, StatusCode::CREATED, "{made}");
+        let (status, _) = call(&setup.app, "POST", &uri, "buyer0", None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, _) = call(&setup.app, "POST", &uri, "buyer1", None).await;
+        assert_eq!(status, StatusCode::CREATED);
+        // Đồng ý riêng cho lời nhắc, không phải quảng cáo.
+        let consents = setup.consents.0.lock().unwrap().clone();
+        assert!(consents.iter().all(|row| row.0.purpose == "promotions.flash_sale_reminder"));
+        // buyer1 đổi ý: bỏ lời nhắc, rút đồng ý.
+        let (status, _) = call(&setup.app, "DELETE", &uri, "buyer1", None).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert!(setup.consents.0.lock().unwrap().iter().any(|row| !row.2));
+
+        // Tới hạn: job gửi đúng một lần, chạy lại không gửi thêm.
+        {
+            use sea_orm::sea_query::Expr;
+            use sea_orm::EntityTrait;
+            crate::entity::reminder::Entity::update_many()
+                .col_expr(
+                    crate::entity::reminder::Column::RemindAt,
+                    Expr::value(Utc::now() - Duration::seconds(1)),
+                )
+                .exec(setup.app.database().write())
+                .await
+                .unwrap();
+        }
+        for _ in 0..2 {
+            autoxide_kernel::job::JobQueue::new("promotions")
+                .enqueue_database(
+                    setup.app.database().write(),
+                    &SendRemindersNow {},
+                    autoxide_kernel::job::EnqueueOptions::default(),
+                )
+                .await
+                .unwrap();
+            super::drain(&setup.app).await;
+        }
+        let sent = setup.notifier.0.lock().unwrap().clone();
+        assert_eq!(sent.len(), 1, "{sent:?}");
+        assert_eq!(sent[0].kind, "promotions.flash_sale_starting");
+        assert_eq!(sent[0].params["title"], "Giảm giá");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn bam_nhac_toi_dong_thoi_chi_mot_loi_nhac() {
+    TestDatabase::run(async |test| {
+        let setup = std::sync::Arc::new(setup(test, true).await);
+        let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
+        let starts = Utc::now() + Duration::hours(2);
+        let id = create(
+            &setup,
+            body(
+                setup.tree.a,
+                json!({"kind": "flash_sale", "value_bp": null, "public": true, "starts_at": starts}),
+            ),
+        )
+        .await;
+        call(
+            &setup.app,
+            "PUT",
+            &format!("/promotions/{id}/flash-items"),
+            "boss",
+            Some(json!({"items": [{"variant_id": variant, "sale_price_minor": 120000}]})),
+        )
+        .await;
+        activate(&setup, &id).await;
+        let uri = format!("/public/promotions/{id}/reminders");
+        let tasks: Vec<_> = (0..8)
+            .map(|_| {
+                let setup = setup.clone();
+                let uri = uri.clone();
+                tokio::spawn(async move { call(&setup.app, "POST", &uri, "buyer0", None).await.0 })
+            })
+            .collect();
+        let mut statuses = Vec::new();
+        for task in tasks {
+            statuses.push(task.await.unwrap());
+        }
+        assert!(statuses.iter().all(|status| status.is_success()), "{statuses:?}");
+        use sea_orm::{EntityTrait, PaginatorTrait};
+        let rows = crate::entity::reminder::Entity::find()
+            .count(setup.app.database().read())
+            .await
+            .unwrap();
+        assert_eq!(rows, 1);
+    })
+    .await
+    .unwrap();
+}

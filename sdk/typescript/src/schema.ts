@@ -8792,6 +8792,18 @@ export type Data_PromotionsRedemption = {
 };
 
 /** Envelope of a single result. */
+export type Data_PromotionsReminder = {
+  /** A reminder of a flash sale. */
+  data: {
+    promotion_id: string;
+    /** When the reminder is sent. */
+    remind_at: string;
+    /** When it was sent; `null` until then. */
+    sent_at?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_PromotionsVoucher = {
   /** A one-time voucher in a user's wallet. */
   data: {
@@ -21755,6 +21767,15 @@ export type PromotionsRejectedCode = {
   code?: string | null;
   reason: PromotionsReason;
   voucher_id?: string | null;
+};
+
+/** A reminder of a flash sale. */
+export type PromotionsReminder = {
+  promotion_id: string;
+  /** When the reminder is sent. */
+  remind_at: string;
+  /** When it was sent; `null` until then. */
+  sent_at?: string | null;
 };
 
 export type PromotionsRewardSelection = "cheapest" | "same_item" | "specified";
@@ -37996,6 +38017,31 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/promotions/public/promotions/{id}/reminders": {
+    /** Ask to be reminded when a flash sale starts. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_PromotionsReminder;
+        201: Data_PromotionsReminder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Cancel your reminder of a flash sale. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
