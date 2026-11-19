@@ -181,6 +181,8 @@ pub(crate) mod reservation_line {
         pub released_quantity: i64,
         pub backordered: bool,
         pub preordered: bool,
+        /// Dòng đặt trước: hàng về đã chia (cộng dồn).
+        pub allocated_quantity: i64,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -553,6 +555,27 @@ pub(crate) mod supplier_return_line {
         pub unit_cost_currency: String,
         pub lot_code: Option<String>,
         pub serials: String,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+pub(crate) mod preorder_counter {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "inventory_preorder_counters")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub variant_id: Uuid,
+        /// Suất đang giữ / đã xác nhận; chỉ đổi bằng `rows::adjust`.
+        pub reserved: i64,
+        pub preorder_limit: i64,
+        pub updated_at: DateTimeUtc,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

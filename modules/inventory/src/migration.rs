@@ -26,6 +26,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateDocuments),
         Box::new(CreateLots),
         Box::new(CreatePurchasing),
+        Box::new(CreatePreorders),
     ]
 }
 
@@ -729,5 +730,60 @@ impl MigrationTrait for CreatePurchasing {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &PURCHASING_TABLES).await
+    }
+}
+
+struct CreatePreorders;
+
+impl MigrationName for CreatePreorders {
+    fn name(&self) -> &str {
+        "m0011_create_preorders"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreatePreorders {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Suất đặt trước theo biến thể (D-204). `preorder_limit` chép từ `catalog` mỗi lần giữ.
+        let mut counters = table("inventory_preorder_counters");
+        counters
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("reserved"))
+            .col(schema::big_integer("preorder_limit"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(counters).await?;
+        index(
+            manager,
+            "inventory_preorder_counters",
+            "inventory_preorder_counters_key",
+            &["tenant_id", "variant_id"],
+            true,
+        )
+        .await?;
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("inventory_reservation_lines"))
+                    .add_column(
+                        ColumnDef::new(Alias::new("allocated_quantity"))
+                            .big_integer()
+                            .not_null()
+                            .default(0),
+                    )
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Alias::new("inventory_reservation_lines"))
+                    .drop_column(Alias::new("allocated_quantity"))
+                    .to_owned(),
+            )
+            .await?;
+        drop_all(manager, &["inventory_preorder_counters"]).await
     }
 }
