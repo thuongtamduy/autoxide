@@ -33,5 +33,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0006_org::Migration),
         // Đường người làm vào khách (bước 34, D-310).
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "notes"),
+        // Luồng thay đổi cho app ngoại tuyến (bước 69 P2).
+        autoxide_kernel::sync::changes_migration("k0002_sync_changes", "notes"),
     ]
 }

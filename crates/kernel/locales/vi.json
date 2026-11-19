@@ -290,6 +290,8 @@
   "tenancy.relocation_schema_differs": "Database của vị trí dữ liệu `{placement}` còn thiếu {pending} migration. Chạy `autoxide migrate up --all` trước.",
   "tenancy.relocation_tenant_exists": "Đã có khách mang ID `{id}`, nên nhánh không thành khách với ID đó được.",
   "tenancy.sandbox_forbidden": "Bản thử không làm được việc `{action}`; làm việc này ở khách hàng thật.",
+  "field:every prefix must start with `https://` or `http://`": "mỗi tiền tố phải bắt đầu bằng `https://` hoặc `http://`",
+  "tenancy.sandbox_only": "Việc này chỉ làm được trong một bản thử; gửi header `Autoxide-Tenant: <id bản thử>`.",
   "tenancy.sandbox_nested": "Không tạo được bản thử từ một bản thử; tạo từ khách hàng thật.",
   "tenancy.sandbox_not_found": "Không có bản thử `{id}` của khách hàng này.",
   "tenant_domain_dns_failed": "Tra DNS không được: {error}",
@@ -391,5 +393,12 @@
   "validation_failed": "Request có giá trị không hợp lệ. Xem `errors` để biết từng trường sai gì.",
   "web_push_disabled": "Máy chủ chưa cấu hình thông báo đẩy trên trình duyệt.",
   "zns_disabled": "Máy chủ chưa cấu hình gửi tin Zalo ZNS.",
-  "text:See queue backlogs, dead jobs, undelivered events, database connections and the newest backup of every database (platform staff only).": "Xem tồn đọng của hàng đợi, job hỏng hẳn, event chưa giao, kết nối database và bản backup mới nhất của mọi database (chỉ nhân sự nền tảng)."
+  "text:See queue backlogs, dead jobs, undelivered events, database connections and the newest backup of every database (platform staff only).": "Xem tồn đọng của hàng đợi, job hỏng hẳn, event chưa giao, kết nối database và bản backup mới nhất của mọi database (chỉ nhân sự nền tảng).",
+  "sync_cursor_expired": "Con trỏ này cũ hơn các thay đổi máy chủ còn giữ. Hãy tải lại danh sách, rồi hỏi thay đổi không kèm `cursor`.",
+  "field:must be the `cursor` of a change this endpoint returned": "phải là `cursor` của một thay đổi endpoint này đã trả",
+  "field:must hold 1 to {max} writes": "phải có từ 1 tới {max} lệnh ghi",
+  "field:must be 1 to 100 characters": "phải dài 1 đến 100 ký tự",
+  "field:must be a path under a sync resource (`GET /api/v1/kernel/sync/resources`)": "phải là đường dẫn dưới một loại bản ghi đồng bộ được (`GET /api/v1/kernel/sync/resources`)",
+  "field:is required: keep one key per queued write": "là bắt buộc: giữ một key cho mỗi lệnh ghi đang chờ",
+  "field:must be visible ASCII characters": "chỉ gồm ký tự ASCII nhìn thấy được"
 }

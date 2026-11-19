@@ -34,6 +34,8 @@ pub(crate) struct RequestAuthenticator {
     pub delegations: Arc<crate::delegation::DelegationService>,
     /// Quyền vào hỗ trợ của nhân sự nền tảng (D-313).
     pub support: Arc<crate::support::SupportService>,
+    /// Rào quyền tối đa khách cấp trên đặt (bước 54): áp cho mọi đường vào.
+    pub guardrails: Arc<crate::guardrail::GuardrailService>,
 }
 
 #[async_trait::async_trait]
@@ -48,7 +50,8 @@ impl Authenticator for RequestAuthenticator {
         let token = bearer_token(authorization)?;
         if let Some(tenant) = api_key::tenant_of(token)? {
             let tenant = self.tenant(tenant, api_key::invalid_api_key).await?;
-            return self.api_keys.authenticate(&tenant, token).await;
+            let principal = self.api_keys.authenticate(&tenant, token).await?;
+            return self.guardrails.apply(principal).await;
         }
         // Chữ ký kiểm bằng khoá của khách ghi trong token TRƯỚC khi tra khách: `tid` giả không
         // dò được khách nào tồn tại.
@@ -67,7 +70,7 @@ impl Authenticator for RequestAuthenticator {
         if user.realm == autoxide_kernel::access::Realm::Customer {
             return Ok(Principal::customer(user.id).in_tenant(tenant.id()));
         }
-        Ok(principal)
+        self.guardrails.apply(principal).await
     }
 
     async fn enter(
@@ -75,10 +78,15 @@ impl Authenticator for RequestAuthenticator {
         principal: &Principal,
         target: &TenantContext,
     ) -> Result<Option<Principal>, Error> {
-        if let Some(entered) = self.delegations.enter(principal, target).await? {
-            return Ok(Some(entered));
+        // Người từ khách khác vào cũng bị rào của khách được vào.
+        let entered = match self.delegations.enter(principal, target).await? {
+            Some(entered) => Some(entered),
+            None => self.support.enter(principal, target).await?,
+        };
+        match entered {
+            Some(entered) => Ok(Some(self.guardrails.apply(entered).await?)),
+            None => Ok(None),
         }
-        self.support.enter(principal, target).await
     }
 
     // Nhân sự nền tảng chỉ vào dữ liệu khách bằng lần cấp có thời hạn (D-190, D-313).
@@ -93,10 +101,14 @@ impl Authenticator for RequestAuthenticator {
         user_id: uuid::Uuid,
     ) -> Result<Option<Principal>, Error> {
         let found = self.roles.user_principal(tenant, user_id).await?;
-        Ok(found.and_then(|(user, principal)| {
+        let principal = found.and_then(|(user, principal)| {
             (user.is_active() && user.realm != autoxide_kernel::access::Realm::Customer)
                 .then_some(principal)
-        }))
+        });
+        match principal {
+            Some(principal) => Ok(Some(self.guardrails.apply(principal).await?)),
+            None => Ok(None),
+        }
     }
 }
 

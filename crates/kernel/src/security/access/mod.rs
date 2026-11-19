@@ -400,8 +400,9 @@ pub struct Principal {
     /// Loại bên làm theo credential (API key `agent`, `service`…).
     kind: ActorKind,
     /// Permission bị role cấm (bước 54, deny thắng allow): đã bỏ khỏi `grants`; giữ tên để lỗi
-    /// nói rõ lý do (`denied_by_role`) thay vì "thiếu".
-    denied: Arc<BTreeSet<String>>,
+    /// nói rõ lý do (`denied_by_role`) thay vì "thiếu". Permission ngoài rào của khách (bước 54)
+    /// cũng bị bỏ, lý do `outside_guardrail`.
+    denied: Arc<BTreeMap<String, &'static str>>,
     /// Dải IP được gọi (API key khai `allowed_ips`, bước 54); `None`: mọi địa chỉ.
     networks: Option<Arc<Vec<crate::config::IpRange>>>,
 }
@@ -460,7 +461,9 @@ impl PrincipalSnapshot {
             fence: self.fence.map(OrgId::from_uuid),
             access: self.access,
             kind: self.kind,
-            denied: Arc::new(self.denied.iter().cloned().collect()),
+            denied: Arc::new(
+                self.denied.iter().map(|name| (name.clone(), DENIED_BY_ROLE)).collect(),
+            ),
             // Job chạy không có request nên không có địa chỉ để kiểm: địa chỉ đã kiểm lúc yêu cầu.
             networks: None,
         }
@@ -497,7 +500,7 @@ impl Principal {
             fence: self.fence.map(|fence| fence.as_uuid()),
             access: self.access,
             kind: self.kind,
-            denied: self.denied.iter().cloned().collect(),
+            denied: self.denied.keys().cloned().collect(),
         }
     }
 }
@@ -620,14 +623,30 @@ impl Principal {
     /// permission thêm sau vẫn có ở request kế.
     #[must_use]
     pub fn without(
-        mut self,
+        self,
         denied: impl IntoIterator<Item = String>,
         catalog: &PermissionCatalog,
     ) -> Self {
         let denied: BTreeSet<String> = denied.into_iter().collect();
-        if denied.is_empty() {
-            return self;
-        }
+        self.remove(|name| denied.contains(name), DENIED_BY_ROLE, catalog)
+    }
+
+    /// Chỉ giữ permission nằm trong rào của khách (bước 54, như SCP của AWS): khách cha / nền tảng
+    /// đặt quyền tối đa cho khách con, không role nào của khách con — kể cả `admin` — vượt được.
+    /// `allowed`: `None` khi khách không bị rào.
+    #[must_use]
+    pub fn within(self, allowed: Option<&BTreeSet<String>>, catalog: &PermissionCatalog) -> Self {
+        let Some(allowed) = allowed else { return self };
+        self.remove(|name| !allowed.contains(name), OUTSIDE_GUARDRAIL, catalog)
+    }
+
+    /// Bỏ mọi permission `drop` chọn, ghi `reason` cho lỗi về sau.
+    fn remove(
+        mut self,
+        drop: impl Fn(&str) -> bool,
+        reason: &'static str,
+        catalog: &PermissionCatalog,
+    ) -> Self {
         let root = root_of(self.tenant);
         let mut kept: BTreeMap<String, Vec<Grant>> = match &self.grants {
             Grants::All => catalog
@@ -638,10 +657,30 @@ impl Principal {
                 .collect(),
             Grants::Only(map) => (**map).clone(),
         };
-        kept.retain(|name, _| !denied.contains(name));
+        let mut removed: Vec<String> = Vec::new();
+        // Tên bị bỏ ghi theo danh mục: cả permission người gọi chưa từng có cũng mang lý do đúng.
+        for permission in catalog.iter() {
+            if drop(permission.name) {
+                removed.push(permission.name.to_owned());
+            }
+        }
+        for name in kept.keys() {
+            if drop(name) && !removed.contains(name) {
+                removed.push(name.clone());
+            }
+        }
+        // Không bỏ gì: giữ nguyên, kể cả "mọi permission" (gồm cả permission thêm sau).
+        if removed.is_empty() {
+            return self;
+        }
+        kept.retain(|name, _| !drop(name));
         self.grants = Grants::Only(Arc::new(kept));
         let mut all = (*self.denied).clone();
-        all.extend(denied);
+        for name in removed {
+            // Lý do đầu tiên giữ nguyên: rào áp sau role cấm, nhưng permission bị cả hai chặn
+            // thì nói lý do của role (người trong khách sửa được).
+            all.entry(name).or_insert(reason);
+        }
         self.denied = Arc::new(all);
         self
     }
@@ -669,14 +708,15 @@ impl Principal {
         ))
     }
 
-    /// Permission `name` bị một role cấm.
+    /// Permission `name` bị một role cấm hay nằm ngoài rào của khách.
     pub fn is_denied(&self, name: &str) -> bool {
-        self.denied.contains(name)
+        self.denied.contains_key(name)
     }
 
-    /// Lỗi 403 `permission_denied` cho `permission`, với `reason` `denied_by_role` hay `missing`.
+    /// Lỗi 403 `permission_denied` cho `permission`, với `reason` `denied_by_role`,
+    /// `outside_guardrail` hay `missing`.
     fn refuse(&self, permission: &Permission) -> Error {
-        let reason = if self.is_denied(permission.name) { "denied_by_role" } else { "missing" };
+        let reason = self.denied.get(permission.name).copied().unwrap_or("missing");
         permission_denied(permission).with_reason(reason)
     }
 
@@ -812,6 +852,11 @@ impl Principal {
         Err(self.refuse(permission))
     }
 }
+
+/// Lý do `permission_denied`: một role của người gọi cấm permission.
+const DENIED_BY_ROLE: &str = "denied_by_role";
+/// Lý do `permission_denied`: permission nằm ngoài rào khách cha đặt cho khách này.
+const OUTSIDE_GUARDRAIL: &str = "outside_guardrail";
 
 fn permission_denied(permission: &Permission) -> Error {
     Error::forbidden(

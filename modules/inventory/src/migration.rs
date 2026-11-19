@@ -27,6 +27,17 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateLots),
         Box::new(CreatePurchasing),
         Box::new(CreatePreorders),
+        // Báo khi có hàng lại (mục 9, D-201): bảng đăng ký, bảng throttle và nonce chống spam của kernel.
+        Box::new(crate::alerts::migration::CreateRestockAlerts),
+        autoxide_kernel::throttle::throttle_migration("m0013_create_throttle", "inventory"),
+        autoxide_kernel::antispam::antispam_migration("m0014_create_antispam_nonces", "inventory"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0015_tenancy_antispam",
+            vec![
+                autoxide_kernel::throttle::tenant_table("inventory"),
+                autoxide_kernel::antispam::tenant_table("inventory"),
+            ],
+        ),
     ]
 }
 

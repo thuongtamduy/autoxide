@@ -120,7 +120,7 @@ impl OrdersService {
             let view = self.view(tenant, existing, &Owner::Buyer(buyer)).await?;
             return Ok(Submitted::Replayed(NewCart { view, token: None }));
         }
-        let now = Utc::now();
+        let now = crate::service::now();
         let token = if buyer.is_none() { Some(random_token(32)?) } else { None };
         let row = cart::ActiveModel {
             id: Set(Uuid::now_v7()),
@@ -192,7 +192,7 @@ impl OrdersService {
             .scoped(tenant)
             .one(tenant.database().read())
             .await?
-            .filter(|row| row.expires_at > Utc::now())
+            .filter(|row| row.expires_at > crate::service::now())
             .ok_or_else(errors::cart_not_found)?;
         let owned = match owner {
             Owner::Buyer(user) => row.buyer_user_id == Some(*user),
@@ -292,7 +292,7 @@ impl OrdersService {
             payment_method: row.payment_method.clone(),
             client: Some("web".to_owned()),
             first_order: false,
-            at: Utc::now(),
+            at: crate::service::now(),
         })
     }
 
@@ -324,7 +324,7 @@ impl OrdersService {
                 let existing = cart_line::Entity::find_by_id((tenant_id, cart_id, variant))
                     .one(&transaction)
                     .await?;
-                let now = Utc::now();
+                let now = crate::service::now();
                 match (existing, quantity) {
                     (Some(line), 0) => {
                         cart_line::Entity::delete_by_id((
@@ -419,7 +419,7 @@ impl OrdersService {
         let row = self.editable_cart(tenant, id, owner).await?;
         let mut active: cart::ActiveModel = row.into();
         edit(&mut active);
-        let now = Utc::now();
+        let now = crate::service::now();
         active.updated_at = Set(now);
         active.expires_at = Set(now + Duration::days(self.config.cart_ttl_days));
         active.abandoned_notified_at = Set(None);
@@ -654,7 +654,7 @@ impl OrdersService {
                     .filter(cart_line::Column::CartId.eq(target_id))
                     .count(&transaction)
                     .await?;
-                let now = Utc::now();
+                let now = crate::service::now();
                 for line in lines {
                     let existing =
                         cart_line::Entity::find_by_id((tenant_id, target_id, line.variant_id))
@@ -741,7 +741,7 @@ async fn touch(
     cart_id: Uuid,
     ttl_days: i64,
 ) -> Result<(), Error> {
-    let now: DateTime<Utc> = Utc::now();
+    let now: DateTime<Utc> = crate::service::now();
     cart::Entity::update_many()
         .col_expr(cart::Column::Status, Expr::value(ACTIVE))
         .col_expr(cart::Column::UpdatedAt, Expr::value(now))

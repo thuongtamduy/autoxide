@@ -75,7 +75,7 @@ fn money(minor: i64, currency: &str) -> Money {
         .unwrap_or_else(|_| Money::new(0, autoxide_kernel::money::Currency::VND))
 }
 
-fn summary(row: shipment::Model) -> Result<SummaryBody, Error> {
+pub(crate) fn summary(row: shipment::Model) -> Result<SummaryBody, Error> {
     let address = crate::shipments::address_of_shipment(&row)?;
     Ok(SummaryBody {
         status: status_of(&row),
@@ -153,7 +153,7 @@ pub(crate) struct DetailBody {
     events: Vec<EventBody>,
 }
 
-fn detail(view: ShipmentView) -> Result<DetailBody, Error> {
+pub(crate) fn detail(view: ShipmentView) -> Result<DetailBody, Error> {
     Ok(DetailBody {
         shipment: summary(view.shipment)?,
         parcels: view

@@ -7,6 +7,7 @@ pub(crate) mod api_keys;
 mod customers;
 mod delegations;
 mod email;
+mod guardrails;
 pub(crate) mod invitations;
 mod login_link;
 pub(crate) mod memberships;
@@ -57,6 +58,8 @@ pub(crate) struct HttpState {
     pub login_links: Arc<crate::login_link::LoginLinks>,
     /// Uỷ quyền theo cây khách hàng (D-310).
     pub delegations: Arc<crate::delegation::DelegationService>,
+    /// Rào quyền tối đa cho khách con (bước 54).
+    pub guardrails: Arc<crate::guardrail::GuardrailService>,
     /// Xác nhận lại danh tính (`POST /me/reauth`, D-308).
     pub reauth: Arc<crate::reauth::Reauthentication>,
     /// Dữ liệu cá nhân của mọi module, cho `GET /me/export`.
@@ -76,6 +79,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(users::routes())
         .merge(api_keys::routes())
         .merge(api_key_rotation::routes())
+        .merge(guardrails::routes())
         .merge(mfa::routes())
         .merge(reset::routes())
         .merge(email::routes())

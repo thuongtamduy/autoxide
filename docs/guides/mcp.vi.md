@@ -220,6 +220,7 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
+| `kernel.list_sandbox_messages` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_sandboxes` | `kernel.sandboxes.read` | read-only |
 | `kernel.list_settings` | `kernel.settings.manage` | read-only |
 | `kernel.list_tenants` | `kernel.tenants.read` | read-only |
@@ -275,6 +276,10 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `notifications.preview_template` | `notifications.templates.read` or `notifications.templates.manage` | read-only |
 | `notifications.send_notification` | `notifications.send` | writes |
 | `notifications.update_template_draft` | `notifications.templates.manage` | writes |
+| `orders.get_order` | `orders.read` | read-only |
+| `orders.list_orders` | `orders.read` | read-only |
+| `orders.request_shipment` | `orders.manage` | writes |
+| `orders.transition_order` | `orders.manage` | destructive |
 | `organizations.add_group_members` | `organizations.groups.manage` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
 | `organizations.create_group` | `organizations.groups.manage` | writes |
@@ -315,6 +320,13 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `reporting.facts` | `reporting.read` | read-only |
 | `reporting.kinds` | `reporting.read` | read-only |
 | `reporting.summary` | `reporting.read` | read-only |
+| `shipping.book_shipment` | `shipping.shipments.manage` | writes |
+| `shipping.cancel_shipment` | `shipping.shipments.manage` | destructive |
+| `shipping.get_shipment` | `shipping.shipments.read` | read-only |
+| `shipping.list_cod_discrepancies` | `shipping.cod.read` or `shipping.cod.manage` | read-only |
+| `shipping.list_shipments` | `shipping.shipments.read` | read-only |
+| `shipping.quote` | `shipping.read` | read-only |
+| `shipping.update_status` | `shipping.shipments.manage` | writes |
 | `support.add_internal_note` | `support.tickets.reply` | writes |
 | `support.get_ticket` | `support.tickets.read` | read-only |
 | `support.link_ticket` | `support.tickets.reply` | writes |

@@ -14,6 +14,7 @@ autoxide-catalog.workspace = true
 autoxide-inventory.workspace = true
 autoxide-kernel.workspace = true
 autoxide-ledger.workspace = true
+autoxide-organizations.workspace = true
 autoxide-promotions.workspace = true
 autoxide-shipping.workspace = true
 autoxide-tax.workspace = true
@@ -30,6 +31,7 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
+futures-util.workspace = true
 tokio.workspace = true
 
 [lints]

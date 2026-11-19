@@ -6,21 +6,31 @@
 //! Đặc tả: `docs/steps/45-orders.md`.
 
 mod abandoned;
+mod accounting;
+mod actions;
 pub mod api;
 mod carts;
+mod checkout;
 mod config;
 mod entity;
 mod errors;
 mod events;
 mod extensions;
+mod holds;
 mod http;
 mod jobs;
+mod lifecycle;
 mod migration;
+mod orders_read;
+mod payments;
 mod permissions;
+mod policy;
 mod pricing;
 mod reasons;
 mod relocation;
 mod service;
+mod shipping_events;
+mod tools;
 
 #[cfg(test)]
 mod tests;
@@ -75,6 +85,10 @@ impl Module for OrdersModule {
         events::all()
     }
 
+    fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
+        policy::all()
+    }
+
     fn reason_lists(&self) -> Vec<autoxide_kernel::reasons::ReasonList> {
         reasons::lists()
     }
@@ -106,8 +120,17 @@ impl Module for OrdersModule {
             units: context.require::<dyn autoxide_address::api::AdministrativeUnits>().ok(),
             extensions: self.extensions.clone(),
             databases: context.tenancy(),
+            // `ledger` đăng ký trước `orders`; chưa cài thì chỉ nhận COD.
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            secret: (*context.require::<autoxide_kernel::secret::SecretKey>()?).clone(),
+            // Chính sách theo nút đọc từ cài đặt kế thừa; chưa cài `organizations`: mặc định.
+            orgs: context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
         };
-        self.service = Some(Arc::new(OrdersService::new(parts, config)));
+        let service = Arc::new(OrdersService::new(parts, config));
+        // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
+        context.provide::<dyn api::Orders>(service.clone())?;
+        context.provide::<dyn api::OrderHolds>(service.clone())?;
+        self.service = Some(service);
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;
         Ok(())
@@ -119,6 +142,25 @@ impl Module for OrdersModule {
 
     fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
         jobs::schedules()
+    }
+
+    fn subscriptions(&self) -> Vec<autoxide_kernel::event::Subscription> {
+        let Some(service) = self.service.clone() else {
+            return Vec::new();
+        };
+        let mut all = holds::subscriptions(&service);
+        all.extend(accounting::subscriptions(&service));
+        all.extend(shipping_events::subscriptions(&service));
+        // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
+        all.push(autoxide_kernel::event::Subscription::optional(
+            payments::LEDGER_PAYMENT_SUCCEEDED,
+            Arc::new(payments::LedgerEvents(service)),
+        ));
+        all
+    }
+
+    fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {
+        self.service.as_ref().map_or_else(Vec::new, tools::all)
     }
 
     fn routes(&self) -> OpenApiRouter {

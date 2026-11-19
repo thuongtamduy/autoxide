@@ -144,6 +144,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-213** Job API chung, xuất danh sách chung, yêu cầu duyệt đầy đủ (bước 51) — 2026-11-14
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
+- **[D-20261119-step69-sync](D-20261119-step69-sync.md)** Đồng bộ khi mất mạng: luồng thay đổi `<module>_changes` theo con trỏ, `412` kèm bản hiện tại, lô ghi chạy từng lệnh như request REST — 2026-11-19
 
 ## MCP, AI, agent dùng API
 
@@ -227,6 +228,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step54-one-decision](D-20261118-step54-one-decision.md)** Bước 54 mục 1: một hàm quyết định quyền; cache theo phiên bản quyền tách thành mục riêng, chờ số đo — 2026-11-18
 - **[D-20261118-step54-role-denies](D-20261118-step54-role-denies.md)** Bước 54: role cấm permission (deny thắng allow) — 2026-11-18
 - **[D-20261119-step54-api-key-limits](D-20261119-step54-api-key-limits.md)** Bước 54: API key có hạn bắt buộc và dải IP — 2026-11-19
+- **[D-20261119-step54-guardrails](D-20261119-step54-guardrails.md)** Bước 54: rào quyền tối đa cho khách con — 2026-11-19
+- **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 
 ## Đa khách, tổ chức, gói
 
@@ -270,6 +273,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step38-relocation](D-20261118-step38-relocation.md)** Tách / gộp khách: chính sách theo bảng, giữ khoá chính, audit ghi lại ở đích, chỉ nhân sự nền tảng chạy — 2026-11-18
 - **[D-20261118-step38-report-facts](D-20261118-step38-report-facts.md)** Báo cáo gộp: `Module::facts`, kho ở database của khách gốc, hai chặng cục bộ → gốc — 2026-11-18
 - **[D-20261118-step38-sandbox](D-20261118-step38-sandbox.md)** Khách thử nghiệm, phần nền: cột của `kernel_tenants`, cùng placement, hạn mức mặc định 1, uỷ quyền vào bằng event — 2026-11-18
+- **[D-20261119-step38-sandbox-isolation](D-20261119-step38-sandbox-isolation.md)** Sandbox cách ly: kernel bọc hợp đồng đối tác lúc công bố, hộp thư giả `kernel_sandbox_messages` — 2026-11-19
 
 ## Hợp đồng cho giao diện
 
@@ -457,8 +461,12 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-api](D-20261118-step44-shipping-api.md)** Module `shipping`: hợp đồng `api` cho bước 45, sổ hãng `CarrierRegistry`, sổ địa chỉ không cần permission, địa chỉ nước ngoài trong `Address` — 2026-11-18
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
+- **[D-20261118-step44-shipping-dates](D-20261118-step44-shipping-dates.md)** `shipping`: ngày giao dự kiến theo lịch giao, giờ sẵn sàng nhận tại cửa hàng, ước tính công khai đọc biến thể qua `Catalog` — 2026-11-18
+- **[D-20261118-step44-shipping-facts](D-20261118-step44-shipping-facts.md)** `shipping`: trả lời tự động về vận đơn cho `support`, câu mẫu khai bằng `answer_text!` — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step45-carts](D-20261118-step45-carts.md)** Giỏ hàng của `orders`: báo giá ở máy chủ, `quote_token`, giỏ vãng lai, module chưa cài — 2026-11-18
+- **[D-20261118-step45-checkout](D-20261118-step45-checkout.md)** Đặt hàng của `orders`: saga giữ chỗ, chống trùng, số đơn, thanh toán qua `ledger`, máy trạng thái — 2026-11-18
+- **[D-20261118-step45-lifecycle](D-20261118-step45-lifecycle.md)** Vòng đời đơn của `orders`: chính sách là cài đặt kế thừa, theo vận đơn, bút toán doanh thu — 2026-11-18
 - **[D-20261118-step45-orders-api](D-20261118-step45-orders-api.md)** Module `orders`: hợp đồng `api` cho bước 46–49, điểm cắm `OrderExtensions`, người mua không cần permission — 2026-11-18
 - **[D-20261118-step53-escalation](D-20261118-step53-escalation.md)** `support`: chuyển khiếu nại qua `ComplaintIntake` (đích là phiếu), liên kết qua sổ đối tượng, câu trả lời mẫu — 2026-11-18
 - **[D-20261118-step53-sla](D-20261118-step53-sla.md)** `support`: chính sách hỗ trợ là một văn bản JSON theo nút, giờ làm nằm trong chính sách, mặc định SLA — 2026-11-18
@@ -468,7 +476,9 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step41-sale-price-source](D-20261119-step41-sale-price-source.md)** `catalog`: giá giảm tự động vào storefront qua điểm cắm `CatalogExtensions` — 2026-11-19
 - **[D-20261119-step42-lots-serials](D-20261119-step42-lots-serials.md)** Lô, hạn dùng và serial của `inventory`: giữ ở mức dòng tồn, chọn lô lúc xuất, hàng không gắn lô được phép — 2026-11-19
 - **[D-20261119-step42-preorders](D-20261119-step42-preorders.md)** Hàng đặt trước của `inventory`: bộ đếm suất có trần, job chia hàng về tính lại từ trạng thái — 2026-11-19
+- **[D-20261119-step42-public-availability](D-20261119-step42-public-availability.md)** Tình trạng hàng công khai của `inventory`: tính như giữ chỗ, bỏ qua biến thể ẩn, cache 5 giây — 2026-11-19
 - **[D-20261119-step42-purchasing](D-20261119-step42-purchasing.md)** Nhập hàng của `inventory`: phiếu nhập ghi sổ cái bằng job, sổ của nút mua hàng, công nợ đọc qua `Ledger::balances` — 2026-11-19
+- **[D-20261119-step42-restock-alerts](D-20261119-step42-restock-alerts.md)** Báo khi có hàng lại của `inventory`: tin giao dịch đã xác nhận hai bước, giành lượt bằng `armed`, ở lại khách gốc khi tách — 2026-11-19
 
 ## Vận hành và hiệu năng
 
@@ -484,3 +494,6 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step39-ops-backlog-api](D-20261118-step39-ops-backlog-api.md)** Tồn đọng qua REST và MCP, chỉ cho nhân sự nền tảng — 2026-11-18
 - **[D-20261118-step39-scheduled-backups](D-20261118-step39-scheduled-backups.md)** Backup theo lịch vào nơi lưu file, giữ N bản, không chép file mặc định — 2026-11-18
 - **[D-20261118-step39-sqlite-optimize](D-20261118-step39-sqlite-optimize.md)** SQLite tự lập thống kê cho bộ lập kế hoạch truy vấn (`PRAGMA optimize`) — 2026-11-18
+- **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
+- **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
+- **[D-20261119-step39-semantic-scan](D-20261119-step39-semantic-scan.md)** Tìm theo ý nghĩa trên dữ liệu lớn: `dot` dùng SIMD, duyệt chia nhiều nhân ngoài thread async — 2026-11-19

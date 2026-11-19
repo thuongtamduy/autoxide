@@ -307,6 +307,8 @@ impl Module for KernelModule {
             Box::new(crate::backup::scheduled::CreateBackups),
             // Khách thử nghiệm (bước 38, D-232): cột sandbox của `kernel_tenants`.
             Box::new(crate::tenancy::sandbox::AddSandbox),
+            // Hộp thư giả của sandbox (bước 38, D-232): cấp khách hàng, mọi database dữ liệu.
+            Box::new(crate::tenancy::sandbox::CreateSandboxMessages),
         ]
     }
 
@@ -458,6 +460,7 @@ impl Module for KernelModule {
             crate::tenancy::PUBLIC_URL,
             crate::tenancy::BUSINESS_MODEL,
             crate::ops::tags::TAGS_RESTRICTED,
+            crate::tenancy::sandbox::WEBHOOK_URLS,
         ]
     }
 

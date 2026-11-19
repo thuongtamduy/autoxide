@@ -200,3 +200,32 @@ pub(crate) fn discrepancy_not_found(id: Uuid) -> Error {
 pub(crate) fn discrepancy_resolved() -> Error {
     Error::conflict("shipping.discrepancy_resolved", "This COD discrepancy is already resolved.")
 }
+
+pub(crate) fn calendar_not_found(id: Uuid) -> Error {
+    Error::not_found(
+        "shipping.calendar_not_found",
+        "There is no delivery calendar `{id}` in your scope.",
+    )
+    .with_param("id", id)
+}
+
+pub(crate) fn estimate_unavailable() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.estimate_unavailable",
+        "Shipping estimates need the catalog module, which is not installed.",
+    )
+}
+
+pub(crate) fn estimate_quantity() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "shipping.estimate_quantity",
+        "The quantity must be 1 to 1000.",
+    )
+}
+
+pub(crate) fn variant_not_for_sale(id: Uuid) -> Error {
+    Error::not_found("shipping.variant_not_for_sale", "There is no variant `{id}` on sale.")
+        .with_param("id", id)
+}

@@ -130,6 +130,11 @@ async fn ho_so_cong_khai_cua_nut() {
         let (status, saved) = send(&app, "PATCH", &path, "admin", Some(body)).await;
         assert_eq!(status, StatusCode::OK, "{saved}");
         assert_eq!(saved["data"]["address"]["commune_name"], "Phuong Ba Dinh");
+        // Module khác (vd `shipping`: giờ sẵn sàng nhận tại cửa hàng) đọc giờ mở cửa qua `OrgDirectory`.
+        let directory = app.api::<dyn crate::api::OrgDirectory>().unwrap();
+        let hours = directory.opening_hours(&tenant_a, root_of(tenant_a.id())).await.unwrap().unwrap();
+        assert_eq!(hours.len(), 1);
+        assert_eq!((hours[0].day, hours[0].opens.to_string()), (1, "08:00:00".to_owned()));
         let stores = |tenant: &'static str| {
             let app = &app;
             async move {

@@ -548,6 +548,34 @@ context.usage_counter(&PRODUCTS, Arc::new(ProductCounter))?; // số đếm th�
 Không có bên cung cấp, khách nền tảng, khách không có gói: mọi lời gọi thành công ngay. Ví dụ đầy
 đủ ở `modules/notes` (`notes.notes`).
 
+### Đồng bộ khi mất mạng
+
+App trên điện thoại, máy tính, máy bán hàng tại quầy giữ bản sao bản ghi, ghi khi mất mạng rồi gửi
+lên sau. Cho một loại bản ghi đồng bộ được:
+
+```rust
+const NOTES_SYNC: SyncResource =
+    SyncResource::new("notes", "", NOTES_READ, "Your notes, in your scope of `notes.read`.");
+
+fn sync_resources(&self) -> Vec<SyncResource> { vec![NOTES_SYNC] }
+// migration, ở cuối:
+autoxide_kernel::sync::changes_migration("k0002_sync_changes", "notes"),
+// trong `start`:
+let sync = context.sync_log();
+```
+
+- Trong transaction ghi của mỗi lệnh tạo / sửa / xoá, thêm một dòng:
+  `sync.changed(&transaction, tenant, &NOTES_SYNC, id, target)` (hay `sync.deleted(…)`), như
+  `Outbox::record`.
+- Phục vụ `GET <đường dẫn>/changes` (nhận `ChangesQuery`, trả `Page<SyncChange<View>>`) bằng
+  `sync.changes(tenant, principal, &NOTES_SYNC, &query, |ids| async move { … })`: tải các bản ghi có
+  ID này mà người gọi còn đọc được, kèm `updated_at`; bản còn lại kernel đổi thành dấu xoá.
+- `If-Match` cũ thì trả `version::changed_with(&view_hiện_tại, current.updated_at)`: `412` kèm bản
+  hiện tại, để app tự gộp.
+
+Lệnh ghi xếp hàng trên máy gửi qua `POST /api/v1/kernel/sync/batch`, chạy từng lệnh qua endpoint REST
+của module — không phải viết gì thêm. Ví dụ đầy đủ ở `modules/notes`.
+
 ### 9. Cấu hình, job, giới hạn
 
 - Cấu hình: khai mỗi biến bằng `Setting` và đọc trong `Module::configure` qua

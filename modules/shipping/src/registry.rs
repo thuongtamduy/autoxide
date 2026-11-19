@@ -5,12 +5,37 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, PoisonError, RwLock};
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::tenancy::TenantContext;
 
+use crate::api::fake::FakeCarrier;
 use crate::api::{CarrierRegistry, ShippingCarrier};
 
-#[derive(Default)]
 pub(crate) struct Registry {
     carriers: RwLock<BTreeMap<&'static str, Arc<dyn ShippingCarrier>>>,
+    /// Hãng giả mọi sandbox dùng thay hãng thật (bước 38, D-232): không gọi mạng, không tạo vận đơn
+    /// thật.
+    simulated: Arc<FakeCarrier>,
+}
+
+impl Default for Registry {
+    fn default() -> Self {
+        Registry { carriers: RwLock::default(), simulated: Arc::new(FakeCarrier::new()) }
+    }
+}
+
+impl Registry {
+    /// Bộ nối của hãng `code` cho khách `tenant`; sandbox luôn nhận hãng giả.
+    pub(crate) fn for_tenant(
+        &self,
+        tenant: &TenantContext,
+        code: &str,
+    ) -> Option<Arc<dyn ShippingCarrier>> {
+        let real = self.get(code)?;
+        if tenant.is_sandbox() {
+            return Some(self.simulated.clone());
+        }
+        Some(real)
+    }
 }
 
 impl CarrierRegistry for Registry {
