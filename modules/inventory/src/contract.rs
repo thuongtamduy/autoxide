@@ -19,6 +19,7 @@ use crate::api::{
     ReserveRequest, RestockRequest,
 };
 use crate::entity::{level, reservation, settings};
+use crate::public::StockLevel;
 use crate::service::{InventoryService, now};
 
 pub(crate) const EXPIRE_RESERVATIONS: &str = "inventory.expire_reservations";
@@ -112,17 +113,17 @@ impl Inventory for InventoryService {
         variant_ids: &[Uuid],
     ) -> Result<Vec<Uuid>, Error> {
         too_many(variant_ids.len())?;
-        let found: Vec<Uuid> = level::Entity::find()
-            .select_only()
-            .column(level::Column::VariantId)
-            .filter(level::Column::OrgId.eq(store_org_id.as_uuid()))
-            .filter(level::Column::VariantId.is_in(variant_ids.to_vec()))
-            .filter(level::Column::Available.gt(0))
-            .scoped(tenant)
-            .into_tuple()
-            .all(tenant.database().read())
-            .await?;
-        Ok(variant_ids.iter().copied().filter(|id| found.contains(id)).collect())
+        if variant_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Cùng cách tính với tình trạng công khai (kho phục vụ cửa hàng, combo, hàng không theo dõi
+        // tồn): "còn hàng" là `in_stock` hay `low`; đặt trước chưa về không tính.
+        let rows = self.levels_at(tenant, variant_ids, &[store_org_id.as_uuid()]).await?;
+        Ok(rows
+            .into_iter()
+            .filter(|row| matches!(row.level, StockLevel::InStock | StockLevel::Low))
+            .map(|row| row.variant_id)
+            .collect())
     }
 
     async fn restock_alerts_of(

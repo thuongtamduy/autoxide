@@ -8438,6 +8438,66 @@ export type Data_OrdersCart = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersCheckoutResult = {
+  /** Result of a checkout. */
+  data: {
+    orders: OrdersOrder[];
+    /** One per amount to pay (D-216). */
+    payment_actions: OrdersPaymentAction[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersOrder = {
+  /** An order. */
+  data: {
+    buyer_user_id?: string | null;
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    channel: string;
+    confirmed_at?: string | null;
+    currency: string;
+    /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
+    fulfillment_status: string;
+    /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
+    funds_flow: string;
+    id: string;
+    /** Lines; empty in lists. */
+    lines: OrdersOrderLine[];
+    number: string;
+    /** The shop (or seller) of the order. */
+    org_id: string;
+    /** Pay before this, or the order is cancelled. */
+    payment_due_at?: string | null;
+    payment_method: string;
+    /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
+    payment_status: string;
+    placed_at: string;
+    /**
+     * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
+     * `completed` or `cancelled`.
+     */
+    status: string;
+    totals: OrdersOrderTotals;
+    /** Changes on every update (for `If-Match`). */
+    version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPublicPayment = {
+  /** Public status of a payment. */
+  data: {
+    amount: Money;
+    expires_at?: string | null;
+    order_number: string;
+    order_status: string;
+    /** `pending`, `succeeded`, `failed`, `expired`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -11440,6 +11500,18 @@ export type Data_Vec_IdentityResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_InventoryPublicAvailability = {
+  data: {
+    level: InventoryPublicStockLevel;
+    /** Units left, only when `level` is `low`. */
+    quantity?: number | null;
+    /** The store (organization unit) selling it. */
+    store_id: string;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_InventoryValuation = {
   data: {
     org_id: string;
@@ -13862,6 +13934,19 @@ export type InventoryMovement = {
   unit_cost?: Money | null;
   variant_id: string;
 };
+
+/** Availability of one variant at one store. */
+export type InventoryPublicAvailability = {
+  level: InventoryPublicStockLevel;
+  /** Units left, only when `level` is `low`. */
+  quantity?: number | null;
+  /** The store (organization unit) selling it. */
+  store_id: string;
+  variant_id: string;
+};
+
+/** How much of a variant a store can sell, without revealing large stock numbers. */
+export type InventoryPublicStockLevel = "in_stock" | "low" | "out" | "preorder";
 
 /** A purchase order to a supplier. */
 export type InventoryPurchaseOrder = {
@@ -16994,6 +17079,41 @@ export type OrdersCartTotals = {
   total: Money;
 };
 
+/** Place the order of a cart. */
+export type OrdersCheckoutRequest = {
+  /** Version of the terms of sale the buyer accepted. */
+  accept_terms_version?: string | null;
+  cart_id: string;
+  contact: OrdersContactRequest;
+  /** Company details for a VAT invoice (tax code, name, address). */
+  invoice_request?: Record<string, unknown> | null;
+  note?: string | null;
+  /**
+   * `cod`, `bank_transfer` (VietQR to the seller's account) or a method of the payment
+   * partner (`card`, `wallet`…).
+   */
+  payment_method: string;
+  /** `quote_token` of the cart you showed the buyer. */
+  quote_token: string;
+  /** Where the payment partner sends the buyer back. */
+  return_url?: string | null;
+};
+
+/** Result of a checkout. */
+export type OrdersCheckoutResult = {
+  orders: OrdersOrder[];
+  /** One per amount to pay (D-216). */
+  payment_actions: OrdersPaymentAction[];
+};
+
+/** Contact for the order. */
+export type OrdersContactRequest = {
+  email?: string | null;
+  name: string;
+  /** Mobile number; delivery and order lookup use it. */
+  phone: string;
+};
+
 /** Why a cart line cannot be ordered now. */
 export type OrdersLineProblem = {
   /** Units left, for `orders.out_of_stock`. */
@@ -17002,12 +17122,108 @@ export type OrdersLineProblem = {
   code: string;
 };
 
+/** An order. */
+export type OrdersOrder = {
+  buyer_user_id?: string | null;
+  cancel_reason?: string | null;
+  cancelled_at?: string | null;
+  channel: string;
+  confirmed_at?: string | null;
+  currency: string;
+  /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
+  fulfillment_status: string;
+  /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
+  funds_flow: string;
+  id: string;
+  /** Lines; empty in lists. */
+  lines: OrdersOrderLine[];
+  number: string;
+  /** The shop (or seller) of the order. */
+  org_id: string;
+  /** Pay before this, or the order is cancelled. */
+  payment_due_at?: string | null;
+  payment_method: string;
+  /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
+  payment_status: string;
+  placed_at: string;
+  /**
+   * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
+   * `completed` or `cancelled`.
+   */
+  status: string;
+  totals: OrdersOrderTotals;
+  /** Changes on every update (for `If-Match`). */
+  version: number;
+};
+
+/** A line of an order (as ordered). */
+export type OrdersOrderLine = {
+  discount: Money;
+  /** The promotion that added this free gift. */
+  gift_of?: string | null;
+  id: string;
+  name: string;
+  product_id: string;
+  quantity: number;
+  returned_quantity: number;
+  sku: string;
+  tax: Money;
+  /** What the buyer pays for the line. */
+  total: Money;
+  unit_price: Money;
+  variant_id: string;
+};
+
+/** Money totals of an order. */
+export type OrdersOrderTotals = {
+  discount: Money;
+  paid: Money;
+  refunded: Money;
+  shipping_discount: Money;
+  shipping_fee: Money;
+  subtotal: Money;
+  tax: Money;
+  total: Money;
+};
+
+/** What the buyer does next to pay one amount. */
+export type OrdersPaymentAction = {
+  amount: Money;
+  expires_at?: string | null;
+  /**
+   * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
+   * `none` (the payment could not be started yet; retry from the order).
+   */
+  kind: string;
+  order_id: string;
+  payment_id: string;
+  /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
+  qr_payload?: string | null;
+  redirect_url?: string | null;
+  /** `pending`, `succeeded`, `failed`, `expired`… */
+  status: string;
+  /** For `GET /public/payments/{token}`. */
+  status_token: string;
+  /** Transfer content the bank transfer must carry. */
+  transfer_code?: string | null;
+};
+
 /** Pre-order information shown before ordering. */
 export type OrdersPreorderInfo = {
   /** Expected date the item arrives (shop time zone). */
   available_on?: string | null;
   /** Pre-orders close at. */
   ends_at?: string | null;
+};
+
+/** Public status of a payment. */
+export type OrdersPublicPayment = {
+  amount: Money;
+  expires_at?: string | null;
+  order_number: string;
+  order_status: string;
+  /** `pending`, `succeeded`, `failed`, `expired`. */
+  status: string;
 };
 
 /** A way to deliver the cart. */
@@ -19202,6 +19418,44 @@ export type Page_OrdersCartSummary = {
     org_id: string;
     status: string;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersOrder = {
+  /** The items of this page, in the requested order. */
+  data: {
+    buyer_user_id?: string | null;
+    cancel_reason?: string | null;
+    cancelled_at?: string | null;
+    channel: string;
+    confirmed_at?: string | null;
+    currency: string;
+    /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
+    fulfillment_status: string;
+    /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
+    funds_flow: string;
+    id: string;
+    /** Lines; empty in lists. */
+    lines: OrdersOrderLine[];
+    number: string;
+    /** The shop (or seller) of the order. */
+    org_id: string;
+    /** Pay before this, or the order is cancelled. */
+    payment_due_at?: string | null;
+    payment_method: string;
+    /** `unpaid`, `cod_pending`, `paid`, `partially_refunded`, `refunded`… */
+    payment_status: string;
+    placed_at: string;
+    /**
+     * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
+     * `completed` or `cancelled`.
+     */
+    status: string;
+    totals: OrdersOrderTotals;
+    /** Changes on every update (for `If-Match`). */
+    version: number;
   }[];
   pagination: Pagination;
 };
@@ -32106,6 +32360,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/inventory/public/availability": {
+    /** Public availability of variants at stores. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { variant_ids: string; store_id?: string }; };
+      responses: {
+        200: Data_Vec_InventoryPublicAvailability;
+        304: void;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/inventory/purchase-orders": {
     /** List purchase orders in your scope. */
     get: {
@@ -36324,6 +36591,19 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders": {
+    /** List orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; payment_status?: string; org_id?: string; channel?: string; number?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersOrder;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/carts": {
     /** List carts, like abandoned carts. */
     get: {
@@ -36480,6 +36760,75 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/checkout": {
+    /** Place an order from a cart. */
+    post: {
+      parameters: { header: { "Idempotency-Key": string; "Cart-Token"?: string | null; "Accept-Language"?: string }; };
+      requestBody: OrdersCheckoutRequest;
+      responses: {
+        200: Data_OrdersCheckoutResult;
+        201: Data_OrdersCheckoutResult;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        428: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders": {
+    /** Your orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersOrder;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}": {
+    /** One of your orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/payments/{token}": {
+    /** Status of a payment, for the QR code screen. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { token: string }; };
+      responses: {
+        200: Data_OrdersPublicPayment;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}": {
+    /** Read an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

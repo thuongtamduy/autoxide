@@ -1049,6 +1049,7 @@ dependencies = [
  "autoxide-testkit",
  "axum",
  "chrono",
+ "futures-util",
  "sea-orm",
  "serde",
  "serde_json",

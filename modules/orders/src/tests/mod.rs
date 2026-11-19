@@ -4,8 +4,11 @@
 //! module thật nằm ở `crates/app/src/e2e/orders.rs`.
 
 mod carts;
+mod checkout;
+mod fake_ledger;
 mod fakes;
 
+pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
 
 use std::collections::HashMap;
@@ -17,6 +20,9 @@ use autoxide_catalog::api::{
 };
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::{Actor, Event, EventInfo, Outbox};
+use autoxide_kernel::migration::prelude::MigrationTrait;
+use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext};
 use autoxide_shipping::api::{Quote, QuoteRequest, ShippingOption, ShippingRates};
@@ -203,6 +209,9 @@ pub(crate) struct Shop {
     pub inventory: Arc<FakeInventory>,
     pub promotions: Arc<FakePromotions>,
     pub shipping: Arc<FakeShipping>,
+    pub ledger: Arc<FakeLedger>,
+    /// Outbox của module giả `ledger` (phát `ledger.payment_succeeded`).
+    pub ledger_outbox: Arc<Mutex<Option<Outbox>>>,
     pub tree: Tree,
 }
 
@@ -225,6 +234,8 @@ pub(crate) async fn shop_with<'a>(
     let shipping = Arc::new(FakeShipping { fee: Mutex::new(30_000), free_over: Some(500_000) });
     let inventory = Arc::new(FakeInventory::default());
     let promotions = Arc::new(FakePromotions::default());
+    let ledger = Arc::new(FakeLedger::default());
+    let (emitter, ledger_outbox) = Emitter::new("ledger", &[PAYMENT_SUCCEEDED]);
     let builder = TestApp::builder(test)
         .principal("boss", Principal::with_all_permissions(Uuid::from_u128(1)))
         .member("staff_a", 2, tree.a, &[("orders.read", autoxide_kernel::access::Scope::Unit)])
@@ -233,7 +244,9 @@ pub(crate) async fn shop_with<'a>(
         .provide::<dyn Catalog>(catalog.clone())
         .provide::<dyn ShippingRates>(shipping.clone())
         .provide::<dyn autoxide_inventory::api::Inventory>(inventory.clone())
-        .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone());
+        .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
+        .provide::<dyn autoxide_ledger::api::Ledger>(ledger.clone())
+        .module(emitter);
     let app = extra(builder, &tree).module(crate::module()).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
@@ -241,7 +254,7 @@ pub(crate) async fn shop_with<'a>(
     OrgTree::insert(&write, DEFAULT_TENANT, tree.a, tree.chain, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.b, tree.chain, 8).await.unwrap();
     write.commit().await.unwrap();
-    Shop { app, catalog, inventory, promotions, shipping, tree }
+    Shop { app, catalog, inventory, promotions, shipping, ledger, ledger_outbox, tree }
 }
 
 pub(crate) async fn shop(test: &TestDatabase) -> Shop {
@@ -303,4 +316,103 @@ pub(crate) async fn drain(app: &TestApp) {
 /// Số tiền (đơn vị nhỏ nhất) của trường tiền `value`.
 pub(crate) fn minor(value: &Value) -> i64 {
     value["amount"].as_str().unwrap().parse().unwrap()
+}
+
+/// Tên event thanh toán xong của `ledger`.
+pub(crate) const PAYMENT_SUCCEEDED: &str = "ledger.payment_succeeded";
+
+/// `ledger.payment_succeeded` do module giả phát (thân phẳng như `ledger` thật).
+#[derive(Debug, serde::Serialize)]
+#[serde(transparent)]
+pub(crate) struct PaymentSucceeded(pub Value);
+
+impl Event for PaymentSucceeded {
+    const NAME: &'static str = PAYMENT_SUCCEEDED;
+}
+
+/// Module giả phát event thay `ledger`: khai tên event, giữ `Outbox` sau `start`.
+pub(crate) struct Emitter {
+    name: &'static str,
+    events: Vec<&'static str>,
+    outbox: Arc<Mutex<Option<Outbox>>>,
+}
+
+impl Emitter {
+    pub(crate) fn new(
+        name: &'static str,
+        events: &[&'static str],
+    ) -> (Self, Arc<Mutex<Option<Outbox>>>) {
+        let outbox = Arc::new(Mutex::new(None));
+        (Emitter { name, events: events.to_vec(), outbox: outbox.clone() }, outbox)
+    }
+}
+
+impl Module for Emitter {
+    fn name(&self) -> &'static str {
+        self.name
+    }
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        vec![
+            autoxide_kernel::event::outbox_migration("m0001_events", self.name),
+            autoxide_kernel::event::outbox_actor_migration("m0002_event_actor", self.name),
+            autoxide_kernel::tenancy::migration::adopt(
+                "m0003_tenancy_events",
+                vec![autoxide_kernel::event::tenant_table(self.name)],
+            ),
+            autoxide_kernel::event::outbox_access_migration("k0001_event_access", self.name),
+        ]
+    }
+    fn events(&self) -> Vec<EventInfo> {
+        self.events.iter().map(|name| EventInfo::new(name, "Test event.")).collect()
+    }
+    fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        *self.outbox.lock().unwrap() = Some(context.outbox()?);
+        Ok(())
+    }
+}
+
+/// Ghi `event` vào outbox của `ledger` giả (một transaction riêng).
+pub(crate) async fn emit<E: Event>(shop: &Shop, event: &E) {
+    let outbox = shop.ledger_outbox.lock().unwrap().clone().unwrap();
+    let tenant = shop.default_tenant();
+    let transaction = shop.database().begin_write().await.unwrap();
+    outbox.record(&transaction, &tenant, Actor::system(), None, event).await.unwrap();
+    transaction.commit().await.unwrap();
+}
+
+/// Job định kỳ chạy ngay: mỗi loại một kiểu (`Job::KIND` là hằng).
+macro_rules! now_job {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, serde::Serialize)]
+        struct $kind {}
+
+        impl autoxide_kernel::job::Job for $kind {
+            const KIND: &'static str = $name;
+        }
+    };
+}
+
+now_job!(MarkAbandonedNow, crate::jobs::MARK_ABANDONED_CARTS);
+now_job!(ExpireUnpaidNow, crate::jobs::EXPIRE_UNPAID);
+now_job!(RecoverNow, crate::jobs::RECOVER_CHECKOUTS);
+
+/// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
+pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
+    let queue = autoxide_kernel::job::JobQueue::new("orders");
+    let options = autoxide_kernel::job::EnqueueOptions::default;
+    let write = app.database().write();
+    match kind {
+        crate::jobs::MARK_ABANDONED_CARTS => {
+            queue.enqueue_database(write, &MarkAbandonedNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_UNPAID => {
+            queue.enqueue_database(write, &ExpireUnpaidNow {}, options()).await
+        }
+        crate::jobs::RECOVER_CHECKOUTS => {
+            queue.enqueue_database(write, &RecoverNow {}, options()).await
+        }
+        other => panic!("no test job for `{other}`"),
+    }
+    .unwrap();
+    drain(app).await;
 }

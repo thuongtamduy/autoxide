@@ -542,7 +542,7 @@ Bắt đầu SAU bước 41. Không bao giờ bán quá tồn khi nhiều reques
       cung cấp qua `ledger`
 - [x] Hàng đặt trước (D-204): biến thể `preorder` (ngày dự kiến có hàng, giới hạn suất — bước 41 khai); giữ suất
       không vượt giới hạn khi nhiều người đặt cùng lúc; hàng về thì chia cho đơn đặt trước theo thứ tự đặt
-- [ ] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
+- [x] Tình trạng hàng công khai theo cửa hàng (D-200): mức `in_stock` / `low` (kèm số khi dưới ngưỡng cấu hình)
       / `out` / `preorder`, không lộ số tồn lớn; `catalog` lọc "chỉ hàng có sẵn ở cửa hàng X" qua `api`; ETag,
       cache ngắn
 - [ ] Báo khi có hàng lại theo cửa hàng (D-201): người mua đăng ký (xác nhận hai bước, đồng ý riêng cho mục đích
@@ -632,7 +632,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Giỏ hàng cho người mua và vãng lai (gộp khi đăng nhập); giá, giảm, thuế, phí giao luôn tính lại ở máy
       chủ, không tin số từ client; `free_shipping_remaining` (D-201); coupon và voucher tách nhau, điền dữ liệu
       điều kiện cho `promotions`, chụp khoản giảm kèm ai trả tiền vào đơn (D-222); danh sách giỏ bỏ dở
-- [ ] Đặt hàng: báo giá cuối → giữ tồn, lượt khuyến mại → số đơn tuần tự (bước 36) → thanh toán theo chế độ
+- [x] Đặt hàng: báo giá cuối → giữ tồn, lượt khuyến mại → số đơn tuần tự (bước 36) → thanh toán theo chế độ
       dòng tiền (tự thu / thu hộ / chia tại cổng / COD; `payment_actions[]`, D-216); `Idempotency-Key` bắt
       buộc; hạn thanh toán đọc từ `ledger` (D-218), hết hạn thì trả chỗ; trạng thái thanh toán công khai
 - [ ] Vòng đời đơn: chờ thanh toán → xác nhận → chuẩn bị → đang giao → đã giao → hoàn tất; huỷ theo quy tắc
