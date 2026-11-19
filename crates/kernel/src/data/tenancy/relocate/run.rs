@@ -82,13 +82,28 @@ pub struct TenantRelocations {
     pub(super) setup: MoveSetup,
     pub(super) outbox: Outbox,
     pub(super) jobs: JobQueue,
-    /// Chờ chừng này sau khi khách thành `moving` (TTL cache khách + thời gian tối đa của request).
-    pub(super) settle: Duration,
+    /// Chờ chừng này (mili giây) sau khi khách thành `moving` (TTL cache khách + thời gian tối đa của
+    /// request). Atomic để test bỏ được thời gian chờ ([`TenantRelocations::skip_settle`]).
+    pub(super) settle: std::sync::atomic::AtomicU64,
     /// `AUTOXIDE_RELOCATION_DRAIN_SECONDS`.
     pub(super) drain: Duration,
     pub(super) translations: Translations,
     pub(super) key: SecretKey,
     pub(super) seeds: Seeds,
+}
+
+impl TenantRelocations {
+    /// Thời gian chờ sau khi khách thành `moving`.
+    pub(super) fn settle(&self) -> Duration {
+        Duration::from_millis(self.settle.load(std::sync::atomic::Ordering::Relaxed))
+    }
+
+    /// Bỏ thời gian chờ máy chủ khác thấy khách đang dời (chỉ cho test, qua
+    /// `TestApp::skip_relocation_wait`): test không phải hạ `AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS`
+    /// xuống 1 giây — mức đó cắt request bình thường của test khi máy CI chậm.
+    pub fn skip_settle(&self) {
+        self.settle.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
 }
 
 impl std::fmt::Debug for TenantRelocations {
@@ -548,7 +563,9 @@ impl Wiring {
             setup,
             outbox: context.outbox()?,
             jobs: context.jobs(),
-            settle,
+            settle: std::sync::atomic::AtomicU64::new(
+                u64::try_from(settle.as_millis()).unwrap_or(u64::MAX),
+            ),
             drain: Duration::from_secs(self.drain),
             translations: context.translations().clone(),
             key,

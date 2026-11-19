@@ -271,6 +271,10 @@ impl ContentService {
             .scoped(tenant)
             .filter(published::Column::RestrictedAt.is_null())
             .filter(on_site(&site.lineage_ids()));
+        // Sandbox (D-232): sitemap rỗng — bản thử không được máy tìm kiếm thu thập.
+        if tenant.is_sandbox() {
+            select = select.filter(published::Column::EntryId.is_null());
+        }
         if let Some(locales) = locales {
             select = select.filter(published::Column::Locale.is_in(locales.iter().cloned()));
         }

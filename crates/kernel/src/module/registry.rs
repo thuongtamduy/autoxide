@@ -330,6 +330,7 @@ impl Modules {
         let custom_fields = self.catalog.custom_fields();
         let references = self.catalog.references();
         let mut apis = Apis::default();
+        let partners = crate::tenancy::sandbox::PartnerGuard::new(registry.clone());
         let mut counters = std::collections::BTreeMap::new();
         // Gọi sau `configure` của mọi module: thời hạn đọc từ cấu hình.
         self.retention = crate::privacy::RetentionCatalog::new(
@@ -376,12 +377,14 @@ impl Modules {
                 facts: &self.facts,
                 analytics: &self.analytics,
                 automations: &self.automations,
+                partners: &partners,
             };
             module.start(&mut context).map_err(|error| {
                 ModuleError(format!("module `{name}` failed to start: {error}"))
             })?;
         }
         self.dns.fill(apis.get::<dyn crate::tenancy::DnsTxtLookup>());
+        partners.fill(apis.get::<dyn crate::tenancy::sandbox::SandboxRecipients>());
         self.orgs.fill(apis.get::<dyn crate::tenancy::OrgNodes>());
         self.catalog.history().fill(apis.get::<dyn crate::resource::RecordHistory>());
         self.catalog.text_model().fill(apis.get::<dyn crate::ai::TextModel>());
@@ -489,6 +492,14 @@ impl Modules {
         T: ?Sized + Send + Sync + 'static,
     {
         self.apis.get()
+    }
+
+    /// Mọi bộ cài đặt các module đã góp cho `T` (`StartContext::contribute`), theo thứ tự đăng ký.
+    pub fn contributions<T>(&self) -> Vec<Arc<T>>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.contributions()
     }
 
     /// Sổ thời hạn lưu của mọi module (đủ sau `start`).

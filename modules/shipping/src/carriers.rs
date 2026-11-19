@@ -103,7 +103,7 @@ impl ShippingService {
             .ok_or_else(|| errors::carrier_account_not_found(id))?;
         let carrier = self
             .carriers
-            .get(&row.carrier_code)
+            .for_tenant(tenant, &row.carrier_code)
             .ok_or_else(|| errors::carrier_unknown(&row.carrier_code))?;
         let sealer = self.secret.sealer().await?;
         let plain = sealer.open(tenant.id(), PURPOSE, &id.to_string(), &row.credentials_sealed)?;

@@ -9,6 +9,7 @@ use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
 use uuid::Uuid;
 
+use super::mailbox::SandboxMessage;
 use super::service::{NewSandbox, Sandbox, SandboxCreated, TenantSandboxes};
 use crate::access::Principal;
 use crate::error::Error;
@@ -22,6 +23,7 @@ pub(crate) fn routes(service: Arc<TenantSandboxes>) -> OpenApiRouter {
         .routes(routes!(list_sandboxes, create_sandbox))
         .routes(routes!(extend_sandbox))
         .routes(routes!(delete_sandbox))
+        .routes(routes!(list_sandbox_messages))
         .with_state(service)
 }
 
@@ -145,4 +147,45 @@ async fn delete_sandbox(
 ) -> Result<StatusCode, Error> {
     service.delete(&tenant, &principal, id).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// Filter of the sandbox message box.
+#[derive(Debug, serde::Deserialize, utoipa::IntoParams)]
+#[into_params(parameter_in = Query)]
+pub(crate) struct MessageFilter {
+    /// Only this channel: `partner`, `sms`, `zns`, `push`, `mail` or `webhook`.
+    channel: Option<String>,
+}
+
+/// List what this sandbox kept instead of sending out.
+///
+/// Requires `kernel.sandboxes.read`, called inside a sandbox (`Autoxide-Tenant: <sandbox id>`).
+/// Partners are always simulated in a sandbox: payments succeed, e-invoices get numbers starting
+/// with `SANDBOX-`, identity checks pass, and every such call is listed here with SMS, Zalo
+/// messages and push notifications. Mail to anyone but staff who may enter the sandbox, and
+/// webhooks to URLs not listed in the tenant setting `kernel.sandbox.webhook_urls`, are listed
+/// here too instead of being sent. Newest first unless `order=asc`.
+#[utoipa::path(
+    get,
+    path = "/sandbox/messages",
+    extensions(("x-permissions" = json!(["kernel.sandboxes.read"]))),
+    operation_id = "list_sandbox_messages",
+    security(("bearer" = [])),
+    params(MessageFilter, PageQuery),
+    responses(
+        (status = 200, description = "One page of kept messages.", body = Page<SandboxMessage>),
+        (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.sandboxes.read`; code `permission_denied`.", body = Problem),
+        (status = 409, description = "The current tenant is not a sandbox; code `tenancy.sandbox_only`.", body = Problem),
+        (status = 422, description = "A paging parameter is invalid; code `validation_failed`.", body = Problem),
+    )
+)]
+async fn list_sandbox_messages(
+    tenant: TenantContext,
+    principal: Principal,
+    Query(filter): Query<MessageFilter>,
+    Query(page): Query<PageQuery>,
+) -> Result<Page<SandboxMessage>, Error> {
+    let page = PageRequest::try_from(page)?;
+    super::mailbox::list(&tenant, &principal, filter.channel.as_deref(), &page).await
 }

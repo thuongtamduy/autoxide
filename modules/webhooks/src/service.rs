@@ -14,7 +14,9 @@ use sea_orm::{
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::delivery::{MAX_ATTEMPTS, STATUS_FAILED, STATUS_PENDING, STATUS_SUCCEEDED, Send};
+use crate::delivery::{
+    MAX_ATTEMPTS, STATUS_FAILED, STATUS_PENDING, STATUS_SANDBOXED, STATUS_SUCCEEDED, Send,
+};
 use crate::entity::{delivery, endpoint};
 use crate::events::{self, Change};
 use crate::signature;
@@ -406,11 +408,13 @@ impl WebhookService {
     ) -> Result<Page<Delivery>, Error> {
         let mut select = delivery::Entity::find().scoped(tenant);
         if let Some(status) = status {
-            if ![STATUS_PENDING, STATUS_SUCCEEDED, STATUS_FAILED].contains(&status) {
+            if ![STATUS_PENDING, STATUS_SUCCEEDED, STATUS_FAILED, STATUS_SANDBOXED]
+                .contains(&status)
+            {
                 return Err(Error::validation(vec![FieldError::new(
                     "status",
                     "invalid",
-                    "must be `pending`, `succeeded` or `failed`",
+                    "must be `pending`, `succeeded`, `failed` or `sandboxed`",
                 )]));
             }
             select = select.filter(delivery::Column::Status.eq(status));
