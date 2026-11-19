@@ -23,6 +23,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::job::tenant_table("inventory")],
         ),
         Box::new(CreateReservations),
+        Box::new(CreateDocuments),
     ]
 }
 
@@ -320,5 +321,118 @@ impl MigrationTrait for CreateReservations {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         drop_all(manager, &RESERVATION_TABLES).await
+    }
+}
+
+struct CreateDocuments;
+
+impl MigrationName for CreateDocuments {
+    fn name(&self) -> &str {
+        "m0008_create_transfers_counts"
+    }
+}
+
+const DOCUMENT_TABLES: [&str; 4] = [
+    "inventory_transfers",
+    "inventory_transfer_lines",
+    "inventory_counts",
+    "inventory_count_lines",
+];
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateDocuments {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Phiếu chuyển kho. Số chứng từ `CK-<năm>-<số>` cấp bằng `numbering` theo khách và năm.
+        let mut transfers = table("inventory_transfers");
+        transfers
+            .col(schema::string_len("number", 32))
+            .col(schema::uuid("from_org_id"))
+            .col(schema::uuid("to_org_id"))
+            .col(schema::string_len("status", 24))
+            .col(schema::timestamp_with_time_zone_null("shipped_at"))
+            .col(schema::string_len_null("reference", 100))
+            .col(schema::text("note"))
+            .col(schema::uuid_null("created_by"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(transfers).await?;
+        let t = "inventory_transfers";
+        index(manager, t, "inventory_transfers_number_key", &["tenant_id", "number"], true).await?;
+        index(
+            manager,
+            t,
+            "inventory_transfers_to_idx",
+            &["tenant_id", "to_org_id", "status"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "inventory_transfers_from_idx",
+            &["tenant_id", "from_org_id", "status"],
+            false,
+        )
+        .await?;
+
+        // Dòng chuyển: giá vốn ở kho đi lúc gửi, để kho đến tính giá vốn bình quân.
+        let mut lines = table("inventory_transfer_lines");
+        lines
+            .col(schema::uuid("transfer_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("quantity"))
+            .col(schema::big_integer("received_quantity"))
+            .col(schema::big_integer_null("unit_cost_minor"))
+            .col(schema::string_len_null("unit_cost_currency", 3));
+        manager.create_table(lines).await?;
+        index(
+            manager,
+            "inventory_transfer_lines",
+            "inventory_transfer_lines_idx",
+            &["tenant_id", "transfer_id"],
+            false,
+        )
+        .await?;
+
+        // Phiếu kiểm kê (`KK-<năm>-<số>`).
+        let mut counts = table("inventory_counts");
+        counts
+            .col(schema::string_len("number", 32))
+            .col(schema::uuid("org_id"))
+            .col(schema::string_len("status", 16))
+            .col(schema::text("note"))
+            .col(schema::timestamp_with_time_zone_null("applied_at"))
+            .col(schema::uuid_null("created_by"))
+            .col(schema::timestamp_with_time_zone("created_at"))
+            .col(schema::timestamp_with_time_zone("updated_at"));
+        manager.create_table(counts).await?;
+        let t = "inventory_counts";
+        index(manager, t, "inventory_counts_number_key", &["tenant_id", "number"], true).await?;
+        index(manager, t, "inventory_counts_org_idx", &["tenant_id", "org_id", "status"], false)
+            .await?;
+
+        // Số đếm: `expected_at_count` = `on_hand` lúc đếm dòng đó (kiểm kê khi đang bán).
+        let mut count_lines = table("inventory_count_lines");
+        count_lines
+            .col(schema::uuid("count_id"))
+            .col(schema::uuid("variant_id"))
+            .col(schema::big_integer("counted"))
+            .col(schema::big_integer("expected_at_count"))
+            .col(schema::timestamp_with_time_zone("counted_at"))
+            .col(schema::string_len_null("reason_code", 64));
+        manager.create_table(count_lines).await?;
+        index(
+            manager,
+            "inventory_count_lines",
+            "inventory_count_lines_key",
+            &["tenant_id", "count_id", "variant_id"],
+            true,
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        drop_all(manager, &DOCUMENT_TABLES).await
     }
 }
