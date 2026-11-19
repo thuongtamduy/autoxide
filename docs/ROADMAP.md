@@ -351,7 +351,7 @@ Bắt đầu SAU bước 37; song song được với 41–49. Phiếu hỗ tr�
 - [x] Tool MCP (cùng permission như REST); gợi ý trả lời bằng AI chỉ là bản nháp (D-109); email trả lời
       vào lại phiếu qua trait `InboundMail` (tắt mặc định); hướng dẫn `docs/SUPPORT.md` (EN + VI); test
       trên cả hai database
-- [ ] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
+- [x] Trả lời tự động câu hỏi đơn giản (D-230): chỉ gửi câu trả lời mẫu đã duyệt hay mẫu câu dựng từ dữ liệu
       chính xác (`FactSource` của module sau), mô hình chỉ phân loại; luật quyết trong Rust, không bao giờ tự động
       cho khiếu nại / hoàn tiền / dữ liệu cá nhân; tắt mặc định, nhãn và "gặp nhân viên"; câu phức tạp → nháp
 

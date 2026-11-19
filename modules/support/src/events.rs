@@ -42,6 +42,14 @@ pub(crate) const TICKET_ESCALATED: EventInfo = EventInfo::new(
 );
 pub(crate) const SATISFACTION_RECORDED: EventInfo =
     EventInfo::new("support.satisfaction_recorded", "A customer rated the support of a ticket.");
+pub(crate) const AUTO_REPLIED: EventInfo = EventInfo::new(
+    "support.auto_replied",
+    "An approved answer or an answer from exact data was sent automatically (without its text).",
+);
+pub(crate) const AUTO_REPLY_DISABLED: EventInfo = EventInfo::new(
+    "support.auto_reply_disabled",
+    "A saved reply stopped being used for automatic answers (reported wrong too often).",
+);
 pub(crate) const TICKETS_CLAIMED: EventInfo = EventInfo::new(
     "support.tickets_claimed",
     "Guest tickets were attached to the account that verified the same email or phone number.",
@@ -75,6 +83,8 @@ event!(TicketAssigned, "support.ticket_assigned");
 event!(MessageAdded, "support.message_added");
 event!(MessageHidden, "support.message_hidden");
 event!(TicketsClaimed, "support.tickets_claimed");
+event!(AutoReplied, "support.auto_replied");
+event!(AutoReplyDisabled, "support.auto_reply_disabled");
 event!(TicketLinked, "support.ticket_linked");
 event!(TicketEscalated, "support.ticket_escalated");
 event!(SatisfactionRecorded, "support.satisfaction_recorded");
@@ -90,6 +100,8 @@ pub(crate) fn all() -> Vec<EventInfo> {
         MESSAGE_ADDED,
         MESSAGE_HIDDEN,
         TICKETS_CLAIMED,
+        AUTO_REPLIED,
+        AUTO_REPLY_DISABLED,
         TICKET_LINKED,
         TICKET_ESCALATED,
         SATISFACTION_RECORDED,

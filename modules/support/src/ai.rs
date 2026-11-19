@@ -38,11 +38,21 @@ impl SupportService {
     ) -> Result<Draft, Error> {
         let ticket = self.get(tenant, Viewer::Staff(principal), id).await?;
         principal.require_at(tenant.database().read(), &TICKETS_REPLY, target(&ticket)).await?;
+        self.draft_for(tenant, &ticket).await
+    }
+
+    /// Soạn và lưu bản nháp cho phiếu `ticket` (đã kiểm quyền, hay do job trả lời tự động gọi).
+    pub(crate) async fn draft_for(
+        &self,
+        tenant: &TenantContext,
+        ticket: &crate::service::Ticket,
+    ) -> Result<Draft, Error> {
+        let id = ticket.id;
         let Some(model) = &self.parts.ai else {
             return Err(ai_unavailable());
         };
         model.ready()?;
-        let messages = self.messages(tenant, Viewer::Staff(principal), &ticket).await?;
+        let messages = self.messages(tenant, Viewer::Internal, ticket).await?;
         let public: Vec<_> = messages
             .iter()
             .filter(|message| message.kind == "public" && message.hidden_at.is_none())
@@ -51,11 +61,11 @@ impl SupportService {
             .iter()
             .map(|message| json!({"from": message.author_kind, "text": redact(&message.body)}))
             .collect();
-        let replies = self.saved_replies(tenant, principal, ticket.org_id).await?;
+        let replies = self.replies_at(tenant, ticket.org_id).await?;
         let saved: Vec<_> = replies
             .iter()
             .take(20)
-            .map(|reply| json!({"name": reply.name, "text": fill(reply, &ticket)}))
+            .map(|reply| json!({"name": reply.name, "text": fill(reply, ticket)}))
             .collect();
         let input = json!({
             "language": ticket.locale.clone().unwrap_or_else(|| "en".to_owned()),
