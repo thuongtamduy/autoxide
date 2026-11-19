@@ -109,6 +109,7 @@ pub(crate) async fn handover(
     Path(id): Path<Uuid>,
     ValidJson(body): ValidJson<HandoverRequest>,
 ) -> Result<Data<OrderResponse>, Error> {
+    principal.require(&crate::permissions::MANAGE)?;
     let collector = match (body.code, body.proxy_name, body.proxy_phone) {
         (Some(code), None, None) => Collector::Code(code),
         (None, Some(name), Some(phone)) => Collector::Proxy { name, phone },
