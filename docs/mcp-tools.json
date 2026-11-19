@@ -6182,6 +6182,76 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a stock transfer between two warehouses as a draft (one line per variant); ship it with the REST endpoint `POST /api/v1/inventory/transfers/{id}/ship`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A stock transfer to create.",
+        "properties": {
+          "from_org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "additionalProperties": false,
+              "description": "A variant and a quantity.",
+              "properties": {
+                "quantity": {
+                  "description": "1 to 1 000 000.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to_org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from_org_id",
+          "to_org_id",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.create_transfer",
+      "output_schema": null,
+      "permissions": [
+        "inventory.transfer"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -6375,6 +6445,60 @@
       "output_schema": null,
       "permissions": [
         "inventory.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Receive goods of a stock transfer in transit, all (no lines) or part.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Goods of a transfer to receive.",
+        "properties": {
+          "id": {
+            "description": "Id of the transfer.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "lines": {
+            "description": "Units received now; empty or omitted: everything still in transit.",
+            "items": {
+              "additionalProperties": false,
+              "description": "A variant and a quantity.",
+              "properties": {
+                "quantity": {
+                  "description": "1 to 1 000 000.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "variant_id",
+                "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "inventory.receive_transfer",
+      "output_schema": null,
+      "permissions": [
+        "inventory.transfer"
       ]
     },
     {
