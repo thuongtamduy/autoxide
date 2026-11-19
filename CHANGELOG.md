@@ -11,6 +11,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: stock transfers between warehouses (draft, in transit with `incoming`, partial receipt carrying
+  the source's average cost, close, cancel; numbers `CK-…`) and stock counts (`KK-…`, counting while selling, CSV
+  import, differences applied as `count` ledger lines with a reason); MCP tools `inventory.create_transfer`,
+  `inventory.receive_transfer`.
 - `catalog` (step 41): public reads for websites under `/api/v1/catalog/public` — product cards with filters by
   category, attribute, price range, text (with or without accents), seller and rating, product pages by slug,
   the category tree and a sitemap, each with an `ETag` and `Cache-Control: public, no-cache`; stores hide chain
