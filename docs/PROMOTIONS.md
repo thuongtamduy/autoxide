@@ -48,7 +48,7 @@ in force a promotion cannot be turned on (`promotions.no_legal_data`). The pack 
 secondary sources: have it checked by a legal professional before real use.
 
 To prepare the notices, `GET /promotions/{id}/notice-export?format=json|csv` (permission
-`promotions.compliance`; MCP tool `promotions.export_notice`) gives one entry per authority: whether a notice
+`promotions.compliance` and `promotions.read`; MCP tool `promotions.export_notice`) gives one entry per authority: whether a notice
 is required under the rules in force on the start day, the last day to submit, the legal basis and what was
 recorded. People submit the notice to the authority; Autoxide only prepares the data and records it.
 

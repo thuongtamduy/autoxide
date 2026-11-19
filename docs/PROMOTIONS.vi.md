@@ -45,8 +45,8 @@ Hạn mức và quy tắc thông báo là **dữ liệu có ngày hiệu lực**
 (`promotions.no_legal_data`). Gói được tổng hợp từ nguồn thứ cấp: cần người có chuyên môn pháp lý đối chiếu
 trước khi chạy thật.
 
-Để chuẩn bị thông báo, `GET /promotions/{id}/notice-export?format=json|csv` (permission `promotions.compliance`;
-tool MCP `promotions.export_notice`) trả một mục mỗi nơi nhận: có cần thông báo không theo quy tắc hiệu lực ngày
+Để chuẩn bị thông báo, `GET /promotions/{id}/notice-export?format=json|csv` (permission `promotions.compliance` và
+`promotions.read`; tool MCP `promotions.export_notice`) trả một mục mỗi nơi nhận: có cần thông báo không theo quy tắc hiệu lực ngày
 bắt đầu, hạn nộp, căn cứ pháp lý và những gì đã ghi nhận. Con người nộp thông báo cho cơ quan; Autoxide chỉ chuẩn
 bị dữ liệu và ghi nhận.
 

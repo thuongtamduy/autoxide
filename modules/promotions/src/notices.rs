@@ -87,6 +87,9 @@ impl PromotionsService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<NoticeExport, Error> {
+        // Cần cả `promotions.compliance` (ở đây, cho REST lẫn MCP) và `promotions.read` (trong
+        // `promotion`, theo nút của chương trình).
+        principal.require(&crate::permissions::COMPLIANCE)?;
         let view = self.promotion(tenant, principal, id).await?;
         let program = program_of(&view);
         let kind = legal_kind(&program);
