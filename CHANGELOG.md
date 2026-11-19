@@ -1068,9 +1068,6 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Changed
 
-- Search by meaning is faster on large sites (step 39): the vector comparison uses the CPU's vector instructions and
-  the scan is split over the CPU cores outside the request thread — 50,000 posts in one language (100,000 chunks of
-  1,024 dimensions) went from 137 ms to 20 ms on 4 cores, with the same results.
 - SQLite: the write connection runs `PRAGMA optimize` when it opens and closes, so the query planner has
   statistics for large tables (step 39). Without them a comment thread on a database with a million comments
   scanned most of the table (3.7 s a request); now 0.4 ms for the query. PostgreSQL is unchanged (autovacuum).
