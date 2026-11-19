@@ -11,6 +11,9 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Added
 
+- Module `inventory`: purchasing — suppliers with their payable from `ledger`, purchase orders received in parts, goods
+  receipts (`PN-…`) posted to the ledger once by a job with a retryable `ledger_status`, supplier returns reversing the
+  posting; MCP tool `inventory.create_receipt`.
 - Module `inventory`: lots with expiry dates (first expired, first out; `GET /lots?expiry_state=`; unit setting
   `inventory.expiring_days`; daily job `inventory.expire_lots` writing expired lots off) and serial numbers that are
   sold only once; transfers keep lots and serial numbers.
