@@ -893,6 +893,11 @@ export type CancelBookingRequest = {
   reason?: string | null;
 };
 
+/** Cancel one of your orders. */
+export type CancelMyOrderRequest = {
+  reason?: string | null;
+};
+
 /** Cancel your tenant's subscription. */
 export type CancelRequest = {
   /**
@@ -8389,6 +8394,17 @@ export type Data_OrdersPublicPayment = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersShipmentRequested = {
+  /** A shipment requested from the shipping module. */
+  data: {
+    cod_amount?: Money | null;
+    order_id: string;
+    /** Key of the request at the shipping module. */
+    request_key: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OverrideResponse = {
   /** An override for one tenant: turn a module or feature on or off, or replace a limit. */
   data: {
@@ -11718,6 +11734,30 @@ export type Data_Vec_NotificationTemplateVersion = {
     subject: string;
     version: number;
     zns_template_id?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersPaymentAction = {
+  data: {
+    amount: Money;
+    expires_at?: string | null;
+    /**
+     * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
+     * `none` (the payment could not be started yet; retry from the order).
+     */
+    kind: string;
+    order_id: string;
+    payment_id: string;
+    /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
+    qr_payload?: string | null;
+    redirect_url?: string | null;
+    /** `pending`, `succeeded`, `failed`, `expired`… */
+    status: string;
+    /** For `GET /public/payments/{token}`. */
+    status_token: string;
+    /** Transfer content the bank transfer must carry. */
+    transfer_code?: string | null;
   }[];
 };
 
@@ -17067,6 +17107,14 @@ export type OrdersPublicPayment = {
   status: string;
 };
 
+/** A shipment requested from the shipping module. */
+export type OrdersShipmentRequested = {
+  cod_amount?: Money | null;
+  order_id: string;
+  /** Key of the request at the shipping module. */
+  request_key: string;
+};
+
 /** A way to deliver the cart. */
 export type OrdersShippingOption = {
   amount: Money;
@@ -17083,6 +17131,14 @@ export type OrdersShippingOption = {
   option_key: string;
   /** Store of a pickup option. */
   pickup_org_id?: string | null;
+};
+
+/** A status change of an order. */
+export type OrdersTransitionRequest = {
+  /** Why (kept in the order history; shown to the buyer when cancelling). */
+  reason?: string | null;
+  /** `preparing` (accept the order), `shipping`, `delivered`, `delivery_failed` or `cancelled`. */
+  to: string;
 };
 
 /** An override to set; it replaces one of the same kind and key. */
@@ -22847,6 +22903,12 @@ export type ReportRequest = {
   /** What is wrong, for the moderators (at most 500 characters). */
   note?: string | null;
   reason: CommentReportReason;
+};
+
+/** A shipment to request. */
+export type RequestOrderShipmentRequest = {
+  /** Note for the carrier. */
+  note?: string | null;
 };
 
 /** The new time of a booking. */
@@ -36544,6 +36606,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/cancel": {
+    /** Cancel one of your orders. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: CancelMyOrderRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/payments/{token}": {
     /** Status of a payment, for the QR code screen. */
     get: {
@@ -36565,6 +36642,54 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/payment-link": {
+    /** Resend the payment of an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/shipments": {
+    /** Request a shipment for an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: RequestOrderShipmentRequest;
+      responses: {
+        202: Data_OrdersShipmentRequested;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/transitions": {
+    /** Move an order through its lifecycle. */
+    post: {
+      parameters: { header: { "If-Match": string; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersTransitionRequest;
+      responses: {
+        200: Data_OrdersOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        412: Problem;
+        422: Problem;
+        428: Problem;
         default: Problem;
       };
     };

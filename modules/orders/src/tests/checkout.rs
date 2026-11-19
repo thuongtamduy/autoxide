@@ -18,7 +18,7 @@ use crate::entity::{checkout, order};
 
 /// Giỏ của `call` ở cửa hàng A với `quantity` biến thể `variant`, đã có nơi giao; trả (id giỏ,
 /// `cart_token` nếu vãng lai, `quote_token`).
-async fn ready_cart(
+pub(crate) async fn ready_cart(
     call: &Call<'_>,
     org: OrgId,
     variant: Uuid,
@@ -42,13 +42,17 @@ async fn ready_cart(
     (id, token, quote)
 }
 
-fn body(cart: &str, quote: &str, method: &str) -> Value {
+pub(crate) fn body(cart: &str, quote: &str, method: &str) -> Value {
     json!({"cart_id": cart, "quote_token": quote, "payment_method": method,
         "contact": {"name": "Nguyễn An", "phone": "0901234567"}})
 }
 
 /// `POST /checkout` với `key` (hay không khoá).
-async fn checkout(call: &Call<'_>, key: Option<&str>, body: Value) -> (StatusCode, Value) {
+pub(crate) async fn checkout(
+    call: &Call<'_>,
+    key: Option<&str>,
+    body: Value,
+) -> (StatusCode, Value) {
     let mut request = call.app.post("/api/v1/orders/checkout").json(body);
     if let Some(who) = call.who {
         request = request.token(who);

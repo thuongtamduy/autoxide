@@ -11,6 +11,7 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::version::Tagged;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
@@ -288,7 +289,7 @@ pub(crate) async fn list_orders(
     operation_id = "get_order",
     params(("id" = Uuid, Path, description = "Id of the order.")),
     responses(
-        (status = 200, description = "The order with lines and payments.", body = Data<OrderResponse>),
+        (status = 200, description = "The order with lines and payments.", body = Data<OrderResponse>, headers(("ETag" = String, description = "Version of the order, for `If-Match`."))),
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.read` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such order; code `orders.order_not_found`.", body = Problem),
@@ -299,7 +300,8 @@ pub(crate) async fn get_order(
     tenant: TenantContext,
     principal: Principal,
     Path(id): Path<Uuid>,
-) -> Result<Data<OrderResponse>, Error> {
+) -> Result<Tagged<OrderResponse>, Error> {
     let view = service.staff_order(&tenant, &principal, id).await?;
-    Ok(Data { data: OrderResponse::new(view)? })
+    let version = view.order.updated_at;
+    Ok(Tagged { version, data: OrderResponse::new(view)? })
 }
