@@ -1,7 +1,10 @@
 //! Cuộc trò chuyện và tin nhắn: gửi lại không trùng, phạm vi theo nhánh, thu hồi, đã đọc, phân công,
 //! đóng, chặn, thông báo gom lô, chuyển phiếu qua `support` thật, tool MCP.
 
+use std::sync::Arc;
+
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_support::api::{NewTicket, Requester, SupportIntake, TicketRef};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
 use sea_orm::sea_query::Expr;
@@ -286,25 +289,36 @@ async fn tin_chua_doc_gui_thong_bao_mot_lan() {
     .unwrap();
 }
 
+/// Mở phiếu giả: đứng chỗ `SupportIntake` của `support` (bài đầu-cuối với `support` thật ở
+/// `crates/app/src/e2e/conversations.rs`).
+#[derive(Default)]
+struct FakeIntake(std::sync::Mutex<Vec<NewTicket>>);
+
+#[async_trait::async_trait]
+impl SupportIntake for FakeIntake {
+    async fn open(
+        &self,
+        _tenant: &autoxide_kernel::tenancy::TenantContext,
+        ticket: NewTicket,
+    ) -> Result<TicketRef, autoxide_kernel::error::Error> {
+        let mut opened = self.0.lock().unwrap();
+        // Một phiếu cho mỗi `reference`: test chỉ chuyển một cuộc.
+        let id = Uuid::from_u128(0x7e);
+        if !opened.iter().any(|known| known.reference == ticket.reference) {
+            opened.push(ticket);
+        }
+        Ok(TicketRef { id, number: "000001".to_owned(), access_token: None })
+    }
+}
+
 #[tokio::test]
 async fn chuyen_thanh_phieu_ho_tro() {
     TestDatabase::run(async |test| {
-        let h = harness_with(test, false, |builder| {
-            builder
-                .setting("AUTOXIDE_ANTISPAM_MIN_FILL_SECONDS", "0")
-                .member(
-                    "agent",
-                    AGENT,
-                    autoxide_kernel::tenancy::root_of(autoxide_kernel::tenancy::DEFAULT_TENANT),
-                    &[
-                        ("conversations.read", autoxide_kernel::access::Scope::Tenant),
-                        ("conversations.reply", autoxide_kernel::access::Scope::Tenant),
-                        ("support.tickets.read", autoxide_kernel::access::Scope::Tenant),
-                    ],
-                )
-                .module(autoxide_support::module())
-        })
-        .await;
+        let intake = Arc::new(FakeIntake::default());
+        let shared = intake.clone();
+        let h =
+            harness_with(test, false, move |builder| builder.provide::<dyn SupportIntake>(shared))
+                .await;
         let id = start(&h.app, "buyer", "Áo bị rách").await;
         reply(&h.app, "agent", &id, "Bạn gửi ảnh giúp shop").await;
         let (status, escalated) =
@@ -316,20 +330,15 @@ async fn chuyen_thanh_phieu_ho_tro() {
         let (_, again) =
             call(&h.app, "POST", &format!("/threads/{id}/escalate"), "agent", None).await;
         assert_eq!(again["data"]["ticket_id"], ticket.as_str());
-        // Phiếu của người mua, mang lịch sử và liên kết về cuộc trò chuyện.
-        let got = h
-            .app
-            .get(&format!("/api/v1/support/tickets/{ticket}"))
-            .token("agent")
-            .send()
-            .await
-            .unwrap();
-        assert_eq!(got.status(), StatusCode::OK, "{}", got.text());
-        let got = got.json();
-        assert_eq!(got["data"]["requester"]["user_id"], Uuid::from_u128(BUYER).to_string());
-        let text = got.to_string();
-        assert!(text.contains("Áo bị rách") && text.contains("Bạn gửi ảnh giúp shop"), "{text}");
-        assert!(text.contains(&format!("conversations.thread:{id}")), "{text}");
+        let opened = intake.0.lock().unwrap().clone();
+        assert_eq!(opened.len(), 1);
+        assert_eq!(opened[0].requester, Requester::User(Uuid::from_u128(BUYER)));
+        assert!(opened[0].body.contains("Áo bị rách") && opened[0].body.contains("Bạn gửi ảnh"));
+        assert!(opened[0].links.contains(&format!("conversations.thread:{id}")));
+        // Nhân viên nhánh khác không chuyển được.
+        let (status, _) =
+            call(&h.app, "POST", &format!("/threads/{id}/escalate"), "branch", None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
     })
     .await
     .unwrap();
