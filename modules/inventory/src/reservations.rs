@@ -55,6 +55,8 @@ struct Need {
     /// Cho `available` âm (bán khi hết hàng, đặt trước).
     negative_ok: bool,
     preorder: bool,
+    /// Giới hạn suất đặt trước (của `catalog`); `None` = không giới hạn.
+    preorder_limit: Option<i64>,
 }
 
 /// Một phần đã chọn kho.
@@ -146,6 +148,7 @@ fn present(
             released_quantity: line.released_quantity,
             backordered: line.backordered,
             preordered: line.preordered,
+            allocated_quantity: line.allocated_quantity,
         })
         .collect();
     Ok(Reservation {
@@ -326,6 +329,9 @@ impl InventoryService {
                 quantity,
                 negative_ok: matches!(variant.sale_mode, SaleMode::Backorder | SaleMode::Preorder),
                 preorder: variant.sale_mode == SaleMode::Preorder,
+                preorder_limit: variant
+                    .preorder_limit
+                    .filter(|_| variant.sale_mode == SaleMode::Preorder),
             });
             Ok(())
         };
@@ -485,6 +491,18 @@ impl InventoryService {
             ordered.push((level, pick));
         }
         ordered.sort_by_key(|(level, _)| *level);
+        // Suất đặt trước: theo thứ tự ID biến thể, trước khi trừ tồn (một câu `UPDATE` có trần).
+        let mut quotas: std::collections::BTreeMap<Uuid, (i64, i64)> =
+            std::collections::BTreeMap::new();
+        for need in needs {
+            if let Some(limit) = need.preorder_limit {
+                let entry = quotas.entry(need.variant).or_insert((limit, 0));
+                entry.1 += need.quantity;
+            }
+        }
+        for (variant, (limit, quantity)) in quotas {
+            crate::preorders::take(transaction, tenant, variant, limit, quantity).await?;
+        }
         let mut touched = Touched::default();
         for (level, pick) in &ordered {
             let bounds =
@@ -537,6 +555,7 @@ impl InventoryService {
                 released_quantity: Set(0),
                 backordered: Set(pick.backordered),
                 preordered: Set(need.preorder),
+                allocated_quantity: Set(0),
             };
             lines.push(
                 reservation_line::Entity::insert(line).exec_with_returning(transaction).await?,
@@ -657,6 +676,9 @@ impl InventoryService {
             let left = remaining(line);
             if left <= 0 {
                 continue;
+            }
+            if line.preordered {
+                crate::preorders::give_back(transaction, tenant, line.variant_id, left).await?;
             }
             if !stock::move_available(
                 transaction,

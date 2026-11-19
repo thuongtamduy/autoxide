@@ -102,6 +102,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `auth.replace_role` | `auth.roles.manage` | writes |
 | `auth.revoke_api_key` | — | destructive |
 | `auth.revoke_invitation` | `auth.invitations.manage` | writes |
+| `auth.rotate_api_key` | — | writes |
 | `auth.set_memberships` | `auth.roles.manage` | writes |
 | `auth.set_user_roles` | `auth.roles.manage` | writes |
 | `auth.update_oidc_provider` | `auth.oidc.manage` | writes |

@@ -204,6 +204,10 @@ pub(crate) fn registrations(service: &Arc<InventoryService>) -> Vec<JobRegistrat
         JobRegistration::new(EXPIRE_RESERVATIONS, Arc::new(ExpireReservations(service.clone()))),
         JobRegistration::new(EXPIRE_LOTS, Arc::new(ExpireLots(service.clone()))),
         JobRegistration::new(
+            crate::preorders::ALLOCATE_PREORDERS,
+            Arc::new(crate::preorders::Allocate(service.clone())),
+        ),
+        JobRegistration::new(
             crate::receipts::POST_RECEIPT,
             Arc::new(PostToLedger(service.clone(), false)),
         ),

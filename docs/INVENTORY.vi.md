@@ -73,6 +73,17 @@ Module `orders` giữ hàng qua `autoxide_inventory::api::Inventory`:
 Chỗ giữ chưa xác nhận quá `expires_at` được job `inventory.expire_reservations` (mỗi phút) trả lại. Mỗi phần giữ trừ
 tồn bằng một câu `UPDATE` có điều kiện, theo thứ tự cố định, nên 100 người cùng mua cái cuối chỉ đúng một người được.
 
+### Hàng đặt trước
+
+Biến thể bán theo `preorder` giữ chỗ được trước khi có hàng. Khi biến thể có `preorder_limit` (khai ở `catalog`), tổng
+đặt trước đang giữ và đã xác nhận không bao giờ vượt giới hạn, kể cả khi nhiều người đặt cùng lúc: người đặt thừa nhận
+409 `inventory.preorder_sold_out`. Huỷ hoặc hết hạn đặt trước thì trả lại suất.
+
+Khi hàng về kho có đơn đặt trước đang chờ (nhập hàng, chuyển kho, trả về, điều chỉnh tăng), job
+`inventory.allocate_preorders` chia hàng rảnh cho các dòng đặt trước **theo thứ tự đặt** và phát
+`inventory.preorder_allocated` cho từng dòng (`quantity` lần này, `allocated_quantity` cộng dồn) để `orders` chuyển đơn
+sang bước tiếp. Chạy lại job không bao giờ chia hai lần.
+
 Quản trị xem chỗ giữ bằng `GET /reservations` (`inventory.reservations.read`) và gỡ chỗ bị kẹt bằng
 `POST /reservations/{id}/release` (`inventory.adjust`; ghi lại người gỡ).
 
