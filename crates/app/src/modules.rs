@@ -94,6 +94,10 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // nên đứng sau `catalog`; đọc cài đặt kế thừa qua `dyn OrgDirectory` nếu có. `orders`
         // (bước 45) đăng ký SAU nó để gọi `dyn Promotions`.
         Box::new(autoxide_promotions::module()),
+        // Giỏ hàng, đặt hàng, đơn hàng (bước 45): gọi `catalog`, `inventory`, `shipping`, `promotions`,
+        // `tax`, `ledger` qua `api` của chúng nên đứng sau cả sáu. Module sau (`marketplace`,
+        // `customers`, `channels`, `affiliate`) cắm vào `dyn OrderExtensions` của nó.
+        Box::new(autoxide_orders::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.
@@ -253,9 +257,10 @@ mod tests {
             // hai của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
             // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), ba của
-            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43), thêm một của `inventory` (trừ lô quá hạn — bước 42)) đúng
-            // một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 59);
+            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher — bước 43), hai
+            // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn — bước 45), thêm một của `inventory` (trừ lô quá
+            // hạn — bước 42)) đúng một job.
+            assert_eq!(a.unwrap() + b.unwrap(), 61);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
