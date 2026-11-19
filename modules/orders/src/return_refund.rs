@@ -238,6 +238,9 @@ mod tests {
             gift_of: None,
             warehouse_org_id: None,
             returned_quantity: 0,
+            allocated_quantity: 0,
+            cancelled_quantity: 0,
+            preorder_delayed_to: None,
             created_at: Utc::now(),
         }
     }
@@ -286,6 +289,7 @@ mod tests {
             completed_at: None,
             cancelled_at: None,
             cancel_reason: None,
+            preorder_accepted_at: None,
             version: 1,
             created_at: now,
             updated_at: now,

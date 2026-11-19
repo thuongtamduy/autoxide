@@ -36,6 +36,9 @@ pub struct Model {
     pub gift_of: Option<Uuid>,
     pub warehouse_org_id: Option<Uuid>,
     pub returned_quantity: i64,
+    pub allocated_quantity: i64,
+    pub cancelled_quantity: i64,
+    pub preorder_delayed_to: Option<Date>,
     pub created_at: DateTimeUtc,
 }
 

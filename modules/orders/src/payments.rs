@@ -34,6 +34,8 @@ pub(crate) const COLLECTED: [&str; 3] = [SUCCEEDED, REFUNDED_PARTIAL, REFUNDED];
 pub(crate) const UNPAID: &str = "unpaid";
 pub(crate) const COD_PENDING: &str = "cod_pending";
 pub(crate) const PAID: &str = "paid";
+/// COD thu nhiều lần (giao nhiều lần): đã thu một phần.
+pub(crate) const PARTIALLY_PAID: &str = "partially_paid";
 /// Event của `ledger` khi đối tác báo đã thu.
 pub(crate) const LEDGER_PAYMENT_SUCCEEDED: &str = "ledger.payment_succeeded";
 

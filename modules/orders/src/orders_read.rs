@@ -19,6 +19,8 @@ pub(crate) struct OrderView {
     pub order: order::Model,
     pub lines: Vec<line::Model>,
     pub payments: Vec<payment::Model>,
+    /// Nhận tại cửa hàng, khi đã sẵn sàng.
+    pub pickup: Option<crate::entity::pickup::Model>,
 }
 
 /// Bộ lọc danh sách đơn của nhân viên.
@@ -29,6 +31,9 @@ pub(crate) struct OrderFilter {
     pub org_id: Option<Uuid>,
     pub channel: Option<String>,
     pub number: Option<String>,
+    pub pickup_org_id: Option<Uuid>,
+    /// `ready`, `picked_up`, `expired`.
+    pub pickup_status: Option<String>,
 }
 
 impl OrdersService {
@@ -50,7 +55,12 @@ impl OrdersService {
             .order_by_asc(payment::Column::Id)
             .all(read)
             .await?;
-        Ok(OrderView { order: row, lines, payments })
+        let pickup = crate::entity::pickup::Entity::find()
+            .filter(crate::entity::pickup::Column::OrderId.eq(row.id))
+            .scoped(tenant)
+            .one(read)
+            .await?;
+        Ok(OrderView { order: row, lines, payments, pickup })
     }
 
     /// Đơn `id` của người mua `buyer` (đơn của người khác: 404).
@@ -118,6 +128,19 @@ impl OrdersService {
         }
         if let Some(number) = &filter.number {
             condition = condition.add(order::Column::Number.eq(number.as_str()));
+        }
+        if let Some(org) = filter.pickup_org_id {
+            condition = condition.add(order::Column::PickupOrgId.eq(org));
+        }
+        if let Some(status) = &filter.pickup_status {
+            // Đơn có dòng `orders_pickups` mang trạng thái này (bảng của chính module).
+            let ids = sea_orm::sea_query::Query::select()
+                .column(crate::entity::pickup::Column::OrderId)
+                .from(crate::entity::pickup::Entity)
+                .and_where(crate::entity::pickup::Column::TenantId.eq(tenant.id().as_uuid()))
+                .and_where(crate::entity::pickup::Column::Status.eq(status.as_str()))
+                .to_owned();
+            condition = condition.add(order::Column::Id.in_subquery(ids));
         }
         let select = order::Entity::find().filter(condition).scoped(tenant);
         fetch_page(select, order::Column::Id, |row| row.id, page, tenant.database().read()).await

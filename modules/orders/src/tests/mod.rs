@@ -8,6 +8,8 @@ mod checkout;
 mod fake_ledger;
 mod fakes;
 mod lifecycle;
+mod pickups;
+mod preorders;
 mod returns;
 
 pub(crate) use fake_ledger::FakeLedger;
@@ -183,18 +185,32 @@ impl FakeShipping {
 #[async_trait::async_trait]
 impl ShippingRates for FakeShipping {
     async fn quote(&self, _tenant: &TenantContext, request: &QuoteRequest) -> Result<Quote, Error> {
-        Ok(serde_json::from_value(json!({"options": [self.option(request)], "unavailable": []}))
-            .unwrap())
+        let options = [serde_json::to_value(self.option(request)).unwrap(), store_option(request)];
+        Ok(serde_json::from_value(json!({"options": options, "unavailable": []})).unwrap())
     }
 
     async fn confirm_option(
         &self,
         _tenant: &TenantContext,
         request: &QuoteRequest,
-        _option_key: &str,
+        option_key: &str,
     ) -> Result<ShippingOption, Error> {
+        if option_key == "store" {
+            return Ok(serde_json::from_value(store_option(request)).unwrap());
+        }
         Ok(self.option(request))
     }
+}
+
+/// Nhận tại chính cửa hàng bán, miễn phí, giữ hàng 2 ngày.
+fn store_option(request: &QuoteRequest) -> Value {
+    json!({
+        "method_id": Uuid::from_u128(7), "method_code": "store", "name": "In store",
+        "kind": "pickup", "amount": money(0), "free_shipping_applied": false, "free_over": null,
+        "tax_category": "vat.standard", "carrier_code": null, "service_code": null,
+        "pickup_org_id": request.org_id, "chargeable_weight_grams": 0, "estimated_days": null,
+        "eta": null, "ready_at": null, "hold_days": 2, "option_key": "store",
+    })
 }
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
@@ -216,6 +232,9 @@ pub(crate) struct Shop {
     pub ledger_outbox: Arc<Mutex<Option<Outbox>>>,
     /// Outbox của module giả `shipping` (phát event vận đơn).
     pub shipping_outbox: Arc<Mutex<Option<Outbox>>>,
+    /// Outbox của module giả `catalog` và `inventory` (event hàng đặt trước).
+    pub catalog_outbox: Arc<Mutex<Option<Outbox>>>,
+    pub inventory_outbox: Arc<Mutex<Option<Outbox>>>,
     pub orgs: Arc<FakeOrgs>,
     pub media: Arc<fakes::FakeMedia>,
     pub tree: Tree,
@@ -243,6 +262,16 @@ pub(crate) async fn shop_with<'a>(
     let ledger = Arc::new(FakeLedger::default());
     let (emitter, ledger_outbox) = Emitter::new("ledger", &[PAYMENT_SUCCEEDED]);
     let (shipping_emitter, shipping_outbox) = Emitter::new("shipping", &SHIPPING_EVENTS);
+    let (catalog_emitter, catalog_outbox) = Emitter::new(
+        "catalog",
+        &[
+            crate::preorders::PREORDER_DATE_CHANGED,
+            autoxide_catalog::api::events::VARIANT_UPDATED,
+            autoxide_catalog::api::events::VARIANT_DELETED,
+        ],
+    );
+    let (inventory_emitter, inventory_outbox) =
+        Emitter::new("inventory", &[crate::preorders::PREORDER_ALLOCATED]);
     let orgs = Arc::new(FakeOrgs::default());
     let media = Arc::new(fakes::FakeMedia::default());
     let builder = TestApp::builder(test)
@@ -258,7 +287,9 @@ pub(crate) async fn shop_with<'a>(
         .provide::<dyn autoxide_organizations::api::OrgDirectory>(orgs.clone())
         .provide::<dyn autoxide_media::api::Media>(media.clone())
         .module(emitter)
-        .module(shipping_emitter);
+        .module(shipping_emitter)
+        .module(catalog_emitter)
+        .module(inventory_emitter);
     let app = extra(builder, &tree).module(crate::module()).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
@@ -275,6 +306,8 @@ pub(crate) async fn shop_with<'a>(
         ledger,
         ledger_outbox,
         shipping_outbox,
+        catalog_outbox,
+        inventory_outbox,
         orgs,
         media,
         tree,
@@ -430,6 +463,7 @@ now_job!(ExpireUnpaidNow, crate::jobs::EXPIRE_UNPAID);
 now_job!(RecoverNow, crate::jobs::RECOVER_CHECKOUTS);
 now_job!(CompleteNow, crate::jobs::COMPLETE_DELIVERED);
 now_job!(UnacceptedNow, crate::jobs::EXPIRE_UNACCEPTED);
+now_job!(PickupsNow, crate::jobs::EXPIRE_PICKUPS);
 
 /// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
 pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
@@ -451,6 +485,9 @@ pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
         }
         crate::jobs::EXPIRE_UNACCEPTED => {
             queue.enqueue_database(write, &UnacceptedNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_PICKUPS => {
+            queue.enqueue_database(write, &PickupsNow {}, options()).await
         }
         other => panic!("no test job for `{other}`"),
     }
@@ -482,11 +519,24 @@ macro_rules! shipping_event {
 
 shipping_event!(ShipmentDelivered, autoxide_shipping::api::events::SHIPMENT_DELIVERED);
 shipping_event!(CodCollected, autoxide_shipping::api::events::COD_COLLECTED);
+shipping_event!(PreorderAllocated, crate::preorders::PREORDER_ALLOCATED);
+shipping_event!(PreorderDateChanged, crate::preorders::PREORDER_DATE_CHANGED);
+shipping_event!(VariantUpdated, autoxide_catalog::api::events::VARIANT_UPDATED);
 
 /// Thân `{"after": ShipmentEvent}` của event vận đơn cho đơn `order`.
 pub(crate) fn shipment_event(order: uuid::Uuid, status: &str, cod: Option<i64>) -> Value {
+    keyed_shipment_event(order, &format!("order:{order}:1"), status, cod)
+}
+
+/// Event vận đơn của lần giao mang khoá `request_key` (khoá `orders` đã gửi `shipping`).
+pub(crate) fn keyed_shipment_event(
+    order: uuid::Uuid,
+    request_key: &str,
+    status: &str,
+    cod: Option<i64>,
+) -> Value {
     json!({"after": {
-        "shipment_id": uuid::Uuid::now_v7(), "order_id": order, "request_key": format!("order:{order}:1"),
+        "shipment_id": uuid::Uuid::now_v7(), "order_id": order, "request_key": request_key,
         "direction": "outbound", "org_id": uuid::Uuid::nil(), "status": status,
         "tracking_number": "T1", "carrier_code": "fake", "cod_amount": cod.map(money),
         "at": Utc::now(),

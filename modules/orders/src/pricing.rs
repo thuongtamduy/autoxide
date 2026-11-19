@@ -127,6 +127,17 @@ pub(crate) struct Quote {
 }
 
 impl Quote {
+    /// Giỏ có dòng hàng đặt trước (D-204).
+    pub(crate) fn has_preorder(&self) -> bool {
+        self.lines.iter().any(|line| {
+            line.gift_of.is_none()
+                && line
+                    .variant
+                    .as_ref()
+                    .is_some_and(|variant| variant.sale_mode == SaleMode::Preorder)
+        })
+    }
+
     /// Dấu vân tay trong `quote_token`.
     pub(crate) fn fingerprint(&self) -> &str {
         token_fingerprint(&self.token)

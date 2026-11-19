@@ -606,7 +606,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Vòng đời đơn: chờ thanh toán → xác nhận → chuẩn bị → đang giao → đã giao → hoàn tất; huỷ theo quy tắc
       (`buyer_cancel_until` tới `preparing`), chờ cửa hàng nhận đơn `acceptance_hours` (D-209); mọi chuyển
       qua service, ghi event và bút toán sổ cái; gửi lại link thanh toán còn hạn
-- [ ] Nhận tại cửa hàng và hàng đặt trước: mã nhận 6 số, người nhận hộ, giữ hàng chờ nhận có hạn rồi huỷ /
+- [x] Nhận tại cửa hàng và hàng đặt trước: mã nhận 6 số, người nhận hộ, giữ hàng chờ nhận có hạn rồi huỷ /
       hoàn theo chính sách; đặt trước (D-204): tách lần giao, đồng ý điều kiện và thấy ngày giao trước khi
       đặt, dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt trước thì huỷ và hoàn tiền tự động
 - [x] Đổi trả và hoàn tiền: trả trong hạn chính sách, lý do theo `allowed_return_reasons` (D-209, D-223), duyệt,

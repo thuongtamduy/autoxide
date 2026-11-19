@@ -44,6 +44,17 @@ pub(crate) struct Contact {
     pub name: String,
     pub phone: String,
     pub email: Option<String>,
+    /// Người nhận hộ khi nhận tại cửa hàng (D-201): tên và số điện thoại, đối chiếu lúc giao.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_phone: Option<String>,
+}
+
+/// Số điện thoại hợp lệ: 8–15 chữ số, có thể bắt đầu bằng `+`.
+pub(crate) fn phone_valid(phone: &str) -> bool {
+    let digits = phone.trim().trim_start_matches('+');
+    (8..=15).contains(&digits.len()) && digits.bytes().all(|b| b.is_ascii_digit())
 }
 
 /// Đầu vào của `POST /checkout`.
@@ -55,6 +66,8 @@ pub(crate) struct CheckoutInput {
     pub contact: Contact,
     pub note: Option<String>,
     pub accept_terms_version: Option<String>,
+    /// Người mua đồng ý điều kiện đặt trước (bắt buộc khi giỏ có hàng đặt trước, D-204).
+    pub accept_preorder_terms: bool,
     pub invoice_request: Option<serde_json::Value>,
     pub return_url: Option<String>,
 }
@@ -87,13 +100,36 @@ fn check_contact(contact: &Contact, problems: &mut Vec<FieldError>) {
             "must be 1 to 200 characters long",
         ));
     }
-    let digits = contact.phone.trim().trim_start_matches('+');
-    if !(8..=15).contains(&digits.len()) || !digits.bytes().all(|b| b.is_ascii_digit()) {
+    if !phone_valid(&contact.phone) {
         problems.push(FieldError::new(
             "contact.phone",
             "format",
             "must be a phone number: 8 to 15 digits, optionally starting with `+`",
         ));
+    }
+    match (&contact.proxy_name, &contact.proxy_phone) {
+        (None, None) => {}
+        (Some(name), Some(phone)) => {
+            if !(1..=200).contains(&name.trim().chars().count()) {
+                problems.push(FieldError::new(
+                    "contact.proxy_name",
+                    "length",
+                    "must be 1 to 200 characters long",
+                ));
+            }
+            if !phone_valid(phone) {
+                problems.push(FieldError::new(
+                    "contact.proxy_phone",
+                    "format",
+                    "must be a phone number: 8 to 15 digits, optionally starting with `+`",
+                ));
+            }
+        }
+        _ => problems.push(FieldError::new(
+            "contact.proxy_name",
+            "required",
+            "give both `proxy_name` and `proxy_phone` of the person collecting, or neither",
+        )),
     }
     if contact.email.as_deref().is_some_and(|email| !email.contains('@') || email.len() > 320) {
         problems.push(FieldError::new("contact.email", "format", "must be an email address"));
@@ -160,6 +196,13 @@ impl OrdersService {
         }
         let mut problems = Vec::new();
         check_contact(&input.contact, &mut problems);
+        if quote.has_preorder() && !input.accept_preorder_terms {
+            problems.push(FieldError::new(
+                "accept_preorder_terms",
+                "required",
+                "the cart has pre-order items: show their terms and expected dates, then send `true`",
+            ));
+        }
         if input.note.as_deref().is_some_and(|note| note.chars().count() > 1000) {
             problems.push(FieldError::new(
                 "note",
@@ -498,7 +541,8 @@ impl Draft<'_> {
                 serde_json::json!({"method_id": option.method_id, "option_key": option.option_key,
                     "method_code": option.method_code, "name": option.name,
                     "carrier_code": option.carrier_code, "amount": option.amount,
-                    "pickup_org_id": option.pickup_org_id, "eta": option.eta})
+                    "pickup_org_id": option.pickup_org_id, "eta": option.eta,
+                    "hold_days": option.hold_days})
                 .to_string()
             })),
             pickup_org_id: Set(quote
@@ -530,6 +574,7 @@ impl Draft<'_> {
             stock_shortage: Set(false),
             invoice_request: Set(self.input.invoice_request.as_ref().map(ToString::to_string)),
             terms_version: Set(self.input.accept_terms_version.clone()),
+            preorder_accepted_at: Set(self.quote.has_preorder().then_some(now)),
             note: Set(self.input.note.clone()),
             locale: Set(self.cart.locale.clone()),
             placed_at: Set(now),
@@ -641,6 +686,9 @@ fn line_row(
         name: Set(variant.name.clone()),
         snapshot: Set(snapshot.to_string()),
         sale_mode: Set(sale_mode.as_str().unwrap_or("in_stock").to_owned()),
+        allocated_quantity: Set(0),
+        cancelled_quantity: Set(0),
+        preorder_delayed_to: Set(None),
         preorder_available_on: Set(variant.preorder_available_on),
         requires_shipping: Set(variant.requires_shipping),
         tax_inclusive: Set(quoted.tax_inclusive),
