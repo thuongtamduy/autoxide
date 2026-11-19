@@ -449,6 +449,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step44-shipping-carriers](D-20261118-step44-shipping-carriers.md)** `shipping`: tài khoản hãng mã hoá trong bảng, bảng chuyển trạng thái chung, đặt hãng giữa hai transaction, webhook ghi nguyên văn rồi xử lý bằng job — 2026-11-18
 - **[D-20261118-step44-shipping-cod](D-20261118-step44-shipping-cod.md)** `shipping`: tiền thu hộ (COD) chỉ ghi nghĩa vụ trong sổ cái, đối soát bảng kê CSV chung, chênh lệch giải quyết bằng danh sách lý do — 2026-11-18
 - **[D-20261118-step44-shipping-dates](D-20261118-step44-shipping-dates.md)** `shipping`: ngày giao dự kiến theo lịch giao, giờ sẵn sàng nhận tại cửa hàng, ước tính công khai đọc biến thể qua `Catalog` — 2026-11-18
+- **[D-20261118-step44-shipping-facts](D-20261118-step44-shipping-facts.md)** `shipping`: trả lời tự động về vận đơn cho `support`, câu mẫu khai bằng `answer_text!` — 2026-11-18
 - **[D-20261118-step44-shipping-rates](D-20261118-step44-shipping-rates.md)** `shipping`: cân quy đổi số nguyên, bậc phí theo vùng tỉnh, phương thức kế thừa theo cây, thuế của phí giao do `orders` tính theo `tax_category` — 2026-11-18
 - **[D-20261118-step45-carts](D-20261118-step45-carts.md)** Giỏ hàng của `orders`: báo giá ở máy chủ, `quote_token`, giỏ vãng lai, module chưa cài — 2026-11-18
 - **[D-20261118-step45-orders-api](D-20261118-step45-orders-api.md)** Module `orders`: hợp đồng `api` cho bước 46–49, điểm cắm `OrderExtensions`, người mua không cần permission — 2026-11-18

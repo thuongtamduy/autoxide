@@ -18,28 +18,42 @@ use crate::entity::shipment;
 
 pub(crate) const TRACKING: &str = "shipping.tracking";
 
+/// Câu trả lời tự động (khoá dịch `text:<câu>`): macro chỉ trả lại chuỗi, để `cargo xtask check`
+/// thấy câu và đòi bản dịch tiếng Việt.
+macro_rules! answer_text {
+    ($text:literal) => {
+        $text
+    };
+}
+
 /// Câu trả lời (khoá dịch `text:<câu>` trong `locales/vi.json`).
-const ANSWER: &str = "Shipment {tracking} of order {order} is {status} (updated {at} UTC).";
-const ANSWER_NO_TRACKING: &str = "The shipment of order {order} is {status} (updated {at} UTC).";
+const ANSWER: &str =
+    answer_text!("Shipment {tracking} of order {order} is {status} (updated {at} UTC).");
+const ANSWER_NO_TRACKING: &str =
+    answer_text!("The shipment of order {order} is {status} (updated {at} UTC).");
 
 /// Cụm từ của từng trạng thái (dịch qua `text:`).
 fn phrase(status: ShipmentStatus) -> &'static str {
     match status {
-        ShipmentStatus::Pending => "being prepared",
+        ShipmentStatus::Pending => answer_text!("being prepared"),
         ShipmentStatus::Booking | ShipmentStatus::ReadyToShip => {
-            "waiting for the carrier to pick it up"
+            answer_text!("waiting for the carrier to pick it up")
         }
-        ShipmentStatus::PickedUp => "picked up by the carrier",
-        ShipmentStatus::InTransit => "on its way",
-        ShipmentStatus::OutForDelivery => "out for delivery today",
-        ShipmentStatus::Delivered => "delivered",
-        ShipmentStatus::DeliveryFailed => "not delivered yet: the last attempt failed",
-        ShipmentStatus::Returning => "on its way back to the shop",
-        ShipmentStatus::Returned => "returned to the shop",
-        ShipmentStatus::ReadyForPickup => "ready for pickup at the store",
-        ShipmentStatus::PickedUpByBuyer => "collected at the store",
-        ShipmentStatus::Cancelled => "cancelled",
-        ShipmentStatus::Lost => "reported lost by the carrier; the shop will contact you",
+        ShipmentStatus::PickedUp => answer_text!("picked up by the carrier"),
+        ShipmentStatus::InTransit => answer_text!("on its way"),
+        ShipmentStatus::OutForDelivery => answer_text!("out for delivery today"),
+        ShipmentStatus::Delivered => answer_text!("delivered"),
+        ShipmentStatus::DeliveryFailed => {
+            answer_text!("not delivered yet: the last attempt failed")
+        }
+        ShipmentStatus::Returning => answer_text!("on its way back to the shop"),
+        ShipmentStatus::Returned => answer_text!("returned to the shop"),
+        ShipmentStatus::ReadyForPickup => answer_text!("ready for pickup at the store"),
+        ShipmentStatus::PickedUpByBuyer => answer_text!("collected at the store"),
+        ShipmentStatus::Cancelled => answer_text!("cancelled"),
+        ShipmentStatus::Lost => {
+            answer_text!("reported lost by the carrier; the shop will contact you")
+        }
     }
 }
 
@@ -73,7 +87,9 @@ impl FactSource for ShippingFacts {
     fn intents(&self) -> Vec<FactIntent> {
         vec![FactIntent {
             intent: TRACKING,
-            description: "Where is my parcel? The status of a shipment, by tracking number or order number.",
+            description: answer_text!(
+                "Where is my parcel? The status of a shipment, by tracking number or order number."
+            ),
             params: json!({
                 "type": "object",
                 "properties": {
