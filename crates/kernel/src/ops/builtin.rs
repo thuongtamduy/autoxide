@@ -490,6 +490,8 @@ impl Module for KernelModule {
         routes = routes.merge(crate::ops::request_log::routes());
         if let Some(hub) = &self.stream {
             routes = routes.merge(crate::http::stream::routes(hub.clone()));
+            routes =
+                routes.merge(crate::http::ws::routes(hub.clone(), self.catalog.signal_topics()));
         }
         routes = routes.merge(crate::ops::filter_parse::routes(
             crate::ops::filter_parse::FilterParseState {

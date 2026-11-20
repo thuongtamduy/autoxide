@@ -354,7 +354,11 @@ pub fn lint(openapi: &OpenApi) -> Vec<String> {
                 }
             }
             let responses = &operation.responses.responses;
-            if !responses.keys().any(|status| status.starts_with('2') || status.starts_with('3')) {
+            // `101`: bắt tay WebSocket thành công (bước 69 P3) cũng là trả lời thành công.
+            if !responses
+                .keys()
+                .any(|status| status.starts_with('2') || status.starts_with('3') || status == "101")
+            {
                 problems.push(format!(
                     "{endpoint}: no success response — declare what the endpoint returns"
                 ));

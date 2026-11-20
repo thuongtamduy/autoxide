@@ -17,3 +17,4 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Uploading large files straight to storage](direct-uploads.md): signed links to S3, completing, checks
 - [Trying changes in a sandbox](sandbox.md): a test copy of your tenant, simulated partners, bringing drafts back
 - [Automating work with rules](automations.md): triggers, conditions, MCP tools as actions, approvals, alerts on unusual figures
+- [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases

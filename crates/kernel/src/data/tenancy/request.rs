@@ -107,7 +107,7 @@ fn normalize_host(host: &str) -> String {
 
 /// Bên gọi đã xác thực, giữ trong extensions để không xác thực hai lần.
 #[derive(Clone)]
-struct Authenticated(Principal);
+pub(crate) struct Authenticated(pub(crate) Principal);
 
 /// Xác thực request bằng `authenticator` rồi kiểm khách (chế độ `multi`). Kết quả giữ trong
 /// extensions của request.
