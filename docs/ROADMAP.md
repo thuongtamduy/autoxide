@@ -934,7 +934,7 @@ khai là tự chạy.
 - [ ] Bản phát hành kế tiếp qua workflow `Release`: image amd64 + arm64 đăng lên `ghcr.io`, chủ
       repo đổi gói image sang Public một lần; `gh attestation verify` xác nhận chứng thực nguồn gốc
       và SBOM; `docs/RELEASING.md` bỏ phần "Khi repo còn riêng tư"
-- [ ] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
+- [x] Thử cài như người lạ bằng image đã đăng (cả SQLite và Postgres), sửa README /
       `docs/DEPLOY.md` (EN + VI cùng commit) theo chỗ vấp
 
 ## 69. Nền cho ứng dụng đa nền tảng: di động, ngoại tuyến, thời gian thực hai chiều (chủ dự án giao ngày 19/11/2026, D-20261119-step69-multiplatform)

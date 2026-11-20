@@ -85,7 +85,47 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
     khách, quyền vào hỗ trợ có thời hạn; danh mục đơn vị hành chính Việt Nam cho địa chỉ
     ([`docs/ADDRESS.vi.md`](docs/ADDRESS.vi.md))
 
+## Chạy thử bằng Docker (không cần build)
+
+Cách nhanh nhất để chạy Autoxide là dùng image đã phát hành: không phải biên dịch gì, SQLite
+nằm trong một Docker volume. Bạn cần [Docker](https://docs.docker.com/get-docker/) và `openssl`.
+Image nặng khoảng 630 MB trên đĩa, máy chủ sẵn sàng khoảng một giây sau khi khởi động.
+
+```bash
+# Hai secret, tự sinh ở đây và giữ trong một file (dùng đúng giá trị này ở mọi lần chạy; không commit)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
+chmod 600 autoxide.env
+
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.15.0   # một bản phát hành ở trang GitHub Releases
+RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
+
+# 1. Tạo bảng (máy chủ không khởi động được nếu chưa làm bước này; làm lại sau mỗi lần cập nhật)
+$RUN $IMAGE migrate up
+# 2. Quản trị viên đầu tiên: mật khẩu mạnh được in ra một lần
+$RUN $IMAGE user create --email you@example.com --name "Your Name" --admin
+# 3. Dữ liệu tham chiếu (địa chỉ, thuế, giới hạn khuyến mãi); chạy lại lần nữa vẫn an toàn
+$RUN $IMAGE task address.import
+$RUN $IMAGE task tax.import_pack
+$RUN $IMAGE task promotions.load_legal_data
+# 4. Chạy máy chủ (nó lắng nghe bên trong container; lệnh này mở ra chỉ trên máy này)
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+
+curl http://127.0.0.1:8080/health/ready     # {"data":{"status":"ok"}}
+$RUN $IMAGE doctor                           # còn thiếu gì trước khi đưa lên thật
+```
+
+Giữ `-v autoxide-data:/var/lib/autoxide/data` ở mọi lệnh: database, file tải lên và mail nằm
+trong volume đó, thiếu nó thì mất cùng container. Bản backup phải ghi vào một thư mục bạn gắn
+vào, không phải một đường dẫn bên trong container (`mkdir backups && sudo chown 10001 backups`,
+rồi thêm `-v "$PWD/backups:/backups"` và chạy `backup /backups/<tên>`). Đăng nhập như ở mục
+[Cấu hình](#cấu-hình) (dùng `http://127.0.0.1:8080`). Với PostgreSQL, reverse proxy có HTTPS,
+cập nhật và restore, xem [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
+
 ## Yêu cầu
+
+Chỉ cần khi build từ mã nguồn (muốn chạy image đã phát hành thì xem mục trên).
 
 - [Rust](https://rustup.rs) — `rustup` tự cài đúng toolchain ghim trong
   `rust-toolchain.toml` ở lần đầu bạn chạy `cargo`
@@ -98,7 +138,7 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 ## Bắt đầu
 
 ```bash
-git clone <repository-url> autoxide
+git clone https://github.com/thuongtamduy/autoxide.git autoxide
 cd autoxide
 
 # Biên dịch và chạy giao diện dòng lệnh
@@ -150,7 +190,7 @@ muốn tự chọn mật khẩu thì đưa nó vào standard input và thêm `--
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
-Nhập dữ liệu tham chiếu đi kèm máy chủ. Hai bước này không đổi dữ liệu của bạn, và chạy
+Nhập dữ liệu tham chiếu đi kèm máy chủ. Các bước này không đổi dữ liệu của bạn, và chạy
 lại thì không đổi gì:
 
 ```bash
@@ -162,6 +202,10 @@ cargo run -p autoxide -- task address.import
 # Gói dữ liệu thuế (thuế suất, quy tắc khấu trừ). Máy chủ đang chạy tự nhập trong vòng
 # một giờ; chạy lệnh này để có ngay. Xem docs/TAX.vi.md.
 cargo run -p autoxide -- task tax.import_pack
+
+# Giới hạn pháp lý về khuyến mãi (Việt Nam). Thiếu nó thì không bật được khuyến mãi
+# (`doctor` sẽ cảnh báo). Xem docs/PROMOTIONS.vi.md.
+cargo run -p autoxide -- task promotions.load_legal_data
 ```
 
 Kiểm bản cài đặt. `doctor` đi qua cấu hình, database, migration, khoá ký, nơi lưu file,
@@ -361,7 +405,7 @@ S3 có bucket tên `autoxide-test`. Gate tự dựng một máy chủ S3 giả l
 | `crates/kernel`  | Nền mà mọi module dựa vào. Không biết module nào.                       |
 | `crates/app`     | Binary `autoxide`: nơi duy nhất đăng ký module.                         |
 | `crates/testkit` | Đồ dùng cho test: mỗi test một database riêng, trên SQLite hoặc PostgreSQL. |
-| `modules/<tên>`  | Mỗi module một crate. `modules/auth`: tài khoản, đăng nhập, role, API key, đăng nhập hai bước. `modules/audit`: audit log chỉ thêm. `modules/idempotency`: nơi lưu idempotency key. `modules/mail`: gửi mail. `modules/files`: lưu file. `modules/webhooks`: webhook. |
+| `modules/<tên>` | Mỗi module một crate, sở hữu bảng của mình (`auth` tài khoản và đăng nhập, `audit`, `files`, `mail`, `webhooks`, `content`, `media`, `catalog`, `orders`… — khoảng ba mươi module; `ls modules` liệt kê hết, các mục ở trên nói từng module làm gì). |
 | `xtask`          | Công cụ cho người phát triển: `cargo xtask check` kiểm ranh giới workspace. |
 | `gate.sh`        | Gate chất lượng. Một thay đổi chỉ xong khi lệnh này xanh.               |
 
