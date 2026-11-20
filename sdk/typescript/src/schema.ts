@@ -1505,6 +1505,12 @@ export type CatalogCreateRoundingRule = {
   step_minor: number;
 };
 
+/** What to export. */
+export type CatalogExportRequest = {
+  /** Only products of this unit and the units below it; leave out for everything you can read. */
+  org_id?: string | null;
+};
+
 /** A filter value and how many products match it. */
 export type CatalogFacetValue = {
   count: number;
@@ -2117,6 +2123,12 @@ export type CatalogSuggestion = {
   path?: string | null;
 };
 
+/** Which language to draft. */
+export type CatalogSuggestionRequest = {
+  /** Language of the draft (one of the configured product languages). */
+  locale: string;
+};
+
 /** The tenant's search synonyms. */
 export type CatalogSynonyms = {
   /**
@@ -2145,6 +2157,43 @@ export type CatalogTextInput = {
    * tenant (`catalog.slug_taken`).
    */
   slug?: string | null;
+};
+
+/** An import or export of products as CSV. */
+export type CatalogTransfer = {
+  /** For a finished export: where to download the file (`GET`, same sign-in). */
+  content_path?: string | null;
+  created_at: string;
+  /** Problems by row, at most 1 000. */
+  errors: CatalogTransferError[];
+  finished_at?: string | null;
+  id: string;
+  /** `import` or `export`. */
+  kind: string;
+  /** Rows written without error. */
+  ok_rows: number;
+  /** The unit new products go to (import) or the branch exported; `null`: by your rights. */
+  org_id?: string | null;
+  /**
+   * `queued`, `running`, `succeeded`, `succeeded_with_errors` (some rows were not written; see
+   * `errors`), `rejected` (the file is not valid; nothing was written) or `failed` (server
+   * problem; start a new one).
+   */
+  status: string;
+  /** Data rows read (import) or written (export). */
+  total_rows: number;
+};
+
+/** One problem of one row of an imported file. */
+export type CatalogTransferError = {
+  /** Stable code of the problem (`required`, `format`, `catalog.sku_taken`…). */
+  code: string;
+  /** Column (or field) at fault; empty when the problem is not about one column. */
+  field: string;
+  /** What to fix, in English. */
+  message: string;
+  /** Line of the file (the header is line 1); 0 for a problem with the whole file. */
+  row: number;
 };
 
 /** Texts of a product in one language. */
@@ -5965,6 +6014,26 @@ export type Data_CatalogStoreOverride = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogSuggestion = {
+  /** An AI draft of a product's description and SEO texts. It changes nothing until applied. */
+  data: {
+    created_at: string;
+    decided_at?: string | null;
+    description: string;
+    id: string;
+    locale: string;
+    meta_description: string;
+    meta_title: string;
+    /** Model that wrote the draft. */
+    model: string;
+    product_id: string;
+    short_description: string;
+    /** `pending`, `applied` or `discarded`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogSynonyms = {
   /** The tenant's search synonyms. */
   data: {
@@ -5974,6 +6043,34 @@ export type Data_CatalogSynonyms = {
      * stored without accents, in lower case.
      */
     groups: string[][];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogTransfer = {
+  /** An import or export of products as CSV. */
+  data: {
+    /** For a finished export: where to download the file (`GET`, same sign-in). */
+    content_path?: string | null;
+    created_at: string;
+    /** Problems by row, at most 1 000. */
+    errors: CatalogTransferError[];
+    finished_at?: string | null;
+    id: string;
+    /** `import` or `export`. */
+    kind: string;
+    /** Rows written without error. */
+    ok_rows: number;
+    /** The unit new products go to (import) or the branch exported; `null`: by your rights. */
+    org_id?: string | null;
+    /**
+     * `queued`, `running`, `succeeded`, `succeeded_with_errors` (some rows were not written; see
+     * `errors`), `rejected` (the file is not valid; nothing was written) or `failed` (server
+     * problem; start a new one).
+     */
+    status: string;
+    /** Data rows read (import) or written (export). */
+    total_rows: number;
   };
 };
 
@@ -26227,6 +26324,12 @@ export type PublicTranslation = {
 
 /** A smaller copy of an image. */
 export type PublicVariant = {
+  /**
+   * URL of the AVIF copy, usually a third smaller than WebP: offer it in a
+   * `<source type="image/avif">` before the WebP one. `null` until it is made (the server makes
+   * them only when `AUTOXIDE_MEDIA_AVIF` is on).
+   */
+  avif_url?: string | null;
   height: number;
   /** JPEG copy (PNG for images with transparency). */
   url: string;
@@ -30175,6 +30278,14 @@ export type Utm = {
 
 /** A smaller copy of an image. */
 export type VariantResponse = {
+  /** Size of the AVIF copy in bytes; `null` like `avif_url`. */
+  avif_size?: number | null;
+  /**
+   * The same copy as AVIF, usually a third smaller than WebP: `url` with `&format=avif`. Offer
+   * it in a `<source type="image/avif">` before the WebP one. Made in the background only when
+   * the server sets `AUTOXIDE_MEDIA_AVIF=true`; `null` until then.
+   */
+  avif_url?: string | null;
   /** `image/jpeg`, or `image/png` for images with transparency. */
   content_type: string;
   height: number;
@@ -32800,6 +32911,76 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/exports": {
+    /** Export products to a CSV file. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogExportRequest;
+      responses: {
+        201: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/exports/{id}": {
+    /** Get an export you started. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/exports/{id}/content": {
+    /** Download the CSV file of a finished export. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: string;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/imports": {
+    /** Import products from a CSV file. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; query: { org_id?: string }; };
+      requestBody: string;
+      responses: {
+        201: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        413: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/imports/{id}": {
+    /** Get an import you started: status, counts and errors by row. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/price-guards": {
     /** List the price floors in your scope. */
     get: {
@@ -33172,6 +33353,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/{id}/suggestions": {
+    /** Ask AI for a draft description and SEO texts of a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogSuggestionRequest;
+      responses: {
+        201: Data_CatalogSuggestion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}/translations/{locale}": {
     /** Set the texts of a product in one language. */
     put: {
@@ -33389,6 +33586,35 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/suggestions/{id}/apply": {
+    /** Apply an AI draft to the product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogSuggestion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/suggestions/{id}/discard": {
+    /** Discard an AI draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogSuggestion;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };
