@@ -679,3 +679,48 @@ nhân dùng chung, database cùng máy.
 | PostgreSQL 16 | 559 | 1.673 ms | 2.231 ms | 3.826 ms |
 
 Đạt mục tiêu p99 < 5 ms của đặc tả trên cả hai database, kể cả khi tính cả các câu đọc chứ không chỉ phần tính.
+
+## Đường nóng của cửa hàng (bước 39, D-20261120-step39-hot-paths) — 20/11/2026
+
+### Đếm câu SQL mỗi request
+
+- **Trong test**: `app.statements(việc).await` của `TestApp` trả các câu SQL việc đó chạy (hook metric của SeaORM,
+  `Database::observe_statements`). Bài giữ N+1: đo cùng một đường với ít và nhiều bản ghi trên trang, số câu phải bằng
+  nhau (`catalog`, `orders` `tests::statements`).
+- **Trên máy chủ thật** (Postgres): bật `pg_stat_statements`, chạy máy chủ ở `AUTOXIDE_PROCESS_ROLE=api` (không có
+  worker làm lẫn số), `SELECT pg_stat_statements_reset()`, gửi N request tuần tự, rồi `sum(calls) / N` (bỏ
+  `BEGIN` / `COMMIT`).
+
+Bộ `small` của `scripts/bench-seed.sh`, Postgres 16, câu SQL / request:
+
+| Đường | Câu |
+| --- | ---: |
+| content public resolve / posts (20) / theo danh mục / feed | 11 |
+| content public sitemap / search / terms/{slug} | 4 / 5 / 3 |
+| comments public threads (20) / comments/{id} | 8 / 3 |
+| GET /auth/me (access token) | 3 (+1 dòng nhật ký request, ghi theo lô nền) |
+| GET /auth/users?limit=50 / GET /audit?limit=50 | 4 / 3 |
+| GET /kernel/find?q=… / GET /kernel/work | 5 / 11 |
+| POST /auth/login | 11 |
+
+Các đường này đã gộp lô (không N+1).
+
+### Cửa hàng: trước / sau
+
+Cửa hàng mẫu tạo qua API thật: 20 nút bán (`store`) dưới gốc, mỗi nút 10 sản phẩm, một bảng giá ở gốc, đợi storefront
+dựng xong (200 sản phẩm), rồi khởi động lại máy chủ ở chế độ chỉ API. Postgres: `ANALYZE` sau khi gieo — database vừa nạp
+lô mà autovacuum chưa phân tích thì planner chọn nested loop (gợi ý tìm 10.8 ms một câu thay vì 0.5 ms). oha 32 kết nối
+8 giây, binary trước / sau xen kẽ, mỗi bản 2 lượt, trung bình. Máy 4 nhân dùng chung, máy tạo tải cùng máy.
+
+| Đường | DB | Câu SQL | req/s | p50 ms | p95 ms |
+| --- | --- | ---: | ---: | ---: | ---: |
+| danh sách 50 sản phẩm | SQLite | 14 → 10 | 302 → 345 | 104.8 → 91.6 | 119.2 → 103.6 |
+| danh sách 50 sản phẩm | Postgres | 14 → 10 | 595 → 706 | 53.1 → 44.3 | 66.7 → 57.4 |
+| trang sản phẩm | SQLite | 28 → 25 | 764 → 863 | 41.4 → 36.7 | 48.3 → 43.8 |
+| trang sản phẩm | Postgres | 28 → 25 | 550 → 621 | 57.2 → 50.3 | 72.5 → 65.8 |
+| facets | SQLite | 27 → 8 | 415 → 1167 | 77.1 → 27.1 | 85.0 → 31.2 |
+| facets | Postgres | 27 → 8 | 536 → 1134 | 58.6 → 27.9 | 74.6 → 36.0 |
+| gợi ý tìm (đối chứng) | SQLite | 8 → 8 | 884 → 882 | 36.1 → 36.0 | 41.2 → 42.0 |
+| gợi ý tìm (đối chứng) | Postgres | 8 → 8 | 814 → 787 | 38.8 → 40.3 | 48.9 → 50.4 |
+
+Còn mở: danh sách sản phẩm trên SQLite chậm gấp đôi Postgres dưới 32 kết nối với cùng 10 câu — chưa đo nguyên nhân.

@@ -13,6 +13,7 @@ use crate::api::{PriceQuery, PriceSnapshot};
 use crate::entity::{attribute, attribute_option, option, option_value, product_attribute};
 use crate::public::pick;
 use crate::service::CatalogService;
+use crate::variants::OptionDetail;
 
 /// Mã thuộc tính mang thương hiệu (thuộc tính `text` hay `option` khách tự khai).
 pub(crate) const BRAND: &str = "brand";
@@ -22,6 +23,17 @@ pub(crate) const BRAND: &str = "brand";
 pub(crate) struct OptionCount {
     pub name: String,
     pub count: usize,
+}
+
+/// Số giá trị của từng tuỳ chọn, từ tuỳ chọn đã đọc (trang sản phẩm đã có, không đọc lại).
+pub(crate) fn option_counts_of(options: &[OptionDetail], locale: &str) -> Vec<OptionCount> {
+    options
+        .iter()
+        .map(|detail| OptionCount {
+            name: pick(&detail.option.names, locale),
+            count: detail.values.len(),
+        })
+        .collect()
 }
 
 impl CatalogService {

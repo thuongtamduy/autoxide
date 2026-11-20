@@ -620,3 +620,24 @@ async fn so_doi_tuong_tra_ten_nut_theo_lo() {
     .await
     .unwrap();
 }
+
+/// `OrgDirectory::units`: nhiều nút một câu SQL (danh sách sản phẩm của nhiều người bán,
+/// D-20261120-step39-hot-paths); ID không có thì vắng.
+#[tokio::test]
+async fn tra_nhieu_nut_mot_cau() {
+    TestDatabase::run(async |test| {
+        let app = build(test, |builder| builder).await;
+        let tree = tree(&app).await;
+        let directory = app.api::<dyn crate::api::OrgDirectory>().unwrap();
+        let tenant = app.default_tenant();
+        let ids = [org(&tree.r1), org(&tree.r2), org(&tree.s1), OrgId::from_uuid(Uuid::now_v7())];
+        let (found, statements) = app.statements(directory.units(&tenant, &ids)).await;
+        let mut names: Vec<String> = found.unwrap().into_iter().map(|unit| unit.name).collect();
+        names.sort();
+        assert_eq!(names, ["Region North", "Region South", "Store Hà Nội"]);
+        assert_eq!(statements.len(), 1, "{statements:#?}");
+        assert!(directory.units(&tenant, &[]).await.unwrap().is_empty());
+    })
+    .await
+    .unwrap();
+}
