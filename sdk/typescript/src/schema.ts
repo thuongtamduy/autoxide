@@ -9472,6 +9472,14 @@ export type Data_OrdersGuestOrder = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersInvoiceRequested = {
+  /** What an invoice request did. */
+  data: {
+    document?: OrdersDocument | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersOrder = {
   /** An order. */
   data: {
@@ -9522,6 +9530,57 @@ export type Data_OrdersPickupReady = {
     ready_at: string;
     /** `ready`, `picked_up` or `expired`. */
     status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPosQuote = {
+  /** A cart at the counter, priced (nothing is saved). */
+  data: {
+    lines: OrdersCartLine[];
+    /** Promotions applied, with their terms. */
+    promotions: Record<string, unknown>[];
+    /** Codes that do not apply, with the reason; the sale goes on without them. */
+    rejected_codes: Record<string, unknown>[];
+    totals: OrdersCartTotals;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPosSale = {
+  /** A sale made at the counter. */
+  data: {
+    /** Cash to give back. */
+    change: Money;
+    /** The order, `delivered` (the customer takes the goods). */
+    order: OrdersOrder;
+    quote?: OrdersPosQuote | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPosShift = {
+  /** A cash register shift. */
+  data: {
+    approved_at?: string | null;
+    approved_by?: string | null;
+    closed_at?: string | null;
+    closed_by?: string | null;
+    counted_cash?: Money | null;
+    expected_cash?: Money | null;
+    id: string;
+    opened_at: string;
+    opened_by: string;
+    opening_cash: Money;
+    /** The store. */
+    org_id: string;
+    register_code: string;
+    /** `open`, `pending_approval` (cash difference above the threshold) or `closed`. */
+    status: string;
+    variance?: Money | null;
+    variance_note?: string | null;
+    /** Code of the list `orders.cash_variance`. */
+    variance_reason?: string | null;
   };
 };
 
@@ -13350,6 +13409,29 @@ export type Data_Vec_NotificationTemplateVersion = {
     subject: string;
     version: number;
     zns_template_id?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersDocument = {
+  data: {
+    document_id: string;
+    issue_date?: string | null;
+    /** `sales`, `cash_register` or `adjustment` (after a return). */
+    kind: string;
+    /** Code to look the invoice up at the tax authority's portal. */
+    lookup_code?: string | null;
+    number?: number | null;
+    /** The return of an adjustment. */
+    return_id?: string | null;
+    /**
+     * Status at `invoices`: `issued`, `submitting`, `accepted`, `rejected`, `cancelled`,
+     * `replaced`, `adjusted`.
+     */
+    status: string;
+    /** Symbol and number printed on the invoice. */
+    symbol?: string | null;
+    total?: Money | null;
   }[];
 };
 
@@ -18894,6 +18976,16 @@ export type OrdersClaimed = {
   order_ids: string[];
 };
 
+/** Close a shift. */
+export type OrdersCloseShiftRequest = {
+  /** Cash counted in the drawer. */
+  counted_cash: Money;
+  /** Required when the count differs. */
+  variance_note?: string | null;
+  /** Required when the count differs: a code of the list `orders.cash_variance`. */
+  variance_reason?: string | null;
+};
+
 /** A one-time code was sent by SMS. */
 export type OrdersCodeSent = {
   /** The code works until then. */
@@ -18919,6 +19011,27 @@ export type OrdersContactRequest = {
   proxy_phone?: string | null;
 };
 
+/** A document of an order (invoice or adjustment). */
+export type OrdersDocument = {
+  document_id: string;
+  issue_date?: string | null;
+  /** `sales`, `cash_register` or `adjustment` (after a return). */
+  kind: string;
+  /** Code to look the invoice up at the tax authority's portal. */
+  lookup_code?: string | null;
+  number?: number | null;
+  /** The return of an adjustment. */
+  return_id?: string | null;
+  /**
+   * Status at `invoices`: `issued`, `submitting`, `accepted`, `rejected`, `cancelled`,
+   * `replaced`, `adjusted`.
+   */
+  status: string;
+  /** Symbol and number printed on the invoice. */
+  symbol?: string | null;
+  total?: Money | null;
+};
+
 /** A new delivery address. */
 export type OrdersGuestAddressRequest = {
   address: AddressInput;
@@ -18940,6 +19053,24 @@ export type OrdersGuestOrder = OrdersOrder & {
   contact?: OrdersMaskedContact | null;
   /** Delivery: recipient masked, address down to the commune / ward (no house number or street). */
   ship_to?: Record<string, unknown> | null;
+};
+
+/** Company details for a VAT invoice. */
+export type OrdersInvoiceRequest = {
+  address?: string | null;
+  email?: string | null;
+  /** Company name, required with `tax_code`. */
+  name?: string | null;
+  /**
+   * Tax code of the company (10 or 13 digits, or a 12-digit personal id); omit for a consumer
+   * invoice.
+   */
+  tax_code?: string | null;
+};
+
+/** What an invoice request did. */
+export type OrdersInvoiceRequested = {
+  document?: OrdersDocument | null;
 };
 
 /** Why a cart line cannot be ordered now. */
@@ -18969,6 +19100,16 @@ export type OrdersMaskedContact = {
   name: string;
   /** First 3 and last 3 digits (`090•••567`). */
   phone: string;
+};
+
+/** Open a shift. */
+export type OrdersOpenShiftRequest = {
+  /** Cash in the drawer at the start. */
+  opening_cash: Money;
+  /** The store. */
+  org_id: string;
+  /** Code of the register (one open shift per register). */
+  register_code: string;
 };
 
 /** An order. */
@@ -19091,6 +19232,89 @@ export type OrdersPickupReady = {
   ready_at: string;
   /** `ready`, `picked_up` or `expired`. */
   status: string;
+};
+
+/** A line sold at the counter. */
+export type OrdersPosLine = {
+  quantity: number;
+  variant_id: string;
+};
+
+/** A payment taken at the counter. */
+export type OrdersPosPayment = {
+  amount: Money;
+  /** Approval code of the card terminal or id of the bank transfer. */
+  approval_code?: string | null;
+  /** `cash`, `card_terminal` or `vietqr`. */
+  method: string;
+  tendered?: Money | null;
+};
+
+/** A cart at the counter, priced (nothing is saved). */
+export type OrdersPosQuote = {
+  lines: OrdersCartLine[];
+  /** Promotions applied, with their terms. */
+  promotions: Record<string, unknown>[];
+  /** Codes that do not apply, with the reason; the sale goes on without them. */
+  rejected_codes: Record<string, unknown>[];
+  totals: OrdersCartTotals;
+};
+
+/** A cart at the counter. */
+export type OrdersPosQuoteRequest = {
+  /** Coupon codes; codes that do not apply are skipped and listed in `rejected_codes`. */
+  codes?: string[];
+  /** Customer account, for prices and promotions of their groups; empty for a walk-in customer. */
+  customer_id?: string | null;
+  lines: OrdersPosLine[];
+  shift_id: string;
+};
+
+/** A sale made at the counter. */
+export type OrdersPosSale = {
+  /** Cash to give back. */
+  change: Money;
+  /** The order, `delivered` (the customer takes the goods). */
+  order: OrdersOrder;
+  quote?: OrdersPosQuote | null;
+};
+
+/** A sale at the counter. */
+export type OrdersPosSaleRequest = {
+  codes?: string[];
+  customer_id?: string | null;
+  lines: OrdersPosLine[];
+  /** They must add up to the order total. */
+  payments: OrdersPosPayment[];
+  /**
+   * Unique id of the sale made by the register (also offline); sending it again returns the
+   * same sale.
+   */
+  reference: string;
+  shift_id: string;
+};
+
+/** A cash register shift. */
+export type OrdersPosShift = {
+  approved_at?: string | null;
+  approved_by?: string | null;
+  closed_at?: string | null;
+  closed_by?: string | null;
+  counted_cash?: Money | null;
+  expected_cash?: Money | null;
+  id: string;
+  opened_at: string;
+  opened_by: string;
+  opening_cash: Money;
+  /** The store. */
+  org_id: string;
+  register_code: string;
+  /** `open`, `pending_approval` (cash difference above the threshold) or `closed`. */
+  status: string;
+  variance?: Money | null;
+  variance_note?: string | null;
+  /** Code of the list `orders.cash_variance`. */
+  variance_reason?: string | null;
 };
 
 /** Pre-order information shown before ordering. */
@@ -41059,6 +41283,48 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/documents": {
+    /** Documents of one of your orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/documents/{document_id}": {
+    /** Print a document of one of your orders. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; document_id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/invoice": {
+    /** Ask for the invoice of one of your orders. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersInvoiceRequest;
+      responses: {
+        200: Data_OrdersInvoiceRequested;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/orders/{id}/returns": {
     /** Ask to return items. */
     post: {
@@ -41115,6 +41381,99 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/catalog": {
+    /** Look up a product by barcode at the counter. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { shift_id: string; barcode: string }; };
+      responses: {
+        200: Data_OrdersPosQuote;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/quote": {
+    /** Price a cart at the counter. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersPosQuoteRequest;
+      responses: {
+        200: Data_OrdersPosQuote;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/sales": {
+    /** Sell at the counter. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersPosSaleRequest;
+      responses: {
+        200: Data_OrdersPosSale;
+        201: Data_OrdersPosSale;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/shifts": {
+    /** Open a cash register shift. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersOpenShiftRequest;
+      responses: {
+        201: Data_OrdersPosShift;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/shifts/{id}/approve": {
+    /** Approve the cash difference of a shift. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersPosShift;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/pos/shifts/{id}/close": {
+    /** Close a cash register shift. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersCloseShiftRequest;
+      responses: {
+        200: Data_OrdersPosShift;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };
@@ -41209,6 +41568,32 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/public/orders/{id}/documents": {
+    /** Documents of a guest order. */
+    get: {
+      parameters: { header: { "Order-Token": string; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_OrdersDocument;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/documents/{document_id}": {
+    /** Print a document of a guest order. */
+    get: {
+      parameters: { header: { "Order-Token": string; "Accept-Language"?: string }; path: { id: string; document_id: string }; };
+      responses: {
+        200: Blob;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/orders/{id}/support": {
     /** Open a support ticket about a guest order. */
     post: {
@@ -41287,6 +41672,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/invoice": {
+    /** Ask for the invoice of an order (staff). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersInvoiceRequest;
+      responses: {
+        200: Data_OrdersInvoiceRequested;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
         default: Problem;
       };
     };

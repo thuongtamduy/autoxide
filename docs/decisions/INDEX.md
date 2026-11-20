@@ -505,6 +505,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 - **[D-20261119-step61-voice](D-20261119-step61-voice.md)** Gọi điện trong chat (bước 61 mục 4): hợp đồng ở kernel, mặc định, ghi âm, sandbox — 2026-11-19
 - **[D-20261120-catalog-recommendations](D-20261120-catalog-recommendations.md)** Bán chạy, đánh giá, mua cùng và sản phẩm tương tự của `catalog` — 2026-11-20
+- **[D-20261120-step45-einvoice-pos](D-20261120-step45-einvoice-pos.md)** Hoá đơn điện tử, thư trạng thái và bán tại quầy của `orders`: `invoices` không ghi doanh thu lần hai, hoá đơn điều chỉnh qua trait, ca quầy hai người duyệt — 2026-11-20
 - **[D-20261120-step45-guest-orders](D-20261120-step45-guest-orders.md)** Mua không cần tài khoản của `orders`: mã một lần, header `Order-Token`, khoá liên hệ theo khách, gắn đơn bằng token — 2026-11-20
 
 ## Vận hành và hiệu năng
