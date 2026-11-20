@@ -28379,6 +28379,38 @@
         ],
         "type": "object"
       },
+      "Data_OrdersAccessToken": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Access to one guest order.",
+            "properties": {
+              "access_token": {
+                "description": "Send it in the `Order-Token` header to see and act on this one order. Returned once.",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "access_token",
+              "order_id",
+              "expires_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OrdersCart": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28555,6 +28587,115 @@
               "payment_actions"
             ],
             "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersClaimed": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Guest orders attached to your account.",
+            "properties": {
+              "order_ids": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "order_ids"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersCodeSent": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A one-time code was sent by SMS.",
+            "properties": {
+              "expires_at": {
+                "description": "The code works until then.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "lookup_id": {
+                "description": "Id of the code: confirm with it.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "order_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "phone": {
+                "description": "Where the code went, masked (`090•••567`).",
+                "type": "string"
+              },
+              "resend_after": {
+                "description": "Seconds to wait before asking for another code.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "lookup_id",
+              "order_id",
+              "expires_at",
+              "resend_after",
+              "phone"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersGuestOrder": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrdersOrder"
+              },
+              {
+                "properties": {
+                  "contact": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/OrdersMaskedContact"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "ship_to": {
+                    "description": "Delivery: recipient masked, address down to the commune / ward (no house number or street).",
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            ],
+            "description": "An order seen with an `Order-Token`: personal data is masked."
           }
         },
         "required": [
@@ -29090,6 +29231,40 @@
             "required": [
               "order_id",
               "request_key"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersSupportTicket": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The support ticket opened.",
+            "properties": {
+              "access_token": {
+                "description": "Guest: token to follow the ticket at `support`; only on the first answer.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "number": {
+                "description": "Number shown to the buyer.",
+                "type": "string"
+              },
+              "ticket_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "ticket_id",
+              "number"
             ],
             "type": "object"
           }
@@ -56978,6 +57153,29 @@
         ],
         "type": "object"
       },
+      "OrdersAccessToken": {
+        "description": "Access to one guest order.",
+        "properties": {
+          "access_token": {
+            "description": "Send it in the `Order-Token` header to see and act on this one order. Returned once.",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "access_token",
+          "order_id",
+          "expires_at"
+        ],
+        "type": "object"
+      },
       "OrdersAttribution": {
         "description": "Referral of the cart.",
         "properties": {
@@ -57509,6 +57707,72 @@
         ],
         "type": "object"
       },
+      "OrdersClaimRequest": {
+        "additionalProperties": false,
+        "description": "Attach guest orders to your account.",
+        "properties": {
+          "lookup_token": {
+            "description": "An `access_token` of a guest order lookup: it proves you own the phone number.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lookup_token"
+        ],
+        "type": "object"
+      },
+      "OrdersClaimed": {
+        "description": "Guest orders attached to your account.",
+        "properties": {
+          "order_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "order_ids"
+        ],
+        "type": "object"
+      },
+      "OrdersCodeSent": {
+        "description": "A one-time code was sent by SMS.",
+        "properties": {
+          "expires_at": {
+            "description": "The code works until then.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "lookup_id": {
+            "description": "Id of the code: confirm with it.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Where the code went, masked (`090•••567`).",
+            "type": "string"
+          },
+          "resend_after": {
+            "description": "Seconds to wait before asking for another code.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "lookup_id",
+          "order_id",
+          "expires_at",
+          "resend_after",
+          "phone"
+        ],
+        "type": "object"
+      },
       "OrdersContactRequest": {
         "additionalProperties": false,
         "description": "Contact for the order.",
@@ -57547,6 +57811,81 @@
         ],
         "type": "object"
       },
+      "OrdersGuestAddressRequest": {
+        "additionalProperties": false,
+        "description": "A new delivery address.",
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/AddressInput"
+          },
+          "code": {
+            "description": "The code from `POST /public/orders/{id}/address/otp`.",
+            "type": "string"
+          },
+          "phone": {
+            "description": "New phone of the recipient; omitted: unchanged.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "recipient_name": {
+            "description": "New recipient; omitted: unchanged.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "address",
+          "code"
+        ],
+        "type": "object"
+      },
+      "OrdersGuestCancelRequest": {
+        "additionalProperties": false,
+        "description": "Cancel a guest order.",
+        "properties": {
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "OrdersGuestOrder": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/OrdersOrder"
+          },
+          {
+            "properties": {
+              "contact": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersMaskedContact"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ship_to": {
+                "description": "Delivery: recipient masked, address down to the commune / ward (no house number or street).",
+                "type": [
+                  "object",
+                  "null"
+                ]
+              }
+            },
+            "type": "object"
+          }
+        ],
+        "description": "An order seen with an `Order-Token`: personal data is masked."
+      },
       "OrdersLineProblem": {
         "description": "Why a cart line cannot be ordered now.",
         "properties": {
@@ -57565,6 +57904,59 @@
         },
         "required": [
           "code"
+        ],
+        "type": "object"
+      },
+      "OrdersLookupConfirmRequest": {
+        "additionalProperties": false,
+        "description": "The one-time code received by SMS.",
+        "properties": {
+          "code": {
+            "example": "123456",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "type": "object"
+      },
+      "OrdersLookupRequest": {
+        "additionalProperties": false,
+        "description": "Look up a guest order.",
+        "properties": {
+          "number": {
+            "description": "Order number, as on the confirmation.",
+            "example": "2026-000123",
+            "type": "string"
+          },
+          "phone": {
+            "description": "Phone number given when ordering.",
+            "example": "0901234567",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "phone"
+        ],
+        "type": "object"
+      },
+      "OrdersMaskedContact": {
+        "description": "Contact of a guest order, masked.",
+        "properties": {
+          "name": {
+            "description": "Initials of family and middle names, then the given name (`N. V. An`).",
+            "type": "string"
+          },
+          "phone": {
+            "description": "First 3 and last 3 digits (`090•••567`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "phone"
         ],
         "type": "object"
       },
@@ -58653,6 +59045,44 @@
           "name",
           "kind",
           "amount"
+        ],
+        "type": "object"
+      },
+      "OrdersSupportRequest": {
+        "additionalProperties": false,
+        "description": "A message to customer support about an order.",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "OrdersSupportTicket": {
+        "description": "The support ticket opened.",
+        "properties": {
+          "access_token": {
+            "description": "Guest: token to follow the ticket at `support`; only on the first answer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "number": {
+            "description": "Number shown to the buyer.",
+            "type": "string"
+          },
+          "ticket_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ticket_id",
+          "number"
         ],
         "type": "object"
       },
@@ -194867,6 +195297,93 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/claim": {
+      "post": {
+        "description": "Signed in. The lookup token proves the phone number (by the one-time code); every guest order\nof this shop with that phone number becomes yours. Calling again changes nothing more.",
+        "operationId": "orders_claim_guest_orders",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersClaimed"
+                }
+              }
+            },
+            "description": "The orders attached (empty when none was left)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Wrong or expired `lookup_token` (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Attach your guest orders to your account.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/me/orders/{id}": {
       "get": {
         "description": "Signed in: an order you placed with your account, with lines and payments.",
@@ -195303,6 +195820,133 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/support": {
+      "post": {
+        "description": "Signed in: an order you placed. The ticket is linked to the order. Sending the same\n`Idempotency-Key` again returns the same ticket.",
+        "operationId": "orders_open_my_order_support",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersSupportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersSupportTicket"
+                }
+              }
+            },
+            "description": "Ticket opened (or the one of the same key).",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order of yours (`orders.order_not_found`) or the shop has no support (`orders.support_unavailable`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Open a support ticket about one of your orders.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/me/returns/{id}": {
       "get": {
         "operationId": "orders_get_my_return",
@@ -195387,6 +196031,894 @@
           "orders"
         ],
         "x-permissions": []
+      }
+    },
+    "/api/v1/orders/public/orders/lookup": {
+      "post": {
+        "description": "Public. Sends a 6-digit code by SMS to the phone number of the order; confirm it with\n`POST /public/orders/lookup/{lookup_id}/confirm`. A wrong phone number and an unknown order\nnumber get the same answer. Limited per order number and phone number\n(`AUTOXIDE_ORDERS_LOOKUP_PER_HOUR`) and per client address.",
+        "operationId": "orders_lookup_guest_order",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersLookupRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodeSent"
+                }
+              }
+            },
+            "description": "Code sent."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No order with this number and phone; code `orders.lookup_failed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many lookups (`orders.lookup_too_many`) or a code was sent too recently (`orders.lookup_resend_too_soon`); see `Retry-After`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Sending SMS is not set up; code `sms_disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Look up a guest order by number and phone.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/lookup/{id}/confirm": {
+      "post": {
+        "description": "Public. A right code gives an access token for this one order (valid for\n`AUTOXIDE_ORDERS_LOOKUP_TOKEN_MINUTES`). A code works once and fails after 5 wrong tries.",
+        "operationId": "orders_confirm_guest_order_lookup",
+        "parameters": [
+          {
+            "description": "`lookup_id` of the code sent.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersLookupConfirmRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersAccessToken"
+                }
+              }
+            },
+            "description": "The access token."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Wrong, used or expired code; code `orders.lookup_code_invalid`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Confirm a guest order lookup with the code.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}": {
+      "get": {
+        "description": "Public with the `Order-Token` header: only the order the token opens. Phone, name and address\nare masked.",
+        "operationId": "orders_get_guest_order",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersGuestOrder"
+                }
+              }
+            },
+            "description": "The order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "See a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/address": {
+      "post": {
+        "description": "Public with the `Order-Token` header and the second code. Only before the goods leave the\nwarehouse (no shipment requested yet). The shipping fee is computed again for the same shipping\nmethod: when it changes, nothing changes and the answer is `orders.address_change_needs_payment`.",
+        "operationId": "orders_change_guest_order_address",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersGuestAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersGuestOrder"
+                }
+              }
+            },
+            "description": "The order with the new address."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The goods left the warehouse (`orders.address_locked`) or the fee changes (`orders.address_change_needs_payment`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Wrong, used or expired code (`orders.lookup_code_invalid`), same `Idempotency-Key` with another body (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Change the delivery address of a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/address/otp": {
+      "post": {
+        "description": "Public with the `Order-Token` header. Sends a second one-time code by SMS to the phone number of\nthe order; only this token can use it. Only while the goods have not left the warehouse.",
+        "operationId": "orders_send_guest_address_code",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodeSent"
+                }
+              }
+            },
+            "description": "Code sent."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The goods left the warehouse or the order is collected in store; code `orders.address_locked`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A code was sent too recently; code `orders.lookup_resend_too_soon`, see `Retry-After`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Sending SMS is not set up; code `sms_disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Ask for a code to change the delivery address.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/cancel": {
+      "post": {
+        "description": "Public with the `Order-Token` header. Same rule as for signed-in buyers: allowed until the\nstatus the shop's policy says (`orders.buyer_cancel_until`); a paid order is refunded through\nthe payment partner. Sending the same `Idempotency-Key` again returns the order.",
+        "operationId": "orders_cancel_guest_order",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersGuestCancelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersGuestOrder"
+                }
+              }
+            },
+            "description": "The cancelled order."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too late to cancel by yourself; code `orders.cancel_not_allowed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Same `Idempotency-Key` with another body (`orders.idempotency_key_reused`) or invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Cancel a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/orders/{id}/support": {
+      "post": {
+        "description": "Public with the `Order-Token` header. The ticket is linked to the order; the asker is the phone\nnumber proved by the code. Sending the same `Idempotency-Key` again returns the same ticket.",
+        "operationId": "orders_open_guest_order_support",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Access token of the order.",
+            "in": "header",
+            "name": "Order-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Key of this attempt; resend the same key when retrying.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersSupportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersSupportTicket"
+                }
+              }
+            },
+            "description": "Ticket opened (or the one of the same key).",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing, wrong or expired token; code `orders.lookup_token_invalid`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token opens another order (`orders.order_not_found`) or the shop has no support (`orders.support_unavailable`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Open a support ticket about a guest order.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
       }
     },
     "/api/v1/orders/public/payments/{token}": {
