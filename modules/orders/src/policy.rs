@@ -167,6 +167,22 @@ pub(crate) const WARRANTY_CLAIM_DAYS: OrgSetting = OrgSetting::new(
     _ => Err("must be a whole number from 1 to 365".to_owned()),
 });
 
+/// Trả trước một phần cho hàng đặt trước (D-232): không đặt = trả đủ lúc đặt; một điều kiện = trả
+/// trước một phần (`crate::advance::Terms`). Không gọi là "đặt cọc" (BLDS 2015 Điều 328).
+pub(crate) const PREORDER_ADVANCE: OrgSetting = OrgSetting::new(
+    "orders.preorder_advance",
+    "Partial advance payment for pre-orders. Not set (default): pre-ordered items are paid in \
+     full when ordering. Set: buyers paying online pay part now and the rest when the items are \
+     ready — exactly one of `rate_bp` (1 to 9999, 3000 = 30% of the pre-ordered part) or `fixed` \
+     (money), optional `min` / `max` (money), `commit_days` (cut-off = expected date minus these \
+     days when the variant has no pre-order end), `retention_bp` (0 to 10000, kept when the buyer \
+     cancels after the cut-off; default 0 = always refund in full), `retention_max` (money), \
+     `balance_due_hours` (1 to 720, default 72) and `overdue_action` (`cancel_per_terms` default, \
+     or `cancel_full_refund`). This is an advance payment, not a deposit.",
+)
+.with_schema(r#"{"type":"object"}"#)
+.checked(|value| crate::advance::Terms::parse(value).map(|_| value.clone()));
+
 /// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
 pub(crate) fn is_code(code: &str) -> bool {
     code.len() <= 64
@@ -187,6 +203,7 @@ pub(crate) fn all() -> Vec<OrgSetting> {
         INVOICE_KIND,
         CASH_VARIANCE_APPROVAL_MINOR,
         WARRANTY_CLAIM_DAYS,
+        PREORDER_ADVANCE,
     ]
 }
 

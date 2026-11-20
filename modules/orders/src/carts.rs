@@ -81,6 +81,8 @@ pub(crate) struct CartView {
     pub quote: Quote,
     /// Cách trả dùng được cho giỏ này (website hiện trước khi đặt).
     pub payment_methods: Vec<String>,
+    /// Trả trước một phần cho hàng đặt trước (khi trả online, D-232): công bố trước khi đặt.
+    pub advance: Option<crate::advance_flow::Planned>,
 }
 
 /// Giỏ vừa tạo; `token` chỉ có với giỏ vãng lai mới.
@@ -243,8 +245,11 @@ impl OrdersService {
         let quote =
             pricing::quote(&self.sources, tenant, &input, self.config.quote_ttl_minutes).await?;
         let payment_methods = self.payment_methods(tenant, &row, &quote).await?;
+        let org = autoxide_kernel::tenancy::OrgId::from_uuid(row.org_id);
+        let advance = self.plan_for(tenant, org, &quote).await?;
         Ok(CartView {
             payment_methods,
+            advance,
             codes: json_list(&row.codes),
             voucher_ids: json_list(&row.voucher_ids),
             ship_to: row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok()),

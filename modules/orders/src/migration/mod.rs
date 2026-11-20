@@ -10,6 +10,7 @@ mod m0010_guests;
 mod m0013_invoices_pos;
 mod m0014_reviews_risk;
 mod m0015_warranty_fields;
+mod m0016_advance;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -51,6 +52,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0014_reviews_risk::Migration),
         // Ô người mua nhập, trả góp, serial, bảo hành (mục 14, 16).
         Box::new(m0015_warranty_fields::Migration),
+        Box::new(m0016_advance::Migration),
     ]
 }
 

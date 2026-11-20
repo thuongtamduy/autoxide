@@ -3,6 +3,7 @@
 //! (`fakes.rs`: biến thể, giá, tồn, mã giảm giá, cách giao đặt sẵn); gọi qua REST. Test với các
 //! module thật nằm ở `crates/app/src/e2e/orders.rs`.
 
+mod advance;
 mod carts;
 mod checkout;
 mod fake_ledger;
@@ -470,6 +471,7 @@ now_job!(CompleteNow, crate::jobs::COMPLETE_DELIVERED);
 now_job!(UnacceptedNow, crate::jobs::EXPIRE_UNACCEPTED);
 now_job!(PickupsNow, crate::jobs::EXPIRE_PICKUPS);
 now_job!(WarrantiesNow, crate::jobs::EXPIRE_WARRANTIES);
+now_job!(BalancesNow, crate::jobs::EXPIRE_PREORDER_BALANCES);
 
 /// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
 pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
@@ -497,6 +499,9 @@ pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
         }
         crate::jobs::EXPIRE_WARRANTIES => {
             queue.enqueue_database(write, &WarrantiesNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_PREORDER_BALANCES => {
+            queue.enqueue_database(write, &BalancesNow {}, options()).await
         }
         other => panic!("no test job for `{other}`"),
     }

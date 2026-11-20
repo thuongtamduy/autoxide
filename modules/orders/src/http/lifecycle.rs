@@ -175,7 +175,8 @@ pub(crate) async fn request_shipment(
 ///
 /// Requires `orders.manage` at the order's shop. For an order waiting for payment before its
 /// deadline: the payment actions still valid (starting the payment again when it could not be
-/// started at checkout), to send to the buyer.
+/// started at checkout), to send to the buyer. For an order with pre-ordered items paid in part
+/// whose balance was asked: the balance payment, opened again when the previous link expired.
 #[utoipa::path(
     post,
     path = "/{id}/payment-link",
@@ -187,7 +188,7 @@ pub(crate) async fn request_shipment(
         (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
         (status = 403, description = "Missing `orders.manage` at the order's shop; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such order; code `orders.order_not_found`.", body = Problem),
-        (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`) or its deadline passed (`orders.payment_expired`).", body = Problem),
+        (status = 409, description = "The order is not waiting for payment (`orders.invalid_transition`), its deadline passed (`orders.payment_expired`) or the time to pay the balance passed (`orders.balance_overdue`).", body = Problem),
     )
 )]
 pub(crate) async fn payment_link(
@@ -202,4 +203,33 @@ pub(crate) async fn payment_link(
         actions.push(PaymentActionResponse::new(&payment, token)?);
     }
     Ok(Data { data: actions })
+}
+
+/// Pay the balance of your order.
+///
+/// Signed in: for your order with pre-ordered items paid in part, once the balance is asked (the
+/// items are ready). Returns the balance payment to follow; a link that expired is opened again
+/// while the time to pay lasts. Calling again returns the same payment.
+#[utoipa::path(
+    post,
+    path = "/me/orders/{id}/payments",
+    extensions(("x-permissions" = json!([]))),
+    operation_id = "pay_my_order_balance",
+    params(("id" = Uuid, Path, description = "Id of the order.")),
+    responses(
+        (status = 200, description = "The balance payment.", body = Data<PaymentActionResponse>),
+        (status = 401, description = "Not signed in; code `unauthenticated`.", body = Problem),
+        (status = 404, description = "No such order of yours; code `orders.order_not_found`.", body = Problem),
+        (status = 409, description = "Nothing to pay yet (`orders.balance_not_requested`) or the time to pay passed (`orders.balance_overdue`).", body = Problem),
+    )
+)]
+pub(crate) async fn pay_balance(
+    State(service): State<Arc<OrdersService>>,
+    tenant: TenantContext,
+    principal: Principal,
+    Path(id): Path<Uuid>,
+) -> Result<Data<PaymentActionResponse>, Error> {
+    let payment = service.buyer_reopen_balance(&tenant, principal.user_id(), id).await?;
+    let token = service.status_token(&tenant, payment.id).await?;
+    Ok(Data { data: PaymentActionResponse::new(&payment, token)? })
 }

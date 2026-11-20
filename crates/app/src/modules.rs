@@ -254,31 +254,22 @@ mod tests {
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
-            let first = settings.modules.worker(4).unwrap();
-            let second = settings.modules.worker(4).unwrap();
+            // Số lịch đếm từ chính các module đã đăng ký (không viết tay: hai PR cùng thêm lịch sẽ
+            // cùng sửa một con số và git gộp im lặng sai). Mỗi worker nhận tối đa `concurrency` job
+            // của một module mỗi lượt: lấy bằng số lịch của module nhiều lịch nhất để một lượt đủ chỗ.
+            let counts = settings.modules.schedule_counts();
+            let total: usize = counts.iter().map(|(_, count)| count).sum();
+            let most = counts.iter().map(|(_, count)| *count).max().unwrap_or(1);
+            assert!(total > 0, "{counts:?}");
+            let concurrency = u64::try_from(most).unwrap();
+            let first = settings.modules.worker(concurrency).unwrap();
+            let second = settings.modules.worker(concurrency).unwrap();
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
-            // Mỗi lịch (của `kernel` — dọn bản xuất, dọn file của job, backup theo lịch (bước 39) —, `ai`, `auth`, `idempotency`, `webhooks`, hai của `files` (dọn mồ côi, dọn lượt tải thẳng bỏ dở), sáu của `plans`, một
-            // của `tax`, sáu của `ledger` (niêm phong, hết hạn thanh toán, đối soát, nhả tạm giữ, kiểm chi trả, đọc biến động ngân hàng), hai của `invoices` (hỏi trạng thái hoá đơn điện tử, dọn chứng từ hết hạn lưu), năm của
-            // `compliance` (hết hạn định danh, nhắc hạn sự cố 72 giờ, dọn bằng chứng đồng ý cookie, nhắc vụ việc quá
-            // hạn — D-360, D-361, D-363;
-            // nhập quy tắc chạy ở mặt điều khiển — cũng là database này), một
-            // của `notifications` (dọn nhật ký gửi), hai của `bookings` (trả chỗ giữ tạm quá hạn, nhắc lịch), ba của `media` (thêm dọn lượt tải thẳng bỏ dở), hai của `content`, một của `forms`, hai
-            // của `newsletter` (dọn dẹp, ghi sổ đồng ý còn sót — D-367), một của `comments`, hai của `support` (đánh dấu quá hạn, tự đóng — bước 53) và hai của
-            // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), ba của `conversations` (xoá cuộc trò
-            // chuyện quá hạn lưu, xoá bản ghi âm quá hạn, yêu cầu gọi lại quá hạn — bước 61), hai của `analytics` (gộp mỗi giờ,
-            // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
-            // bốn của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront, bỏ số bán
-            // quá 90 ngày, dọn file nhập / xuất — bước 41), một
-            // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
-            // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), bốn của
-            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher, nhắc flash sale — bước 43), tám
-            // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
-            // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận, hết hạn giữ hàng chờ nhận tại
-            // cửa hàng, hết hạn bảo hành — bước 45), thêm một của
-            // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 73);
+            // Mỗi lịch của mọi module tới hạn ở lượt đầu: hai worker cùng chạy mà mỗi lịch đúng một
+            // job.
+            assert_eq!(a.unwrap() + b.unwrap(), total, "{counts:?}");
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);

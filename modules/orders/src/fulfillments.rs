@@ -147,9 +147,17 @@ impl OrdersService {
                     .await?;
                 let rows = fulfillments_of(&transaction, tenant, id).await?;
                 let sent = shipped(&rows, &[REQUESTED, SHIPPING, DELIVERED]);
+                // Trả trước một phần (D-232): hàng đặt trước chỉ đi khi phần còn lại đã trả.
+                let plan = self.advance_plan(&transaction, tenant, id).await?;
+                let blocked = crate::advance_flow::preorder_blocked(plan.as_ref());
+                let held_back = blocked
+                    && lines.iter().any(|line| {
+                        line.sale_mode == "preorder" && ready(line) && remaining(line, &sent) > 0
+                    });
                 let picked: Vec<(line::Model, i64)> = lines
                     .iter()
                     .filter(|line| ready(line))
+                    .filter(|line| !(blocked && line.sale_mode == "preorder"))
                     .filter_map(|line| {
                         let left = remaining(line, &sent);
                         (left > 0).then(|| (line.clone(), left))
@@ -172,6 +180,15 @@ impl OrdersService {
                     }
                     if lines.is_empty() {
                         return Err(errors::delivery_required());
+                    }
+                    if held_back {
+                        let left =
+                            current.total_minor - current.paid_minor + current.refunded_minor;
+                        let left = autoxide_kernel::money::Money::from_columns(
+                            left.max(0),
+                            &current.currency,
+                        )?;
+                        return Err(errors::balance_unpaid(left.to_string()));
                     }
                     return Err(errors::nothing_to_ship());
                 }

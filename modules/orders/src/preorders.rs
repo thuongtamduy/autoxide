@@ -134,7 +134,8 @@ impl OrdersService {
             update = update.col_expr(line::Column::WarehouseOrgId, Expr::value(Some(warehouse)));
         }
         update.scoped(tenant).exec(tenant.database().write()).await?;
-        Ok(())
+        // Trả trước một phần (D-232): hàng đặt trước về đủ → yêu cầu phần còn lại.
+        self.request_balance(tenant, order_id).await
     }
 
     /// Dòng đặt trước đang chờ của biến thể `variant`.
@@ -210,8 +211,14 @@ impl OrdersService {
     /// và hoàn tiền; đơn có phần khác thì huỷ phần chưa có hàng và hoàn phần tiền của nó.
     async fn preorder_stopped(&self, tenant: &TenantContext, variant: Uuid) -> Result<(), Error> {
         for line in self.waiting_lines(tenant, variant).await? {
-            self.cancel_preorder_lines(tenant, line.order_id, &[line.id], "preorder_stopped")
-                .await?;
+            self.cancel_preorder_lines(
+                tenant,
+                line.order_id,
+                &[line.id],
+                "preorder_stopped",
+                LineCancel::default(),
+            )
+            .await?;
         }
         Ok(())
     }
@@ -224,6 +231,7 @@ impl OrdersService {
         order_id: Uuid,
         line_ids: &[Uuid],
         reason: &str,
+        cancel: LineCancel,
     ) -> Result<(), Error> {
         let (database, outbox) = (tenant.database(), &self.outbox);
         let outcome = database
@@ -243,7 +251,14 @@ impl OrdersService {
                 let cancelling: Vec<(&line::Model, i64)> = lines
                     .iter()
                     .filter(|line| line_ids.contains(&line.id) && line.sale_mode == "preorder")
-                    .map(|line| (line, unallocated(line)))
+                    .map(|line| {
+                        let units = if cancel.allocated_too {
+                            line.quantity - line.cancelled_quantity
+                        } else {
+                            unallocated(line)
+                        };
+                        (line, units)
+                    })
                     .filter(|(_, units)| *units > 0)
                     .collect();
                 if cancelling.is_empty() {
@@ -292,6 +307,10 @@ impl OrdersService {
                     });
                 }
                 let mut value = 0;
+                // Đơn trả trước một phần chưa trả phần còn lại: chỉ phần trả trước của dòng là đã thu.
+                let mut advance_value = 0;
+                let plan = self.advance_plan(&transaction, tenant, order_id).await?;
+                let partial = crate::advance_flow::preorder_blocked(plan.as_ref());
                 let mut cancelled = Vec::new();
                 for (line, units) in &cancelling {
                     line::Entity::update_many()
@@ -307,6 +326,9 @@ impl OrdersService {
                     let share = i128::from(line.total_minor) * i128::from(*units)
                         / i128::from(line.quantity.max(1));
                     value += i64::try_from(share).map_err(Error::internal)?;
+                    let advance = i128::from(line.advance_minor.unwrap_or(0)) * i128::from(*units)
+                        / i128::from(line.quantity.max(1));
+                    advance_value += i64::try_from(advance).map_err(Error::internal)?;
                     cancelled.push(json!({
                         "line_id": line.id, "variant_id": line.variant_id, "quantity": units,
                         "line_key": line.line_key,
@@ -322,13 +344,23 @@ impl OrdersService {
                     .record(&transaction, tenant, Actor::system(), subject(order_id), &event)
                     .await?;
                 transaction.commit().await?;
-                let refundable = (current.paid_minor - current.refunded_minor).min(value);
+                let owed = if partial { advance_value } else { value };
+                let refundable = (current.paid_minor - current.refunded_minor).min(owed);
                 Ok(Outcome::LinesCancelled { refund: refundable, currency: current.currency })
             })
             .await?;
         match outcome {
-            Outcome::OrderCancelled => self.refund_cancelled(tenant, order_id).await,
+            Outcome::OrderCancelled => {
+                self.refund_cancelled_keeping(tenant, order_id, cancel.keep).await?;
+                self.post_retention(tenant, order_id, cancel.keep).await
+            }
             Outcome::LinesCancelled { refund, currency } if refund > 0 => {
+                let refund = (refund - cancel.keep).max(0);
+                self.post_retention(tenant, order_id, cancel.keep.min(refund + cancel.keep))
+                    .await?;
+                if refund == 0 {
+                    return Ok(());
+                }
                 let ids: Vec<String> = line_ids.iter().map(Uuid::to_string).collect();
                 let request = RefundRequest {
                     order_id,
@@ -347,6 +379,15 @@ impl OrdersService {
             _ => Ok(()),
         }
     }
+}
+
+/// Cách huỷ dòng đặt trước.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct LineCancel {
+    /// Huỷ cả phần đã chia hàng (quá hạn trả phần còn lại), không chỉ phần chưa có hàng.
+    pub allocated_too: bool,
+    /// Giữ lại chừng này của phần trả trước (người mua huỷ sau mốc chốt, theo điều kiện đã chụp).
+    pub keep: i64,
 }
 
 enum Outcome {

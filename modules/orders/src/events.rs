@@ -63,6 +63,8 @@ event!(ReviewPublished, names::REVIEW_PUBLISHED);
 event!(ReviewModerated, names::REVIEW_MODERATED);
 event!(CodBlockChanged, names::COD_BLOCK_CHANGED);
 event!(WarrantyClaimChanged, names::WARRANTY_CLAIM_CHANGED);
+event!(PreorderBalanceRequested, names::PREORDER_BALANCE_REQUESTED);
+event!(PreorderBalanceOverdue, names::PREORDER_BALANCE_OVERDUE);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![

@@ -285,6 +285,19 @@ impl CatalogService {
             }
         }
         let transaction = tenant.database().begin_write().await?;
+        // Hai lần dựng lại cùng sản phẩm chạy song song (vd đổi giá và lên bán liền nhau): trên
+        // Postgres cả hai cùng đọc "chưa có dòng" trước khi bên kia commit nên cùng ghi event
+        // `display_price_changed`. Khoá dòng sản phẩm trước (thứ tự ID, chống deadlock): bên sau chờ
+        // bên trước commit rồi mới đọc dòng storefront, thấy giá như cũ thì không ghi lại. SQLite đã
+        // một bên ghi mỗi lúc (D-181).
+        autoxide_kernel::rows::lock(
+            &transaction,
+            product::Entity::find()
+                .filter(product::Column::Id.is_in(ids.iter().copied()))
+                .scoped(tenant),
+            product::Column::Id,
+        )
+        .await?;
         let existing = storefront_entry::Entity::find()
             .filter(storefront_entry::Column::ProductId.is_in(ids.iter().copied()))
             .scoped(tenant)
