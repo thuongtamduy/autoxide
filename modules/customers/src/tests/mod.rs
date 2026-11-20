@@ -5,10 +5,12 @@
 
 mod engagement;
 mod fake_ledger;
+pub(crate) mod fake_shop;
 mod groups;
 mod loyalty;
 mod profiles;
 mod stored_value;
+mod wishlist_alerts;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -126,6 +128,8 @@ fake_event!(Cancelled, autoxide_orders::api::events::ORDER_CANCELLED);
 fake_event!(UserDeleted, autoxide_kernel::privacy::USER_DELETED);
 fake_event!(Abandoned, autoxide_orders::api::events::CART_ABANDONED);
 fake_event!(ConsentWithdrawn, autoxide_compliance::api::CONSENT_WITHDRAWN);
+fake_event!(DisplayPriceChanged, autoxide_catalog::api::events::DISPLAY_PRICE_CHANGED);
+fake_event!(LevelChanged, autoxide_inventory::api::events::LEVEL_CHANGED);
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
 pub(crate) struct Tree {
@@ -141,6 +145,11 @@ pub(crate) struct Shop {
     pub promotions: Arc<FakePromotions>,
     pub notifier: Arc<FakeNotifier>,
     pub consents: Arc<FakeConsents>,
+    pub catalog: Arc<fake_shop::FakeCatalog>,
+    pub inventory: Arc<fake_shop::FakeInventory>,
+    pub rules: Arc<FakeRules>,
+    catalog_events: Arc<Mutex<Option<Outbox>>>,
+    inventory_events: Arc<Mutex<Option<Outbox>>>,
     compliance: Arc<Mutex<Option<Outbox>>>,
     orders: Arc<Mutex<Option<Outbox>>>,
     auth: Arc<Mutex<Option<Outbox>>>,
@@ -170,6 +179,11 @@ pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) ->
     let promotions = Arc::new(FakePromotions::default());
     let notifier = Arc::new(FakeNotifier::default());
     let consents = Arc::new(FakeConsents::default());
+    let catalog = Arc::new(fake_shop::FakeCatalog::default());
+    let inventory = Arc::new(fake_shop::FakeInventory::default());
+    let rules = Arc::new(FakeRules::default());
+    let catalog_events = Arc::new(Mutex::new(None));
+    let inventory_events = Arc::new(Mutex::new(None));
     let compliance = Arc::new(Mutex::new(None));
     let orders = Arc::new(Mutex::new(None));
     let auth = Arc::new(Mutex::new(None));
@@ -195,6 +209,19 @@ pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) ->
         .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
         .provide::<dyn autoxide_notifications::api::Notifier>(notifier.clone())
         .provide::<dyn autoxide_compliance::api::ConsentLedger>(consents.clone())
+        .provide::<dyn autoxide_catalog::api::Catalog>(catalog.clone())
+        .provide::<dyn autoxide_inventory::api::Inventory>(inventory.clone())
+        .provide::<dyn autoxide_compliance::api::ComplianceRules>(rules.clone())
+        .module(Emitter {
+            name: "catalog",
+            events: vec![autoxide_catalog::api::events::DISPLAY_PRICE_CHANGED],
+            outbox: catalog_events.clone(),
+        })
+        .module(Emitter {
+            name: "inventory",
+            events: vec![autoxide_inventory::api::events::LEVEL_CHANGED],
+            outbox: inventory_events.clone(),
+        })
         .module(Emitter {
             name: "compliance",
             events: vec![autoxide_compliance::api::CONSENT_WITHDRAWN],
@@ -236,6 +263,11 @@ pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) ->
         promotions,
         notifier,
         consents,
+        catalog,
+        inventory,
+        rules,
+        catalog_events,
+        inventory_events,
         compliance,
         orders,
         auth,
@@ -254,6 +286,22 @@ impl Shop {
     /// Ghi event của `orders` giả.
     pub(crate) async fn order_event<E: Event>(&self, event: &E) {
         self.emit(&self.orders, event).await;
+    }
+
+    /// Giá công khai của sản phẩm `product` đổi (event của `catalog` giả).
+    pub(crate) async fn price_changed(&self, product: Uuid) {
+        let event = DisplayPriceChanged(json!({"after": {"product_id": product}}));
+        self.emit(&self.catalog_events, &event).await;
+    }
+
+    /// Tồn bán được của biến thể `variant` đi từ `before` lên `after` (event của `inventory` giả).
+    pub(crate) async fn stock_changed(&self, variant: Uuid, before: i64, after: i64) {
+        self.inventory.available.lock().unwrap().insert(variant, after);
+        let event = LevelChanged(json!({
+            "before": {"available": before},
+            "after": {"variant_id": variant, "available": after},
+        }));
+        self.emit(&self.inventory_events, &event).await;
     }
 
     pub(crate) async fn compliance_event<E: Event>(&self, event: &E) {
@@ -291,6 +339,9 @@ impl Shop {
             }
             crate::jobs::EVALUATE_TIERS => {
                 queue.enqueue_database(write, &TiersNow {}, options()).await
+            }
+            crate::jobs::SEND_WISHLIST_ALERTS => {
+                queue.enqueue_database(write, &WishlistAlertsNow {}, options()).await
             }
             other => panic!("no test job for `{other}`"),
         }
@@ -546,7 +597,7 @@ pub(crate) async fn age_points(app: &TestApp) {
 macro_rules! now_job {
     ($kind:ident, $name:expr) => {
         #[derive(Debug, serde::Serialize)]
-        struct $kind {}
+        pub(crate) struct $kind {}
 
         impl autoxide_kernel::job::Job for $kind {
             const KIND: &'static str = $name;
@@ -558,6 +609,48 @@ now_job!(ExpirePointsNow, crate::jobs::EXPIRE_POINTS);
 now_job!(ReleaseHoldsNow, crate::jobs::RELEASE_EXPIRED_HOLDS);
 now_job!(BirthdayNow, crate::jobs::BIRTHDAY_VOUCHERS);
 now_job!(TiersNow, crate::jobs::EVALUATE_TIERS);
+now_job!(WishlistAlertsNow, crate::jobs::SEND_WISHLIST_ALERTS);
+
+/// Quy tắc `notifications.send_windows` giả: mặc định khung đang ĐÓNG (lịch hằng giờ của job tự chạy
+/// trong `drain` không gửi gì); `open()` đặt một khung quanh giờ hiện tại.
+#[derive(Default)]
+pub(crate) struct FakeRules(pub Mutex<bool>);
+
+impl FakeRules {
+    pub(crate) fn close(&self) {
+        *self.0.lock().unwrap() = false;
+    }
+    pub(crate) fn open(&self) {
+        *self.0.lock().unwrap() = true;
+    }
+}
+
+#[async_trait::async_trait]
+impl autoxide_compliance::api::ComplianceRules for FakeRules {
+    async fn effective(
+        &self,
+        _: TenantId,
+        key: &str,
+        at: chrono::DateTime<chrono::Utc>,
+    ) -> Result<Option<autoxide_compliance::api::Rule>, Error> {
+        if key != "notifications.send_windows" {
+            return Ok(None);
+        }
+        // Giờ UTC (lệch 0): khung mở = 2 giờ trước tới 2 giờ sau; khung đóng = 3 tới 5 giờ sau.
+        let hhmm = |hours: i64| (at + chrono::Duration::hours(hours)).format("%H:%M").to_string();
+        let window = if *self.0.lock().unwrap() {
+            json!({"from": hhmm(-2), "to": hhmm(2)})
+        } else {
+            json!({"from": hhmm(3), "to": hhmm(5)})
+        };
+        let body = json!({"utc_offset_minutes": 0, "marketing": {"email": window, "sms": null}});
+        Ok(Some(serde_json::from_value(json!({
+            "jurisdiction": "vn", "key": key, "version": 1, "effective_from": at,
+            "effective_to": null, "body": body, "legal_basis": "test", "needs_legal_review": false,
+        }))
+        .map_err(Error::internal)?))
+    }
+}
 
 /// `Notifier` giả: ghi lại tin.
 #[derive(Default)]
@@ -581,31 +674,57 @@ impl autoxide_notifications::api::Notifier for FakeNotifier {
     }
 }
 
-/// Sổ đồng ý giả: tài khoản có đồng ý `marketing`.
+/// Sổ đồng ý giả: tài khoản có đồng ý `marketing` (`.0`) và đồng ý báo yêu thích (`.1`, ghi qua
+/// `grant` / `withdraw`).
 #[derive(Default)]
-pub(crate) struct FakeConsents(pub Mutex<Vec<Uuid>>);
+pub(crate) struct FakeConsents(pub Mutex<Vec<Uuid>>, pub Mutex<Vec<Uuid>>);
+
+fn consent_of(
+    key: &autoxide_compliance::api::ConsentKey,
+    state: &str,
+) -> autoxide_compliance::api::Consent {
+    autoxide_compliance::api::Consent {
+        id: Uuid::now_v7(),
+        purpose: key.purpose.clone(),
+        scope: key.scope.clone(),
+        channel: key.channel.clone(),
+        state: state.to_owned(),
+        granted_at: Some(chrono::Utc::now()),
+        withdrawn_at: None,
+        subject_value: None,
+    }
+}
 
 #[async_trait::async_trait]
 impl autoxide_compliance::api::ConsentLedger for FakeConsents {
     async fn grant(
         &self,
         _: TenantId,
-        _: autoxide_compliance::api::ConsentSubject,
-        _: autoxide_compliance::api::ConsentKey,
+        subject: autoxide_compliance::api::ConsentSubject,
+        key: autoxide_compliance::api::ConsentKey,
         _: autoxide_compliance::api::ConsentEvidence,
         _: &str,
     ) -> Result<autoxide_compliance::api::Consent, Error> {
-        Err(Error::internal("not used"))
+        if let autoxide_compliance::api::ConsentSubject::User(user) = subject {
+            let mut alerts = self.1.lock().unwrap();
+            if !alerts.contains(&user) {
+                alerts.push(user);
+            }
+        }
+        Ok(consent_of(&key, "granted"))
     }
     async fn withdraw(
         &self,
         _: TenantId,
-        _: autoxide_compliance::api::ConsentSubject,
-        _: autoxide_compliance::api::ConsentKey,
+        subject: autoxide_compliance::api::ConsentSubject,
+        key: autoxide_compliance::api::ConsentKey,
         _: &str,
         _: &str,
     ) -> Result<autoxide_compliance::api::Consent, Error> {
-        Err(Error::internal("not used"))
+        if let autoxide_compliance::api::ConsentSubject::User(user) = subject {
+            self.1.lock().unwrap().retain(|old| *old != user);
+        }
+        Ok(consent_of(&key, "withdrawn"))
     }
     async fn is_granted(
         &self,
@@ -613,8 +732,9 @@ impl autoxide_compliance::api::ConsentLedger for FakeConsents {
         subject: &autoxide_compliance::api::ConsentSubject,
         key: &autoxide_compliance::api::ConsentKey,
     ) -> Result<bool, Error> {
-        Ok(key.purpose == "marketing"
-            && matches!(subject, autoxide_compliance::api::ConsentSubject::User(user) if self.0.lock().unwrap().contains(user)))
+        let list = if key.purpose == crate::wishlist_alerts::PURPOSE { &self.1 } else { &self.0 };
+        Ok((key.purpose == "marketing" || key.purpose == crate::wishlist_alerts::PURPOSE)
+            && matches!(subject, autoxide_compliance::api::ConsentSubject::User(user) if list.lock().unwrap().contains(user)))
     }
     async fn granted_many(
         &self,

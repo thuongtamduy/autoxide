@@ -155,6 +155,11 @@ impl CustomersService {
             count += 1;
         }
         transaction.commit().await?;
+        // Giá mốc cho báo giảm giá (D-233): đọc `catalog` sau commit. Lỗi đọc giá không làm hỏng
+        // việc thêm; mốc được đặt ở lần đầu thấy giá.
+        if let Err(error) = self.fill_baselines(tenant, profile.id).await {
+            tracing::warn!(error = %error, "wishlist baseline prices not read");
+        }
         self.wishlist(tenant, user).await
     }
 
@@ -558,7 +563,8 @@ impl EventHandler for EngagementEvents {
                 Ok(())
             }
             autoxide_compliance::api::CONSENT_WITHDRAWN => {
-                self.0.consent_withdrawn(tenant, &event.payload).await
+                self.0.consent_withdrawn(tenant, &event.payload).await?;
+                self.0.alert_consent_withdrawn(tenant, &event.payload).await
             }
             _ => Ok(()),
         }

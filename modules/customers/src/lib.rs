@@ -32,6 +32,7 @@ mod segments;
 mod service;
 mod stored_value;
 mod tools;
+mod wishlist_alerts;
 
 #[cfg(test)]
 mod tests;
@@ -121,6 +122,7 @@ impl Module for CustomersModule {
         let notifier = context.require::<dyn autoxide_notifications::api::Notifier>().ok();
         if let Some(notifier) = &notifier {
             notifier.declare(engagement::CART_REMINDER)?;
+            notifier.declare(wishlist_alerts::WISHLIST_ALERT)?;
         }
         let service = Arc::new(CustomersService {
             databases: context.tenancy(),
@@ -135,6 +137,9 @@ impl Module for CustomersModule {
             consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
             notifier,
             config: self.config.clone().unwrap_or_default(),
+            catalog: context.require::<dyn autoxide_catalog::api::Catalog>().ok(),
+            inventory: context.require::<dyn autoxide_inventory::api::Inventory>().ok(),
+            rules: context.require::<dyn autoxide_compliance::api::ComplianceRules>().ok(),
             entitlements: context.entitlements(),
         });
         context.personal_data(service.clone())?;
@@ -167,7 +172,9 @@ impl Module for CustomersModule {
         use autoxide_orders::api::events as orders;
         let handler = Arc::new(facts::OrderEvents(service.clone()));
         let holds = Arc::new(loyalty::tender::OrderHolds(service.clone()));
-        let engagement = Arc::new(engagement::EngagementEvents(service));
+        let engagement = Arc::new(engagement::EngagementEvents(service.clone()));
+        let alerts = Arc::new(wishlist_alerts::signals::AlertSignals(service));
+        use autoxide_catalog::api::events as catalog;
         vec![
             Subscription::new(
                 autoxide_kernel::privacy::USER_DELETED,
@@ -180,6 +187,11 @@ impl Module for CustomersModule {
             Subscription::optional(orders::ORDER_CANCELLED, holds),
             Subscription::optional(orders::CART_ABANDONED, engagement.clone()),
             Subscription::optional(autoxide_compliance::api::CONSENT_WITHDRAWN, engagement),
+            // Báo yêu thích (D-233): tín hiệu giá / tồn.
+            Subscription::optional(catalog::DISPLAY_PRICE_CHANGED, alerts.clone()),
+            Subscription::optional(catalog::PRICE_CHANGED, alerts.clone()),
+            Subscription::optional(catalog::PRICE_EFFECTIVE, alerts.clone()),
+            Subscription::optional(autoxide_inventory::api::events::LEVEL_CHANGED, alerts),
         ]
     }
 
@@ -206,7 +218,7 @@ impl Module for CustomersModule {
     }
 
     fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
-        vec![stored_value::GIFT_CARDS, stored_value::STORE_CREDIT]
+        vec![stored_value::GIFT_CARDS, stored_value::STORE_CREDIT, wishlist_alerts::WISHLIST_ALERTS]
     }
 
     fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {

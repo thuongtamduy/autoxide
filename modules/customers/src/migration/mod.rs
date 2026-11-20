@@ -5,6 +5,7 @@ mod m0001_create_customers;
 mod m0006_loyalty;
 mod m0007_engagement;
 mod m0008_stored_value;
+mod m0011_wishlist_alerts;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -36,5 +37,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0010_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("customers")],
         ),
+        // Báo yêu thích có hàng lại / giảm giá (bước 47, D-233).
+        Box::new(m0011_wishlist_alerts::Migration),
     ]
 }
