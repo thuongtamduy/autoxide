@@ -68,6 +68,10 @@ pub(crate) struct CatalogService {
     pub(crate) suggestions: autoxide_kernel::suggest::SuggestSources,
     /// `dyn Embedder` của module `ai` khi đã cài: sản phẩm tương tự theo ý nghĩa.
     pub(crate) embedder: Option<Arc<dyn autoxide_kernel::ai::Embedder>>,
+    /// `dyn Storage` của module `files` khi đã cài: file nhập / xuất CSV.
+    pub(crate) storage: Option<Arc<dyn autoxide_kernel::storage::Storage>>,
+    /// `dyn TextModel` của module `ai` khi đã cài: bản nháp mô tả và SEO (D-109).
+    pub(crate) text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
 }
 
 impl crate::api::CatalogExtensions for CatalogService {

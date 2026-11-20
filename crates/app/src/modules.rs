@@ -269,8 +269,8 @@ mod tests {
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), ba của `conversations` (xoá cuộc trò
             // chuyện quá hạn lưu, xoá bản ghi âm quá hạn, yêu cầu gọi lại quá hạn — bước 61), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
-            // ba của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront, bỏ số bán
-            // quá 90 ngày — bước 41), một
+            // bốn của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront, bỏ số bán
+            // quá 90 ngày, dọn file nhập / xuất — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
             // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), bốn của
             // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher, nhắc flash sale — bước 43), tám

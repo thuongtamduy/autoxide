@@ -171,5 +171,20 @@
   "text:See the products, variants and categories in your scope, including drafts.": "Xem sản phẩm, biến thể và danh mục trong phạm vi của bạn, kể cả bản nháp.",
   "text:The expected availability date of a pre-order variant changed.": "Ngày dự kiến có hàng của một biến thể đặt trước thay đổi.",
   "field:must be between 1 and 12": "phải từ 1 đến 12",
-  "text:Test event.": "Event dùng trong test."
+  "text:Test event.": "Event dùng trong test.",
+  "catalog.transfer_not_found": "Không có lần nhập hay xuất `{id}` nào của bạn.",
+  "catalog.storage_unavailable": "Nhập và xuất cần nơi lưu file: hãy cài module `files`.",
+  "field:must be at most {max} bytes": "tối đa {max} byte",
+  "field:must be a whole number of grams": "phải là số gam nguyên",
+  "field:must be physical, digital, service or bundle": "phải là physical, digital, service hay bundle",
+  "field:is required for a new product": "bắt buộc khi tạo sản phẩm mới",
+  "field:cannot change the kind of an existing product": "không đổi được loại của sản phẩm đã có",
+  "text:A CSV import finished (status, rows read, rows written, error count).": "Một lần nhập CSV đã xong (trạng thái, số dòng đọc, số dòng ghi, số lỗi).",
+  "text:A CSV export finished (status, rows written).": "Một lần xuất CSV đã xong (trạng thái, số dòng ghi).",
+  "catalog.suggestion_not_found": "Không có bản nháp AI `{id}` trong phạm vi của bạn.",
+  "catalog.suggestion_decided": "Bản nháp AI `{id}` đã được áp hay bỏ; hãy xin bản mới.",
+  "field:the product has no name in this language yet; add one first": "sản phẩm chưa có tên ở ngôn ngữ này; hãy đặt tên trước",
+  "text:The public price of a product on a website changed (unit, product, price before and after; `null` when not on sale there).": "Giá công khai của một sản phẩm trên một website đổi (nút, sản phẩm, giá trước và sau; `null` khi không bán ở đó).",
+  "catalog.ai_unavailable": "Bản nháp AI cần module `ai`, máy chủ này chưa cài.",
+  "field:must not be empty": "không được để trống"
 }

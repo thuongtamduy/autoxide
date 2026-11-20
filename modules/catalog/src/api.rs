@@ -44,6 +44,11 @@ pub mod events {
     /// Giá hẹn giờ vừa bắt đầu hay giá tạm thời vừa hết hạn (lịch mỗi phút): `after` có
     /// `variant_ids` và khoảng `from` / `to` đã xét. Giá đang áp của các biến thể đó có thể đã đổi.
     pub const PRICE_EFFECTIVE: &str = "catalog.price_effective";
+    /// Giá công khai của một sản phẩm ở một nút bán đổi (D-233): `before` / `after` đều là
+    /// `{"org_id", "product_id", "price": Money | null}` — giá sau giảm tự động nếu có, không thì giá
+    /// thấp nhất của các biến thể; `null` khi sản phẩm không hiện ở đó. Không dùng giá gạch. Event chỉ
+    /// là tín hiệu: bên nghe đọc lại giá hiện tại nếu cần.
+    pub const DISPLAY_PRICE_CHANGED: &str = "catalog.display_price_changed";
 
     /// Event của module `inventory` (bước 42) mà `catalog` nghe để có giá vốn cho sàn giá
     /// (D-222). `catalog` đọc payload `{"after": {"org_id": "<uuid>", "variant_id": "<uuid>",
@@ -69,6 +74,47 @@ pub mod events {
     pub const ORDERS_REVIEW_PUBLISHED: &str = "orders.review_published";
     /// Như [`ORDERS_REVIEW_PUBLISHED`], khi đánh giá bị ẩn hay mở lại.
     pub const ORDERS_REVIEW_MODERATED: &str = "orders.review_moderated";
+
+    // Hai bộ đọc dưới đây là hợp đồng payload: `catalog` đọc event của `orders` bằng đúng chúng,
+    // và test của `orders` dùng chúng để kiểm event mình phát khớp hợp đồng.
+
+    /// Một dòng của đơn hoàn tất: sản phẩm và số lượng.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct SoldLine {
+        pub product_id: uuid::Uuid,
+        pub quantity: i64,
+    }
+
+    /// Đọc `after.order_id` và `after.lines[].{product_id, quantity}` của
+    /// [`ORDERS_ORDER_COMPLETED`]; dòng số lượng ≤ 0 bị bỏ. `None` khi thiếu trường.
+    pub fn completed_order(payload: &serde_json::Value) -> Option<(uuid::Uuid, Vec<SoldLine>)> {
+        let after = &payload["after"];
+        let order: uuid::Uuid = after.get("order_id")?.as_str()?.parse().ok()?;
+        let lines = after
+            .get("lines")?
+            .as_array()?
+            .iter()
+            .filter_map(|line| {
+                let product_id = line.get("product_id")?.as_str()?.parse().ok()?;
+                let quantity = line.get("quantity")?.as_i64()?;
+                (quantity > 0).then_some(SoldLine { product_id, quantity })
+            })
+            .collect();
+        Some((order, lines))
+    }
+
+    /// Đọc `after.product_id` và `after.product_rating.{count, sum}` của event đánh giá:
+    /// `(sản phẩm, số đánh giá, tổng số sao)`. `None` khi thiếu trường hay tổng không thể có
+    /// (mỗi đánh giá 1–5 sao).
+    pub fn product_rating(payload: &serde_json::Value) -> Option<(uuid::Uuid, i64, i64)> {
+        let after = &payload["after"];
+        let product: uuid::Uuid = after.get("product_id")?.as_str()?.parse().ok()?;
+        let rating = after.get("product_rating")?;
+        let count = rating.get("count")?.as_i64()?;
+        let sum = rating.get("sum")?.as_i64()?;
+        (count >= 0 && sum >= count && sum <= count.saturating_mul(5))
+            .then_some((product, count, sum))
+    }
 }
 
 /// Loại sản phẩm.

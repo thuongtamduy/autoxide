@@ -11,6 +11,8 @@ mod collections;
 mod net_content;
 mod recommend;
 mod search;
+mod suggestions;
+mod transfers;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -39,6 +41,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(recommend::CreateRecommendations),
         // Dấu `ai_assisted` của bộ sưu tập (bước 55).
         Box::new(collection_ai::AddCollectionAiAssisted),
+        // Nhập / xuất CSV bằng job.
+        Box::new(transfers::CreateTransfers),
+        // Bản nháp AI cho mô tả và SEO.
+        Box::new(suggestions::CreateSuggestions),
     ]
 }
 

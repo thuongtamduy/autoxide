@@ -34,40 +34,7 @@ const MAX_ORDER_PRODUCTS: usize = 100;
 /// Lịch mỗi ngày: bỏ dòng bán cũ, tính lại.
 pub(crate) const REFRESH_SALES: &str = "catalog.refresh_sales";
 
-/// Một dòng của đơn hoàn tất: sản phẩm và số lượng.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct SoldLine {
-    pub product_id: Uuid,
-    pub quantity: i64,
-}
-
-/// Đọc `after.order_id` và `after.lines[].{product_id, quantity}` của `orders.order_completed`.
-pub(crate) fn completed_order(payload: &serde_json::Value) -> Option<(Uuid, Vec<SoldLine>)> {
-    let after = &payload["after"];
-    let order: Uuid = after.get("order_id")?.as_str()?.parse().ok()?;
-    let lines = after
-        .get("lines")?
-        .as_array()?
-        .iter()
-        .filter_map(|line| {
-            let product_id = line.get("product_id")?.as_str()?.parse().ok()?;
-            let quantity = line.get("quantity")?.as_i64()?;
-            (quantity > 0).then_some(SoldLine { product_id, quantity })
-        })
-        .collect();
-    Some((order, lines))
-}
-
-/// Đọc `after.product_id` và `after.product_rating.{count, sum}` của event đánh giá.
-pub(crate) fn product_rating(payload: &serde_json::Value) -> Option<(Uuid, i64, i64)> {
-    let after = &payload["after"];
-    let product: Uuid = after.get("product_id")?.as_str()?.parse().ok()?;
-    let rating = after.get("product_rating")?;
-    let count = rating.get("count")?.as_i64()?;
-    let sum = rating.get("sum")?.as_i64()?;
-    // Mỗi đánh giá 1–5 sao: tổng phải nằm trong [count, 5 × count].
-    (count >= 0 && sum >= count && sum <= count.saturating_mul(5)).then_some((product, count, sum))
-}
+pub(crate) use crate::api::events::{SoldLine, completed_order, product_rating};
 
 /// Điểm trung bình × 100, làm tròn; 0 khi chưa có đánh giá.
 fn rating_x100(count: i64, sum: i64) -> i32 {

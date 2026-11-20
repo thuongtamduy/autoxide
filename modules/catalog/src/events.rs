@@ -44,6 +44,9 @@ event!(CategoryChanged, "catalog.category_changed");
 event!(PreorderDateChanged, "catalog.preorder_date_changed");
 event!(PriceListChanged, "catalog.price_list_changed");
 event!(CollectionChanged, "catalog.collection_changed");
+event!(ImportCompleted, "catalog.import_completed");
+event!(DisplayPriceChanged, names::DISPLAY_PRICE_CHANGED);
+event!(ExportCompleted, "catalog.export_completed");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -81,6 +84,16 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "catalog.preorder_date_changed",
             "The expected availability date of a pre-order variant changed.",
         ),
+        EventInfo::new(
+            names::DISPLAY_PRICE_CHANGED,
+            "The public price of a product on a website changed (unit, product, price before and \
+             after; `null` when not on sale there).",
+        ),
+        EventInfo::new(
+            "catalog.import_completed",
+            "A CSV import finished (status, rows read, rows written, error count).",
+        ),
+        EventInfo::new("catalog.export_completed", "A CSV export finished (status, rows written)."),
         EventInfo::new(
             "catalog.collection_changed",
             "A product collection was created, changed, given other products or deleted.",

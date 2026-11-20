@@ -16,6 +16,7 @@ use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
+use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
@@ -26,11 +27,13 @@ use sea_orm::{
     QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use uuid::Uuid;
 
 use crate::api::PriceQuery;
 use crate::entity::{price, price_list, product, store_override, storefront_entry, variant};
 use crate::errors;
+use crate::events::{Change, DisplayPriceChanged};
 use crate::permissions::{PRODUCTS_READ, PRODUCTS_WRITE};
 use crate::pricing::ancestors;
 use crate::service::{CatalogService, now, writable};
@@ -310,6 +313,31 @@ impl CatalogService {
                 entry.sale_price_minor = Set(old.sale_price_minor);
                 entry.sale_ends_at = Set(old.sale_ends_at);
             }
+            let shown = display_price(
+                *entry.visible.as_ref(),
+                *entry.min_price_minor.as_ref(),
+                *entry.sale_price_minor.as_ref(),
+            );
+            let before = keep.get(&key).and_then(|old| {
+                display_price(old.visible, old.min_price_minor, old.sale_price_minor)
+            });
+            if shown != before {
+                let currency = entry.currency.as_ref().clone();
+                let price = |minor: Option<i64>| {
+                    minor.map(|minor| json!({"amount": minor.to_string(), "currency": currency}))
+                };
+                let body = |minor: Option<i64>| json!({"org_id": key.0, "product_id": key.1, "price": price(minor)});
+                let change = Change { before: Some(body(before)), after: Some(body(shown)) };
+                self.outbox
+                    .record(
+                        &transaction,
+                        tenant,
+                        Actor::system(),
+                        crate::events::product_subject(key.1),
+                        &DisplayPriceChanged(change),
+                    )
+                    .await?;
+            }
             entry.insert(&transaction).await?;
         }
         // Chữ hay trạng thái đổi thì vector của sản phẩm tương tự cũng phải lập lại.
@@ -410,6 +438,12 @@ impl CatalogService {
         transaction.commit().await?;
         Ok(row)
     }
+}
+
+/// Giá người mua thấy công khai: giá sau giảm tự động nếu có, không thì giá thấp nhất; `None` khi
+/// sản phẩm không hiện. Không dùng giá gạch (D-233).
+fn display_price(visible: bool, min: i64, sale: Option<i64>) -> Option<i64> {
+    visible.then(|| sale.map_or(min, |sale| sale.min(min)))
 }
 
 fn empty_entry(
