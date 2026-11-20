@@ -49,6 +49,7 @@ mod reviews;
 mod risk;
 mod service;
 mod shipping_events;
+mod tenders;
 mod tools;
 mod warranty;
 

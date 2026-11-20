@@ -302,15 +302,16 @@ migration có `down`; `outbox_migration`, `jobs_migration`).
 | `GET/PUT /gift-card-products/{variant_id}` | `customers.stored_value.manage` | |
 | `POST /{id}/store-credit/adjustments` | `customers.stored_value.manage` | bồi thường có lý do, `reference` |
 | `GET/POST /reminder-rules` · `GET/POST /referral-rules` | `customers.engagement.manage` | |
-| `GET /me` · `PUT /me` | `customers.self` | hồ sơ của chính mình (tạo khi chưa có) |
-| `GET /me/points` · `GET /me/gift-cards` · `POST /me/gift-cards/attach` · `GET /me/store-credit` | `customers.self` | gắn thẻ vào tài khoản (vẫn chỉ dùng trong khách) |
-| `GET/POST /me/wishlist` · `DELETE /me/wishlist/{product_id}` | `customers.self` | |
-| `POST /me/wishlist/merge` `{items}` | `customers.self` | gộp danh sách lưu ở trình duyệt khi đăng nhập, bỏ trùng (B-c13) |
-| `GET /me/wishlist/alerts` · `PUT /me/wishlist/alerts` `{back_in_stock, price_drop, consent?: {text, text_version}}` | `customers.self` | báo yêu thích (D-233): bật cần `consent` → ghi sổ đồng ý; tắt cả hai → rút đồng ý, xoá hàng đợi |
-| `GET /me/recently-viewed` · `POST /me/recently-viewed` | `customers.self` | |
-| `GET /me/referral` · `POST /me/referral/apply` | `customers.self` | mã của mình; nhập mã người giới thiệu |
+| `GET /me` · `PUT /me` | đăng nhập | hồ sơ của chính mình (tạo khi chưa có) |
+| `GET /me/points` · `GET /me/gift-cards` · `POST /me/gift-cards/attach` · `GET /me/store-credit` | đăng nhập | gắn thẻ vào tài khoản (vẫn chỉ dùng trong khách) |
+| `GET/POST /me/wishlist` · `DELETE /me/wishlist/{product_id}` | đăng nhập | |
+| `POST /me/wishlist/merge` `{items}` | đăng nhập | gộp danh sách lưu ở trình duyệt khi đăng nhập, bỏ trùng (B-c13) |
+| `GET /me/wishlist/alerts` · `PUT /me/wishlist/alerts` `{back_in_stock, price_drop, consent?: {text, text_version}}` | đăng nhập | báo yêu thích (D-233): bật cần `consent` → ghi sổ đồng ý; tắt cả hai → rút đồng ý, xoá hàng đợi |
+| `GET /me/recently-viewed` · `POST /me/recently-viewed` | đăng nhập | |
+| `GET /me/referral` · `POST /me/referral/apply` | đăng nhập | mã của mình; nhập mã người giới thiệu |
 
-`customers.self` nằm trong role người mua mặc định (cùng chỗ với `orders.buy`).
+Đường `/me…` chỉ cần đăng nhập, không cần permission: người mua (`Realm::Customer`) không mang permission nào, như
+`orders` (D-20261120-step47-customers).
 
 ### Tool MCP
 
@@ -361,7 +362,7 @@ giảm ≥ 5%), `AUTOXIDE_CUSTOMERS_WISHLIST_ALERTS_PER_DAY` (1 tin / người /
 
 ### Permission
 
-`customers.self`, `customers.read`, `customers.manage`, `customers.segments.manage`,
+`customers.read`, `customers.manage`, `customers.segments.manage`,
 `customers.loyalty.manage`, `customers.loyalty.adjust`, `customers.stored_value.manage`,
 `customers.engagement.manage`, `customers.contact.reveal` (xem SĐT / email đầy đủ, D-226).
 

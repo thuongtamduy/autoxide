@@ -232,6 +232,12 @@ pub(crate) async fn payload(
         .order_by_asc(line::Column::Id)
         .all(transaction)
         .await?;
+    // Tiền người mua trả cho hàng hoá (sau giảm, gồm thuế, không phí giao) — cơ sở tính tổng chi và
+    // điểm của `customers` (D-226).
+    let goods: i64 = lines.iter().map(|line| line.total_minor).sum();
+    // … không gồm phần trả bằng điểm / thẻ quà tặng (bước 47).
+    let tendered = crate::tenders::tendered_minor(transaction, order.tenant_id, order.id).await?;
+    let goods_paid = (goods - tendered).max(0);
     let lines: Vec<Value> = lines
         .iter()
         .map(|line| {
@@ -254,9 +260,14 @@ pub(crate) async fn payload(
         "payment_method": order.payment_method,
         "funds_flow": order.funds_flow,
         "buyer_user_id": order.buyer_user_id,
+        // Khoá liên hệ của số người mua (HMAC theo khách, không phải số): `customers` nhận diện
+        // khách quen không có tài khoản.
+        "buyer_key": order.buyer_key,
+        "placed_at": order.placed_at,
         "hold_reference": hold_reference(order.id),
         "total": money(order.total_minor),
         "paid": money(order.paid_minor),
+        "goods_paid": money(goods_paid),
         "lines": lines,
     }))
 }

@@ -692,12 +692,15 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
 
-- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi; nhãn, ghi chú, trường tự định nghĩa dùng chỗ
-      chung của bước 51 (D-237); che số điện thoại / email, xem đủ cần permission và ghi audit (D-226)
-- [ ] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
-      hạng thành viên làm điều kiện khuyến mại (D-222)
-- [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
-      điểm chưa dùng là nghĩa vụ ghi trong sổ cái; cơ sở tính điểm thống nhất (D-226)
+- [x] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi; nhãn, ghi chú, trường tự định nghĩa dùng chỗ
+      chung của bước 51 (D-237); che số điện thoại / email, xem đủ cần permission và ghi audit (D-226) —
+      D-20261120-step47-customers
+- [x] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
+      hạng thành viên làm điều kiện khuyến mại (D-222) — nhóm cắm vào `orders` qua `BuyerGroups`; hạng có giá trị
+      khi mục điểm thưởng / hạng xong
+- [x] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
+      điểm chưa dùng là nghĩa vụ ghi trong sổ cái; cơ sở tính điểm thống nhất (D-226) — D-20261120-step47-loyalty
+      (còn: trả điểm khi hoàn phần đơn trả bằng điểm, đối trừ `buyer.prepayments` với phải thu của đơn)
 - [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
       ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử / thẻ trả trước
       (D-194); số dư là nghĩa vụ trong sổ cái
@@ -705,7 +708,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người mua đã đồng ý nhận tin quảng cáo (bước 37);
       giới thiệu bạn bè có thưởng
 - [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
-      `grant_voucher`, gọi lại không cấp thêm
+      `grant_voucher`, gọi lại không cấp thêm — sinh nhật, đổi điểm, sau khi mua xong (D-20261120-step47-loyalty);
+      giới thiệu bạn làm cùng mục giới thiệu
 - [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
       ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
 - [ ] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay

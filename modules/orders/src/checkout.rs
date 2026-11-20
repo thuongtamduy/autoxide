@@ -74,6 +74,8 @@ pub(crate) struct CheckoutInput {
     pub custom_fields: Option<serde_json::Map<String, serde_json::Value>>,
     /// Trả góp qua đối tác: đối tác và số kỳ (chỉ với `payment_method = installment`).
     pub installment: Option<Installment>,
+    /// Trả một phần bằng điểm / thẻ quà tặng / số dư (bước 47), giữ theo thứ tự gửi.
+    pub tenders: Vec<crate::tenders::TenderRequest>,
 }
 
 /// Trả góp qua đối tác có giấy phép (bước 36): `orders` không cho vay, không giữ tiền (D-187) —
@@ -103,6 +105,16 @@ pub(crate) struct Placed {
 pub(crate) struct Holds {
     pub inventory: bool,
     pub promotions: bool,
+    /// Tender đã giữ (điểm, thẻ quà tặng…) — bước 47.
+    #[serde(default)]
+    pub tenders: Vec<crate::tenders::HeldTender>,
+}
+
+impl Holds {
+    /// Tiền đã giữ bằng tender.
+    pub(crate) fn tendered_minor(&self) -> i64 {
+        self.tenders.iter().map(|part| part.amount_minor).sum()
+    }
 }
 
 fn owner_key(owner: &Owner, cart_id: Uuid) -> String {
@@ -174,6 +186,7 @@ impl OrdersService {
             "cart_id": input.cart_id, "quote": pricing::token_fingerprint(&input.quote_token),
             "payment_method": input.payment_method, "contact": input.contact, "note": input.note,
             "custom_fields": input.custom_fields, "installment": input.installment,
+            "tenders": input.tenders,
         }))?;
         if let Some(existing) = self.find_checkout(tenant, &key, reference).await? {
             return self.replay(existing, &fingerprint, reference);
@@ -367,6 +380,25 @@ impl OrdersService {
         let held = self
             .hold_all(tenant, order_id, org, None, &quote, &price_input, hold_until, &mut holds)
             .await;
+        let buyer = match owner {
+            Owner::Buyer(user) => Some(*user),
+            Owner::Guest(_) => None,
+        };
+        let held = match held {
+            Ok(()) => {
+                self.hold_tenders(
+                    tenant,
+                    order_id,
+                    buyer,
+                    &input.tenders,
+                    quote.total,
+                    hold_until,
+                    &mut holds.tenders,
+                )
+                .await
+            }
+            Err(error) => Err(error),
+        };
         if let Err(error) = held {
             self.release_holds(tenant, order_id, &holds, ReleaseReason::CheckoutAborted).await;
             self.fail_checkout(tenant, order_id, error.code()).await?;
@@ -408,8 +440,10 @@ impl OrdersService {
         }
 
         // 8. Lượt thu ở đối tác (ngoài transaction). Đối tác lỗi: đơn vẫn chờ thanh toán, người mua
-        // mở lại bằng `POST /me/orders/{id}/payments`; hết hạn thì job huỷ.
+        // mở lại bằng `POST /me/orders/{id}/payments`; hết hạn thì job huỷ. Trả đủ bằng tender: không
+        // còn gì để thu.
         if method != Method::Cod
+            && holds.tendered_minor() < quote.total.minor()
             && let Err(error) = self.start_payment(tenant, order_id, input.return_url.clone()).await
         {
             tracing::warn!(order_id = %order_id, code = error.code(), "payment could not be started at checkout");
@@ -511,6 +545,7 @@ impl OrdersService {
         {
             tracing::warn!(order_id = %order_id, code = error.code(), "promotion hold not released");
         }
+        self.release_tenders(tenant, order_id, &holds.tenders).await;
     }
 
     pub(crate) async fn fail_checkout(
@@ -545,8 +580,14 @@ impl OrdersService {
                         .await?;
                 let number = format!("{year}-{sequence:06}");
                 insert_lines(&transaction, draft.lines(tenant)?).await?;
+                let tendered = draft.holds.tendered_minor();
+                let paid_by_tenders = tendered > 0 && tendered >= draft.quote.total.minor();
                 let (status, payment_status) = if draft.method == Method::Cod {
                     (OrderStatus::Confirmed, payments::COD_PENDING)
+                } else if paid_by_tenders {
+                    (OrderStatus::Confirmed, payments::PAID)
+                } else if tendered > 0 {
+                    (OrderStatus::PendingPayment, payments::PARTIALLY_PAID)
                 } else {
                     (OrderStatus::PendingPayment, payments::UNPAID)
                 };
@@ -555,15 +596,26 @@ impl OrdersService {
                     if draft.buyer.is_some() { Cause::Buyer } else { Cause::System },
                     draft.buyer.map_or_else(Actor::public, Actor::user),
                 );
-                let created = lifecycle::create(
-                    &transaction,
-                    tenant,
-                    outbox,
-                    draft.order_row(tenant, number, payment_status)?,
-                    &transition,
-                )
-                .await?;
-                draft.payment_row(tenant, &created).insert(&transaction).await?;
+                let mut row = draft.order_row(tenant, number, payment_status)?;
+                row.paid_minor = Set(tendered);
+                // Khoản trả bằng tender ghi TRƯỚC khi tạo đơn: event `orders.order_placed` tính
+                // `goods_paid` đã trừ phần này.
+                for part in draft.holds.tenders.iter().filter(|part| part.amount_minor > 0) {
+                    crate::tenders::payment_row(
+                        tenant,
+                        draft.order_id,
+                        draft.quote.total.currency().code(),
+                        part,
+                        now,
+                    )
+                    .insert(&transaction)
+                    .await?;
+                }
+                let created =
+                    lifecycle::create(&transaction, tenant, outbox, row, &transition).await?;
+                if !paid_by_tenders || draft.method == Method::Cod {
+                    draft.payment_row(tenant, &created, tendered).insert(&transaction).await?;
+                }
                 if let Some(planned) = &draft.advance {
                     crate::advance_flow::plan_row(tenant, created.id, planned)?
                         .insert(&transaction)
@@ -712,12 +764,20 @@ impl Draft<'_> {
         Ok(rows)
     }
 
-    fn payment_row(&self, tenant: &TenantContext, order: &order::Model) -> payment::ActiveModel {
+    /// Khoản thu ở đối tác (hay COD) cho phần còn lại sau `tendered` đã trả bằng tender.
+    fn payment_row(
+        &self,
+        tenant: &TenantContext,
+        order: &order::Model,
+        tendered: i64,
+    ) -> payment::ActiveModel {
         let now = crate::service::now();
         // Trả trước một phần: khoản lúc đặt là `upfront` (hàng sẵn + phần trả trước).
         let (purpose, amount) = match &self.advance {
-            Some(planned) => (crate::advance::PURPOSE_ADVANCE, planned.split.upfront.minor()),
-            None => (payments::PURPOSE_ORDER, order.total_minor),
+            Some(planned) => {
+                (crate::advance::PURPOSE_ADVANCE, (planned.split.upfront.minor() - tendered).max(0))
+            }
+            None => (payments::PURPOSE_ORDER, (order.total_minor - tendered).max(0)),
         };
         payment::ActiveModel {
             id: Set(Uuid::now_v7()),

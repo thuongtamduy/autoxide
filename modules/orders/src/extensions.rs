@@ -32,6 +32,20 @@ impl Extensions {
     pub(crate) fn buyer_groups(&self) -> Option<Arc<dyn BuyerGroups>> {
         self.buyer_groups.get().cloned()
     }
+
+    /// Tender loại `kind`, nếu đã cắm.
+    pub(crate) fn tender(&self, kind: &str) -> Option<Arc<dyn Tender>> {
+        let tenders = self.tenders.lock().ok()?;
+        tenders.iter().find(|tender| tender.kind() == kind).cloned()
+    }
+
+    /// Loại của mọi tender đã cắm.
+    pub(crate) fn tender_kinds(&self) -> Vec<&'static str> {
+        self.tenders
+            .lock()
+            .map(|tenders| tenders.iter().map(|tender| tender.kind()).collect())
+            .unwrap_or_default()
+    }
 }
 
 impl OrderExtensions for Extensions {

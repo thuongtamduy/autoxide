@@ -190,6 +190,12 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `conversations.list_threads` | `conversations.read` | read-only |
 | `conversations.reply` | `conversations.reply` | writes |
 | `conversations.suggest_reply` | `conversations.reply` | writes |
+| `customers.get_customer` | `customers.read` | read-only |
+| `customers.list_groups` | `customers.read` or `customers.segments.manage` | read-only |
+| `customers.preview_group` | `customers.read` or `customers.segments.manage` | read-only |
+| `customers.reveal_contact` | `customers.contact.reveal` | writes |
+| `customers.search_customers` | `customers.read` | read-only |
+| `customers.upsert_group` | `customers.segments.manage` | writes |
 | `files.confirm_upload` | `files.upload` or `files.manage` | writes |
 | `files.create_upload` | `files.upload` | writes |
 | `files.delete_file` | `files.upload` or `files.manage` | destructive |

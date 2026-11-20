@@ -150,6 +150,16 @@ export type AddressInput = {
   province_code: string;
 };
 
+/** A manual change of points. */
+export type AdjustPointsRequest = {
+  /** Positive adds a lot under the current rule; negative removes points, oldest first. */
+  points: number;
+  /** Why, kept in the history; 1 to 500 characters. */
+  reason: string;
+  /** Your reference (ticket, complaint…); the same reference never applies twice. */
+  reference: string;
+};
+
 /** An administrative unit. */
 export type AdministrativeUnit = {
   code: string;
@@ -4742,6 +4752,21 @@ export type CreateCommentRequest = {
   trap?: string | null;
 };
 
+/** A new customer group. */
+export type CreateCustomerGroupRequest = {
+  /** Up to 500 characters. */
+  description?: string | null;
+  /** `manual` (default: staff add members) or `rule` (members follow `rule`). */
+  kind?: string | null;
+  /** 1 to 100 characters, unique in the shop. */
+  name: string;
+  /** Unit of the group; only customers of that unit and below can match. Omitted: the root unit. */
+  org_id?: string | null;
+  /** Customer group code for price lists (`a-z`, `0-9`, `_`), e.g. `vip`. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+};
+
 /** A new endpoint. */
 export type CreateEndpointRequest = {
   /** What the endpoint is for, up to 200 characters. */
@@ -4835,6 +4860,36 @@ export type CreateListRequest = {
   new_posts?: NewPosts | null;
   /** Omitted: `false` (not open to public sign-up). */
   public?: boolean | null;
+};
+
+/** A new loyalty rule; it replaces the current one from `effective_from` on. */
+export type CreateLoyaltyRuleRequest = {
+  /** ISO 4217 code, e.g. `VND`. */
+  currency: string;
+  earn_per_minor: number;
+  /** Omitted: now. Never in the past. */
+  effective_from?: string | null;
+  /** 1 to 10000. */
+  max_redeem_ratio_bp: number;
+  min_redeem_points?: number;
+  /** Smallest currency unit, e.g. `1000` (1,000 VND per point). */
+  point_value_minor: number;
+  points_per_unit: number;
+  /** 1 to 120. */
+  points_valid_months: number;
+};
+
+/** A new membership tier, or a new version of one (same `code`). */
+export type CreateMembershipTierRequest = {
+  /** `a-z`, `0-9`, `_`, e.g. `gold`. */
+  code: string;
+  currency: string;
+  /** `10000` = ×1. */
+  earn_multiplier_bp: number;
+  effective_from?: string | null;
+  name: string;
+  rank: number;
+  threshold_minor: number;
 };
 
 /** A new cart. */
@@ -4980,6 +5035,16 @@ export type CreateUserRequest = {
   password?: string | null;
 };
 
+/** A new voucher reward. */
+export type CreateVoucherRewardRequest = {
+  /** `birthday`, `purchase` or `points`. */
+  kind: string;
+  min_order_minor?: number | null;
+  points_cost?: number | null;
+  /** A promotion of kind `voucher`. */
+  promotion_id: string;
+};
+
 /** A new API key, with its secret. The secret is shown only here. */
 export type CreatedApiKeyResponse = ApiKeyResponse & {
   /**
@@ -5105,6 +5170,111 @@ export type CustomerBookingRequest = {
   service_id: string;
   /** A `starts_at` from the availability. */
   starts_at: string;
+};
+
+/** Full contact details of a customer. */
+export type CustomerContact = {
+  email?: string | null;
+  /** E.164 form, e.g. `+84912345678`. */
+  phone?: string | null;
+};
+
+/** How many customers match a group now. */
+export type CustomerGroupPreview = {
+  matching: number;
+};
+
+/** A customer group. */
+export type CustomerGroupResponse = {
+  created_at: string;
+  description?: string | null;
+  id: string;
+  /** `manual` (staff add members) or `rule` (members follow the rule). */
+  kind: string;
+  /** Number of members (only when reading one group). */
+  members?: number | null;
+  name: string;
+  /** Unit of the group; the root unit means the whole shop. */
+  org_id: string;
+  /** Customer group code for price lists, if any. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+  updated_at: string;
+};
+
+/** Rule of a rule group: a customer belongs when ALL given conditions hold. */
+export type CustomerGroupRule = {
+  /** Ordered within the last N days (1 to 3650). */
+  last_order_within_days?: number | null;
+  /** At least this many orders (cancelled orders do not count). */
+  orders_count_min?: number | null;
+  /** Registered or first bought at one of these units or below them. */
+  org_in?: string[];
+  /** Has at least one of these tags (ids from `/api/v1/kernel/tags`). */
+  tags_any?: string[];
+  /** Membership tier code is one of these. */
+  tier_in?: string[];
+  /**
+   * Total spent at least this much, in the smallest unit of the shop's currency (e.g. `5000000`
+   * for 5,000,000 VND).
+   */
+  total_spent_min?: number | null;
+};
+
+/** One order in a customer's purchase history. */
+export type CustomerOrder = {
+  /** `web`, `pos` or a channel code. */
+  channel: string;
+  completed_at?: string | null;
+  /** Paid for goods: after discounts, with tax, without shipping. */
+  net: Money;
+  number: string;
+  order_id: string;
+  /** Selling unit. */
+  org_id: string;
+  placed_at: string;
+  refunded: Money;
+  /** Order status as last reported by orders. */
+  status: string;
+};
+
+/** Loyalty points of a customer, with the program rules shown to buyers. */
+export type CustomerPoints = {
+  /** Points that can be used now. */
+  balance: number;
+  /** Points held for orders waiting for payment. */
+  held: number;
+  /** Lots with points left, soonest expiry first. */
+  lots: PointsLot[];
+  rule?: LoyaltyRule | null;
+};
+
+/** A customer profile, as staff see it: phone and email are masked. */
+export type CustomerProfile = {
+  birthday?: string | null;
+  created_at: string;
+  /** Values of the shop's custom fields for customers. */
+  custom_fields: Record<string, unknown>;
+  /** Masked email, e.g. `n•••@gmail.com`. */
+  email_masked?: string | null;
+  first_order_at?: string | null;
+  full_name?: string | null;
+  /** `female`, `male` or `other`. */
+  gender?: string | null;
+  id: string;
+  last_order_at?: string | null;
+  /** Orders placed and not cancelled. */
+  orders_count: number;
+  /** Unit where the customer registered or first bought. */
+  org_id: string;
+  /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+  phone_masked?: string | null;
+  /** Membership tier code. */
+  tier?: string | null;
+  total_spent?: Money | null;
+  updated_at: string;
+  /** The buyer account of the profile, if linked. */
+  user_id?: string | null;
 };
 
 /** A customer account of the tenant's shop. */
@@ -7544,6 +7714,90 @@ export type Data_CustomFieldView = {
 };
 
 /** Envelope of a single result. */
+export type Data_CustomerContact = {
+  /** Full contact details of a customer. */
+  data: {
+    email?: string | null;
+    /** E.164 form, e.g. `+84912345678`. */
+    phone?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerGroupPreview = {
+  /** How many customers match a group now. */
+  data: {
+    matching: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerGroupResponse = {
+  /** A customer group. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    id: string;
+    /** `manual` (staff add members) or `rule` (members follow the rule). */
+    kind: string;
+    /** Number of members (only when reading one group). */
+    members?: number | null;
+    name: string;
+    /** Unit of the group; the root unit means the whole shop. */
+    org_id: string;
+    /** Customer group code for price lists, if any. */
+    price_group?: string | null;
+    rule?: CustomerGroupRule | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerPoints = {
+  /** Loyalty points of a customer, with the program rules shown to buyers. */
+  data: {
+    /** Points that can be used now. */
+    balance: number;
+    /** Points held for orders waiting for payment. */
+    held: number;
+    /** Lots with points left, soonest expiry first. */
+    lots: PointsLot[];
+    rule?: LoyaltyRule | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerProfile = {
+  /** A customer profile, as staff see it: phone and email are masked. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    /** Values of the shop's custom fields for customers. */
+    custom_fields: Record<string, unknown>;
+    /** Masked email, e.g. `n•••@gmail.com`. */
+    email_masked?: string | null;
+    first_order_at?: string | null;
+    full_name?: string | null;
+    /** `female`, `male` or `other`. */
+    gender?: string | null;
+    id: string;
+    last_order_at?: string | null;
+    /** Orders placed and not cancelled. */
+    orders_count: number;
+    /** Unit where the customer registered or first bought. */
+    org_id: string;
+    /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+    phone_masked?: string | null;
+    /** Membership tier code. */
+    tier?: string | null;
+    total_spent?: Money | null;
+    updated_at: string;
+    /** The buyer account of the profile, if linked. */
+    user_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CustomerResponse = {
   /** A customer account of the tenant's shop. */
   data: {
@@ -8989,6 +9243,25 @@ export type Data_LoginLinkResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_LoyaltyRule = {
+  /** A loyalty rule: how points are earned and redeemed from `effective_from` on. */
+  data: {
+    /** Paid for goods per earning unit (smallest currency unit), e.g. `10000`. */
+    earn_per_minor: number;
+    effective_from: string;
+    id: string;
+    /** Points pay at most this share of an order, in basis points (`5000` = 50%). */
+    max_redeem_ratio_bp: number;
+    min_redeem_points: number;
+    /** What one point is worth when redeemed. */
+    point_value: Money;
+    /** Points per earning unit. */
+    points_per_unit: number;
+    points_valid_months: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_MeResponse = {
   /** The signed-in user and what they may do. */
   data: {
@@ -9121,6 +9394,23 @@ export type Data_MediaItemResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_MembershipTier = {
+  /** A membership tier version. */
+  data: {
+    code: string;
+    /** Earning multiplier in basis points (`12000` = ×1.2). */
+    earn_multiplier_bp: number;
+    effective_from: string;
+    id: string;
+    name: string;
+    /** Higher wins when several tiers are reached. */
+    rank: number;
+    /** Spent on goods over the last 12 months to reach the tier. */
+    threshold: Money;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_MenuResponse = {
   /** A navigation menu. */
   data: {
@@ -9241,6 +9531,24 @@ export type Data_ModuleInfo = {
     subscriptions: string[];
     /** MCP tools the module offers at `/mcp`. */
     tools: ModuleTool[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_MyCustomerProfile = {
+  /** The buyer's own profile: nothing is masked. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    email?: string | null;
+    full_name?: string | null;
+    gender?: string | null;
+    id: string;
+    orders_count: number;
+    /** The verified phone of the account, in E.164 form. */
+    phone?: string | null;
+    tier?: string | null;
+    total_spent?: Money | null;
   };
 };
 
@@ -10965,6 +11273,15 @@ export type Data_RecoveryCodesResponse = {
      * the phone. Store them somewhere safe, away from the phone.
      */
     recovery_codes: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_RedeemedVoucher = {
+  /** The voucher put in your wallet. */
+  data: {
+    promotion_id: string;
+    voucher_id: string;
   };
 };
 
@@ -15055,6 +15372,23 @@ export type Data_VerifiedResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_VoucherReward = {
+  /** A voucher reward: a voucher promotion given on birthdays, after a purchase or for points. */
+  data: {
+    active: boolean;
+    id: string;
+    /** `birthday`, `purchase` or `points`. */
+    kind: string;
+    /** Smallest goods amount of the order (`purchase`). */
+    min_order_minor?: number | null;
+    /** Points it costs (`points`). */
+    points_cost?: number | null;
+    /** The voucher promotion of the promotions module. */
+    promotion_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_WithholdingQuote = {
   /** Taxes to withhold. */
   data: {
@@ -17904,6 +18238,22 @@ export type LoginRequest = {
   realm?: Realm;
 };
 
+/** A loyalty rule: how points are earned and redeemed from `effective_from` on. */
+export type LoyaltyRule = {
+  /** Paid for goods per earning unit (smallest currency unit), e.g. `10000`. */
+  earn_per_minor: number;
+  effective_from: string;
+  id: string;
+  /** Points pay at most this share of an order, in basis points (`5000` = 50%). */
+  max_redeem_ratio_bp: number;
+  min_redeem_points: number;
+  /** What one point is worth when redeemed. */
+  point_value: Money;
+  /** Points per earning unit. */
+  points_per_unit: number;
+  points_valid_months: number;
+};
+
 /** An API key of any user, for administrators. */
 export type ManagedApiKeyResponse = ApiKeyResponse & {
   /** Email of that user; `null` like `user_name`. */
@@ -18112,6 +18462,20 @@ export type MembershipRowResponse = {
   role_id: string;
   role_name: string;
   user_id: string;
+};
+
+/** A membership tier version. */
+export type MembershipTier = {
+  code: string;
+  /** Earning multiplier in basis points (`12000` = ×1.2). */
+  earn_multiplier_bp: number;
+  effective_from: string;
+  id: string;
+  name: string;
+  /** Higher wins when several tiers are reached. */
+  rank: number;
+  /** Spent on goods over the last 12 months to reach the tier. */
+  threshold: Money;
 };
 
 /** Every unit a user should work in, with the roles there. */
@@ -18540,6 +18904,21 @@ export type MoveRequest = {
 export type MoveUnitRequest = {
   /** The new parent; you need `organizations.units.write` there too. */
   parent_id: string;
+};
+
+/** The buyer's own profile: nothing is masked. */
+export type MyCustomerProfile = {
+  birthday?: string | null;
+  created_at: string;
+  email?: string | null;
+  full_name?: string | null;
+  gender?: string | null;
+  id: string;
+  orders_count: number;
+  /** The verified phone of the account, in E.164 form. */
+  phone?: string | null;
+  tier?: string | null;
+  total_spent?: Money | null;
 };
 
 /** A permission the caller holds. */
@@ -19471,6 +19850,11 @@ export type OrdersCheckoutRequest = {
   quote_token: string;
   /** Where the payment partner sends the buyer back. */
   return_url?: string | null;
+  /**
+   * Pay part (or all) of the order with points, a gift card or store credit, in this order;
+   * `payment_method` pays the rest. Each kind at most once.
+   */
+  tenders?: OrdersTenderInput[];
 };
 
 /** Result of a checkout. */
@@ -20277,6 +20661,14 @@ export type OrdersSupportTicket = {
   /** Number shown to the buyer. */
   number: string;
   ticket_id: string;
+};
+
+/** A way to pay from value kept by the shop. */
+export type OrdersTenderInput = {
+  /** Data of the kind, e.g. `{"points": 500}`. */
+  input: Record<string, unknown>;
+  /** `points` (customers module); `gift_card`, `store_credit` when the shop enabled them. */
+  kind: string;
 };
 
 /** A status change of an order. */
@@ -21443,6 +21835,81 @@ export type Page_ConversationReport = {
 };
 
 /** One page of a list. */
+export type Page_CustomerGroupResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    id: string;
+    /** `manual` (staff add members) or `rule` (members follow the rule). */
+    kind: string;
+    /** Number of members (only when reading one group). */
+    members?: number | null;
+    name: string;
+    /** Unit of the group; the root unit means the whole shop. */
+    org_id: string;
+    /** Customer group code for price lists, if any. */
+    price_group?: string | null;
+    rule?: CustomerGroupRule | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerOrder = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `web`, `pos` or a channel code. */
+    channel: string;
+    completed_at?: string | null;
+    /** Paid for goods: after discounts, with tax, without shipping. */
+    net: Money;
+    number: string;
+    order_id: string;
+    /** Selling unit. */
+    org_id: string;
+    placed_at: string;
+    refunded: Money;
+    /** Order status as last reported by orders. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerProfile = {
+  /** The items of this page, in the requested order. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    /** Values of the shop's custom fields for customers. */
+    custom_fields: Record<string, unknown>;
+    /** Masked email, e.g. `n•••@gmail.com`. */
+    email_masked?: string | null;
+    first_order_at?: string | null;
+    full_name?: string | null;
+    /** `female`, `male` or `other`. */
+    gender?: string | null;
+    id: string;
+    last_order_at?: string | null;
+    /** Orders placed and not cancelled. */
+    orders_count: number;
+    /** Unit where the customer registered or first bought. */
+    org_id: string;
+    /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+    phone_masked?: string | null;
+    /** Membership tier code. */
+    tier?: string | null;
+    total_spent?: Money | null;
+    updated_at: string;
+    /** The buyer account of the profile, if linked. */
+    user_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CustomerResponse = {
   /** The items of this page, in the requested order. */
   data: {
@@ -22539,6 +23006,26 @@ export type Page_LoggedRequest = {
 };
 
 /** One page of a list. */
+export type Page_LoyaltyRule = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** Paid for goods per earning unit (smallest currency unit), e.g. `10000`. */
+    earn_per_minor: number;
+    effective_from: string;
+    id: string;
+    /** Points pay at most this share of an order, in basis points (`5000` = 50%). */
+    max_redeem_ratio_bp: number;
+    min_redeem_points: number;
+    /** What one point is worth when redeemed. */
+    point_value: Money;
+    /** Points per earning unit. */
+    points_per_unit: number;
+    points_valid_months: number;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_ManagedApiKeyResponse = {
   /** The items of this page, in the requested order. */
   data: (ApiKeyResponse & {
@@ -22644,6 +23131,24 @@ export type Page_MembershipRowResponse = {
     role_id: string;
     role_name: string;
     user_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_MembershipTier = {
+  /** The items of this page, in the requested order. */
+  data: {
+    code: string;
+    /** Earning multiplier in basis points (`12000` = ×1.2). */
+    earn_multiplier_bp: number;
+    effective_from: string;
+    id: string;
+    name: string;
+    /** Higher wins when several tiers are reached. */
+    rank: number;
+    /** Spent on goods over the last 12 months to reach the tier. */
+    threshold: Money;
   }[];
   pagination: Pagination;
 };
@@ -22970,6 +23475,22 @@ export type Page_PlanSubscription = {
     /** The tenant already had its free trial. */
     trial_used: boolean;
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_PointsEntry = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    id: string;
+    /** `earn`, `hold`, `redeem`, `release`, `expire`, `adjust`, `reverse` or `restore`. */
+    kind: string;
+    /** Positive: added; negative: removed. */
+    points: number;
+    reason?: string | null;
+    reference: string;
   }[];
   pagination: Pagination;
 };
@@ -24229,6 +24750,24 @@ export type Page_UserResponse = {
   pagination: Pagination;
 };
 
+/** One page of a list. */
+export type Page_VoucherReward = {
+  /** The items of this page, in the requested order. */
+  data: {
+    active: boolean;
+    id: string;
+    /** `birthday`, `purchase` or `points`. */
+    kind: string;
+    /** Smallest goods amount of the order (`purchase`). */
+    min_order_minor?: number | null;
+    /** Points it costs (`points`). */
+    points_cost?: number | null;
+    /** The voucher promotion of the promotions module. */
+    promotion_id: string;
+  }[];
+  pagination: Pagination;
+};
+
 /** How to get the next page. */
 export type Pagination = {
   /** The limit that was applied to this page. */
@@ -24661,6 +25200,29 @@ export type PlatformNoticeRequest = {
   category: string;
   link?: string | null;
   title: string;
+};
+
+/** One line of the points history. */
+export type PointsEntry = {
+  created_at: string;
+  id: string;
+  /** `earn`, `hold`, `redeem`, `release`, `expire`, `adjust`, `reverse` or `restore`. */
+  kind: string;
+  /** Positive: added; negative: removed. */
+  points: number;
+  reason?: string | null;
+  reference: string;
+};
+
+/** A lot of points with its own expiry. */
+export type PointsLot = {
+  earned: number;
+  expires_at: string;
+  /** Held for orders waiting for payment. */
+  held: number;
+  id: string;
+  /** Not yet used (includes `held`). */
+  remaining: number;
 };
 
 /** Connections of one pool. */
@@ -26682,6 +27244,18 @@ export type RecoveryCodesResponse = {
   recovery_codes: string[];
 };
 
+/** Exchange points for a voucher. */
+export type RedeemVoucherRequest = {
+  /** A voucher reward of kind `points`. */
+  reward_id: string;
+};
+
+/** The voucher put in your wallet. */
+export type RedeemedVoucher = {
+  promotion_id: string;
+  voucher_id: string;
+};
+
 /** A redirect to create or set. */
 export type RedirectRequest = {
   /** The old address, a path starting with `/`. */
@@ -26731,6 +27305,25 @@ export type Referrer = {
 /** A refresh token, as returned by sign-in or by the previous refresh. */
 export type RefreshRequest = {
   refresh_token: string;
+};
+
+/** A customer registered at the counter. */
+export type RegisterCustomerRequest = {
+  birthday?: string | null;
+  /** Values of the shop's custom fields for customers. */
+  custom_fields?: Record<string, unknown> | null;
+  email?: string | null;
+  /** Up to 200 characters. */
+  full_name?: string | null;
+  /** `female`, `male` or `other`. */
+  gender?: string | null;
+  /**
+   * Unit where the customer registers; you need `customers.manage` there. Omitted: the root
+   * unit.
+   */
+  org_id?: string | null;
+  /** Phone number, e.g. `0912345678` or `+84912345678`. */
+  phone: string;
 };
 
 /** A new account created by its owner. */
@@ -27638,6 +28231,11 @@ export type SetSupportPolicyRequest = SupportPolicy;
 export type SetSupportTeamMemberRequest = {
   /** Takes new tickets in round-robin assignment. */
   accepting: boolean;
+};
+
+/** Turn a voucher reward on or off. */
+export type SetVoucherRewardRequest = {
+  active: boolean;
 };
 
 /** A setting that units can set and the units below them inherit. */
@@ -30130,6 +30728,27 @@ export type UpdateCommentRequest = {
   status: CommentStatus;
 };
 
+/** Changes to a customer group. Omitted fields stay as they are; the kind and unit never change. */
+export type UpdateCustomerGroupRequest = {
+  /** An empty string clears it. */
+  description?: string | null;
+  name?: string | null;
+  /** An empty string clears it. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+};
+
+/** Changes to a customer. Omitted fields stay as they are; an empty string clears a text. */
+export type UpdateCustomerProfileRequest = {
+  birthday?: string | null;
+  /** Custom field values to set; `null` clears a field. */
+  custom_fields?: Record<string, unknown> | null;
+  email?: string | null;
+  full_name?: string | null;
+  /** `female`, `male`, `other` or an empty string. */
+  gender?: string | null;
+};
+
 /** Changes to a customer account. Omitted fields stay as they are. */
 export type UpdateCustomerRequest = {
   /** `true` disables the account and signs it out everywhere; `false` enables it. */
@@ -30243,6 +30862,16 @@ export type UpdateMeRequest = {
   name?: string | null;
   /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
   time_zone?: string | null;
+};
+
+/** Changes to your profile. Omitted fields stay as they are; an empty string clears a text. */
+export type UpdateMyCustomerProfileRequest = {
+  birthday?: string | null;
+  email?: string | null;
+  /** Up to 200 characters. */
+  full_name?: string | null;
+  /** `female`, `male`, `other` or an empty string. */
+  gender?: string | null;
 };
 
 /**
@@ -30485,6 +31114,20 @@ export type ViewChanges = {
 
 /** Who may load the content without signing in. */
 export type Visibility = "private" | "public";
+
+/** A voucher reward: a voucher promotion given on birthdays, after a purchase or for points. */
+export type VoucherReward = {
+  active: boolean;
+  id: string;
+  /** `birthday`, `purchase` or `points`. */
+  kind: string;
+  /** Smallest goods amount of the order (`purchase`). */
+  min_order_minor?: number | null;
+  /** Points it costs (`points`). */
+  points_cost?: number | null;
+  /** The voucher promotion of the promotions module. */
+  promotion_id: string;
+};
 
 /** Taxes to withhold. */
 export type WithholdingQuote = {
@@ -37151,6 +37794,400 @@ export interface paths {
         403: Problem;
         404: Problem;
         413: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers": {
+    /** List the customers in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; group_id?: string; tier?: string; tags?: string; org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Register a customer at the counter by phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RegisterCustomerRequest;
+      responses: {
+        201: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups": {
+    /** List customer groups. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a customer group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateCustomerGroupRequest;
+      responses: {
+        201: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}": {
+    /** Get a customer group with its number of members. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a customer group. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerGroupRequest;
+      responses: {
+        200: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a customer group and its memberships. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}/members/{profile_id}": {
+    /** Add a customer to a manual group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; profile_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a customer from a manual group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; profile_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}/preview": {
+    /** Count the customers a group matches now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerGroupPreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/loyalty/rules": {
+    /** List loyalty rules (all versions). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_LoyaltyRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a loyalty rule version. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateLoyaltyRuleRequest;
+      responses: {
+        201: Data_LoyaltyRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/loyalty/tiers": {
+    /** List membership tiers (all versions). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_MembershipTier;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a membership tier, or a new version of one. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateMembershipTierRequest;
+      responses: {
+        201: Data_MembershipTier;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/loyalty/voucher-rewards": {
+    /** List voucher rewards. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_VoucherReward;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a voucher reward. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateVoucherRewardRequest;
+      responses: {
+        201: Data_VoucherReward;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/loyalty/voucher-rewards/{id}": {
+    /** Turn a voucher reward on or off. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: SetVoucherRewardRequest;
+      responses: {
+        200: Data_VoucherReward;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me": {
+    /** Get your customer profile (created on first visit). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_MyCustomerProfile;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change your customer profile. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UpdateMyCustomerProfileRequest;
+      responses: {
+        200: Data_MyCustomerProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/orders": {
+    /** List your orders as the shop's customer history sees them. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerOrder;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/points": {
+    /** Get your loyalty points and the program rules. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_CustomerPoints;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/points/rewards": {
+    /** List the voucher rewards you can get for points. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_VoucherReward;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/points/vouchers": {
+    /** Exchange your points for a voucher. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RedeemVoucherRequest;
+      responses: {
+        201: Data_RedeemedVoucher;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}": {
+    /** Get a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a customer. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerProfileRequest;
+      responses: {
+        200: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/contact": {
+    /** Show the full phone number and email of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { reason?: string }; };
+      responses: {
+        200: Data_CustomerContact;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/orders": {
+    /** List the orders of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/points": {
+    /** Get the loyalty points of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerPoints;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/points/adjustments": {
+    /** Add or remove points of a customer by hand. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AdjustPointsRequest;
+      responses: {
+        200: Data_CustomerPoints;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/points/entries": {
+    /** List the points history of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_PointsEntry;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

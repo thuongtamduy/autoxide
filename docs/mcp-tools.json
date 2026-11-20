@@ -6356,6 +6356,275 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Get one customer profile: totals, tier, custom fields. Phone and email are masked.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One customer.",
+        "properties": {
+          "id": {
+            "description": "Id of the customer profile.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "customers.get_customer",
+      "output_schema": null,
+      "permissions": [
+        "customers.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List customer groups (manual or rule-based) in your scope.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A page of groups.",
+        "properties": {
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "customers.list_groups",
+      "output_schema": null,
+      "permissions": [
+        "customers.read",
+        "customers.segments.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Count the customers a group matches now (rule groups: matching the rule; manual groups: members).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "One group.",
+        "properties": {
+          "id": {
+            "description": "Id of the group.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "customers.preview_group",
+      "output_schema": null,
+      "permissions": [
+        "customers.read",
+        "customers.segments.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Show the full phone number and email of a customer. Every call is written to the audit log; give a reason.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Why the full contact details are needed.",
+        "properties": {
+          "id": {
+            "description": "Id of the customer profile.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Reason kept in the audit log, up to 200 characters.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "customers.reveal_contact",
+      "output_schema": null,
+      "permissions": [
+        "customers.contact.reveal"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Find customers in your scope by name, phone number or email, or list a group's or tier's customers. Phone and email are masked.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Which customers to find.",
+        "properties": {
+          "cursor": {
+            "description": "`next_cursor` of the previous page.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "group_id": {
+            "description": "Only members of this customer group.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "description": "1 to 200; default 50.",
+            "format": "int32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "q": {
+            "description": "A name (accents do not matter), a phone number or an email.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tier": {
+            "description": "Only this membership tier code.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "customers.search_customers",
+      "output_schema": null,
+      "permissions": [
+        "customers.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Create a customer group (no `id`) or change one. A rule group's members follow its rule shortly after; check with `preview_group` first.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A group to create (no `id`) or change (with `id`).",
+        "properties": {
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id of the group to change; omitted: create one.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "description": "`manual` or `rule` (only when creating; default `manual`).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "1 to 100 characters, unique in the shop (required to create).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "org_id": {
+            "description": "Unit of a new group; omitted: the root unit.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "price_group": {
+            "description": "Customer group code for price lists, e.g. `vip`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule": {
+            "description": "Rule of a rule group; all given conditions must hold: `total_spent_min` (smallest currency\nunit), `orders_count_min`, `last_order_within_days` (1 to 3650), `tier_in` (tier codes),\n`tags_any` (tag ids), `org_in` (unit ids).",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "customers.upsert_group",
+      "output_schema": null,
+      "permissions": [
+        "customers.segments.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
         "returns_secret": false

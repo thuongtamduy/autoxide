@@ -102,6 +102,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // `tax`, `ledger` qua `api` của chúng nên đứng sau cả sáu. Module sau (`marketplace`,
         // `customers`, `channels`, `affiliate`) cắm vào `dyn OrderExtensions` của nó.
         Box::new(autoxide_orders::module()),
+        // Khách hàng và giữ chân khách (bước 47): nghe event của `orders` (hồ sơ, lịch sử mua) và cắm
+        // nhóm khách vào `dyn OrderExtensions`, nên đứng SAU `orders`.
+        Box::new(autoxide_customers::module()),
         // Báo cáo gộp của cây khách hàng (bước 38): nghe event mà mọi module khai số liệu
         // (`Module::facts`), cần `dyn Ledger` (tỉ giá) và `dyn OrgDirectory` (múi giờ), nên đứng
         // CUỐI CÙNG.

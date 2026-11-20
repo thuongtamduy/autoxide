@@ -30,7 +30,9 @@ use uuid::Uuid;
 
 /// Tên event `orders` phát (payload `{"before": …, "after": …}`; `after` luôn có `order_id`,
 /// `tenant_id`, `org_id`, `channel` khi là event của một đơn). Không event nào mang secret, token
-/// hay `Cart-Token`.
+/// hay `Cart-Token`. Event của một đơn (đặt, xác nhận, đổi trạng thái…) có thêm `buyer_key` (khoá
+/// liên hệ HMAC theo khách của số người mua, không phải số), `placed_at` và `goods_paid` (tiền người
+/// mua trả cho hàng hoá: sau giảm, gồm thuế, không phí giao — cơ sở điểm của bước 47, D-226).
 pub mod events {
     /// Đơn vừa tạo (`pending_payment` hay `confirmed`).
     pub const ORDER_PLACED: &str = "orders.order_placed";
