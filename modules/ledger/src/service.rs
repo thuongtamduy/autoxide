@@ -773,6 +773,15 @@ impl LedgerService {
                 OrgTarget::new(OrgId::from_uuid(found.org_id), None),
             )
             .await?;
+        // Khoá dòng tài khoản trước (cùng thứ tự với bút toán: tài khoản rồi số dư): bút toán đang
+        // ghi xong thì mới đổi; bút toán sau chờ và thấy sàn / trạng thái mới. Sửa từ bản vừa khoá
+        // để không ghi đè thay đổi của người khác bằng bản đọc ở trên.
+        let found = autoxide_kernel::rows::lock_one(
+            &transaction,
+            account::Entity::find_by_id(found.id).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(account_not_found)?;
         // Sàn mới phải đúng với số dư hiện tại: khoá dòng số dư rồi so.
         if let Some(Some(floor)) = change.floor.map(|floor| floor.map(Money::minor)) {
             let current = autoxide_kernel::rows::lock_one(
