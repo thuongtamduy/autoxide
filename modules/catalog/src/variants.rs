@@ -712,13 +712,13 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<(variant::Model, product::Model), Error> {
-        let row = variant::Entity::find_by_id(id)
+        let found = variant::Entity::find_by_id(id)
             .scoped(tenant)
             .one(transaction)
             .await?
             .ok_or_else(|| errors::variant_not_found(id))?;
         let product = self
-            .product_for_write(transaction, tenant, principal, row.product_id, &PRODUCTS_WRITE)
+            .product_for_write(transaction, tenant, principal, found.product_id, &PRODUCTS_WRITE)
             .await
             .map_err(|error| {
                 if error.code() == "catalog.product_not_found" {
@@ -727,6 +727,13 @@ impl CatalogService {
                     error
                 }
             })?;
+        // Đọc lại biến thể sau khi đã khoá sản phẩm: lệnh sửa biến thể chen trước vừa commit thì
+        // bản này thấy giá trị mới (vd ngày đặt trước), không phát lại event "đã đổi".
+        let row = variant::Entity::find_by_id(id)
+            .scoped(tenant)
+            .one(transaction)
+            .await?
+            .ok_or_else(|| errors::variant_not_found(id))?;
         Ok((row, product))
     }
 

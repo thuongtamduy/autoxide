@@ -411,3 +411,37 @@ async fn ro_ri_giua_khach() {
     .await
     .unwrap();
 }
+
+/// Hai lần đổi ngày đặt trước cùng lúc sang cùng một ngày: chỉ một event "ngày đã đổi" (cùng mẫu
+/// lỗi với storefront, #246). Postgres từng cho cả hai cùng đọc ngày cũ và cùng phát event.
+#[tokio::test]
+async fn doi_ngay_dat_truoc_dong_thoi_chi_phat_mot_event() {
+    use sea_orm::{ConnectionTrait as _, Statement};
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let mut body = product_body(tree.a, "PRE-R", "Hàng đặt trước");
+        let later = (chrono::Utc::now() + chrono::Duration::days(30)).date_naive();
+        body["variant"]["sale_mode"] = json!("preorder");
+        body["variant"]["preorder_available_on"] = json!(later);
+        body["variant"]["preorder_limit"] = json!(100);
+        let (status, made) = call(&app, "POST", "/products", "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::CREATED, "{made}");
+        let variant = made["data"]["variants"][0]["id"].as_str().unwrap().to_owned();
+        let uri = format!("/variants/{variant}");
+        let moved = json!({"preorder_available_on": later + chrono::Duration::days(7)});
+        let (first, second) = tokio::join!(
+            call(&app, "PATCH", &uri, "boss", Some(moved.clone())),
+            call(&app, "PATCH", &uri, "boss", Some(moved.clone())),
+        );
+        assert_eq!((first.0, second.0), (StatusCode::OK, StatusCode::OK), "{first:?} {second:?}");
+        let read = app.database().read();
+        let sql = "SELECT id FROM catalog_events WHERE name = 'catalog.preorder_date_changed'";
+        let rows = read
+            .query_all_raw(Statement::from_string(read.get_database_backend(), sql))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+    })
+    .await
+    .unwrap();
+}
