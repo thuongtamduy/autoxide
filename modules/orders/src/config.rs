@@ -83,6 +83,18 @@ pub(crate) const LOOKUP_TOKEN_MINUTES: Setting = Setting::new(
 )
 .with_default("30");
 
+pub(crate) const REVIEW_EDIT_DAYS: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_REVIEW_EDIT_DAYS",
+    "Days a buyer may still edit a product review after writing it (0 to 365).",
+)
+.with_default("30");
+
+pub(crate) const REVIEW_VOTES_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_REVIEW_VOTES_PER_HOUR",
+    "\"Helpful\" votes one account may cast per hour (1 to 10000).",
+)
+.with_default("60");
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OrdersConfig {
@@ -98,6 +110,8 @@ pub(crate) struct OrdersConfig {
     pub lookup_ip_per_hour: u32,
     pub lookup_resend_seconds: i64,
     pub lookup_token_minutes: i64,
+    pub review_edit_days: i64,
+    pub review_votes_per_hour: u32,
 }
 
 impl Default for OrdersConfig {
@@ -115,6 +129,8 @@ impl Default for OrdersConfig {
             lookup_ip_per_hour: 20,
             lookup_resend_seconds: 60,
             lookup_token_minutes: 30,
+            review_edit_days: 30,
+            review_votes_per_hour: 60,
         }
     }
 }
@@ -133,6 +149,8 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<OrdersConfig, Invali
     let lookups_ip = reader.get_with(&LOOKUP_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 1000));
     let resend = reader.get_with(&LOOKUP_RESEND_SECONDS, |raw| parse_in_range(raw, 10i64, 3600));
     let token = reader.get_with(&LOOKUP_TOKEN_MINUTES, |raw| parse_in_range(raw, 5i64, 1440));
+    let review_edit = reader.get_with(&REVIEW_EDIT_DAYS, |raw| parse_in_range(raw, 0i64, 365));
+    let votes = reader.get_with(&REVIEW_VOTES_PER_HOUR, |raw| parse_in_range(raw, 1u32, 10_000));
     Ok(OrdersConfig {
         cart_ttl_days: ttl?,
         cart_max_lines: lines?,
@@ -146,5 +164,7 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<OrdersConfig, Invali
         lookup_ip_per_hour: lookups_ip?,
         lookup_resend_seconds: resend?,
         lookup_token_minutes: token?,
+        review_edit_days: review_edit?,
+        review_votes_per_hour: votes?,
     })
 }

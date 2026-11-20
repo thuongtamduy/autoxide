@@ -246,6 +246,16 @@ impl OrdersService {
         {
             return Err(errors::cod_not_allowed());
         }
+        // Chống bom hàng (D-194): người mua bị chặn hay rủi ro cao theo quy tắc → phải trả trước.
+        if method == Method::Cod {
+            self.check_cod_risk(
+                tenant,
+                OrgId::from_uuid(row.org_id),
+                &input.contact.phone,
+                quote.total,
+            )
+            .await?;
+        }
         if method != Method::Cod && self.ledger.is_none() {
             return Err(errors::payment_method_unavailable(&input.payment_method));
         }

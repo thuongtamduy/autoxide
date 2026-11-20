@@ -13,6 +13,8 @@ mod lifecycle;
 mod pickups;
 mod preorders;
 mod returns;
+mod reviews;
+mod risk_reports;
 
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};

@@ -40,6 +40,9 @@ pub(crate) fn registrations(service: &Arc<OrdersService>) -> Vec<JobRegistration
         JobRegistration::new(EXPIRE_UNACCEPTED, Arc::new(Unaccepted(service.clone()))),
         JobRegistration::new(EXPIRE_PICKUPS, Arc::new(Pickups(service.clone()))),
     ]
+    .into_iter()
+    .chain(crate::reviews::registrations(service))
+    .collect()
 }
 
 pub(crate) fn schedules() -> Vec<Schedule> {

@@ -11,6 +11,8 @@ pub(crate) const RETURN_REJECTED: &str = "orders.return_rejected";
 pub(crate) const RETURN_REASON: &str = "orders.return_reason";
 /// Lý do chênh lệch tiền két khi đóng ca (D-227).
 pub(crate) const CASH_VARIANCE: &str = "orders.cash_variance";
+/// Lý do chặn thanh toán khi nhận hàng của một người mua (D-194).
+pub(crate) const COD_BLOCK: &str = "orders.cod_block";
 
 pub(crate) fn lists() -> Vec<ReasonList> {
     vec![
@@ -53,6 +55,15 @@ pub(crate) fn lists() -> Vec<ReasonList> {
                 ReasonDefault::new("wrong_change", "Wrong change given"),
                 ReasonDefault::new("unrecorded_sale", "Sale not recorded"),
                 ReasonDefault::new("theft_or_loss", "Theft or loss"),
+                ReasonDefault::new("other", "Other reason"),
+            ],
+        ),
+        ReasonList::new(
+            COD_BLOCK,
+            vec![
+                ReasonDefault::new("refused_deliveries", "Refused several deliveries"),
+                ReasonDefault::new("fake_orders", "Placed orders with fake details"),
+                ReasonDefault::new("unreachable", "Could not be reached for delivery"),
                 ReasonDefault::new("other", "Other reason"),
             ],
         ),

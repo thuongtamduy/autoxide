@@ -92,8 +92,22 @@ pub(crate) const CANCELLED: NotificationKind = NotificationKind::new(
 )
 .sample(r#"{"number": "2026-000123", "link": "https://shop.example.com/orders/2026-000123"}"#);
 
+/// Đánh giá của người mua bị ẩn (Luật 19/2023: báo người viết, kèm lý do).
+pub(crate) const REVIEW_HIDDEN: NotificationKind = NotificationKind::new(
+    Category::Transactional,
+    &[Channel::Email, Channel::InApp],
+    NotificationTemplate::new(
+        "orders.review_hidden",
+        "Your review was hidden",
+        "Your product review was hidden by the shop for this reason: {reason}. Contact the shop \
+         if you think this is a mistake.",
+        "Your review was hidden",
+    ),
+)
+.sample(r#"{"reason": "personal_data"}"#);
+
 pub(crate) fn declare(notifier: &dyn Notifier) -> Result<(), Error> {
-    for kind in [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED] {
+    for kind in [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, REVIEW_HIDDEN] {
         notifier.declare(kind)?;
     }
     Ok(())
