@@ -8,11 +8,13 @@ use autoxide_kernel::migration::prelude::*;
 
 mod collection_ai;
 mod collections;
+mod media_alts;
 mod net_content;
 mod recommend;
 mod search;
 mod suggestions;
 mod transfers;
+mod variant_attributes;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -45,6 +47,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(transfers::CreateTransfers),
         // Bản nháp AI cho mô tả và SEO.
         Box::new(suggestions::CreateSuggestions),
+        // `alt` của ảnh sản phẩm theo ngôn ngữ (D-202).
+        Box::new(media_alts::CreateMediaAlts),
+        // Thuộc tính theo biến thể cho trang sản phẩm.
+        Box::new(variant_attributes::CreateVariantAttributes),
     ]
 }
 

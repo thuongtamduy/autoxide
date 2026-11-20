@@ -1538,6 +1538,19 @@ export type CatalogFloorAction = "warn" | "block";
  */
 export type CatalogKind = "physical" | "digital" | "service" | "bundle";
 
+/** The alternative text of one image in one language. */
+export type CatalogMediaAlt = {
+  alt: string;
+  locale: string;
+  media_id: string;
+};
+
+/** The alternative text of an image in one language. */
+export type CatalogMediaAltRequest = {
+  /** What the image shows, for people who cannot see it; 1 to 500 characters. */
+  alt: string;
+};
+
 /** Where to move a category. */
 export type CatalogMoveCategory = {
   /** New parent; `null` makes it a top category. */
@@ -1736,6 +1749,11 @@ export type CatalogProduct = {
   kind: CatalogKind;
   lot_tracked: boolean;
   media: CatalogProductMedia[];
+  /**
+   * Alternative texts of the images in other languages (`PUT
+   * /products/{id}/media/{media_id}/alts/{locale}`).
+   */
+  media_alts: CatalogMediaAlt[];
   options: CatalogOption[];
   /** The organization unit that owns the product. */
   org_id: string;
@@ -1982,6 +2000,11 @@ export type CatalogPublicTranslation = {
 
 /** A variant on sale. */
 export type CatalogPublicVariant = {
+  /**
+   * What is particular to this variant (how many it serves, what is in the box, care…), in the
+   * language asked; empty when the variant has none.
+   */
+  attributes: CatalogPublicAttribute[];
   /** GTIN / EAN barcode, for structured data. */
   barcode?: string | null;
   compare_at?: Money | null;
@@ -2328,6 +2351,40 @@ export type CatalogVariant = {
   updated_at: string;
   weight_grams?: number | null;
   width_mm?: number | null;
+};
+
+/** One stored value of an attribute on a variant (an `options` attribute has one row per option). */
+export type CatalogVariantAttributeStored = {
+  attribute_id: string;
+  option_id?: string | null;
+  /** Translations of `value_text`. */
+  texts: {
+    [key: string]: string;
+  };
+  value_boolean?: boolean | null;
+  value_date?: string | null;
+  value_integer?: number | null;
+  value_text?: string | null;
+};
+
+/** The value of one attribute on a variant. */
+export type CatalogVariantAttributeValue = {
+  attribute_id: string;
+  /** For a text attribute: the text in other languages, e.g. `{"en": "Machine washable"}`. */
+  texts?: {
+    [key: string]: string;
+  };
+  /**
+   * By the attribute's type, as for a product: text (in the product's default language), a
+   * whole number, a decimal written as text, `true` / `false`, a date, an option code or a list
+   * of option codes.
+   */
+  value: unknown;
+};
+
+/** The whole set of attribute values of a variant. */
+export type CatalogVariantAttributes = {
+  attributes: CatalogVariantAttributeValue[];
 };
 
 /** A variant to create, or the first variant of a new product. */
@@ -5880,6 +5937,11 @@ export type Data_CatalogProduct = {
     kind: CatalogKind;
     lot_tracked: boolean;
     media: CatalogProductMedia[];
+    /**
+     * Alternative texts of the images in other languages (`PUT
+     * /products/{id}/media/{media_id}/alts/{locale}`).
+     */
+    media_alts: CatalogMediaAlt[];
     options: CatalogOption[];
     /** The organization unit that owns the product. */
     org_id: string;
@@ -13009,6 +13071,22 @@ export type Data_Vec_CatalogVariant = {
     updated_at: string;
     weight_grams?: number | null;
     width_mm?: number | null;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogVariantAttributeStored = {
+  data: {
+    attribute_id: string;
+    option_id?: string | null;
+    /** Translations of `value_text`. */
+    texts: {
+      [key: string]: string;
+    };
+    value_boolean?: boolean | null;
+    value_date?: string | null;
+    value_integer?: number | null;
+    value_text?: string | null;
   }[];
 };
 
@@ -33320,6 +33398,35 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/products/{id}/media/{media_id}/alts/{locale}": {
+    /** Set the alternative text of a product image in one language. */
+    put: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; media_id: string; locale: string }; };
+      requestBody: CatalogMediaAltRequest;
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove the alternative text of a product image in one language. */
+    delete: {
+      parameters: { header: { "If-Match"?: string | null; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; media_id: string; locale: string }; };
+      responses: {
+        200: Data_CatalogProduct;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/products/{id}/options": {
     /** Replace the options of a product (colour, size…). */
     put: {
@@ -33681,6 +33788,32 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}/attributes": {
+    /** List the attribute values of a variant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogVariantAttributeStored;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Replace the attribute values of a variant. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogVariantAttributes;
+      responses: {
+        200: Data_Vec_CatalogVariantAttributeStored;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

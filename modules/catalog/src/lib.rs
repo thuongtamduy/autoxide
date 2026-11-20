@@ -19,6 +19,7 @@ mod facets;
 mod floors;
 mod http;
 mod listeners;
+mod media_alts;
 mod migration;
 mod permissions;
 mod pricing;
@@ -40,9 +41,11 @@ mod synonyms;
 mod tools;
 mod tools_assist;
 mod transfers;
+mod variant_attributes;
 mod variants;
 
 mod relocation;
+mod resources;
 #[cfg(test)]
 mod tests;
 
@@ -96,6 +99,10 @@ impl Module for CatalogModule {
         events::all()
     }
 
+    fn resource_events(&self) -> Vec<autoxide_kernel::resource::ResourceEvent> {
+        resources::resource_events()
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -138,6 +145,21 @@ impl Module for CatalogModule {
         context.resource_type(
             collections::resource::COLLECTION,
             Arc::new(collections::resource::CollectionResolver),
+        )?;
+        // Sản phẩm và danh mục trong sổ đối tượng: hỏi đáp (`comments`), menu (`menus`), nhãn
+        // `seller` cho người quản lý sản phẩm (D-202, D-238).
+        context.resource_type(
+            resources::PRODUCT,
+            Arc::new(resources::ProductResolver(service.clone())),
+        )?;
+        context.resource_type(
+            resources::CATEGORY,
+            Arc::new(resources::CategoryResolver(service.clone())),
+        )?;
+        context.badge_source(
+            resources::PRODUCT,
+            &[resources::SELLER],
+            Arc::new(resources::SellerBadge),
         )?;
         context.suggest_source(Arc::new(suggest::ProductSuggestions(service.clone())))?;
         context.suggest_source(Arc::new(suggest::CategorySuggestions(service.clone())))?;

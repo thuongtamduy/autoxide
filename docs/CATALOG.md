@@ -240,6 +240,37 @@ changes. `POST /suggestions/{id}/apply` writes it into that language's text (nam
 and marks the product `ai_assisted`; `POST /suggestions/{id}/discard` drops it. MCP tool:
 `catalog.suggest_copy`.
 
+## Product Q&A, menus and other modules
+
+Products and categories are in the kernel's object directory, so other modules can point at them
+without reading catalog tables:
+
+- `catalog.product`: public when on sale (`active`) with a text in the language asked; title, short
+  description, address `/<prefix>/<slug>` and first image. Product questions and answers use module
+  `comments` with this target type. Suggested settings: `AUTOXIDE_COMMENTS_TARGET_TYPES` including
+  `catalog.product`, `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES=catalog.product` (verified accounts only,
+  Decree 147/2024 — check the scope with the original text) and
+  `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE=catalog.product:user=pre` (questions wait for review). Archiving
+  or deleting a product closes and hides its questions. An author who can manage the product
+  (`catalog.products.write` on its unit) gets the badge `seller`; module `orders` adds
+  `verified_buyer`.
+- `catalog.category`: for website menus (module `menus`) — names and addresses (`/categories/<slug>`)
+  by language, children in display order, only visible categories. A "best sellers" block in a menu is
+  the public product list filtered by category and sorted `best_selling`.
+
+Image texts by language: `PUT /products/{id}/media/{media_id}/alts/{locale}` `{"alt": "…"}` (with
+`If-Match`; `DELETE` removes it). Product pages in that language show it; otherwise the product's own
+`alt` in its default language, then the media library's text in that language. Removing an image from
+the product removes its texts.
+
+## What differs between variants
+
+`PUT /variants/{id}/attributes` sets attribute values on one variant — how many people it serves, what
+is in the box, care instructions, dishwasher safe — using the tenant's attributes (`POST /attributes`),
+so nothing is fixed to one trade. Text values may carry translations: `{"attribute_id": …, "value":
+"Rửa tay", "texts": {"en": "Hand wash"}}`. The public product page lists them under each variant
+(`variants[].attributes`) in the language asked.
+
 ## Settings
 
 | Variable | Default | Meaning |

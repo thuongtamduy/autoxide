@@ -7,14 +7,17 @@ mod changes;
 mod collections;
 mod display_price;
 mod extensions;
+mod media_alts;
 mod pricing;
 mod products;
 mod public;
 mod readiness;
 mod recommend;
+mod resources;
 mod search;
 mod suggestions;
 mod transfers;
+mod variant_attributes;
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};

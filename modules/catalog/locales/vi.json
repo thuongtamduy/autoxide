@@ -186,5 +186,8 @@
   "field:the product has no name in this language yet; add one first": "sản phẩm chưa có tên ở ngôn ngữ này; hãy đặt tên trước",
   "text:The public price of a product on a website changed (unit, product, price before and after; `null` when not on sale there).": "Giá công khai của một sản phẩm trên một website đổi (nút, sản phẩm, giá trước và sau; `null` khi không bán ở đó).",
   "catalog.ai_unavailable": "Bản nháp AI cần module `ai`, máy chủ này chưa cài.",
-  "field:must not be empty": "không được để trống"
+  "field:must not be empty": "không được để trống",
+  "catalog.product_media_not_found": "Ảnh `{media_id}` không phải ảnh của sản phẩm này.",
+  "field:is not a configured language": "không phải ngôn ngữ đã cấu hình",
+  "field:only text attributes have translations": "chỉ thuộc tính kiểu chữ mới có bản dịch"
 }

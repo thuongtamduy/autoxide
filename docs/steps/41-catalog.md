@@ -216,6 +216,7 @@ chính) và `m0002…` (bảng phụ), mỗi cái có `down`; thêm `outbox_migr
 | `catalog_variants` | `id`, `tenant_id`, `product_id`, `sku`, `sku_key` (chữ hoa, bỏ khoảng trắng), `barcode?`, `option_key` (ID giá trị tuỳ chọn sắp tăng, nối `,`), `position`, `active`, `sale_mode` (`in_stock` mặc định / `backorder` / `preorder`), `preorder_available_on?` (`date`, theo múi giờ của nút), `preorder_limit?` (tổng suất, NULL = không giới hạn), `preorder_ends_at?` (hết nhận đặt), lời nhắn đặt trước công khai theo ngôn ngữ (D-204), `weight_grams?`, `length_mm?`, `width_mm?`, `height_mm?`, `image_media_id?`, `updated_at` | unique (`tenant_id`,`sku_key`); unique (`tenant_id`,`barcode`) (NULL lặp được trên cả hai DB); unique (`tenant_id`,`product_id`,`option_key`) |
 | `catalog_product_media` | `product_id`, `media_id`, `variant_id?`, `position`, `alt` (nghĩa bản ngôn ngữ mặc định của khách) | (`tenant_id`,`product_id`,`position`) |
 | `catalog_product_media_alts` | `alt` theo ngôn ngữ (D-202): `tenant_id`, `product_id`, `media_id`, `locale`, `alt`, `updated_at` | khoá (`tenant_id`,`product_id`,`media_id`,`locale`) |
+| `catalog_variant_attributes` | giá trị thuộc tính theo biến thể (website bán hàng, 16/11/2026): `product_id`, `variant_id`, `attribute_id`, cột giá trị như `catalog_product_attributes`, `texts?` (JSON bản dịch cho thuộc tính chữ) — D-20261120-catalog-variant-attributes | (`tenant_id`,`variant_id`,`attribute_id`); (`tenant_id`,`product_id`) |
 | `catalog_categories` | `id`, `tenant_id`, `parent_id?`, `depth`, `position`, `updated_at` | (`tenant_id`,`parent_id`,`position`) |
 | `catalog_category_paths` | `ancestor_id`, `descendant_id`, `depth` (bảng tổ tiên – con cháu, gồm chính nó) | unique (`tenant_id`,`ancestor_id`,`descendant_id`); (`tenant_id`,`descendant_id`) |
 | `catalog_category_translations` | `category_id`, `locale`, `name`, `slug` | unique (`tenant_id`,`locale`,`slug`) |
@@ -367,6 +368,7 @@ Quản trị:
 | `PUT/DELETE /products/{id}/translations/{locale}` | write | slug tự sinh từ tên khi trống (`autoxide_kernel::slug`) |
 | `PUT /products/{id}/options` · `PUT /products/{id}/attributes` · `PUT /products/{id}/media` · `PUT /products/{id}/categories` | write | thay cả tập; ảnh phải là `media` `Public` |
 | `PUT/DELETE /products/{id}/media/{media_id}/alts/{locale}` | write | `If-Match`; `alt` theo ngôn ngữ (D-202), lỗi `catalog.unsupported_locale` |
+| `GET/PUT /variants/{id}/attributes` | read · write | thuộc tính theo biến thể, `texts` cho thuộc tính chữ; trả trong `variants[].attributes` của `by-slug` (D-20261120-catalog-variant-attributes) |
 | `POST /products/{id}/variants` · `PATCH/DELETE /variants/{id}` · `GET /variants?code=` | write · read | tính năng `catalog.variants` khi > 1 biến thể; nhận `sale_mode` và trường đặt trước (D-204) |
 | `PUT /variants/{id}/components` | write | tính năng `catalog.bundles` |
 | `POST/DELETE /variants/{id}/digital-assets[/{asset}]` | write | tải file lên (khai `Module::body_limits`), tính năng `catalog.digital` |

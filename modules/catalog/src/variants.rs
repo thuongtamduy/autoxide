@@ -428,6 +428,16 @@ pub(crate) async fn delete_product_parts<C: ConnectionTrait>(
         .scoped(tenant)
         .exec(connection)
         .await?;
+    crate::entity::variant_attribute::Entity::delete_many()
+        .filter(crate::entity::variant_attribute::Column::ProductId.eq(product_id))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
+    crate::entity::media_alt::Entity::delete_many()
+        .filter(crate::entity::media_alt::Column::ProductId.eq(product_id))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
     option_value::Entity::delete_many()
         .filter(option_value::Column::ProductId.eq(product_id))
         .scoped(tenant)
@@ -695,7 +705,7 @@ impl CatalogService {
     }
 
     /// Biến thể `id` cùng sản phẩm của nó, trong transaction ghi, đã kiểm quyền ghi.
-    async fn variant_for_write<C: ConnectionTrait>(
+    pub(crate) async fn variant_for_write<C: ConnectionTrait>(
         &self,
         transaction: &C,
         tenant: &TenantContext,
@@ -814,6 +824,11 @@ impl CatalogService {
             .await?;
         variant::Entity::delete_many()
             .filter(variant::Column::Id.eq(id))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
+        crate::entity::variant_attribute::Entity::delete_many()
+            .filter(crate::entity::variant_attribute::Column::VariantId.eq(id))
             .scoped(tenant)
             .exec(&transaction)
             .await?;

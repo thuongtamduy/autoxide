@@ -481,15 +481,15 @@ bước 35.
       giao hàng), combo / bộ sản phẩm trừ kho từng thành phần; hàng đặt trước (`sale_mode`, ngày dự kiến có
       hàng, giới hạn suất — D-204)
 - [x] Gợi ý sản phẩm: sản phẩm tương tự theo ý nghĩa (embedding sẵn có của module `ai`); "thường mua cùng"
-- [ ] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
+- [x] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
       sản phẩm ở nút sở hữu), event vòng đời (lưu trữ / xoá → đóng và ẩn hỏi đáp); `catalog_product_media`
       ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
-- [ ] Danh mục trong menu của website (D-238): `catalog.category` trong sổ đối tượng (`resolve_many` theo ngôn ngữ,
+- [x] Danh mục trong menu của website (D-238): `catalog.category` trong sổ đối tượng (`resolve_many` theo ngôn ngữ,
       `children` theo thứ tự hiển thị, chỉ danh mục đang hiện), `catalog.product` có `image`; khối "Bán chạy" của
       bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
 - [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
       khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
-- [ ] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
+- [x] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
       ngôn ngữ (vd số người dùng, trong hộp có gì, cách dùng / chăm sóc, dùng được máy rửa bát) — thuộc tính khai
       theo loại sản phẩm, không viết cứng ngành nào; catalog công khai lọc theo người bán và đường dẫn trang sản
       phẩm cho hàng người bán (cùng 46)

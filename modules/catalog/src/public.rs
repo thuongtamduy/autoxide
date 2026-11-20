@@ -15,8 +15,8 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::entity::{
-    category, category_path, category_translation, price_list, product, product_media,
-    store_override, storefront_entry, translation, variant,
+    category, category_path, category_translation, price_list, product, product_attribute,
+    product_media, store_override, storefront_entry, translation, variant,
 };
 use crate::errors;
 use crate::public_filter::Skip;
@@ -482,62 +482,7 @@ impl CatalogService {
         let rows = self.product_attributes(read, tenant, product_id).await?;
         let ids: Vec<Uuid> = rows.iter().map(|row| row.attribute_id).collect();
         let details = self.attribute_details(read, tenant, &ids).await?;
-        let mut out: Vec<PublicAttribute> = Vec::new();
-        for row in rows {
-            let Some(detail) = details.get(&row.attribute_id) else { continue };
-            let attribute = &detail.attribute;
-            let option =
-                row.option_id.and_then(|id| detail.options.iter().find(|option| option.id == id));
-            let (value, label) = if let Some(option) = option {
-                (Value::String(option.code.clone()), pick(&option.labels, locale))
-            } else if let Some(text) = &row.value_text {
-                (Value::String(text.clone()), text.clone())
-            } else if let Some(number) = row.value_integer {
-                let shown = if attribute.data_type == "decimal" {
-                    unscale(number, attribute.scale)
-                } else {
-                    number.to_string()
-                };
-                let value = if attribute.data_type == "decimal" {
-                    Value::String(shown.clone())
-                } else {
-                    Value::from(number)
-                };
-                (value, shown)
-            } else if let Some(flag) = row.value_boolean {
-                (Value::Bool(flag), flag.to_string())
-            } else if let Some(date) = row.value_date {
-                (Value::String(date.to_string()), date.to_string())
-            } else {
-                continue;
-            };
-            // `options`: nhiều dòng cùng thuộc tính gộp thành một mục, giá trị là danh sách.
-            if attribute.data_type == "options" {
-                if let Some(existing) = out.iter_mut().find(|item| item.code == attribute.code) {
-                    if let Value::Array(items) = &mut existing.value {
-                        items.push(value);
-                    }
-                    existing.label = format!("{}, {label}", existing.label);
-                    continue;
-                }
-                out.push(PublicAttribute {
-                    code: attribute.code.clone(),
-                    name: pick(&attribute.names, locale),
-                    unit: attribute.unit.clone(),
-                    value: Value::Array(vec![value]),
-                    label,
-                });
-                continue;
-            }
-            out.push(PublicAttribute {
-                code: attribute.code.clone(),
-                name: pick(&attribute.names, locale),
-                unit: attribute.unit.clone(),
-                value,
-                label,
-            });
-        }
-        Ok(out)
+        Ok(present_attributes(rows, &details, locale))
     }
 
     /// Một trang sitemap: mọi sản phẩm thấy được ở website, kèm mọi bản dịch (hay một ngôn ngữ).
@@ -629,6 +574,26 @@ impl CatalogService {
             .collect())
     }
 
+    /// Như [`public_media`](Self::public_media), với `alt` của media bằng ngôn ngữ `locale`.
+    pub(crate) async fn public_media_in(
+        &self,
+        tenant: &TenantContext,
+        ids: &[Uuid],
+        locale: &str,
+    ) -> Result<HashMap<Uuid, autoxide_media::api::MediaRef>, Error> {
+        let Some(media) = &self.media else { return Ok(HashMap::new()) };
+        if ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        Ok(media
+            .find_many_in(tenant, ids, locale)
+            .await?
+            .into_iter()
+            .filter(|item| item.visibility == autoxide_media::api::MediaVisibility::Public)
+            .map(|item| (item.id, item))
+            .collect())
+    }
+
     /// Tên của các nút bán (người bán). Chưa cài `organizations`: rỗng.
     pub(crate) async fn seller_names(
         &self,
@@ -662,6 +627,70 @@ fn unscale(number: i64, scale: i32) -> String {
     let fraction = format!("{fraction:0width$}", width = scale as usize);
     let fraction = fraction.trim_end_matches('0');
     if fraction.is_empty() { format!("{sign}{whole}") } else { format!("{sign}{whole}.{fraction}") }
+}
+
+/// Thuộc tính hiển thị từ các dòng giá trị (của sản phẩm hay của biến thể), ở ngôn ngữ `locale`.
+pub(crate) fn present_attributes(
+    rows: Vec<product_attribute::Model>,
+    details: &HashMap<Uuid, crate::attributes::AttributeDetail>,
+    locale: &str,
+) -> Vec<PublicAttribute> {
+    let mut out: Vec<PublicAttribute> = Vec::new();
+    for row in rows {
+        let Some(detail) = details.get(&row.attribute_id) else { continue };
+        let attribute = &detail.attribute;
+        let option =
+            row.option_id.and_then(|id| detail.options.iter().find(|option| option.id == id));
+        let (value, label) = if let Some(option) = option {
+            (Value::String(option.code.clone()), pick(&option.labels, locale))
+        } else if let Some(text) = &row.value_text {
+            (Value::String(text.clone()), text.clone())
+        } else if let Some(number) = row.value_integer {
+            let shown = if attribute.data_type == "decimal" {
+                unscale(number, attribute.scale)
+            } else {
+                number.to_string()
+            };
+            let value = if attribute.data_type == "decimal" {
+                Value::String(shown.clone())
+            } else {
+                Value::from(number)
+            };
+            (value, shown)
+        } else if let Some(flag) = row.value_boolean {
+            (Value::Bool(flag), flag.to_string())
+        } else if let Some(date) = row.value_date {
+            (Value::String(date.to_string()), date.to_string())
+        } else {
+            continue;
+        };
+        // `options`: nhiều dòng cùng thuộc tính gộp thành một mục, giá trị là danh sách.
+        if attribute.data_type == "options" {
+            if let Some(existing) = out.iter_mut().find(|item| item.code == attribute.code) {
+                if let Value::Array(items) = &mut existing.value {
+                    items.push(value);
+                }
+                existing.label = format!("{}, {label}", existing.label);
+                continue;
+            }
+            out.push(PublicAttribute {
+                code: attribute.code.clone(),
+                name: pick(&attribute.names, locale),
+                unit: attribute.unit.clone(),
+                value: Value::Array(vec![value]),
+                label,
+            });
+            continue;
+        }
+        out.push(PublicAttribute {
+            code: attribute.code.clone(),
+            name: pick(&attribute.names, locale),
+            unit: attribute.unit.clone(),
+            value,
+            label,
+        });
+    }
+    out
 }
 
 #[cfg(test)]

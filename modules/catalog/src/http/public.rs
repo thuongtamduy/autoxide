@@ -507,6 +507,21 @@ pub(crate) struct PublicVariant {
     /// For `preorder`: the message to show, in the language asked.
     pub preorder_message: Option<String>,
     pub image_media_id: Option<Uuid>,
+    /// What is particular to this variant (how many it serves, what is in the box, care…), in the
+    /// language asked; empty when the variant has none.
+    pub attributes: Vec<PublicAttributeResponse>,
+}
+
+impl From<crate::public::PublicAttribute> for PublicAttributeResponse {
+    fn from(item: crate::public::PublicAttribute) -> Self {
+        PublicAttributeResponse {
+            code: item.code,
+            name: item.name,
+            unit: item.unit,
+            value: item.value,
+            label: item.label,
+        }
+    }
 }
 
 /// An attribute of the product, in the language asked.
@@ -578,6 +593,15 @@ struct PageData {
     media: HashMap<Uuid, autoxide_media::api::MediaRef>,
     /// Giá ngay trước giá giảm tạm thời, theo biến thể.
     regular: HashMap<Uuid, crate::api::PriceSnapshot>,
+    alts: AltData,
+    /// Thuộc tính theo biến thể, ở ngôn ngữ của trang.
+    variant_attributes: HashMap<Uuid, Vec<crate::public::PublicAttribute>>,
+}
+
+/// `alt` theo ngôn ngữ của trang sản phẩm.
+struct AltData {
+    overrides: HashMap<Uuid, String>,
+    is_default_locale: bool,
 }
 
 fn product_page(
@@ -652,21 +676,33 @@ fn product_page(
                     preorder_available_on: row.preorder_available_on,
                     preorder_message: messages.get(locale).cloned(),
                     image_media_id: row.image_media_id,
+                    attributes: data
+                        .variant_attributes
+                        .get(&row.id)
+                        .into_iter()
+                        .flatten()
+                        .cloned()
+                        .map(PublicAttributeResponse::from)
+                        .collect(),
                 }
             })
             .collect(),
-        images: product.media.iter().filter_map(|row| image(row, media)).collect(),
-        attributes: product
-            .attributes
-            .into_iter()
-            .map(|item| PublicAttributeResponse {
-                code: item.code,
-                name: item.name,
-                unit: item.unit,
-                value: item.value,
-                label: item.label,
+        images: product
+            .media
+            .iter()
+            .filter_map(|row| {
+                let mut found = image(row, media)?;
+                let media_alt = media.get(&row.media_id).map_or("", |item| item.alt.as_str());
+                found.alt = crate::media_alts::public_alt(
+                    row,
+                    &data.alts.overrides,
+                    data.alts.is_default_locale,
+                    media_alt,
+                );
+                Some(found)
             })
             .collect(),
+        attributes: product.attributes.into_iter().map(PublicAttributeResponse::from).collect(),
         categories: product
             .categories
             .into_iter()
@@ -731,13 +767,22 @@ async fn get_public_product(
     let locale = service.locale(&query.locale)?;
     let product = service.public_product(&tenant, &site, &locale, &slug).await?;
     let ids: Vec<Uuid> = product.media.iter().map(|row| row.media_id).collect();
-    let media = service.public_media(&tenant, &ids).await?;
+    // `alt` theo ngôn ngữ của trang (D-202): media theo ngôn ngữ, bản ghi đè của sản phẩm.
+    let media = service.public_media_in(&tenant, &ids, &locale).await?;
+    let alts = AltData {
+        overrides: service.media_alts_in(&tenant, product.card.product.id, &locale).await?,
+        is_default_locale: product.card.product.default_locale == locale,
+    };
     let mut rows =
         cards(&service, &tenant, &site, &locale, std::slice::from_ref(&product.card)).await?;
     let pricing = autoxide_kernel::tenancy::OrgId::from_uuid(product.card.entry.org_id);
     let regular = service.regular_prices(&tenant, pricing, &product.prices).await?;
     let card = rows.pop().ok_or_else(|| crate::errors::product_slug_not_found(&slug))?;
-    let page = product_page(&service, product, card, &PageData { media, regular }, &locale);
+    let variant_ids: Vec<Uuid> = product.variants.iter().map(|row| row.id).collect();
+    let variant_attributes =
+        service.public_variant_attributes(&tenant, &variant_ids, &locale).await?;
+    let data = PageData { media, regular, alts, variant_attributes };
+    let page = product_page(&service, product, card, &data, &locale);
     cached(&tenant, Data { data: page })
 }
 

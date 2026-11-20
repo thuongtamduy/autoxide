@@ -224,6 +224,36 @@ phẩm đã nói. Kết quả là **bản nháp**: sản phẩm không đổi g�
 dung ở ngôn ngữ đó (giữ tên và đường dẫn) và đánh dấu sản phẩm `ai_assisted`; `POST
 /suggestions/{id}/discard` bỏ nó. Tool MCP: `catalog.suggest_copy`.
 
+## Hỏi đáp sản phẩm, menu và module khác
+
+Sản phẩm và danh mục nằm trong sổ đối tượng của kernel, nên module khác trỏ tới được mà không đọc
+bảng của catalog:
+
+- `catalog.product`: công khai khi đang bán (`active`) và có nội dung ở ngôn ngữ hỏi; tiêu đề, mô tả
+  ngắn, đường dẫn `/<tiền tố>/<slug>` và ảnh đầu tiên. Hỏi đáp sản phẩm dùng module `comments` với loại
+  đích này. Cấu hình gợi ý: `AUTOXIDE_COMMENTS_TARGET_TYPES` gồm `catalog.product`,
+  `AUTOXIDE_COMMENTS_VERIFIED_ONLY_TYPES=catalog.product` (chỉ tài khoản đã xác thực, Nghị định
+  147/2024 — cần đối chiếu phạm vi với văn bản gốc) và
+  `AUTOXIDE_COMMENTS_MODERATION_BY_TYPE=catalog.product:user=pre` (câu hỏi chờ duyệt). Lưu trữ hay xoá
+  sản phẩm thì hỏi đáp của nó bị đóng và ẩn. Tác giả quản lý được sản phẩm (`catalog.products.write` ở
+  nút của nó) có nhãn `seller`; module `orders` thêm nhãn `verified_buyer`.
+- `catalog.category`: cho menu của website (module `menus`) — tên và đường dẫn (`/categories/<slug>`)
+  theo ngôn ngữ, danh mục con theo thứ tự hiển thị, chỉ danh mục đang hiện. Khối "Bán chạy" trong menu
+  là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`.
+
+Chữ mô tả ảnh theo ngôn ngữ: `PUT /products/{id}/media/{media_id}/alts/{locale}` `{"alt": "…"}` (kèm
+`If-Match`; `DELETE` để bỏ). Trang sản phẩm ở ngôn ngữ đó hiện chữ này; không có thì `alt` của sản phẩm ở
+ngôn ngữ mặc định, rồi tới chữ của thư viện media ở ngôn ngữ đó. Bỏ ảnh khỏi sản phẩm thì chữ của nó cũng
+bị bỏ.
+
+## Thông tin khác nhau giữa các biến thể
+
+`PUT /variants/{id}/attributes` đặt giá trị thuộc tính cho một biến thể — dùng cho mấy người, trong hộp có
+gì, cách chăm sóc, dùng được máy rửa bát — bằng bộ thuộc tính của khách (`POST /attributes`), nên không
+viết cứng cho ngành nào. Giá trị chữ có thể kèm bản dịch: `{"attribute_id": …, "value": "Rửa tay",
+"texts": {"en": "Hand wash"}}`. Trang sản phẩm công khai liệt kê chúng dưới từng biến thể
+(`variants[].attributes`) ở ngôn ngữ hỏi.
+
 ## Cấu hình
 
 | Biến | Mặc định | Ý nghĩa |
