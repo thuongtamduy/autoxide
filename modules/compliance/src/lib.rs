@@ -38,6 +38,7 @@ mod permissions;
 mod privacy;
 mod provider;
 mod service;
+mod sign_in_codes;
 mod subject_requests;
 mod tools;
 mod tools_cases;
@@ -54,6 +55,8 @@ mod tests_cases;
 mod tests_moit;
 #[cfg(test)]
 mod tests_privacy;
+#[cfg(test)]
+mod tests_sign_in_codes;
 #[cfg(test)]
 mod tests_tracking;
 #[cfg(test)]
@@ -236,6 +239,10 @@ impl Module for ComplianceModule {
         });
         self.service = Some(service.clone());
         context.personal_data(Arc::new(privacy::CompliancePersonalData(service.clone())))?;
+        // Mã đăng nhập bằng số cho `auth` (đăng ký trước): không có `auth` (chương trình rút gọn) thì bỏ qua.
+        if let Ok(extensions) = context.require::<dyn autoxide_auth::api::AuthExtensions>() {
+            extensions.set_phone_codes(Arc::new(sign_in_codes::SignInCodes(service.clone())))?;
+        }
         let provider = Arc::new(provider::Provider(service));
         context.provide::<dyn api::KycGate>(provider.clone())?;
         context.provide::<dyn api::AcceptanceGate>(provider.clone())?;

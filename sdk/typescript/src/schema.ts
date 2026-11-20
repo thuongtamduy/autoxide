@@ -10576,6 +10576,17 @@ export type Data_PersonalDataResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_PhoneCodeResponse = {
+  /** A sign-in code was sent. */
+  data: {
+    /** Send this with the code to `POST /api/v1/auth/phone/login`. */
+    challenge_id: string;
+    /** The code stops working at this time. */
+    expires_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_Pin = {
   /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
   data: {
@@ -25141,6 +25152,33 @@ export type PersonalDataResponse = Record<string, unknown> & {
   auth: Record<string, unknown>;
 };
 
+/** A phone number to send a sign-in code to. */
+export type PhoneCodeRequest = {
+  /** Mobile number, e.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
+/** A sign-in code was sent. */
+export type PhoneCodeResponse = {
+  /** Send this with the code to `POST /api/v1/auth/phone/login`. */
+  challenge_id: string;
+  /** The code stops working at this time. */
+  expires_at: string;
+};
+
+/** A sign-in code to check. */
+export type PhoneLoginRequest = {
+  /** The `challenge_id` from `POST /api/v1/auth/phone/codes`. */
+  challenge_id: string;
+  /** The 6-digit code from the SMS. */
+  code: string;
+  /**
+   * Display name when this creates a new account (1 to 100 characters); otherwise ignored. Without
+   * it the account is named after the masked number.
+   */
+  name?: string | null;
+};
+
 /** A shortcut the signed-in user pinned: a screen of the navigation or a record. */
 export type Pin = {
   created_at: string;
@@ -27397,13 +27435,17 @@ export type ReasonView = {
 /** Proof that you are the account owner, for one sensitive change. */
 export type ReauthRequest = {
   /** How you prove it is you. */
-  method: "password" | "totp" | "passkey" | "email_link";
+  method: "password" | "totp" | "passkey" | "email_link" | "phone_code";
   /** With `passkey`. */
   passkey_ceremony_id?: string | null;
   /** With `passkey`: the browser's `AuthenticationResponseJSON`. */
   passkey_credential?: Record<string, unknown> | null;
   /** With `password`. */
   password?: string | null;
+  /** With `phone_code`. */
+  phone_challenge_id?: string | null;
+  /** With `phone_code`: the 6-digit code from the SMS. */
+  phone_code?: string | null;
   /** With `totp`. */
   totp_code?: string | null;
 };
@@ -32755,6 +32797,37 @@ export interface paths {
         200: Data_Vec_PermissionResponse;
         401: Problem;
         403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/phone/codes": {
+    /** Send a sign-in code to a phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: PhoneCodeRequest;
+      responses: {
+        202: Data_PhoneCodeResponse;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/phone/login": {
+    /** Sign in, or create a buyer account, with a code sent by SMS. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: PhoneLoginRequest;
+      responses: {
+        200: Data_TokenResponse;
+        201: Data_TokenResponse;
+        202: Data_MfaChallengeResponse;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

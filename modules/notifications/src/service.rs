@@ -250,7 +250,9 @@ impl NotificationsService {
                 let (email, locale) = match &self.users {
                     Some(users) => {
                         let user = users.find(tenant, *id).await?.ok_or_else(recipient_unknown)?;
-                        let email = user.is_active().then(|| user.email.clone());
+                        // Tài khoản chỉ có số điện thoại (`auth`, bước 47) có email rỗng: không có hộp mail.
+                        let email = (user.is_active() && !user.email.is_empty())
+                            .then(|| user.email.clone());
                         (email, user.locale.clone())
                     }
                     None => (None, None),

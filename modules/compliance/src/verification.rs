@@ -29,14 +29,14 @@ use crate::events;
 use crate::service::{ComplianceService, now};
 
 /// Nhãn dẫn pepper của mã một lần từ khoá gốc (`SecretKey::derive_for`).
-const OTP_PURPOSE: &str = "compliance.otp";
+pub(crate) const OTP_PURPOSE: &str = "compliance.otp";
 /// Mã nước mặc định khi người dùng gõ số bắt đầu bằng `0`.
 const DEFAULT_COUNTRY: &str = "84";
 /// Chờ nhà cung cấp SMS tối đa chừng này.
-const SMS_TIMEOUT: Duration = Duration::from_secs(10);
+pub(crate) const SMS_TIMEOUT: Duration = Duration::from_secs(10);
 /// Mã đã hết hạn / đã dùng giữ lại chừng này rồi job hằng ngày xoá.
 pub(crate) const CHALLENGE_KEEP_HOURS: i64 = 24;
-const HOUR: Duration = Duration::from_secs(3_600);
+pub(crate) const HOUR: Duration = Duration::from_secs(3_600);
 const DAY: Duration = Duration::from_secs(86_400);
 
 /// Trạng thái xác thực của một tài khoản.
@@ -57,7 +57,7 @@ pub(crate) fn verification_required(level: VerificationLevel) -> Error {
     .with_param("level", level.as_str())
 }
 
-fn otp_invalid() -> Error {
+pub(crate) fn otp_invalid() -> Error {
     Error::new(
         ErrorKind::Validation,
         "compliance.otp_invalid",
@@ -65,7 +65,7 @@ fn otp_invalid() -> Error {
     )
 }
 
-fn otp_attempts_exceeded() -> Error {
+pub(crate) fn otp_attempts_exceeded() -> Error {
     Error::too_many_requests(
         "compliance.otp_attempts_exceeded",
         "Too many wrong codes; ask for a new code.",
@@ -80,21 +80,21 @@ fn phone_not_allowed() -> Error {
     )
 }
 
-fn phone_in_use() -> Error {
+pub(crate) fn phone_in_use() -> Error {
     Error::conflict(
         "compliance.phone_in_use",
         "This phone number is already verified for another account.",
     )
 }
 
-fn challenge_not_found() -> Error {
+pub(crate) fn challenge_not_found() -> Error {
     Error::not_found(
         "compliance.challenge_not_found",
         "There is no such phone verification for your account.",
     )
 }
 
-fn otp_throttled(retry_after: u64) -> Error {
+pub(crate) fn otp_throttled(retry_after: u64) -> Error {
     Error::too_many_requests(
         "compliance.otp_throttled",
         "Too many codes were asked for. Wait {seconds} seconds, then try again.",
@@ -105,18 +105,18 @@ fn otp_throttled(retry_after: u64) -> Error {
 
 /// Băm `code` của mã `id` bằng pepper của khách. Mã 6 số chỉ có một triệu khả năng: không có pepper
 /// thì ai đọc được bảng sẽ thử hết trong tích tắc.
-fn code_hash(pepper: &[u8; 32], id: Uuid, code: &str) -> String {
+pub(crate) fn code_hash(pepper: &[u8; 32], id: Uuid, code: &str) -> String {
     let pepper: String = pepper.iter().map(|byte| format!("{byte:02x}")).collect();
     sha256(&format!("{pepper}|{id}|{code}"))
 }
 
 /// So hai chuỗi trong thời gian không phụ thuộc chỗ khác nhau đầu tiên.
-fn same(a: &str, b: &str) -> bool {
+pub(crate) fn same(a: &str, b: &str) -> bool {
     a.len() == b.len() && a.bytes().zip(b.bytes()).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 /// Mã 6 chữ số ngẫu nhiên đều (loại bỏ phần dư để không lệch về số nhỏ).
-fn random_code() -> Result<String, Error> {
+pub(crate) fn random_code() -> Result<String, Error> {
     // 4_294_000_000 là bội lớn nhất của 1_000_000 không vượt `u32::MAX`.
     const LIMIT: u32 = 4_294_000_000;
     loop {
@@ -227,7 +227,10 @@ impl ComplianceService {
 
     /// Số tài khoản tối đa dùng chung một số đã xác thực (chính sách `posting.max_accounts_per_phone`,
     /// mặc định 1).
-    async fn max_accounts_per_phone(&self, tenant: &TenantContext) -> Result<u64, Error> {
+    pub(crate) async fn max_accounts_per_phone(
+        &self,
+        tenant: &TenantContext,
+    ) -> Result<u64, Error> {
         Ok(self
             .policy(tenant, "posting.max_accounts_per_phone")
             .await?
@@ -237,7 +240,7 @@ impl ComplianceService {
     }
 
     /// Số tài khoản KHÁC `user_id` đã xác thực số có khoá `phone_key`.
-    async fn others_with_phone<C: sea_orm::ConnectionTrait>(
+    pub(crate) async fn others_with_phone<C: sea_orm::ConnectionTrait>(
         connection: &C,
         tenant: &TenantContext,
         phone_key: &str,
@@ -253,7 +256,11 @@ impl ComplianceService {
     }
 
     /// Chuẩn hoá và kiểm số `raw` theo quy tắc `posting.phone_countries` đang hiệu lực.
-    async fn allowed_phone(&self, tenant: &TenantContext, raw: &str) -> Result<PhoneNumber, Error> {
+    pub(crate) async fn allowed_phone(
+        &self,
+        tenant: &TenantContext,
+        raw: &str,
+    ) -> Result<PhoneNumber, Error> {
         let Some(phone) = PhoneNumber::parse(raw, DEFAULT_COUNTRY) else {
             return Err(Error::validation(vec![FieldError::new(
                 "phone",

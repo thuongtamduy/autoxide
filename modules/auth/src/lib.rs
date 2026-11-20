@@ -37,6 +37,9 @@ mod org_tests;
 mod passkey;
 mod password;
 mod permissions;
+mod phone;
+#[cfg(test)]
+mod phone_tests;
 mod privacy;
 mod reauth;
 mod recovery;
@@ -346,10 +349,19 @@ impl Module for AuthModule {
             passkeys: passkeys.clone(),
             mfa: mfa.clone(),
         }))?;
+        // Đăng nhập bằng số: `compliance` (đăng ký sau) cắm bộ mã qua `AuthExtensions`.
+        let phone = Arc::new(phone::PhoneSignIn::new(
+            sessions.clone(),
+            secrets.as_ref().clone(),
+            outbox.clone(),
+            context.require::<dyn autoxide_organizations::api::OrgDirectory>().ok(),
+        ));
+        context.provide::<dyn api::AuthExtensions>(phone.clone())?;
         let reauth = Arc::new(reauth::Reauthentication {
             sessions: sessions.clone(),
             mfa: mfa.clone(),
             passkeys: passkeys.clone(),
+            phone: phone.clone(),
             mailer: mailer.clone(),
             translations: context.translations().clone(),
             ttl: chrono::Duration::from_std(config.reauth_ttl)
@@ -401,6 +413,7 @@ impl Module for AuthModule {
         context.provide::<dyn api::Invitations>(invitations.clone())?;
         self.invitations = Some(invitations.clone());
         self.state = Some(http::HttpState {
+            phone,
             oidc,
             support,
             invitations,
@@ -597,6 +610,7 @@ pub(crate) mod testing {
         pub verifications: Arc<crate::verify::EmailVerifications>,
         pub passkeys: Arc<crate::passkey::PasskeyService>,
         pub reauth: Arc<crate::reauth::Reauthentication>,
+        pub phone: Arc<crate::phone::PhoneSignIn>,
         pub mails: Arc<FakeMailer>,
         pub database: Database,
         /// Khách mặc định trên database của test.
@@ -712,16 +726,24 @@ pub(crate) mod testing {
                 }),
             )
             .unwrap();
+        let phone = Arc::new(crate::phone::PhoneSignIn::new(
+            sessions.clone(),
+            autoxide_kernel::secret::SecretKey::new(database.clone(), None),
+            autoxide_kernel::event::Outbox::standalone("auth"),
+            None,
+        ));
         let reauth = Arc::new(crate::reauth::Reauthentication {
             sessions: sessions.clone(),
             mfa: mfa.clone(),
             passkeys: passkeys.clone(),
+            phone: phone.clone(),
             mailer: mails.clone(),
             translations: translations.clone(),
             ttl: chrono::Duration::minutes(10),
         });
         Services {
             reauth,
+            phone,
             personal_data,
             passkeys,
             users,

@@ -87,6 +87,7 @@ fn rows(tenant_id: Uuid, count: u64, hash: &str, now: DateTime<Utc>) -> Vec<enti
                 locale: Set(None),
                 time_zone: Set(None),
                 realm: Set(entity::realm_str(autoxide_kernel::access::Realm::Staff).to_owned()),
+                phone_key: Set(None),
             }
         })
         .collect()

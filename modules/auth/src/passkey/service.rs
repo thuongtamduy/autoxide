@@ -106,7 +106,10 @@ impl PasskeyService {
             .map(|row| row.user_handle.clone())
             .unwrap_or_else(Engine::new_user_handle);
         let ids: Vec<Vec<u8>> = existing.into_iter().map(|row| row.credential_id).collect();
-        let started = engine.start_registration(&handle, &user.email, &user.name, &ids).map_err(
+        // Tài khoản chỉ có số điện thoại (bước 47): không có email, tên đăng nhập của passkey là tên
+        // hiển thị.
+        let login = if user.email.is_empty() { user.name.as_str() } else { user.email.as_str() };
+        let started = engine.start_registration(&handle, login, &user.name, &ids).map_err(
             |Rejected(reason)| Error::internal(format!("passkey registration: {reason}")),
         )?;
         self.save_ceremony(tenant, Some(user_id), started.state, started.options).await

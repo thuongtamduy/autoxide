@@ -31,6 +31,9 @@ pub struct Model {
     pub time_zone: Option<String>,
     /// `staff` hay `customer` (D-309).
     pub realm: String,
+    /// HMAC của số điện thoại dùng để đăng nhập (`SecretKey::phone_key`); `None`: không đăng nhập bằng
+    /// số. Tài khoản chỉ có số thì `email` là `''` (bước 47).
+    pub phone_key: Option<String>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -712,8 +712,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       `grant_voucher`, gọi lại không cấp thêm — D-20261120-step47-loyalty, D-20261120-step47-engagement
 - [x] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
       ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ — D-20261120-step47-wishlist-alerts
-- [ ] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
-      passkey (gửi SMS qua đối tác, không giữ secret trong code)
+- [x] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
+      passkey (gửi SMS qua đối tác, không giữ secret trong code) — D-20261120-phone-accounts
 
 ## 48. Bán đa kênh (`channels`)
 
@@ -924,8 +924,9 @@ công khai bị đổi, hay tách phần ít đổi của kernel thành crate ri
 
 Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi quyết định riêng.
 
-- [ ] Đăng nhập / tạo tài khoản bằng số điện thoại + OTP (tài khoản không bắt buộc email — thay đổi phá vỡ của
-      `auth`, cần quyết định) — làm cùng bước 47 (chuyển từ bước 45)
+- [x] Đăng nhập / tạo tài khoản bằng số điện thoại + OTP (tài khoản không bắt buộc email — thay đổi phá vỡ của
+      `auth`, cần quyết định) — làm cùng bước 47 (chuyển từ bước 45) — D-20261120-phone-accounts (không phá vỡ:
+      `email = ""`)
 - [ ] Nối nhà cung cấp thật đầu tiên cho luồng bán chính: thanh toán, SMS, vận chuyển, hoá đơn điện tử (mỗi loại một
       đối tác; chủ dự án chọn đối tác và cấp tài khoản thử) — hiện mọi nhà cung cấp chỉ có bộ giả
 - [ ] Ghép lô chạy thêm test Postgres cho crate bị sửa (lỗi đồng thời của #246 và luồng sự kiện chỉ lộ trên Postgres

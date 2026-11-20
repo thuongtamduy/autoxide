@@ -25,6 +25,22 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 
 Khi máy chủ bật (`AUTOXIDE_AUTH_LOGIN_LINK=true`), `POST /api/v1/auth/login/link` với `{"email": …}` gửi một link đăng nhập dùng một lần (sống `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`, mặc định 15 phút). Endpoint luôn trả 202 như nhau dù email có tài khoản hay không. Hoàn tất bằng `POST /api/v1/auth/login/link/confirm` với `token` trong mail; kết quả như `/login` (token, hay `mfa_token` khi bật xác thực hai bước). Gửi `"bind_device": true` để nhận `device_secret` rồi gửi lại nó cùng token: link khi đó chỉ dùng được trên thiết bị này.
 
+## Người mua: đăng nhập bằng số điện thoại
+
+Người mua đăng nhập, hay tạo tài khoản, bằng mã gửi qua SMS. Máy chủ cần có nhà cung cấp SMS; không có
+thì các endpoint này trả 503 `auth.phone_sign_in_unavailable`.
+
+1. `POST /api/v1/auth/phone/codes` với `{"phone": "0912345678"}` trả 202 kèm `challenge_id`. Câu trả
+   lời giống nhau dù số đã có tài khoản hay chưa.
+2. `POST /api/v1/auth/phone/login` với `{"challenge_id": "…", "code": "123456", "name": "Lan"}`. Số đã
+   có tài khoản người mua thì đăng nhập vào đó (200). Số mới thì tạo tài khoản người mua không email,
+   không mật khẩu (201) khi cửa hàng cho người mua tự tạo tài khoản; `name` chỉ dùng lúc đó. Cả hai trả
+   cùng token như `/login`, hoặc 202 khi tài khoản bật đăng nhập hai bước.
+
+Tài khoản như vậy có `email` là `""` cho tới khi người mua thêm email. Để xác nhận một thay đổi nhạy cảm
+(`POST /api/v1/auth/me/reauth`), dùng `"method": "phone_code"` với `phone_challenge_id` và `phone_code`
+mới gửi tới chính số của mình; sau đó thêm được passkey và đăng nhập bằng passkey.
+
 ## Làm mới trước khi access token hết hạn
 
 `expires_in` cho biết access token sống bao nhiêu giây. Trước lúc đó một chút, đổi refresh token lấy cặp mới. Mỗi refresh token chỉ dùng được **một lần**: giữ lại cái mới.
