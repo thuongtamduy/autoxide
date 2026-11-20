@@ -22,4 +22,7 @@ pub(crate) mod stored_value_entry;
 pub(crate) mod stored_value_hold;
 pub(crate) mod tier;
 pub(crate) mod voucher_program;
+pub(crate) mod wishlist_alert_batch;
+pub(crate) mod wishlist_alert_queue;
+pub(crate) mod wishlist_alert_setting;
 pub(crate) mod wishlist_item;

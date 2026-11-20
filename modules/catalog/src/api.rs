@@ -377,12 +377,36 @@ pub trait Catalog: Send + Sync {
         variant_ids: &[Uuid],
     ) -> Result<Vec<PriceFloor>, Error>;
 
+    /// Giá công khai lúc này (D-233, báo giảm giá cho danh sách yêu thích), ở nút sở hữu sản phẩm
+    /// (bảng giá chung gần nhất trong chuỗi của nó): theo biến thể là giá niêm yết hay giá sau giảm
+    /// tự động nếu thấp hơn; theo sản phẩm là giá thấp nhất của các biến thể đang bán. Không dùng giá gạch, giá theo nhóm khách hay
+    /// mã giảm giá. Không bán / không có giá thì vắng. Mỗi danh sách tối đa [`MAX_IDS`].
+    ///
+    /// Cài đặt mặc định trả rỗng, để bản giả trong test của module khác không phải sửa.
+    async fn display_prices(
+        &self,
+        tenant: &TenantContext,
+        product_ids: &[Uuid],
+        variant_ids: &[Uuid],
+    ) -> Result<DisplayPrices, Error> {
+        let _ = (tenant, product_ids, variant_ids);
+        Ok(DisplayPrices::default())
+    }
+
     /// Thành phần của các biến thể combo (biến thể không phải combo thì vắng).
     async fn bundle_components(
         &self,
         tenant: &TenantContext,
         variant_ids: &[Uuid],
     ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error>;
+}
+
+/// Giá công khai (D-233) theo sản phẩm và theo biến thể, xem [`Catalog::display_prices`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct DisplayPrices {
+    pub products: HashMap<Uuid, Money>,
+    pub variants: HashMap<Uuid, Money>,
 }
 
 /// Giá sau giảm tự động của một biến thể (từ khuyến mại không cần mã, không điều kiện giỏ).

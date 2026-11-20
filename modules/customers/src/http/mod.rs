@@ -9,6 +9,7 @@ mod me;
 mod staff;
 mod stored_value;
 pub(crate) mod views;
+mod wishlist_alerts;
 
 use std::sync::Arc;
 
@@ -41,6 +42,7 @@ pub(crate) fn routes(service: Arc<CustomersService>) -> OpenApiRouter {
         .routes(routes!(loyalty::redeem_voucher))
         .routes(routes!(engagement::list_wishlist, engagement::add_wishlist))
         .routes(routes!(engagement::merge_wishlist))
+        .routes(routes!(wishlist_alerts::get_wishlist_alerts, wishlist_alerts::set_wishlist_alerts))
         .routes(routes!(engagement::remove_wishlist))
         .routes(routes!(engagement::list_views, engagement::record_view))
         .routes(routes!(engagement::my_referral))

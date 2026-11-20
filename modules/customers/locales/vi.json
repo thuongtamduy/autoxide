@@ -82,5 +82,13 @@
   "customers.lookup_throttled": "Nhập sai mã thẻ quà tặng quá nhiều lần. Chờ {seconds} giây rồi thử lại.",
   "customers.stored_value_disabled": "Thẻ quà tặng và số dư cửa hàng chưa được bật cho cửa hàng này.",
   "customers.stored_value_need_account": "Đăng nhập để trả bằng thẻ quà tặng hoặc số dư cửa hàng.",
-  "text:Issue, look up and void gift cards and change customers' store credit (only when gift cards or store credit are turned on).": "Phát hành, tra và huỷ thẻ quà tặng, đổi số dư cửa hàng của khách (chỉ khi đã bật thẻ quà tặng hay số dư cửa hàng)."
+  "text:Issue, look up and void gift cards and change customers' store credit (only when gift cards or store credit are turned on).": "Phát hành, tra và huỷ thẻ quà tặng, đổi số dư cửa hàng của khách (chỉ khi đã bật thẻ quà tặng hay số dư cửa hàng).",
+  "customers.wishlist_alert_consent_required": "Bật báo yêu thích cần đồng ý của người mua: gửi `consent_text` và `consent_version` đúng như đã cho họ xem.",
+  "customers.wishlist_alert_unavailable": "Cửa hàng này không gửi được loại báo yêu thích này.",
+  "text:A wishlist alert (back in stock or cheaper) was sent to a consenting buyer.": "Đã gửi báo yêu thích (có hàng lại hay giảm giá) cho người mua có đồng ý.",
+  "customers.wishlist_alert.title": "Tin vui về danh sách yêu thích của bạn",
+  "customers.wishlist_alert.body": "{count} sản phẩm trong danh sách yêu thích của bạn đã có hàng lại hoặc đang rẻ hơn.",
+  "customers.wishlist_alert.short": "Sản phẩm yêu thích có hàng lại hoặc rẻ hơn",
+  "field:must be at most 2000 characters": "tối đa 2000 ký tự",
+  "field:must be at most 50 characters": "tối đa 50 ký tự"
 }

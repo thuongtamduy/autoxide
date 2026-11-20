@@ -86,3 +86,33 @@ async fn hai_lan_dung_lai_dong_thoi_chi_phat_mot_event() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn doc_gia_cong_khai_theo_san_pham_va_bien_the() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let list = price_list(&app, tree.chain).await;
+        let (product, variant) = on_sale(&app, &list, tree.chain, "D-3", "Bàn", 300_000).await;
+        let (draft, _) = super::create_product(&app, "boss", tree.chain, "D-4", "Ghế").await;
+        let product: uuid::Uuid = product.parse().unwrap();
+        let variant: uuid::Uuid = variant.parse().unwrap();
+        let draft: uuid::Uuid = draft.parse().unwrap();
+        let catalog = app.api::<dyn crate::api::Catalog>().unwrap();
+        let tenant = app.default_tenant();
+        let prices = catalog.display_prices(&tenant, &[product, draft], &[variant]).await.unwrap();
+        assert_eq!(prices.products.get(&product).map(|money| money.minor()), Some(300_000));
+        assert_eq!(prices.variants.get(&variant).map(|money| money.minor()), Some(300_000));
+        // Sản phẩm chưa bán (nháp): vắng.
+        assert!(!prices.products.contains_key(&draft));
+        let body = json!({"reference": "cheaper", "prices": [{"variant_id": variant,
+            "amount": {"amount": "250000", "currency": "VND"}}]});
+        let (status, added) =
+            call(&app, "POST", &format!("/price-lists/{list}/prices"), "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{added}");
+        let prices = catalog.display_prices(&tenant, &[product], &[]).await.unwrap();
+        assert_eq!(prices.products.get(&product).map(|money| money.minor()), Some(250_000));
+        assert!(prices.variants.is_empty());
+    })
+    .await
+    .unwrap();
+}

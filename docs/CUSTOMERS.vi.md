@@ -84,6 +84,14 @@ của mình không bị che ở `GET /api/v1/customers/me`.
   sau khi đăng nhập, gửi danh sách lưu ở trình duyệt tới `POST /me/wishlist/merge`; dòng trùng được bỏ qua.
 - **Vừa xem** (`/me/recently-viewed`): chỉ người đã đăng nhập (vãng lai lưu ở trình duyệt), mới nhất trước,
   dòng cũ được xoá mỗi ngày.
+- **Báo yêu thích** (`GET`/`PUT /me/wishlist/alerts`): tắt cho tới khi người mua tự bật, kèm đồng ý
+  của họ (`consent_text`, `consent_version`, ghi trong sổ đồng ý với mục đích
+  `customers.wishlist_alerts`). Hai loại: có hàng lại (cần `inventory`; bỏ qua sản phẩm người mua đã
+  đăng ký báo ở `inventory`) và giảm giá: thấp hơn ít nhất `AUTOXIDE_CUSTOMERS_WISHLIST_PRICE_DROP_MIN_BP`
+  (mặc định 5%) so với giá lúc thêm vào yêu thích, không bao giờ so với giá gạch; sau khi báo, giá đã báo
+  thành mốc mới. Báo được gom mỗi giờ, chỉ trong khung giờ quảng cáo: một tin tối đa 10 sản phẩm, tối đa
+  `AUTOXIDE_CUSTOMERS_WISHLIST_ALERTS_PER_DAY` tin mỗi ngày (mặc định 1), mỗi sản phẩm mỗi loại tối đa một
+  lần trong 7 ngày. Rút đồng ý thì dừng ngay.
 - **Nhắc giỏ bỏ dở** (`POST /reminder-rules`, `customers.engagement.manage`): nhắc giỏ là tin quảng cáo. Chỉ
   gửi cho người mua đã đồng ý nhận tin quảng cáo (sổ đồng ý của `compliance`), kiểm lại đồng ý ngay trước khi
   gửi, dừng khi người mua đặt đơn hay rút đồng ý. `notifications` áp khung giờ và link huỷ nhận.

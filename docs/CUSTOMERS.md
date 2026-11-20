@@ -89,6 +89,15 @@ The buyer sees their own profile unmasked at `GET /api/v1/customers/me`.
   are skipped.
 - **Recently viewed** (`/me/recently-viewed`): signed-in buyers only (guests keep it in the browser),
   newest first, old entries removed every day.
+- **Wishlist alerts** (`GET`/`PUT /me/wishlist/alerts`): off until the buyer turns them on, with
+  their consent (`consent_text`, `consent_version`, kept in the consent register under the purpose
+  `customers.wishlist_alerts`). Two kinds: back in stock (needs `inventory`; skipped for products
+  the buyer already asked `inventory` about) and price drop: at least
+  `AUTOXIDE_CUSTOMERS_WISHLIST_PRICE_DROP_MIN_BP` (default 5%) below the price when the product was
+  added, never against a crossed-out price; after an alert the alerted price is the new reference.
+  Alerts are batched every hour, only in the allowed advertising hours: one message with up to 10
+  products, at most `AUTOXIDE_CUSTOMERS_WISHLIST_ALERTS_PER_DAY` messages a day (default 1), each
+  product at most once every 7 days for each kind. Withdrawing the consent stops them at once.
 - **Abandoned cart reminders** (`POST /reminder-rules`, `customers.engagement.manage`): reminders are
   advertising. They go only to buyers who consented to marketing messages (consent register of
   `compliance`), consent is checked again right before sending, and they stop when the buyer orders

@@ -710,8 +710,8 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
       giới thiệu bạn bè có thưởng — D-20261120-step47-engagement
 - [x] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
       `grant_voucher`, gọi lại không cấp thêm — D-20261120-step47-loyalty, D-20261120-step47-engagement
-- [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
-      ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
+- [x] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
+      ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ — D-20261120-step47-wishlist-alerts
 - [x] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
       passkey (gửi SMS qua đối tác, không giữ secret trong code) — D-20261120-phone-accounts
 

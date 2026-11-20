@@ -806,7 +806,9 @@ name = "autoxide-customers"
 version = "0.15.0"
 dependencies = [
  "async-trait",
+ "autoxide-catalog",
  "autoxide-compliance",
+ "autoxide-inventory",
  "autoxide-kernel",
  "autoxide-ledger",
  "autoxide-notifications",

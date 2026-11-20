@@ -15588,6 +15588,22 @@ export type Data_VoucherReward = {
 };
 
 /** Envelope of a single result. */
+export type Data_WishlistAlerts = {
+  /** Your wishlist alert settings. */
+  data: {
+    /** Hear when a wishlist product is back in stock. */
+    back_in_stock: boolean;
+    /** Whether this shop can send back-in-stock alerts at all. */
+    back_in_stock_available: boolean;
+    /**
+     * Hear when a wishlist product is really cheaper (at least the shop's minimum drop since you
+     * added it, never against a crossed-out price).
+     */
+    price_drop: boolean;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_WithholdingQuote = {
   /** Taxes to withhold. */
   data: {
@@ -28552,6 +28568,19 @@ export type SetVoucherRewardRequest = {
   active: boolean;
 };
 
+/**
+ * Turn wishlist alerts on or off. Turning any on needs your consent: send the consent text and its
+ * version exactly as shown to you. Turning both off withdraws the consent.
+ */
+export type SetWishlistAlertsRequest = {
+  back_in_stock: boolean;
+  /** The consent sentence shown to the buyer (up to 2000 characters); required to turn on. */
+  consent_text?: string | null;
+  /** Version of that sentence (up to 50 characters); required to turn on. */
+  consent_version?: string | null;
+  price_drop: boolean;
+};
+
 /** A setting that units can set and the units below them inherit. */
 export type SettingResponse = {
   /** The value when no unit sets it; `null`: none. */
@@ -31452,6 +31481,19 @@ export type VoucherReward = {
   points_cost?: number | null;
   /** The voucher promotion of the promotions module. */
   promotion_id: string;
+};
+
+/** Your wishlist alert settings. */
+export type WishlistAlerts = {
+  /** Hear when a wishlist product is back in stock. */
+  back_in_stock: boolean;
+  /** Whether this shop can send back-in-stock alerts at all. */
+  back_in_stock_available: boolean;
+  /**
+   * Hear when a wishlist product is really cheaper (at least the shop's minimum drop since you
+   * added it, never against a crossed-out price).
+   */
+  price_drop: boolean;
 };
 
 /** A wishlist item. */
@@ -38627,6 +38669,30 @@ export interface paths {
       requestBody: WishlistItemInput;
       responses: {
         200: Data_Vec_WishlistItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/wishlist/alerts": {
+    /** Get your wishlist alert settings. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_WishlistAlerts;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Turn wishlist alerts on or off. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: SetWishlistAlertsRequest;
+      responses: {
+        200: Data_WishlistAlerts;
         401: Problem;
         403: Problem;
         422: Problem;
