@@ -24,5 +24,16 @@ Quyết định:
 khó đảm bảo cùng kết quả; arm64 cần máy arm riêng đã có nhưng thêm bước); `cache-to: type=registry` (không bị trần 10 GB của
 cache Actions nhưng cần quyền ghi thẻ cache vào ghcr).
 
+Số đo (chạy tay `Release image (existing tag)` với tag v0.14.0 hai lần liên tiếp, nhánh của PR, runner GitHub):
+
+| Bước `build-push-action` | Lần 1 (cache nguội) | Lần 2 (trúng cache) |
+| --- | --- | --- |
+| linux/amd64 | 12 phút 16 giây | 4 phút 46 giây (−61%) |
+| linux/arm64 | 9 phút 21 giây | 4 phút 48 giây (−49%) |
+| Cả workflow | 13 phút 46 giây | 5 phút 52 giây |
+
+Còn lại ~4,8 phút ở lần 2 là build các crate của workspace (bản release, kernel và 35 module); tách tiếp phải tách kernel
+(D-20261120-build-faster).
+
 Hệ quả: lớp thư viện (~1–2 GB mỗi kiến trúc) chiếm chỗ trong 10 GB cache Actions của repo, đẩy bớt cache của `rust-cache`.
 Đổi `Cargo.lock` (thư viện) thì lớp thư viện build lại một lần. Số đo ở mô tả PR.
