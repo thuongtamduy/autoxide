@@ -57,6 +57,8 @@ event!(ReturnReceived, names::RETURN_RECEIVED);
 event!(ReturnStatusChanged, names::RETURN_STATUS_CHANGED);
 event!(DeliveryAddressChanged, names::DELIVERY_ADDRESS_CHANGED);
 event!(OrdersClaimed, names::ORDERS_CLAIMED);
+event!(InvoiceLinked, names::INVOICE_LINKED);
+event!(PosShiftClosed, names::POS_SHIFT_CLOSED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![

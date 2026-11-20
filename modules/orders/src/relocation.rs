@@ -20,6 +20,9 @@ pub(crate) fn relocation() -> Relocation {
         .follow("orders_returns", "order_id", "orders_orders")
         .follow("orders_pickups", "order_id", "orders_orders")
         .follow("orders_fulfillments", "order_id", "orders_orders")
+        .follow("orders_invoice_links", "order_id", "orders_orders")
+        .by_org(&["orders_pos_shifts"])
+        .follow("orders_pos_sales", "shift_id", "orders_pos_shifts")
         .ephemeral(&[
             "orders_checkouts",
             "orders_lookup_codes",

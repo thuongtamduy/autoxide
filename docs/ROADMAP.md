@@ -615,13 +615,14 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Trả hàng phía người mua (D-201, D-202): cách gửi trả (lấy tận nơi / bưu cục / cửa hàng), thời gian hoàn
       theo phương thức thanh toán; ảnh kèm (lý do bắt buộc ảnh là chính sách theo nút); `returns/preview`
       trả tiền hoàn, cách gửi và phí, thời gian hoàn, hạn — không ghi
-- [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc
+- [x] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền (D-20261120-step45-einvoice-pos); `invoice_timing = on_delivered` mặc
       định (D-215); khoản giảm, hàng khuyến mại trên hoá đơn (D-222, cần đối chiếu NĐ 123/2020 sửa bởi NĐ
       70/2025); mail xác nhận, cập nhật trạng thái qua job theo i18n; chứng từ của người mua
 - [x] Mua không cần tài khoản (D-201, D-202, D-20261120-step45-guest-orders): tra đơn bằng số đơn + OTP; token xem đơn để huỷ, đổi địa chỉ
       (OTP lần hai), mở hỗ trợ ở `support` (D-204), qua cùng service; giới hạn tra / gửi lại OTP / hạn token
       là cấu hình; che số điện thoại, địa chỉ tới cấp phường; gắn đơn vãng lai vào tài khoản đã xác thực số
-- [ ] Bán tại quầy (POS) qua API cho chuỗi: đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ kho của cửa hàng
+- [x] Bán tại quầy (POS) qua API cho chuỗi (D-20261120-step45-einvoice-pos; danh mục đầy đủ và tìm khách ở quầy chờ
+      bước 47): đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ kho của cửa hàng
       đó; đóng ca có chênh lệch: lý do, ghi sổ cái, cần duyệt khi vượt ngưỡng (D-227)
 - [ ] Đánh giá sau mua: chỉ người đã mua, kiểm duyệt không chặn / ẩn trái quy định (Luật 19/2023), lý do ẩn
       theo danh sách (D-223); dùng `comments`, module `reviews` hay đặt ở `orders` — ghi quyết định; lọc có

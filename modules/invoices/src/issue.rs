@@ -739,8 +739,20 @@ impl InvoicesService {
         id: Uuid,
         correction: Correction,
     ) -> Result<Submitted<Document>, Error> {
-        let Correction { relation, direction, buyer, lines, reference } = correction;
         let original = self.document_for(tenant, principal, &CORRECT, id).await?;
+        self.correct_document(tenant, Actor::from(principal), original, correction).await
+    }
+
+    /// Lập nháp sửa sai của chứng từ `original` (đã kiểm quyền ở bên gọi): REST qua [`correct`],
+    /// module khác qua `dyn Invoices::adjust`. Nháp kế thừa cờ `booked_by_source` của chứng từ gốc.
+    pub(crate) async fn correct_document(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        original: document::Model,
+        correction: Correction,
+    ) -> Result<Submitted<Document>, Error> {
+        let Correction { relation, direction, buyer, lines, reference } = correction;
         if !["issued", "submitting", "accepted"].contains(&original.status.as_str()) {
             return Err(Error::conflict(
                 "invoices.not_correctable",
@@ -771,14 +783,9 @@ impl InvoicesService {
         draft.on_behalf_of = original.on_behalf_of_org_id.map(OrgId::from_uuid);
         draft.series = original.series_id;
         draft.prices_include_tax = original.prices_include_tax;
+        draft.booked_by_source = original.booked_by_source;
         let direction = if relation == "replacement" { "increase".to_owned() } else { direction };
-        self.create_inner(
-            tenant,
-            Actor::from(principal),
-            draft,
-            Some((original.id, relation, direction)),
-        )
-        .await
+        self.create_inner(tenant, actor, draft, Some((original.id, relation, direction))).await
     }
 }
 
@@ -786,7 +793,12 @@ impl InvoicesService {
 /// `tax.vat_output` (chứng từ điều chỉnh giảm thì ngược lại), vào sổ của người bán. `None`: chứng từ
 /// không ghi sổ (không phải chứng từ bán hàng, chưa phát hành, tổng 0).
 fn issue_entry(row: &document::Model) -> Result<Option<NewEntry>, Error> {
-    if !is_sales_kind(&row.kind) || row.number.is_none() || row.total_minor <= 0 {
+    // Bên lập (vd `orders`) đã tự ghi doanh thu theo nghiệp vụ của nó: chứng từ không ghi lần hai.
+    if row.booked_by_source
+        || !is_sales_kind(&row.kind)
+        || row.number.is_none()
+        || row.total_minor <= 0
+    {
         return Ok(None);
     }
     let currency = Currency::parse(&row.currency)?;

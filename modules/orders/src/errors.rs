@@ -333,3 +333,61 @@ pub(crate) fn guest_key_reused(key: &str) -> Error {
 pub(crate) fn sms_unavailable() -> Error {
     autoxide_kernel::sms::sms_disabled()
 }
+
+pub(crate) fn invoices_unavailable() -> Error {
+    Error::not_found(
+        "orders.invoices_unavailable",
+        "This server issues no electronic invoices (the `invoices` module is not installed).",
+    )
+}
+
+pub(crate) fn invoice_already_issued() -> Error {
+    Error::conflict(
+        "orders.invoice_already_issued",
+        "The order already has an invoice; ask the shop for an adjustment or a replacement.",
+    )
+}
+
+pub(crate) fn document_not_found() -> Error {
+    Error::not_found("orders.document_not_found", "No such document of this order.")
+}
+
+pub(crate) fn shift_not_found() -> Error {
+    Error::not_found("orders.shift_not_found", "No cash register shift with this id.")
+}
+
+pub(crate) fn shift_already_open(register: &str) -> Error {
+    Error::conflict(
+        "orders.shift_already_open",
+        "Register {register} already has an open shift; close it first.",
+    )
+    .with_param("register", register)
+}
+
+pub(crate) fn shift_not_open() -> Error {
+    Error::conflict("orders.shift_not_open", "The shift is not open (not opened yet, or closed).")
+}
+
+pub(crate) fn shift_not_pending() -> Error {
+    Error::conflict("orders.shift_not_pending", "The shift is not waiting for approval.")
+}
+
+pub(crate) fn shift_approval_self() -> Error {
+    Error::forbidden(
+        "orders.shift_approval_self",
+        "The person who closed the shift cannot approve its cash difference; ask someone else.",
+    )
+}
+
+pub(crate) fn payments_mismatch(
+    paid: autoxide_kernel::money::Money,
+    total: autoxide_kernel::money::Money,
+) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.payments_mismatch",
+        "The payments add up to {paid}, the order total is {total}.",
+    )
+    .with_param("paid", paid.to_string())
+    .with_param("total", total.to_string())
+}

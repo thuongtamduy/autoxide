@@ -112,6 +112,48 @@ pub(crate) const PICKUP_EXPIRED_ACTION: OrgSetting = OrgSetting::new(
     _ => Err("must be `cancel_refund` or `keep_waiting`".to_owned()),
 });
 
+/// Khi nào lập hoá đơn điện tử của đơn (D-215): mặc định khi giao xong — NĐ 123/2020 sửa bởi NĐ
+/// 70/2025, Điều 9 (thời điểm chuyển giao quyền sở hữu; cần đối chiếu văn bản gốc).
+pub(crate) const INVOICE_TIMING: OrgSetting = OrgSetting::new(
+    "orders.invoice_timing",
+    "When the electronic invoice of an order is issued: `on_confirm`, `on_delivered` (default: \
+     when ownership passes to the buyer), `on_complete` or `on_request` (only when the buyer or \
+     staff asks).",
+)
+.with_default("\"on_delivered\"")
+.with_schema(r#"{"type":"string","enum":["on_confirm","on_delivered","on_complete","on_request"]}"#)
+.checked(|value| match value.as_str() {
+    Some("on_confirm" | "on_delivered" | "on_complete" | "on_request") => Ok(value.clone()),
+    _ => Err("must be `on_confirm`, `on_delivered`, `on_complete` or `on_request`".to_owned()),
+});
+
+/// Loại hoá đơn của đơn bán online (theo phương pháp tính thuế của người bán).
+pub(crate) const INVOICE_KIND: OrgSetting = OrgSetting::new(
+    "orders.invoice_kind",
+    "Kind of electronic invoice for orders: `vat_invoice` (sellers using the credit method) or \
+     `sales_invoice` (direct method). Sales at the counter use `cash_register_invoice`.",
+)
+.with_default("\"vat_invoice\"")
+.with_schema(r#"{"type":"string","enum":["vat_invoice","sales_invoice"]}"#)
+.checked(|value| match value.as_str() {
+    Some("vat_invoice" | "sales_invoice") => Ok(value.clone()),
+    _ => Err("must be `vat_invoice` or `sales_invoice`".to_owned()),
+});
+
+/// Chênh lệch tiền két (đơn vị nhỏ nhất, giá trị tuyệt đối) quá mức này thì đóng ca cần người duyệt
+/// (D-227).
+pub(crate) const CASH_VARIANCE_APPROVAL_MINOR: OrgSetting = OrgSetting::new(
+    "orders.cash_variance_approval_minor",
+    "Cash difference at shift close (in minor units, either way) above which a second person \
+     must approve the close (0 to 1000000000000).",
+)
+.with_default("200000")
+.with_schema(r#"{"type":"integer","minimum":0,"maximum":1000000000000}"#)
+.checked(|value| match value.as_i64() {
+    Some(amount) if (0..=1_000_000_000_000).contains(&amount) => Ok(value.clone()),
+    _ => Err("must be a whole number from 0 to 1000000000000".to_owned()),
+});
+
 /// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
 pub(crate) fn is_code(code: &str) -> bool {
     code.len() <= 64
@@ -128,6 +170,9 @@ pub(crate) fn all() -> Vec<OrgSetting> {
         ALLOWED_RETURN_REASONS,
         RETURN_PHOTO_REASONS,
         PICKUP_EXPIRED_ACTION,
+        INVOICE_TIMING,
+        INVOICE_KIND,
+        CASH_VARIANCE_APPROVAL_MINOR,
     ]
 }
 
@@ -161,7 +206,7 @@ impl Policy {
 }
 
 impl OrdersService {
-    async fn setting(
+    pub(crate) async fn setting(
         &self,
         tenant: &TenantContext,
         org: OrgId,

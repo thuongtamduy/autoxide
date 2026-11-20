@@ -5,9 +5,11 @@
 mod carts;
 pub(crate) mod dto;
 mod guests;
+mod invoices;
 mod lifecycle;
 mod orders;
 mod pickups;
+mod pos;
 pub(crate) mod returns;
 
 use std::sync::Arc;
@@ -57,5 +59,17 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(guests::guest_support))
         .routes(routes!(guests::my_order_support))
         .routes(routes!(guests::claim))
+        .routes(routes!(invoices::request_invoice))
+        .routes(routes!(invoices::request_my_invoice))
+        .routes(routes!(invoices::my_documents))
+        .routes(routes!(invoices::guest_documents))
+        .routes(routes!(invoices::print_my_document))
+        .routes(routes!(invoices::print_guest_document))
+        .routes(routes!(pos::open_shift))
+        .routes(routes!(pos::close_shift))
+        .routes(routes!(pos::approve_shift))
+        .routes(routes!(pos::quote))
+        .routes(routes!(pos::sell))
+        .routes(routes!(pos::catalog))
         .with_state(service)
 }

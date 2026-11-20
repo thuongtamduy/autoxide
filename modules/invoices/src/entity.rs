@@ -95,6 +95,8 @@ pub(crate) mod document {
         pub base_total_minor: Option<i64>,
         /// Lúc ảnh chụp người mua cá nhân được ẩn danh (hết hạn lưu).
         pub buyer_purged_at: Option<DateTimeUtc>,
+        /// Bên lập (module nguồn) tự ghi sổ doanh thu: phát hành không ghi bút toán.
+        pub booked_by_source: bool,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
