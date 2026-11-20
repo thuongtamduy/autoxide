@@ -624,15 +624,15 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Bán tại quầy (POS) qua API cho chuỗi (D-20261120-step45-einvoice-pos; danh mục đầy đủ và tìm khách ở quầy chờ
       bước 47): đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ kho của cửa hàng
       đó; đóng ca có chênh lệch: lý do, ghi sổ cái, cần duyệt khi vượt ngưỡng (D-227)
-- [ ] Đánh giá sau mua: chỉ người đã mua, kiểm duyệt không chặn / ẩn trái quy định (Luật 19/2023), lý do ẩn
+- [x] Đánh giá sau mua (D-20261120-step45-reviews-risk-reports): chỉ người đã mua, kiểm duyệt không chặn / ẩn trái quy định (Luật 19/2023), lý do ẩn
       theo danh sách (D-223); dùng `comments`, module `reviews` hay đặt ở `orders` — ghi quyết định; lọc có
       ảnh / số sao / sắp xếp, ảnh người mua; đếm đánh giá mới theo mốc đã xem; nhãn `verified_buyer` (D-202)
-- [ ] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút được, đếm cùng transaction, `sort=helpful`
+- [x] Nút "Đánh giá này hữu ích" (D-203): mỗi người một phiếu, rút được, đếm cùng transaction, `sort=helpful`
       bằng con trỏ, không tự / người bán bỏ phiếu, không có "không hữu ích"; tóm tắt đánh giá bằng AI chỉ là
       bản nháp nhân viên duyệt, gắn nhãn (D-109, D-201)
-- [ ] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho báo cáo
+- [x] Báo cáo bán hàng theo cửa hàng / kênh / sản phẩm / thời gian, theo quyền độ sâu; event cho kho báo cáo
       gộp (bước 38); xuất đơn qua xuất chung của bước 51 (D-213)
-- [ ] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua chỉ trong dữ liệu của khách (có
+- [x] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua chỉ trong dữ liệu của khách (có
       căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao, danh sách chặn có lý do và thời
       hạn; không chia sẻ danh sách giữa các khách
 - [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp

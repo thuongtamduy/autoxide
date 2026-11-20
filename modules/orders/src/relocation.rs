@@ -21,7 +21,9 @@ pub(crate) fn relocation() -> Relocation {
         .follow("orders_pickups", "order_id", "orders_orders")
         .follow("orders_fulfillments", "order_id", "orders_orders")
         .follow("orders_invoice_links", "order_id", "orders_orders")
-        .by_org(&["orders_pos_shifts"])
+        .by_org(&["orders_pos_shifts", "orders_reviews", "orders_cod_rules"])
+        .follow("orders_review_votes", "review_id", "orders_reviews")
+        .follow("orders_delivery_outcomes", "order_id", "orders_orders")
         .follow("orders_pos_sales", "shift_id", "orders_pos_shifts")
         .ephemeral(&[
             "orders_checkouts",
@@ -29,5 +31,10 @@ pub(crate) fn relocation() -> Relocation {
             "orders_lookup_tokens",
             "orders_guest_requests",
             "orders_throttle",
+            // Tổng hợp, tính lại được từ đánh giá; bản nháp AI sinh lại được.
+            "orders_review_stats",
+            "orders_review_summaries",
+            // Khoá liên hệ theo khách: sang khách khác thì khoá khác, không mang theo được.
+            "orders_cod_blocks",
         ])
 }

@@ -28411,6 +28411,60 @@
         ],
         "type": "object"
       },
+      "Data_OrdersBuyerRisk": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Delivery statistics of a buyer, in this shop only.",
+            "properties": {
+              "block_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "blocked_until": {
+                "description": "Until when cash on delivery is blocked, if it is.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "delivered": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "fail_ratio_bp": {
+                "description": "`(failed + refused) / all`, in basis points (10000 = 100%).",
+                "format": "int64",
+                "type": "integer"
+              },
+              "failed": {
+                "description": "Delivery attempts that failed.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "refused": {
+                "description": "Orders cancelled after they left (refused, returned).",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "delivered",
+              "failed",
+              "refused",
+              "fail_ratio_bp"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OrdersCart": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28610,6 +28664,125 @@
             },
             "required": [
               "order_ids"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersCodBlock": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A buyer blocked from paying on delivery.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "lifted_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reason_code": {
+                "description": "Code of the list `orders.cod_block`.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "reason_code",
+              "expires_at",
+              "created_by",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersCodRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A cash-on-delivery rule.",
+            "properties": {
+              "action": {
+                "description": "`require_prepayment`.",
+                "type": "string"
+              },
+              "effective_from": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "effective_to": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "max_fail_ratio_bp": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "max_order_value": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/Money"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "min_orders": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "org_id",
+              "min_orders",
+              "max_fail_ratio_bp",
+              "action",
+              "effective_from"
             ],
             "type": "object"
           }
@@ -29425,6 +29598,285 @@
               "methods",
               "deadline_at",
               "photos_required"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReview": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A product review.",
+            "properties": {
+              "body": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "helpful_count": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "hidden_reason": {
+                "description": "Code of the list `orders.review_hidden`, when hidden.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "media_ids": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "product_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "rating": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "replied_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "reply": {
+                "description": "The shop's public answer.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`published` or `hidden`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "variant_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "verified_buyer": {
+                "description": "Always `true`: only buyers who received the item can review it.",
+                "type": "boolean"
+              },
+              "voted_by_me": {
+                "description": "Signed in: whether you voted \"helpful\" for it.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "product_id",
+              "variant_id",
+              "rating",
+              "body",
+              "media_ids",
+              "verified_buyer",
+              "status",
+              "helpful_count",
+              "created_at",
+              "updated_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReviewCount": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A count of reviews.",
+            "properties": {
+              "count": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReviewHelpful": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "\"Helpful\" votes of a review.",
+            "properties": {
+              "helpful_count": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "voted_by_me": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "helpful_count",
+              "voted_by_me"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReviewStats": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Star counts and the approved AI summary of a product's reviews.",
+            "properties": {
+              "average": {
+                "description": "Average stars with one decimal (`\"4.5\"`); `null` without reviews.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "count": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "stars": {
+                "description": "Number of reviews with 1, 2, 3, 4 and 5 stars.",
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "summary": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/OrdersReviewSummary"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "with_media": {
+                "description": "Reviews with photos.",
+                "format": "int64",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "count",
+              "stars",
+              "with_media"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersReviewSummary": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A summary of reviews written with AI and approved by staff.",
+            "properties": {
+              "ai_generated": {
+                "description": "Always `true`: shown with an \"AI-generated\" label (D-109).",
+                "type": "boolean"
+              },
+              "body": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "generated_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "product_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "reviewed_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "source_review_count": {
+                "format": "int32",
+                "type": "integer"
+              },
+              "status": {
+                "description": "`pending`, `draft`, `approved`, `rejected`, `superseded` or `failed`.",
+                "type": "string"
+              },
+              "themes": {
+                "description": "Themes buyers often mention.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "product_id",
+              "locale",
+              "status",
+              "themes",
+              "ai_generated",
+              "source_review_count"
             ],
             "type": "object"
           }
@@ -41254,6 +41706,131 @@
         ],
         "type": "object"
       },
+      "Data_Vec_OrdersCodBlock": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A buyer blocked from paying on delivery.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "lifted_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reason_code": {
+                  "description": "Code of the list `orders.cod_block`.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "reason_code",
+                "expires_at",
+                "created_by",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_OrdersCodRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A cash-on-delivery rule.",
+              "properties": {
+                "action": {
+                  "description": "`require_prepayment`.",
+                  "type": "string"
+                },
+                "effective_from": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "effective_to": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "max_fail_ratio_bp": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "max_order_value": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Money"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "min_orders": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "min_orders",
+                "max_fail_ratio_bp",
+                "action",
+                "effective_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_Vec_OrdersDocument": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -41471,6 +42048,62 @@
                 "reference",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_OrdersSalesRow": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A row of the sales report.",
+              "properties": {
+                "discount": {
+                  "$ref": "#/components/schemas/Money"
+                },
+                "gross": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "What buyers paid: after discounts, taxes included."
+                },
+                "key": {
+                  "description": "Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`.",
+                  "type": "string"
+                },
+                "orders": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "quantity": {
+                  "description": "Units sold (by product only).",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "refunded": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Refunded so far (not by product)."
+                },
+                "tax": {
+                  "$ref": "#/components/schemas/Money"
+                }
+              },
+              "required": [
+                "key",
+                "orders",
+                "gross",
+                "discount",
+                "tax",
+                "refunded"
               ],
               "type": "object"
             },
@@ -57515,6 +58148,51 @@
         },
         "type": "object"
       },
+      "OrdersBuyerRisk": {
+        "description": "Delivery statistics of a buyer, in this shop only.",
+        "properties": {
+          "block_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blocked_until": {
+            "description": "Until when cash on delivery is blocked, if it is.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "delivered": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "fail_ratio_bp": {
+            "description": "`(failed + refused) / all`, in basis points (10000 = 100%).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "failed": {
+            "description": "Delivery attempts that failed.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "refused": {
+            "description": "Orders cancelled after they left (refused, returned).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "delivered",
+          "failed",
+          "refused",
+          "fail_ratio_bp"
+        ],
+        "type": "object"
+      },
       "OrdersCart": {
         "description": "A cart with its quote, computed again by the server on every read.",
         "properties": {
@@ -58078,6 +58756,193 @@
         ],
         "type": "object"
       },
+      "OrdersCodBlock": {
+        "description": "A buyer blocked from paying on delivery.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "lifted_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason_code": {
+            "description": "Code of the list `orders.cod_block`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "reason_code",
+          "expires_at",
+          "created_by",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "OrdersCodBlockRequest": {
+        "additionalProperties": false,
+        "description": "Block a buyer from paying on delivery.",
+        "properties": {
+          "expires_at": {
+            "description": "Required; at most 365 days from now (no block is permanent).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "note": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "phone": {
+            "description": "Phone number of the buyer (kept only as a keyed hash).",
+            "example": "0901234567",
+            "type": "string"
+          },
+          "reason_code": {
+            "description": "A code of the list `orders.cod_block`.",
+            "example": "fake_orders",
+            "type": "string"
+          }
+        },
+        "required": [
+          "phone",
+          "reason_code",
+          "expires_at"
+        ],
+        "type": "object"
+      },
+      "OrdersCodRule": {
+        "description": "A cash-on-delivery rule.",
+        "properties": {
+          "action": {
+            "description": "`require_prepayment`.",
+            "type": "string"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "effective_to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "max_fail_ratio_bp": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "max_order_value": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "min_orders": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "min_orders",
+          "max_fail_ratio_bp",
+          "action",
+          "effective_from"
+        ],
+        "type": "object"
+      },
+      "OrdersCodRuleRequest": {
+        "additionalProperties": false,
+        "description": "A new cash-on-delivery rule.",
+        "properties": {
+          "effective_from": {
+            "description": "Default: now.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "effective_to": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_fail_ratio_bp": {
+            "description": "Failed or refused deliveries, in basis points, from which the buyer must pay in advance.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "max_order_value": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Money",
+                "description": "Orders above this total must be paid in advance, whoever the buyer."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "min_orders": {
+            "description": "Orders with a delivery result the buyer needs before the ratio counts (1 to 1000).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "org_id": {
+            "description": "The shop (or the tenant's root node for every shop).",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "min_orders",
+          "max_fail_ratio_bp"
+        ],
+        "type": "object"
+      },
       "OrdersCodeSent": {
         "description": "A one-time code was sent by SMS.",
         "properties": {
@@ -58418,6 +59283,28 @@
         "required": [
           "name",
           "phone"
+        ],
+        "type": "object"
+      },
+      "OrdersModerateReviewRequest": {
+        "additionalProperties": false,
+        "description": "Hide or reopen a review.",
+        "properties": {
+          "action": {
+            "description": "`hide` or `reopen`.",
+            "example": "hide",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Required to hide: a code of the list `orders.review_hidden`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "action"
         ],
         "type": "object"
       },
@@ -59352,6 +60239,19 @@
         ],
         "type": "object"
       },
+      "OrdersReplyReviewRequest": {
+        "additionalProperties": false,
+        "description": "The shop's answer.",
+        "properties": {
+          "reply": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reply"
+        ],
+        "type": "object"
+      },
       "OrdersReturn": {
         "description": "A return.",
         "properties": {
@@ -59753,6 +60653,312 @@
         ],
         "type": "object"
       },
+      "OrdersReview": {
+        "description": "A product review.",
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "helpful_count": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "hidden_reason": {
+            "description": "Code of the list `orders.review_hidden`, when hidden.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "media_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "rating": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "replied_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reply": {
+            "description": "The shop's public answer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`published` or `hidden`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "verified_buyer": {
+            "description": "Always `true`: only buyers who received the item can review it.",
+            "type": "boolean"
+          },
+          "voted_by_me": {
+            "description": "Signed in: whether you voted \"helpful\" for it.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "variant_id",
+          "rating",
+          "body",
+          "media_ids",
+          "verified_buyer",
+          "status",
+          "helpful_count",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersReviewCount": {
+        "description": "A count of reviews.",
+        "properties": {
+          "count": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count"
+        ],
+        "type": "object"
+      },
+      "OrdersReviewHelpful": {
+        "description": "\"Helpful\" votes of a review.",
+        "properties": {
+          "helpful_count": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "voted_by_me": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "helpful_count",
+          "voted_by_me"
+        ],
+        "type": "object"
+      },
+      "OrdersReviewRequest": {
+        "additionalProperties": false,
+        "description": "A review to write or edit.",
+        "properties": {
+          "body": {
+            "description": "Up to 5000 characters; may be empty.",
+            "type": "string"
+          },
+          "media_ids": {
+            "description": "Photos you uploaded (`POST /api/v1/media/me/uploads`), at most 6.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "rating": {
+            "description": "1 to 5 stars.",
+            "example": 5,
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rating"
+        ],
+        "type": "object"
+      },
+      "OrdersReviewStats": {
+        "description": "Star counts and the approved AI summary of a product's reviews.",
+        "properties": {
+          "average": {
+            "description": "Average stars with one decimal (`\"4.5\"`); `null` without reviews.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "stars": {
+            "description": "Number of reviews with 1, 2, 3, 4 and 5 stars.",
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          },
+          "summary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersReviewSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "with_media": {
+            "description": "Reviews with photos.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "stars",
+          "with_media"
+        ],
+        "type": "object"
+      },
+      "OrdersReviewSummary": {
+        "description": "A summary of reviews written with AI and approved by staff.",
+        "properties": {
+          "ai_generated": {
+            "description": "Always `true`: shown with an \"AI-generated\" label (D-109).",
+            "type": "boolean"
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "generated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "source_review_count": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "status": {
+            "description": "`pending`, `draft`, `approved`, `rejected`, `superseded` or `failed`.",
+            "type": "string"
+          },
+          "themes": {
+            "description": "Themes buyers often mention.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "locale",
+          "status",
+          "themes",
+          "ai_generated",
+          "source_review_count"
+        ],
+        "type": "object"
+      },
+      "OrdersSalesRow": {
+        "description": "A row of the sales report.",
+        "properties": {
+          "discount": {
+            "$ref": "#/components/schemas/Money"
+          },
+          "gross": {
+            "$ref": "#/components/schemas/Money",
+            "description": "What buyers paid: after discounts, taxes included."
+          },
+          "key": {
+            "description": "Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`.",
+            "type": "string"
+          },
+          "orders": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "quantity": {
+            "description": "Units sold (by product only).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "refunded": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Refunded so far (not by product)."
+          },
+          "tax": {
+            "$ref": "#/components/schemas/Money"
+          }
+        },
+        "required": [
+          "key",
+          "orders",
+          "gross",
+          "discount",
+          "tax",
+          "refunded"
+        ],
+        "type": "object"
+      },
       "OrdersShipmentRequested": {
         "description": "A shipment requested from the shipping module.",
         "properties": {
@@ -59850,6 +61056,20 @@
           "kind",
           "amount"
         ],
+        "type": "object"
+      },
+      "OrdersSummaryRequest": {
+        "additionalProperties": false,
+        "description": "Ask for an AI summary draft.",
+        "properties": {
+          "locale": {
+            "description": "`vi` (default) or `en`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         "type": "object"
       },
       "OrdersSupportRequest": {
@@ -68314,6 +69534,116 @@
                 "lines",
                 "requested_at",
                 "deadline_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_OrdersReview": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A product review.",
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "helpful_count": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "hidden_reason": {
+                  "description": "Code of the list `orders.review_hidden`, when hidden.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "media_ids": {
+                  "items": {
+                    "format": "uuid",
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "product_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "rating": {
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "replied_at": {
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reply": {
+                  "description": "The shop's public answer.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "description": "`published` or `hidden`.",
+                  "type": "string"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "verified_buyer": {
+                  "description": "Always `true`: only buyers who received the item can review it.",
+                  "type": "boolean"
+                },
+                "voted_by_me": {
+                  "description": "Signed in: whether you voted \"helpful\" for it.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "product_id",
+                "variant_id",
+                "rating",
+                "body",
+                "media_ids",
+                "verified_buyer",
+                "status",
+                "helpful_count",
+                "created_at",
                 "updated_at"
               ],
               "type": "object"
@@ -196688,6 +198018,266 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/orders/{id}/lines/{line_id}/review": {
+      "post": {
+        "description": "Signed in: a line of an order you placed that was delivered; one review per line. Published at\nonce (reviews are not held for approval).",
+        "operationId": "orders_create_my_review",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the order line.",
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReview"
+                }
+              }
+            },
+            "description": "The review.",
+            "headers": {
+              "Location": {
+                "description": "Path of the review.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The item was not delivered to you (`orders.review_not_allowed`) or your account is not verified (`orders.account_not_verified`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order or line of yours; code `orders.order_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You already reviewed this line; code `orders.review_exists`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values, or photos not yours (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Review an item you received.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      },
+      "put": {
+        "description": "Signed in: your review of this order line, within `AUTOXIDE_ORDERS_REVIEW_EDIT_DAYS` of writing\nit.",
+        "operationId": "orders_edit_my_review",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the order line.",
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReview"
+                }
+              }
+            },
+            "description": "The review."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No review of yours for this line; code `orders.review_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too late to edit; code `orders.review_edit_closed`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Edit your review of an item.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/me/orders/{id}/returns": {
       "post": {
         "description": "Signed in: an order you placed, delivered and inside the shop's return window. Units already\nreturned or in another open return cannot be asked again. Free gifts are added when returning\nmakes the promotion's condition fail and the promotion wants gifts back. Send an\n`Idempotency-Key` header to retry safely.",
@@ -197819,6 +199409,123 @@
         ],
         "x-permissions": [
           "orders.pos.shift"
+        ]
+      }
+    },
+    "/api/v1/orders/products/{product_id}/review-summaries": {
+      "post": {
+        "description": "Requires `orders.reviews.moderate`. A background job asks the AI model for a draft\n(`status: pending` → `draft`); it is shown publicly only after staff approve it, with an AI\nlabel (D-109).",
+        "operationId": "orders_request_review_summary",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersSummaryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewSummary"
+                }
+              }
+            },
+            "description": "The summary, `pending`.",
+            "headers": {
+              "Location": {
+                "description": "Path of the summary.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is not available; code `orders.ai_unavailable` or `ai.disabled`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Write an AI summary draft of a product's reviews.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
         ]
       }
     },
@@ -199002,6 +200709,582 @@
         "x-public": true
       }
     },
+    "/api/v1/orders/public/products/{product_id}/reviews": {
+      "get": {
+        "description": "Public. Published reviews, newest first unless `sort=helpful`. Signed in, each review says\nwhether you voted for it.",
+        "operationId": "orders_list_product_reviews",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only reviews with this many stars (1 to 5).",
+            "in": "query",
+            "name": "rating",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Only reviews with (`true`) or without (`false`) photos.",
+            "in": "query",
+            "name": "has_media",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "`newest` (default) or `helpful` (most \"helpful\" votes first; the reader chooses it).",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OrdersReview"
+                }
+              }
+            },
+            "description": "A page of reviews."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad cursor or limit."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid filter (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {},
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List reviews of a product.",
+        "tags": [
+          "orders"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "Only reviews with this many stars (1 to 5).",
+            "kind": "integer",
+            "name": "rating",
+            "operator": "eq"
+          },
+          {
+            "description": "Only reviews with (`true`) or without (`false`) photos.",
+            "kind": "boolean",
+            "name": "has_media",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "orders.list_product_reviews",
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/products/{product_id}/reviews/stats": {
+      "get": {
+        "description": "Public. Counts of published reviews, the average, and the AI summary approved by staff (with\nits AI label), if any.",
+        "operationId": "orders_get_product_review_stats",
+        "parameters": [
+          {
+            "description": "Id of the product.",
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "`vi` (default) or `en`.",
+            "in": "query",
+            "name": "locale",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewStats"
+                }
+              }
+            },
+            "description": "The counts."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Star counts of a product's reviews.",
+        "tags": [
+          "orders"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/orders/public/reviews/{id}/helpful": {
+      "delete": {
+        "description": "Signed in. Without a vote, nothing changes.",
+        "operationId": "orders_unvote_review_helpful",
+        "parameters": [
+          {
+            "description": "Id of the review.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewHelpful"
+                }
+              }
+            },
+            "description": "The votes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such published review; code `orders.review_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Take back a \"helpful\" vote.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      },
+      "put": {
+        "description": "Signed in. One vote per person; voting again changes nothing. Not for your own reviews, nor for\nmoderators of the shop selling the product. There is no \"not helpful\" vote.",
+        "operationId": "orders_vote_review_helpful",
+        "parameters": [
+          {
+            "description": "Id of the review.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewHelpful"
+                }
+              }
+            },
+            "description": "The votes."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "You moderate this shop's reviews; code `orders.review_vote_not_allowed`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such published review; code `orders.review_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Your own review; code `orders.review_vote_own`."
+          },
+          "429": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Too many votes; code `orders.review_votes_too_many`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Vote a review \"helpful\".",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/orders/reports/sales": {
+      "get": {
+        "description": "Requires `orders.reports.read`; only shops in your scope count. Orders placed in `[from, to)`,\nneither waiting for payment nor cancelled.",
+        "operationId": "orders_sales_report",
+        "parameters": [
+          {
+            "description": "`org`, `channel`, `product`, `day` or `month` (days and months in UTC).",
+            "in": "query",
+            "name": "group_by",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "From (included).",
+            "in": "query",
+            "name": "from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "To (excluded); at most 366 days after `from`.",
+            "in": "query",
+            "name": "to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Currency of the orders counted; default `VND`.",
+            "in": "query",
+            "name": "currency",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersSalesRow"
+                }
+              }
+            },
+            "description": "The rows (biggest first; days and months in order)."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reports.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Sales report.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reports.read"
+        ]
+      }
+    },
     "/api/v1/orders/returns": {
       "get": {
         "description": "Requires `orders.read` (returns of orders of shops in your scope).",
@@ -199388,6 +201671,1292 @@
         ],
         "x-permissions": [
           "orders.returns.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/review-summaries/{id}/approve": {
+      "post": {
+        "description": "Requires `orders.reviews.moderate`. It replaces the summary shown for the product and language.",
+        "operationId": "orders_approve_review_summary",
+        "parameters": [
+          {
+            "description": "Id of the summary.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewSummary"
+                }
+              }
+            },
+            "description": "The summary, `approved`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such summary; code `orders.summary_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a draft; code `orders.summary_not_draft`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Approve an AI summary draft.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/review-summaries/{id}/reject": {
+      "post": {
+        "description": "Requires `orders.reviews.moderate`.",
+        "operationId": "orders_reject_review_summary",
+        "parameters": [
+          {
+            "description": "Id of the summary.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewSummary"
+                }
+              }
+            },
+            "description": "The summary, `rejected`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such summary; code `orders.summary_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a draft; code `orders.summary_not_draft`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Reject an AI summary draft.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/reviews": {
+      "get": {
+        "description": "Requires `orders.reviews.moderate` (reviews of shops in your scope), newest first.",
+        "operationId": "orders_list_reviews",
+        "parameters": [
+          {
+            "description": "`published` or `hidden`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only reviews written after this time (e.g. the time you last looked).",
+            "in": "query",
+            "name": "created_after",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_OrdersReview"
+                }
+              }
+            },
+            "description": "A page of reviews."
+          },
+          "400": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Bad cursor or limit."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List reviews to moderate.",
+        "tags": [
+          "orders"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`published` or `hidden`.",
+            "kind": "string",
+            "name": "status",
+            "operator": "eq"
+          },
+          {
+            "description": "Only reviews written after this time (e.g. the time you last looked).",
+            "kind": "date-time",
+            "name": "created_after",
+            "operator": "eq"
+          },
+          {
+            "kind": "uuid",
+            "name": "product_id",
+            "operator": "eq"
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "orders.list_reviews",
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/reviews/count": {
+      "get": {
+        "description": "Requires `orders.reviews.moderate`. With `created_after` set to the time you last looked\n(`/api/v1/me/flags` key `orders.reviews.seen_at`), the number of new reviews.",
+        "operationId": "orders_count_reviews",
+        "parameters": [
+          {
+            "description": "`published` or `hidden`.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only reviews written after this time (e.g. the time you last looked).",
+            "in": "query",
+            "name": "created_after",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "product_id",
+            "required": false,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReviewCount"
+                }
+              }
+            },
+            "description": "The count."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Count reviews to moderate.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/reviews/{id}/moderation": {
+      "post": {
+        "description": "Requires `orders.reviews.moderate` at the shop. A review is hidden only for a reason of the list\n`orders.review_hidden` (Consumer Protection Law 19/2023: reviews are not blocked or hidden\notherwise); the author is told. Votes are kept and come back on reopening.",
+        "operationId": "orders_moderate_review",
+        "parameters": [
+          {
+            "description": "Id of the review.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersModerateReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReview"
+                }
+              }
+            },
+            "description": "The review."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such review in your scope; code `orders.review_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Reason missing or not listed (`orders.moderation_reason_invalid`) or bad action (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Hide or reopen a review.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/reviews/{id}/reply": {
+      "post": {
+        "description": "Requires `orders.reviews.moderate` at the shop. A new answer replaces the old one.",
+        "operationId": "orders_reply_review",
+        "parameters": [
+          {
+            "description": "Id of the review.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersReplyReviewRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersReview"
+                }
+              }
+            },
+            "description": "The review."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.reviews.moderate`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such review in your scope; code `orders.review_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Answer a review publicly.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.reviews.moderate"
+        ]
+      }
+    },
+    "/api/v1/orders/risk/buyers": {
+      "get": {
+        "description": "Requires `orders.risk.manage`. Only orders of this shop (tenant) count; nothing is shared\nbetween tenants.",
+        "operationId": "orders_get_buyer_risk",
+        "parameters": [
+          {
+            "description": "Phone number of the buyer.",
+            "in": "query",
+            "name": "phone",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersBuyerRisk"
+                }
+              }
+            },
+            "description": "The statistics."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not a phone number (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Delivery statistics of a buyer.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/risk/cod-blocks": {
+      "get": {
+        "description": "Requires `orders.risk.manage`. Blocks of this tenant only, expiring soonest first.",
+        "operationId": "orders_list_cod_blocks",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersCodBlock"
+                }
+              }
+            },
+            "description": "The active blocks."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List active cash-on-delivery blocks.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `orders.risk.manage`. Needs a listed reason and an end date; the buyer must pay in\nadvance until then. Applies in this tenant only.",
+        "operationId": "orders_create_cod_block",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersCodBlockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodBlock"
+                }
+              }
+            },
+            "description": "The block.",
+            "headers": {
+              "Location": {
+                "description": "Path of the block.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Block a buyer from paying on delivery.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/risk/cod-blocks/{id}": {
+      "delete": {
+        "description": "Requires `orders.risk.manage`. Lifting again changes nothing.",
+        "operationId": "orders_lift_cod_block",
+        "parameters": [
+          {
+            "description": "Id of the block.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodBlock"
+                }
+              }
+            },
+            "description": "The lifted block."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such block; code `orders.cod_block_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Lift a cash-on-delivery block.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/risk/cod-rules": {
+      "get": {
+        "description": "Requires `orders.risk.manage` (rules of nodes in your scope), newest first.",
+        "operationId": "orders_list_cod_rules",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersCodRule"
+                }
+              }
+            },
+            "description": "The rules, ended ones included."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List cash-on-delivery rules.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `orders.risk.manage` at the node. A buyer whose failed and refused deliveries reach the\nratio (after `min_orders`), or an order above `max_order_value`, must pay in advance. Rules are\nnever edited: end one (`DELETE`) and add another.",
+        "operationId": "orders_create_cod_rule",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersCodRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodRule"
+                }
+              }
+            },
+            "description": "The rule.",
+            "headers": {
+              "Location": {
+                "description": "Path of the rule.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage` at the node; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Add a cash-on-delivery rule.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/risk/cod-rules/{id}": {
+      "delete": {
+        "description": "Requires `orders.risk.manage` at the node. The rule stops applying now; it is kept.",
+        "operationId": "orders_end_cod_rule",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersCodRule"
+                }
+              }
+            },
+            "description": "The ended rule."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.risk.manage` at the node; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such rule; code `orders.cod_rule_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "End a cash-on-delivery rule.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.risk.manage"
         ]
       }
     },

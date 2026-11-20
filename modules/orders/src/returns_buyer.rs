@@ -285,7 +285,7 @@ impl OrdersService {
     /// Ảnh kèm (D-202): tối đa [`MAX_PHOTOS`], bắt buộc khi lý do nằm trong
     /// `orders.return_photo_reasons`, mỗi ảnh phải do chính người mua tải lên và không trong thùng
     /// rác (hỏi `media` qua trait, không đọc bảng của nó).
-    async fn check_photos(
+    pub(crate) async fn check_photos(
         &self,
         tenant: &TenantContext,
         buyer: Uuid,

@@ -37,6 +37,8 @@ pub(crate) struct Parts {
     pub translations: Translations,
     pub invoices: Option<Arc<dyn autoxide_invoices::api::Invoices>>,
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    pub posting: autoxide_kernel::access::PostingVerification,
+    pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
 }
 
 pub(crate) struct OrdersService {
@@ -60,6 +62,10 @@ pub(crate) struct OrdersService {
     pub invoices: Option<Arc<dyn autoxide_invoices::api::Invoices>>,
     /// Thư xác nhận, cập nhật trạng thái (chưa cài `notifications`: không gửi).
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    /// Tài khoản đã xác thực để đăng nội dung chưa (NĐ 147/2024) — đánh giá.
+    pub posting: autoxide_kernel::access::PostingVerification,
+    /// Bản nháp tóm tắt đánh giá (chưa cài `ai`: không tóm tắt).
+    pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
     pub config: OrdersConfig,
 }
 
@@ -82,6 +88,8 @@ impl OrdersService {
             translations: parts.translations,
             invoices: parts.invoices,
             notifier: parts.notifier,
+            posting: parts.posting,
+            text_model: parts.text_model,
             config,
         }
     }

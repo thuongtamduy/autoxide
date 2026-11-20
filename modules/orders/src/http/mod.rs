@@ -11,6 +11,8 @@ mod orders;
 mod pickups;
 mod pos;
 pub(crate) mod returns;
+mod reviews;
+mod risk;
 
 use std::sync::Arc;
 
@@ -71,5 +73,22 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(pos::quote))
         .routes(routes!(pos::sell))
         .routes(routes!(pos::catalog))
+        .routes(routes!(reviews::create_review, reviews::edit_review))
+        .routes(routes!(reviews::public_reviews))
+        .routes(routes!(reviews::review_stats))
+        .routes(routes!(reviews::vote_helpful, reviews::unvote_helpful))
+        .routes(routes!(reviews::staff_reviews))
+        .routes(routes!(reviews::count_reviews))
+        .routes(routes!(reviews::moderate))
+        .routes(routes!(reviews::reply))
+        .routes(routes!(reviews::request_summary))
+        .routes(routes!(reviews::approve_summary))
+        .routes(routes!(reviews::reject_summary))
+        .routes(routes!(risk::buyer_risk))
+        .routes(routes!(risk::list_rules, risk::create_rule))
+        .routes(routes!(risk::end_rule))
+        .routes(routes!(risk::list_blocks, risk::create_block))
+        .routes(routes!(risk::lift_block))
+        .routes(routes!(risk::sales_report))
         .with_state(service)
 }

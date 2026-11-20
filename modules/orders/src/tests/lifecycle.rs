@@ -23,6 +23,11 @@ use crate::entity::order;
 pub(super) async fn cod_order(shop: &Shop) -> Uuid {
     let shirt = shop.catalog.add(shop.tree.a, 100_000);
     shop.inventory.stock(shop.tree.a, shirt, 10);
+    cod_order_of(shop, shirt).await
+}
+
+/// Đơn COD của `buyer1` với 2 đơn vị biến thể `shirt` (đã có tồn); trả ID.
+pub(super) async fn cod_order_of(shop: &Shop, shirt: Uuid) -> Uuid {
     let buyer = Call::as_user(shop, "buyer1");
     let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 2).await;
     let (status, placed) =
