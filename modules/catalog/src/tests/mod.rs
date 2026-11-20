@@ -10,11 +10,12 @@ mod pricing;
 mod products;
 mod public;
 mod readiness;
+mod recommend;
 mod search;
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
-use autoxide_testkit::{TestApp, TestDatabase};
+use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -41,17 +42,23 @@ pub(crate) struct Tree {
 /// App với: `boss` (mọi quyền cả khách), `store_a` / `store_b` (mọi quyền ở cửa hàng của mình,
 /// độ sâu `unit`).
 pub(crate) async fn app(test: &TestDatabase) -> (TestApp, Tree) {
+    app_with(test, |builder| builder).await
+}
+
+/// Như [`app`], thêm module / trait giả bằng `extra` (gọi sau khi đã đăng ký `catalog`).
+pub(crate) async fn app_with<'a>(
+    test: &'a TestDatabase,
+    extra: impl FnOnce(TestAppBuilder<'a>) -> TestAppBuilder<'a>,
+) -> (TestApp, Tree) {
     let org = || OrgId::from_uuid(Uuid::now_v7());
     let tree = Tree { chain: org(), a: org(), b: org() };
     let scoped = |scope: Scope| ALL.map(|name| (name, scope));
-    let app = TestApp::builder(test)
+    let builder = TestApp::builder(test)
         .member("boss", 1, root_of(DEFAULT_TENANT), &scoped(Scope::Tenant))
         .member("store_a", 2, tree.a, &scoped(Scope::Unit))
         .member("store_b", 3, tree.b, &scoped(Scope::Unit))
-        .module(crate::module())
-        .build()
-        .await
-        .unwrap();
+        .module(crate::module());
+    let app = extra(builder).build().await.unwrap();
     let write = app.database().begin_write().await.unwrap();
     let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.chain, root, 8).await.unwrap();
