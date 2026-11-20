@@ -19,13 +19,23 @@
 #                         sqlite    bước 7 (kèm doc-test ở gate đầy đủ);
 #                         postgres  bước 8.
 #                       Không có `--only` thì chạy cả ba, như cũ.
+#   --only build        đi kèm gate đầy đủ hoặc `--pr`: build mọi chương trình test MỘT lần thành archive
+#                       của nextest ở GATE_ARCHIVE_DIR (D-20261120-ci-nextest-archive), kèm file `filter`
+#                       (filterset chọn test: `all()` ở gate đầy đủ, crate bị ảnh hưởng ở `--pr`). Gate đầy
+#                       đủ chạy luôn doc-test ở đây (chúng cần trình biên dịch). Không chạy test nào khác.
+#   --archive DIR       đi kèm `--only sqlite|postgres`: chạy test từ archive trong DIR (do `--only build`
+#                       làm, có thể ở máy khác) bằng nextest thay vì build rồi chạy bằng `cargo xtask`;
+#                       không biên dịch gì. `lint` + `build` + `sqlite --archive` + `postgres --archive`
+#                       cộng lại đúng bằng gate không có cờ. Trên Postgres tối đa 16 test chạy cùng lúc,
+#                       như `cargo xtask test-all`.
 #   --shard k/n         đi kèm gate đầy đủ hoặc `--pr`: bước test (7, 8) chỉ chạy phần thứ k trong n
 #                       phần của mọi test (`cargo xtask … --shard`); n phần cộng lại đúng bằng mọi
 #                       test, doc-test chạy ở phần 1. CI chạy mỗi phần trên một máy (D-20261119-ci-faster).
 #
 # CI trên GitHub (.github/workflows/ci.yml): pull request chạy `--pr`, push lên main chạy gate đầy
-# đủ (D-175, D-197), mỗi lần tách thành ba job `--only …` chạy song song; gate trên máy vẫn là định
-# nghĩa "xong", CI là lưới thứ hai.
+# đủ (D-175, D-197), mỗi lần tách thành nhiều job: `--only lint`, `--only build` (archive test), rồi
+# `--only sqlite|postgres --archive … --shard k/n` chạy song song (D-20261120-ci-nextest-archive);
+# gate trên máy vẫn là định nghĩa "xong", CI là lưới thứ hai.
 #
 # Cả hai chạy ở mức ưu tiên CPU thấp (`renice`) để máy vẫn dùng được trong lúc build.
 #
@@ -62,6 +72,8 @@
 #   GATE_S3_IMAGE        image cho container S3 giả lập (mặc định motoserver/moto).
 #   GATE_GITLEAKS_IMAGE  image gitleaks khi máy không cài gitleaks.
 #   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main).
+#   GATE_ARCHIVE_DIR     với --only build: thư mục ghi archive test và file filter (mặc định
+#                        target/gate-archive).
 #   GATE_TARGET_MAX_GB   trần dung lượng của target/ (mặc định 40): vượt thì gate dọn trước khi build
 #                        (cache incremental trước, vẫn vượt thì `cargo clean`). 0: không dọn.
 #
@@ -78,8 +90,9 @@ QUICK=0
 PR=0
 ONLY=""
 SHARD=()
+ARCHIVE=""
 usage() {
-  echo "usage: ./gate.sh [--quick | --pr] [--only lint|sqlite|postgres] [--shard k/n]" >&2
+  echo "usage: ./gate.sh [--quick | --pr] [--only lint|build|sqlite|postgres] [--archive DIR] [--shard k/n]" >&2
   exit 2
 }
 while [ $# -gt 0 ]; do
@@ -89,6 +102,11 @@ while [ $# -gt 0 ]; do
     --only)
       [ $# -ge 2 ] || usage
       ONLY="$2"
+      shift
+      ;;
+    --archive)
+      [ $# -ge 2 ] || usage
+      ARCHIVE="$2"
       shift
       ;;
     --shard)
@@ -103,9 +121,14 @@ while [ $# -gt 0 ]; do
 done
 [ "$QUICK" = 1 ] && [ "$PR" = 1 ] && usage
 case "$ONLY" in
-  "" | lint | sqlite | postgres) ;;
+  "" | lint | build | sqlite | postgres) ;;
   *) usage ;;
 esac
+# Archive chỉ để chạy test của một database; `build` thì không chia phần.
+if [ -n "$ARCHIVE" ]; then
+  case "$ONLY" in sqlite | postgres) ;; *) usage ;; esac
+fi
+[ "$ONLY" = build ] && [ ${#SHARD[@]} -gt 0 ] && usage
 # Gate nhanh vốn chỉ có SQLite và đã nhanh: không chia.
 [ "$QUICK" = 1 ] && [ -n "$ONLY" ] && usage
 [ "$QUICK" = 1 ] && [ ${#SHARD[@]} -gt 0 ] && usage
@@ -144,6 +167,9 @@ require() {
 }
 
 require cargo "Install Rust from https://rustup.rs"
+if [ "$ONLY" = build ] || [ -n "$ARCHIVE" ]; then
+  require cargo-nextest "Install it with: cargo install cargo-nextest --locked"
+fi
 if runs lint; then
   require cargo-deny "Install it with: cargo install cargo-deny --locked"
 fi
@@ -217,6 +243,48 @@ if [ "$ONLY" = lint ]; then
   exit 0
 fi
 
+# --- Build test một lần thành archive (D-20261120-ci-nextest-archive) -----------------------------
+
+if [ "$ONLY" = build ]; then
+  ARCHIVE_DIR="${GATE_ARCHIVE_DIR:-target/gate-archive}"
+  mkdir -p "$ARCHIVE_DIR"
+  step "build every test program into a nextest archive ($ARCHIVE_DIR)"
+  cargo nextest archive --workspace --locked --archive-file "$ARCHIVE_DIR/tests.tar.zst"
+  if [ "$PR" = 1 ]; then
+    BASE="${GATE_BASE:-origin/main}"
+    step "tests to run: crates changed since $BASE and their dependents (cargo xtask test-filter)"
+    cargo xtask test-filter --base "$BASE" > "$ARCHIVE_DIR/filter"
+  else
+    echo "all()" > "$ARCHIVE_DIR/filter"
+    # Doc-test cần trình biên dịch nên chạy ở đây, không ở máy chạy archive; như bước 7 của gate
+    # một máy, trên SQLite.
+    step "doc tests"
+    env -u TEST_DATABASE_URL cargo test --workspace --locked --doc
+  fi
+  printf 'filter: %s\n' "$(cat "$ARCHIVE_DIR/filter")"
+  printf '\n\033[32mgate%s --only build: green — test archive built%s\033[0m\n' \
+    "$([ "$PR" = 1 ] && echo ' --pr')" "$([ "$PR" = 1 ] || echo ', doc tests')"
+  exit 0
+fi
+
+# Chạy test từ archive bằng nextest, không biên dịch gì. Gọi thẳng `cargo-nextest` (không qua `cargo`):
+# máy chạy không cần toolchain ghim trong rust-toolchain.toml. Archive giải nén vào chính thư mục
+# repo: test dùng `env!("CARGO_BIN_EXE_autoxide")` (đường dẫn ghi lúc build, `target/debug/autoxide`).
+# Mỗi test chạy trong tiến trình riêng (nextest). `$1`: số test chạy cùng lúc; phần còn lại: tham số cho `env`.
+run_archive() {
+  local threads="$1" filter partition=()
+  shift
+  filter="$(cat "$ARCHIVE/filter")"
+  if [ ${#SHARD[@]} -gt 0 ]; then
+    partition=(--partition "count:${SHARD[1]}")
+  fi
+  env "$@" cargo-nextest nextest run \
+    --archive-file "$ARCHIVE/tests.tar.zst" \
+    --workspace-remap "$PWD" --extract-to "$PWD" --extract-overwrite \
+    --filterset "$filter" "${partition[@]}" \
+    --test-threads "$threads" --no-fail-fast --no-tests pass
+}
+
 # --- Gate nhanh: test của crate bị ảnh hưởng, chỉ SQLite ---------------------------
 
 if [ "$QUICK" = 1 ]; then
@@ -264,6 +332,11 @@ BASE="${GATE_BASE:-origin/main}"
 # `env -u`: bỏ biến nếu người chạy lỡ đặt sẵn, để bước này chắc chắn là SQLite.
 if ! runs sqlite; then
   :
+elif [ -n "$ARCHIVE" ]; then
+  step "tests on SQLite, from the archive in $ARCHIVE (nextest)"
+  # Mỗi nhân hai test: nhiều test chờ I/O (file, S3); `cargo xtask` cũng cho tới 4 chương trình
+  # × 4 thread chạy cùng lúc trên máy 4 nhân.
+  run_archive $(( $(nproc 2>/dev/null || echo 4) * 2 )) -u TEST_DATABASE_URL
 elif [ "$PR" = 1 ]; then
   step "tests on SQLite, crates changed since $BASE only (cargo xtask test-affected)"
   env -u TEST_DATABASE_URL cargo xtask test-affected --base "$BASE" --keep-env "${SHARD[@]}"
@@ -320,6 +393,12 @@ if [ -n "$POSTGRES_URL" ]; then
 else
   step "tests on Postgres ($POSTGRES_IMAGE in Docker)"
   start_postgres
+fi
+if [ -n "$ARCHIVE" ]; then
+  # 16: như POSTGRES_CONCURRENT_TESTS của `cargo xtask test-all` — dưới trần 300 kết nối.
+  run_archive 16 TEST_DATABASE_URL="$POSTGRES_URL"
+  printf '\n\033[32mgate%s --only postgres --archive: green — tests on Postgres\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
+  exit 0
 fi
 if [ "$PR" = 1 ]; then
   TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env "${SHARD[@]}"
