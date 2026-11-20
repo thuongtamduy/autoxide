@@ -388,4 +388,22 @@ mod tests {
         assert!(again.contains(r#"-t "$IMAGE:$VERSION""#));
         assert!(again.contains(r#"echo "version=${TAG#v}""#));
     }
+
+    /// CI và phát hành chạy gate bằng CÙNG một workflow dùng chung (`gate.yml`), không mỗi nơi một cấu hình
+    /// (D-20261120-release-gate-sharded): release.yml không được quay lại chạy `./gate.sh` cả cục trên một máy.
+    #[test]
+    fn ci_va_phat_hanh_dung_chung_workflow_gate() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |file: &str| {
+            std::fs::read_to_string(root.join(".github/workflows").join(file)).unwrap()
+        };
+        for file in ["ci.yml", "release.yml"] {
+            assert!(
+                read(file).contains("uses: ./.github/workflows/gate.yml"),
+                "{file} must call the shared gate.yml"
+            );
+        }
+        assert!(read("gate.yml").contains("workflow_call:"));
+        assert!(!read("release.yml").contains("./gate.sh"));
+    }
 }

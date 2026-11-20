@@ -1,0 +1,181 @@
+# Phần dùng chung của gate trên CI: lint, build test MỘT lần thành archive nextest, rồi test chia shard
+# trên nhiều máy. Hai nơi gọi: `ci.yml` (pull request, push main, chạy tay) và `release.yml` (đẩy tag),
+# để cả hai chạy đúng một cách chia và không lặp cấu hình (D-20261120-release-gate-sharded).
+#
+# Gọi bằng `uses: ./.github/workflows/gate.yml`; ngữ cảnh `github` là của workflow gọi (`event_name`,
+# `ref`, `event.pull_request.title`…), nên pull request vẫn chạy `--pr`, còn push, tag và chạy tay chạy
+# gate đầy đủ. Điều kiện "repo công khai" và "PR ghép lô" do workflow gọi kiểm (ở job gọi), không ở đây.
+#
+# Cache (Swatinem/rust-cache): chỉ main ghi (`save-if`), pull request và tag chỉ đọc (tag đọc được cache
+# của nhánh mặc định). Job build test có khoá `test`; clippy build khác nên có khoá riêng.
+name: Gate (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      postgres-18:
+        description: "Also run the tests on PostgreSQL 18 (besides the minimum supported 16)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: gate / lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Cả lịch sử và tag: `cargo xtask api-diff` so với tag phát hành gần nhất; gitleaks quét
+          # toàn bộ lịch sử.
+          fetch-depth: 0
+      # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: lint
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deny
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only lint
+
+  # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
+  # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
+  # (push lên main) chạy doc-test ở đây.
+  build:
+    name: gate / build tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
+          fetch-depth: 0
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-archive
+          path: target/gate-archive
+          if-no-files-found: error
+          retention-days: 1
+          # Archive đã nén zstd.
+          compression-level: 0
+
+  tests:
+    name: gate / ${{ matrix.target.name }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        # `part`: phần của `./gate.sh --only`; `shard`: phần của `./gate.sh --shard` (nextest
+        # `--partition count:k/n`). Không build nên chia thêm máy rẻ: mỗi máy chỉ tải archive rồi chạy.
+        # Postgres thấp nhất được hỗ trợ (STACK.md) và mới nhất: `postgres-18` tắt thì chỉ chạy bản thấp
+        # nhất (dễ hỏng nhất) để có kết quả sớm — pull request và phát hành; push lên main và chạy tay
+        # thì chạy cả hai (D-20261118-public-ci-openapi-dup).
+        target: >-
+          ${{ fromJSON(inputs.postgres-18 && '[
+            {"name": "sqlite 1/4", "part": "sqlite", "shard": "1/4", "postgres": "16"},
+            {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
+            {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
+            {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
+            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
+            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
+            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 18 1/4", "part": "postgres", "shard": "1/4", "postgres": "18"},
+            {"name": "postgres 18 2/4", "part": "postgres", "shard": "2/4", "postgres": "18"},
+            {"name": "postgres 18 3/4", "part": "postgres", "shard": "3/4", "postgres": "18"},
+            {"name": "postgres 18 4/4", "part": "postgres", "shard": "4/4", "postgres": "18"}
+          ]' || '[
+            {"name": "sqlite 1/4", "part": "sqlite", "shard": "1/4", "postgres": "16"},
+            {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
+            {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
+            {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
+            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
+            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
+            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"}
+          ]') }}
+    services:
+      # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
+      # cho matrix khỏi rẽ nhánh; nó không dùng tới.
+      postgres:
+        image: postgres:${{ matrix.target.postgres }}-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s --health-timeout 5s --health-retries 30
+      # Máy chủ S3 giả lập cho test lưu file (D-066).
+      s3:
+        image: motoserver/moto:5.2.5
+        ports: ["5000:5000"]
+    env:
+      CARGO_TERM_COLOR: always
+      # Database và S3 dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
+      GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
+      GATE_S3_ENDPOINT: http://127.0.0.1:5000
+    steps:
+      # Mã nguồn cùng commit với archive: test đọc file của repo (bản dịch, docs/openapi.json…).
+      - uses: actions/checkout@v7
+      # Không cài toolchain Rust: archive đã build, `gate.sh --archive` gọi thẳng `cargo-nextest`.
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - uses: actions/download-artifact@v8
+        with:
+          name: test-archive
+          path: target/gate-archive
+      # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
+      # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
+      # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
+      - name: Configure the PostgreSQL service like gate.sh
+        if: ${{ matrix.target.part == 'postgres' }}
+        run: |
+          container=${{ job.services.postgres.id }}
+          docker exec "$container" psql -U postgres -q \
+            -c "ALTER SYSTEM SET max_connections = 300" \
+            -c "ALTER SYSTEM SET fsync = off" \
+            -c "ALTER SYSTEM SET synchronous_commit = off" \
+            -c "ALTER SYSTEM SET full_page_writes = off"
+          docker restart "$container" >/dev/null
+          for _ in $(seq 1 30); do
+            docker exec "$container" pg_isready -h 127.0.0.1 -U postgres >/dev/null && \
+              docker exec "$container" psql -h 127.0.0.1 -U postgres -tAc "SHOW max_connections" && exit 0
+            sleep 1
+          done
+          exit 1
+      - name: Create the S3 test bucket
+        run: |
+          for _ in $(seq 1 30); do
+            curl --silent --fail --request PUT "$GATE_S3_ENDPOINT/autoxide-test" && exit 0
+            sleep 1
+          done
+          exit 1
+      # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc (file `filter` trong
+      # archive); push lên main và chạy tay: mọi test (D-20261118-ci-pr-affected-tests).
+      - run: >-
+          ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+          --only ${{ matrix.target.part }} --archive target/gate-archive
+          --shard ${{ matrix.target.shard }}
