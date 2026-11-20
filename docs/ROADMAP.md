@@ -704,12 +704,11 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 - [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
       ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử / thẻ trả trước
       (D-194); số dư là nghĩa vụ trong sổ cái
-- [ ] Danh sách yêu thích (gộp danh sách của trình duyệt vào tài khoản khi đăng nhập), sản phẩm vừa xem;
+- [x] Danh sách yêu thích (gộp danh sách của trình duyệt vào tài khoản khi đăng nhập), sản phẩm vừa xem;
       nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người mua đã đồng ý nhận tin quảng cáo (bước 37);
-      giới thiệu bạn bè có thưởng
-- [ ] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
-      `grant_voucher`, gọi lại không cấp thêm — sinh nhật, đổi điểm, sau khi mua xong (D-20261120-step47-loyalty);
-      giới thiệu bạn làm cùng mục giới thiệu
+      giới thiệu bạn bè có thưởng — D-20261120-step47-engagement
+- [x] Tặng voucher (D-222): sinh nhật, đổi điểm lấy voucher, sau khi mua, giới thiệu bạn — qua
+      `grant_voucher`, gọi lại không cấp thêm — D-20261120-step47-loyalty, D-20261120-step47-engagement
 - [ ] Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (D-233): người mua tự bật, đồng ý riêng, chỉ giảm thật
       ≥ ngưỡng so với giá mốc, tối đa 1 lần / 7 ngày mỗi sản phẩm, gom lô theo khung giờ
 - [ ] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay

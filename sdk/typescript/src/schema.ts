@@ -335,6 +335,11 @@ export type AppliedGuardrailsResponse = {
   max_permissions?: string[] | null;
 };
 
+/** A referral code to enter. */
+export type ApplyReferralRequest = {
+  code: string;
+};
+
 /** Records to tag or untag in one call. */
 export type ApplyTagInput = {
   /** Records that get the tag (those that have it already are skipped). */
@@ -4906,6 +4911,27 @@ export type CreateOrdersCartRequest = {
 export type CreatePlacementRequest = PlacementFields & {
   /** 1 to 64 lower-case letters, digits or `_`, e.g. `home_hero`. */
   key: string;
+};
+
+/** A new referral reward rule; it replaces the current one from now on. */
+export type CreateReferralRuleRequest = {
+  /** ISO 4217 code, e.g. `VND`. */
+  currency: string;
+  /** Smallest currency unit; 0 or more. */
+  min_first_order_minor: number;
+  /** Points for the new buyer (0 to 1000000). */
+  referee_points: number;
+  referee_promotion_id?: string | null;
+  /** Points for the buyer who shared the code (0 to 1000000). */
+  referrer_points: number;
+  referrer_promotion_id?: string | null;
+};
+
+/** A new reminder rule; it replaces the current one from now on. */
+export type CreateReminderRuleRequest = {
+  /** 1 to 5 delays of 15 to 10080 minutes, e.g. `[60, 1440]`. */
+  delays_minutes: number[];
+  enabled: boolean;
 };
 
 /**
@@ -9553,6 +9579,17 @@ export type Data_MyCustomerProfile = {
 };
 
 /** Envelope of a single result. */
+export type Data_MyReferral = {
+  /** Your referral code. */
+  data: {
+    /** Share it: a friend enters it within the first days after signing up. */
+    code: string;
+    /** Friends whose first order earned the reward. */
+    rewarded: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_NavigationView = {
   /** The navigation the caller may use, grouped. */
   data: {
@@ -11310,6 +11347,36 @@ export type Data_RedirectResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ReferralResponse = {
+  /** A referral entered by the buyer. */
+  data: {
+    id: string;
+    /** `pending` until your first order completes, then `rewarded`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ReferralRule = {
+  /** Referral reward rule. */
+  data: {
+    currency: string;
+    effective_from: string;
+    id: string;
+    /** Goods of the first order must reach this amount (smallest currency unit). */
+    min_first_order_minor: number;
+    /** Points for the new buyer. */
+    referee_points: number;
+    /** Voucher promotion for the new buyer. */
+    referee_promotion_id?: string | null;
+    /** Points for the buyer who shared the code. */
+    referrer_points: number;
+    /** Voucher promotion for the buyer who shared the code. */
+    referrer_promotion_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RelocationPlan = {
   /** What a split or merge would do (dry run). Nothing is changed. */
   data: {
@@ -11336,6 +11403,18 @@ export type Data_RelocationPlan = {
     /** Tenant that receives them (split: the new tenant, its id is the id of the branch unit). */
     target_tenant_id: string;
     warnings: RelocationWarning[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_ReminderRule = {
+  /** Abandoned cart reminder rule. */
+  data: {
+    /** Minutes after a cart is abandoned at which reminders go out. */
+    delays_minutes: number[];
+    effective_from: string;
+    enabled: boolean;
+    id: string;
   };
 };
 
@@ -14793,6 +14872,14 @@ export type Data_Vec_ReasonView = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_RecentlyViewed = {
+  data: {
+    product_id: string;
+    viewed_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_RecordEvent = {
   data: {
     actor_id?: string | null;
@@ -14837,6 +14924,25 @@ export type Data_Vec_RecordType = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_ReferralRule = {
+  data: {
+    currency: string;
+    effective_from: string;
+    id: string;
+    /** Goods of the first order must reach this amount (smallest currency unit). */
+    min_first_order_minor: number;
+    /** Points for the new buyer. */
+    referee_points: number;
+    /** Voucher promotion for the new buyer. */
+    referee_promotion_id?: string | null;
+    /** Points for the buyer who shared the code. */
+    referrer_points: number;
+    /** Voucher promotion for the buyer who shared the code. */
+    referrer_promotion_id?: string | null;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_Referrer = {
   data: {
     /** How it points: e.g. `featured_media`, `body`, `menu_item`. */
@@ -14861,6 +14967,17 @@ export type Data_Vec_Release = {
     sections: ReleaseSection[];
     /** `0.14.0`, or `unreleased` for changes in this build that have no version yet. */
     version: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ReminderRule = {
+  data: {
+    /** Minutes after a cart is abandoned at which reminders go out. */
+    delays_minutes: number[];
+    effective_from: string;
+    enabled: boolean;
+    id: string;
   }[];
 };
 
@@ -15360,6 +15477,15 @@ export type Data_Vec_UserFlag = {
     updated_at: string;
     /** Up to 200 characters, e.g. `dismissed` or the last version whose news were seen. */
     value: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_WishlistItem = {
+  data: {
+    added_at: string;
+    product_id: string;
+    variant_id?: string | null;
   }[];
 };
 
@@ -18553,6 +18679,12 @@ export type MergeTag = {
   into: string;
 };
 
+/** Items kept in the browser before signing in. */
+export type MergeWishlistRequest = {
+  /** At most 1000; duplicates and items already in the wishlist are skipped. */
+  items: WishlistItemInput[];
+};
+
 /** A figure that a `metric` trigger can watch. */
 export type MetricTriggerInfo = {
   description: string;
@@ -18928,6 +19060,14 @@ export type MyPermission = {
   name: string;
   /** How careful a grant needs to be: `read`, `write`, `destructive`, `sensitive_data` or `money`. */
   risk: string;
+};
+
+/** Your referral code. */
+export type MyReferral = {
+  /** Share it: a friend enters it within the first days after signing up. */
+  code: string;
+  /** Friends whose first order earned the reward. */
+  rewarded: number;
 };
 
 /** A message from the customer. */
@@ -27189,6 +27329,12 @@ export type RebuildResponse = {
   requeued: number;
 };
 
+/** A recently viewed product. */
+export type RecentlyViewed = {
+  product_id: string;
+  viewed_at: string;
+};
+
 /** An event recorded about a record. */
 export type RecordEvent = {
   actor_id?: string | null;
@@ -27289,6 +27435,30 @@ export type RedirectResponse = {
   /** Target address (a path in the site, or a full URL). */
   to_url?: string | null;
   updated_at: string;
+};
+
+/** A referral entered by the buyer. */
+export type ReferralResponse = {
+  id: string;
+  /** `pending` until your first order completes, then `rewarded`. */
+  status: string;
+};
+
+/** Referral reward rule. */
+export type ReferralRule = {
+  currency: string;
+  effective_from: string;
+  id: string;
+  /** Goods of the first order must reach this amount (smallest currency unit). */
+  min_first_order_minor: number;
+  /** Points for the new buyer. */
+  referee_points: number;
+  /** Voucher promotion for the new buyer. */
+  referee_promotion_id?: string | null;
+  /** Points for the buyer who shared the code. */
+  referrer_points: number;
+  /** Voucher promotion for the buyer who shared the code. */
+  referrer_promotion_id?: string | null;
 };
 
 /** A record that points to the record asked about. */
@@ -27514,6 +27684,15 @@ export type RelocationWarning = {
   code: string;
   message: string;
   table: string;
+};
+
+/** Abandoned cart reminder rule. */
+export type ReminderRule = {
+  /** Minutes after a cart is abandoned at which reminders go out. */
+  delays_minutes: number[];
+  effective_from: string;
+  enabled: boolean;
+  id: string;
 };
 
 /** A new name for a tag. */
@@ -31112,6 +31291,11 @@ export type ViewChanges = {
   params?: Record<string, unknown> | null;
 };
 
+/** A product the buyer just looked at. */
+export type ViewRequest = {
+  product_id: string;
+};
+
 /** Who may load the content without signing in. */
 export type Visibility = "private" | "public";
 
@@ -31127,6 +31311,20 @@ export type VoucherReward = {
   points_cost?: number | null;
   /** The voucher promotion of the promotions module. */
   promotion_id: string;
+};
+
+/** A wishlist item. */
+export type WishlistItem = {
+  added_at: string;
+  product_id: string;
+  variant_id?: string | null;
+};
+
+/** A product (or one variant of it) in the wishlist. */
+export type WishlistItemInput = {
+  product_id: string;
+  /** Omitted: the product as a whole. */
+  variant_id?: string | null;
 };
 
 /** Taxes to withhold. */
@@ -38091,6 +38289,154 @@ export interface paths {
         404: Problem;
         409: Problem;
         503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/recently-viewed": {
+    /** List the products you looked at recently, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_RecentlyViewed;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Record that you looked at a product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ViewRequest;
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/referral": {
+    /** Get your referral code. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_MyReferral;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/referral/apply": {
+    /** Enter the referral code of the friend who invited you. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ApplyReferralRequest;
+      responses: {
+        201: Data_ReferralResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/wishlist": {
+    /** List your wishlist, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_WishlistItem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a product to your wishlist. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: WishlistItemInput;
+      responses: {
+        200: Data_Vec_WishlistItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/wishlist/merge": {
+    /** Merge the wishlist kept in the browser into your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: MergeWishlistRequest;
+      responses: {
+        200: Data_Vec_WishlistItem;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/wishlist/{product_id}": {
+    /** Remove a product (all its variants) from your wishlist. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { product_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/referral-rules": {
+    /** List referral reward rules, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ReferralRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set referral rewards. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateReferralRuleRequest;
+      responses: {
+        201: Data_ReferralRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/reminder-rules": {
+    /** List abandoned cart reminder rules, newest first. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ReminderRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Set abandoned cart reminders. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateReminderRuleRequest;
+      responses: {
+        201: Data_ReminderRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
         default: Problem;
       };
     };

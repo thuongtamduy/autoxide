@@ -82,6 +82,22 @@ The buyer sees their own profile unmasked at `GET /api/v1/customers/me`.
 - **Ledger**: unused points are a liability (`loyalty.liability`) at their value when earned;
   redeeming credits `buyer.prepayments`, expiry credits `loyalty.breakage`.
 
+## Wishlist, recently viewed, reminders, referrals
+
+- **Wishlist** (`/me/wishlist`): products or single variants, up to `AUTOXIDE_CUSTOMERS_WISHLIST_MAX`.
+  Right after signing in, send the list kept in the browser to `POST /me/wishlist/merge`; duplicates
+  are skipped.
+- **Recently viewed** (`/me/recently-viewed`): signed-in buyers only (guests keep it in the browser),
+  newest first, old entries removed every day.
+- **Abandoned cart reminders** (`POST /reminder-rules`, `customers.engagement.manage`): reminders are
+  advertising. They go only to buyers who consented to marketing messages (consent register of
+  `compliance`), consent is checked again right before sending, and they stop when the buyer orders
+  or withdraws consent. `notifications` applies the allowed hours and the unsubscribe link.
+- **Referrals**: every buyer has a code (`GET /me/referral`); a new buyer enters it within
+  `AUTOXIDE_CUSTOMERS_REFERRAL_APPLY_DAYS` days and before the first order (`POST /me/referral/apply`).
+  When that first order completes with enough goods, both are rewarded once, with points and optional
+  vouchers (`POST /referral-rules`). The same phone or email as the referrer is refused.
+
 ## Tags, notes, custom fields
 
 Profiles are records of kind `customers.customer`: internal tags, notes and custom fields come from
@@ -98,6 +114,7 @@ target `customers.customer`). Filter the list by tags with `?tags=<id>,<id>`.
 | `customers.segments.manage` | Create, change, delete groups and their members |
 | `customers.loyalty.manage` | Loyalty rules, tiers and voucher rewards (whole shop) |
 | `customers.loyalty.adjust` | Add or remove points by hand |
+| `customers.engagement.manage` | Cart reminders and referral rewards |
 
 Buyers need no permission: `/me` only needs a signed-in account.
 

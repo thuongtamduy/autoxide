@@ -3,6 +3,7 @@
 //! event giống `orders::lifecycle::payload`), `OrderExtensions` giả giữ `BuyerGroups` được cắm vào,
 //! `AccountVerification` giả trả số đã xác thực.
 
+mod engagement;
 mod fake_ledger;
 mod groups;
 mod loyalty;
@@ -26,13 +27,14 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// Mọi permission của module, độ sâu `tenant`.
-pub(crate) const ALL: [&str; 6] = [
+pub(crate) const ALL: [&str; 7] = [
     "customers.read",
     "customers.manage",
     "customers.contact.reveal",
     "customers.segments.manage",
     "customers.loyalty.manage",
     "customers.loyalty.adjust",
+    "customers.engagement.manage",
 ];
 
 pub(crate) const BUYER: u128 = 101;
@@ -120,6 +122,8 @@ fake_event!(Refunded, autoxide_orders::api::events::REFUND_COMPLETED);
 fake_event!(Confirmed, autoxide_orders::api::events::ORDER_CONFIRMED);
 fake_event!(Cancelled, autoxide_orders::api::events::ORDER_CANCELLED);
 fake_event!(UserDeleted, autoxide_kernel::privacy::USER_DELETED);
+fake_event!(Abandoned, autoxide_orders::api::events::CART_ABANDONED);
+fake_event!(ConsentWithdrawn, autoxide_compliance::api::CONSENT_WITHDRAWN);
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
 pub(crate) struct Tree {
@@ -133,6 +137,9 @@ pub(crate) struct Shop {
     pub extensions: Arc<FakeExtensions>,
     pub accounts: Arc<FakeAccounts>,
     pub promotions: Arc<FakePromotions>,
+    pub notifier: Arc<FakeNotifier>,
+    pub consents: Arc<FakeConsents>,
+    compliance: Arc<Mutex<Option<Outbox>>>,
     orders: Arc<Mutex<Option<Outbox>>>,
     auth: Arc<Mutex<Option<Outbox>>>,
 }
@@ -154,6 +161,9 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
     let extensions = Arc::new(FakeExtensions::default());
     let accounts = Arc::new(FakeAccounts::default());
     let promotions = Arc::new(FakePromotions::default());
+    let notifier = Arc::new(FakeNotifier::default());
+    let consents = Arc::new(FakeConsents::default());
+    let compliance = Arc::new(Mutex::new(None));
     let orders = Arc::new(Mutex::new(None));
     let auth = Arc::new(Mutex::new(None));
     let all: Vec<(&str, Scope)> = ALL.iter().map(|name| (*name, Scope::Tenant)).collect();
@@ -172,6 +182,13 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
         .provide::<dyn OrderExtensions>(extensions.clone())
         .provide::<dyn AccountVerification>(accounts.clone())
         .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
+        .provide::<dyn autoxide_notifications::api::Notifier>(notifier.clone())
+        .provide::<dyn autoxide_compliance::api::ConsentLedger>(consents.clone())
+        .module(Emitter {
+            name: "compliance",
+            events: vec![autoxide_compliance::api::CONSENT_WITHDRAWN],
+            outbox: compliance.clone(),
+        })
         .provide::<dyn autoxide_ledger::api::Ledger>(Arc::new(fake_ledger::FakeLedger::default()))
         .module(Emitter {
             name: "orders",
@@ -181,6 +198,7 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
                 autoxide_orders::api::events::REFUND_COMPLETED,
                 autoxide_orders::api::events::ORDER_CONFIRMED,
                 autoxide_orders::api::events::ORDER_CANCELLED,
+                autoxide_orders::api::events::CART_ABANDONED,
             ],
             outbox: orders.clone(),
         })
@@ -199,7 +217,18 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
     OrgTree::insert(&write, DEFAULT_TENANT, tree.a, chain, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.b, chain, 8).await.unwrap();
     write.commit().await.unwrap();
-    Shop { app, tree, extensions, accounts, promotions, orders, auth }
+    Shop {
+        app,
+        tree,
+        extensions,
+        accounts,
+        promotions,
+        notifier,
+        consents,
+        compliance,
+        orders,
+        auth,
+    }
 }
 
 impl Shop {
@@ -214,6 +243,10 @@ impl Shop {
     /// Ghi event của `orders` giả.
     pub(crate) async fn order_event<E: Event>(&self, event: &E) {
         self.emit(&self.orders, event).await;
+    }
+
+    pub(crate) async fn compliance_event<E: Event>(&self, event: &E) {
+        self.emit(&self.compliance, event).await;
     }
 
     pub(crate) async fn user_deleted(&self, user: Uuid) {
@@ -516,3 +549,102 @@ now_job!(ExpirePointsNow, crate::jobs::EXPIRE_POINTS);
 now_job!(ReleaseHoldsNow, crate::jobs::RELEASE_EXPIRED_HOLDS);
 now_job!(BirthdayNow, crate::jobs::BIRTHDAY_VOUCHERS);
 now_job!(TiersNow, crate::jobs::EVALUATE_TIERS);
+
+/// `Notifier` giả: ghi lại tin.
+#[derive(Default)]
+pub(crate) struct FakeNotifier(pub Mutex<Vec<autoxide_notifications::api::Notification>>);
+
+#[async_trait::async_trait]
+impl autoxide_notifications::api::Notifier for FakeNotifier {
+    fn declare(&self, _: autoxide_notifications::api::NotificationKind) -> Result<(), Error> {
+        Ok(())
+    }
+    async fn notify(
+        &self,
+        _: TenantId,
+        notification: autoxide_notifications::api::Notification,
+    ) -> Result<autoxide_notifications::api::Outcome, Error> {
+        let mut sent = self.0.lock().unwrap();
+        if !sent.iter().any(|old| old.dedupe_key == notification.dedupe_key) {
+            sent.push(notification);
+        }
+        Ok(autoxide_notifications::api::Outcome::default())
+    }
+}
+
+/// Sổ đồng ý giả: tài khoản có đồng ý `marketing`.
+#[derive(Default)]
+pub(crate) struct FakeConsents(pub Mutex<Vec<Uuid>>);
+
+#[async_trait::async_trait]
+impl autoxide_compliance::api::ConsentLedger for FakeConsents {
+    async fn grant(
+        &self,
+        _: TenantId,
+        _: autoxide_compliance::api::ConsentSubject,
+        _: autoxide_compliance::api::ConsentKey,
+        _: autoxide_compliance::api::ConsentEvidence,
+        _: &str,
+    ) -> Result<autoxide_compliance::api::Consent, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn withdraw(
+        &self,
+        _: TenantId,
+        _: autoxide_compliance::api::ConsentSubject,
+        _: autoxide_compliance::api::ConsentKey,
+        _: &str,
+        _: &str,
+    ) -> Result<autoxide_compliance::api::Consent, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn is_granted(
+        &self,
+        _: TenantId,
+        subject: &autoxide_compliance::api::ConsentSubject,
+        key: &autoxide_compliance::api::ConsentKey,
+    ) -> Result<bool, Error> {
+        Ok(key.purpose == "marketing"
+            && matches!(subject, autoxide_compliance::api::ConsentSubject::User(user) if self.0.lock().unwrap().contains(user)))
+    }
+    async fn granted_many(
+        &self,
+        tenant: TenantId,
+        subjects: &[autoxide_compliance::api::ConsentSubject],
+        key: &autoxide_compliance::api::ConsentKey,
+    ) -> Result<Vec<bool>, Error> {
+        let mut out = Vec::new();
+        for subject in subjects {
+            out.push(self.is_granted(tenant, subject, key).await?);
+        }
+        Ok(out)
+    }
+    async fn get(
+        &self,
+        _: TenantId,
+        _: Uuid,
+    ) -> Result<Option<autoxide_compliance::api::Consent>, Error> {
+        Ok(None)
+    }
+}
+
+/// Cho mọi job đang chờ của `customers` tới hạn ngay (giả lập thời gian trôi).
+pub(crate) async fn jobs_due_now(app: &TestApp) {
+    use sea_orm::{ConnectionTrait, Statement};
+    let write = app.database().write();
+    let past = chrono::Utc::now() - chrono::Duration::minutes(1);
+    let sql = match write.get_database_backend() {
+        sea_orm::DatabaseBackend::Postgres => {
+            "UPDATE customers_jobs SET run_at = $1 WHERE completed_at IS NULL"
+        }
+        _ => "UPDATE customers_jobs SET run_at = ? WHERE completed_at IS NULL",
+    };
+    write
+        .execute_raw(Statement::from_sql_and_values(
+            write.get_database_backend(),
+            sql,
+            [past.into()],
+        ))
+        .await
+        .unwrap();
+}

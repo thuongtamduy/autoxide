@@ -10,8 +10,10 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 autoxide-compliance.workspace = true
+getrandom.workspace = true
 autoxide-kernel.workspace = true
 autoxide-ledger.workspace = true
+autoxide-notifications.workspace = true
 autoxide-orders.workspace = true
 autoxide-promotions.workspace = true
 axum.workspace = true
