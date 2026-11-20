@@ -320,3 +320,69 @@ fn service_with_ledger(app: &TestApp) -> Arc<crate::service::ShippingService> {
     parts.ledger = app.api::<dyn Ledger>();
     Arc::new(crate::service::ShippingService::new(parts, Default::default()))
 }
+
+#[tokio::test]
+async fn hai_bang_ke_cung_van_don_chi_ghi_so_mot_lan() {
+    TestDatabase::run(async |test| {
+        let (app, store, account, method) = cod_shop(test, &[]).await;
+        let (id, tracking) = booked(&app, store, &method, "a").await;
+        deliver(&app, &id).await;
+        let csv = format!("tracking_number,cod_amount,fee\n{tracking},520000,20000\n");
+        // Hai bảng kê khác mã cùng có vận đơn này, nhập cùng lúc: Postgres từng cho cả hai cùng
+        // thấy vận đơn chưa chốt và ghi có tiền COD hai lần.
+        let (first, second) = tokio::join!(
+            import(&app, &account, "BK-A", &csv),
+            import(&app, &account, "BK-B", &csv)
+        );
+        assert_eq!(first.0, StatusCode::CREATED, "{}", first.1);
+        assert_eq!(second.0, StatusCode::CREATED, "{}", second.1);
+        // Một bảng kê lặp dòng của vận đơn khác: cũng chỉ ghi một lần.
+        let (other, tracking) = booked(&app, store, &method, "b").await;
+        deliver(&app, &other).await;
+        let csv = format!(
+            "tracking_number,cod_amount,fee\n{tracking},520000,20000\n{tracking},520000,20000\n"
+        );
+        let (status, statement) = import(&app, &account, "BK-C", &csv).await;
+        assert_eq!(status, StatusCode::CREATED, "{statement}");
+        drain(&app).await;
+        let key = AccountKey::new(store, "shipping.settlement_in_transit", Currency::VND)
+            .with_counterparty(Counterparty::new("shipping.carrier_account", account.clone()));
+        assert_eq!(balance(&app, key).await, 1_000_000, "each shipment settled once");
+        assert_eq!(carrier_balance(&app, store, &account).await, 0);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn hai_nguoi_xu_ly_chenh_lech_cung_luc_chi_mot_ben_duoc() {
+    TestDatabase::run(async |test| {
+        let (app, store, account, method) = cod_shop(test, &[]).await;
+        let (id, tracking) = booked(&app, store, &method, "a").await;
+        deliver(&app, &id).await;
+        let csv = format!("tracking_number,cod_amount,fee\n{tracking},500000,20000\n");
+        let (status, statement) = import(&app, &account, "BK-R", &csv).await;
+        assert_eq!(status, StatusCode::CREATED, "{statement}");
+        let (_, list) = call(&app, "GET", "/cod/discrepancies?status=open", "boss", None).await;
+        let mismatch = list["data"][0]["id"].as_str().unwrap().to_owned();
+        let path = format!("/cod/discrepancies/{mismatch}/resolve");
+        let resolve = json!({"resolution_code": "written_off", "note": "Hang khong tra du"});
+        // Hai người bấm giải quyết cùng lúc: Postgres từng cho cả hai cùng thấy `open`, cùng ghi và
+        // cùng phát event.
+        let (first, second) = tokio::join!(
+            call(&app, "POST", &path, "boss", Some(resolve.clone())),
+            call(&app, "POST", &path, "boss", Some(resolve.clone())),
+        );
+        let mut statuses = [first.0, second.0];
+        statuses.sort();
+        assert_eq!(statuses, [StatusCode::OK, StatusCode::CONFLICT], "{first:?} {second:?}");
+        drain(&app).await;
+        assert_eq!(
+            carrier_balance(&app, store, &account).await,
+            500_000,
+            "20 000 written off once"
+        );
+    })
+    .await
+    .unwrap();
+}
