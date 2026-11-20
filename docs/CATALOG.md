@@ -174,6 +174,9 @@ under `/collections` (`catalog.collections.manage` at the collection's unit; rea
 - `texts` by language: `title`, `slug` (unique in the language), `description`, `meta_title`,
   `meta_description`; `media_id` (a public picture); `status` (`draft`, `active`, `archived`) and an
   optional `starts_at` / `ends_at`.
+- `ai_assisted`: the texts were written with an AI's suggestion; the public page carries it so the
+  website shows an AI label (Vietnam's Law on Artificial Intelligence — check the original text). MCP
+  tools set it by default; a person clears it with `PATCH` after rewriting the texts.
 
 The website reads `GET /api/v1/catalog/public/collections/{slug}?locale=vi` (public; `site` or the
 domain): the collection's texts and one page of its products, with the same cards as
@@ -181,6 +184,7 @@ domain): the collection's texts and one page of its products, with the same card
 collections in their time window, of the website or a unit above it, are public. Banners and menus
 point to a collection as `catalog.collection` of the object directory (`/collections/<slug>`). MCP tools:
 `catalog.list_collections`, `catalog.save_collection` (drafts only: a person sets a collection `active`).
+A worked home-page example: [`docs/guides/storefront.md`](guides/storefront.md).
 
 ## For other modules
 

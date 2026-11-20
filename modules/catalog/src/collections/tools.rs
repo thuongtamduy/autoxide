@@ -1,5 +1,6 @@
 //! Tool MCP cho bộ sưu tập (bước 55): cùng service, cùng permission với REST (luật kiến trúc 8).
-//! Tool không bật bộ sưu tập (`active`): chỉ tạo / sửa bản nháp, người dùng bật lên (D-109).
+//! Tool không bật bộ sưu tập (`active`): chỉ tạo / sửa bản nháp, người dùng bật lên (D-109). Chữ do
+//! agent viết mặc định mang dấu `ai_assisted`, như tool banner của `content`.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -81,6 +82,8 @@ pub(crate) struct SaveCollectionInput {
     product_ids: Option<Vec<Uuid>>,
     /// `draft` or `archived`; a tool never makes a collection `active`.
     status: Option<String>,
+    /// The texts came from AI; defaults to `true` for a tool.
+    ai_assisted: Option<bool>,
 }
 
 /// A collection and its `version`.
@@ -127,6 +130,7 @@ async fn save(
             "An AI tool only drafts collections; a person turns them on with `PATCH /api/v1/catalog/collections/<id>`.",
         ));
     }
+    let ai_assisted = input.ai_assisted.unwrap_or(true);
     let detail = match input.id {
         Some(id) => {
             let version = input.version.as_deref().ok_or_else(|| {
@@ -145,6 +149,7 @@ async fn save(
                 starts_at: input.starts_at.map(Some),
                 ends_at: input.ends_at.map(Some),
                 texts: texts(input.texts),
+                ai_assisted: Some(ai_assisted),
             };
             service.update_collection(tenant, principal, id, patch, expected).await?
         }
@@ -162,6 +167,7 @@ async fn save(
                 starts_at: input.starts_at,
                 ends_at: input.ends_at,
                 texts: texts(input.texts),
+                ai_assisted,
             };
             service.create_collection(tenant, principal, new).await?
         }
