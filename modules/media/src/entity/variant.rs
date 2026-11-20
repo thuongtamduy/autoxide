@@ -36,19 +36,31 @@ impl Model {
     pub(crate) fn is_webp(&self) -> bool {
         self.content_type == WEBP
     }
+
+    /// Bản AVIF (bước 39 B8, D-20261119-step39-avif), làm bằng job nền khi bật `AUTOXIDE_MEDIA_AVIF`.
+    pub(crate) fn is_avif(&self) -> bool {
+        self.content_type == AVIF
+    }
 }
 
 /// Loại nội dung của bản WebP.
 pub(crate) const WEBP: &str = "image/webp";
 
+/// Loại nội dung của bản AVIF.
+pub(crate) const AVIF: &str = "image/avif";
+
 /// Khoá ở nơi lưu: `media/<item_id>/<version_id>_w<width>` (JPEG / PNG, cạnh khoá của bản gốc)
-/// hay `…_w<width>.webp` (bản WebP cùng cỡ).
+/// hay `…_w<width>.webp` (bản WebP cùng cỡ), `…_w<width>.avif` (bản AVIF cùng cỡ).
 pub(crate) fn storage_key(
     item_id: Uuid,
     version_id: Uuid,
     width: i32,
     content_type: &str,
 ) -> String {
-    let suffix = if content_type == WEBP { ".webp" } else { "" };
+    let suffix = match content_type {
+        WEBP => ".webp",
+        AVIF => ".avif",
+        _ => "",
+    };
     format!("{}_w{width}{suffix}", crate::entity::item::storage_key(item_id, version_id))
 }

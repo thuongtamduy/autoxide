@@ -26,6 +26,7 @@ ignore = [
   { id = "RUSTSEC-2026-0542", reason = "humantime unmaintained (no vulnerability; flagged because it wraps chrono). Only reached through object_store (S3 storage of the files module); no maintained replacement upstream yet, removed together with chrono. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained (no vulnerability). sqlx and sea-orm (the database layer) are built on it, so it cannot be replaced alone; move to jiff/time when they do. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained (no vulnerability), only used to read IANA time zone names; replaced together with chrono. See docs/DECISIONS.md D-346." },
+  { id = "RUSTSEC-2024-0436", reason = "paste unmaintained (no vulnerability): a compile-time proc-macro pulled in by rav1e, the AVIF encoder of the media module; nothing of it runs in the server. See docs/decisions/D-20261119-step39-avif.md." },
   { id = "RUSTSEC-2026-0459", reason = "SQLite bundled by libsqlite3-sys < 0.39; sqlx-sqlite 0.9.0 (latest) requires < 0.38, so no fixed version can be selected yet. Only exploitable through a database file supplied by an untrusted party, which Autoxide never opens. See docs/DECISIONS.md D-032." },
 ]
 

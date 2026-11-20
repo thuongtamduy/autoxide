@@ -149,6 +149,9 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 # Mã hoá WebP có mất dữ liệu (kèm alpha) cho ảnh thu nhỏ của `media` (D-176, D-196): `image`
 # chỉ mã hoá WebP không mất dữ liệu. Bọc `libwebp` (C, BSD-3-Clause, biên dịch kèm như SQLite).
 webp = { version = "0.3", default-features = false }
+# Mã hoá AVIF cho ảnh thu nhỏ của `media` (bước 39 B8, D-20261119-step39-avif): job nền, tắt mặc định.
+# Rust thuần (`rav1e`, BSD-2-Clause): không bật `asm` (cần `nasm` lúc build) hay `threading` (`rayon`).
+ravif = { version = "0.13", default-features = false }
 # Slug của module `content` (D-102): chuyển chữ Unicode sang ASCII ("Đà Lạt" → "da-lat").
 slug = "0.1"
 # Bỏ dấu khi tìm theo chữ ("da lat" ra "Đà Lạt"): tách chữ và dấu (NFD) rồi bỏ dấu

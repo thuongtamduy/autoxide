@@ -600,6 +600,49 @@ làn giống hệt `dot` cũ ở mọi cỡ. Kết luận: dưới ngưỡng 50 
 trên máy 4 nhân; vòng duyệt không còn chạy trên thread async. Giới hạn kế tiếp là bộ nhớ (cột cuối, mỗi khách mỗi
 ngôn ngữ mỗi bản), không phải thời gian.
 
+## Rà index bằng EXPLAIN (bước 39, D-20261120-step39-index-review) — 20/11/2026
+
+Bộ dữ liệu `full` như mục "Đọc công khai trên bộ dữ liệu cỡ thật"; máy 4 nhân dùng chung; Postgres 16 cài thường. Gọi hết các
+endpoint danh sách của `content`, `media`, `comments`, `auth` (từng tham số lọc, `order`, `count`), lấy plan thật từ
+`auto_explain`, rồi chạy `EXPLAIN QUERY PLAN` trên SQLite cho 273 câu SELECT khác nhau với cùng tham số.
+
+| Truy vấn | Postgres (plan, một request) | SQLite (plan, một request) | Quyết định |
+| --- | --- | --- | --- |
+| Danh sách công khai lọc theo danh mục / thẻ / tác giả | quét ngược `content_published_list_idx`, dò `content_entry_terms_pkey`: 62 ms | `content_entry_terms_term_idx` rồi sắp xếp tạm: 176 ms (danh mục lớn nhất) | đủ index (đã có `term_idx`, `author_idx`); phần chậm là thống kê thô của SQLite |
+| Hàng đợi duyệt (`comments_targets`, `pending_count > 0`, 2% chờ duyệt) | đi theo `uid_key`: 11 ms; thêm thử `(tenant_id, pending_count, uid)`: 18 ms, không được dùng | `uid_key`: 24 ms; thêm thử: 22 ms, không được dùng | không thêm |
+| `search_key LIKE '%…%'` (tìm trong `content`) | quét song song `content_entries`: 429 ms (công khai), 1 377 ms (quản trị) | đỏ như BENCHMARKS đã ghi | không có index chạy cả hai database; việc của `content` |
+| `count=true` danh sách công khai | `COUNT(*)` qua `content_published`: 62–95 ms | quét index phủ | đếm phải đọc hết |
+| Nạp toàn bộ `content_revisions` (3,9 s), `content_entry_terms` (2,4 s) không `WHERE` | một lần lúc máy chủ khởi động, ngoài đường request (cần đối chiếu nơi gọi) | — | không phải truy vấn danh sách |
+| Nhận event / job chờ (`<module>_events`, `<module>_jobs`) | index `*_pending_sweep_idx` | cùng index, sắp xếp tạm chỉ trên tập chờ (nhỏ) | đúng thiết kế |
+
+Mọi câu danh sách còn lại của bốn module dùng index (không `Seq Scan` / `SCAN` bảng lớn). Bảng của module khác trống nên chưa
+rà được (xem quyết định).
+
+## Ảnh AVIF so với WebP (bước 39 B8, D-232) — 19/11/2026
+
+Quyết định: D-20261119-step39-avif. Máy như các mục trên (4 nhân Xeon 2,1 GHz dùng chung), build release, một chương
+trình đo tạm ngoài repo (`image` 0.25 đổi cỡ bằng CatmullRom như job ảnh thu nhỏ; WebP qua `webp` 0.3 chất lượng 80 như
+D-196; AVIF qua `ravif` 0.13, tốc độ 6; điểm bằng `dssim-core` 3.5, giải mã AVIF bằng `avifdec` — công cụ chấm điểm
+chạy ngoài repo, không vào workspace). Với mỗi cỡ, chọn chất lượng AVIF thấp nhất (bước 5) có DSSIM không kém bản WebP.
+
+Bộ ảnh: `lake.jpg` 4000 × 2250 (ảnh chụp, CC0, đi kèm crate `webp`); ảnh sản phẩm nền trắng 1600 × 1600 và bản cắt nền
+trong suốt (tự dựng bằng code: thân chai đổ bóng, nhãn có hoa văn); banner có chữ 2400 × 800 (tự dựng: nền chuyển
+màu, nét chữ mảnh tương phản cao, nút).
+
+| Ảnh | WebP 80, tổng các cỡ | AVIF cùng chất lượng | Chất lượng AVIF chọn | Mã hoá AVIF tổng, 1 thread (asm / Rust thuần) |
+| --- | ---: | ---: | :---: | ---: |
+| `lake.jpg` (320, 640, 1280, 1920) | 140 KB | 98 KB (**−30%**) | 75–80 | 4,9 s / 7,8 s |
+| sản phẩm nền trắng (320, 640, 1280) | 53 KB | 32 KB (**−39%**) | 60–75 | 2,8 s / — |
+| sản phẩm trong suốt (320, 640, 1280) | 72 KB | 40 KB (**−44%**) | 60–75 | 2,6 s / — |
+| banner có chữ (320, 640, 1280, 1920) | 267 KB | 192 KB (**−28%**) | 70–85 | 4,1 s / 6,8 s |
+
+Từng cỡ: nhẹ hơn 10–48%; ít nhất ở ảnh nhỏ nhất có chữ (320 px: −10%). WebP mã hoá 3–250 ms mỗi cỡ; AVIF chậm hơn
+20–40 lần — lý do chỉ làm bằng job nền, tắt mặc định. RAM đỉnh khi mã hoá cả 4 cỡ của `lake.jpg` (kể cả ảnh gốc đã giải
+mã): 146 MiB. Build sạch riêng `ravif` + `rav1e`: ~49 s, binary thêm ~3 MB.
+
+Ngưỡng (D-232): trung vị tiết kiệm ≥ 20% (đạt: −34%), tổng 4 cỡ ≤ 10 s một thread (đạt: 7,8 s Rust thuần), RAM ≤ 512 MiB
+(đạt) → làm.
+
 ## Rate limit theo API key đếm chung qua database (bước 40 P6) — 18/11/2026
 
 Cùng một binary release, máy 4 CPU, máy tạo tải chạy chung, chế độ `single`, 6 giây mỗi bài, 64 kết nối, 3 lượt xen kẽ,

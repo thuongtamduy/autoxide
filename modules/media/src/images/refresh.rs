@@ -28,8 +28,9 @@ pub(crate) fn task(service: Arc<MediaService>, databases: DatabaseRegistry) -> T
         "refresh_variants",
         "Queue new smaller copies for every image whose copies no longer match \
          AUTOXIDE_MEDIA_IMAGE_WIDTHS (run it after changing that setting) or have no WebP copy \
-         yet (images processed before WebP copies were added). The worker makes them in the background; \
-         nothing else changes.",
+         yet (images processed before WebP copies were added), and — when AUTOXIDE_MEDIA_AVIF is \
+         `true` — AVIF copies for images that have none yet. The worker makes them in the \
+         background; nothing else changes.",
         Arc::new(Refresh { service, databases }),
     )
     .argument(TaskArgument::optional(
@@ -117,22 +118,32 @@ impl MediaService {
             };
             after = Some(last.id);
             let made = variants_of(tenant.database().read(), tenant, &items).await?;
-            let outdated: Vec<&Item> = items
-                .iter()
-                .filter(|item| {
-                    let rows = made.get(&item.id).map(Vec::as_slice).unwrap_or_default();
-                    let saved: BTreeSet<i32> =
-                        rows.iter().filter(|row| !row.is_webp()).map(|row| row.width).collect();
-                    let webp: BTreeSet<i32> =
-                        rows.iter().filter(|row| row.is_webp()).map(|row| row.width).collect();
-                    let wanted = wanted_widths(&self.config.image_widths, item);
-                    // Ảnh làm trước khi có bản WebP (D-196): cỡ nào thiếu WebP thì làm lại cả bộ.
-                    needs_refresh(&wanted, &saved, item) || saved != webp
-                })
-                .collect();
+            // Ảnh lệch cấu hình → làm lại cả bộ (job ảnh thu nhỏ tự xếp bản AVIF khi bật). Ảnh đủ bộ
+            // mà thiếu bản AVIF khi đã bật `AUTOXIDE_MEDIA_AVIF` → chỉ xếp job AVIF (bước 39 B8).
+            let mut outdated: Vec<&Item> = Vec::new();
+            let mut without_avif: Vec<&Item> = Vec::new();
+            for item in &items {
+                let rows = made.get(&item.id).map(Vec::as_slice).unwrap_or_default();
+                let saved: BTreeSet<i32> = rows
+                    .iter()
+                    .filter(|row| !row.is_webp() && !row.is_avif())
+                    .map(|row| row.width)
+                    .collect();
+                let webp: BTreeSet<i32> =
+                    rows.iter().filter(|row| row.is_webp()).map(|row| row.width).collect();
+                let avif: BTreeSet<i32> =
+                    rows.iter().filter(|row| row.is_avif()).map(|row| row.width).collect();
+                let wanted = wanted_widths(&self.config.image_widths, item);
+                // Ảnh làm trước khi có bản WebP (D-196): cỡ nào thiếu WebP thì làm lại cả bộ.
+                if needs_refresh(&wanted, &saved, item) || saved != webp {
+                    outdated.push(item);
+                } else if self.config.avif && !saved.is_empty() && saved != avif {
+                    without_avif.push(item);
+                }
+            }
             checked += items.len();
-            stale += outdated.len();
-            if !dry_run && !outdated.is_empty() {
+            stale += outdated.len() + without_avif.len();
+            if !dry_run && (!outdated.is_empty() || !without_avif.is_empty()) {
                 // Một transaction ngắn mỗi lô: chỉ ghi dòng job.
                 let transaction = tenant.database().begin_write().await?;
                 for item in outdated {
@@ -141,6 +152,9 @@ impl MediaService {
                     let options = EnqueueOptions::default()
                         .unique_key(format!("refresh:{}:{}", item.id, item.version_id));
                     self.jobs.enqueue(&transaction, tenant, &job, options).await?;
+                }
+                for item in without_avif {
+                    self.enqueue_avif(&transaction, tenant, item.id, item.version_id).await?;
                 }
                 transaction.commit().await?;
             }
