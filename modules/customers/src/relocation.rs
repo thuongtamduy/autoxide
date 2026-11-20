@@ -41,4 +41,6 @@ pub(crate) fn relocation() -> Relocation {
                 parent_column: "order_id",
             },
         )
+        // Bộ đếm tra mã sai: tạm, mất khi tách / gộp không sao (đếm lại từ đầu).
+        .ephemeral(&["customers_throttle"])
 }
