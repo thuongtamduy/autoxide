@@ -103,6 +103,22 @@ pub(crate) fn not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
+/// Đọc và khoá dòng phiếu `id` tới hết `transaction` ghi (D-181). Mọi đường đọc trạng thái phiếu
+/// rồi ghi lại (đổi trạng thái, thêm tin, đếm lần thử mã, trả lời tự động) khoá qua đây: trên
+/// Postgres hai transaction không cùng đọc trạng thái cũ rồi ghi đè nhau (phiếu đã đóng bị mở lại,
+/// lần thử mã bị đếm mất); SQLite vốn một bên ghi mỗi lúc.
+pub(crate) async fn lock_ticket(
+    transaction: &sea_orm::DatabaseTransaction,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<Ticket, Error> {
+    use autoxide_kernel::tenancy::ScopeExt as _;
+    use sea_orm::EntityTrait as _;
+    autoxide_kernel::rows::lock_one(transaction, ticket::Entity::find_by_id(id).scoped(tenant))
+        .await?
+        .ok_or_else(|| not_found(id))
+}
+
 /// Lỗi "ngoài phạm vi đọc" thành 404 (không lộ phiếu tồn tại).
 pub(crate) fn hidden(result: Result<(), Error>, id: Uuid) -> Result<(), Error> {
     result.map_err(|error| if error.code() == "org_out_of_scope" { not_found(id) } else { error })

@@ -481,11 +481,10 @@ impl SupportService {
             self.check_team(tenant, &before, team).await?;
         }
         let transaction = tenant.database().begin_write().await?;
-        let before = ticket::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| not_found(id))?;
+        // Khoá phiếu: hai lần đổi trạng thái cùng lúc nối đuôi nhau — lần sau xét bước chuyển từ
+        // trạng thái lần trước vừa ghi, không cùng xuất phát từ trạng thái cũ (phát event trùng,
+        // mở lại phiếu đã đóng).
+        let before = crate::service::lock_ticket(&transaction, tenant, id).await?;
         principal.require_write_at(&transaction, &TICKETS_REPLY, target(&before)).await?;
         let at = now();
         let mut row = before.clone().into_active_model();

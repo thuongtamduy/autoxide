@@ -148,3 +148,30 @@ async fn gop_phieu_vang_lai_vao_tai_khoan() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn doan_ma_dong_thoi_van_bi_dem_du_lan_thu() {
+    TestDatabase::run(async |test| {
+        let harness = harness(test).await;
+        let app = &harness.app;
+        let (id, token) = open_as_guest(app, json!({"email": "doan@example.com"})).await;
+        let verify = format!("/public/tickets/{id}/verify");
+        // Phát mã, rồi gửi một loạt mã sai cùng lúc: mỗi lần đoán phải được đếm. Postgres từng cho
+        // cả loạt cùng thấy 0 lần thử, nên giới hạn 5 lần mất tác dụng và mã đúng vẫn dùng được.
+        let (status, _) = call(app, "POST", &verify, "", Some(json!({"token": token}))).await;
+        assert_eq!(status, StatusCode::OK);
+        let code = harness.notifier.last_code();
+        let wrong =
+            json!({"token": token, "code": if code == "000000" { "111111" } else { "000000" }});
+        let guess = || call(app, "POST", &verify, "", Some(wrong.clone()));
+        let results = tokio::join!(guess(), guess(), guess(), guess(), guess(), guess());
+        for (status, _) in [results.0, results.1, results.2, results.3, results.4, results.5] {
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        let (status, problem) =
+            call(app, "POST", &verify, "", Some(json!({"token": token, "code": code}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+    })
+    .await
+    .unwrap();
+}

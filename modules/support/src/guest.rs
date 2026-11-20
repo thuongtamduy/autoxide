@@ -204,11 +204,9 @@ impl SupportService {
         };
         let expected = self.code_hash(tenant, id, code).await?;
         let transaction = tenant.database().begin_write().await?;
-        let current = ticket::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| not_found(id))?;
+        // Khoá dòng phiếu: N lần đoán mã cùng lúc nối đuôi nhau, mỗi lần thấy số lần thử của lần
+        // trước — không thì Postgres cho cả N cùng thấy 0 lần thử và giới hạn 5 lần mất tác dụng.
+        let current = crate::service::lock_ticket(&transaction, tenant, id).await?;
         let live = current.otp_expires_at.is_some_and(|at| at > Utc::now())
             && current.otp_attempts < OTP_ATTEMPTS;
         let mut row = current.clone().into_active_model();
