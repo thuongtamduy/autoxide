@@ -15,10 +15,11 @@ use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+use axum::extract::ws::rejection::WebSocketUpgradeRejection;
 use axum::extract::ws::{CloseFrame, Message, Utf8Bytes, WebSocket, WebSocketUpgrade};
 use axum::extract::{FromRequestParts, Query, State};
 use axum::http::request::Parts;
-use axum::response::Response;
+use axum::response::{IntoResponse, Response};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, mpsc};
 use utoipa::IntoParams;
@@ -123,7 +124,9 @@ async fn events_ws(
     principal: Principal,
     Query(query): Query<WsQuery>,
     parts: Parts,
-    upgrade: WebSocketUpgrade,
+    // Nhận cả lỗi bắt tay thay vì để axum từ chối ngay: client biết trước máy chủ tắt stream (404),
+    // thiếu đăng nhập (401) hay sai `names` (422) — cùng thứ tự lỗi với SSE — rồi mới tới lỗi bắt tay.
+    upgrade: Result<WebSocketUpgrade, WebSocketUpgradeRejection>,
 ) -> Result<Response, Error> {
     if !state.hub.enabled() {
         return Err(disabled());
@@ -136,6 +139,10 @@ async fn events_ws(
         .filter(|raw| !raw.trim().is_empty())
         .map(parse_last_event_id)
         .transpose()?;
+    let upgrade = match upgrade {
+        Ok(upgrade) => upgrade,
+        Err(rejection) => return Ok(rejection.into_response()),
+    };
     // Giữ chỗ trước khi đổi giao thức: vượt giới hạn thì trả 429 như SSE.
     let ticket = state.hub.session(&tenant, principal.user_id())?;
     let receiver = state.hub.connect(&tenant, filter, last, None);

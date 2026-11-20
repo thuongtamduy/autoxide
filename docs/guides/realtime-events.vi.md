@@ -55,6 +55,10 @@ Event được giao **ít nhất một lần**. Khi mất kết nối, nối l�
 
 Event được giữ 7 ngày. Khi `id` cuối cũ hơn, stream gửi `event: reset` trước: tải lại dữ liệu qua REST rồi nghe tiếp. Máy chủ cũng đóng mỗi stream sau 30 phút (để permission bị thu hồi có hiệu lực) và khi tắt; nối lại cùng cách. Nhiều máy chủ sau bộ cân bằng tải vẫn đúng: máy chủ nào cũng đọc event từ database, nên nối lại vào máy nào cũng được.
 
+## Hai chiều: WebSocket
+
+App còn gửi tín hiệu tức thời ("đang gõ", "online") — chat, màn hình vị trí người giao hàng — dùng `GET /api/v1/kernel/events/ws`: cùng event, cùng quyền, cùng cách nối lại và giới hạn qua WebSocket, thêm lệnh điều khiển từ app. Ghi dữ liệu vẫn qua REST. Xem [Làm app điện thoại hay app máy tính](mobile.vi.md#7-event-thời-gian-thực-và-tín-hiệu-tức-thời).
+
 ## Giới hạn
 
 Mỗi máy chủ giữ tối đa `AUTOXIDE_EVENTS_STREAM_MAX_PER_USER` stream mỗi người dùng (mặc định 5), `AUTOXIDE_EVENTS_STREAM_MAX_PER_TENANT` mỗi khách (200) và `AUTOXIDE_EVENTS_STREAM_MAX_CONNECTIONS` tổng cộng (1000); vượt thì nhận `429 kernel.stream_too_many`. Mỗi màn hình mở một stream với mọi tên event nó cần, không phải mỗi event một stream. Sau Nginx, response đã có `X-Accel-Buffering: no`; proxy khác không được đệm `text/event-stream`.

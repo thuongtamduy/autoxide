@@ -203026,7 +203026,7 @@
                 }
               }
             },
-            "description": "Missing `plans.billing.manage` (`permission_denied`), or the platform tenant (`plans.platform_exempt`)."
+            "description": "Missing `plans.billing.manage`; code `permission_denied`."
           },
           "404": {
             "content": {
@@ -203056,7 +203056,7 @@
                 }
               }
             },
-            "description": "The store does not confirm the purchase (`errors` on `proof`), or its product is not linked to a plan (`plans.store_product_unknown`)."
+            "description": "The store does not confirm the purchase (`errors` on `proof`), its product is not linked to a plan (`plans.store_product_unknown`), or the tenant is the platform, which no plan limits (`plans.platform_exempt`)."
           },
           "503": {
             "content": {

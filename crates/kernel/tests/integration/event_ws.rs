@@ -396,3 +396,42 @@ async fn tin_hieu_chi_trong_chu_de_duoc_vao() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn loi_cua_ban_tay_theo_thu_tu_nhu_sse() {
+    TestDatabase::run(async |test| {
+        let server = server(test).await;
+        let path = "/api/v1/kernel/events/ws?names=notes.*";
+        // Chưa đăng nhập: 401 trước khi xét bắt tay.
+        let response = server.app.get(path).send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 401, "{}", response.text());
+        // Tên event không có: 422, cũng trước khi xét bắt tay.
+        let response = server
+            .app
+            .get("/api/v1/kernel/events/ws?names=notes.missing")
+            .token("ada")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status().as_u16(), 422, "{}", response.text());
+        // Đủ điều kiện nhưng không phải bắt tay WebSocket: 400.
+        let response = server.app.get(path).token("ada").send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 400, "{}", response.text());
+        assert_eq!(response.json()["code"], "bad_request");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn may_chu_tat_stream_tra_404_ca_khi_khong_phai_ban_tay() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test).user("ada", 0xada, &[]).build().await.unwrap();
+        let response =
+            app.get("/api/v1/kernel/events/ws?names=notes.*").token("ada").send().await.unwrap();
+        assert_eq!(response.status().as_u16(), 404, "{}", response.text());
+        assert_eq!(response.json()["code"], "kernel.stream_disabled");
+    })
+    .await
+    .unwrap();
+}
