@@ -276,9 +276,11 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       `/public/sitemap`, `/public/feed`, `/public/search`, ảnh và bản nhỏ, bình luận của bài
       (`/public/threads`, `/public/comments`). Đặt ngưỡng p95 mỗi đường, ghi vào `docs/BENCHMARKS.md` — đo 19/11/2026: lỗi thống kê SQLite đã sửa (D-20261118-step39-sqlite-optimize); đường còn đỏ (lọc
       theo danh mục, tìm theo từ của `content`; danh sách đầy đủ trên SQLite) ghi ở BENCHMARKS, báo phiên giữ `content`
-- [ ] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
+- [x] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
       truy vấn danh sách, lọc, đếm của các module trên bộ dữ liệu lớn; index thiếu thêm bằng
-      migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau
+      migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau — xong cho bốn module có dữ liệu cỡ thật (`auth`, `content`, `media`,
+      `comments`): không có index thiếu thật sự, không thêm migration; module khác chưa có bộ dữ liệu mẫu,
+      D-20261120-step39-index-review
 - [x] Nén response (gzip, brotli): đo cỡ và thời gian trên JSON thật (danh sách, `openapi.json`
       hơn 1 MB), rồi quyết nén trong app (`tower-http`) hay để reverse proxy làm; không nén lại
       file đã nén (ảnh). Ghi quyết định; sửa `docs/DEPLOY.md` (EN + VI) theo — nén trong app, mức 1, D-20261119-step39-compression

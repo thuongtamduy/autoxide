@@ -415,6 +415,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
+- **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19
 - **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
 
 ## Tiền, thuế, chứng từ
@@ -526,3 +527,4 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
 - **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
 - **[D-20261119-step39-semantic-scan](D-20261119-step39-semantic-scan.md)** Tìm theo ý nghĩa trên dữ liệu lớn: `dot` dùng SIMD, duyệt chia nhiều nhân ngoài thread async — 2026-11-19
+- **[D-20261120-step39-index-review](D-20261120-step39-index-review.md)** Rà index bằng EXPLAIN trên bộ dữ liệu `full`: không thêm migration — 2026-11-20

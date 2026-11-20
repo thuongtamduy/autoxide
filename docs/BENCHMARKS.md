@@ -600,6 +600,24 @@ làn giống hệt `dot` cũ ở mọi cỡ. Kết luận: dưới ngưỡng 50 
 trên máy 4 nhân; vòng duyệt không còn chạy trên thread async. Giới hạn kế tiếp là bộ nhớ (cột cuối, mỗi khách mỗi
 ngôn ngữ mỗi bản), không phải thời gian.
 
+## Rà index bằng EXPLAIN (bước 39, D-20261120-step39-index-review) — 20/11/2026
+
+Bộ dữ liệu `full` như mục "Đọc công khai trên bộ dữ liệu cỡ thật"; máy 4 nhân dùng chung; Postgres 16 cài thường. Gọi hết các
+endpoint danh sách của `content`, `media`, `comments`, `auth` (từng tham số lọc, `order`, `count`), lấy plan thật từ
+`auto_explain`, rồi chạy `EXPLAIN QUERY PLAN` trên SQLite cho 273 câu SELECT khác nhau với cùng tham số.
+
+| Truy vấn | Postgres (plan, một request) | SQLite (plan, một request) | Quyết định |
+| --- | --- | --- | --- |
+| Danh sách công khai lọc theo danh mục / thẻ / tác giả | quét ngược `content_published_list_idx`, dò `content_entry_terms_pkey`: 62 ms | `content_entry_terms_term_idx` rồi sắp xếp tạm: 176 ms (danh mục lớn nhất) | đủ index (đã có `term_idx`, `author_idx`); phần chậm là thống kê thô của SQLite |
+| Hàng đợi duyệt (`comments_targets`, `pending_count > 0`, 2% chờ duyệt) | đi theo `uid_key`: 11 ms; thêm thử `(tenant_id, pending_count, uid)`: 18 ms, không được dùng | `uid_key`: 24 ms; thêm thử: 22 ms, không được dùng | không thêm |
+| `search_key LIKE '%…%'` (tìm trong `content`) | quét song song `content_entries`: 429 ms (công khai), 1 377 ms (quản trị) | đỏ như BENCHMARKS đã ghi | không có index chạy cả hai database; việc của `content` |
+| `count=true` danh sách công khai | `COUNT(*)` qua `content_published`: 62–95 ms | quét index phủ | đếm phải đọc hết |
+| Nạp toàn bộ `content_revisions` (3,9 s), `content_entry_terms` (2,4 s) không `WHERE` | một lần lúc máy chủ khởi động, ngoài đường request (cần đối chiếu nơi gọi) | — | không phải truy vấn danh sách |
+| Nhận event / job chờ (`<module>_events`, `<module>_jobs`) | index `*_pending_sweep_idx` | cùng index, sắp xếp tạm chỉ trên tập chờ (nhỏ) | đúng thiết kế |
+
+Mọi câu danh sách còn lại của bốn module dùng index (không `Seq Scan` / `SCAN` bảng lớn). Bảng của module khác trống nên chưa
+rà được (xem quyết định).
+
 ## Ảnh AVIF so với WebP (bước 39 B8, D-232) — 19/11/2026
 
 Quyết định: D-20261119-step39-avif. Máy như các mục trên (4 nhân Xeon 2,1 GHz dùng chung), build release, một chương
