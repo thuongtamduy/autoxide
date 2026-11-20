@@ -92,6 +92,25 @@ pub fn affected(workspace: &Workspace, changed: &[String]) -> Affected {
     }
 }
 
+/// `cargo xtask test-filter --base <ref>`: filterset của nextest chọn đúng các crate mà
+/// `test-affected --base <ref>` chạy — CI build test một lần thành archive của nextest rồi chạy ở
+/// nhiều máy, nên việc chọn crate làm trước, ở máy build (D-20261120-ci-nextest-archive).
+pub fn filter(workspace: &Workspace, base: &str) -> Result<String, String> {
+    let changed = changed_files(&workspace.root, base)?;
+    Ok(filterset(&affected(workspace, &changed)))
+}
+
+/// Filterset của nextest cho một lựa chọn crate: `all()`, `none()` hay `package(=a) | package(=b)`.
+fn filterset(selected: &Affected) -> String {
+    match selected {
+        Affected::All => "all()".to_owned(),
+        Affected::Crates(crates) if crates.is_empty() => "none()".to_owned(),
+        Affected::Crates(crates) => {
+            crates.iter().map(|name| format!("package(={name})")).collect::<Vec<_>>().join(" | ")
+        }
+    }
+}
+
 /// Cây file của lần `test-affected` xanh gần nhất. Ref cục bộ: `git push` chỉ đẩy nhánh và tag.
 const GREEN_REF: &str = "refs/autoxide/quick-green";
 
@@ -734,6 +753,16 @@ mod tests {
     fn changed(files: &[&str]) -> Affected {
         let files: Vec<String> = files.iter().map(|file| (*file).to_owned()).collect();
         affected(&workspace(), &files)
+    }
+
+    #[test]
+    fn filterset_cua_nextest_theo_lua_chon() {
+        assert_eq!(filterset(&Affected::All), "all()");
+        assert_eq!(filterset(&crates(&[])), "none()");
+        assert_eq!(
+            filterset(&crates(&["autoxide", "autoxide-notes"])),
+            "package(=autoxide) | package(=autoxide-notes)"
+        );
     }
 
     #[test]
