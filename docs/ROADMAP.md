@@ -916,6 +916,22 @@ build và chạy test của cả workspace (ở đợt này, một lượt gate 
 lần lượt chỉ sửa `xtask`, phần lớn là test e2e của binary). Hướng có thể xét: chỉ chạy test của crate phụ thuộc vào đúng phần
 công khai bị đổi, hay tách phần ít đổi của kernel thành crate riêng. Chưa làm.
 
+## Việc tồn đọng sau v0.15.0 (đánh giá ngày 20/11/2026)
+
+Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi quyết định riêng.
+
+- [ ] Đăng nhập / tạo tài khoản bằng số điện thoại + OTP (tài khoản không bắt buộc email — thay đổi phá vỡ của
+      `auth`, cần quyết định) — làm cùng bước 47 (chuyển từ bước 45)
+- [ ] Nối nhà cung cấp thật đầu tiên cho luồng bán chính: thanh toán, SMS, vận chuyển, hoá đơn điện tử (mỗi loại một
+      đối tác; chủ dự án chọn đối tác và cấp tài khoản thử) — hiện mọi nhà cung cấp chỉ có bộ giả
+- [ ] Ghép lô chạy thêm test Postgres cho crate bị sửa (lỗi đồng thời của #246 và luồng sự kiện chỉ lộ trên Postgres
+      ở CI); rà mọi chỗ "đọc → so → ghi event" ở các module tìm chỗ thiếu khoá
+- [ ] `/kernel/find`, `/kernel/work` bỏ nguồn chậm khi máy bận: đo lại hạn mỗi nguồn và để client hiện rõ phần thiếu
+- [ ] Tách kernel (nút thắt build: sửa kernel phải build lại gần hết, xem D-20261120-build-faster)
+- [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn; cài `cargo-semver-checks` cho bước phát hành
+- [ ] Đăng SDK lên npm / Maven / pub (chờ tài khoản của chủ dự án)
+- [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); `chrono` không còn bảo trì (D-346, chờ sqlx / sea-orm)
+
 ## Chờ chủ dự án
 
 ## 50. Công khai repo (chờ chủ dự án, D-175, D-197, D-199)
