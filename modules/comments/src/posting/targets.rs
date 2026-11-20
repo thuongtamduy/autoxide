@@ -348,11 +348,21 @@ impl CommentsService {
         if existing.is_none() {
             ensure_target(&transaction, tenant, &self.config, kind, id, now).await?;
         }
-        let before = target::Entity::find_by_id(key)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| Error::internal("target row missing after insert"))?;
+        // Khoá dòng đích rồi mới tính trạng thái mới (D-181): hai lần đổi cùng lúc (quản trị ẩn
+        // đích, module chủ đổi hạn đóng) nối đuôi nhau trên Postgres — bên sau thấy `hidden` bên
+        // trước vừa ghi, không ghi đè lệnh ẩn bằng giá trị cũ, không phát `TargetClosed` hai lần.
+        let before = autoxide_kernel::rows::lock_one(
+            &transaction,
+            target::Entity::find_by_id(key).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(|| Error::internal("target row missing after insert"))?;
+        // Phiên bản người gọi đã đọc: kiểm lại trên dòng đã khoá (bản đọc ở trên chưa khoá).
+        if let (Some(expected), Some(_)) = (expected, &existing)
+            && before.updated_at != expected
+        {
+            return Err(autoxide_kernel::version::changed());
+        }
         let mut row = before.clone().into_active_model();
         let mut hidden = before.hidden;
         let mut state = before.state.clone();
