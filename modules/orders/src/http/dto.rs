@@ -212,6 +212,11 @@ pub(crate) struct CartResponse {
     shipping: ShippingResponse,
     ship_to: Option<ShipToResponse>,
     payment_method: Option<String>,
+    /// Ways to pay this cart: `cod` (cash on delivery, when the shop allows it and the cart is
+    /// delivered; a buyer with too many refused deliveries may still be asked to pay first),
+    /// `bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`
+    /// (through a partner).
+    payment_methods: Vec<String>,
     attribution: Option<AttributionResponse>,
     totals: TotalsResponse,
     /// How much more to spend for free shipping (`0`: already free), when the option has a
@@ -268,6 +273,7 @@ impl CartResponse {
             },
             ship_to: view.ship_to.map(ShipToResponse::from),
             payment_method: view.cart.payment_method.clone(),
+            payment_methods: view.payment_methods,
             attribution: view.attribution.map(|attribution| AttributionResponse {
                 click_id: attribution.click_id,
                 code: attribution.code,
@@ -389,6 +395,18 @@ pub(crate) struct OrderResponse {
     /// Collecting in store: the shop, and the pickup once the order is ready.
     pickup_org_id: Option<Uuid>,
     pickup: Option<PickupResponse>,
+    /// Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields).
+    custom_fields: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or
+    /// `preparing`); omitted in lists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    buyer_cancel_until: Option<String>,
+    /// Whether the buyer may cancel now; omitted in lists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    buyer_can_cancel: Option<bool>,
+    /// Until when a return can be requested (delivered orders); omitted in lists.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    return_until: Option<DateTime<Utc>>,
 }
 
 /// An order waiting in store.
@@ -443,6 +461,10 @@ impl OrderResponse {
             version: row.version,
             pickup_org_id: row.pickup_org_id,
             pickup: None,
+            custom_fields: row.custom_fields.as_deref().and_then(|text| serde_json::from_str(text).ok()),
+            buyer_cancel_until: None,
+            buyer_can_cancel: None,
+            return_until: None,
         })
     }
 
@@ -482,6 +504,9 @@ impl OrderResponse {
         let mut response = OrderResponse::summary(view.order)?;
         response.lines = lines;
         response.pickup = pickup;
+        response.buyer_cancel_until = Some(view.deadlines.buyer_cancel_until.as_str().to_owned());
+        response.buyer_can_cancel = Some(view.deadlines.buyer_can_cancel);
+        response.return_until = view.deadlines.return_until;
         Ok(response)
     }
 

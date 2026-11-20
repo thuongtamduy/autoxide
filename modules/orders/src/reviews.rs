@@ -81,16 +81,6 @@ pub(crate) struct StaffFilter {
     pub product_id: Option<Uuid>,
 }
 
-/// Thống kê công khai của một sản phẩm.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct Stats {
-    pub count: i64,
-    pub rating_sum: i64,
-    pub stars: [i64; 5],
-    pub with_media: i64,
-    pub summary: Option<review_summary::Model>,
-}
-
 /// Job `orders.summarize_reviews`.
 #[derive(Debug, Serialize, Deserialize)]
 struct Summarize {
@@ -414,36 +404,6 @@ impl OrdersService {
             .all(tenant.database().read())
             .await?;
         Ok(voted.into_iter().collect())
-    }
-
-    /// Thống kê sao và bản tóm tắt AI đã duyệt của sản phẩm (`locale`).
-    pub(crate) async fn review_stats(
-        &self,
-        tenant: &TenantContext,
-        product_id: Uuid,
-        locale: &str,
-    ) -> Result<Stats, Error> {
-        let read = tenant.database().read();
-        let row = review_stat::Entity::find()
-            .filter(review_stat::Column::ProductId.eq(product_id))
-            .scoped(tenant)
-            .one(read)
-            .await?;
-        let summary = review_summary::Entity::find()
-            .filter(review_summary::Column::ApprovedKey.eq(format!("{product_id}:{locale}")))
-            .scoped(tenant)
-            .one(read)
-            .await?;
-        Ok(match row {
-            Some(row) => Stats {
-                count: row.review_count,
-                rating_sum: row.rating_sum,
-                stars: [row.count_1, row.count_2, row.count_3, row.count_4, row.count_5],
-                with_media: row.media_count,
-                summary,
-            },
-            None => Stats { summary, ..Stats::default() },
-        })
     }
 
     /// `PUT` / `DELETE /public/reviews/{id}/helpful`: bỏ / rút phiếu "hữu ích". Trả (số phiếu, đã bỏ

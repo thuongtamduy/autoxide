@@ -70,7 +70,27 @@ pub(crate) struct CheckoutInput {
     pub accept_preorder_terms: bool,
     pub invoice_request: Option<serde_json::Value>,
     pub return_url: Option<String>,
+    /// Ô người mua nhập (trường tự định nghĩa mức `buyer_input` của `orders.order`, D-235).
+    pub custom_fields: Option<serde_json::Map<String, serde_json::Value>>,
+    /// Trả góp qua đối tác: đối tác và số kỳ (chỉ với `payment_method = installment`).
+    pub installment: Option<Installment>,
 }
+
+/// Trả góp qua đối tác có giấy phép (bước 36): `orders` không cho vay, không giữ tiền (D-187) —
+/// đối tác trả đủ cho người bán, người mua trả góp cho đối tác.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub(crate) struct Installment {
+    /// Mã bộ nối đối tác trả góp (cổng thanh toán của `ledger`).
+    pub partner: String,
+    /// Số kỳ.
+    pub months: i32,
+}
+
+/// Loại bản ghi của sổ đối tượng cho trường tự định nghĩa của đơn (bước 51 P19, D-235).
+pub(crate) const ORDER_TARGET: &str = "orders.order";
+
+/// Số kỳ trả góp nhận được.
+pub(crate) const INSTALLMENT_MONTHS: [i32; 6] = [3, 6, 9, 12, 18, 24];
 
 /// Kết quả đặt hàng: các đơn đã tạo (một người bán: một đơn).
 #[derive(Debug, Clone)]
@@ -153,6 +173,7 @@ impl OrdersService {
         let fingerprint = reference::fingerprint(&json!({
             "cart_id": input.cart_id, "quote": pricing::token_fingerprint(&input.quote_token),
             "payment_method": input.payment_method, "contact": input.contact, "note": input.note,
+            "custom_fields": input.custom_fields, "installment": input.installment,
         }))?;
         if let Some(existing) = self.find_checkout(tenant, &key, reference).await? {
             return self.replay(existing, &fingerprint, reference);
@@ -210,6 +231,52 @@ impl OrdersService {
                 "must be at most 1000 characters long",
             ));
         }
+        match (input.payment_method.as_str(), &input.installment) {
+            ("installment", None) => problems.push(FieldError::new(
+                "installment",
+                "required",
+                "is required with the payment method `installment`",
+            )),
+            ("installment", Some(plan)) => {
+                if !(1..=40).contains(&plan.partner.trim().chars().count()) {
+                    problems.push(FieldError::new(
+                        "installment.partner",
+                        "length",
+                        "must be 1 to 40 characters",
+                    ));
+                }
+                if !INSTALLMENT_MONTHS.contains(&plan.months) {
+                    problems.push(
+                        FieldError::new("installment.months", "invalid", "must be one of {values}")
+                            .with_param(
+                                "values",
+                                INSTALLMENT_MONTHS.map(|months| months.to_string()).join(", "),
+                            ),
+                    );
+                }
+            }
+            (_, Some(_)) => problems.push(FieldError::new(
+                "installment",
+                "not_allowed",
+                "is only for the payment method `installment`",
+            )),
+            _ => {}
+        }
+        // Ô người mua nhập: kiểm cùng bộ gom lỗi của lượt đặt (D-235).
+        let custom_fields = match self
+            .custom_fields
+            .validate_buyer_input(tenant, ORDER_TARGET, input.custom_fields.as_ref())
+            .await
+        {
+            Ok(values) => (!values.is_empty())
+                .then(|| serde_json::to_string(&values).map_err(Error::internal))
+                .transpose()?,
+            Err(error) if !error.fields().is_empty() => {
+                problems.extend(error.fields().iter().cloned());
+                None
+            }
+            Err(error) => return Err(error),
+        };
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -327,6 +394,7 @@ impl OrdersService {
             holds: &holds,
             due: now + Duration::minutes(self.config.hold_minutes - self.config.hold_grace_minutes),
             buyer_key,
+            custom_fields,
         };
         if let Err(error) = self.create_order(tenant, &draft).await {
             self.release_holds(tenant, order_id, &holds, ReleaseReason::CheckoutAborted).await;
@@ -538,6 +606,8 @@ struct Draft<'a> {
     due: chrono::DateTime<Utc>,
     /// Khoá liên hệ của số điện thoại người mua (tra đơn, gắn đơn, chống bom hàng).
     buyer_key: Option<String>,
+    /// Ô người mua nhập đã kiểm (JSON).
+    custom_fields: Option<String>,
 }
 
 impl Draft<'_> {
@@ -610,6 +680,7 @@ impl Draft<'_> {
             cancelled_at: Set(None),
             cancel_reason: Set(None),
             version: Set(1),
+            custom_fields: Set(self.custom_fields.clone()),
             created_at: Set(now),
             updated_at: Set(now),
         })
@@ -642,6 +713,11 @@ impl Draft<'_> {
             action: Set(None),
             expires_at: Set(order.payment_due_at),
             succeeded_at: Set(None),
+            installment: Set(self
+                .input
+                .installment
+                .as_ref()
+                .map(|plan| json!({"partner": plan.partner.trim(), "months": plan.months}).to_string())),
             created_at: Set(now),
             updated_at: Set(now),
         }

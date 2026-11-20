@@ -27,6 +27,9 @@ pub(crate) const EXPIRE_UNACCEPTED: &str = "orders.expire_unaccepted";
 /// Nhắc / hết hạn giữ hàng chờ nhận tại cửa hàng (mỗi giờ).
 pub(crate) const EXPIRE_PICKUPS: &str = "orders.expire_pickups";
 
+/// Đánh dấu bảo hành hết hạn (mỗi ngày).
+pub(crate) const EXPIRE_WARRANTIES: &str = "orders.expire_warranties";
+
 /// Số bản ghi một lượt của job định kỳ.
 pub(crate) const BATCH: u64 = 100;
 
@@ -39,6 +42,7 @@ pub(crate) fn registrations(service: &Arc<OrdersService>) -> Vec<JobRegistration
         JobRegistration::new(COMPLETE_DELIVERED, Arc::new(Complete(service.clone()))),
         JobRegistration::new(EXPIRE_UNACCEPTED, Arc::new(Unaccepted(service.clone()))),
         JobRegistration::new(EXPIRE_PICKUPS, Arc::new(Pickups(service.clone()))),
+        JobRegistration::new(EXPIRE_WARRANTIES, Arc::new(Warranties(service.clone()))),
     ]
     .into_iter()
     .chain(crate::reviews::registrations(service))
@@ -54,6 +58,7 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(COMPLETE_DELIVERED, COMPLETE_DELIVERED, Duration::from_secs(3600)),
         Schedule::new(EXPIRE_UNACCEPTED, EXPIRE_UNACCEPTED, Duration::from_secs(600)),
         Schedule::new(EXPIRE_PICKUPS, EXPIRE_PICKUPS, Duration::from_secs(3600)),
+        Schedule::new(EXPIRE_WARRANTIES, EXPIRE_WARRANTIES, Duration::from_secs(86_400)),
     ]
 }
 
@@ -117,5 +122,14 @@ struct Pickups(Arc<OrdersService>);
 impl JobHandler for Pickups {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.expire_pickups(&job.database).await.map(|_| ())
+    }
+}
+
+struct Warranties(Arc<OrdersService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Warranties {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.expire_warranties(&job.database).await.map(|_| ())
     }
 }

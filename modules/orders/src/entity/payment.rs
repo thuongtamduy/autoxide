@@ -25,6 +25,7 @@ pub struct Model {
     pub succeeded_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
+    pub installment: Option<String>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

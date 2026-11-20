@@ -41,11 +41,13 @@ mod reports;
 mod return_refund;
 mod returns;
 mod returns_buyer;
+mod review_stats;
 mod reviews;
 mod risk;
 mod service;
 mod shipping_events;
 mod tools;
+mod warranty;
 
 #[cfg(test)]
 mod tests;
@@ -98,6 +100,19 @@ impl Module for OrdersModule {
 
     fn events(&self) -> Vec<autoxide_kernel::event::EventInfo> {
         events::all()
+    }
+
+    fn custom_field_targets(&self) -> Vec<autoxide_kernel::custom_fields::CustomFieldTarget> {
+        // Trường tự định nghĩa của đơn (bước 51 P19, D-235): nội bộ (nhân sự), hay ô người mua nhập
+        // lúc đặt hàng (`buyer_input` — "giờ nhận hàng mong muốn", "mã số thuế công ty").
+        vec![
+            autoxide_kernel::custom_fields::CustomFieldTarget::new(
+                checkout::ORDER_TARGET,
+                permissions::READ,
+                permissions::MANAGE,
+            )
+            .visibilities(&["internal", "buyer_input"]),
+        ]
     }
 
     fn facts(&self) -> Vec<autoxide_kernel::report::FactSource> {
@@ -156,6 +171,7 @@ impl Module for OrdersModule {
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
             posting: context.posting_verification(),
             text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
+            custom_fields: context.custom_fields(),
         };
         if let Some(notifier) = &parts.notifier {
             notices::declare(notifier.as_ref())?;
@@ -203,6 +219,7 @@ impl Module for OrdersModule {
         all.extend(notices::subscriptions(&service));
         all.extend(reviews::subscriptions(&service));
         all.extend(risk::subscriptions(&service));
+        all.extend(warranty::subscriptions(&service));
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
         all.push(autoxide_kernel::event::Subscription::optional(
             payments::LEDGER_PAYMENT_SUCCEEDED,

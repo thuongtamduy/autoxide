@@ -1,7 +1,7 @@
 //! Lỗi của module `orders`. `code` là hợp đồng với client và là i18n key (bản dịch ở
 //! `locales/vi.json`); câu tiếng Anh ở đây là bản mặc định.
 
-use autoxide_kernel::error::{Error, ErrorKind};
+use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 
 pub(crate) fn cart_not_found() -> Error {
     Error::not_found("orders.cart_not_found", "No cart with this id.")
@@ -473,4 +473,33 @@ pub(crate) fn cod_rule_not_found() -> Error {
 
 pub(crate) fn cod_block_not_found() -> Error {
     Error::not_found("orders.cod_block_not_found", "No cash-on-delivery block with this id.")
+}
+
+pub(crate) fn serials_invalid(problems: Vec<FieldError>) -> Error {
+    Error::validation(problems)
+}
+
+pub(crate) fn warranty_not_found() -> Error {
+    Error::not_found("orders.warranty_not_found", "No warranty with this id.")
+}
+
+pub(crate) fn warranty_expired(date: String) -> Error {
+    Error::conflict(
+        "orders.warranty_expired",
+        "This warranty ended on {date}; a claim can no longer be opened.",
+    )
+    .with_param("date", date)
+}
+
+pub(crate) fn warranty_claim_not_found() -> Error {
+    Error::not_found("orders.warranty_claim_not_found", "No warranty claim with this id.")
+}
+
+pub(crate) fn warranty_claim_transition(from: &str, to: &str) -> Error {
+    Error::conflict(
+        "orders.warranty_claim_transition",
+        "A warranty claim cannot move from `{from}` to `{to}`.",
+    )
+    .with_param("from", from)
+    .with_param("to", to)
 }

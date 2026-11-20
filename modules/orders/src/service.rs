@@ -39,6 +39,7 @@ pub(crate) struct Parts {
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     pub posting: autoxide_kernel::access::PostingVerification,
     pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
+    pub custom_fields: autoxide_kernel::custom_fields::CustomFields,
 }
 
 pub(crate) struct OrdersService {
@@ -66,6 +67,8 @@ pub(crate) struct OrdersService {
     pub posting: autoxide_kernel::access::PostingVerification,
     /// Bản nháp tóm tắt đánh giá (chưa cài `ai`: không tóm tắt).
     pub text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
+    /// Ô người mua nhập lúc đặt hàng (trường tự định nghĩa, D-235).
+    pub custom_fields: autoxide_kernel::custom_fields::CustomFields,
     pub config: OrdersConfig,
 }
 
@@ -90,6 +93,7 @@ impl OrdersService {
             notifier: parts.notifier,
             posting: parts.posting,
             text_model: parts.text_model,
+            custom_fields: parts.custom_fields,
             config,
         }
     }

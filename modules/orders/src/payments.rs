@@ -131,6 +131,14 @@ impl OrdersService {
                     row.reference.clone(),
                 )
                 .source_id(order_id.to_string());
+                // Trả góp: chọn đúng bộ nối của đối tác người mua chọn.
+                if let Some(plan) = row
+                    .installment
+                    .as_deref()
+                    .and_then(|raw| serde_json::from_str::<crate::checkout::Installment>(raw).ok())
+                {
+                    request.provider = Some(plan.partner);
+                }
                 if let Some(url) = return_url {
                     request = request.return_url(url);
                 }

@@ -38,7 +38,7 @@ pub(crate) const PLACED: NotificationKind = NotificationKind::new(
         "Order {number} received",
     ),
 )
-.sample(r#"{"number": "2026-000123", "total": "250.000 ₫", "link": "https://shop.example.com/orders/2026-000123"}"#);
+.sample(r#"{"number": "2026-000123", "total": "250.000 ₫", "link": "https://shop.example.com/orders/2026-000123", "fields": {"delivery_time": "18:00-20:00"}}"#);
 
 /// Đã thanh toán / đã xác nhận.
 pub(crate) const CONFIRMED: NotificationKind = NotificationKind::new(
@@ -164,7 +164,13 @@ impl EventHandler for Notice {
             (None, None) => return Ok(()),
         };
         let total = Money::from_columns(row.total_minor, &row.currency)?;
-        let params = json!({"number": row.number, "total": total.to_string()});
+        // Ô người mua nhập lúc đặt (D-235): mẫu thư đọc `{fields.<khoá>}`.
+        let fields = row
+            .custom_fields
+            .as_deref()
+            .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+            .unwrap_or_else(|| json!({}));
+        let params = json!({"number": row.number, "total": total.to_string(), "fields": fields});
         let notification =
             Notification::new(self.kind.key(), recipient, params, format!("orders:{}", event.id))
                 .locale(row.locale.clone());

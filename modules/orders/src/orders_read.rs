@@ -21,6 +21,19 @@ pub(crate) struct OrderView {
     pub payments: Vec<payment::Model>,
     /// Nhận tại cửa hàng, khi đã sẵn sàng.
     pub pickup: Option<crate::entity::pickup::Model>,
+    /// Hạn người mua tự huỷ / đổi trả theo chính sách của nút bán (website hiện sẵn).
+    pub deadlines: Deadlines,
+}
+
+/// Hạn của người mua trên một đơn.
+#[derive(Debug, Clone)]
+pub(crate) struct Deadlines {
+    /// Trạng thái cuối cùng người mua còn tự huỷ được.
+    pub buyer_cancel_until: crate::api::OrderStatus,
+    /// Người mua huỷ được ngay lúc này không.
+    pub buyer_can_cancel: bool,
+    /// Hạn yêu cầu đổi trả (khi đã giao).
+    pub return_until: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Bộ lọc danh sách đơn của nhân viên.
@@ -60,7 +73,18 @@ impl OrdersService {
             .scoped(tenant)
             .one(read)
             .await?;
-        Ok(OrderView { order: row, lines, payments, pickup })
+        let policy =
+            self.policy(tenant, autoxide_kernel::tenancy::OrgId::from_uuid(row.org_id)).await?;
+        let status = crate::api::OrderStatus::parse(&row.status);
+        let deadlines = Deadlines {
+            buyer_cancel_until: policy.buyer_cancel_until,
+            buyer_can_cancel: status.is_some_and(|status| policy.buyer_may_cancel(status)),
+            return_until: row
+                .delivered_at
+                .filter(|_| row.status != crate::api::OrderStatus::Cancelled.as_str())
+                .map(|at| at + chrono::Duration::days(policy.return_window_days)),
+        };
+        Ok(OrderView { order: row, lines, payments, pickup, deadlines })
     }
 
     /// Đơn `id` của người mua `buyer` (đơn của người khác: 404).

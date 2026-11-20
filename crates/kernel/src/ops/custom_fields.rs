@@ -210,6 +210,36 @@ impl CustomFields {
         creating: bool,
     ) -> Result<Map<String, Value>, Error> {
         let fields = self.definitions(tenant, target).await?;
+        check_values(&fields, incoming, current, creating)
+    }
+
+    /// Như [`validate`](Self::validate) khi người dùng cuối tạo bản ghi (vd người mua đặt hàng —
+    /// D-235): chỉ xét trường mức `buyer_input` của `target` — khoá khác (kể cả trường `internal`)
+    /// là lỗi `unknown`, và trường `internal` bắt buộc không chặn người dùng cuối (nhân sự điền sau).
+    pub async fn validate_buyer_input(
+        &self,
+        tenant: &TenantContext,
+        target: &str,
+        incoming: Option<&Map<String, Value>>,
+    ) -> Result<Map<String, Value>, Error> {
+        let fields: Vec<CustomFieldView> = self
+            .definitions(tenant, target)
+            .await?
+            .into_iter()
+            .filter(|field| field.visibility == "buyer_input")
+            .collect();
+        check_values(&fields, incoming, None, true)
+    }
+}
+
+/// Kiểm `incoming` gộp vào `current` theo `fields` (định nghĩa đang bật), gom mọi lỗi một lần.
+fn check_values(
+    fields: &[CustomFieldView],
+    incoming: Option<&Map<String, Value>>,
+    current: Option<&Map<String, Value>>,
+    creating: bool,
+) -> Result<Map<String, Value>, Error> {
+    {
         let mut merged = current.cloned().unwrap_or_default();
         let mut problems = Vec::new();
         if let Some(incoming) = incoming {
@@ -235,7 +265,7 @@ impl CustomFields {
                 }
             }
         }
-        for field in &fields {
+        for field in fields {
             if creating
                 && !merged.contains_key(&field.key)
                 && let Some(default) = &field.default
@@ -271,7 +301,9 @@ impl CustomFields {
             Err(error)
         }
     }
+}
 
+impl CustomFields {
     /// Ghi index lọc của bản ghi `record` (module `module`) theo giá trị đã lưu: gọi cùng
     /// transaction với bản ghi. Chỉ trường `filterable`.
     pub async fn write_index<C: ConnectionTrait>(
