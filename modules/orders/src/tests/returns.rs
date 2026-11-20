@@ -24,6 +24,14 @@ use crate::entity::{line, order};
 /// Đơn COD (2 × 100.000 + phí giao 30.000) đã giao và đã thu tiền; trả (ID đơn, ID dòng áo).
 pub(super) async fn delivered_order(shop: &Shop) -> (Uuid, Uuid) {
     let id = cod_order(shop).await;
+    deliver(shop, id).await;
+    let (_, found) = Call::as_user(shop, "boss").send("GET", &format!("/{id}"), None).await;
+    let line_id = found["data"]["lines"][0]["id"].as_str().unwrap().parse().unwrap();
+    (id, line_id)
+}
+
+/// Hãng báo đã giao đơn COD `id` và đã thu tiền.
+pub(super) async fn deliver(shop: &Shop, id: Uuid) {
     emit_from(
         shop,
         &shop.shipping_outbox,
@@ -38,9 +46,6 @@ pub(super) async fn delivered_order(shop: &Shop) -> (Uuid, Uuid) {
     .await;
     drain(shop).await;
     assert_eq!(status_of(shop, id).await, "delivered");
-    let (_, found) = Call::as_user(shop, "boss").send("GET", &format!("/{id}"), None).await;
-    let line_id = found["data"]["lines"][0]["id"].as_str().unwrap().parse().unwrap();
-    (id, line_id)
 }
 
 pub(super) fn return_body(line: Uuid, quantity: i64, reason: &str) -> Value {

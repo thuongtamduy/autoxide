@@ -391,3 +391,86 @@ pub(crate) fn payments_mismatch(
     .with_param("paid", paid.to_string())
     .with_param("total", total.to_string())
 }
+
+pub(crate) fn review_not_found() -> Error {
+    Error::not_found("orders.review_not_found", "No product review with this id.")
+}
+
+pub(crate) fn review_not_allowed() -> Error {
+    Error::forbidden(
+        "orders.review_not_allowed",
+        "Only buyers who received this item can review it (the order must be delivered).",
+    )
+}
+
+pub(crate) fn review_exists() -> Error {
+    Error::conflict(
+        "orders.review_exists",
+        "You already reviewed this item of this order; edit that review instead.",
+    )
+}
+
+pub(crate) fn review_edit_closed() -> Error {
+    Error::conflict("orders.review_edit_closed", "The time to edit this review has passed.")
+}
+
+pub(crate) fn review_vote_own() -> Error {
+    Error::conflict("orders.review_vote_own", "You cannot vote for your own review.")
+}
+
+pub(crate) fn review_vote_not_allowed() -> Error {
+    Error::forbidden(
+        "orders.review_vote_not_allowed",
+        "Sellers and moderators cannot vote for reviews of their own products.",
+    )
+}
+
+pub(crate) fn review_votes_too_many(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "orders.review_votes_too_many",
+        "Too many votes. Try again in {retry_after} seconds.",
+    )
+    .with_param("retry_after", retry_after)
+    .with_retry_after(retry_after)
+}
+
+pub(crate) fn moderation_reason_invalid() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.moderation_reason_invalid",
+        "Hiding a review needs a reason of the list `orders.review_hidden`.",
+    )
+}
+
+pub(crate) fn account_not_verified() -> Error {
+    Error::forbidden(
+        "orders.account_not_verified",
+        "Verify your account (phone number) before writing reviews.",
+    )
+}
+
+pub(crate) fn ai_unavailable() -> Error {
+    Error::unavailable(
+        "orders.ai_unavailable",
+        "AI summaries are not available: the `ai` module is not installed or turned off.",
+    )
+}
+
+pub(crate) fn summary_not_found() -> Error {
+    Error::not_found("orders.summary_not_found", "No review summary with this id.")
+}
+
+pub(crate) fn summary_not_draft() -> Error {
+    Error::conflict(
+        "orders.summary_not_draft",
+        "Only a generated draft can be approved or rejected.",
+    )
+}
+
+pub(crate) fn cod_rule_not_found() -> Error {
+    Error::not_found("orders.cod_rule_not_found", "No cash-on-delivery rule with this id.")
+}
+
+pub(crate) fn cod_block_not_found() -> Error {
+    Error::not_found("orders.cod_block_not_found", "No cash-on-delivery block with this id.")
+}

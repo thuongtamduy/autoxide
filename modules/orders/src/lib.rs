@@ -37,9 +37,12 @@ mod pricing;
 mod reasons;
 mod refunds;
 mod relocation;
+mod reports;
 mod return_refund;
 mod returns;
 mod returns_buyer;
+mod reviews;
+mod risk;
 mod service;
 mod shipping_events;
 mod tools;
@@ -97,6 +100,10 @@ impl Module for OrdersModule {
         events::all()
     }
 
+    fn facts(&self) -> Vec<autoxide_kernel::report::FactSource> {
+        events::facts()
+    }
+
     fn org_settings(&self) -> Vec<autoxide_kernel::tenancy::OrgSetting> {
         policy::all()
     }
@@ -147,6 +154,8 @@ impl Module for OrdersModule {
             // `invoices`, `notifications` đăng ký trước `orders`; chưa cài thì bỏ bước đó.
             invoices: context.require::<dyn autoxide_invoices::api::Invoices>().ok(),
             notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
+            posting: context.posting_verification(),
+            text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
         };
         if let Some(notifier) = &parts.notifier {
             notices::declare(notifier.as_ref())?;
@@ -161,6 +170,13 @@ impl Module for OrdersModule {
         if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
             facts.attach(Arc::new(facts::OrderFacts::new(context.translations().clone())))?;
         }
+        // Nhãn `verified_buyer` trên sản phẩm (hỏi đáp, bình luận — D-202); xuất đơn qua xuất chung.
+        context.badge_source(
+            "catalog.product",
+            &["verified_buyer"],
+            Arc::new(reviews::VerifiedBuyer(service.clone())),
+        )?;
+        context.export_source(Arc::new(reports::OrderExport(service.clone())))?;
         self.service = Some(service);
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;
@@ -185,6 +201,8 @@ impl Module for OrdersModule {
         all.extend(preorders::subscriptions(&service));
         all.extend(invoicing::subscriptions(&service));
         all.extend(notices::subscriptions(&service));
+        all.extend(reviews::subscriptions(&service));
+        all.extend(risk::subscriptions(&service));
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
         all.push(autoxide_kernel::event::Subscription::optional(
             payments::LEDGER_PAYMENT_SUCCEEDED,

@@ -59,6 +59,9 @@ event!(DeliveryAddressChanged, names::DELIVERY_ADDRESS_CHANGED);
 event!(OrdersClaimed, names::ORDERS_CLAIMED);
 event!(InvoiceLinked, names::INVOICE_LINKED);
 event!(PosShiftClosed, names::POS_SHIFT_CLOSED);
+event!(ReviewPublished, names::REVIEW_PUBLISHED);
+event!(ReviewModerated, names::REVIEW_MODERATED);
+event!(CodBlockChanged, names::COD_BLOCK_CHANGED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -142,4 +145,90 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "The balance of a pre-order paid in part was not paid in time.",
         ),
     ]
+}
+
+/// Số liệu cho báo cáo gộp (bước 38): doanh số đơn đã xác nhận và tiền đã hoàn, theo kênh.
+pub(crate) const SALES_TOTAL: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "orders.sales_total",
+        "Total of the orders confirmed (paid, cash on delivery accepted, point of sale or channel), \
+         in the currency of each order; dimension `channel` is `web`, `pos` or a channel code.",
+        autoxide_kernel::report::Measure::Amount,
+        &["channel"],
+    );
+
+pub(crate) const SALES_COUNT: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "orders.sales_count",
+        "Number of orders confirmed; dimension `channel`.",
+        autoxide_kernel::report::Measure::Quantity,
+        &["channel"],
+    );
+
+pub(crate) const REFUNDED_TOTAL: autoxide_kernel::report::FactKind =
+    autoxide_kernel::report::FactKind::new(
+        "orders.refunded_total",
+        "Money refunded to buyers, in the currency of each order; dimension `channel`.",
+        autoxide_kernel::report::Measure::Amount,
+        &["channel"],
+    );
+
+pub(crate) fn facts() -> Vec<autoxide_kernel::report::FactSource> {
+    vec![
+        autoxide_kernel::report::FactSource::new(
+            names::ORDER_CONFIRMED,
+            vec![SALES_TOTAL, SALES_COUNT],
+            confirmed_facts,
+        ),
+        autoxide_kernel::report::FactSource::new(
+            names::REFUND_COMPLETED,
+            vec![REFUNDED_TOTAL],
+            refunded_facts,
+        ),
+    ]
+}
+
+fn channel_of(after: &Value) -> String {
+    after.get("channel").and_then(Value::as_str).unwrap_or("web").to_owned()
+}
+
+/// `orders.order_confirmed` → tổng tiền và một đơn, theo kênh.
+fn confirmed_facts(
+    event: &autoxide_kernel::event::Delivered,
+) -> Result<Vec<autoxide_kernel::report::Fact>, autoxide_kernel::error::Error> {
+    use autoxide_kernel::report::{Fact, money_field, org_field};
+    let after = &event.payload["after"];
+    let org = org_field(after);
+    let channel = channel_of(after);
+    let mut facts = Vec::new();
+    if let Some(total) = money_field(after, "total")? {
+        facts.push(
+            Fact::new(SALES_TOTAL.kind, event.occurred_at)
+                .org(org)
+                .amount(total)
+                .dimension("channel", channel.clone()),
+        );
+    }
+    facts.push(
+        Fact::new(SALES_COUNT.kind, event.occurred_at)
+            .org(org)
+            .quantity(1)
+            .dimension("channel", channel),
+    );
+    Ok(facts)
+}
+
+/// `orders.refund_completed` → số tiền hoàn, theo kênh.
+fn refunded_facts(
+    event: &autoxide_kernel::event::Delivered,
+) -> Result<Vec<autoxide_kernel::report::Fact>, autoxide_kernel::error::Error> {
+    use autoxide_kernel::report::{Fact, money_field, org_field};
+    let after = &event.payload["after"];
+    let Some(amount) = money_field(after, "amount")? else { return Ok(Vec::new()) };
+    Ok(vec![
+        Fact::new(REFUNDED_TOTAL.kind, event.occurred_at)
+            .org(org_field(after))
+            .amount(amount)
+            .dimension("channel", channel_of(after)),
+    ])
 }
