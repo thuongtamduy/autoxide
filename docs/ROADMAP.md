@@ -642,8 +642,9 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       — phần `FactSource` đã xong (D-20261120-step45-guest-orders); khối chờ `Module::blocks` của bước 67
 - [x] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
-- [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
+- [x] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
+      — thu phần còn lại bằng COD và hoá đơn lúc thu trước chưa làm (D-20261120-step45-preorder-advance)
 - [ ] Website bán hàng (16/11/2026): báo giá giỏ trả thêm số điểm tối đa dùng được, cách trả dùng được cho giỏ
       (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán; đơn có sẵn `return_until`,
       `buyer_cancel_until`; đánh giá: số đếm có ảnh và theo biến thể, "chủ đề người mua hay nhắc" kèm bản tóm tắt AI

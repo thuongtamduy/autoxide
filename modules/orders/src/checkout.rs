@@ -373,6 +373,10 @@ impl OrdersService {
             return Err(error);
         }
 
+        // Trả trước một phần cho hàng đặt trước (D-232): chỉ khi trả online (COD thu khi giao).
+        let advance =
+            if method == Method::Cod { None } else { self.plan_for(tenant, org, &quote).await? };
+
         // 7. Tạo đơn trong một transaction.
         let funds_flow = match &self.ledger {
             Some(ledger) => payments::funds_flow(ledger.flow_settings(tenant, org).await?.mode),
@@ -395,6 +399,7 @@ impl OrdersService {
             due: now + Duration::minutes(self.config.hold_minutes - self.config.hold_grace_minutes),
             buyer_key,
             custom_fields,
+            advance,
         };
         if let Err(error) = self.create_order(tenant, &draft).await {
             self.release_holds(tenant, order_id, &holds, ReleaseReason::CheckoutAborted).await;
@@ -564,6 +569,11 @@ impl OrdersService {
                 )
                 .await?;
                 draft.payment_row(tenant, &created).insert(&transaction).await?;
+                if let Some(planned) = &draft.advance {
+                    crate::advance_flow::plan_row(tenant, created.id, planned)?
+                        .insert(&transaction)
+                        .await?;
+                }
                 checkout::Entity::update_many()
                     .col_expr(checkout::Column::State, Expr::value(PLACED))
                     .col_expr(
@@ -608,6 +618,8 @@ struct Draft<'a> {
     buyer_key: Option<String>,
     /// Ô người mua nhập đã kiểm (JSON).
     custom_fields: Option<String>,
+    /// Kế hoạch trả trước một phần (D-232).
+    advance: Option<crate::advance_flow::Planned>,
 }
 
 impl Draft<'_> {
@@ -691,22 +703,38 @@ impl Draft<'_> {
         &self,
         tenant: &TenantContext,
     ) -> Result<Vec<(line::ActiveModel, Vec<line_tax::ActiveModel>)>, Error> {
-        quoted_rows(tenant, self.order_id, self.quote)
+        let mut rows = quoted_rows(tenant, self.order_id, self.quote)?;
+        if let Some(planned) = &self.advance {
+            for (index, (row, _)) in rows.iter_mut().enumerate() {
+                if let Some(advance) =
+                    planned.split.line_advance.get(index).filter(|a| a.minor() > 0)
+                {
+                    row.advance_minor = Set(Some(advance.minor()));
+                    row.preorder_commit_at = Set(planned.commit_at.get(index).copied().flatten());
+                }
+            }
+        }
+        Ok(rows)
     }
 
     fn payment_row(&self, tenant: &TenantContext, order: &order::Model) -> payment::ActiveModel {
         let now = crate::service::now();
+        // Trả trước một phần: khoản lúc đặt là `upfront` (hàng sẵn + phần trả trước).
+        let (purpose, amount) = match &self.advance {
+            Some(planned) => (crate::advance::PURPOSE_ADVANCE, planned.split.upfront.minor()),
+            None => (payments::PURPOSE_ORDER, order.total_minor),
+        };
         payment::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
             order_id: Set(order.id),
-            purpose: Set(payments::PURPOSE_ORDER.to_owned()),
+            purpose: Set(purpose.to_owned()),
             method: Set(self.input.payment_method.clone()),
             gateway: Set(None),
             ledger_payment_id: Set(None),
             external_id: Set(None),
-            reference: Set(payments::reference(order.id, payments::PURPOSE_ORDER, 1)),
-            amount_minor: Set(order.total_minor),
+            reference: Set(payments::reference(order.id, purpose, 1)),
+            amount_minor: Set(amount),
             currency: Set(order.currency.clone()),
             tendered_minor: Set(None),
             status: Set(payments::PENDING.to_owned()),
@@ -793,6 +821,8 @@ fn line_row(
         allocated_quantity: Set(0),
         cancelled_quantity: Set(0),
         preorder_delayed_to: Set(None),
+        advance_minor: Set(None),
+        preorder_commit_at: Set(None),
         preorder_available_on: Set(variant.preorder_available_on),
         requires_shipping: Set(variant.requires_shipping),
         tax_inclusive: Set(quoted.tax_inclusive),

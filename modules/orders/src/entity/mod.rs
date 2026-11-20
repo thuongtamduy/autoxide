@@ -1,5 +1,6 @@
 //! Entity SeaORM của các bảng `orders_…`. Chỉ module `orders` đọc / ghi các bảng này.
 
+pub(crate) mod advance_plan;
 pub(crate) mod cart;
 pub(crate) mod cart_line;
 pub(crate) mod checkout;

@@ -21,7 +21,7 @@ use super::{
 use crate::entity::line;
 
 /// Biến thể đặt trước của cửa hàng A, giá `price`, hàng về sau 10 ngày.
-fn preorder_item(shop: &Shop, price: i64) -> Uuid {
+pub(super) fn preorder_item(shop: &Shop, price: i64) -> Uuid {
     let id = shop.catalog.add_with(shop.tree.a, price, |variant| {
         variant.sale_mode = SaleMode::Preorder;
         variant.preorder_available_on = Some((Utc::now() + Duration::days(10)).date_naive());
@@ -31,7 +31,7 @@ fn preorder_item(shop: &Shop, price: i64) -> Uuid {
 }
 
 /// Giỏ của `buyer1` ở cửa hàng A với `items` (biến thể, số lượng); trả (giỏ, mã báo giá).
-async fn cart_of(shop: &Shop, items: &[(Uuid, i64)]) -> (String, String) {
+pub(super) async fn cart_of(shop: &Shop, items: &[(Uuid, i64)]) -> (String, String) {
     let buyer = Call::as_user(shop, "buyer1");
     let (_, created) =
         buyer.send("POST", "/carts", Some(json!({"org_id": shop.tree.a.as_uuid()}))).await;
@@ -73,7 +73,7 @@ async fn place(shop: &Shop, items: &[(Uuid, i64)], method: &str) -> Uuid {
     id
 }
 
-async fn ship(shop: &Shop, id: Uuid) -> (StatusCode, Value) {
+pub(super) async fn ship(shop: &Shop, id: Uuid) -> (StatusCode, Value) {
     Call::as_user(shop, "boss").send("POST", &format!("/{id}/shipments"), Some(json!({}))).await
 }
 

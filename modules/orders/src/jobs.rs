@@ -30,6 +30,9 @@ pub(crate) const EXPIRE_PICKUPS: &str = "orders.expire_pickups";
 /// Đánh dấu bảo hành hết hạn (mỗi ngày).
 pub(crate) const EXPIRE_WARRANTIES: &str = "orders.expire_warranties";
 
+/// Quá hạn trả phần còn lại của đơn trả trước một phần (mỗi giờ, D-232).
+pub(crate) const EXPIRE_PREORDER_BALANCES: &str = "orders.expire_preorder_balances";
+
 /// Số bản ghi một lượt của job định kỳ.
 pub(crate) const BATCH: u64 = 100;
 
@@ -43,6 +46,7 @@ pub(crate) fn registrations(service: &Arc<OrdersService>) -> Vec<JobRegistration
         JobRegistration::new(EXPIRE_UNACCEPTED, Arc::new(Unaccepted(service.clone()))),
         JobRegistration::new(EXPIRE_PICKUPS, Arc::new(Pickups(service.clone()))),
         JobRegistration::new(EXPIRE_WARRANTIES, Arc::new(Warranties(service.clone()))),
+        JobRegistration::new(EXPIRE_PREORDER_BALANCES, Arc::new(Balances(service.clone()))),
     ]
     .into_iter()
     .chain(crate::reviews::registrations(service))
@@ -59,6 +63,11 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(EXPIRE_UNACCEPTED, EXPIRE_UNACCEPTED, Duration::from_secs(600)),
         Schedule::new(EXPIRE_PICKUPS, EXPIRE_PICKUPS, Duration::from_secs(3600)),
         Schedule::new(EXPIRE_WARRANTIES, EXPIRE_WARRANTIES, Duration::from_secs(86_400)),
+        Schedule::new(
+            EXPIRE_PREORDER_BALANCES,
+            EXPIRE_PREORDER_BALANCES,
+            Duration::from_secs(3600),
+        ),
     ]
 }
 
@@ -131,5 +140,14 @@ struct Warranties(Arc<OrdersService>);
 impl JobHandler for Warranties {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         self.0.expire_warranties(&job.database).await.map(|_| ())
+    }
+}
+
+struct Balances(Arc<OrdersService>);
+
+#[async_trait::async_trait]
+impl JobHandler for Balances {
+    async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        self.0.expire_preorder_balances(&job.database).await.map(|_| ())
     }
 }

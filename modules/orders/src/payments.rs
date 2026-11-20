@@ -224,6 +224,7 @@ impl OrdersService {
                     return Ok(false);
                 }
                 let now = crate::service::now();
+                let purpose = stored.purpose.clone();
                 let mut paid: payment::ActiveModel = stored.into();
                 paid.status = Set(SUCCEEDED.to_owned());
                 paid.succeeded_at = Set(Some(now));
@@ -232,12 +233,40 @@ impl OrdersService {
                 let late = current.status == OrderStatus::Cancelled.as_str();
                 let paid_minor = current.paid_minor + amount.minor();
                 let order_id = current.id;
-                if late {
+                // Trả trước một phần (D-232): khoản lúc đặt → `partially_paid`; phần còn lại →
+                // `paid`, đơn đã xác nhận từ trước nên không chuyển trạng thái.
+                let balance = purpose == crate::advance::PURPOSE_BALANCE;
+                let status_after =
+                    if purpose == crate::advance::PURPOSE_ADVANCE { PARTIALLY_PAID } else { PAID };
+                if !late && let Some(next) = crate::advance_flow::status_after_payment(&purpose) {
+                    crate::entity::advance_plan::Entity::update_many()
+                        .col_expr(
+                            crate::entity::advance_plan::Column::Status,
+                            sea_orm::sea_query::Expr::value(next),
+                        )
+                        .col_expr(
+                            crate::entity::advance_plan::Column::UpdatedAt,
+                            sea_orm::sea_query::Expr::value(now),
+                        )
+                        .filter(crate::entity::advance_plan::Column::OrderId.eq(current.id))
+                        .scoped(tenant)
+                        .exec(&transaction)
+                        .await?;
+                }
+                if late || balance {
                     // Không mở lại đơn đã huỷ: ghi đã thu, hoàn bằng job.
                     order::Entity::update_many()
                         .col_expr(
                             order::Column::PaidMinor,
                             sea_orm::sea_query::Expr::value(paid_minor),
+                        )
+                        .col_expr(
+                            order::Column::PaymentStatus,
+                            sea_orm::sea_query::Expr::value(if late {
+                                current.payment_status.clone()
+                            } else {
+                                PAID.to_owned()
+                            }),
                         )
                         .filter(order::Column::Id.eq(order_id))
                         .scoped(tenant)
@@ -254,7 +283,7 @@ impl OrdersService {
                         &transition,
                         |row| {
                             row.paid_minor = Set(paid_minor);
-                            row.payment_status = Set(PAID.to_owned());
+                            row.payment_status = Set(status_after.to_owned());
                         },
                     )
                     .await?;
