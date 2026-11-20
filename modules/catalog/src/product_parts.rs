@@ -175,6 +175,13 @@ impl CatalogService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
+        // Ảnh bị bỏ khỏi sản phẩm: bỏ luôn `alt` theo ngôn ngữ của nó (D-202).
+        crate::entity::media_alt::Entity::delete_many()
+            .filter(crate::entity::media_alt::Column::ProductId.eq(id))
+            .filter(crate::entity::media_alt::Column::MediaId.is_not_in(ids.clone()))
+            .scoped(tenant)
+            .exec(&transaction)
+            .await?;
         for (position, item) in items.iter().enumerate() {
             product_media::ActiveModel {
                 id: Set(Uuid::now_v7()),

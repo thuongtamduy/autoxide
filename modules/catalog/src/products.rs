@@ -95,6 +95,8 @@ pub(crate) struct ProductDetail {
     pub variants: Vec<variant::Model>,
     pub category_ids: Vec<Uuid>,
     pub media: Vec<product_media::Model>,
+    /// `alt` theo ngôn ngữ của ảnh (D-202).
+    pub media_alts: Vec<crate::entity::media_alt::Model>,
     /// Đoạn đầu của đường dẫn công khai (`AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX`).
     pub path_prefix: String,
 }
@@ -578,6 +580,13 @@ impl CatalogService {
             .all(read)
             .await?;
         let options = crate::variants::options_of(read, tenant, id).await?;
+        let media_alts = crate::entity::media_alt::Entity::find()
+            .filter(crate::entity::media_alt::Column::ProductId.eq(id))
+            .scoped(tenant)
+            .order_by_asc(crate::entity::media_alt::Column::MediaId)
+            .order_by_asc(crate::entity::media_alt::Column::Locale)
+            .all(read)
+            .await?;
         Ok(ProductDetail {
             product: row,
             translations,
@@ -585,6 +594,7 @@ impl CatalogService {
             variants,
             category_ids,
             media,
+            media_alts,
             path_prefix: self.config.product_path_prefix.clone(),
         })
     }

@@ -57,3 +57,52 @@ pub(crate) mod suggestion {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+/// `alt` của một ảnh sản phẩm ở một ngôn ngữ (m0017, D-202).
+pub(crate) mod media_alt {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_product_media_alts")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub product_id: Uuid,
+        pub media_id: Uuid,
+        pub locale: String,
+        pub alt: String,
+        pub updated_at: DateTimeUtc,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}
+
+/// Giá trị thuộc tính của một biến thể (m0018); `options` thành nhiều dòng như của sản phẩm.
+pub(crate) mod variant_attribute {
+    use sea_orm::entity::prelude::*;
+
+    #[sea_orm::model]
+    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
+    #[sea_orm(table_name = "catalog_variant_attributes")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: Uuid,
+        pub tenant_id: Uuid,
+        pub product_id: Uuid,
+        pub variant_id: Uuid,
+        pub attribute_id: Uuid,
+        pub value_text: Option<String>,
+        pub value_integer: Option<i64>,
+        pub value_boolean: Option<bool>,
+        pub value_date: Option<Date>,
+        pub option_id: Option<Uuid>,
+        /// JSON `{ngôn ngữ: chữ}` cho thuộc tính kiểu chữ.
+        pub texts: Option<String>,
+    }
+
+    impl ActiveModelBehavior for ActiveModel {}
+    tenant_scoped!();
+}

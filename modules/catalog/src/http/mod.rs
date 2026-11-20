@@ -11,6 +11,7 @@ pub(crate) mod attributes;
 pub(crate) mod changes;
 pub(crate) mod collections;
 pub(crate) mod dto;
+pub(crate) mod media_alts;
 pub(crate) mod pricing;
 pub(crate) mod products;
 pub(crate) mod public;
@@ -19,10 +20,13 @@ pub(crate) mod search;
 pub(crate) mod stores;
 pub(crate) mod suggestions;
 pub(crate) mod transfers;
+pub(crate) mod variant_attributes;
 
 pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
     OpenApiRouter::new()
         .merge(products::routes(service.clone()))
+        .merge(media_alts::routes(service.clone()))
+        .merge(variant_attributes::routes(service.clone()))
         .merge(pricing::routes(service.clone()))
         .merge(attributes::routes(service.clone()))
         .merge(changes::routes(service.clone()))

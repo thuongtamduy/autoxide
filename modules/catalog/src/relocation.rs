@@ -39,6 +39,8 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_embeddings", "product_id", "catalog_products")
         .follow("catalog_similar_products", "product_id", "catalog_products")
         .follow("catalog_suggestions", "product_id", "catalog_products")
+        .follow("catalog_product_media_alts", "product_id", "catalog_products")
+        .follow("catalog_variant_attributes", "product_id", "catalog_products")
         .copy_on_split(&[
             "catalog_categories",
             "catalog_rounding_rules",

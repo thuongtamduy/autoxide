@@ -768,4 +768,4 @@ pub(crate) use recommend::{co_purchase, embedding, product_stat, similar_product
 
 // Nhập / xuất CSV (m0014).
 mod transfer_entity;
-pub(crate) use transfer_entity::{suggestion, transfer};
+pub(crate) use transfer_entity::{media_alt, suggestion, transfer, variant_attribute};

@@ -415,6 +415,15 @@ pub(crate) struct ProductMediaDto {
     pub alt: String,
 }
 
+/// The alternative text of one image in one language.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[schema(as = CatalogMediaAlt)]
+pub(crate) struct MediaAltResponse {
+    pub media_id: Uuid,
+    pub locale: String,
+    pub alt: String,
+}
+
 impl From<&product_media::Model> for ProductMediaDto {
     fn from(row: &product_media::Model) -> Self {
         ProductMediaDto { media_id: row.media_id, variant_id: row.variant_id, alt: row.alt.clone() }
@@ -450,6 +459,9 @@ pub(crate) struct ProductResponse {
     pub options: Vec<OptionDto>,
     pub variants: Vec<VariantResponse>,
     pub media: Vec<ProductMediaDto>,
+    /// Alternative texts of the images in other languages (`PUT
+    /// /products/{id}/media/{media_id}/alts/{locale}`).
+    pub media_alts: Vec<MediaAltResponse>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub activated_at: Option<DateTime<Utc>>,
@@ -482,6 +494,15 @@ impl From<ProductDetail> for ProductResponse {
             options: detail.options.iter().map(OptionDto::from).collect(),
             variants: detail.variants.iter().map(VariantResponse::from).collect(),
             media: detail.media.iter().map(ProductMediaDto::from).collect(),
+            media_alts: detail
+                .media_alts
+                .iter()
+                .map(|row| MediaAltResponse {
+                    media_id: row.media_id,
+                    locale: row.locale.clone(),
+                    alt: row.alt.clone(),
+                })
+                .collect(),
             created_at: product.created_at,
             updated_at: product.updated_at,
             activated_at: product.activated_at,
