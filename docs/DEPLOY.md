@@ -3,7 +3,8 @@
 [Tiếng Việt](DEPLOY.vi.md)
 
 This guide takes you from nothing to a running server you can keep up to date and back
-up. Pick one of the two ways to run it:
+up. Pick one of the two ways to run it (a third, one container with SQLite and no build,
+is in [section C](#c-one-container-with-sqlite)):
 
 | | Docker Compose with PostgreSQL | One binary with SQLite |
 | --- | --- | --- |
@@ -19,7 +20,7 @@ You can start with SQLite and move to PostgreSQL later without losing data (see
 ### 1. Get the code and set the secrets
 
 ```bash
-git clone <repository URL> autoxide
+git clone https://github.com/thuongtamduy/autoxide.git autoxide
 cd autoxide
 ```
 
@@ -187,7 +188,7 @@ alone, restore (`--no-deps` keeps Compose from applying migrations first: restor
 an empty database), then start everything:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d --wait postgres
 docker compose run --rm --no-deps -v "$PWD/backups:/backups" app restore /backups/2026-11-11
 docker compose up -d
 ```
@@ -308,6 +309,46 @@ placements nor a placement's own file storage; the command prints a warning nami
 those up with the database's (and the storage's) own tools. Keep
 `AUTOXIDE_SECRET_KEY` in a safe place apart from the backups: without it, the encrypted secrets in
 a backup cannot be read.
+
+## C. One container with SQLite
+
+For trying Autoxide or a small installation on one machine, without building anything. The
+steps to the first run are in the README, [Try it with Docker](../README.md#try-it-with-docker-no-build).
+The rules that matter after that, with `IMAGE` and `RUN` as defined there:
+
+- The server never applies migrations by itself. Starting `serve` on an empty or older
+  database stops at once with `N migrations have not been applied … run autoxide migrate up
+  first`: run `$RUN $IMAGE migrate up`, then start it.
+- Everything the server writes is in the volume `autoxide-data` (`/var/lib/autoxide/data`):
+  the database, uploaded files, and mail until SMTP is configured. A container started without
+  that volume keeps its data only until it is removed.
+- `docker run -p 8080:8080` publishes the port on every network interface of the machine; use
+  `-p 127.0.0.1:8080:8080` and a reverse proxy ([A.4](#4-put-it-on-the-internet)). Put more
+  settings in `autoxide.env` (one `NAME=value` per line, no quotes).
+- Update: pull the new image, apply its migrations, replace the container.
+
+```bash
+IMAGE=ghcr.io/thuongtamduy/autoxide:<new version>
+docker pull $IMAGE
+$RUN $IMAGE migrate up
+docker rm -f autoxide
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+```
+
+- Back up to a directory you mount (the image runs as user 10001, which must be able to write
+  there), and restore into a new volume before starting the server:
+
+```bash
+mkdir -p backups && sudo chown 10001 backups
+$RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
+# on the new machine, or with the volume removed:
+$RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
+```
+
+Without the `chown`, the backup stops with `Permission denied (os error 13)`. A backup written
+to a path that is not mounted disappears with the container, and the command still says it
+succeeded.
 
 ## Moving from SQLite to PostgreSQL
 

@@ -89,7 +89,47 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
     sign-in links, delegation down chains of tenants, time-limited support access; the official
     list of Vietnamese administrative units for addresses ([`docs/ADDRESS.md`](docs/ADDRESS.md))
 
+## Try it with Docker (no build)
+
+The quickest way to run Autoxide is a released image: nothing to compile, SQLite inside a
+Docker volume. You need [Docker](https://docs.docker.com/get-docker/) and `openssl`. The
+image is about 630 MB on disk and the server is ready about a second after it starts.
+
+```bash
+# Two secrets, made up here and kept in a file (use the same ones on every start; never commit it)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
+chmod 600 autoxide.env
+
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.15.0   # a release from the GitHub Releases page
+RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
+
+# 1. Create the tables (the server will not start before this, and again after every update)
+$RUN $IMAGE migrate up
+# 2. The first administrator: a strong password is printed once
+$RUN $IMAGE user create --email you@example.com --name "Your Name" --admin
+# 3. Reference data (addresses, taxes, promotion limits); each is safe to run again
+$RUN $IMAGE task address.import
+$RUN $IMAGE task tax.import_pack
+$RUN $IMAGE task promotions.load_legal_data
+# 4. Start the server (it listens inside the container; this publishes it on this machine only)
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+
+curl http://127.0.0.1:8080/health/ready     # {"data":{"status":"ok"}}
+$RUN $IMAGE doctor                           # what is still missing before going live
+```
+
+Keep `-v autoxide-data:/var/lib/autoxide/data` on every command: the database, uploaded files
+and mail live in that volume, and without it they vanish with the container. A backup must go
+to a directory you mount, not to a path inside the container (`mkdir backups && sudo chown 10001
+backups`, then add `-v "$PWD/backups:/backups"` and run `backup /backups/<name>`). Sign in as
+shown under [Configuration](#configuration) (use `http://127.0.0.1:8080`). For PostgreSQL,
+a reverse proxy with HTTPS, updates and restore, see [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Requirements
+
+These are only needed to build from source (to run a released image, see above).
 
 - [Rust](https://rustup.rs) — `rustup` installs the exact toolchain pinned in
   `rust-toolchain.toml` the first time you run `cargo`
@@ -102,7 +142,7 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 ## Getting started
 
 ```bash
-git clone <repository-url> autoxide
+git clone https://github.com/thuongtamduy/autoxide.git autoxide
 cd autoxide
 
 # Build and run the command-line interface
@@ -154,7 +194,7 @@ to choose your own, pipe it in and add `--password-stdin`:
 cargo run -p autoxide -- user create --email you@example.com --name "Your Name" --admin
 ```
 
-Import the reference data the server ships with. Neither step changes your own
+Import the reference data the server ships with. No step changes your own
 data, and running one again changes nothing:
 
 ```bash
@@ -166,6 +206,10 @@ cargo run -p autoxide -- task address.import
 # The tax data pack (rates, withholding rules). A running server imports it by itself
 # within an hour; run this to have it at once. See docs/TAX.md.
 cargo run -p autoxide -- task tax.import_pack
+
+# The legal limits on promotions (Vietnam). Without them promotions cannot be turned on
+# (`doctor` warns). See docs/PROMOTIONS.md.
+cargo run -p autoxide -- task promotions.load_legal_data
 ```
 
 Check the installation. `doctor` goes through the configuration, the database,
@@ -368,7 +412,7 @@ S3 emulator ([moto](https://github.com/getmoto/moto)) in Docker for this; set
 | `crates/kernel`  | The foundation every module builds on. Knows no module.                 |
 | `crates/app`     | The `autoxide` binary: the one place where modules are registered.      |
 | `crates/testkit` | Test support: an isolated database per test, on SQLite or PostgreSQL.   |
-| `modules/<name>` | One crate per module. `modules/auth`: accounts, sign-in, roles, API keys, two-step sign-in. `modules/audit`: the append-only audit log. `modules/idempotency`: storage for idempotency keys. `modules/mail`: mail delivery. `modules/files`: file storage. `modules/webhooks`: webhooks. |
+| `modules/<name>` | One crate per module, each owning its tables (`auth` accounts and sign-in, `audit`, `files`, `mail`, `webhooks`, `content`, `media`, `catalog`, `orders`… — about thirty; `ls modules` lists them, the sections above say what each does). |
 | `xtask`          | Developer tooling: `cargo xtask check` enforces the workspace boundaries. |
 | `gate.sh`        | The quality gate. A change is done only when this is green.             |
 
