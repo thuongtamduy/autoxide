@@ -9,6 +9,108 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-20
+
+### Added
+
+- Module `customers`: wishlist (merged from the browser at sign-in), recently viewed products,
+  abandoned cart reminders sent only to buyers who consented to marketing (stopped when they order or
+  withdraw consent), and referrals rewarded once after the referred buyer's first completed order.
+- Module `customers`: loyalty points in lots with their own expiry (earned when an order completes,
+  oldest lot used first, never below zero under concurrent use), membership tiers by 12-month
+  spending with an earning multiplier, manual adjustments with a reference, birthday / purchase /
+  points-exchange vouchers through promotions, and the unused points kept as a liability in the
+  ledger at their value when earned.
+- Module `orders`: checkout accepts `tenders` (e.g. `{"kind": "points", "input": {"points": 500}}`)
+  to pay part or all of an order; the payment partner collects only the rest, and an order paid in
+  full by tenders is confirmed at once.
+- Buyers can sign in or create an account with a phone number and a code sent by SMS (`POST /api/v1/auth/phone/codes`, `POST /api/v1/auth/phone/login`); such accounts have no email (`email` is `""`) and confirm sensitive changes with `"method": "phone_code"` on `POST /api/v1/auth/me/reauth`. `compliance` sends and checks the codes. See `docs/guides/authentication.md`.
+- Module `customers` (step 47): sales profiles of buyers keyed by account or phone number (keyed hash
+  per shop), registration at the counter, purchase history and totals built from order events,
+  masked phone and email for staff with an audited `GET /customers/{id}/contact`, manual and
+  rule-based customer groups (total spent, orders, recency, tier, tags, units) plugged into carts of
+  `orders` for price lists and promotions, MCP tools. Guide: `docs/CUSTOMERS.md`.
+- Gift cards and store credit in `customers`, **off by default** (`AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED` plus the plan features `customers.gift_cards` / `customers.store_credit`): issue, look up (wrong codes throttled) and void gift cards, staff store credit adjustments, `/me` views, and checkout tenders `gift_card` / `store_credit`. Value is spent only in the issuing shop; there is no cash-out path. See `docs/CUSTOMERS.md`.
+- Wishlist alerts in `customers` (`GET`/`PUT /api/v1/customers/me/wishlist/alerts`): buyers turn on back-in-stock and real price-drop alerts with their own consent; alerts are batched hourly within the allowed hours, at most one message a day by default and once every 7 days per product. New `Catalog::display_prices` reads the public price of products and variants. See `docs/CUSTOMERS.md`.
+
+### Changed
+
+- CLI: `autoxide backup` / `restore` print the absolute path of the backup, explain a permission
+  error with the fix (create the directory, give it to uid 10001), and `backup` warns when run in a
+  container with a target that is not on a volume or mount. `serve` and `user create` on a database
+  that is not migrated now say how many migrations are pending (first few names) and which command
+  to run, with the stable error code `kernel.migrations_pending`, instead of listing every
+  migration.
+- The release binary is about half the size (377 MB → 198 MB; the Docker image shrinks by the same
+  amount) and slightly faster: release builds strip symbols and use thin link-time optimization
+  with one codegen unit. Panic messages still name the file and line; backtraces no longer name
+  functions.
+- Module `orders`: checkout and point-of-sale orders write all order lines and their taxes with
+  one statement per table instead of one per line, so placing a large order holds the write lock
+  for less time. Responses do not change.
+- Faster public shop reads, same responses: the product list and its facets look up seller
+  names once per page instead of once per seller (new `OrgDirectory::units`; its default
+  implementation keeps older implementations working); the product page no longer reads image
+  `alt` overrides and option counts twice; the deprecated `GET /content/public/menus/{key}` reads
+  all linked terms in one statement.
+- Module `orders`: order events carry `buyer_key` (keyed hash of the buyer's phone, never the
+  number), `placed_at` and `goods_paid` (paid for goods after discounts, with tax, without shipping).
+- Docs: README and the deployment guide now start with a released Docker image and SQLite
+  (migrate, first administrator, reference data, serve, backup and restore with a mounted
+  directory), list the `promotions.load_legal_data` step, and use the real repository URL.
+
+### Fixed
+
+- Module `auth`: an invitation revoked while it is being accepted either stays revoked (the
+  acceptance fails) or is accepted (the revoke answers `409`) — never both; revoke no longer
+  emits an event for an invitation that was accepted in the meantime.
+- Module `automations`: enabling a rule checks that it is still the version the enabler validated
+  (`412` otherwise) — an agent edit in between can no longer be enabled under a human's
+  permissions without review. Concurrent edits get distinct version numbers.
+- Module `bookings`: changes to one booking are serialised — two reschedules at once no longer
+  leak a slot or release the old session seat twice, and a deposit that arrives while the hold
+  expires no longer confirms a booking whose slot was already released (Postgres).
+- Module `catalog`: writes to a product (status, variants, documents) lock the product row, so a
+  product cannot go on sale while a required document is being removed, and two concurrent variant
+  edits no longer both emit `catalog.preorder_date_changed` (Postgres).
+- Module `comments`: hiding a comment target while the owning module changes its close date no
+  longer loses the hide (Postgres); `If-Match` on a target is checked on the locked row.
+- Module `compliance`: two KYC callbacks for the same attempt processed at once record the result
+  and emit `compliance.kyc_verified` once. Adding tracking tags at the same time bumps the cookie
+  policy version for every new provider (visitors are asked again), and creating the banner twice
+  at once no longer fails with `500` (Postgres).
+- Module `invoices`: a replacement or adjustment issues only while the original is still
+  correctable; a second draft replacing the same invoice (issued at the same time or later) is
+  refused with `invoices.not_correctable` instead of booking the revenue twice.
+- Module `ledger`: postings lock their accounts before checking status and floor, so raising a
+  floor or closing an account at the same time can no longer let a posting through below the new
+  floor or into the closed account (Postgres). Account updates no longer overwrite a concurrent
+  change.
+- Module `notifications`: registering the same push endpoint or device token twice at the same
+  time keeps a working subscription — the stored secret is always sealed for the row's own ID.
+- Module `promotions`: pausing and ending (or two activations of) the same promotion at the same
+  time no longer both succeed from the old status — the loser gets `409` instead of a `200` that
+  recorded a version and an event (and released the plan slot) for a transition that did not
+  happen (Postgres). Edits and deletes read the status under the same lock.
+- Module `shipping`: two COD statements that list the same shipment (different references, or
+  one statement repeating a line) settle it once — the carrier COD was credited twice on Postgres
+  (and for a repeated line on SQLite too). Two people resolving the same COD discrepancy at once:
+  the second gets `409` instead of overwriting the first resolution.
+- Module `support`: a message sent while the ticket is being closed no longer reopens the closed
+  ticket on Postgres; concurrent status changes no longer both start from the old status; an
+  automatic reply re-checks inside its transaction that the ticket is still open and that no other
+  automatic reply got in first.
+
+### Security
+
+- Module `bookings`: parallel guesses of a guest phone code all count towards the five-attempt
+  limit on Postgres.
+- Module `orders`: guesses of a guest order-lookup code are counted before the code is checked,
+  so a burst of parallel guesses cannot check more than five codes.
+- Module `support`: parallel guesses of a guest ticket's verification code all count towards the
+  five-attempt limit on Postgres (they used to see the same attempt count, so the limit did not
+  stop a burst of guesses).
+
 ## [0.15.0] - 2026-11-20
 
 ### Added
@@ -2060,7 +2162,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...v0.13.0
