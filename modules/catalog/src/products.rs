@@ -608,11 +608,16 @@ impl CatalogService {
         id: Uuid,
         permission: &autoxide_kernel::access::Permission,
     ) -> Result<product::Model, Error> {
-        let row = product::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(transaction)
-            .await?
-            .ok_or_else(|| errors::product_not_found(id))?;
+        // Khoá dòng sản phẩm tới hết transaction ghi (D-181): mọi lệnh sửa sản phẩm, biến thể, giấy
+        // tờ đi qua đây nên nối đuôi nhau trên Postgres — mở bán (kiểm giấy tờ bắt buộc) không chen
+        // giữa lúc giấy tờ đang bị xoá, hai lần sửa không cùng xuất phát từ bản cũ rồi phát event
+        // trùng. Ngoài transaction (kết nối ghi trần) khoá nhả ngay sau câu lệnh, không hại gì.
+        let row = autoxide_kernel::rows::lock_one(
+            transaction,
+            product::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(|| errors::product_not_found(id))?;
         writable(principal, transaction, &PRODUCTS_READ, permission, row.org_id, || {
             errors::product_not_found(id)
         })
