@@ -73,7 +73,7 @@ autoxide-orders = { path = "modules/orders" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 tower-http = { version = "0.7", features = [
   "catch-panic",
   "compression-br",
@@ -254,6 +254,8 @@ pulldown-cmark = { version = "0.13", default-features = false }
 # `ServiceExt::oneshot`: gửi một request thẳng vào router, không cần mở port — trong test, và ở lô
 # ghi đồng bộ của kernel (bước 69 P2: chạy từng lệnh qua router con).
 tower = { version = "0.5", features = ["util"] }
+# Client WebSocket cho test của `GET /api/v1/kernel/events/ws` (cùng bản axum dùng, bước 69 P3).
+tokio-tungstenite = "0.29"
 # Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
 # Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
 proptest = { version = "1.12", default-features = false, features = ["std"] }

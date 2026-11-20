@@ -44,6 +44,7 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ------------------ | ------------------------------- | --------- | --------------------------------------------------- |
 | Async runtime      | `tokio`                         | 1.54      | Chuẩn thực tế của Rust async                        |
 | HTTP / REST        | `axum`                          | 0.8       | Do nhóm tokio làm                                   |
+| WebSocket          | `axum` feature `ws` (`tokio-tungstenite` 0.29) | 0.8 | `GET /api/v1/kernel/events/ws` (bước 69); test dùng client `tokio-tungstenite` cùng bản |
 | Middleware HTTP    | `tower-http`                    | 0.7       | Trace, CORS, timeout, giới hạn body, request id, nén response (gzip, brotli — D-20261119-step39-compression) |
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres                  |
 | Migration          | `sea-orm-migration`             | 2.0       | Viết bằng Rust, chạy được trên cả hai database      |

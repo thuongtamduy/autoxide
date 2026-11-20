@@ -937,7 +937,7 @@ thiếu. Các bước nền đã xong: bắt đầu được ngay, song song v�
 - [x] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
       (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
-- [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
+- [x] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
       event, chỉ nhận lệnh điều khiển (đăng ký, đang gõ, online) — ghi dữ liệu vẫn qua REST
 - [x] Mua trong ứng dụng: trait `StorePurchases` (App Store Server API, Google Play Developer API, thông báo máy chủ
       có kiểm chữ ký) + bộ giả, `plans` nối vào thuê bao và quyền dùng, gọi lại không cấp trùng; tiền do Apple /
