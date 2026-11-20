@@ -194,7 +194,8 @@ sẵn lệnh.
 - Thay đổi người dùng thấy ghi bằng một file mảnh `changelog.d/<tên>.<mục>.md`, **không sửa
   `CHANGELOG.md`** — gộp lúc phát hành bằng `cargo xtask changelog` (D-20261119-changelog-fragments).
 - Nhiều phiên song song: mỗi phiên một PR cho một cụm việc, gate nhanh xanh thì push, không chờ CI; phiên điều phối
-  ghép và merge theo lô; PR chỉ xung đột ở file sinh tự động thì không cần gộp `main` lại (D-20261119-merge-batches).
+  ghép và merge theo lô; PR chỉ xung đột ở file sinh tự động thì không cần gộp `main` lại (D-20261119-merge-batches);
+  khi ghép lô chạy test của crate bị sửa trên cả Postgres (D-20261120-batch-postgres).
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
   bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo

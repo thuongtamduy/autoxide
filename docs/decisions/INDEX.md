@@ -87,6 +87,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 - **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19
+- **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-build-faster](D-20261120-build-faster.md)** Build nhanh hơn: archive test của CI dùng opt-level 0 cho thư viện ngoài; không dùng cargo-hakari; đề xuất tách kernel — 2026-11-20
 - **[D-20261120-ci-nextest-archive](D-20261120-ci-nextest-archive.md)** CI build test một lần thành archive của nextest, các máy test chỉ tải về và chạy — 2026-11-20
 - **[D-20261120-docker-chef](D-20261120-docker-chef.md)** Image Docker tách lớp thư viện ngoài bằng cargo-chef để cache gha giữ được — 2026-11-20
