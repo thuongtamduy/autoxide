@@ -84,6 +84,12 @@ bước 7.**
    git push origin vX.Y.Z
    ```
 
+   Môi trường của agent không đẩy được tag (chỉ được đẩy nhánh làm việc) thì nhờ chủ dự án tạo trên
+   GitHub: Releases → Draft a new release → tag `vX.Y.Z` (Create new tag), **Target** là commit
+   release ở trên (hay commit merge của nó, cùng nội dung) → Publish. Workflow `Release` chạy theo tag
+   đó; thấy trang Release đã có thì cập nhật ghi chú và đính kèm file chứ không báo lỗi. Ghi chú quá
+   giới hạn của GitHub (125 000 ký tự) thì workflow thay bằng đoạn ngắn dẫn tới `CHANGELOG.md`.
+
 7. Theo dõi workflow `Release` của tag (Actions → Release) tới khi xanh, rồi kiểm image đã đăng:
 
    ```bash

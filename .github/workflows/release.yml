@@ -182,6 +182,18 @@ jobs:
             found && /^## \[/ { exit }
             found { print }
           ' CHANGELOG.md > notes.md
+          # GitHub giới hạn ghi chú một bản phát hành ở 125 000 ký tự (v0.15.0 vượt). Dài hơn thì thay
+          # bằng đoạn ngắn dẫn tới mục của bản này trong CHANGELOG.md của tag.
+          if [ "$(wc -c < notes.md)" -gt 120000 ]; then
+            anchor="$(printf '%s' "$version" | tr -d '.')"
+            released="$(grep -m1 "^## \\[$version\\]" CHANGELOG.md | sed 's/.* - //')"
+            {
+              echo "Docker image: \`ghcr.io/${GITHUB_REPOSITORY,,}:$version\` (linux/amd64, linux/arm64)."
+              echo
+              echo "The list of changes is too long for this page; see"
+              echo "[CHANGELOG.md](https://github.com/$GITHUB_REPOSITORY/blob/$TAG/CHANGELOG.md#${anchor}---${released})."
+            } > notes.md
+          fi
       # Gói SDK TypeScript đính kèm bản phát hành: client cài bằng URL của file, không cần npm registry (D-177).
       - name: Pack the TypeScript SDK
         working-directory: sdk/typescript
@@ -194,6 +206,15 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           sdk="$(ls autoxide-sdk-*.tgz)"
-          gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag \
-            "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
-            "$sdk#TypeScript SDK (npm install <URL of this file>)"
+          # Chủ dự án có thể đã tạo trang Release để có tag (agent không đẩy được tag): khi đó cập nhật
+          # trang đó và đính kèm file, thay vì báo "already exists".
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG" --title "Autoxide $TAG" --notes-file notes.md
+            gh release upload "$TAG" --clobber \
+              "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
+              "$sdk#TypeScript SDK (npm install <URL of this file>)"
+          else
+            gh release create "$TAG" --title "Autoxide $TAG" --notes-file notes.md --verify-tag \
+              "sbom.spdx.json#SBOM (SPDX JSON) of the Docker image" \
+              "$sdk#TypeScript SDK (npm install <URL of this file>)"
+          fi
