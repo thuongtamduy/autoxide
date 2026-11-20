@@ -113,6 +113,14 @@ impl EmailVerifications {
         if user.email_verified_at.is_some() {
             return Err(already_verified());
         }
+        // Tài khoản chỉ có số điện thoại (bước 47): chưa có email để xác minh.
+        if user.email.is_empty() {
+            return Err(Error::validation(vec![FieldError::new(
+                "email",
+                "missing",
+                "this account has no email yet; add one first",
+            )]));
+        }
         self.send(tenant, actor, &user, &user.email, language).await
     }
 

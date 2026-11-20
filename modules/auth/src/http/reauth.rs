@@ -39,6 +39,9 @@ pub(crate) enum ReauthMethod {
     Passkey,
     /// A mail to your address with the token.
     EmailLink,
+    /// A code sent by SMS to the number you sign in with: `phone_challenge_id` (from
+    /// `POST /api/v1/auth/phone/codes`) and `phone_code`. For accounts without email.
+    PhoneCode,
 }
 
 /// Proof that you are the account owner, for one sensitive change.
@@ -59,6 +62,11 @@ pub(crate) struct ReauthRequest {
     /// With `passkey`: the browser's `AuthenticationResponseJSON`.
     #[schema(value_type = Option<Object>)]
     passkey_credential: Option<serde_json::Value>,
+    /// With `phone_code`.
+    phone_challenge_id: Option<Uuid>,
+    /// With `phone_code`: the 6-digit code from the SMS.
+    #[validate(length(max = 16))]
+    phone_code: Option<String>,
 }
 
 /// A confirmation token.
@@ -129,6 +137,10 @@ async fn reauthenticate(
             credential: input.passkey_credential.unwrap_or_default(),
         }),
         ReauthMethod::EmailLink => Proof::EmailLink,
+        ReauthMethod::PhoneCode => Proof::PhoneCode {
+            challenge_id: input.phone_challenge_id.ok_or_else(|| missing("phone_challenge_id"))?,
+            code: input.phone_code.ok_or_else(|| missing("phone_code"))?,
+        },
     };
     let status =
         if input.method == ReauthMethod::EmailLink { StatusCode::ACCEPTED } else { StatusCode::OK };

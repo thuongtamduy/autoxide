@@ -160,3 +160,48 @@ pub trait AccountRecovery: Send + Sync {
         email: &str,
     ) -> Result<(User, u64), Error>;
 }
+
+/// Mã một lần gửi tới số điện thoại đã gửi đi (bước 47, đăng nhập bằng số).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhoneCodeSent {
+    /// ID của mã; người dùng gửi lại cùng mã họ nhận được.
+    pub id: Uuid,
+    pub expires_at: DateTime<Utc>,
+}
+
+/// Gửi và kiểm mã một lần qua SMS cho đăng nhập bằng số điện thoại (bước 47,
+/// D-20261120-phone-accounts). `compliance` cài (giữ quy tắc số được nhận, giới hạn gửi, bên gửi SMS)
+/// và cắm vào bằng [`AuthExtensions::set_phone_codes`] vì đăng ký sau `auth`.
+#[async_trait::async_trait]
+pub trait PhoneCodes: Send + Sync {
+    /// Gửi mã tới số `phone` (chưa chuẩn hoá). Lỗi khi số không được nhận, gửi quá nhiều, SMS hỏng.
+    async fn send(
+        &self,
+        tenant: &TenantContext,
+        phone: &str,
+        ip: Option<std::net::IpAddr>,
+    ) -> Result<PhoneCodeSent, Error>;
+
+    /// Kiểm mã `code` của `id`: đúng, còn hạn, chưa dùng → số đã xác thực (dùng một lần).
+    async fn verify(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        code: &str,
+    ) -> Result<autoxide_kernel::sms::PhoneNumber, Error>;
+
+    /// Ghi số vừa xác thực là số của tài khoản `user_id` (cho module khác biết qua
+    /// `AccountVerification`). Bỏ qua, không lỗi, khi quy tắc của khách không cho thêm tài khoản dùng số.
+    async fn record(
+        &self,
+        tenant: &TenantContext,
+        user_id: Uuid,
+        phone: &autoxide_kernel::sms::PhoneNumber,
+    ) -> Result<(), Error>;
+}
+
+/// Điểm cắm của `auth` cho module đăng ký sau (giống `OrderExtensions` của `orders`).
+pub trait AuthExtensions: Send + Sync {
+    /// Cắm bộ gửi / kiểm mã cho đăng nhập bằng số. Cắm lần hai: lỗi.
+    fn set_phone_codes(&self, codes: std::sync::Arc<dyn PhoneCodes>) -> Result<(), Error>;
+}

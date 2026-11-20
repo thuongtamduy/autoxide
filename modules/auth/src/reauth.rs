@@ -42,6 +42,11 @@ pub(crate) enum Proof {
     Factor(Reauth),
     /// Gửi token qua mail tới email của tài khoản.
     EmailLink,
+    /// Mã SMS gửi tới số đăng nhập của tài khoản (`POST /phone/codes`), cho tài khoản chỉ có số.
+    PhoneCode {
+        challenge_id: Uuid,
+        code: String,
+    },
 }
 
 /// Token vừa phát; `token` là `None` khi gửi qua mail.
@@ -54,6 +59,7 @@ pub(crate) struct Reauthentication {
     pub sessions: Arc<SessionService>,
     pub mfa: Arc<MfaService>,
     pub passkeys: Arc<PasskeyService>,
+    pub phone: Arc<crate::phone::PhoneSignIn>,
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     /// Hạn của token (`AUTOXIDE_AUTH_REAUTH_MINUTES`).
@@ -94,7 +100,19 @@ impl Reauthentication {
                     .get(tenant, user_id)
                     .await?
                     .ok_or_else(|| crate::user::user_not_found(user_id))?;
+                // Tài khoản chỉ có số điện thoại (bước 47): không có địa chỉ để gửi.
+                if user.email.is_empty() {
+                    return Err(Error::validation(vec![FieldError::new(
+                        "method",
+                        "unavailable",
+                        "this account has no email; use `phone_code`",
+                    )]));
+                }
                 Some(user.email)
+            }
+            Proof::PhoneCode { challenge_id, code } => {
+                self.phone.reauthenticate(tenant, user_id, challenge_id, &code).await?;
+                None
             }
         };
         let transaction = tenant.database().begin_write().await?;

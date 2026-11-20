@@ -1,0 +1,1 @@
+- Buyers can sign in or create an account with a phone number and a code sent by SMS (`POST /api/v1/auth/phone/codes`, `POST /api/v1/auth/phone/login`); such accounts have no email (`email` is `""`) and confirm sensitive changes with `"method": "phone_code"` on `POST /api/v1/auth/me/reauth`. `compliance` sends and checks the codes. See `docs/guides/authentication.md`.

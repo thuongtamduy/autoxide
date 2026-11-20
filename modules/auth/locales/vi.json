@@ -235,5 +235,9 @@
   "text:This tenant removed the guardrail it had set for a tenant below it (`before.tenant_id`).": "Khách này gỡ rào đã đặt cho một khách ở dưới nó (`before.tenant_id`).",
   "text:This tenant set or changed the most permissions a tenant below it can use (`after`: tenant, permissions).": "Khách này đặt hay đổi số permission tối đa của một khách ở dưới nó (`after`: khách, permission).",
   "text:Two-step sign-in was turned off, by the user or by an administrator.": "Đăng nhập hai bước bị tắt, bởi người dùng hay quản trị viên.",
-  "text:Write notes.": "Viết ghi chú."
+  "text:Write notes.": "Viết ghi chú.",
+  "auth.phone_sign_in_unavailable": "Máy chủ này không gửi được mã đăng nhập qua SMS.",
+  "field:this account has no email yet; add one first": "tài khoản này chưa có email; hãy thêm email trước",
+  "field:this account has no email; use `phone_code`": "tài khoản này không có email; hãy dùng `phone_code`",
+  "field:was not sent to the number this account signs in with": "không được gửi tới số mà tài khoản này dùng để đăng nhập"
 }

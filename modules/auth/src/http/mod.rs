@@ -14,6 +14,7 @@ pub(crate) mod memberships;
 mod mfa;
 pub(crate) mod oidc;
 mod passkeys;
+mod phone;
 mod reauth;
 mod reset;
 pub(crate) mod roles;
@@ -47,6 +48,8 @@ pub(crate) struct HttpState {
     pub resets: Arc<PasswordResets>,
     pub verifications: Arc<EmailVerifications>,
     pub passkeys: Arc<crate::passkey::PasskeyService>,
+    /// Đăng nhập bằng số điện thoại + mã qua SMS (bước 47).
+    pub phone: Arc<crate::phone::PhoneSignIn>,
     /// Cây tổ chức: cài đặt của khách (`auth.customer_registration`…). `None`: app không có
     /// module `organizations`.
     pub orgs: Option<Arc<dyn autoxide_organizations::api::OrgDirectory>>,
@@ -90,6 +93,7 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(customers::routes())
         .merge(delegations::routes())
         .merge(login_link::routes())
+        .merge(phone::routes())
         .merge(oidc::routes())
         .merge(invitations::routes())
         .merge(support::routes())

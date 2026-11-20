@@ -25,6 +25,23 @@ curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
 
 When the server turns it on (`AUTOXIDE_AUTH_LOGIN_LINK=true`), `POST /api/v1/auth/login/link` with `{"email": …}` sends a one-time sign-in link (valid `AUTOXIDE_AUTH_LOGIN_LINK_MINUTES`, 15 by default). It always answers 202 the same way, whether or not the email has an account. Finish with `POST /api/v1/auth/login/link/confirm` and the `token` from the mail; the answer is the same as `/login` (tokens, or an `mfa_token` when two-step sign-in is on). Send `"bind_device": true` to get a `device_secret` and send it back with the token: the link then works only on this device.
 
+## Buyers: sign in with a phone number
+
+Buyers can sign in, or create an account, with a code sent by SMS. It needs an SMS provider on the
+server; without one these endpoints answer 503 `auth.phone_sign_in_unavailable`.
+
+1. `POST /api/v1/auth/phone/codes` with `{"phone": "0912345678"}` answers 202 with a `challenge_id`.
+   The answer is the same whether the number has an account or not.
+2. `POST /api/v1/auth/phone/login` with `{"challenge_id": "…", "code": "123456", "name": "Lan"}`.
+   A number that already has a buyer account signs in to it (200). A new number creates a buyer
+   account without email or password (201) when the shop lets buyers create accounts; `name` is used
+   only then. Both answer with the same tokens as `/login`, or 202 when the account has two-step
+   sign-in on.
+
+Such an account has `email` set to `""` until the buyer adds one. To confirm a sensitive change
+(`POST /api/v1/auth/me/reauth`) it uses `"method": "phone_code"` with a fresh `phone_challenge_id`
+and `phone_code` sent to its own number; after that it can add a passkey and sign in with it.
+
 ## Refresh before the access token expires
 
 `expires_in` says how many seconds the access token lives. Shortly before, exchange the refresh token for a new pair. Each refresh token works **once**: keep the new one.

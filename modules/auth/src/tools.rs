@@ -558,6 +558,7 @@ mod tests {
                 autoxide_kernel::event::Outbox::standalone("auth"),
             )),
             personal_data: services.personal_data.clone(),
+            phone: services.phone.clone(),
             self_registration: false,
             country_header: None,
         })

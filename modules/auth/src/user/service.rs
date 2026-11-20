@@ -188,6 +188,7 @@ impl UserService {
             locale: Set(None),
             time_zone: Set(None),
             realm: Set(entity::realm_str(realm).to_owned()),
+            phone_key: Set(None),
         }
         .insert(&transaction)
         .await
@@ -674,7 +675,7 @@ fn check_locale(raw: &str) -> Result<String, FieldError> {
 /// Cắt trước để hai database trả về cùng một giá trị.
 /// Email và tên viết thường, bỏ dấu, lưu ở `auth_user.search_text` để tìm (m0016, m0017):
 /// "dat" tìm ra "Đạt".
-fn search_text(email: &str, name: &str) -> String {
+pub(crate) fn search_text(email: &str, name: &str) -> String {
     autoxide_kernel::search::fold(&format!("{email} {name}"))
 }
 
