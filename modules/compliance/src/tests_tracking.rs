@@ -265,3 +265,34 @@ async fn nha_cung_cap_bat_hien_trong_ben_nhan_du_lieu() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn them_tag_dong_thoi_van_tang_phien_ban_dung() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let uri = format!("/cookie-settings/{}", root());
+        // Banner chưa có: hai lần thêm tag cùng lúc cùng tạo banner. Postgres từng cho bên sau vướng
+        // khoá chính (500) và chữ ký thiếu tag của bên kia.
+        let (ga4, meta) =
+            tokio::join!(add(&app, "ga4", "G-ABC12345"), add(&app, "meta", "1234567890123456"));
+        assert_eq!(ga4.0, StatusCode::CREATED, "{}", ga4.1);
+        assert_eq!(meta.0, StatusCode::CREATED, "{}", meta.1);
+        // Banner đã có: thêm tiếp hai tag cùng lúc.
+        let (gtm, tiktok) = tokio::join!(
+            add(&app, "gtm", "GTM-ABC1234"),
+            add(&app, "tiktok", "C1A2B3C4D5E6F7G8H9I0")
+        );
+        assert_eq!(gtm.0, StatusCode::CREATED, "{}", gtm.1);
+        assert_eq!(tiktok.0, StatusCode::CREATED, "{}", tiktok.1);
+        let (_, before) = call(&app, "GET", &uri, "admin", None).await;
+        let version = before["data"]["policy_version"].as_i64().unwrap();
+        // Chữ ký đã gồm mọi tag đang bật: lưu lại cài đặt không đổi gì thì không tăng phiên bản. Chữ
+        // ký thiếu tag (hai bên cùng tính trên tập tag cũ) sẽ làm lần lưu này tăng phiên bản.
+        let (status, same) =
+            call(&app, "PUT", &uri, "admin", Some(json!({"position": "top"}))).await;
+        assert_eq!(status, StatusCode::OK, "{same}");
+        assert_eq!(same["data"]["policy_version"].as_i64(), Some(version), "{same}");
+    })
+    .await
+    .unwrap();
+}

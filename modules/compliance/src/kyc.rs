@@ -363,6 +363,17 @@ impl ComplianceService {
                 )
                 .await?
                 .ok_or_else(kyc_not_found)?;
+                // Đọc lại lượt xác thực sau khi khoá hồ sơ (D-181): hai callback cùng lượt chạy cùng
+                // lúc thì bên sau chờ khoá, rồi thấy lượt đã xong và thôi — không thì Postgres cho
+                // cả hai cùng thấy `pending` ở câu đọc trên, cùng ghi và phát event hai lần.
+                let still_pending = kyc_attempt::Entity::find_by_id(attempt.id)
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?
+                    .is_some_and(|row| row.status == "pending");
+                if !still_pending {
+                    return Ok(());
+                }
                 let at = now();
                 let mut active: kyc_profile::ActiveModel = profile.clone().into();
                 let (attempt_status, result_code) = match &outcome.status {
