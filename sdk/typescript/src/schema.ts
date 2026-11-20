@@ -12466,6 +12466,48 @@ export type Data_Vec_CatalogPublicCategory = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_CatalogPublicProductCard = {
+  data: {
+    /**
+     * Some text was written from an AI suggestion: label it (Vietnam's Law on Artificial
+     * Intelligence 134/2025/QH15).
+     */
+    ai_assisted: boolean;
+    /** Brand (the attribute with code `brand`); `null` without one. */
+    brand?: string | null;
+    compare_at?: Money | null;
+    id: string;
+    image?: CatalogPublicImage | null;
+    /** `physical`, `digital`, `service` or `bundle`. */
+    kind: string;
+    name: string;
+    /** Address of the product page on the website, without language prefix. */
+    path: string;
+    /** Lowest current price over the variants (no customer group, no code needed). */
+    price_from: Money;
+    /** Highest current price over the variants: show "from" when it differs from `price_from`. */
+    price_to: Money;
+    /** Average rating out of 5 (two decimals); `null` before the first rating. */
+    rating?: number | null;
+    rating_count: number;
+    /** When `sale_price` ends; `null`: no end set. */
+    sale_ends_at?: string | null;
+    sale_price?: Money | null;
+    seller: CatalogPublicSeller;
+    short_description: string;
+    slug: string;
+    unit_price?: CatalogUnitPrice | null;
+    /** Number of variants on sale. */
+    variant_count: number;
+    /**
+     * The product's options and how many values each has, e.g. `[{"name": "Size", "count": 3}]`
+     * ("3 sizes").
+     */
+    variant_summary: CatalogOptionSummary[];
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_CatalogRestrictionRule = {
   data: {
     code: string;
@@ -32291,6 +32333,32 @@ export interface paths {
       responses: {
         200: Data_CatalogFacets;
         403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products/{id}/frequently-bought-together": {
+    /** List products frequently bought together with a product (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; limit?: number; site?: string }; };
+      responses: {
+        200: Data_Vec_CatalogPublicProductCard;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/products/{id}/similar": {
+    /** List products similar to a product (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { locale: string; limit?: number; site?: string }; };
+      responses: {
+        200: Data_Vec_CatalogPublicProductCard;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };
