@@ -12,8 +12,8 @@
 //! - Giải mã / đổi cỡ chạy trên thread riêng (`spawn_blocking`), không chặn thread async.
 //! - Khoá ở nơi lưu `media/<id>/<version_id>_w<width>` (trong nơi lưu của khách); gắn với một
 //!   phiên bản nội dung — thay nội dung thì bản cũ bị xoá và job làm lại cho phiên bản mới.
-//! - AVIF và SVG không có ảnh thu nhỏ (không có bộ giải mã AVIF thuần Rust; SVG đã co giãn
-//!   được).
+//! - Ảnh gốc AVIF và SVG không có ảnh thu nhỏ (không có bộ giải mã AVIF thuần Rust; SVG đã co
+//!   giãn được). Bản AVIF CỦA ảnh thu nhỏ do job riêng làm (`avif.rs`, bước 39 B8).
 
 use std::io::Cursor;
 use std::sync::Arc;
@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::entity::item;
-use crate::entity::variant::{self, WEBP, storage_key};
+use crate::entity::variant::{self, AVIF, WEBP, storage_key};
 use crate::service::{Item, MediaService, now};
 
 pub(crate) const MAKE_VARIANTS: &str = "media.make_variants";
@@ -192,6 +192,8 @@ impl MediaService {
             }
         }
         saved?;
+        // Bản AVIF (bước 39 B8): job riêng, chỉ khi bật, sau khi ảnh thu nhỏ đã lưu.
+        self.enqueue_avif(tenant.database().write(), tenant, item_id, version_id).await?;
         // Đếm theo cỡ (mỗi cỡ hai file: JPEG / PNG và WebP).
         let sizes = rendered.iter().filter(|copy| copy.content_type != WEBP).count();
         tracing::info!(media_item_id = %item_id, sizes, "smaller copies of an image made");
@@ -242,22 +244,21 @@ impl MediaService {
         Ok(true)
     }
 
-    /// Ảnh thu nhỏ rộng `width` của nội dung hiện tại của `item`, nếu đã làm: bản WebP khi
-    /// `webp`, không thì bản JPEG / PNG.
+    /// Ảnh thu nhỏ rộng `width` của nội dung hiện tại của `item` ở định dạng `format`, nếu đã làm.
     pub(crate) async fn variant(
         &self,
         tenant: &TenantContext,
         item: &Item,
         width: u32,
-        webp: bool,
+        format: CopyFormat,
     ) -> Result<Option<Variant>, Error> {
         let Ok(width) = i32::try_from(width) else {
             return Ok(None);
         };
-        let format = if webp {
-            variant::Column::ContentType.eq(WEBP)
-        } else {
-            variant::Column::ContentType.ne(WEBP)
+        let format = match format {
+            CopyFormat::Webp => variant::Column::ContentType.eq(WEBP),
+            CopyFormat::Avif => variant::Column::ContentType.eq(AVIF),
+            CopyFormat::Main => variant::Column::ContentType.is_not_in([WEBP, AVIF]),
         };
         Ok(variant::Entity::find()
             .scoped(tenant)
@@ -268,6 +269,14 @@ impl MediaService {
             .one(tenant.database().read())
             .await?)
     }
+}
+
+/// Định dạng của một bản thu nhỏ: JPEG / PNG (luôn có), WebP (D-196), AVIF (bước 39 B8).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CopyFormat {
+    Main,
+    Webp,
+    Avif,
 }
 
 /// Ảnh thu nhỏ của nội dung hiện tại của từng item trong `items`, theo chiều rộng tăng dần
@@ -297,24 +306,40 @@ pub(crate) async fn variants_of<C: ConnectionTrait>(
     Ok(found)
 }
 
-/// Một cỡ ảnh thu nhỏ: bản JPEG / PNG và bản WebP cùng cỡ (nếu đã làm).
+/// Một cỡ ảnh thu nhỏ: bản JPEG / PNG và các bản WebP, AVIF cùng cỡ (nếu đã làm).
 #[derive(Debug, Clone)]
 pub(crate) struct VariantPair {
     pub main: Variant,
     pub webp: Option<Variant>,
+    pub avif: Option<Variant>,
 }
 
-/// Ghép các dòng của một item (theo chiều rộng tăng dần) thành từng cỡ. Bản WebP không có bản
-/// JPEG / PNG cùng cỡ thì bỏ (không xảy ra: hai bản luôn được lưu cùng transaction).
+/// Ghép các dòng của một item (theo chiều rộng tăng dần) thành từng cỡ. Bản WebP / AVIF không có
+/// bản JPEG / PNG cùng cỡ thì bỏ (không xảy ra: bản chính luôn lưu trước hay cùng lúc).
 pub(crate) fn pair(rows: Vec<Variant>) -> Vec<VariantPair> {
-    let (webp, main): (Vec<Variant>, Vec<Variant>) = rows.into_iter().partition(Variant::is_webp);
-    let mut webp: std::collections::HashMap<i32, Variant> =
-        webp.into_iter().map(|copy| (copy.width, copy)).collect();
-    main.into_iter().map(|main| VariantPair { webp: webp.remove(&main.width), main }).collect()
+    let mut webp: std::collections::HashMap<i32, Variant> = std::collections::HashMap::new();
+    let mut avif: std::collections::HashMap<i32, Variant> = std::collections::HashMap::new();
+    let mut main = Vec::new();
+    for row in rows {
+        if row.is_webp() {
+            webp.insert(row.width, row);
+        } else if row.is_avif() {
+            avif.insert(row.width, row);
+        } else {
+            main.push(row);
+        }
+    }
+    main.into_iter()
+        .map(|main| VariantPair {
+            webp: webp.remove(&main.width),
+            avif: avif.remove(&main.width),
+            main,
+        })
+        .collect()
 }
 
 /// Giải mã `original` (có giới hạn chống "bom giải nén"), xoay theo EXIF.
-fn decode(original: &[u8]) -> Result<DynamicImage, String> {
+pub(crate) fn decode(original: &[u8]) -> Result<DynamicImage, String> {
     let mut reader =
         ImageReader::new(Cursor::new(original)).with_guessed_format().map_err(|e| e.to_string())?;
     let mut limits = Limits::default();

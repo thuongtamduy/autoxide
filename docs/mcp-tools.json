@@ -2897,6 +2897,36 @@
     {
       "annotations": {
         "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Status of an import you started, with the counts and the errors by row.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "An import to look at.",
+        "properties": {
+          "id": {
+            "description": "Id of the import, from `start_import`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.import_status",
+      "output_schema": null,
+      "permissions": [
+        "catalog.import"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
         "read_only": true,
         "requires_approval_for_agent": false,
         "returns_secret": false
@@ -3266,6 +3296,78 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.publish"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Import products from a CSV file in the background: a known SKU updates that variant and its text, a new SKU creates a draft product. Nothing is put on sale. Follow with `import_status`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A CSV file to import.",
+        "properties": {
+          "csv": {
+            "description": "The whole CSV file (first line: column names `sku`, `name`, `locale`, `short_description`,\n`description`, `kind`, `tax_category`, `barcode`, `weight_grams`).",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Unit that owns the new products; leave out when you work in one unit only.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.start_import",
+      "output_schema": null,
+      "permissions": [
+        "catalog.import"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Ask AI for a draft short description, description and SEO texts of a product. The draft changes nothing until a person applies it (`POST /api/v1/catalog/suggestions/{id}/apply`).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A product to draft texts for.",
+        "properties": {
+          "locale": {
+            "description": "Language of the draft, e.g. `vi`.",
+            "type": "string"
+          },
+          "product_id": {
+            "description": "Id of the product.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "locale"
+        ],
+        "type": "object"
+      },
+      "name": "catalog.suggest_copy",
+      "output_schema": null,
+      "permissions": [
+        "catalog.products.write"
       ]
     },
     {

@@ -7,7 +7,7 @@
   "field:must be `public` or `private`": "phải là `public` hay `private`",
   "field:must be `root` or a folder id": "phải là `root` hay id của một thư mục",
   "field:must be `true` or `false`": "phải là `true` hay `false`",
-  "field:must be `webp`, or left out for the JPEG or PNG copy": "phải là `webp`, hoặc bỏ trống để lấy bản JPEG hay PNG",
+  "field:must be `webp` or `avif`, or left out for the JPEG or PNG copy": "phải là `webp` hay `avif`, hoặc bỏ trống để lấy bản JPEG hay PNG",
   "field:must be a BCP 47 language code like `vi` or `en`": "phải là mã ngôn ngữ BCP 47, ví dụ `vi` hay `en`",
   "field:must be a media type like `image/png` or a family like `image/*`": "phải là loại tệp như `image/png` hay một nhóm như `image/*`",
   "field:must be at most {alt_max_length} characters long": "phải dài tối đa {alt_max_length} ký tự",

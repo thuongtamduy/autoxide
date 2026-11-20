@@ -399,6 +399,7 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
         .read_only(),
     ];
     tools.extend(crate::collections::tools::all(service));
+    tools.extend(crate::tools_assist::all(service));
     tools
 }
 

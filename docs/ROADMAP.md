@@ -276,9 +276,11 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       `/public/sitemap`, `/public/feed`, `/public/search`, ảnh và bản nhỏ, bình luận của bài
       (`/public/threads`, `/public/comments`). Đặt ngưỡng p95 mỗi đường, ghi vào `docs/BENCHMARKS.md` — đo 19/11/2026: lỗi thống kê SQLite đã sửa (D-20261118-step39-sqlite-optimize); đường còn đỏ (lọc
       theo danh mục, tìm theo từ của `content`; danh sách đầy đủ trên SQLite) ghi ở BENCHMARKS, báo phiên giữ `content`
-- [ ] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
+- [x] Rà index bằng `EXPLAIN` (SQLite `EXPLAIN QUERY PLAN`, Postgres `EXPLAIN ANALYZE`) cho mọi
       truy vấn danh sách, lọc, đếm của các module trên bộ dữ liệu lớn; index thiếu thêm bằng
-      migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau
+      migration mới (không sửa migration cũ); ghi bảng truy vấn → kế hoạch trước / sau — xong cho bốn module có dữ liệu cỡ thật (`auth`, `content`, `media`,
+      `comments`): không có index thiếu thật sự, không thêm migration; module khác chưa có bộ dữ liệu mẫu,
+      D-20261120-step39-index-review
 - [x] Nén response (gzip, brotli): đo cỡ và thời gian trên JSON thật (danh sách, `openapi.json`
       hơn 1 MB), rồi quyết nén trong app (`tower-http`) hay để reverse proxy làm; không nén lại
       file đã nén (ảnh). Ghi quyết định; sửa `docs/DEPLOY.md` (EN + VI) theo — nén trong app, mức 1, D-20261119-step39-compression
@@ -292,8 +294,9 @@ Nhóm B — hiệu năng ở quy mô thật (bài đo hiện có chạy trên da
       20 ms, D-20261119-step39-semantic-scan
 - [x] Quan sát theo khách (D-190): log và trace mang trường `tenant_id`; **không** dùng `tenant_id`
       làm nhãn số đo (trái luật code về nhãn); lượng dùng theo khách lấy từ số đo dùng của bước 35
-- [ ] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
-      lượng tương đương, không thì ghi "không làm" kèm số đo
+- [x] Ảnh AVIF (D-232): đo so với WebP trên bộ ảnh mẫu; chỉ thêm (job, tắt mặc định) khi nhẹ hơn ≥ 20% ở chất
+      lượng tương đương, không thì ghi "không làm" kèm số đo — đạt (−34% trung vị), làm: job `media.make_avif`,
+      D-20261119-step39-avif
 - [x] Rút số câu SQL của `GET /auth/me`, `auth.whoami`, `GET /auth/users` (D-302: 3 → 6 câu cho một `GET /auth/me`,
       chậm 35–46%; bước 34 thêm một câu kiểm role bắt buộc MFA, D-317): lấy `has_password`, `last_sign_in_at` từ chính
       dòng người dùng đã đọc, gộp cờ MFA, role bắt buộc MFA và email đang chờ đổi vào một câu; đo lại bằng `scripts/loadtest.sh`, mục tiêu trong ±20% của mốc trước bước 33 — xong trước bước 39 theo lời chủ dự án: 7 → 3 câu, +172% (D-319)
@@ -469,9 +472,9 @@ bước 35.
       từng giá trị lọc (có giới hạn, có index, cả hai database)
 - [x] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
       thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại
-- [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
+- [x] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
       xuất); gợi ý mô tả và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
-- [ ] API hợp đồng (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời điểm để chụp vào chứng từ, sàn
+- [x] API hợp đồng (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời điểm để chụp vào chứng từ, sàn
       giá cho `promotions`; điểm cắm `set_listing_gate` cho `marketplace`; event khi giá hay trạng thái đổi;
       tool MCP như REST
 - [ ] Loại sản phẩm: hàng vật lý, hàng số (link ký có hạn qua `files`, giới hạn lượt tải), dịch vụ (không

@@ -162,6 +162,28 @@ bằng đúng lệnh trên: `autoxide task media.refresh_variants` (lệnh cũng
 bản WebP). Làm bản WebP tốn thời gian của job nền gấp khoảng ba lần bản JPEG (thêm chừng một
 phần tư giây cho mỗi ảnh chụp với các cỡ mặc định); request không bị chậm đi.
 
+### Bản AVIF
+
+Đặt `AUTOXIDE_MEDIA_AVIF=true` (mặc định tắt) thì máy chủ làm thêm một bản AVIF cho mỗi ảnh thu
+nhỏ, bằng một job nền riêng sau khi ảnh thu nhỏ đã lưu — không bao giờ trong lúc tải lên. Cùng
+chất lượng nhìn, bản AVIF nhẹ hơn bản WebP khoảng một phần ba (28–44% trên bộ ảnh thử,
+`docs/BENCHMARKS.md`), nhưng làm nó tốn vài giây CPU mỗi ảnh (tới khoảng 8 giây cho bốn cỡ mặc
+định của một ảnh chụp 4000 × 2250), nên chỉ bật khi máy chủ dư CPU. Khi đó mỗi mục của `variants`
+có `avif_url` (`url` thêm `&format=avif`) và `avif_size`; đặt nó lên đầu:
+
+```html
+<picture>
+  <source type="image/avif" srcset="…&w=320&format=avif 320w, …&w=640&format=avif 640w" sizes="100vw">
+  <source type="image/webp" srcset="…&w=320&format=webp 320w, …&w=640&format=webp 640w" sizes="100vw">
+  <img src="…&w=640" srcset="…&w=320 320w, …&w=640 640w" sizes="100vw" alt="…">
+</picture>
+```
+
+`avif_url` là `null` khi bản đó chưa làm xong (hay máy chủ không làm); xin địa chỉ có
+`&format=avif` trước lúc đó thì nhận bản WebP (hay bản JPEG / PNG), cache ngắn. Sau khi bật, lệnh
+`autoxide task media.refresh_variants` xếp việc làm bản AVIF cho các ảnh đã tải lên trước đó. Tắt
+thì không làm bản mới; bản đã làm vẫn được phục vụ.
+
 ## Nhãn
 
 Ngoài một thư mục, item mang được tối đa 20 nhãn (mỗi nhãn 1 tới 50 ký tự, không có `,`).

@@ -15,6 +15,8 @@ pub(crate) fn relocation() -> Relocation {
             "catalog_store_overrides",
             "catalog_collections",
         ])
+        // Lần nhập / xuất: việc tạm (file ghi theo khách, xoá sau 7 ngày) — không đi đâu cả.
+        .ephemeral(&["catalog_transfers"])
         // Bảng dẫn xuất: dựng lại sau khi tách / gộp (`autoxide task catalog.rebuild_storefront`).
         .follow("catalog_storefront_entries", "product_id", "catalog_products")
         .follow("catalog_product_translations", "product_id", "catalog_products")
@@ -36,6 +38,7 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_co_purchases", "product_id", "catalog_products")
         .follow("catalog_embeddings", "product_id", "catalog_products")
         .follow("catalog_similar_products", "product_id", "catalog_products")
+        .follow("catalog_suggestions", "product_id", "catalog_products")
         .copy_on_split(&[
             "catalog_categories",
             "catalog_rounding_rules",

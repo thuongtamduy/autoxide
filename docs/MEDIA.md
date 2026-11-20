@@ -168,6 +168,29 @@ whose copies were made before WebP copies existed get them from the same command
 the WebP copies takes the background job about three times as long as the JPEG ones (about
 a quarter of a second more per photo for the default widths); requests are not slowed.
 
+### AVIF copies
+
+With `AUTOXIDE_MEDIA_AVIF=true` (off by default) the server also makes an AVIF copy of every
+smaller copy, in a separate background job after the smaller copies are saved — never while
+uploading. At the same visual quality an AVIF copy is about a third lighter than the WebP one
+(28–44% on the test images, `docs/BENCHMARKS.md`), but making it takes seconds of CPU per image
+(up to about 8 s for the four default widths of a 4000 × 2250 photo), so turn it on only when the
+server has CPU to spare. Each entry of `variants` then gives `avif_url` (`url` plus
+`&format=avif`) and `avif_size`; put it first:
+
+```html
+<picture>
+  <source type="image/avif" srcset="…&w=320&format=avif 320w, …&w=640&format=avif 640w" sizes="100vw">
+  <source type="image/webp" srcset="…&w=320&format=webp 320w, …&w=640&format=webp 640w" sizes="100vw">
+  <img src="…&w=640" srcset="…&w=320 320w, …&w=640 640w" sizes="100vw" alt="…">
+</picture>
+```
+
+`avif_url` is `null` until the copy is made (or when the server does not make them); an address
+with `&format=avif` asked for before then returns the WebP copy (or the JPEG or PNG one), briefly
+cached. After turning it on, `autoxide task media.refresh_variants` queues AVIF copies for the
+images uploaded before. Turning it off stops making new ones; those already made are still served.
+
 ## Tags
 
 Besides its one folder, an item may carry up to 20 tags (each 1 to 50 characters, without

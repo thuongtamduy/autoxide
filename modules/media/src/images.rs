@@ -3,5 +3,6 @@
 
 pub(crate) mod alt;
 pub(crate) mod alts;
+pub(crate) mod avif;
 pub(crate) mod refresh;
 pub(crate) mod variants;

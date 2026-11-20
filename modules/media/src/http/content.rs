@@ -31,6 +31,7 @@ use uuid::Uuid;
 
 use super::MediaItemResponse;
 use super::items::{body_stream, content_type};
+use crate::images::variants::CopyFormat;
 use crate::library::sniff::is_raster_image;
 use crate::service::{Item, MediaService, Visibility};
 
@@ -49,23 +50,25 @@ pub(crate) struct VersionQuery {
     /// Width of a smaller copy (one of the item's `variants`). Until that copy is made, or
     /// when the image is narrower, the original is sent.
     w: Option<u32>,
-    /// `webp`: with `w`, the WebP copy of that width (much smaller; the variant's
-    /// `webp_url`). Until it is made, the JPEG or PNG copy is sent instead, so the address
-    /// always shows an image. Ignored without `w`.
+    /// `webp` or `avif`: with `w`, the WebP or AVIF copy of that width (much smaller; the
+    /// variant's `webp_url`, `avif_url`). Until it is made, the next best copy is sent instead
+    /// (for `avif`: the WebP copy, then the JPEG or PNG one), so the address always shows an
+    /// image. Ignored without `w`.
     #[param(value_type = Option<String>, example = "webp")]
     format: Option<String>,
 }
 
 impl VersionQuery {
-    /// `format=webp`? Giá trị khác là lỗi, báo rõ thay vì lặng lẽ trả JPEG.
-    fn webp(&self) -> Result<bool, Error> {
+    /// Định dạng xin (`format=webp` / `avif`)? Giá trị khác là lỗi, báo rõ thay vì lặng lẽ trả JPEG.
+    fn format(&self) -> Result<CopyFormat, Error> {
         match self.format.as_deref() {
-            None => Ok(false),
-            Some(raw) if raw.eq_ignore_ascii_case("webp") => Ok(true),
+            None => Ok(CopyFormat::Main),
+            Some(raw) if raw.eq_ignore_ascii_case("webp") => Ok(CopyFormat::Webp),
+            Some(raw) if raw.eq_ignore_ascii_case("avif") => Ok(CopyFormat::Avif),
             Some(_) => Err(Error::validation(vec![FieldError::new(
                 "format",
                 "invalid",
-                "must be `webp`, or left out for the JPEG or PNG copy",
+                "must be `webp` or `avif`, or left out for the JPEG or PNG copy",
             )])),
         }
     }
@@ -101,7 +104,7 @@ impl VersionQuery {
         (status = 401, description = "A token was sent but is not valid; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 404, description = "No media item has this id that you may load; code `media.item_not_found`.", body = Problem),
         (status = 416, description = "The range is outside the content; code `media.range_not_satisfiable`. `Content-Range: bytes */<size>` gives the size.", body = Problem),
-        (status = 422, description = "`format` is not `webp`; see `errors`.", body = Problem),
+        (status = 422, description = "`format` is not `webp` or `avif`; see `errors`.", body = Problem),
     )
 )]
 pub(crate) async fn get_content(
@@ -129,7 +132,7 @@ pub(crate) async fn get_content(
         (status = 200, description = "The headers of the content (`Content-Length`, `Content-Type`, `ETag`…)."),
         (status = 304, description = "Not modified: the `ETag` in `If-None-Match` is current."),
         (status = 404, description = "No media item has this id that you may load."),
-        (status = 422, description = "`format` is not `webp`."),
+        (status = 422, description = "`format` is not `webp` or `avif`."),
     )
 )]
 pub(crate) async fn head_content(
@@ -201,19 +204,32 @@ async fn serve(
     request: &HeaderMap,
     with_body: bool,
 ) -> Result<Response, Error> {
-    let webp = query.webp()?;
+    let format = query.format()?;
     let item = service.viewable(tenant, principal.as_ref(), id).await?;
-    // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc. Xin bản WebP mà chưa có thì
-    // gửi bản JPEG / PNG cùng cỡ: địa chỉ trong `<source type="image/webp">` vẫn ra ảnh.
-    let mut copy = match query.w {
-        Some(width) if webp => service.variant(tenant, &item, width, true).await?,
-        Some(width) => service.variant(tenant, &item, width, false).await?,
-        None => None,
-    };
-    let fallback = webp && copy.is_none();
-    if let (true, Some(width)) = (fallback, query.w) {
-        copy = service.variant(tenant, &item, width, false).await?;
+    // Ảnh thu nhỏ xin bằng `w`, nếu đã làm xong; không thì bản gốc. Xin bản WebP / AVIF mà chưa
+    // có thì gửi bản kế tiếp cùng cỡ (AVIF → WebP → JPEG / PNG): địa chỉ trong
+    // `<source type="image/avif">` vẫn ra ảnh.
+    let mut copy = None;
+    if let Some(width) = query.w {
+        let order: &[CopyFormat] = match format {
+            CopyFormat::Avif => &[CopyFormat::Avif, CopyFormat::Webp, CopyFormat::Main],
+            CopyFormat::Webp => &[CopyFormat::Webp, CopyFormat::Main],
+            CopyFormat::Main => &[CopyFormat::Main],
+        };
+        for wanted in order {
+            copy = service.variant(tenant, &item, width, *wanted).await?;
+            if copy.is_some() {
+                break;
+            }
+        }
     }
+    // Bản gửi không đúng định dạng xin: tạm, không được cache lâu dưới địa chỉ này.
+    let fallback = format != CopyFormat::Main
+        && copy.as_ref().is_some_and(|copy| match format {
+            CopyFormat::Webp => !copy.is_webp(),
+            CopyFormat::Avif => !copy.is_avif(),
+            CopyFormat::Main => false,
+        });
     // Bản xin chưa làm xong (sẽ có): bản đang gửi là tạm, không được cache lâu dưới địa chỉ này.
     let pending = query.w.is_some_and(|width| {
         (copy.is_none() || fallback)
@@ -227,7 +243,13 @@ async fn serve(
                 "\"{}-w{}{}\"",
                 item.version_id,
                 copy.width,
-                if copy.is_webp() { "-webp" } else { "" }
+                if copy.is_webp() {
+                    "-webp"
+                } else if copy.is_avif() {
+                    "-avif"
+                } else {
+                    ""
+                }
             ),
             copy.content_type.clone(),
             u64::try_from(copy.size).unwrap_or_default(),
