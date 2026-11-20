@@ -32,7 +32,7 @@ Bạn cần:
 Rồi:
 
 ```bash
-git clone <repository-url> autoxide
+git clone https://github.com/thuongtamduy/autoxide.git autoxide
 cd autoxide
 git config core.hooksPath .githooks
 cargo test --workspace

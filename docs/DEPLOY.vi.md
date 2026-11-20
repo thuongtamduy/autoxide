@@ -3,7 +3,8 @@
 [English](DEPLOY.md)
 
 Hướng dẫn này đưa bạn từ con số không tới một máy chủ đang chạy, cập nhật được và có
-backup. Chọn một trong hai cách chạy:
+backup. Chọn một trong hai cách chạy (cách thứ ba, một container với SQLite và không cần build,
+ở [mục C](#c-một-container-với-sqlite)):
 
 | | Docker Compose với PostgreSQL | Một binary với SQLite |
 | --- | --- | --- |
@@ -19,7 +20,7 @@ Bạn có thể bắt đầu với SQLite rồi chuyển sang PostgreSQL về sa
 ### 1. Lấy mã nguồn và đặt secret
 
 ```bash
-git clone <URL của repository> autoxide
+git clone https://github.com/thuongtamduy/autoxide.git autoxide
 cd autoxide
 ```
 
@@ -184,7 +185,7 @@ object storage. Để khôi phục vào một bản cài mới, chỉ khởi đ�
 khởi động tất cả:
 
 ```bash
-docker compose up -d postgres
+docker compose up -d --wait postgres
 docker compose run --rm --no-deps -v "$PWD/backups:/backups" app restore /backups/2026-11-11
 docker compose up -d
 ```
@@ -303,6 +304,45 @@ mọi file ở nơi lưu file chung, nhưng không có database của các place
 file riêng của placement; lệnh in cảnh báo nêu tên chúng. Backup những thứ đó bằng công cụ của chính
 database (và của nơi lưu). Cất `AUTOXIDE_SECRET_KEY` ở nơi an toàn, tách khỏi bản
 backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc được.
+
+## C. Một container với SQLite
+
+Để dùng thử Autoxide hoặc một bản cài nhỏ trên một máy, không phải build gì. Các bước tới lần
+chạy đầu nằm ở README, mục [Chạy thử bằng Docker](../README.vi.md#chạy-thử-bằng-docker-không-cần-build).
+Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa ở đó:
+
+- Máy chủ không bao giờ tự áp dụng migration. Chạy `serve` trên database trống hay cũ hơn sẽ dừng
+  ngay với `N migrations have not been applied … run autoxide migrate up first`: chạy
+  `$RUN $IMAGE migrate up` rồi mới khởi động.
+- Mọi thứ máy chủ ghi ra nằm trong volume `autoxide-data` (`/var/lib/autoxide/data`): database,
+  file tải lên, và mail cho tới khi cấu hình SMTP. Container chạy không gắn volume đó chỉ giữ dữ
+  liệu cho tới khi bị xoá.
+- `docker run -p 8080:8080` mở cổng trên mọi giao diện mạng của máy; hãy dùng
+  `-p 127.0.0.1:8080:8080` và một reverse proxy ([A.4](#4-đưa-lên-internet)). Thêm cấu hình vào
+  `autoxide.env` (mỗi dòng một `TÊN=giá trị`, không có dấu nháy).
+- Cập nhật: kéo image mới, áp dụng migration của nó, thay container.
+
+```bash
+IMAGE=ghcr.io/thuongtamduy/autoxide:<phiên bản mới>
+docker pull $IMAGE
+$RUN $IMAGE migrate up
+docker rm -f autoxide
+docker run -d --name autoxide --restart unless-stopped --env-file autoxide.env \
+  -v autoxide-data:/var/lib/autoxide/data -p 127.0.0.1:8080:8080 $IMAGE serve
+```
+
+- Backup vào một thư mục bạn gắn vào (image chạy bằng user 10001, user đó phải ghi được vào
+  đó), và restore vào volume mới trước khi khởi động máy chủ:
+
+```bash
+mkdir -p backups && sudo chown 10001 backups
+$RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
+# trên máy mới, hoặc sau khi xoá volume:
+$RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
+```
+
+Thiếu `chown`, backup dừng với `Permission denied (os error 13)`. Backup ghi vào đường dẫn không
+được gắn vào sẽ biến mất cùng container, mà lệnh vẫn báo thành công.
 
 ## Chuyển từ SQLite sang PostgreSQL
 
