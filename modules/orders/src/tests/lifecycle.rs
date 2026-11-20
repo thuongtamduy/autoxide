@@ -32,7 +32,7 @@ pub(super) async fn cod_order(shop: &Shop) -> Uuid {
 }
 
 /// `POST /api/v1/orders/{id}/transitions` của `boss` với `If-Match`.
-async fn transition(
+pub(super) async fn transition(
     shop: &Shop,
     id: Uuid,
     to: &str,
@@ -49,7 +49,7 @@ async fn transition(
     (answer.status(), answer.json())
 }
 
-async fn etag(shop: &Shop, id: Uuid) -> String {
+pub(super) async fn etag(shop: &Shop, id: Uuid) -> String {
     let answer = shop.get(&format!("/api/v1/orders/{id}")).token("boss").send().await.unwrap();
     assert_eq!(answer.status(), StatusCode::OK);
     answer.header("etag").to_owned()

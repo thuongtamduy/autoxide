@@ -725,7 +725,7 @@ pub(crate) struct Delivery {
 }
 
 /// Địa chỉ không kiểm được (chưa cài `address`): giữ mã, tên để trống.
-fn unchecked_address(input: AddressInput) -> Result<Address, Error> {
+pub(crate) fn unchecked_address(input: AddressInput) -> Result<Address, Error> {
     // `Address` là `#[non_exhaustive]` ở crate khác: dựng qua JSON.
     serde_json::from_value(serde_json::json!({
         "country": input.country, "province_code": input.province_code, "province_name": "",
