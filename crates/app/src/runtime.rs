@@ -143,20 +143,13 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
     Ok(Runtime { config, database, modules, api, dispatcher, worker, draining })
 }
 
-/// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu từng migration và
-/// lệnh cần chạy.
+/// Lỗi nếu database còn migration chưa áp dụng; thông báo nêu số lượng, vài tên đầu và
+/// lệnh cần chạy (`kernel.migrations_pending`).
 pub(crate) async fn require_applied(modules: &Modules, database: &Database) -> Result<(), String> {
     let migrator = modules.migrator().map_err(|error| error.to_string())?;
     let pending = migrator.pending(database).await.map_err(|error| error.to_string())?;
     if pending.is_empty() {
         return Ok(());
     }
-    let noun = if pending.len() == 1 { "migration has" } else { "migrations have" };
-    let list: Vec<String> =
-        pending.iter().map(|state| format!("{}/{}", state.module, state.name)).collect();
-    Err(format!(
-        "{} {noun} not been applied to the database: {}; run `autoxide migrate up` first",
-        pending.len(),
-        list.join(", ")
-    ))
+    Err(autoxide_kernel::migration::pending_error(&pending).message())
 }

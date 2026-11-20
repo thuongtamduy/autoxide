@@ -72,7 +72,12 @@ fn finish(outcome: Result<String, String>) -> ExitCode {
 /// Tạo bản backup trong `directory`; trả nội dung in ra. Lõi nằm ở `autoxide_kernel::backup`, dùng
 /// chung với job backup theo lịch.
 pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result<String, String> {
+    // Đường dẫn tuyệt đối: người chạy trong container phải thấy bản backup nằm ở ĐÂU.
+    let directory = absolute(&directory);
     prepare_directory(&directory)?;
+    if let Some(warning) = container_warning(&directory) {
+        eprintln!("autoxide: warning: {warning}");
+    }
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let result = async {
         let migrator = runtime.modules.migrator().map_err(|error| error.to_string())?;
@@ -202,6 +207,8 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
 }
 
 fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> String {
+    let directory = absolute(directory);
+    let directory = directory.as_path();
     let rows: u64 = tables.iter().map(|table| table.rows).sum();
     format!(
         "{verb} {rows} rows in {} tables and {files} files ({}).\n",
@@ -210,11 +217,16 @@ fn summary(verb: &str, tables: &[CopiedTable], files: u64, directory: &Path) -> 
     )
 }
 
+/// Đường dẫn tuyệt đối (không cần thư mục tồn tại); không đổi được thì giữ nguyên.
+fn absolute(path: &Path) -> PathBuf {
+    std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
 /// Thư mục đích phải chưa có hoặc trống.
 fn prepare_directory(directory: &Path) -> Result<(), String> {
     if directory.exists() {
-        let mut entries = std::fs::read_dir(directory)
-            .map_err(|error| format!("{}: {error}", directory.display()))?;
+        let mut entries =
+            std::fs::read_dir(directory).map_err(|error| describe_io(directory, &error))?;
         if entries.next().is_some() {
             return Err(format!(
                 "{} is not empty; back up into a new or empty directory",
@@ -222,7 +234,54 @@ fn prepare_directory(directory: &Path) -> Result<(), String> {
             ));
         }
     }
-    private_dir(directory).map_err(|error| format!("{}: {error}", directory.display()))
+    private_dir(directory).map_err(|error| describe_io(directory, &error))
+}
+
+/// Lỗi ghi/đọc thư mục; lỗi quyền (`os error 13`) kèm cách sửa, vì người dùng container hay
+/// gặp: image chạy bằng user không phải root (10001) nên không ghi được vào thư mục của root.
+fn describe_io(directory: &Path, error: &std::io::Error) -> String {
+    if error.kind() == std::io::ErrorKind::PermissionDenied {
+        return format!(
+            "{}: permission denied. The user running autoxide (in the container image: uid \
+             10001) must be able to write there: create the directory first and give it to that \
+             user (`mkdir -p <dir> && sudo chown 10001 <dir>`), or choose another directory",
+            directory.display()
+        );
+    }
+    format!("{}: {error}", directory.display())
+}
+
+/// Cảnh báo (không chặn) khi chạy trong container mà `directory` nằm cùng thiết bị với `/`:
+/// bản backup sẽ nằm trong lớp ghi của container và mất khi container bị xoá.
+fn container_warning(directory: &Path) -> Option<String> {
+    let in_container =
+        Path::new("/.dockerenv").exists() || Path::new("/run/.containerenv").exists();
+    let on_root = same_device(directory, Path::new("/"))?;
+    warn_unmounted(in_container, on_root, directory)
+}
+
+/// Phần quyết định của [`container_warning`], tách ra để test không cần container thật.
+fn warn_unmounted(in_container: bool, on_root_device: bool, directory: &Path) -> Option<String> {
+    (in_container && on_root_device).then(|| {
+        format!(
+            "{} is inside the container's own filesystem, not on a volume or bind mount; the \
+             backup is lost when the container is removed. Mount a volume (for example \
+             `-v \"$PWD/backups:/backups\"`) and back up into it",
+            directory.display()
+        )
+    })
+}
+
+/// `a` và `b` cùng thiết bị? `None` khi không xác định được (hệ không phải Unix, hay lỗi đọc).
+#[cfg(unix)]
+fn same_device(a: &Path, b: &Path) -> Option<bool> {
+    use std::os::unix::fs::MetadataExt as _;
+    Some(std::fs::metadata(a).ok()?.dev() == std::fs::metadata(b).ok()?.dev())
+}
+
+#[cfg(not(unix))]
+fn same_device(_: &Path, _: &Path) -> Option<bool> {
+    None
 }
 
 async fn read_manifest(directory: &Path) -> Result<Value, String> {
@@ -427,6 +486,27 @@ mod tests {
         })
         .await
         .unwrap();
+    }
+
+    #[test]
+    fn canh_bao_chi_khi_trong_container_va_cung_thiet_bi_voi_goc() {
+        let dir = Path::new("/data/b");
+        assert!(warn_unmounted(true, true, dir).is_some_and(|text| text.contains("/data/b")));
+        assert!(warn_unmounted(true, false, dir).is_none());
+        assert!(warn_unmounted(false, true, dir).is_none());
+    }
+
+    #[test]
+    fn loi_quyen_ghi_noi_cach_sua() {
+        let error = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+        let text = describe_io(Path::new("/backups"), &error);
+        assert!(text.contains("permission denied") && text.contains("chown 10001"), "{text}");
+        assert!(!text.contains("os error"));
+    }
+
+    #[test]
+    fn duong_dan_bao_cao_la_tuyet_doi() {
+        assert!(absolute(Path::new("backups/x")).is_absolute());
     }
 
     #[tokio::test]

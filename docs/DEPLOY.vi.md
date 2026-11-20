@@ -312,7 +312,9 @@ chạy đầu nằm ở README, mục [Chạy thử bằng Docker](../README.vi.
 Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa ở đó:
 
 - Máy chủ không bao giờ tự áp dụng migration. Chạy `serve` trên database trống hay cũ hơn sẽ dừng
-  ngay với `N migrations have not been applied … run autoxide migrate up first`: chạy
+  ngay với `N migration(s) have not been applied to the database (first: …); run autoxide migrate
+  up first` (chỉ nêu số lượng và vài tên đầu; `autoxide migrate status` liệt kê đủ; mã lỗi
+  `kernel.migrations_pending`): chạy
   `$RUN $IMAGE migrate up` rồi mới khởi động.
 - Mọi thứ máy chủ ghi ra nằm trong volume `autoxide-data` (`/var/lib/autoxide/data`): database,
   file tải lên, và mail cho tới khi cấu hình SMTP. Container chạy không gắn volume đó chỉ giữ dữ
@@ -341,8 +343,10 @@ $RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
 $RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
 ```
 
-Thiếu `chown`, backup dừng với `Permission denied (os error 13)`. Backup ghi vào đường dẫn không
-được gắn vào sẽ biến mất cùng container, mà lệnh vẫn báo thành công.
+Thiếu `chown`, backup dừng với `permission denied` và nói rõ thư mục nào cần giao cho uid 10001.
+Xong, lệnh in đường dẫn tuyệt đối của bản backup. Backup ghi vào đường dẫn không được gắn vào sẽ
+biến mất cùng container: trong container, `backup` cảnh báo ở stderr khi đích không nằm trên
+volume hay bind mount (vẫn chạy tiếp).
 
 ## Chuyển từ SQLite sang PostgreSQL
 
