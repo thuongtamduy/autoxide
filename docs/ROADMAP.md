@@ -701,9 +701,10 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 - [x] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
       điểm chưa dùng là nghĩa vụ ghi trong sổ cái; cơ sở tính điểm thống nhất (D-226) — D-20261120-step47-loyalty
       (còn: trả điểm khi hoàn phần đơn trả bằng điểm, đối trừ `buyer.prepayments` với phải thu của đơn)
-- [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
+- [x] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
       ra ngoài — **tắt mặc định**, chỉ bật sau khi đối chiếu NĐ 52/2024 về ví điện tử / thẻ trả trước
-      (D-194); số dư là nghĩa vụ trong sổ cái
+      (D-194); số dư là nghĩa vụ trong sổ cái — D-20261120-step47-stored-value (còn: bán thẻ qua `orders`,
+      hoàn đơn trả bằng thẻ về thẻ, người mua chọn nhận hoàn tiền dạng số dư, giới hạn theo cửa hàng)
 - [x] Danh sách yêu thích (gộp danh sách của trình duyệt vào tài khoản khi đăng nhập), sản phẩm vừa xem;
       nhắc giỏ hàng bỏ dở qua `notifications` — chỉ khi người mua đã đồng ý nhận tin quảng cáo (bước 37);
       giới thiệu bạn bè có thưởng — D-20261120-step47-engagement

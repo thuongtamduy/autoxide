@@ -8,6 +8,7 @@ mod fake_ledger;
 mod groups;
 mod loyalty;
 mod profiles;
+mod stored_value;
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -27,7 +28,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// Mọi permission của module, độ sâu `tenant`.
-pub(crate) const ALL: [&str; 7] = [
+pub(crate) const ALL: [&str; 8] = [
     "customers.read",
     "customers.manage",
     "customers.contact.reveal",
@@ -35,6 +36,7 @@ pub(crate) const ALL: [&str; 7] = [
     "customers.loyalty.manage",
     "customers.loyalty.adjust",
     "customers.engagement.manage",
+    "customers.stored_value.manage",
 ];
 
 pub(crate) const BUYER: u128 = 101;
@@ -154,6 +156,11 @@ impl std::ops::Deref for Shop {
 /// Người dùng: `boss` (mọi quyền, cả khách), `reader` (chỉ `customers.read`), `staff_a` (đọc / sửa ở
 /// cửa hàng A), người mua `buyer` (101), `buyer2` (102), `buyer3` (103).
 pub(crate) async fn shop(test: &TestDatabase) -> Shop {
+    shop_with(test, &[]).await
+}
+
+/// Như [`shop`], kèm biến cấu hình `settings`.
+pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) -> Shop {
     let org = || OrgId::from_uuid(Uuid::now_v7());
     let root = root_of(DEFAULT_TENANT);
     let tree = Tree { a: org(), b: org() };
@@ -167,7 +174,11 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
     let orders = Arc::new(Mutex::new(None));
     let auth = Arc::new(Mutex::new(None));
     let all: Vec<(&str, Scope)> = ALL.iter().map(|name| (*name, Scope::Tenant)).collect();
-    let app = TestApp::builder(test)
+    let mut builder = TestApp::builder(test);
+    for (name, value) in settings {
+        builder = builder.setting(name, value);
+    }
+    let app = builder
         .member("boss", 1, root, &all)
         .member("reader", 2, root, &[("customers.read", Scope::Tenant)])
         .member(
@@ -255,14 +266,12 @@ impl Shop {
 
     /// `Tender` loại `points` mà `customers` đã cắm vào `orders`.
     pub(crate) fn points_tender(&self) -> Arc<dyn Tender> {
-        self.extensions
-            .1
-            .lock()
-            .unwrap()
-            .iter()
-            .find(|tender| tender.kind() == "points")
-            .cloned()
-            .unwrap()
+        self.tender("points").unwrap()
+    }
+
+    /// `Tender` loại `kind` mà `customers` đã cắm vào `orders` (nếu có).
+    pub(crate) fn tender(&self, kind: &str) -> Option<Arc<dyn Tender>> {
+        self.extensions.1.lock().unwrap().iter().find(|tender| tender.kind() == kind).cloned()
     }
 
     /// Chạy job định kỳ `kind` ngay (như lịch của database).

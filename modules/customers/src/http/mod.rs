@@ -7,6 +7,7 @@ mod groups;
 mod loyalty;
 mod me;
 mod staff;
+mod stored_value;
 pub(crate) mod views;
 
 use std::sync::Arc;
@@ -46,5 +47,13 @@ pub(crate) fn routes(service: Arc<CustomersService>) -> OpenApiRouter {
         .routes(routes!(engagement::apply_referral))
         .routes(routes!(engagement::list_reminder_rules, engagement::create_reminder_rule))
         .routes(routes!(engagement::list_referral_rules, engagement::create_referral_rule))
+        .routes(routes!(stored_value::issue_gift_card))
+        .routes(routes!(stored_value::get_gift_card))
+        .routes(routes!(stored_value::lookup_gift_card))
+        .routes(routes!(stored_value::void_gift_card))
+        .routes(routes!(stored_value::adjust_store_credit))
+        .routes(routes!(stored_value::my_gift_cards))
+        .routes(routes!(stored_value::attach_gift_card))
+        .routes(routes!(stored_value::my_store_credit))
         .with_state(service)
 }

@@ -92,6 +92,30 @@ của mình không bị che ở `GET /api/v1/customers/me`.
   hoàn tất đủ tiền hàng, cả hai được thưởng một lần bằng điểm và voucher tuỳ chọn (`POST /referral-rules`).
   Cùng số điện thoại hay email với người giới thiệu bị từ chối.
 
+## Thẻ quà tặng và số dư cửa hàng (tắt mặc định)
+
+Giá trị trả trước có thể thuộc quy định về thanh toán (NĐ 52/2024/NĐ-CP). Phải bật cả hai lớp mới dùng
+được: `AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED=true` (chỉ sau khi người có chuyên môn đã đối chiếu quy định
+cho cửa hàng của bạn) **và** tính năng của gói `customers.gift_cards` / `customers.store_credit`. Nếu không,
+mọi endpoint dưới đây trả 403 `customers.stored_value_disabled` và lúc thanh toán không có hai hình thức
+này. `autoxide doctor` cảnh báo khi đang bật.
+
+- Giá trị chỉ dùng trả đơn của chính cửa hàng phát hành. **Không** có cách rút ra, đổi tiền mặt, nạp bằng
+  tiền hay chuyển cho người khác.
+- **Thẻ quà tặng** (`customers.stored_value.manage`): `POST /gift-cards` phát hành thẻ tối đa
+  `AUTOXIDE_CUSTOMERS_GIFT_CARD_MAX_MINOR`; mã 16 ký tự chỉ có trong câu trả lời đó (cửa hàng chỉ giữ bản băm
+  và 4 ký tự cuối). Cùng `reference` không bao giờ ra thẻ thứ hai. `POST /gift-cards/lookup` tìm thẻ theo
+  mã; `POST /gift-cards/{id}/void` huỷ thẻ bị mất.
+- Mã sai được đếm theo người: sai quá `AUTOXIDE_CUSTOMERS_GIFT_CARD_LOOKUPS_PER_HOUR` lần trong một giờ thì
+  tra cứu trả 429 `customers.lookup_throttled` tới hết giờ. Mã đúng không bị đếm.
+- **Số dư cửa hàng** chỉ đến từ bồi thường của nhân viên: `POST /{id}/store-credit/adjustments` kèm
+  `reference` và lý do (cùng `reference` chỉ áp một lần; không xuống dưới 0).
+- **Người mua**: `GET /me/gift-cards`, `POST /me/gift-cards/attach` (kèm mã), `GET /me/store-credit`. Lúc
+  thanh toán, trả một phần hay toàn bộ đơn bằng `gift_card` (`{"code": "…"}`) hay `store_credit`
+  (`{"amount": <tối đa>}`, tuỳ chọn); cần đăng nhập. Giá trị được giữ tới khi đơn được xác nhận, và trả lại
+  khi đơn bị huỷ hay hết hạn giữ.
+- Sổ cái cho thấy phần còn nợ trên thẻ và số dư (`gift_card.liability`, `store_credit.liability`).
+
 ## Nhãn, ghi chú, trường tự định nghĩa
 
 Hồ sơ là bản ghi loại `customers.customer`: nhãn nội bộ, ghi chú và trường tự định nghĩa dùng
@@ -109,6 +133,7 @@ endpoint chung của kernel (`/api/v1/kernel/tags`, ghi chú trên bản ghi, đ
 | `customers.loyalty.manage` | Quy tắc điểm, hạng, phần thưởng voucher (cả cửa hàng) |
 | `customers.loyalty.adjust` | Cộng / trừ điểm bằng tay |
 | `customers.engagement.manage` | Nhắc giỏ và thưởng giới thiệu |
+| `customers.stored_value.manage` | Phát hành, tra, huỷ thẻ quà tặng; đổi số dư cửa hàng |
 
 Người mua không cần permission: `/me` chỉ cần tài khoản đã đăng nhập.
 

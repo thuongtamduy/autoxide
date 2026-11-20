@@ -30,6 +30,7 @@ mod relocation;
 mod resource;
 mod segments;
 mod service;
+mod stored_value;
 mod tools;
 
 #[cfg(test)]
@@ -134,6 +135,7 @@ impl Module for CustomersModule {
             consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
             notifier,
             config: self.config.clone().unwrap_or_default(),
+            entitlements: context.entitlements(),
         });
         context.personal_data(service.clone())?;
         // Hồ sơ là một loại đối tượng: nhãn và ghi chú nội bộ của bước 51 gắn lên nó (D-237).
@@ -147,6 +149,12 @@ impl Module for CustomersModule {
             extensions.set_buyer_groups(provider)?;
             // Điểm thưởng là một cách trả tiền của đơn (D-222).
             extensions.add_tender(Arc::new(loyalty::tender::PointsTender(service.clone())))?;
+            // Thẻ quà tặng / số dư: TẮT mặc định — tắt thì không cắm tender (D-194).
+            if service.config.stored_value_enabled {
+                extensions.add_tender(Arc::new(stored_value::GiftCardTender(service.clone())))?;
+                extensions
+                    .add_tender(Arc::new(stored_value::StoreCreditTender(service.clone())))?;
+            }
         }
         self.service = Some(service);
         Ok(())
@@ -195,6 +203,19 @@ impl Module for CustomersModule {
 
     fn routes(&self) -> OpenApiRouter {
         self.service.clone().map_or_else(OpenApiRouter::new, http::routes)
+    }
+
+    fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
+        vec![stored_value::GIFT_CARDS, stored_value::STORE_CREDIT]
+    }
+
+    fn checks(&self) -> Vec<autoxide_kernel::doctor::Check> {
+        let enabled = self.config.as_ref().is_some_and(|config| config.stored_value_enabled);
+        vec![autoxide_kernel::doctor::Check::new(
+            "customers.stored_value",
+            "Gift cards and store credit stay off unless the operator turned them on on purpose.",
+            Arc::new(stored_value::StoredValueCheck(enabled)),
+        )]
     }
 
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {

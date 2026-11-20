@@ -35,6 +35,8 @@ pub(crate) struct CustomersService {
     /// Gửi tin (nhắc giỏ); chưa cài thì không gửi.
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     pub config: crate::config::CustomersConfig,
+    /// Tính năng theo khách (thẻ quà tặng, số dư).
+    pub entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }
 
 impl CustomersService {

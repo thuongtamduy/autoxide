@@ -29,6 +29,27 @@ pub(crate) const REFERRAL_APPLY_DAYS: Setting = Setting::new(
 )
 .with_default("14");
 
+pub(crate) const STORED_VALUE_ENABLED: Setting = Setting::new(
+    "AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED",
+    "Turn on gift cards and store credit (`true` / `false`). Off by default: turn on only after a \
+     qualified person checked Decree 52/2024/ND-CP on prepaid cards; each shop also needs the plan \
+     features `customers.gift_cards` / `customers.store_credit`.",
+)
+.with_default("false");
+
+pub(crate) const GIFT_CARD_MAX_MINOR: Setting = Setting::new(
+    "AUTOXIDE_CUSTOMERS_GIFT_CARD_MAX_MINOR",
+    "Largest value of one gift card, in the smallest currency unit (1 to 1000000000000).",
+)
+.with_default("10000000");
+
+pub(crate) const GIFT_CARD_LOOKUPS_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_CUSTOMERS_GIFT_CARD_LOOKUPS_PER_HOUR",
+    "Wrong gift card codes one person may enter per hour before lookups are blocked for the hour, \
+     against guessing codes (1 to 1000).",
+)
+.with_default("10");
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone)]
 pub(crate) struct CustomersConfig {
@@ -36,6 +57,9 @@ pub(crate) struct CustomersConfig {
     pub recent_views_max: u64,
     pub recent_views_days: i64,
     pub referral_apply_days: i64,
+    pub stored_value_enabled: bool,
+    pub gift_card_max_minor: i64,
+    pub lookup_per_hour: u32,
 }
 
 impl Default for CustomersConfig {
@@ -45,6 +69,9 @@ impl Default for CustomersConfig {
             recent_views_max: 50,
             recent_views_days: 90,
             referral_apply_days: 14,
+            stored_value_enabled: false,
+            gift_card_max_minor: 10_000_000,
+            lookup_per_hour: 10,
         }
     }
 }
@@ -54,10 +81,22 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<CustomersConfig, Inv
     let views = reader.get_with(&RECENT_VIEWS_MAX, |raw| parse_in_range(raw, 1u64, 1000));
     let days = reader.get_with(&RECENT_VIEWS_DAYS, |raw| parse_in_range(raw, 1i64, 3650));
     let referral = reader.get_with(&REFERRAL_APPLY_DAYS, |raw| parse_in_range(raw, 1i64, 365));
+    let enabled = reader.get_with(&STORED_VALUE_ENABLED, |raw| match raw.trim() {
+        "true" => Ok(true),
+        "false" => Ok(false),
+        _ => Err("must be `true` or `false`".to_owned()),
+    });
+    let max =
+        reader.get_with(&GIFT_CARD_MAX_MINOR, |raw| parse_in_range(raw, 1i64, 1_000_000_000_000));
+    let lookups =
+        reader.get_with(&GIFT_CARD_LOOKUPS_PER_HOUR, |raw| parse_in_range(raw, 1u32, 1000));
     Ok(CustomersConfig {
         wishlist_max: wishlist?,
         recent_views_max: views?,
         recent_views_days: days?,
         referral_apply_days: referral?,
+        stored_value_enabled: enabled?,
+        gift_card_max_minor: max?,
+        lookup_per_hour: lookups?,
     })
 }

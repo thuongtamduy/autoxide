@@ -403,8 +403,14 @@ impl EventHandler for OrderHolds {
             return Ok(());
         };
         match event.name.as_str() {
-            orders::ORDER_CONFIRMED => self.0.confirm_hold(&event.tenant, reference).await,
-            orders::ORDER_CANCELLED => self.0.release_hold(&event.tenant, reference).await,
+            orders::ORDER_CONFIRMED => {
+                self.0.confirm_hold(&event.tenant, reference).await?;
+                self.0.settle_value_holds(&event.tenant, reference, true).await
+            }
+            orders::ORDER_CANCELLED => {
+                self.0.release_hold(&event.tenant, reference).await?;
+                self.0.settle_value_holds(&event.tenant, reference, false).await
+            }
             _ => Ok(()),
         }
     }
