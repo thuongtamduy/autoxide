@@ -12,7 +12,7 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::entity::{group_member, order_fact, profile};
+use crate::entity::{cart_reminder, group_member, order_fact, profile, recent_view, wishlist_item};
 use crate::service::CustomersService;
 
 #[async_trait::async_trait]
@@ -38,7 +38,23 @@ impl PersonalData for CustomersService {
             .scoped(tenant)
             .all(read)
             .await?;
+        let wishlist = wishlist_item::Entity::find()
+            .filter(wishlist_item::Column::ProfileId.eq(row.id))
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        let views = recent_view::Entity::find()
+            .filter(recent_view::Column::ProfileId.eq(row.id))
+            .scoped(tenant)
+            .all(read)
+            .await?;
         Ok(json!({
+            "wishlist": wishlist.iter().map(|item| json!({
+                "product_id": item.product_id, "variant_id": item.variant_id, "added_at": item.added_at,
+            })).collect::<Vec<_>>(),
+            "recently_viewed": views.iter().map(|view| json!({
+                "product_id": view.product_id, "viewed_at": view.viewed_at,
+            })).collect::<Vec<_>>(),
             "profile": {
                 "id": row.id,
                 "full_name": row.full_name,
@@ -78,6 +94,29 @@ impl EventHandler for ErasedUsers {
         };
         let tenant = &event.tenant;
         let transaction = tenant.database().begin_write().await?;
+        if let Some(row) = profile::Entity::find()
+            .filter(profile::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .one(&transaction)
+            .await?
+        {
+            // Yêu thích, vừa xem, nhắc giỏ đang chờ là dữ liệu hành vi của người đó: xoá.
+            wishlist_item::Entity::delete_many()
+                .filter(wishlist_item::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+            recent_view::Entity::delete_many()
+                .filter(recent_view::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+            cart_reminder::Entity::delete_many()
+                .filter(cart_reminder::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+        }
         // Bỏ mọi trường nhận diện; hồ sơ còn lại là một dòng ẩn danh (tổng chi, số đơn).
         profile::Entity::update_many()
             .col_expr(profile::Column::UserId, Expr::value(Option::<Uuid>::None))

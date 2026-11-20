@@ -16,6 +16,8 @@ pub(crate) const POINTS_REDEEMED: &str = "customers.points_redeemed";
 pub(crate) const POINTS_EXPIRED: &str = "customers.points_expired";
 pub(crate) const POINTS_ADJUSTED: &str = "customers.points_adjusted";
 pub(crate) const TIER_CHANGED: &str = "customers.tier_changed";
+pub(crate) const CART_REMINDER_SENT: &str = "customers.cart_reminder_sent";
+pub(crate) const REFERRAL_REWARDED: &str = "customers.referral_rewarded";
 
 /// Dữ liệu chung của mọi event của module.
 #[derive(Debug, Clone, Default, Serialize)]
@@ -56,6 +58,8 @@ event!(PointsRedeemed, POINTS_REDEEMED);
 event!(PointsExpired, POINTS_EXPIRED);
 event!(PointsAdjusted, POINTS_ADJUSTED);
 event!(TierChanged, TIER_CHANGED);
+event!(CartReminderSent, CART_REMINDER_SENT);
+event!(ReferralRewarded, REFERRAL_REWARDED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -90,5 +94,13 @@ pub(crate) fn all() -> Vec<EventInfo> {
             "Loyalty points were added or removed by staff or taken back after a refund.",
         ),
         EventInfo::new(TIER_CHANGED, "A customer moved to another membership tier (or lost it)."),
+        EventInfo::new(
+            CART_REMINDER_SENT,
+            "An abandoned cart reminder was sent to a consenting buyer.",
+        ),
+        EventInfo::new(
+            REFERRAL_REWARDED,
+            "A referred buyer's first order completed; both buyers were rewarded.",
+        ),
     ]
 }

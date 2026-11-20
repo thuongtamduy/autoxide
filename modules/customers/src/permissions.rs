@@ -43,6 +43,19 @@ pub(crate) const LOYALTY_ADJUST: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const ENGAGEMENT_MANAGE: Permission = Permission::new(
+    "customers.engagement.manage",
+    "Set abandoned cart reminders and referral rewards.",
+);
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![READ, MANAGE, CONTACT_REVEAL, SEGMENTS_MANAGE, LOYALTY_MANAGE, LOYALTY_ADJUST]
+    vec![
+        READ,
+        MANAGE,
+        CONTACT_REVEAL,
+        SEGMENTS_MANAGE,
+        LOYALTY_MANAGE,
+        LOYALTY_ADJUST,
+        ENGAGEMENT_MANAGE,
+    ]
 }

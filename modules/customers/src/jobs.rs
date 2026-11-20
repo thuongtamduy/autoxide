@@ -27,6 +27,14 @@ pub(crate) fn registrations(service: &Arc<CustomersService>) -> Vec<JobRegistrat
     vec![
         JobRegistration::new(POST_LEDGER, Arc::new(PostLedgerJob(service.clone()))),
         JobRegistration::new(
+            crate::engagement::SEND_CART_REMINDER,
+            Arc::new(crate::engagement::SendCartReminderJob(service.clone())),
+        ),
+        JobRegistration::new(
+            crate::engagement::PURGE_RECENT_VIEWS,
+            Arc::new(crate::engagement::PurgeRecentViewsJob(service.clone())),
+        ),
+        JobRegistration::new(
             EXPIRE_POINTS,
             Arc::new(Sweep { service: service.clone(), kind: EXPIRE_POINTS }),
         ),
@@ -52,6 +60,11 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(RELEASE_EXPIRED_HOLDS, RELEASE_EXPIRED_HOLDS, Duration::from_secs(300)),
         Schedule::new(EVALUATE_TIERS, EVALUATE_TIERS, DAY),
         Schedule::new(BIRTHDAY_VOUCHERS, BIRTHDAY_VOUCHERS, DAY),
+        Schedule::new(
+            crate::engagement::PURGE_RECENT_VIEWS,
+            crate::engagement::PURGE_RECENT_VIEWS,
+            DAY,
+        ),
     ]
 }
 

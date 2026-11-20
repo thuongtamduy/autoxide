@@ -78,6 +78,20 @@ của mình không bị che ở `GET /api/v1/customers/me`.
 - **Sổ cái**: điểm chưa dùng là nghĩa vụ (`loyalty.liability`) theo giá trị lúc tích; đổi điểm ghi Có
   `buyer.prepayments`, hết hạn ghi Có `loyalty.breakage`.
 
+## Yêu thích, vừa xem, nhắc giỏ, giới thiệu bạn
+
+- **Yêu thích** (`/me/wishlist`): sản phẩm hay một biến thể, tối đa `AUTOXIDE_CUSTOMERS_WISHLIST_MAX`. Ngay
+  sau khi đăng nhập, gửi danh sách lưu ở trình duyệt tới `POST /me/wishlist/merge`; dòng trùng được bỏ qua.
+- **Vừa xem** (`/me/recently-viewed`): chỉ người đã đăng nhập (vãng lai lưu ở trình duyệt), mới nhất trước,
+  dòng cũ được xoá mỗi ngày.
+- **Nhắc giỏ bỏ dở** (`POST /reminder-rules`, `customers.engagement.manage`): nhắc giỏ là tin quảng cáo. Chỉ
+  gửi cho người mua đã đồng ý nhận tin quảng cáo (sổ đồng ý của `compliance`), kiểm lại đồng ý ngay trước khi
+  gửi, dừng khi người mua đặt đơn hay rút đồng ý. `notifications` áp khung giờ và link huỷ nhận.
+- **Giới thiệu bạn**: mỗi người mua có một mã (`GET /me/referral`); người mới nhập mã trong
+  `AUTOXIDE_CUSTOMERS_REFERRAL_APPLY_DAYS` ngày và trước đơn đầu (`POST /me/referral/apply`). Khi đơn đầu đó
+  hoàn tất đủ tiền hàng, cả hai được thưởng một lần bằng điểm và voucher tuỳ chọn (`POST /referral-rules`).
+  Cùng số điện thoại hay email với người giới thiệu bị từ chối.
+
 ## Nhãn, ghi chú, trường tự định nghĩa
 
 Hồ sơ là bản ghi loại `customers.customer`: nhãn nội bộ, ghi chú và trường tự định nghĩa dùng
@@ -94,6 +108,7 @@ endpoint chung của kernel (`/api/v1/kernel/tags`, ghi chú trên bản ghi, đ
 | `customers.segments.manage` | Tạo, sửa, xoá nhóm và thành viên |
 | `customers.loyalty.manage` | Quy tắc điểm, hạng, phần thưởng voucher (cả cửa hàng) |
 | `customers.loyalty.adjust` | Cộng / trừ điểm bằng tay |
+| `customers.engagement.manage` | Nhắc giỏ và thưởng giới thiệu |
 
 Người mua không cần permission: `/me` chỉ cần tài khoản đã đăng nhập.
 

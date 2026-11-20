@@ -2,6 +2,7 @@
 //! service → trả envelope. Ba nhóm: nhân viên (hồ sơ, theo permission ở nút), nhóm khách
 //! (`/groups`), người mua (`/me`, chỉ hồ sơ của mình).
 
+mod engagement;
 mod groups;
 mod loyalty;
 mod me;
@@ -37,5 +38,13 @@ pub(crate) fn routes(service: Arc<CustomersService>) -> OpenApiRouter {
         .routes(routes!(loyalty::get_my_points))
         .routes(routes!(loyalty::list_my_rewards))
         .routes(routes!(loyalty::redeem_voucher))
+        .routes(routes!(engagement::list_wishlist, engagement::add_wishlist))
+        .routes(routes!(engagement::merge_wishlist))
+        .routes(routes!(engagement::remove_wishlist))
+        .routes(routes!(engagement::list_views, engagement::record_view))
+        .routes(routes!(engagement::my_referral))
+        .routes(routes!(engagement::apply_referral))
+        .routes(routes!(engagement::list_reminder_rules, engagement::create_reminder_rule))
+        .routes(routes!(engagement::list_referral_rules, engagement::create_referral_rule))
         .with_state(service)
 }

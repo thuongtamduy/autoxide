@@ -30,6 +30,11 @@ pub(crate) struct CustomersService {
     pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
     /// Cấp voucher tặng; chưa cài thì không tặng voucher.
     pub promotions: Option<Arc<dyn autoxide_promotions::api::Promotions>>,
+    /// Sổ đồng ý (tin quảng cáo); chưa cài thì không nhắc giỏ.
+    pub consents: Option<Arc<dyn autoxide_compliance::api::ConsentLedger>>,
+    /// Gửi tin (nhắc giỏ); chưa cài thì không gửi.
+    pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
+    pub config: crate::config::CustomersConfig,
 }
 
 impl CustomersService {

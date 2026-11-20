@@ -184,6 +184,10 @@ impl CustomersService {
         let transaction = tenant.database().begin_write().await?;
         self.ensure_fact(&transaction, tenant, profile.id, &order).await?;
         transaction.commit().await?;
+        // Người mua đã đặt đơn: thôi nhắc giỏ bỏ dở.
+        if let Some(user) = order.buyer_user_id {
+            self.cancel_reminders(tenant, user).await?;
+        }
         Ok(())
     }
 
@@ -210,6 +214,11 @@ impl CustomersService {
             .await?
             .rows_affected;
         let completed = changed == 1 && order.status == COMPLETED;
+        let referral = if completed {
+            self.qualify_referral(&transaction, tenant, &fact).await?
+        } else {
+            None
+        };
         if changed == 1 {
             match order.status.as_str() {
                 COMPLETED => self.add_spent(&transaction, tenant, &fact).await?,
@@ -232,6 +241,9 @@ impl CustomersService {
             // Voucher sau khi mua: gọi `promotions` sau khi commit (không gọi trong transaction ghi);
             // event giao lại thì `source_ref` chống cấp thêm.
             self.purchase_vouchers(tenant, &fact).await?;
+        }
+        if let Some((row, rule)) = referral {
+            self.referral_vouchers(tenant, &row, &rule).await?;
         }
         Ok(())
     }

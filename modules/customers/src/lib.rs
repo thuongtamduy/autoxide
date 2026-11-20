@@ -10,6 +10,8 @@
 //! `docs/steps/47-customers.md`.
 
 pub mod api;
+mod config;
+mod engagement;
 mod entity;
 mod errors;
 mod events;
@@ -23,6 +25,7 @@ mod migration;
 mod permissions;
 mod privacy;
 mod profiles;
+mod referrals;
 mod relocation;
 mod resource;
 mod segments;
@@ -50,6 +53,7 @@ pub fn module() -> impl Module {
 
 #[derive(Default)]
 struct CustomersModule {
+    config: Option<config::CustomersConfig>,
     /// Có sau `start`.
     service: Option<Arc<CustomersService>>,
 }
@@ -104,7 +108,19 @@ impl Module for CustomersModule {
         )]
     }
 
+    fn configure(
+        &mut self,
+        reader: &mut autoxide_kernel::config::ConfigReader<'_>,
+    ) -> Result<(), autoxide_kernel::config::Invalid> {
+        self.config = Some(config::read(reader)?);
+        Ok(())
+    }
+
     fn start(&mut self, context: &mut StartContext<'_>) -> Result<(), Error> {
+        let notifier = context.require::<dyn autoxide_notifications::api::Notifier>().ok();
+        if let Some(notifier) = &notifier {
+            notifier.declare(engagement::CART_REMINDER)?;
+        }
         let service = Arc::new(CustomersService {
             databases: context.tenancy(),
             outbox: context.outbox()?,
@@ -115,6 +131,9 @@ impl Module for CustomersModule {
             custom_fields: context.custom_fields(),
             ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
             promotions: context.require::<dyn autoxide_promotions::api::Promotions>().ok(),
+            consents: context.require::<dyn autoxide_compliance::api::ConsentLedger>().ok(),
+            notifier,
+            config: self.config.clone().unwrap_or_default(),
         });
         context.personal_data(service.clone())?;
         // Hồ sơ là một loại đối tượng: nhãn và ghi chú nội bộ của bước 51 gắn lên nó (D-237).
@@ -139,7 +158,8 @@ impl Module for CustomersModule {
         };
         use autoxide_orders::api::events as orders;
         let handler = Arc::new(facts::OrderEvents(service.clone()));
-        let holds = Arc::new(loyalty::tender::OrderHolds(service));
+        let holds = Arc::new(loyalty::tender::OrderHolds(service.clone()));
+        let engagement = Arc::new(engagement::EngagementEvents(service));
         vec![
             Subscription::new(
                 autoxide_kernel::privacy::USER_DELETED,
@@ -150,6 +170,8 @@ impl Module for CustomersModule {
             Subscription::optional(orders::REFUND_COMPLETED, handler),
             Subscription::optional(orders::ORDER_CONFIRMED, holds.clone()),
             Subscription::optional(orders::ORDER_CANCELLED, holds),
+            Subscription::optional(orders::CART_ABANDONED, engagement.clone()),
+            Subscription::optional(autoxide_compliance::api::CONSENT_WITHDRAWN, engagement),
         ]
     }
 

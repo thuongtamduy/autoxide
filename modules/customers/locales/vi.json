@@ -62,5 +62,17 @@
   "text:Loyalty points paid part of a confirmed order.": "Điểm thưởng đã trả một phần đơn đã xác nhận.",
   "text:Loyalty points were added or removed by staff or taken back after a refund.": "Điểm được nhân viên cộng / trừ, hay thu hồi sau khi hoàn tiền.",
   "text:Set the loyalty program: earning and redeeming rules, membership tiers and voucher rewards.": "Đặt chương trình điểm: quy tắc tích / đổi, hạng thành viên và phần thưởng voucher.",
-  "text:Unused loyalty points of a lot expired.": "Điểm chưa dùng của một lô đã hết hạn."
+  "text:Unused loyalty points of a lot expired.": "Điểm chưa dùng của một lô đã hết hạn.",
+  "customers.cart_reminder.title": "Bạn còn sản phẩm trong giỏ",
+  "customers.cart_reminder.body": "Những sản phẩm bạn chọn vẫn đang chờ trong giỏ. Hãy hoàn tất đơn khi bạn sẵn sàng.",
+  "customers.cart_reminder.short": "Sản phẩm đang chờ trong giỏ",
+  "customers.referral_code_invalid": "Mã giới thiệu không đúng.",
+  "customers.referral_not_eligible": "Tài khoản không còn nhập được mã giới thiệu (đã được giới thiệu, đã đặt đơn, hay quá hạn sau khi đăng ký).",
+  "customers.self_referral": "Không tự giới thiệu chính mình được.",
+  "customers.wishlist_full": "Danh sách yêu thích có tối đa {max} sản phẩm.",
+  "field:must be 1 to 5 delays of 15 to 10080 minutes": "phải có 1 tới 5 mốc trễ, mỗi mốc 15 tới 10080 phút",
+  "text:A referred buyer's first order completed; both buyers were rewarded.": "Đơn đầu tiên của người được giới thiệu đã hoàn tất; cả hai người được thưởng.",
+  "text:An abandoned cart reminder was sent to a consenting buyer.": "Đã gửi nhắc giỏ bỏ dở cho người mua có đồng ý.",
+  "text:Set abandoned cart reminders and referral rewards.": "Đặt nhắc giỏ bỏ dở và thưởng giới thiệu bạn.",
+  "field:must be from 0 to 1000000": "phải từ 0 tới 1000000"
 }
