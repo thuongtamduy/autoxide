@@ -1,9 +1,3 @@
 # File .rs được miễn luật `file-length` của `cargo xtask check` (D-20261118-file-length): đã dài hơn
 # 1200 dòng từ trước khi có luật. Mỗi dòng: `<số dòng tối đa> <đường dẫn>`. File ở đây KHÔNG được dài
 # thêm; tách xong (còn ≤ 1200 dòng) thì xoá dòng của nó. Không thêm file mới vào đây — tách file.
-1339 crates/kernel/src/data/tenancy/moves.rs
-1363 crates/kernel/src/ops/custom_fields.rs
-1477 modules/compliance/src/cases.rs
-1203 modules/compliance/src/http_cases.rs
-1337 modules/content/src/entries.rs
-1986 modules/content/src/http/tests.rs
