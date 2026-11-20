@@ -29,8 +29,8 @@ mod referrals;
 mod relocation;
 mod resource;
 mod segments;
-mod stored_value;
 mod service;
+mod stored_value;
 mod tools;
 
 #[cfg(test)]
@@ -152,7 +152,8 @@ impl Module for CustomersModule {
             // Thẻ quà tặng / số dư: TẮT mặc định — tắt thì không cắm tender (D-194).
             if service.config.stored_value_enabled {
                 extensions.add_tender(Arc::new(stored_value::GiftCardTender(service.clone())))?;
-                extensions.add_tender(Arc::new(stored_value::StoreCreditTender(service.clone())))?;
+                extensions
+                    .add_tender(Arc::new(stored_value::StoreCreditTender(service.clone())))?;
             }
         }
         self.service = Some(service);

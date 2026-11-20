@@ -18,7 +18,13 @@ const TABLES: [&str; 4] = [
     "customers_gift_cards",
 ];
 
-async fn index(manager: &SchemaManager<'_>, table: &str, name: &str, columns: &[&str], unique: bool) -> Result<(), DbErr> {
+async fn index(
+    manager: &SchemaManager<'_>,
+    table: &str,
+    name: &str,
+    columns: &[&str],
+    unique: bool,
+) -> Result<(), DbErr> {
     let mut index = Index::create();
     index.name(name).table(Alias::new(table));
     if unique {
@@ -58,10 +64,32 @@ impl MigrationTrait for Migration {
             )
             .await?;
         let cards = "customers_gift_cards";
-        index(manager, cards, "customers_gift_cards_code", &["tenant_id", "code_hash"], true).await?;
-        index(manager, cards, "customers_gift_cards_issued", &["tenant_id", "issued_reference"], true).await?;
-        index(manager, cards, "customers_gift_cards_owner", &["tenant_id", "owner_profile_id"], false).await?;
-        index(manager, cards, "customers_gift_cards_expiry", &["tenant_id", "status", "expires_at"], false).await?;
+        index(manager, cards, "customers_gift_cards_code", &["tenant_id", "code_hash"], true)
+            .await?;
+        index(
+            manager,
+            cards,
+            "customers_gift_cards_issued",
+            &["tenant_id", "issued_reference"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            cards,
+            "customers_gift_cards_owner",
+            &["tenant_id", "owner_profile_id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            cards,
+            "customers_gift_cards_expiry",
+            &["tenant_id", "status", "expires_at"],
+            false,
+        )
+        .await?;
 
         manager
             .create_table(
@@ -98,8 +126,22 @@ impl MigrationTrait for Migration {
             )
             .await?;
         let entries = "customers_stored_value_entries";
-        index(manager, entries, "customers_sv_entries_ref", &["tenant_id", "instrument", "instrument_id", "reference", "kind"], true).await?;
-        index(manager, entries, "customers_sv_entries_instrument", &["tenant_id", "instrument", "instrument_id", "id"], false).await?;
+        index(
+            manager,
+            entries,
+            "customers_sv_entries_ref",
+            &["tenant_id", "instrument", "instrument_id", "reference", "kind"],
+            true,
+        )
+        .await?;
+        index(
+            manager,
+            entries,
+            "customers_sv_entries_instrument",
+            &["tenant_id", "instrument", "instrument_id", "id"],
+            false,
+        )
+        .await?;
 
         manager
             .create_table(
@@ -115,11 +157,20 @@ impl MigrationTrait for Migration {
                     .col(schema::string_len("status", 16))
                     .col(schema::timestamp_with_time_zone("expires_at"))
                     .col(schema::timestamp_with_time_zone("created_at"))
-                    .primary_key(Index::create().col("tenant_id").col("reference").col("instrument"))
+                    .primary_key(
+                        Index::create().col("tenant_id").col("reference").col("instrument"),
+                    )
                     .to_owned(),
             )
             .await?;
-        index(manager, "customers_stored_value_holds", "customers_sv_holds_due", &["tenant_id", "status", "expires_at"], false).await
+        index(
+            manager,
+            "customers_stored_value_holds",
+            "customers_sv_holds_due",
+            &["tenant_id", "status", "expires_at"],
+            false,
+        )
+        .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {

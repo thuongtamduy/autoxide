@@ -8,8 +8,6 @@
 //! chỉ giảm qua giữ / dùng cho đơn, huỷ thẻ, hết hạn, điều chỉnh của nhân viên có lý do. Mã thẻ chỉ lưu
 //! băm SHA-256 + 4 ký tự cuối; tra mã có giới hạn số lần (chống dò).
 
-use std::sync::Arc;
-
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::entitlement::Feature;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
@@ -18,19 +16,21 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
-use autoxide_orders::api::Tender;
-use chrono::{DateTime, Utc};
-use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
+use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
     QueryOrder, Set,
 };
-use serde_json::Value;
 use uuid::Uuid;
 
-use crate::entity::{gift_card, store_credit, stored_value_entry, stored_value_hold};
+use crate::entity::{gift_card, store_credit, stored_value_entry};
 use crate::loyalty::ledger::{Line, PREPAYMENTS};
 use crate::service::{CustomersService, now};
+
+mod holds;
+mod tender;
+
+pub(crate) use tender::{GiftCardTender, StoreCreditTender, StoredValueCheck};
 
 pub(crate) const GIFT_CARDS: Feature =
     Feature::new("customers.gift_cards", "Gift cards usable only in the shop that issued them.");
@@ -46,7 +46,7 @@ pub(crate) const CREDIT_LIABILITY: &str = "store_credit.liability";
 pub(crate) const BREAKAGE: &str = "stored_value.breakage";
 pub(crate) const CREDIT_EXPENSE: &str = "store_credit.expense";
 
-const HELD: &str = "held";
+pub(super) const HELD: &str = "held";
 /// Chữ dễ đọc, không nhập nhằng (bỏ 0/O, 1/I/L).
 const ALPHABET: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 const CODE_LENGTH: usize = 16;
@@ -58,11 +58,11 @@ pub(crate) fn disabled() -> Error {
     )
 }
 
-fn card_not_found() -> Error {
+pub(super) fn card_not_found() -> Error {
     Error::not_found("customers.gift_card_not_found", "This gift card code is wrong.")
 }
 
-fn card_inactive() -> Error {
+pub(super) fn card_inactive() -> Error {
     Error::new(
         ErrorKind::Conflict,
         "customers.gift_card_inactive",
@@ -70,7 +70,7 @@ fn card_inactive() -> Error {
     )
 }
 
-fn insufficient(available: i64) -> Error {
+pub(super) fn insufficient(available: i64) -> Error {
     Error::new(
         ErrorKind::Conflict,
         "customers.insufficient_balance",
@@ -79,7 +79,7 @@ fn insufficient(available: i64) -> Error {
     .with_param("available", available)
 }
 
-fn lookup_throttled(retry_after: u64) -> Error {
+pub(super) fn lookup_throttled(retry_after: u64) -> Error {
     Error::too_many_requests(
         "customers.lookup_throttled",
         "Too many wrong gift card codes. Wait {seconds} seconds, then try again.",
@@ -88,7 +88,7 @@ fn lookup_throttled(retry_after: u64) -> Error {
     .with_retry_after(retry_after)
 }
 
-fn need_account() -> Error {
+pub(super) fn need_account() -> Error {
     Error::new(
         ErrorKind::Validation,
         "customers.stored_value_need_account",
@@ -143,7 +143,11 @@ impl CustomersService {
         Ok(())
     }
 
-    async fn sv_entry<C: ConnectionTrait>(
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "một dòng sổ cần đủ các trường; gom struct không rõ hơn"
+    )]
+    pub(super) async fn sv_entry<C: ConnectionTrait>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -524,7 +528,7 @@ impl CustomersService {
             .ok_or_else(|| Error::internal("store credit vanished"))
     }
 
-    async fn credit_balance<C: ConnectionTrait>(
+    pub(super) async fn credit_balance<C: ConnectionTrait>(
         &self,
         connection: &C,
         tenant: &TenantContext,
@@ -534,352 +538,5 @@ impl CustomersService {
             .one(connection)
             .await?
             .map_or(0, |row| row.balance_minor))
-    }
-
-    /// Giữ giá trị của một công cụ cho đơn `reference`: ghi chỗ giữ trước ("trùng thì bỏ qua" —
-    /// gọi lại hay hai lần cùng lúc chỉ giữ một lần), rồi trừ số dư bằng một câu có điều kiện.
-    async fn hold_value(
-        &self,
-        tenant: &TenantContext,
-        instrument: &'static str,
-        id: Uuid,
-        reference: &str,
-        wanted: Money,
-        expires_at: DateTime<Utc>,
-    ) -> Result<Money, Error> {
-        let key = (tenant.id().as_uuid(), reference.to_owned(), instrument.to_owned());
-        let transaction = tenant.database().begin_write().await?;
-        let inserted = stored_value_hold::Entity::insert(stored_value_hold::ActiveModel {
-            tenant_id: Set(tenant.id().as_uuid()),
-            reference: Set(reference.to_owned()),
-            instrument: Set(instrument.to_owned()),
-            instrument_id: Set(id),
-            amount_minor: Set(wanted.minor()),
-            currency: Set(wanted.currency().code().to_owned()),
-            status: Set(HELD.to_owned()),
-            expires_at: Set(expires_at),
-            created_at: Set(now()),
-        })
-        .on_conflict(OnConflict::new().do_nothing().to_owned())
-        .exec_without_returning(&transaction)
-        .await?;
-        if inserted == 0 {
-            transaction.rollback().await?;
-            let existing = stored_value_hold::Entity::find_by_id(key)
-                .one(tenant.database().write())
-                .await?
-                .ok_or_else(|| Error::internal("stored value hold vanished"))?;
-            return Money::from_columns(existing.amount_minor, &existing.currency);
-        }
-        let changed = if instrument == GIFT_CARD {
-            let filter = Condition::all()
-                .add(gift_card::Column::Id.eq(id))
-                .add(gift_card::Column::TenantId.eq(tenant.id().as_uuid()))
-                .add(gift_card::Column::Status.eq("active"));
-            rows::adjust::<gift_card::Entity, _>(
-                &transaction,
-                gift_card::Column::BalanceMinor,
-                filter,
-                -wanted.minor(),
-                Bounds::NON_NEGATIVE,
-            )
-            .await?
-        } else {
-            let filter = Condition::all()
-                .add(store_credit::Column::ProfileId.eq(id))
-                .add(store_credit::Column::TenantId.eq(tenant.id().as_uuid()));
-            rows::adjust::<store_credit::Entity, _>(
-                &transaction,
-                store_credit::Column::BalanceMinor,
-                filter,
-                -wanted.minor(),
-                Bounds::NON_NEGATIVE,
-            )
-            .await?
-        };
-        if changed == 0 {
-            transaction.rollback().await?;
-            let read = tenant.database().read();
-            let available = if instrument == GIFT_CARD {
-                gift_card::Entity::find_by_id(id).one(read).await?.map_or(0, |row| row.balance_minor)
-            } else {
-                self.credit_balance(read, tenant, id).await?
-            };
-            return Err(insufficient(available));
-        }
-        self.sv_entry(
-            &transaction,
-            tenant,
-            instrument,
-            id,
-            "hold",
-            Money::new(-wanted.minor(), wanted.currency()),
-            reference,
-            Actor::system(),
-        )
-        .await?;
-        transaction.commit().await?;
-        Ok(wanted)
-    }
-
-    /// Xác nhận (`confirm`) hay trả (`!confirm`) mọi chỗ giữ thẻ / số dư của đơn `reference`.
-    pub(crate) async fn settle_value_holds(
-        &self,
-        tenant: &TenantContext,
-        reference: &str,
-        confirm: bool,
-    ) -> Result<(), Error> {
-        let holds = stored_value_hold::Entity::find()
-            .filter(stored_value_hold::Column::Reference.eq(reference))
-            .filter(stored_value_hold::Column::Status.eq(HELD))
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        for hold in holds {
-            let transaction = tenant.database().begin_write().await?;
-            let changed = stored_value_hold::Entity::update_many()
-                .col_expr(
-                    stored_value_hold::Column::Status,
-                    Expr::value(if confirm { "confirmed" } else { "released" }),
-                )
-                .filter(stored_value_hold::Column::Reference.eq(reference))
-                .filter(stored_value_hold::Column::Instrument.eq(hold.instrument.as_str()))
-                .filter(stored_value_hold::Column::Status.eq(HELD))
-                .scoped(tenant)
-                .exec(&transaction)
-                .await?
-                .rows_affected;
-            if changed == 0 {
-                continue;
-            }
-            let money = Money::from_columns(hold.amount_minor, &hold.currency)?;
-            if confirm {
-                self.sv_entry(
-                    &transaction,
-                    tenant,
-                    &hold.instrument,
-                    hold.instrument_id,
-                    "redeem",
-                    money,
-                    reference,
-                    Actor::system(),
-                )
-                .await?;
-                let liability =
-                    if hold.instrument == GIFT_CARD { GIFT_LIABILITY } else { CREDIT_LIABILITY };
-                self.queue_posting(
-                    &transaction,
-                    tenant,
-                    format!("customers:{}:redeem:{reference}", hold.instrument),
-                    "Gift card or store credit used for an order",
-                    &hold.currency,
-                    vec![
-                        Line::debit(liability, hold.amount_minor),
-                        Line::credit(PREPAYMENTS, hold.amount_minor),
-                    ],
-                )
-                .await?;
-            } else {
-                if hold.instrument == GIFT_CARD {
-                    let returned = gift_card::Entity::update_many()
-                        .col_expr(
-                            gift_card::Column::BalanceMinor,
-                            Expr::col(gift_card::Column::BalanceMinor).add(hold.amount_minor),
-                        )
-                        .filter(gift_card::Column::Id.eq(hold.instrument_id))
-                        .filter(gift_card::Column::Status.eq("active"))
-                        .scoped(tenant)
-                        .exec(&transaction)
-                        .await?
-                        .rows_affected;
-                    // Thẻ đã huỷ / hết hạn trong lúc đang giữ: phần giữ không về thẻ mà thành thu
-                    // nhập khác, như số dư lúc huỷ.
-                    if returned == 0 {
-                        self.queue_posting(
-                            &transaction,
-                            tenant,
-                            format!("customers:gift_card:release:{reference}"),
-                            "Gift card hold released after the card ended",
-                            &hold.currency,
-                            vec![
-                                Line::debit(GIFT_LIABILITY, hold.amount_minor),
-                                Line::credit(BREAKAGE, hold.amount_minor),
-                            ],
-                        )
-                        .await?;
-                    }
-                } else {
-                    store_credit::Entity::update_many()
-                        .col_expr(
-                            store_credit::Column::BalanceMinor,
-                            Expr::col(store_credit::Column::BalanceMinor).add(hold.amount_minor),
-                        )
-                        .filter(store_credit::Column::ProfileId.eq(hold.instrument_id))
-                        .scoped(tenant)
-                        .exec(&transaction)
-                        .await?;
-                }
-                self.sv_entry(
-                    &transaction,
-                    tenant,
-                    &hold.instrument,
-                    hold.instrument_id,
-                    "release",
-                    money,
-                    reference,
-                    Actor::system(),
-                )
-                .await?;
-            }
-            transaction.commit().await?;
-        }
-        Ok(())
-    }
-
-    /// Trả chỗ giữ quá hạn và cho thẻ quá hạn hết hiệu lực (job, chỉ khi đã bật).
-    pub(crate) async fn stored_value_sweep(&self, tenant: &TenantContext) -> Result<u64, Error> {
-        if !self.config.stored_value_enabled {
-            return Ok(0);
-        }
-        let due = stored_value_hold::Entity::find()
-            .filter(stored_value_hold::Column::Status.eq(HELD))
-            .filter(stored_value_hold::Column::ExpiresAt.lte(now()))
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        let mut done = due.len() as u64;
-        for hold in due {
-            self.settle_value_holds(tenant, &hold.reference, false).await?;
-        }
-        let expired = gift_card::Entity::find()
-            .filter(gift_card::Column::Status.eq("active"))
-            .filter(gift_card::Column::ExpiresAt.lte(now()))
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?;
-        for card in expired {
-            let transaction = tenant.database().begin_write().await?;
-            let changed = gift_card::Entity::update_many()
-                .col_expr(gift_card::Column::Status, Expr::value("expired"))
-                .col_expr(gift_card::Column::BalanceMinor, Expr::value(0_i64))
-                .filter(gift_card::Column::Id.eq(card.id))
-                .filter(gift_card::Column::Status.eq("active"))
-                .filter(gift_card::Column::BalanceMinor.eq(card.balance_minor))
-                .scoped(tenant)
-                .exec(&transaction)
-                .await?
-                .rows_affected;
-            if changed == 1 && card.balance_minor > 0 {
-                self.queue_posting(
-                    &transaction,
-                    tenant,
-                    format!("customers:gift_card:{}:expire", card.id),
-                    "Gift card expired",
-                    &card.currency,
-                    vec![
-                        Line::debit(GIFT_LIABILITY, card.balance_minor),
-                        Line::credit(BREAKAGE, card.balance_minor),
-                    ],
-                )
-                .await?;
-                done += 1;
-            }
-            transaction.commit().await?;
-        }
-        Ok(done)
-    }
-}
-
-/// `Tender` loại `gift_card`: `input = {"code": "…"}`.
-pub(crate) struct GiftCardTender(pub Arc<CustomersService>);
-
-#[async_trait::async_trait]
-impl Tender for GiftCardTender {
-    fn kind(&self) -> &'static str {
-        GIFT_CARD
-    }
-
-    async fn hold(
-        &self,
-        tenant: &TenantContext,
-        reference: &str,
-        buyer: Option<Uuid>,
-        input: &Value,
-        max: Money,
-        expires_at: DateTime<Utc>,
-    ) -> Result<Money, Error> {
-        // Cần tài khoản: bộ đếm tra sai theo người; khách vãng lai dùng chung một bộ đếm thì người
-        // đoán mã sẽ chặn mọi khách vãng lai khác.
-        let who = buyer.ok_or_else(|| need_account())?;
-        let code = input["code"].as_str().unwrap_or_default();
-        let card = self.0.lookup_gift_card(tenant, who, code).await?;
-        let expired = card.expires_at.is_some_and(|at| at <= now());
-        if card.status != "active" || expired {
-            return Err(card_inactive());
-        }
-        if card.currency != max.currency().code() {
-            return Err(card_inactive());
-        }
-        let wanted = Money::new(Ord::min(card.balance_minor, max.minor()), max.currency());
-        self.0.hold_value(tenant, GIFT_CARD, card.id, reference, wanted, expires_at).await
-    }
-
-    async fn release(&self, tenant: &TenantContext, reference: &str) -> Result<(), Error> {
-        self.0.settle_value_holds(tenant, reference, false).await
-    }
-}
-
-/// `Tender` loại `store_credit`: số dư của chính người mua; `input = {"amount": <tối đa>}` (tuỳ chọn).
-pub(crate) struct StoreCreditTender(pub Arc<CustomersService>);
-
-#[async_trait::async_trait]
-impl Tender for StoreCreditTender {
-    fn kind(&self) -> &'static str {
-        CREDIT
-    }
-
-    async fn hold(
-        &self,
-        tenant: &TenantContext,
-        reference: &str,
-        buyer: Option<Uuid>,
-        input: &Value,
-        max: Money,
-        expires_at: DateTime<Utc>,
-    ) -> Result<Money, Error> {
-        self.0.stored_value_allowed(tenant, &STORE_CREDIT).await?;
-        let buyer = buyer.ok_or_else(|| need_account())?;
-        let profile = self.0.me(tenant, buyer).await?;
-        let balance = self.0.credit_balance(tenant.database().read(), tenant, profile.id).await?;
-        let cap = input["amount"].as_i64().unwrap_or(i64::MAX);
-        let wanted = Money::new(Ord::max(Ord::min(Ord::min(balance, max.minor()), cap), 0), max.currency());
-        if !wanted.is_positive() {
-            return Err(insufficient(balance));
-        }
-        self.0.hold_value(tenant, CREDIT, profile.id, reference, wanted, expires_at).await
-    }
-
-    async fn release(&self, tenant: &TenantContext, reference: &str) -> Result<(), Error> {
-        self.0.settle_value_holds(tenant, reference, false).await
-    }
-}
-
-/// `autoxide doctor`: cảnh báo khi thẻ quà tặng / số dư đã bật (cần đối chiếu NĐ 52/2024).
-pub(crate) struct StoredValueCheck(pub bool);
-
-#[async_trait::async_trait]
-impl autoxide_kernel::doctor::Probe for StoredValueCheck {
-    async fn probe(&self) -> autoxide_kernel::doctor::Finding {
-        if self.0 {
-            autoxide_kernel::doctor::Finding::warning(
-                "gift cards and store credit are turned on (AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED)",
-            )
-            .with_hint(
-                "Keep them only after a qualified person checked Decree 52/2024/ND-CP on prepaid cards and e-wallets: \
-                 usable only in the issuing shop, no cash out, no transfer.",
-            )
-        } else {
-            autoxide_kernel::doctor::Finding::ok("gift cards and store credit are off")
-        }
     }
 }

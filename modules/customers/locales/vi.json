@@ -81,5 +81,6 @@
   "customers.insufficient_balance": "Không đủ số dư (còn {available}).",
   "customers.lookup_throttled": "Nhập sai mã thẻ quà tặng quá nhiều lần. Chờ {seconds} giây rồi thử lại.",
   "customers.stored_value_disabled": "Thẻ quà tặng và số dư cửa hàng chưa được bật cho cửa hàng này.",
-  "customers.stored_value_need_account": "Đăng nhập để trả bằng thẻ quà tặng hoặc số dư cửa hàng."
+  "customers.stored_value_need_account": "Đăng nhập để trả bằng thẻ quà tặng hoặc số dư cửa hàng.",
+  "text:Issue, look up and void gift cards and change customers' store credit (only when gift cards or store credit are turned on).": "Phát hành, tra và huỷ thẻ quà tặng, đổi số dư cửa hàng của khách (chỉ khi đã bật thẻ quà tặng hay số dư cửa hàng)."
 }

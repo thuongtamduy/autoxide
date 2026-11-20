@@ -19,7 +19,11 @@ pub(crate) fn relocation() -> Relocation {
         .follow("customers_referrals", "referee_profile_id", "customers_profiles")
         .follow("customers_store_credits", "profile_id", "customers_profiles")
         // Thẻ quà tặng là của cả khách (không theo nút): ở lại khách nguồn khi tách, chuyển khi gộp.
-        .stay(&["customers_gift_cards", "customers_stored_value_entries", "customers_stored_value_holds"])
+        .stay(&[
+            "customers_gift_cards",
+            "customers_stored_value_entries",
+            "customers_stored_value_holds",
+        ])
         // Chương trình điểm chung của khách: tách khách thì khách mới có bản sao.
         .copy_on_split(&[
             "customers_loyalty_rules",
