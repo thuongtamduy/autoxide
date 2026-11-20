@@ -293,3 +293,10 @@ opt-level = 3
 # trước / sau ở D-179.
 [profile.release]
 overflow-checks = true
+# Cỡ và tốc độ bản release (D-20261120-release-profile), đo trên cùng máy, build sạch: gốc 377 MB / 25.9
+# phút; chỉ strip 290 MB; strip + LTO thin + 1 codegen unit 198 MB / 21.2 phút, đường nóng nhanh hơn 1–21%;
+# LTO fat 181 MB nhưng 40.3 phút và không nhanh hơn thin. Bỏ bảng symbol: thông báo panic vẫn có file và
+# dòng, chỉ backtrace (`RUST_BACKTRACE`) mất tên hàm.
+strip = "symbols"
+lto = "thin"
+codegen-units = 1
