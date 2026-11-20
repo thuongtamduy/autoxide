@@ -483,3 +483,29 @@ async fn ho_so_kyc_kem_ten_chu_the_co_thieu_giay_to_va_ghi_chu_duyet() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_callback_cung_luot_chi_phat_mot_event() {
+    use sea_orm::{ConnectionTrait, Statement};
+    TestDatabase::run(async |test| {
+        let (app, verifier) = app(test).await;
+        let (_, reference) = start(&app, "alice").await;
+        verifier.complete(&reference, true, "NGUYEN VAN A", "001099012345");
+        // Nhà cung cấp gọi callback hai lần (gửi lại khi chưa nhận được trả lời), hai job xử lý chạy
+        // cùng lúc. Postgres từng cho cả hai cùng thấy lượt `pending` và cùng phát
+        // `compliance.kyc_verified`.
+        let (first, second) = tokio::join!(callback(&app, &reference), callback(&app, &reference));
+        assert_eq!((first, second), (StatusCode::NO_CONTENT, StatusCode::NO_CONTENT));
+        // Mỗi callback một job; worker chạy hai job cùng lúc.
+        run_jobs(&app).await;
+        let read = app.database().read();
+        let sql = "SELECT name FROM compliance_events WHERE name = 'compliance.kyc_verified'";
+        let rows = read
+            .query_all_raw(Statement::from_string(read.get_database_backend(), sql))
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 1);
+    })
+    .await
+    .unwrap();
+}

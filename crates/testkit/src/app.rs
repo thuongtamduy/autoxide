@@ -38,6 +38,8 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use crate::statements::StatementLog;
+
 use autoxide_kernel::access::{Authenticator, Grant, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
@@ -100,6 +102,7 @@ pub struct TestApp {
     dns: FakeDns,
     /// Database đã được chép từ database mẫu thay vì migrate từ đầu.
     from_template: bool,
+    statements: Arc<StatementLog>,
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -148,6 +151,15 @@ impl TestApp {
     /// migrate từ đầu. Chỉ để testkit tự kiểm; bài test không cần biết.
     pub fn from_template(&self) -> bool {
         self.from_template
+    }
+
+    /// Chạy `work` và trả kèm mọi câu SQL app chạy trong lúc đó (D-20261120-step39-hot-paths) —
+    /// để test giữ số câu của một request. Mỗi lúc chỉ đo một việc; đo lồng nhau thì lượt trong
+    /// lấy hết câu.
+    pub async fn statements<T>(&self, work: impl Future<Output = T>) -> (T, Vec<String>) {
+        self.statements.start();
+        let output = work.await;
+        (output, self.statements.stop())
     }
 
     /// Sổ database của app (chế độ, placement, tra khách).
@@ -475,8 +487,11 @@ impl<'a> TestAppBuilder<'a> {
             // `up` bên dưới làm hết việc như trước.
             from_template = crate::template::prepare(&config.database, &migrator).await;
         }
-        let database =
+        let mut database =
             Database::connect(&config.database).await.map_err(|e| fail("database", e))?;
+        // Gắn bộ đếm câu SQL trước khi ai clone `database` (registry, module).
+        let statements = Arc::new(StatementLog::default());
+        database.observe_statements(statements.observer());
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
         let registry = if self.multi {
             // Đặt thẳng chế độ (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có cả khoá gốc); các
@@ -592,6 +607,7 @@ impl<'a> TestAppBuilder<'a> {
             registry,
             dns,
             from_template,
+            statements,
         })
     }
 }

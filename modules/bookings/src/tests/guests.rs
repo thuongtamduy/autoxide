@@ -250,3 +250,45 @@ async fn lich_cua_toi_tep_lich_va_tool_mcp() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn doan_ma_dong_thoi_van_bi_chan_sau_nam_lan() {
+    use sea_orm::EntityTrait as _;
+    TestDatabase::run(async |test| {
+        let setup = setup(test).await;
+        let shop = &setup.shop;
+        let start = in_minutes(48 * 60);
+        let body = |phone_code: Value| {
+            json!({"service_id": setup.service, "starts_at": start, "phone_code": phone_code,
+                   "customer": {"name": "Guest", "phone": "0912345678"}})
+        };
+        let right = code(&setup, "0912345678").await;
+        let mut wrong = right.clone();
+        wrong["code"] = json!(if right["code"] == "000000" { "111111" } else { "000000" });
+        // Sáu lần đoán cùng lúc: Postgres từng cho cả sáu cùng thấy 0 lần thử, nên giới hạn 5 lần
+        // không chặn được loạt đoán song song.
+        let guess =
+            || call(shop, "POST", "/bookings/public/bookings", None, Some(body(wrong.clone())));
+        let results = tokio::join!(guess(), guess(), guess(), guess(), guess(), guess());
+        for (status, _) in [results.0, results.1, results.2, results.3, results.4, results.5] {
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        // Mỗi lần được so mã là một lần thử đã đếm: không lần nào quá 5.
+        let challenge: uuid::Uuid = right["challenge_id"].as_str().unwrap().parse().unwrap();
+        let row = crate::entity::guest_challenge::Entity::find_by_id(challenge)
+            .one(shop.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(row.attempts <= 5, "{} guesses were checked", row.attempts);
+        let (status, problem) =
+            call(shop, "POST", "/bookings/public/bookings", None, Some(body(right))).await;
+        assert_eq!(
+            (status, problem["code"].as_str()),
+            (StatusCode::UNPROCESSABLE_ENTITY, Some("bookings.code_invalid")),
+            "{problem}"
+        );
+    })
+    .await
+    .unwrap();
+}

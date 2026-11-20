@@ -358,6 +358,17 @@ impl SupportService {
     ) -> Result<(), Error> {
         let at = now();
         let transaction = tenant.database().begin_write().await?;
+        // Khoá phiếu rồi xét lại điều kiện đã xét ngoài transaction: phiếu vừa đóng, vừa tạm dừng
+        // trả lời tự động, hay vừa có một lượt trả lời tự động khác chen vào (giới hạn lượt liên
+        // tiếp đã tính trên số cũ) thì thôi.
+        let current = crate::service::lock_ticket(&transaction, tenant, before.id).await?;
+        if current.status == Status::Closed.as_str()
+            || current.auto_reply_paused
+            || current.auto_replies_in_row > before.auto_replies_in_row
+        {
+            transaction.rollback().await?;
+            return Ok(());
+        }
         let (source_kind, macro_id, intent) = match &source {
             AutoSource::Macro(id) => ("macro", Some(*id), None),
             AutoSource::Fact { intent } => ("fact", None, Some(intent.clone())),
@@ -413,11 +424,6 @@ impl SupportService {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
-        let current = ticket::Entity::find_by_id(before.id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| crate::service::not_found(before.id))?;
         let mut row = current.clone().into_active_model();
         row.auto_replies_in_row = Set(current.auto_replies_in_row.saturating_add(1));
         row.last_message_at = Set(at);

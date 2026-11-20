@@ -576,3 +576,41 @@ async fn gan_don_bang_token_sai_la_loi_cua_truong() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn doan_ma_tra_don_dong_thoi_van_bi_chan_sau_nam_lan() {
+    TestDatabase::run(async |test| {
+        let guests = guests(test, false).await;
+        let (_, number) = guest_order(&guests.shop).await;
+        let body = json!({"number": number, "phone": "0901234567"});
+        let (status, sent) =
+            public(&guests.shop, "POST", "/public/orders/lookup", None, None, Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{sent}");
+        let id = sent["data"]["lookup_id"].as_str().unwrap();
+        let confirm = format!("/public/orders/lookup/{id}/confirm");
+        let right = last_code(&guests.sms);
+        let wrong = json!({"code": if right == "000000" { "111111" } else { "000000" }});
+        // Tám lần đoán cùng lúc: trước đây mỗi lần đọc số lượt rồi mới so mã, nên cả loạt cùng thấy
+        // dưới giới hạn và cùng được so — giới hạn 5 lần không chặn được dò mã song song.
+        let guess = || public(&guests.shop, "POST", &confirm, None, None, Some(wrong.clone()));
+        let results =
+            tokio::join!(guess(), guess(), guess(), guess(), guess(), guess(), guess(), guess());
+        for (status, _) in
+            [results.0, results.1, results.2, results.3, results.4, results.5, results.6, results.7]
+        {
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+        }
+        // Mỗi lần được so mã là một lần thử đã đếm: không lần nào quá 5.
+        let row = lookup_code::Entity::find_by_id(uuid::Uuid::parse_str(id).unwrap())
+            .one(guests.shop.database().read())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(row.attempts <= 5, "{} guesses were checked", row.attempts);
+        let (status, _) =
+            public(&guests.shop, "POST", &confirm, None, None, Some(json!({"code": right}))).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "mã hỏng sau 5 lần sai");
+    })
+    .await
+    .unwrap();
+}

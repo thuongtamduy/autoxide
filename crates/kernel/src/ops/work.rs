@@ -28,8 +28,15 @@ use crate::i18n::{Language, Translations};
 use crate::response::{Data, Problem};
 use crate::tenancy::{OrgId, TenantContext, root_of};
 
-/// Hạn giờ của một nguồn việc trong một lần gom.
-pub const SOURCE_TIMEOUT: Duration = Duration::from_millis(300);
+/// Hạn giờ của một nguồn việc trong một lần gom (dùng chung cho hộp việc, tìm chung, tóm tắt,
+/// bước thiết lập, mở thẳng theo mã).
+///
+/// Bản release: 300 ms. Bản debug (test, `cargo run`) chậm hơn nhiều lần và test chạy song song
+/// trên máy CI bận, nên 300 ms làm nguồn bình thường thỉnh thoảng rơi vào `incomplete` — test hộp
+/// việc, tìm chung đỏ ngẫu nhiên trên Postgres. Bản debug cho 1,5 s: vẫn ngắn hơn nguồn chậm giả
+/// lập trong test (ngủ 2 s), nên hành vi "bỏ nguồn chậm" vẫn được kiểm.
+pub const SOURCE_TIMEOUT: Duration =
+    if cfg!(debug_assertions) { Duration::from_millis(1500) } else { Duration::from_millis(300) };
 /// Giữ số đếm trong bộ nhớ bao lâu.
 const COUNT_CACHE: Duration = Duration::from_secs(10);
 /// Tối đa số việc mỗi nguồn trả trong một lần gom.

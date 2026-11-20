@@ -279,47 +279,52 @@ impl ContentService {
             .await?)
     }
 
-    /// Tên của các term (theo ngôn ngữ của menu, thiếu thì mặc định).
+    /// Tên của các term (theo ngôn ngữ của menu, thiếu thì ngôn ngữ mặc định, thiếu nữa thì bản
+    /// dịch đầu). Một câu cho mọi term của menu (D-20261120-step39-hot-paths; trước: một câu mỗi
+    /// term). Term không còn bản dịch nào thì vắng.
     async fn term_refs(
         &self,
         tenant: &TenantContext,
         ids: &[Uuid],
         locale: &str,
     ) -> Result<HashMap<Uuid, crate::taxonomy::terms::TermRef>, Error> {
-        let mut found = HashMap::new();
-        for id in ids {
-            if let Ok(term) = self.term_for_menu(tenant, *id, locale).await {
-                found.insert(*id, term);
-            }
+        if ids.is_empty() {
+            return Ok(HashMap::new());
         }
-        Ok(found)
-    }
-
-    async fn term_for_menu(
-        &self,
-        tenant: &TenantContext,
-        id: Uuid,
-        locale: &str,
-    ) -> Result<crate::taxonomy::terms::TermRef, Error> {
         let texts = crate::entity::term_translation::Entity::find()
             .scoped(tenant)
-            .filter(crate::entity::term_translation::Column::TermId.eq(id))
+            .filter(crate::entity::term_translation::Column::TermId.is_in(ids.to_vec()))
+            // Thứ tự cố định cho lựa chọn "bản dịch đầu".
+            .order_by_asc(crate::entity::term_translation::Column::Locale)
             .all(tenant.database().read())
             .await?;
         let default = self.languages(tenant).await?.default;
-        let chosen = texts
-            .iter()
-            .find(|text| text.locale == locale)
-            .or_else(|| texts.iter().find(|text| text.locale == default))
-            .or_else(|| texts.first())
-            .ok_or_else(|| crate::taxonomy::terms::term_not_found(id))?;
-        Ok(crate::taxonomy::terms::TermRef {
-            id,
-            taxonomy: chosen.taxonomy.clone(),
-            name: chosen.name.clone(),
-            slug: chosen.slug.clone(),
-            locale: chosen.locale.clone(),
-        })
+        let mut by_term: HashMap<Uuid, Vec<&crate::entity::term_translation::Model>> =
+            HashMap::new();
+        for text in &texts {
+            by_term.entry(text.term_id).or_default().push(text);
+        }
+        let mut found = HashMap::new();
+        for (id, texts) in by_term {
+            let chosen = texts
+                .iter()
+                .find(|text| text.locale == locale)
+                .or_else(|| texts.iter().find(|text| text.locale == default))
+                .or_else(|| texts.first());
+            if let Some(chosen) = chosen {
+                found.insert(
+                    id,
+                    crate::taxonomy::terms::TermRef {
+                        id,
+                        taxonomy: chosen.taxonomy.clone(),
+                        name: chosen.name.clone(),
+                        slug: chosen.slug.clone(),
+                        locale: chosen.locale.clone(),
+                    },
+                );
+            }
+        }
+        Ok(found)
     }
 
     /// Đích của mọi mục có thật: mục nội dung cùng ngôn ngữ, term có thật.

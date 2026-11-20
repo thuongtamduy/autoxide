@@ -36,7 +36,7 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::api::OrderStatus;
-use crate::checkout::{Holds, quoted_rows};
+use crate::checkout::{Holds, insert_lines, quoted_rows};
 use crate::entity::{order, payment, pos_sale, pos_shift};
 use crate::errors;
 use crate::events::{Change, PosShiftClosed};
@@ -658,12 +658,7 @@ impl OrdersService {
                     &format!("orders.order:{year}"),
                 )
                 .await?;
-                for (row, taxes) in quoted_rows(tenant, order_id, quote)? {
-                    row.insert(&transaction).await?;
-                    for tax in taxes {
-                        tax.insert(&transaction).await?;
-                    }
-                }
+                insert_lines(&transaction, quoted_rows(tenant, order_id, quote)?).await?;
                 let method =
                     if paid.len() == 1 { paid[0].method.clone() } else { "split".to_owned() };
                 let row = order::ActiveModel {

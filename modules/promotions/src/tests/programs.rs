@@ -649,3 +649,44 @@ async fn so_doi_tuong_chi_cong_khai_khi_dang_chay() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn tam_dung_va_ket_thuc_cung_luc_khong_phat_event_sai() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        for _ in 0..4 {
+            let id = running(&setup, body(setup.tree.a, json!({}))).await;
+            // Tạm dừng và kết thúc cùng lúc. Postgres từng cho cả hai cùng xuất phát từ `active`:
+            // bên thua không đổi được dòng nhưng vẫn trả 200, ghi phiên bản và phát event (vd
+            // `promotion_ended` cho chương trình đang tạm dừng, nhả suất hạn mức gói).
+            let (pause, end) = (format!("/promotions/{id}/pause"), format!("/promotions/{id}/end"));
+            let (paused, ended) = tokio::join!(
+                call(&setup.app, "POST", &pause, "boss", None),
+                call(&setup.app, "POST", &end, "boss", None),
+            );
+            assert_eq!(ended.0, StatusCode::OK, "{}", ended.1);
+            assert_eq!(ended.1["data"]["status"], "ended", "{}", ended.1);
+            match paused.0 {
+                StatusCode::OK => assert_eq!(paused.1["data"]["status"], "paused", "{}", paused.1),
+                StatusCode::CONFLICT => {}
+                other => panic!("pause: {other} {}", paused.1),
+            }
+            let (_, versions) =
+                call(&setup.app, "GET", &format!("/promotions/{id}/versions"), "boss", None).await;
+            let actions: Vec<&str> = versions["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| v["action"].as_str().unwrap())
+                .collect();
+            let expected: &[&str] = if paused.0 == StatusCode::OK {
+                &["activated", "paused", "ended"]
+            } else {
+                &["activated", "ended"]
+            };
+            assert_eq!(actions, expected);
+        }
+    })
+    .await
+    .unwrap();
+}

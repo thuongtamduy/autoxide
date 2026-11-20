@@ -15,6 +15,7 @@ mod readiness;
 mod recommend;
 mod resources;
 mod search;
+mod statements;
 mod suggestions;
 mod transfers;
 mod variant_attributes;

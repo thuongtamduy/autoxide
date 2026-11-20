@@ -304,6 +304,11 @@ fn contained(old: &Value, new: &Value, path: &str, problems: &mut Vec<String>) {
     match (old, new) {
         (Value::Object(old), Value::Object(new)) => {
             for (key, value) in old {
+                // Lần gửi webhook gần nhất do job nền ghi, lúc nào cũng có thể đổi (bản mới có thể
+                // gửi xong lần đầu ngay sau khi khởi động) — không phải dữ liệu bị nâng cấp làm hỏng.
+                if key == "last_delivery" {
+                    continue;
+                }
                 match new.get(key) {
                     Some(other) => contained(value, other, &format!("{path}.{key}"), problems),
                     None => problems.push(format!("{path}.{key}: missing after the upgrade")),

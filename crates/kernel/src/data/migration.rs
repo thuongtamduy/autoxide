@@ -482,6 +482,29 @@ impl MigrationTrait for Transactional {
     }
 }
 
+/// Lỗi "database chưa migrate" (`kernel.migrations_pending`) cho lệnh CLI: chỉ nêu SỐ migration
+/// chưa chạy và vài tên đầu, kèm lệnh cần chạy. Không liệt kê hết — database mới tinh có hàng
+/// trăm migration và một dòng lỗi dài vài KB che mất lệnh sửa. Danh sách đầy đủ:
+/// `autoxide migrate status`.
+pub fn pending_error(pending: &[MigrationState]) -> Error {
+    const SHOWN: usize = 3;
+    let first: Vec<String> = pending
+        .iter()
+        .take(SHOWN)
+        .map(|state| format!("{}/{}", state.module, state.name))
+        .collect();
+    let more = pending.len().saturating_sub(SHOWN);
+    let first =
+        if more == 0 { first.join(", ") } else { format!("{}, and {more} more", first.join(", ")) };
+    Error::conflict(
+        "kernel.migrations_pending",
+        "{count} migration(s) have not been applied to the database (first: {first}); run \
+         `autoxide migrate up` first, or `autoxide migrate status` to list them",
+    )
+    .with_param("count", pending.len())
+    .with_param("first", first)
+}
+
 #[cfg(test)]
 mod tests {
     use super::prelude::*;

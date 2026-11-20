@@ -295,7 +295,7 @@ impl Invitations {
             return if current.status == "revoked" { Ok(current) } else { Err(not_pending(id)) };
         }
         let transaction = tenant.database().begin_write().await?;
-        entity::Entity::update_many()
+        let revoked = entity::Entity::update_many()
             .col_expr(entity::Column::Status, Expr::value("revoked"))
             .col_expr(entity::Column::UpdatedAt, Expr::value(now()))
             .filter(entity::Column::Id.eq(id))
@@ -303,6 +303,13 @@ impl Invitations {
             .scoped(tenant)
             .exec(&transaction)
             .await?;
+        if revoked.rows_affected == 0 {
+            // Lời mời vừa được nhận (hay vừa thu hồi) sau lúc đọc ở trên: không phát event thu hồi
+            // cho một lời mời không còn `pending`.
+            transaction.rollback().await?;
+            let current = self.managed(tenant, principal, id).await?;
+            return if current.status == "revoked" { Ok(current) } else { Err(not_pending(id)) };
+        }
         tokens().revoke(&transaction, tenant, PURPOSE, &id.to_string()).await?;
         let after = entity::Entity::find_by_id((tenant.id().as_uuid(), id))
             .scoped(tenant)
@@ -531,15 +538,23 @@ impl Invitations {
                 .apply_verified_email(&tenant, &transaction, user_id, &invitation.email, now())
                 .await?;
         }
-        crate::role::add_roles(&transaction, &tenant, user_id, invitation.org_id, roles).await?;
-        entity::Entity::update_many()
+        // Chốt lời mời trước khi gán role, chỉ khi nó còn `pending` (D-181): quản trị vừa thu hồi
+        // (`revoke` đổi có điều kiện cùng dòng) trong lúc người được mời đang nhận thì bên nhận thấy
+        // lời mời đã đóng và không nhận role — không ghi đè `revoked` thành `accepted`.
+        let accepted = entity::Entity::update_many()
             .col_expr(entity::Column::Status, Expr::value("accepted"))
             .col_expr(entity::Column::AcceptedUserId, Expr::value(Some(user_id)))
             .col_expr(entity::Column::UpdatedAt, Expr::value(now()))
             .filter(entity::Column::Id.eq(id))
+            .filter(entity::Column::Status.eq("pending"))
             .scoped(&tenant)
             .exec(&transaction)
             .await?;
+        if accepted.rows_affected == 0 {
+            transaction.rollback().await?;
+            return Err(invalid().with_reason("closed"));
+        }
+        crate::role::add_roles(&transaction, &tenant, user_id, invitation.org_id, roles).await?;
         let event = events::InvitationAccepted {
             before: None,
             after: Some(
@@ -740,6 +755,43 @@ mod tests {
             assert!(user.email_verified_at.is_some(), "email được mời coi là đã xác minh");
             let principal = services.roles.principal(&services.tenant, user.id).await.unwrap();
             assert!(principal.allows("auth.users.read"));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Thu hồi đúng lúc người được mời đang nhận: một trong hai thắng, không bao giờ cả hai. Trước đây
+    /// bên nhận ghi đè `revoked` thành `accepted` và vẫn nhận role (khoảng hở là lúc tạo tài khoản).
+    #[tokio::test]
+    async fn thu_hoi_dong_thoi_voi_nhan_loi_moi() {
+        TestDatabase::run(async |test| {
+            let services = services(test).await;
+            let tenant = &services.tenant;
+            let role = role(&services, &["auth.users.read"]).await;
+            let invitations = invitations(&services);
+            let boss = admin(&services);
+            for (index, _) in (0..3).enumerate() {
+                let email = format!("race{index}@example.com");
+                let row = invitations
+                    .create(tenant, Some(&boss), invite(&email, role), Language::En)
+                    .await
+                    .unwrap();
+                let token = deliver(&services, &invitations).await;
+                let (accepted, revoked) = tokio::join!(
+                    invitations.accept(Some(tenant), &token, None, None, None, None),
+                    invitations.revoke(tenant, &boss, row.id),
+                );
+                match (accepted, revoked) {
+                    (Ok(_), Err(error)) => assert_eq!(error.code(), "auth.invitation_not_pending"),
+                    (Err(error), Ok(revoked)) => {
+                        assert_eq!(error.code(), "auth.invitation_invalid");
+                        assert_eq!(revoked.status, "revoked");
+                    }
+                    (accepted, revoked) => {
+                        panic!("both won: {:?} / {:?}", accepted.map(|a| a.user_id), revoked)
+                    }
+                }
+            }
         })
         .await
         .unwrap();

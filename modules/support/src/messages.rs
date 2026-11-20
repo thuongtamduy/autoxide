@@ -80,11 +80,9 @@ impl SupportService {
 
         let at = now();
         let transaction = tenant.database().begin_write().await?;
-        let before = ticket::Entity::find_by_id(ticket_id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| not_found(ticket_id))?;
+        // Khoá phiếu: phiếu vừa bị đóng (nhân viên, job tự đóng) thì tin này thấy trạng thái mới,
+        // không ghi đè `closed` thành `pending_agent`.
+        let before = crate::service::lock_ticket(&transaction, tenant, ticket_id).await?;
         if let Viewer::Staff(principal) = viewer {
             principal.require_write_at(&transaction, &TICKETS_REPLY, target(&before)).await?;
         }

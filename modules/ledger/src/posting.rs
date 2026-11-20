@@ -602,14 +602,28 @@ async fn write(
             .all(transaction)
             .await?
     };
+    // Khoá các tài khoản (ID tăng dần, chống deadlock) rồi mới xét trạng thái và sàn (D-181):
+    // đóng tài khoản hay nâng sàn cùng lúc (`update_account` khoá dòng tài khoản trước) thì bút toán
+    // này chờ và thấy giá trị mới — không ghi lọt vào tài khoản vừa đóng, không trừ dưới sàn mới.
+    let mut account_ids: Vec<Uuid> =
+        by_id.iter().map(|row| row.id).chain(by_key.iter().map(|(_, row)| row.id)).collect();
+    account_ids.sort_unstable();
+    account_ids.dedup();
+    let locked = rows::lock(
+        transaction,
+        account::Entity::find().scoped(tenant).filter(account::Column::Id.is_in(account_ids)),
+        account::Column::Id,
+    )
+    .await?;
     let mut resolved = Vec::with_capacity(draft.lines.len());
     for item in &draft.lines {
         let found = match &item.account {
-            LineAccount::Id(id) => by_id.iter().find(|row| row.id == *id),
+            LineAccount::Id(id) => Some(*id),
             LineAccount::Key(key) => {
-                by_key.iter().find(|(stored, _)| stored == key).map(|(_, row)| row)
+                by_key.iter().find(|(stored, _)| stored == key).map(|(_, row)| row.id)
             }
         };
+        let found = found.and_then(|id| locked.iter().find(|row| row.id == id));
         let Some(found) = found.filter(|row| row.book_id == book.id) else {
             return Err(account_not_found());
         };

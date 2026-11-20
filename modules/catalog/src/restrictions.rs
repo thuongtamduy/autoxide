@@ -602,11 +602,13 @@ impl CatalogService {
         fail_if_any(problems)?;
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let before = product::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| errors::product_not_found(id))?;
+        // Khoá sản phẩm như `product_for_write`: mở bán (kiểm giấy tờ) chờ lệnh này xong.
+        let before = autoxide_kernel::rows::lock_one(
+            &transaction,
+            product::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(|| errors::product_not_found(id))?;
         writable(principal, &transaction, &PRODUCTS_READ, &DOCUMENTS_MANAGE, before.org_id, || {
             errors::product_not_found(id)
         })
@@ -642,11 +644,13 @@ impl CatalogService {
     ) -> Result<(), Error> {
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let before = product::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| errors::product_not_found(id))?;
+        // Khoá sản phẩm như `product_for_write`: mở bán (kiểm giấy tờ) chờ lệnh này xong.
+        let before = autoxide_kernel::rows::lock_one(
+            &transaction,
+            product::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(|| errors::product_not_found(id))?;
         writable(principal, &transaction, &PRODUCTS_READ, &DOCUMENTS_MANAGE, before.org_id, || {
             errors::product_not_found(id)
         })

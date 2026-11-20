@@ -122,6 +122,18 @@ impl OpeningRange {
 pub trait OrgDirectory: Send + Sync {
     /// Nút `id` của khách, hoặc `None`.
     async fn unit(&self, tenant: &TenantContext, id: OrgId) -> Result<Option<Unit>, Error>;
+    /// Các nút trong `ids` có thật ở khách (thứ tự bất kỳ; ID không có thì vắng). Cho trang liệt
+    /// kê nhiều người bán: một lần tra thay vì một lần mỗi nút. Mặc định: gọi [`Self::unit`] từng
+    /// ID (cài đặt thật đọc một câu).
+    async fn units(&self, tenant: &TenantContext, ids: &[OrgId]) -> Result<Vec<Unit>, Error> {
+        let mut found = Vec::new();
+        for id in ids {
+            if let Some(unit) = self.unit(tenant, *id).await? {
+                found.push(unit);
+            }
+        }
+        Ok(found)
+    }
     /// Nút gốc của khách (tạo nếu còn thiếu — chịu được event "khách mới" đến chậm).
     async fn root(&self, tenant: &TenantContext) -> Result<Unit, Error>;
     /// Các nút trên `id`, gần nhất trước, gồm gốc; không gồm chính nó.

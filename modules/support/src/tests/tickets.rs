@@ -323,3 +323,33 @@ async fn xoa_tai_khoan_an_danh_hoa_giu_thong_ke() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn dong_phieu_va_gui_tin_cung_luc_phieu_van_dong() {
+    TestDatabase::run(async |test| {
+        let harness = harness(test).await;
+        let app = &harness.app;
+        for _ in 0..5 {
+            let id = open_as_buyer(app).await;
+            let path = format!("/tickets/{id}");
+            let answer = json!({"body": "Chúng tôi đang kiểm tra."});
+            let (status, _) =
+                call(app, "POST", &format!("{path}/messages"), "agent", Some(answer)).await;
+            assert_eq!(status, StatusCode::CREATED);
+            // Nhân viên đóng phiếu đúng lúc người mua gửi tin. Thứ tự nào cũng được, nhưng phiếu
+            // phải còn đóng: Postgres từng cho tin của người mua ghi đè `closed` thành
+            // `pending_agent` (đọc trạng thái trước khi lệnh đóng commit).
+            let mine = format!("/me/tickets/{id}/messages");
+            let (closed, sent) = tokio::join!(
+                call(app, "PATCH", &path, "agent", Some(json!({"status": "closed"}))),
+                call(app, "POST", &mine, "buyer", Some(json!({"body": "Còn nữa."}))),
+            );
+            assert_eq!(closed.0, StatusCode::OK, "{}", closed.1);
+            assert!(matches!(sent.0, StatusCode::CREATED | StatusCode::CONFLICT), "{}", sent.1);
+            let (_, got) = call(app, "GET", &path, "agent", None).await;
+            assert_eq!(got["data"]["status"], "closed");
+        }
+    })
+    .await
+    .unwrap();
+}
