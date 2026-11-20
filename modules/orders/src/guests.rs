@@ -17,6 +17,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::i18n::Language;
 use autoxide_kernel::reference::fingerprint;
+use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
@@ -25,7 +26,8 @@ use autoxide_shipping::api::{QuoteItem, QuoteRequest};
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
+    QueryOrder, Set,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -346,19 +348,24 @@ impl OrdersService {
             .await?
             .ok_or_else(errors::lookup_code_invalid)?;
         let at = now();
-        if row.consumed_at.is_some() || row.expires_at <= at || row.attempts >= MAX_ATTEMPTS {
+        if row.consumed_at.is_some() || row.expires_at <= at {
             return Err(errors::lookup_code_invalid());
         }
-        if !same(&row.code_hash, &code_hash(&pepper, id, code.trim())) {
-            lookup_code::Entity::update_many()
-                .col_expr(
-                    lookup_code::Column::Attempts,
-                    Expr::col(lookup_code::Column::Attempts).add(1),
-                )
-                .filter(lookup_code::Column::Id.eq(id))
-                .scoped(tenant)
-                .exec(write)
-                .await?;
+        // Giành một lượt thử TRƯỚC khi so mã, bằng một câu cộng có trần (D-181): N lần đoán cùng
+        // lúc thì chỉ 5 lần đầu được so. Đọc số lượt rồi mới so (như trước) thì cả N cùng thấy dưới
+        // giới hạn — trên cả SQLite lẫn Postgres, vì không có transaction nào giữ dòng.
+        let counted = rows::adjust::<lookup_code::Entity, _>(
+            write,
+            lookup_code::Column::Attempts,
+            Condition::all()
+                .add(lookup_code::Column::Id.eq(id))
+                .add(lookup_code::Column::TenantId.eq(tenant.id().as_uuid()))
+                .add(lookup_code::Column::ConsumedAt.is_null()),
+            1,
+            Bounds { floor: 0, ceiling: i64::from(MAX_ATTEMPTS) },
+        )
+        .await?;
+        if counted == 0 || !same(&row.code_hash, &code_hash(&pepper, id, code.trim())) {
             return Err(errors::lookup_code_invalid());
         }
         // Dùng một lần: hai request cùng mã thì chỉ một bên được.
@@ -366,7 +373,6 @@ impl OrdersService {
             .col_expr(lookup_code::Column::ConsumedAt, Expr::value(at))
             .filter(lookup_code::Column::Id.eq(id))
             .filter(lookup_code::Column::ConsumedAt.is_null())
-            .filter(lookup_code::Column::Attempts.lt(MAX_ATTEMPTS))
             .scoped(tenant)
             .exec(write)
             .await?;
