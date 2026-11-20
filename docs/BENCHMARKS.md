@@ -727,3 +727,32 @@ lô mà autovacuum chưa phân tích thì planner chọn nested loop (gợi ý t
 dòng sau (đếm trong test, cả hai database).
 
 Còn mở: danh sách sản phẩm trên SQLite chậm gấp đôi Postgres dưới 32 kết nối với cùng 10 câu — chưa đo nguyên nhân.
+
+## Cấu hình bản release (D-20261120-release-profile) — 20/11/2026
+
+Build sạch `cargo build --release --locked -p autoxide`, 4 job, máy 4 nhân dùng chung, cùng mã nguồn:
+
+| Cấu hình | Binary | Build sạch |
+| --- | ---: | ---: |
+| gốc (`overflow-checks` thôi) | 377 MB | 25.9 phút |
+| `strip = "symbols"` | 290 MB | 25.6 phút |
+| strip + `lto = "thin"` + `codegen-units = 1` (chọn) | 198 MB | 21.2 phút |
+| strip + `lto = "fat"` + `codegen-units = 1` | 181 MB | 40.3 phút |
+
+Độ trễ (cửa hàng 20 người bán × 10 sản phẩm như mục trên, oha 32 kết nối 8 giây, mỗi bản 2 lượt xen kẽ, trung bình;
+req/s (so với gốc) / p50 ms / p95 ms):
+
+| Đường | DB | gốc | thin (chọn) | fat |
+| --- | --- | --- | --- | --- |
+| danh sách 50 sản phẩm | SQLite | 314 / 100.2 / 115.5 | 318 (+1%) / 99.1 / 116.5 | 320 (+2%) / 98.4 / 112.8 |
+| trang sản phẩm | SQLite | 798 / 39.3 / 49.2 | 850 (+6%) / 37.3 / 45.0 | 836 (+5%) / 38.0 / 45.7 |
+| facets | SQLite | 416 / 77.1 / 85.2 | 445 (+7%) / 71.4 / 84.3 | 429 (+3%) / 74.7 / 85.2 |
+| gợi ý tìm | SQLite | 904 / 35.2 / 41.4 | 956 (+6%) / 33.1 / 39.6 | 944 (+4%) / 33.5 / 39.7 |
+| GET /auth/me | SQLite | 3538 / 8.9 / 12.7 | 3844 (+9%) / 8.2 / 11.7 | 3864 (+9%) / 8.1 / 11.6 |
+| danh sách 50 sản phẩm | Postgres | 660 / 47.9 / 60.2 | 688 (+4%) / 45.3 / 60.4 | 644 (−2%) / 49.4 / 62.0 |
+| trang sản phẩm | Postgres | 548 / 57.4 / 72.8 | 616 (+12%) / 51.0 / 68.8 | 590 (+8%) / 53.9 / 67.4 |
+| facets | Postgres | 532 / 60.1 / 74.8 | 544 (+2%) / 59.6 / 73.5 | 590 (+11%) / 53.4 / 69.0 |
+| gợi ý tìm | Postgres | 819 / 38.6 / 50.3 | 842 (+3%) / 37.7 / 47.9 | 873 (+7%) / 36.7 / 45.8 |
+| GET /auth/me | Postgres | 2548 / 12.2 / 17.1 | 2968 (+16%) / 10.5 / 14.9 | 3086 (+21%) / 10.0 / 14.3 |
+
+Đăng nhập (Argon2id) không so được: 16 kết nối vào một email bị login throttling chặn 2–15% request.
