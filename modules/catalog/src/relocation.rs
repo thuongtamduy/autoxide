@@ -30,6 +30,12 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_product_documents", "product_id", "catalog_products")
         .follow("catalog_collection_texts", "collection_id", "catalog_collections")
         .follow("catalog_collection_items", "collection_id", "catalog_collections")
+        // Bán chạy, đánh giá, gợi ý sản phẩm (m0013): đi theo sản phẩm.
+        .follow("catalog_sold_products", "product_id", "catalog_products")
+        .follow("catalog_product_stats", "product_id", "catalog_products")
+        .follow("catalog_co_purchases", "product_id", "catalog_products")
+        .follow("catalog_embeddings", "product_id", "catalog_products")
+        .follow("catalog_similar_products", "product_id", "catalog_products")
         .copy_on_split(&[
             "catalog_categories",
             "catalog_rounding_rules",

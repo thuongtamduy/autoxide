@@ -6,6 +6,8 @@
 //!   `Subscription::optional`) → giá vốn trong `catalog_variant_costs` cho sàn giá (D-222). Payload
 //!   mong đợi: `{"after": {"org_id", "variant_id", "unit_cost": {"amount": "<số nguyên>",
 //!   "currency": "VND"}}}` — xem `api::events::INVENTORY_COST_CHANGED`.
+//! - `orders.order_completed`, `orders.review_published` / `review_moderated` (module `orders`,
+//!   đăng ký sau `catalog`) → số bán, mua cùng, điểm đánh giá (`recommend.rs`).
 
 use std::sync::Arc;
 
@@ -18,7 +20,10 @@ use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
-use crate::api::events::INVENTORY_COST_CHANGED;
+use crate::api::events::{
+    INVENTORY_COST_CHANGED, ORDERS_ORDER_COMPLETED, ORDERS_REVIEW_MODERATED,
+    ORDERS_REVIEW_PUBLISHED,
+};
 use crate::entity::{price, price_list, product};
 use crate::service::CatalogService;
 
@@ -37,6 +42,9 @@ pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> 
             service.clone(),
         ),
         Subscription::optional(UNIT_STATUS_CHANGED, service.clone()),
+        Subscription::optional(ORDERS_ORDER_COMPLETED, service.clone()),
+        Subscription::optional(ORDERS_REVIEW_PUBLISHED, service.clone()),
+        Subscription::optional(ORDERS_REVIEW_MODERATED, service.clone()),
     ]
 }
 
@@ -72,6 +80,23 @@ impl EventHandler for CatalogService {
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
             let write = event.tenant.database().write();
             return self.queue_variants(write, &event.tenant, variants).await;
+        }
+        if event.name == ORDERS_ORDER_COMPLETED {
+            let Some((order, lines)) = crate::recommend::completed_order(&event.payload) else {
+                tracing::warn!(event_id = %event.id, "orders.order_completed without order_id or lines; ignored");
+                return Ok(());
+            };
+            return self
+                .record_completed_order(&event.tenant, order, &lines, event.occurred_at)
+                .await;
+        }
+        if event.name == ORDERS_REVIEW_PUBLISHED || event.name == ORDERS_REVIEW_MODERATED {
+            let Some((product, count, sum)) = crate::recommend::product_rating(&event.payload)
+            else {
+                tracing::warn!(event_id = %event.id, "review event without product_id or product_rating; ignored");
+                return Ok(());
+            };
+            return self.record_rating(&event.tenant, product, count, sum).await;
         }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
