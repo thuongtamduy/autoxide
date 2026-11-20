@@ -186,11 +186,12 @@ impl Automations {
         let now = now();
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let before = Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| rule_not_found(id))?;
+        // Khoá luật (D-181): hai lần sửa / bật / tắt cùng lúc nối đuôi nhau — bên sau thấy phiên
+        // bản bên trước vừa ghi, không cùng ghi `version + 1` từ bản cũ.
+        let before =
+            autoxide_kernel::rows::lock_one(&transaction, Entity::find_by_id(id).scoped(tenant))
+                .await?
+                .ok_or_else(|| rule_not_found(id))?;
         principal.require_write_at(&transaction, &AUTOMATIONS_MANAGE, target(&before)).await?;
         let mut row = before.clone().into_active_model();
         if let Some(name) = changes.name {
@@ -253,7 +254,8 @@ impl Automations {
         };
         let body = self.validate(tenant, principal, &raw).await?;
         let zone = self.zone(tenant, OrgId::from_uuid(current.org_id), &body).await;
-        self.set_status(tenant, principal, id, (ACTIVE, Some((&body, zone))), expected).await
+        let checked = Some((&body, zone, current.version));
+        self.set_status(tenant, principal, id, (ACTIVE, checked), expected).await
     }
 
     /// Tắt luật (lần chạy đang dở vẫn chạy nốt).
@@ -268,27 +270,36 @@ impl Automations {
         self.set_status(tenant, principal, id, (DISABLED, None), expected).await
     }
 
-    /// Đổi trạng thái của luật `id` bằng tay; `body` (khi bật): luật đã kiểm lại và múi giờ của nó.
+    /// Đổi trạng thái của luật `id` bằng tay; `body` (khi bật): luật đã kiểm lại, múi giờ của nó và
+    /// phiên bản đã kiểm.
     async fn set_status(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        (status, body): (&str, Option<(&RuleBody, Tz)>),
+        (status, body): (&str, Option<(&RuleBody, Tz, i32)>),
         expected: Option<DateTime<Utc>>,
     ) -> Result<Rule, Error> {
         let now = now();
         let transaction = tenant.database().begin_write().await?;
-        let before = Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| rule_not_found(id))?;
+        // Khoá luật (D-181): hai lần sửa / bật / tắt cùng lúc nối đuôi nhau — bên sau thấy phiên
+        // bản bên trước vừa ghi, không cùng ghi `version + 1` từ bản cũ.
+        let before =
+            autoxide_kernel::rows::lock_one(&transaction, Entity::find_by_id(id).scoped(tenant))
+                .await?
+                .ok_or_else(|| rule_not_found(id))?;
         principal.require_write_at(&transaction, &AUTOMATIONS_MANAGE, target(&before)).await?;
+        // Bật luật đúng bản đã kiểm lại với quyền người bật: luật bị sửa chen giữa (vd agent sửa,
+        // luật chuyển sang chờ duyệt) thì từ chối — không bật bản chưa ai kiểm dưới quyền người này.
+        if let Some((_, _, checked)) = body
+            && before.version != checked
+        {
+            return Err(autoxide_kernel::version::changed());
+        }
         let mut row = before.clone().into_active_model();
         row.status = Set(status.to_owned());
         row.status_reason = Set(None);
-        if let Some((body, zone)) = body {
+        if let Some((body, zone, _)) = body {
             row.run_as = Set(principal.user_id());
             row.timezone = Set(zone.name().to_owned());
             row.next_run_at = Set(next_run(body, status, zone, now));
@@ -322,11 +333,12 @@ impl Automations {
     ) -> Result<(), Error> {
         self.get_rule(tenant, principal, id).await?;
         let transaction = tenant.database().begin_write().await?;
-        let before = Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| rule_not_found(id))?;
+        // Khoá luật (D-181): hai lần sửa / bật / tắt cùng lúc nối đuôi nhau — bên sau thấy phiên
+        // bản bên trước vừa ghi, không cùng ghi `version + 1` từ bản cũ.
+        let before =
+            autoxide_kernel::rows::lock_one(&transaction, Entity::find_by_id(id).scoped(tenant))
+                .await?
+                .ok_or_else(|| rule_not_found(id))?;
         principal.require_write_at(&transaction, &AUTOMATIONS_MANAGE, target(&before)).await?;
         let mut delete = Entity::delete_many().filter(Column::Id.eq(id)).scoped(tenant);
         if let Some(expected) = expected {

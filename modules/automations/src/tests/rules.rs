@@ -164,3 +164,40 @@ async fn luat_cua_nut_khac_khong_thay() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_lan_sua_dong_thoi_moi_lan_mot_phien_ban() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let actions =
+            json!([{"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}]);
+        let rule = harness.rule_by(&harness.owner, on_order(), json!(null), actions).await.unwrap();
+        let rename = |name: &str| crate::service::rules::RuleChanges {
+            name: Some(name.to_owned()),
+            ..Default::default()
+        };
+        // Hai lần sửa cùng lúc: Postgres từng cho cả hai cùng đọc phiên bản cũ và cùng ghi
+        // `version + 1` — hai nội dung khác nhau mang cùng một số phiên bản.
+        let (first, second) = tokio::join!(
+            harness.service.update_rule(
+                &harness.tenant,
+                &harness.owner,
+                rule.id,
+                rename("A"),
+                None
+            ),
+            harness.service.update_rule(
+                &harness.tenant,
+                &harness.owner,
+                rule.id,
+                rename("B"),
+                None
+            ),
+        );
+        let mut versions = [first.unwrap().version, second.unwrap().version];
+        versions.sort_unstable();
+        assert_eq!(versions, [rule.version + 1, rule.version + 2]);
+    })
+    .await
+    .unwrap();
+}
