@@ -221,6 +221,15 @@ impl Catalog for CatalogService {
         self.resolve_prices(tenant, query, true).await
     }
 
+    async fn display_prices(
+        &self,
+        tenant: &TenantContext,
+        product_ids: &[Uuid],
+        variant_ids: &[Uuid],
+    ) -> Result<crate::api::DisplayPrices, Error> {
+        self.display_prices_now(tenant, product_ids, variant_ids).await
+    }
+
     async fn price_floors(
         &self,
         tenant: &TenantContext,

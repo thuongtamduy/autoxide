@@ -35,6 +35,12 @@ pub(crate) struct CustomersService {
     /// Gửi tin (nhắc giỏ); chưa cài thì không gửi.
     pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     pub config: crate::config::CustomersConfig,
+    /// Giá công khai, biến thể → sản phẩm (báo yêu thích); thiếu thì không báo giảm giá.
+    pub catalog: Option<Arc<dyn autoxide_catalog::api::Catalog>>,
+    /// Tồn bán được (báo yêu thích có hàng lại); thiếu thì không có loại báo này.
+    pub inventory: Option<Arc<dyn autoxide_inventory::api::Inventory>>,
+    /// Khung giờ gửi quảng cáo (`notifications.send_windows`); thiếu thì 07:00–22:00.
+    pub rules: Option<Arc<dyn autoxide_compliance::api::ComplianceRules>>,
     /// Tính năng theo khách (thẻ quà tặng, số dư).
     pub entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }

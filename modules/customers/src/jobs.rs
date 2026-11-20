@@ -12,7 +12,10 @@ use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
-use crate::entity::{gift_card, loyalty_rule, point_hold, voucher_program};
+use crate::entity::{
+    gift_card, loyalty_rule, point_hold, voucher_program, wishlist_alert_batch,
+    wishlist_alert_queue,
+};
 use crate::loyalty::ledger::{POST_LEDGER, PostLedgerJob};
 use crate::service::{CustomersService, now};
 
@@ -21,6 +24,7 @@ pub(crate) const RELEASE_EXPIRED_HOLDS: &str = "customers.release_expired_holds"
 pub(crate) const EVALUATE_TIERS: &str = "customers.evaluate_tiers";
 pub(crate) const BIRTHDAY_VOUCHERS: &str = "customers.birthday_vouchers";
 pub(crate) const STORED_VALUE_SWEEP: &str = "customers.stored_value_sweep";
+pub(crate) use crate::wishlist_alerts::batches::SEND_WISHLIST_ALERTS;
 
 const DAY: Duration = Duration::from_secs(24 * 3600);
 
@@ -52,6 +56,10 @@ pub(crate) fn registrations(service: &Arc<CustomersService>) -> Vec<JobRegistrat
             Arc::new(Sweep { service: service.clone(), kind: STORED_VALUE_SWEEP }),
         ),
         JobRegistration::new(
+            SEND_WISHLIST_ALERTS,
+            Arc::new(Sweep { service: service.clone(), kind: SEND_WISHLIST_ALERTS }),
+        ),
+        JobRegistration::new(
             BIRTHDAY_VOUCHERS,
             Arc::new(Sweep { service: service.clone(), kind: BIRTHDAY_VOUCHERS }),
         ),
@@ -64,6 +72,8 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         // Chỗ giữ điểm của đơn chưa trả: mỗi 5 phút.
         Schedule::new(RELEASE_EXPIRED_HOLDS, RELEASE_EXPIRED_HOLDS, Duration::from_secs(300)),
         Schedule::new(EVALUATE_TIERS, EVALUATE_TIERS, DAY),
+        // Báo yêu thích: gom lô mỗi giờ (D-233).
+        Schedule::new(SEND_WISHLIST_ALERTS, SEND_WISHLIST_ALERTS, Duration::from_secs(3600)),
         Schedule::new(BIRTHDAY_VOUCHERS, BIRTHDAY_VOUCHERS, DAY),
         // Thẻ quà tặng / số dư (chỉ làm gì khi đã bật): chỗ giữ quá hạn, thẻ hết hạn.
         Schedule::new(STORED_VALUE_SWEEP, STORED_VALUE_SWEEP, Duration::from_secs(300)),
@@ -109,6 +119,26 @@ impl Sweep {
                     .all(read)
                     .await?
             }
+            SEND_WISHLIST_ALERTS => {
+                let mut tenants: Vec<Uuid> = wishlist_alert_queue::Entity::find()
+                    .select_only()
+                    .column(wishlist_alert_queue::Column::TenantId)
+                    .distinct()
+                    .into_tuple()
+                    .all(read)
+                    .await?;
+                tenants.extend(
+                    wishlist_alert_batch::Entity::find()
+                        .filter(wishlist_alert_batch::Column::Status.eq("pending"))
+                        .select_only()
+                        .column(wishlist_alert_batch::Column::TenantId)
+                        .distinct()
+                        .into_tuple::<Uuid>()
+                        .all(read)
+                        .await?,
+                );
+                tenants
+            }
             BIRTHDAY_VOUCHERS => {
                 voucher_program::Entity::find()
                     .filter(voucher_program::Column::Kind.eq(crate::loyalty::vouchers::BIRTHDAY))
@@ -138,6 +168,7 @@ impl Sweep {
             RELEASE_EXPIRED_HOLDS => self.service.release_expired_holds(tenant).await,
             EVALUATE_TIERS => self.service.evaluate_tiers(tenant).await,
             STORED_VALUE_SWEEP => self.service.stored_value_sweep(tenant).await,
+            SEND_WISHLIST_ALERTS => self.service.send_wishlist_alerts(tenant).await,
             _ => self.service.birthday_vouchers(tenant).await,
         }
     }

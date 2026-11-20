@@ -388,6 +388,82 @@ impl CatalogService {
         Ok(Some(found))
     }
 
+    /// Giá công khai lúc này (D-233), ở nút sở hữu sản phẩm (bảng giá chung gần nhất trong chuỗi của
+    /// nó): theo biến thể = giá niêm yết, hay giá sau giảm tự động nếu thấp hơn; theo sản phẩm = giá
+    /// thấp nhất của các biến thể đang bán. Không dùng giá gạch. Không bán / không có giá thì vắng.
+    pub(crate) async fn display_prices_now(
+        &self,
+        tenant: &TenantContext,
+        product_ids: &[Uuid],
+        variant_ids: &[Uuid],
+    ) -> Result<crate::api::DisplayPrices, Error> {
+        let mut answer = crate::api::DisplayPrices::default();
+        if product_ids.len() > crate::api::MAX_IDS || variant_ids.len() > crate::api::MAX_IDS {
+            return Err(errors::too_many_ids(crate::api::MAX_IDS));
+        }
+        if product_ids.is_empty() && variant_ids.is_empty() {
+            return Ok(answer);
+        }
+        let read = tenant.database().read();
+        let variants = variant::Entity::find()
+            .filter(
+                sea_orm::Condition::any()
+                    .add(variant::Column::ProductId.is_in(product_ids.iter().copied()))
+                    .add(variant::Column::Id.is_in(variant_ids.iter().copied())),
+            )
+            .filter(variant::Column::Active.eq(true))
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        let owners: BTreeSet<Uuid> = variants.iter().map(|row| row.product_id).collect();
+        let products = product::Entity::find()
+            .filter(product::Column::Id.is_in(owners.iter().copied()))
+            .filter(product::Column::Status.eq("active"))
+            .scoped(tenant)
+            .all(read)
+            .await?;
+        let at = now();
+        // Theo nút sở hữu: mỗi nút một tiền tệ, một lần hỏi giá.
+        let sites: BTreeSet<Uuid> = products.iter().map(|row| row.org_id).collect();
+        for site in sites.into_iter().map(OrgId::from_uuid) {
+            let Some(currency) = self.site_currency(read, tenant, site).await? else { continue };
+            let here: BTreeSet<Uuid> = products
+                .iter()
+                .filter(|row| row.org_id == site.as_uuid())
+                .map(|row| row.id)
+                .collect();
+            let selling: Vec<&variant::Model> =
+                variants.iter().filter(|row| here.contains(&row.product_id)).collect();
+            let ids: Vec<Uuid> = selling.iter().map(|row| row.id).collect();
+            let mut prices = Vec::new();
+            for chunk in ids.chunks(crate::api::MAX_IDS) {
+                let query = PriceQuery::new(site, currency, at, chunk.to_vec());
+                prices.extend(self.resolve_prices(tenant, &query, false).await?);
+            }
+            let sales = self.sale_prices_at(tenant, site, at, &prices).await?.unwrap_or_default();
+            for price in &prices {
+                let shown =
+                    sales.get(&price.variant_id).map_or(price.amount, |sale| sale.sale_price);
+                answer.variants.insert(price.variant_id, shown);
+            }
+            for row in &selling {
+                let Some(shown) = answer.variants.get(&row.id).copied() else { continue };
+                answer
+                    .products
+                    .entry(row.product_id)
+                    .and_modify(|best: &mut autoxide_kernel::money::Money| {
+                        if shown.minor() < best.minor() {
+                            *best = shown;
+                        }
+                    })
+                    .or_insert(shown);
+            }
+        }
+        answer.products.retain(|id, _| product_ids.contains(id));
+        answer.variants.retain(|id, _| variant_ids.contains(id));
+        Ok(answer)
+    }
+
     /// Dựng lại cả khách, theo lô [`BATCH`] sản phẩm.
     pub(crate) async fn rebuild_storefront(&self, tenant: &TenantContext) -> Result<u64, Error> {
         let mut after: Option<Uuid> = None;

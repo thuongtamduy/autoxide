@@ -12,7 +12,10 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::entity::{cart_reminder, group_member, order_fact, profile, recent_view, wishlist_item};
+use crate::entity::{
+    cart_reminder, group_member, order_fact, profile, recent_view, wishlist_alert_batch,
+    wishlist_alert_queue, wishlist_alert_setting, wishlist_item,
+};
 use crate::service::CustomersService;
 
 #[async_trait::async_trait]
@@ -48,7 +51,14 @@ impl PersonalData for CustomersService {
             .scoped(tenant)
             .all(read)
             .await?;
+        let alerts = wishlist_alert_setting::Entity::find_by_id((tenant.id().as_uuid(), row.id))
+            .one(read)
+            .await?;
         Ok(json!({
+            "wishlist_alerts": alerts.map(|alerts| json!({
+                "back_in_stock": alerts.back_in_stock, "price_drop": alerts.price_drop,
+                "updated_at": alerts.updated_at,
+            })),
             "wishlist": wishlist.iter().map(|item| json!({
                 "product_id": item.product_id, "variant_id": item.variant_id, "added_at": item.added_at,
             })).collect::<Vec<_>>(),
@@ -113,6 +123,22 @@ impl EventHandler for ErasedUsers {
                 .await?;
             cart_reminder::Entity::delete_many()
                 .filter(cart_reminder::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+            // Báo yêu thích: cài đặt, hàng đợi, lô đã gửi (gắn với tài khoản).
+            wishlist_alert_setting::Entity::delete_many()
+                .filter(wishlist_alert_setting::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+            wishlist_alert_queue::Entity::delete_many()
+                .filter(wishlist_alert_queue::Column::ProfileId.eq(row.id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+            wishlist_alert_batch::Entity::delete_many()
+                .filter(wishlist_alert_batch::Column::ProfileId.eq(row.id))
                 .scoped(tenant)
                 .exec(&transaction)
                 .await?;

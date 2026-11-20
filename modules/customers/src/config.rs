@@ -50,6 +50,19 @@ pub(crate) const GIFT_CARD_LOOKUPS_PER_HOUR: Setting = Setting::new(
 )
 .with_default("10");
 
+pub(crate) const WISHLIST_PRICE_DROP_MIN_BP: Setting = Setting::new(
+    "AUTOXIDE_CUSTOMERS_WISHLIST_PRICE_DROP_MIN_BP",
+    "Smallest price drop that triggers a wishlist alert, in basis points of the price when the \
+     product was added (100 = 1%; 1 to 9000).",
+)
+.with_default("500");
+
+pub(crate) const WISHLIST_ALERTS_PER_DAY: Setting = Setting::new(
+    "AUTOXIDE_CUSTOMERS_WISHLIST_ALERTS_PER_DAY",
+    "Most wishlist alert messages one buyer gets per day, each with up to 10 products (1 to 10).",
+)
+.with_default("1");
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone)]
 pub(crate) struct CustomersConfig {
@@ -60,6 +73,8 @@ pub(crate) struct CustomersConfig {
     pub stored_value_enabled: bool,
     pub gift_card_max_minor: i64,
     pub lookup_per_hour: u32,
+    pub price_drop_min_bp: i64,
+    pub wishlist_alerts_per_day: u64,
 }
 
 impl Default for CustomersConfig {
@@ -72,6 +87,8 @@ impl Default for CustomersConfig {
             stored_value_enabled: false,
             gift_card_max_minor: 10_000_000,
             lookup_per_hour: 10,
+            price_drop_min_bp: 500,
+            wishlist_alerts_per_day: 1,
         }
     }
 }
@@ -90,6 +107,8 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<CustomersConfig, Inv
         reader.get_with(&GIFT_CARD_MAX_MINOR, |raw| parse_in_range(raw, 1i64, 1_000_000_000_000));
     let lookups =
         reader.get_with(&GIFT_CARD_LOOKUPS_PER_HOUR, |raw| parse_in_range(raw, 1u32, 1000));
+    let drop = reader.get_with(&WISHLIST_PRICE_DROP_MIN_BP, |raw| parse_in_range(raw, 1i64, 9000));
+    let per_day = reader.get_with(&WISHLIST_ALERTS_PER_DAY, |raw| parse_in_range(raw, 1u64, 10));
     Ok(CustomersConfig {
         wishlist_max: wishlist?,
         recent_views_max: views?,
@@ -98,5 +117,7 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<CustomersConfig, Inv
         stored_value_enabled: enabled?,
         gift_card_max_minor: max?,
         lookup_per_hour: lookups?,
+        price_drop_min_bp: drop?,
+        wishlist_alerts_per_day: per_day?,
     })
 }
