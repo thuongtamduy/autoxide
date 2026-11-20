@@ -57,6 +57,31 @@ The buyer sees their own profile unmasked at `GET /api/v1/customers/me`.
 - Carts of `orders` receive the buyer's group ids (for promotions limited to groups), the
   membership tier and the price group.
 
+## Loyalty points and tiers
+
+- **Rules** (`POST /api/v1/customers/loyalty/rules`) are dated data: earning unit (`earn_per_minor`,
+  e.g. 10,000 VND → `points_per_unit`), value of one point, validity in months, minimum to redeem,
+  and the largest share of an order points may pay. A new version starts at `effective_from` (now or
+  later) and never changes the past.
+- Points are **earned when an order completes**, on what the buyer paid for goods (definition above),
+  times the tier multiplier. Each earning is a **lot** that expires at the end of the day (Vietnam
+  time) `points_valid_months` later. Redeeming uses the lot that expires first.
+- **Paying with points**: send `"tenders": [{"kind": "points", "input": {"points": 500}}]` to
+  `POST /api/v1/orders/checkout`. Points are held until the order is confirmed (then used) or
+  cancelled / unpaid in time (then given back). The payment partner collects only the rest.
+- **Tiers** (`POST /loyalty/tiers`): the highest tier whose 12-month spending threshold is reached,
+  checked when an order completes and every day. The tier code goes to carts (promotions by tier)
+  and to group rules (`tier_in`).
+- **Manual adjustments**: `POST /api/v1/customers/{id}/points/adjustments` with `customers.loyalty.adjust`,
+  a reference (never applied twice) and a reason.
+- **Voucher rewards** (`POST /loyalty/voucher-rewards`, kinds `birthday`, `purchase`, `points`) are
+  granted through the promotions module; a birthday gives one voucher a year, an order one voucher,
+  and an exchange for points takes the points first and gives them back if the voucher cannot be
+  granted. Buyers see their points, the rules in force and the rewards at `GET /me/points` and
+  `GET /me/points/rewards`, and exchange with `POST /me/points/vouchers`.
+- **Ledger**: unused points are a liability (`loyalty.liability`) at their value when earned;
+  redeeming credits `buyer.prepayments`, expiry credits `loyalty.breakage`.
+
 ## Tags, notes, custom fields
 
 Profiles are records of kind `customers.customer`: internal tags, notes and custom fields come from
@@ -71,6 +96,8 @@ target `customers.customer`). Filter the list by tags with `?tags=<id>,<id>`.
 | `customers.manage` | Register at the counter, edit profiles, tag profiles |
 | `customers.contact.reveal` | See full phone and email (audited) |
 | `customers.segments.manage` | Create, change, delete groups and their members |
+| `customers.loyalty.manage` | Loyalty rules, tiers and voucher rewards (whole shop) |
+| `customers.loyalty.adjust` | Add or remove points by hand |
 
 Buyers need no permission: `/me` only needs a signed-in account.
 

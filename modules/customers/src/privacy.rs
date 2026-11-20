@@ -89,6 +89,7 @@ impl EventHandler for ErasedUsers {
             .col_expr(profile::Column::FullNameSearch, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::Birthday, Expr::value(Option::<chrono::NaiveDate>::None))
             .col_expr(profile::Column::Gender, Expr::value(Option::<String>::None))
+            .col_expr(profile::Column::BirthdayMd, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::CustomFields, Expr::value("{}"))
             .col_expr(profile::Column::UpdatedAt, Expr::value(crate::service::now()))
             .filter(profile::Column::UserId.eq(user_id))

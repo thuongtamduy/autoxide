@@ -76,6 +76,23 @@ pub(crate) struct CheckoutRequest {
     custom_fields: Option<serde_json::Map<String, serde_json::Value>>,
     /// With `payment_method: installment`: the licensed partner and the number of months.
     installment: Option<InstallmentRequest>,
+    /// Pay part (or all) of the order with points, a gift card or store credit, in this order;
+    /// `payment_method` pays the rest. Each kind at most once.
+    #[serde(default)]
+    tenders: Vec<TenderInput>,
+}
+
+/// A way to pay from value kept by the shop.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(as = OrdersTenderInput)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TenderInput {
+    /// `points` (customers module); `gift_card`, `store_credit` when the shop enabled them.
+    #[schema(example = "points")]
+    kind: String,
+    /// Data of the kind, e.g. `{"points": 500}`.
+    #[schema(value_type = Object)]
+    input: serde_json::Value,
 }
 
 /// Pay in instalments through a licensed partner (the partner pays the shop in full).
@@ -114,8 +131,8 @@ pub(crate) struct InstallmentRequest {
         (status = 200, description = "Same `Idempotency-Key` as an earlier checkout: its result.", body = Data<CheckoutResponse>),
         (status = 401, description = "Guest cart without the right `Cart-Token`; code `orders.cart_token_invalid`.", body = Problem),
         (status = 404, description = "No such cart; code `orders.cart_not_found`.", body = Problem),
-        (status = 409, description = "Prices changed (`orders.quote_changed`) or the quote expired (`orders.quote_expired`), not enough stock (`orders.out_of_stock`), a promotion ran out (`orders.promotion_unavailable`), the cart was already ordered (`orders.cart_closed`), or the same key is still being processed (`orders.checkout_in_progress`) or failed (`orders.checkout_failed`).", body = Problem),
-        (status = 422, description = "Empty cart (`orders.cart_empty`), delivery missing (`orders.delivery_required`), payment method not usable (`orders.payment_method_unavailable`), a product not on sale (`orders.variant_unavailable`), the key reused for another cart (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
+        (status = 409, description = "Prices changed (`orders.quote_changed`) or the quote expired (`orders.quote_expired`), not enough stock (`orders.out_of_stock`), a promotion ran out (`orders.promotion_unavailable`), the cart was already ordered (`orders.cart_closed`), or the same key is still being processed (`orders.checkout_in_progress`) or failed (`orders.checkout_failed`), or a tender cannot pay (e.g. `customers.insufficient_points`).", body = Problem),
+        (status = 422, description = "Empty cart (`orders.cart_empty`), delivery missing (`orders.delivery_required`), payment method not usable (`orders.payment_method_unavailable`), a product not on sale (`orders.variant_unavailable`), a tender not accepted (`orders.tender_unavailable`), the key reused for another cart (`orders.idempotency_key_reused`), or invalid values (see `errors`).", body = Problem),
         (status = 428, description = "The `Idempotency-Key` header is missing; code `orders.idempotency_key_required`.", body = Problem),
     )
 )]
@@ -156,6 +173,11 @@ pub(crate) async fn checkout(
             partner: plan.partner,
             months: plan.months,
         }),
+        tenders: input
+            .tenders
+            .into_iter()
+            .map(|tender| crate::tenders::TenderRequest { kind: tender.kind, input: tender.input })
+            .collect(),
     };
     let placed = service.checkout(&tenant, &owner, &key, request).await?;
     let (created, placed) = match placed {

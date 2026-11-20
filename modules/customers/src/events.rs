@@ -11,6 +11,11 @@ pub(crate) const PROFILE_LINKED: &str = "customers.profile_linked";
 pub(crate) const CONTACT_REVEALED: &str = "customers.contact_revealed";
 pub(crate) const GROUP_CHANGED: &str = "customers.group_changed";
 pub(crate) const GROUP_MEMBERSHIP_CHANGED: &str = "customers.group_membership_changed";
+pub(crate) const POINTS_EARNED: &str = "customers.points_earned";
+pub(crate) const POINTS_REDEEMED: &str = "customers.points_redeemed";
+pub(crate) const POINTS_EXPIRED: &str = "customers.points_expired";
+pub(crate) const POINTS_ADJUSTED: &str = "customers.points_adjusted";
+pub(crate) const TIER_CHANGED: &str = "customers.tier_changed";
 
 /// Dữ liệu chung của mọi event của module.
 #[derive(Debug, Clone, Default, Serialize)]
@@ -46,6 +51,11 @@ event!(ProfileLinked, PROFILE_LINKED);
 event!(ContactRevealed, CONTACT_REVEALED);
 event!(GroupChanged, GROUP_CHANGED);
 event!(GroupMembershipChanged, GROUP_MEMBERSHIP_CHANGED);
+event!(PointsEarned, POINTS_EARNED);
+event!(PointsRedeemed, POINTS_REDEEMED);
+event!(PointsExpired, POINTS_EXPIRED);
+event!(PointsAdjusted, POINTS_ADJUSTED);
+event!(TierChanged, TIER_CHANGED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -69,5 +79,16 @@ pub(crate) fn all() -> Vec<EventInfo> {
             GROUP_MEMBERSHIP_CHANGED,
             "A customer joined or left customer groups (`after.joined`, `after.left`).",
         ),
+        EventInfo::new(
+            POINTS_EARNED,
+            "A customer earned loyalty points (a new lot with its own expiry).",
+        ),
+        EventInfo::new(POINTS_REDEEMED, "Loyalty points paid part of a confirmed order."),
+        EventInfo::new(POINTS_EXPIRED, "Unused loyalty points of a lot expired."),
+        EventInfo::new(
+            POINTS_ADJUSTED,
+            "Loyalty points were added or removed by staff or taken back after a refund.",
+        ),
+        EventInfo::new(TIER_CHANGED, "A customer moved to another membership tier (or lost it)."),
     ]
 }

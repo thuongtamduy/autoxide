@@ -15,7 +15,9 @@ mod errors;
 mod events;
 mod facts;
 mod http;
+mod jobs;
 mod listing;
+mod loyalty;
 mod membership;
 mod migration;
 mod permissions;
@@ -111,6 +113,8 @@ impl Module for CustomersModule {
             // `compliance` đăng ký trước; thiếu thì không gắn hồ sơ theo số đã xác thực.
             accounts: context.require::<dyn autoxide_compliance::api::AccountVerification>().ok(),
             custom_fields: context.custom_fields(),
+            ledger: context.require::<dyn autoxide_ledger::api::Ledger>().ok(),
+            promotions: context.require::<dyn autoxide_promotions::api::Promotions>().ok(),
         });
         context.personal_data(service.clone())?;
         // Hồ sơ là một loại đối tượng: nhãn và ghi chú nội bộ của bước 51 gắn lên nó (D-237).
@@ -122,6 +126,8 @@ impl Module for CustomersModule {
         // của nó. Không có `orders` (vd test) thì bỏ qua.
         if let Ok(extensions) = context.require::<dyn autoxide_orders::api::OrderExtensions>() {
             extensions.set_buyer_groups(provider)?;
+            // Điểm thưởng là một cách trả tiền của đơn (D-222).
+            extensions.add_tender(Arc::new(loyalty::tender::PointsTender(service.clone())))?;
         }
         self.service = Some(service);
         Ok(())
@@ -132,7 +138,8 @@ impl Module for CustomersModule {
             return Vec::new();
         };
         use autoxide_orders::api::events as orders;
-        let handler = Arc::new(facts::OrderEvents(service));
+        let handler = Arc::new(facts::OrderEvents(service.clone()));
+        let holds = Arc::new(loyalty::tender::OrderHolds(service));
         vec![
             Subscription::new(
                 autoxide_kernel::privacy::USER_DELETED,
@@ -141,15 +148,23 @@ impl Module for CustomersModule {
             Subscription::optional(orders::ORDER_PLACED, handler.clone()),
             Subscription::optional(orders::ORDER_STATUS_CHANGED, handler.clone()),
             Subscription::optional(orders::REFUND_COMPLETED, handler),
+            Subscription::optional(orders::ORDER_CONFIRMED, holds.clone()),
+            Subscription::optional(orders::ORDER_CANCELLED, holds),
         ]
     }
 
     fn jobs(&self) -> Vec<autoxide_kernel::job::JobRegistration> {
-        self.service.as_ref().map_or_else(Vec::new, membership::registrations)
+        self.service.as_ref().map_or_else(Vec::new, |service| {
+            let mut all = membership::registrations(service);
+            all.extend(jobs::registrations(service));
+            all
+        })
     }
 
     fn schedules(&self) -> Vec<autoxide_kernel::job::Schedule> {
-        membership::schedules()
+        let mut all = membership::schedules();
+        all.extend(jobs::schedules());
+        all
     }
 
     fn tools(&self) -> Vec<autoxide_kernel::mcp::Tool> {

@@ -17,6 +17,7 @@ mod returns;
 mod reviews;
 mod risk_reports;
 mod statements;
+mod tenders;
 mod warranty_fields;
 
 pub(crate) use fake_ledger::FakeLedger;

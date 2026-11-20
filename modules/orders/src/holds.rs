@@ -76,7 +76,7 @@ impl OrdersService {
         for (tenant_id, id) in stuck {
             let tenant = self.databases.tenant(TenantId::from_uuid(tenant_id)).await?;
             // Không biết đã giữ tới đâu: trả cả hai (trả khi chưa giữ là không làm gì).
-            let holds = Holds { inventory: true, promotions: true };
+            let holds = Holds { inventory: true, promotions: true, tenders: self.all_tenders() };
             self.release_holds(&tenant, id, &holds, ReleaseReason::CheckoutAborted).await;
             self.fail_checkout(&tenant, id, "orders.checkout_stuck").await?;
             recovered += 1;

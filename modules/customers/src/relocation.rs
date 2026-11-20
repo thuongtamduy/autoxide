@@ -8,6 +8,16 @@ pub(crate) fn relocation() -> Relocation {
         .by_org(&["customers_profiles", "customers_groups"])
         .follow("customers_order_facts", "profile_id", "customers_profiles")
         .follow("customers_group_members", "group_id", "customers_groups")
+        .follow("customers_points_balances", "profile_id", "customers_profiles")
+        .follow("customers_points_lots", "profile_id", "customers_profiles")
+        .follow("customers_points_entries", "profile_id", "customers_profiles")
+        .follow("customers_point_holds", "profile_id", "customers_profiles")
+        // Chương trình điểm chung của khách: tách khách thì khách mới có bản sao.
+        .copy_on_split(&[
+            "customers_loyalty_rules",
+            "customers_tiers",
+            "customers_voucher_programs",
+        ])
         // Khoá của dòng đơn là `order_id` (không có cột `id`).
         .table(
             "customers_refund_facts",

@@ -552,6 +552,7 @@ fn new_row(
         first_order_at: Set(None),
         last_order_at: Set(None),
         custom_fields: Set("{}".to_owned()),
+        birthday_md: Set(None),
         created_at: Set(at),
         updated_at: Set(at),
     }
@@ -574,6 +575,7 @@ fn apply_details(row: &mut profile::ActiveModel, details: Details) -> Vec<&'stat
     }
     if let Some(birthday) = details.birthday {
         row.birthday = Set(Some(birthday));
+        row.birthday_md = Set(Some(birthday.format("%m-%d").to_string()));
         changed.push("birthday");
     }
     if let Some(gender) = details.gender {

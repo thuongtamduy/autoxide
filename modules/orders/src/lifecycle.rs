@@ -234,7 +234,10 @@ pub(crate) async fn payload(
         .await?;
     // Tiền người mua trả cho hàng hoá (sau giảm, gồm thuế, không phí giao) — cơ sở tính tổng chi và
     // điểm của `customers` (D-226).
-    let goods_paid: i64 = lines.iter().map(|line| line.total_minor).sum();
+    let goods: i64 = lines.iter().map(|line| line.total_minor).sum();
+    // … không gồm phần trả bằng điểm / thẻ quà tặng (bước 47).
+    let tendered = crate::tenders::tendered_minor(transaction, order.tenant_id, order.id).await?;
+    let goods_paid = (goods - tendered).max(0);
     let lines: Vec<Value> = lines
         .iter()
         .map(|line| {

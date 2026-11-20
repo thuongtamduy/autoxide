@@ -209,6 +209,7 @@ impl CustomersService {
             .exec(&transaction)
             .await?
             .rows_affected;
+        let completed = changed == 1 && order.status == COMPLETED;
         if changed == 1 {
             match order.status.as_str() {
                 COMPLETED => self.add_spent(&transaction, tenant, &fact).await?,
@@ -227,6 +228,11 @@ impl CustomersService {
             }
         }
         transaction.commit().await?;
+        if completed {
+            // Voucher sau khi mua: gọi `promotions` sau khi commit (không gọi trong transaction ghi);
+            // event giao lại thì `source_ref` chống cấp thêm.
+            self.purchase_vouchers(tenant, &fact).await?;
+        }
         Ok(())
     }
 
@@ -239,6 +245,9 @@ impl CustomersService {
     ) -> Result<(), Error> {
         let amount = (fact.net_minor - fact.refunded_minor).max(0);
         self.change_spent(connection, tenant, fact.profile_id, &fact.currency, amount).await?;
+        // Hạng trước, điểm sau: đơn vừa hoàn tất được tích theo hạng mà chính nó giúp đạt.
+        self.evaluate_tier(connection, tenant, fact.profile_id).await?;
+        self.earn_for_order(connection, tenant, fact).await?;
         self.schedule_evaluation(connection, tenant, fact.profile_id).await
     }
 
@@ -342,6 +351,8 @@ impl CustomersService {
                         -delta,
                     )
                     .await?;
+                    self.reverse_for_refund(&transaction, tenant, &fact, refund_id, delta).await?;
+                    self.evaluate_tier(&transaction, tenant, fact.profile_id).await?;
                     self.schedule_evaluation(&transaction, tenant, fact.profile_id).await?;
                 }
             }

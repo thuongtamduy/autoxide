@@ -411,6 +411,31 @@
         ],
         "type": "object"
       },
+      "AdjustPointsRequest": {
+        "additionalProperties": false,
+        "description": "A manual change of points.",
+        "properties": {
+          "points": {
+            "description": "Positive adds a lot under the current rule; negative removes points, oldest first.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "description": "Why, kept in the history; 1 to 500 characters.",
+            "type": "string"
+          },
+          "reference": {
+            "description": "Your reference (ticket, complaint…); the same reference never applies twice.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "points",
+          "reference",
+          "reason"
+        ],
+        "type": "object"
+      },
       "AdministrativeUnit": {
         "description": "An administrative unit.",
         "properties": {
@@ -14385,6 +14410,105 @@
         ],
         "type": "object"
       },
+      "CreateLoyaltyRuleRequest": {
+        "additionalProperties": false,
+        "description": "A new loyalty rule; it replaces the current one from `effective_from` on.",
+        "properties": {
+          "currency": {
+            "description": "ISO 4217 code, e.g. `VND`.",
+            "type": "string"
+          },
+          "earn_per_minor": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "effective_from": {
+            "description": "Omitted: now. Never in the past.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_redeem_ratio_bp": {
+            "description": "1 to 10000.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "min_redeem_points": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "point_value_minor": {
+            "description": "Smallest currency unit, e.g. `1000` (1,000 VND per point).",
+            "format": "int64",
+            "type": "integer"
+          },
+          "points_per_unit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "points_valid_months": {
+            "description": "1 to 120.",
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "earn_per_minor",
+          "points_per_unit",
+          "point_value_minor",
+          "currency",
+          "points_valid_months",
+          "max_redeem_ratio_bp"
+        ],
+        "type": "object"
+      },
+      "CreateMembershipTierRequest": {
+        "additionalProperties": false,
+        "description": "A new membership tier, or a new version of one (same `code`).",
+        "properties": {
+          "code": {
+            "description": "`a-z`, `0-9`, `_`, e.g. `gold`.",
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "earn_multiplier_bp": {
+            "description": "`10000` = ×1.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "rank": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "threshold_minor": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "code",
+          "name",
+          "threshold_minor",
+          "currency",
+          "earn_multiplier_bp",
+          "rank"
+        ],
+        "type": "object"
+      },
       "CreateOrdersCartRequest": {
         "additionalProperties": false,
         "description": "A new cart.",
@@ -14768,6 +14892,40 @@
         "required": [
           "email",
           "name"
+        ],
+        "type": "object"
+      },
+      "CreateVoucherRewardRequest": {
+        "additionalProperties": false,
+        "description": "A new voucher reward.",
+        "properties": {
+          "kind": {
+            "description": "`birthday`, `purchase` or `points`.",
+            "type": "string"
+          },
+          "min_order_minor": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "points_cost": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "promotion_id": {
+            "description": "A promotion of kind `voucher`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "promotion_id"
         ],
         "type": "object"
       },
@@ -15325,6 +15483,45 @@
           "net",
           "refunded",
           "placed_at"
+        ],
+        "type": "object"
+      },
+      "CustomerPoints": {
+        "description": "Loyalty points of a customer, with the program rules shown to buyers.",
+        "properties": {
+          "balance": {
+            "description": "Points that can be used now.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "held": {
+            "description": "Points held for orders waiting for payment.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "lots": {
+            "description": "Lots with points left, soonest expiry first.",
+            "items": {
+              "$ref": "#/components/schemas/PointsLot"
+            },
+            "type": "array"
+          },
+          "rule": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/LoyaltyRule",
+                "description": "The rule in force; absent when the shop has no loyalty program."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "balance",
+          "held",
+          "lots"
         ],
         "type": "object"
       },
@@ -23139,6 +23336,54 @@
         ],
         "type": "object"
       },
+      "Data_CustomerPoints": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "Loyalty points of a customer, with the program rules shown to buyers.",
+            "properties": {
+              "balance": {
+                "description": "Points that can be used now.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "held": {
+                "description": "Points held for orders waiting for payment.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "lots": {
+                "description": "Lots with points left, soonest expiry first.",
+                "items": {
+                  "$ref": "#/components/schemas/PointsLot"
+                },
+                "type": "array"
+              },
+              "rule": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LoyaltyRule",
+                    "description": "The rule in force; absent when the shop has no loyalty program."
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "balance",
+              "held",
+              "lots"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CustomerProfile": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -27882,6 +28127,66 @@
         ],
         "type": "object"
       },
+      "Data_LoyaltyRule": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A loyalty rule: how points are earned and redeemed from `effective_from` on.",
+            "properties": {
+              "earn_per_minor": {
+                "description": "Paid for goods per earning unit (smallest currency unit), e.g. `10000`.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "effective_from": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "max_redeem_ratio_bp": {
+                "description": "Points pay at most this share of an order, in basis points (`5000` = 50%).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "min_redeem_points": {
+                "format": "int64",
+                "type": "integer"
+              },
+              "point_value": {
+                "$ref": "#/components/schemas/Money",
+                "description": "What one point is worth when redeemed."
+              },
+              "points_per_unit": {
+                "description": "Points per earning unit.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "points_valid_months": {
+                "format": "int32",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "id",
+              "earn_per_minor",
+              "points_per_unit",
+              "point_value",
+              "points_valid_months",
+              "min_redeem_points",
+              "max_redeem_ratio_bp",
+              "effective_from"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_MeResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -28174,6 +28479,58 @@
               "updated_at",
               "tags",
               "variants"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_MembershipTier": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A membership tier version.",
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "earn_multiplier_bp": {
+                "description": "Earning multiplier in basis points (`12000` = ×1.2).",
+                "format": "int32",
+                "type": "integer"
+              },
+              "effective_from": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "rank": {
+                "description": "Higher wins when several tiers are reached.",
+                "format": "int32",
+                "type": "integer"
+              },
+              "threshold": {
+                "$ref": "#/components/schemas/Money",
+                "description": "Spent on goods over the last 12 months to reach the tier."
+              }
+            },
+            "required": [
+              "id",
+              "code",
+              "name",
+              "threshold",
+              "earn_multiplier_bp",
+              "rank",
+              "effective_from"
             ],
             "type": "object"
           }
@@ -34159,6 +34516,33 @@
             },
             "required": [
               "recovery_codes"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_RedeemedVoucher": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The voucher put in your wallet.",
+            "properties": {
+              "promotion_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "voucher_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "voucher_id",
+              "promotion_id"
             ],
             "type": "object"
           }
@@ -47299,6 +47683,59 @@
         ],
         "type": "object"
       },
+      "Data_VoucherReward": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A voucher reward: a voucher promotion given on birthdays, after a purchase or for points.",
+            "properties": {
+              "active": {
+                "type": "boolean"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "kind": {
+                "description": "`birthday`, `purchase` or `points`.",
+                "type": "string"
+              },
+              "min_order_minor": {
+                "description": "Smallest goods amount of the order (`purchase`).",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "points_cost": {
+                "description": "Points it costs (`points`).",
+                "format": "int64",
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "promotion_id": {
+                "description": "The voucher promotion of the promotions module.",
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "promotion_id",
+              "active"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_WithholdingQuote": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -55962,6 +56399,57 @@
         ],
         "type": "object"
       },
+      "LoyaltyRule": {
+        "description": "A loyalty rule: how points are earned and redeemed from `effective_from` on.",
+        "properties": {
+          "earn_per_minor": {
+            "description": "Paid for goods per earning unit (smallest currency unit), e.g. `10000`.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "max_redeem_ratio_bp": {
+            "description": "Points pay at most this share of an order, in basis points (`5000` = 50%).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "min_redeem_points": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "point_value": {
+            "$ref": "#/components/schemas/Money",
+            "description": "What one point is worth when redeemed."
+          },
+          "points_per_unit": {
+            "description": "Points per earning unit.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "points_valid_months": {
+            "format": "int32",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "earn_per_minor",
+          "points_per_unit",
+          "point_value",
+          "points_valid_months",
+          "min_redeem_points",
+          "max_redeem_ratio_bp",
+          "effective_from"
+        ],
+        "type": "object"
+      },
       "ManagedApiKeyResponse": {
         "allOf": [
           {
@@ -56457,6 +56945,49 @@
           "role_name",
           "inherited",
           "created_at"
+        ],
+        "type": "object"
+      },
+      "MembershipTier": {
+        "description": "A membership tier version.",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "earn_multiplier_bp": {
+            "description": "Earning multiplier in basis points (`12000` = ×1.2).",
+            "format": "int32",
+            "type": "integer"
+          },
+          "effective_from": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "rank": {
+            "description": "Higher wins when several tiers are reached.",
+            "format": "int32",
+            "type": "integer"
+          },
+          "threshold": {
+            "$ref": "#/components/schemas/Money",
+            "description": "Spent on goods over the last 12 months to reach the tier."
+          }
+        },
+        "required": [
+          "id",
+          "code",
+          "name",
+          "threshold",
+          "earn_multiplier_bp",
+          "rank",
+          "effective_from"
         ],
         "type": "object"
       },
@@ -60412,6 +60943,13 @@
               "string",
               "null"
             ]
+          },
+          "tenders": {
+            "description": "Pay part (or all) of the order with points, a gift card or store credit, in this order;\n`payment_method` pays the rest. Each kind at most once.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersTenderInput"
+            },
+            "type": "array"
           }
         },
         "required": [
@@ -63019,6 +63557,26 @@
         "required": [
           "ticket_id",
           "number"
+        ],
+        "type": "object"
+      },
+      "OrdersTenderInput": {
+        "additionalProperties": false,
+        "description": "A way to pay from value kept by the shop.",
+        "properties": {
+          "input": {
+            "description": "Data of the kind, e.g. `{\"points\": 500}`.",
+            "type": "object"
+          },
+          "kind": {
+            "description": "`points` (customers module); `gift_card`, `store_credit` when the shop enabled them.",
+            "example": "points",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "input"
         ],
         "type": "object"
       },
@@ -71080,6 +71638,74 @@
         ],
         "type": "object"
       },
+      "Page_LoyaltyRule": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A loyalty rule: how points are earned and redeemed from `effective_from` on.",
+              "properties": {
+                "earn_per_minor": {
+                  "description": "Paid for goods per earning unit (smallest currency unit), e.g. `10000`.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "effective_from": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "max_redeem_ratio_bp": {
+                  "description": "Points pay at most this share of an order, in basis points (`5000` = 50%).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "min_redeem_points": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "point_value": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "What one point is worth when redeemed."
+                },
+                "points_per_unit": {
+                  "description": "Points per earning unit.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "points_valid_months": {
+                  "format": "int32",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id",
+                "earn_per_minor",
+                "points_per_unit",
+                "point_value",
+                "points_valid_months",
+                "min_redeem_points",
+                "max_redeem_ratio_bp",
+                "effective_from"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_ManagedApiKeyResponse": {
         "description": "One page of a list.",
         "properties": {
@@ -71369,6 +71995,66 @@
                 "role_name",
                 "inherited",
                 "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_MembershipTier": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A membership tier version.",
+              "properties": {
+                "code": {
+                  "type": "string"
+                },
+                "earn_multiplier_bp": {
+                  "description": "Earning multiplier in basis points (`12000` = ×1.2).",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "effective_from": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "rank": {
+                  "description": "Higher wins when several tiers are reached.",
+                  "format": "int32",
+                  "type": "integer"
+                },
+                "threshold": {
+                  "$ref": "#/components/schemas/Money",
+                  "description": "Spent on goods over the last 12 months to reach the tier."
+                }
+              },
+              "required": [
+                "id",
+                "code",
+                "name",
+                "threshold",
+                "earn_multiplier_bp",
+                "rank",
+                "effective_from"
               ],
               "type": "object"
             },
@@ -72537,6 +73223,62 @@
                 "addons",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_PointsEntry": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "One line of the points history.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`earn`, `hold`, `redeem`, `release`, `expire`, `adjust`, `reverse` or `restore`.",
+                  "type": "string"
+                },
+                "points": {
+                  "description": "Positive: added; negative: removed.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reference": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "points",
+                "reference",
+                "created_at"
               ],
               "type": "object"
             },
@@ -76636,6 +77378,67 @@
         ],
         "type": "object"
       },
+      "Page_VoucherReward": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A voucher reward: a voucher promotion given on birthdays, after a purchase or for points.",
+              "properties": {
+                "active": {
+                  "type": "boolean"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "`birthday`, `purchase` or `points`.",
+                  "type": "string"
+                },
+                "min_order_minor": {
+                  "description": "Smallest goods amount of the order (`purchase`).",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "points_cost": {
+                  "description": "Points it costs (`points`).",
+                  "format": "int64",
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "promotion_id": {
+                  "description": "The voucher promotion of the promotions module.",
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "promotion_id",
+                "active"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Pagination": {
         "description": "How to get the next page.",
         "properties": {
@@ -77802,6 +78605,80 @@
           "category",
           "title",
           "body"
+        ],
+        "type": "object"
+      },
+      "PointsEntry": {
+        "description": "One line of the points history.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`earn`, `hold`, `redeem`, `release`, `expire`, `adjust`, `reverse` or `restore`.",
+            "type": "string"
+          },
+          "points": {
+            "description": "Positive: added; negative: removed.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "points",
+          "reference",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "PointsLot": {
+        "description": "A lot of points with its own expiry.",
+        "properties": {
+          "earned": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "held": {
+            "description": "Held for orders waiting for payment.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "remaining": {
+            "description": "Not yet used (includes `held`).",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "earned",
+          "remaining",
+          "held",
+          "expires_at"
         ],
         "type": "object"
       },
@@ -84243,6 +85120,39 @@
         ],
         "type": "object"
       },
+      "RedeemVoucherRequest": {
+        "additionalProperties": false,
+        "description": "Exchange points for a voucher.",
+        "properties": {
+          "reward_id": {
+            "description": "A voucher reward of kind `points`.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reward_id"
+        ],
+        "type": "object"
+      },
+      "RedeemedVoucher": {
+        "description": "The voucher put in your wallet.",
+        "properties": {
+          "promotion_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "voucher_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "voucher_id",
+          "promotion_id"
+        ],
+        "type": "object"
+      },
       "RedirectRequest": {
         "additionalProperties": false,
         "description": "A redirect to create or set.",
@@ -86707,6 +87617,19 @@
         },
         "required": [
           "accepting"
+        ],
+        "type": "object"
+      },
+      "SetVoucherRewardRequest": {
+        "additionalProperties": false,
+        "description": "Turn a voucher reward on or off.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active"
         ],
         "type": "object"
       },
@@ -95575,6 +96498,50 @@
           "public"
         ],
         "type": "string"
+      },
+      "VoucherReward": {
+        "description": "A voucher reward: a voucher promotion given on birthdays, after a purchase or for points.",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "kind": {
+            "description": "`birthday`, `purchase` or `points`.",
+            "type": "string"
+          },
+          "min_order_minor": {
+            "description": "Smallest goods amount of the order (`purchase`).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "points_cost": {
+            "description": "Points it costs (`points`).",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "promotion_id": {
+            "description": "The voucher promotion of the promotions module.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "promotion_id",
+          "active"
+        ],
+        "type": "object"
       },
       "WithholdingQuote": {
         "description": "Taxes to withhold.",
@@ -156372,6 +157339,889 @@
         ]
       }
     },
+    "/api/v1/customers/loyalty/rules": {
+      "get": {
+        "description": "Requires `customers.loyalty.manage`.",
+        "operationId": "customers_list_loyalty_rules",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_LoyaltyRule"
+                }
+              }
+            },
+            "description": "One page of rule versions."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List loyalty rules (all versions).",
+        "tags": [
+          "customers"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "customers.list_loyalty_rules",
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `customers.loyalty.manage` for the whole shop. Rules are dated data: a new version\ntakes effect at `effective_from` (now or later) and never changes the past.",
+        "operationId": "customers_create_loyalty_rule",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLoyaltyRuleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_LoyaltyRule"
+                }
+              }
+            },
+            "description": "Added.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage` for the whole shop; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`) or `effective_from` is in the past (`customers.rule_effective_in_past`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a loyalty rule version.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      }
+    },
+    "/api/v1/customers/loyalty/tiers": {
+      "get": {
+        "description": "Requires `customers.loyalty.manage`.",
+        "operationId": "customers_list_membership_tiers",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_MembershipTier"
+                }
+              }
+            },
+            "description": "One page of tier versions."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List membership tiers (all versions).",
+        "tags": [
+          "customers"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "customers.list_membership_tiers",
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `customers.loyalty.manage` for the whole shop. Customers move between tiers by what\nthey spent on goods over the last 12 months; checked when an order completes and every day.",
+        "operationId": "customers_create_membership_tier",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipTierRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_MembershipTier"
+                }
+              }
+            },
+            "description": "Added.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage` for the whole shop; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "This tier already has a version from the same moment; code `conflict`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (see `errors`) or `effective_from` is in the past (`customers.rule_effective_in_past`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a membership tier, or a new version of one.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      }
+    },
+    "/api/v1/customers/loyalty/voucher-rewards": {
+      "get": {
+        "description": "Requires `customers.loyalty.manage`.",
+        "operationId": "customers_list_voucher_rewards",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_VoucherReward"
+                }
+              }
+            },
+            "description": "One page of voucher rewards."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List voucher rewards.",
+        "tags": [
+          "customers"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "customers.list_voucher_rewards",
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `customers.loyalty.manage` for the whole shop. Vouchers are granted through the\npromotions module; granting twice for the same birthday year, order or exchange gives nothing more.",
+        "operationId": "customers_create_voucher_reward",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVoucherRewardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_VoucherReward"
+                }
+              }
+            },
+            "description": "Added.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage` for the whole shop; code `permission_denied` or `org_out_of_scope`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add a voucher reward.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      }
+    },
+    "/api/v1/customers/loyalty/voucher-rewards/{id}": {
+      "put": {
+        "description": "Requires `customers.loyalty.manage` for the whole shop.",
+        "operationId": "customers_set_voucher_reward",
+        "parameters": [
+          {
+            "description": "Id of the voucher reward.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetVoucherRewardRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_VoucherReward"
+                }
+              }
+            },
+            "description": "Changed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No voucher reward with this id; code `customers.voucher_program_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Turn a voucher reward on or off.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.loyalty.manage"
+        ]
+      }
+    },
     "/api/v1/customers/me": {
       "get": {
         "description": "Any signed-in buyer. When your account has a verified phone number that the shop already knows\nfrom orders or the counter, that history becomes yours.",
@@ -156681,6 +158531,348 @@
           }
         ],
         "x-autoxide-list": "customers.list_my_customer_orders",
+        "x-permissions": []
+      }
+    },
+    "/api/v1/customers/me/points": {
+      "get": {
+        "description": "Any signed-in buyer. Pay with points at checkout with the tender `points`.",
+        "operationId": "customers_get_my_points",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomerPoints"
+                }
+              }
+            },
+            "description": "Your balance, lots and the rule in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get your loyalty points and the program rules.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": []
+      }
+    },
+    "/api/v1/customers/me/points/rewards": {
+      "get": {
+        "description": "Any signed-in buyer.",
+        "operationId": "customers_list_my_point_rewards",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_VoucherReward"
+                }
+              }
+            },
+            "description": "One page of active rewards."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the voucher rewards you can get for points.",
+        "tags": [
+          "customers"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "customers.list_my_point_rewards",
+        "x-permissions": []
+      }
+    },
+    "/api/v1/customers/me/points/vouchers": {
+      "post": {
+        "description": "Any signed-in buyer. The points are taken first; if the voucher cannot be granted they come\nback and the error says why. Send an `Idempotency-Key` so a retry does not exchange twice.",
+        "operationId": "customers_redeem_my_points_for_voucher",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RedeemVoucherRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RedeemedVoucher"
+                }
+              }
+            },
+            "description": "The voucher is in your wallet.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No active reward with this id; code `customers.voucher_program_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not enough points (`customers.insufficient_points`) or the voucher ran out (promotions codes)."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The promotions module is not installed; code `customers.vouchers_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Exchange your points for a voucher.",
+        "tags": [
+          "customers"
+        ],
         "x-permissions": []
       }
     },
@@ -157170,6 +159362,396 @@
           }
         ],
         "x-autoxide-list": "customers.list_customer_orders",
+        "x-permissions": [
+          "customers.read"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/points": {
+      "get": {
+        "description": "Requires `customers.read` covering the customer's unit.",
+        "operationId": "customers_get_customer_points",
+        "parameters": [
+          {
+            "description": "Id of the customer profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomerPoints"
+                }
+              }
+            },
+            "description": "Balance, lots and the rule in force."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No customer with this id in your scope; code `customers.profile_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get the loyalty points of a customer.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.read"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/points/adjustments": {
+      "post": {
+        "description": "Requires `customers.loyalty.adjust` covering the customer's unit (and `customers.read`). The\nsame `reference` never applies twice; every change is in the history with its reason.",
+        "operationId": "customers_adjust_customer_points",
+        "parameters": [
+          {
+            "description": "Id of the customer profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdjustPointsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CustomerPoints"
+                }
+              }
+            },
+            "description": "Points after the change."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.loyalty.adjust`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No customer with this id in your scope; code `customers.profile_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not enough points to remove (`customers.insufficient_points`) or no loyalty rule yet (`customers.no_loyalty_rule`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add or remove points of a customer by hand.",
+        "tags": [
+          "customers"
+        ],
+        "x-permissions": [
+          "customers.loyalty.adjust"
+        ]
+      }
+    },
+    "/api/v1/customers/{id}/points/entries": {
+      "get": {
+        "description": "Requires `customers.read` covering the customer's unit. Newest first unless `order=asc`.",
+        "operationId": "customers_list_customer_points_entries",
+        "parameters": [
+          {
+            "description": "Id of the customer profile.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_PointsEntry"
+                }
+              }
+            },
+            "description": "One page of the history."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `customers.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No customer with this id in your scope; code `customers.profile_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the points history of a customer.",
+        "tags": [
+          "customers"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "customers.list_customer_points_entries",
         "x-permissions": [
           "customers.read"
         ]
@@ -203442,7 +206024,7 @@
                 }
               }
             },
-            "description": "Prices changed (`orders.quote_changed`) or the quote expired (`orders.quote_expired`), not enough stock (`orders.out_of_stock`), a promotion ran out (`orders.promotion_unavailable`), the cart was already ordered (`orders.cart_closed`), or the same key is still being processed (`orders.checkout_in_progress`) or failed (`orders.checkout_failed`)."
+            "description": "Prices changed (`orders.quote_changed`) or the quote expired (`orders.quote_expired`), not enough stock (`orders.out_of_stock`), a promotion ran out (`orders.promotion_unavailable`), the cart was already ordered (`orders.cart_closed`), or the same key is still being processed (`orders.checkout_in_progress`) or failed (`orders.checkout_failed`), or a tender cannot pay (e.g. `customers.insufficient_points`)."
           },
           "422": {
             "content": {
@@ -203452,7 +206034,7 @@
                 }
               }
             },
-            "description": "Empty cart (`orders.cart_empty`), delivery missing (`orders.delivery_required`), payment method not usable (`orders.payment_method_unavailable`), a product not on sale (`orders.variant_unavailable`), the key reused for another cart (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
+            "description": "Empty cart (`orders.cart_empty`), delivery missing (`orders.delivery_required`), payment method not usable (`orders.payment_method_unavailable`), a product not on sale (`orders.variant_unavailable`), a tender not accepted (`orders.tender_unavailable`), the key reused for another cart (`orders.idempotency_key_reused`), or invalid values (see `errors`)."
           },
           "428": {
             "content": {

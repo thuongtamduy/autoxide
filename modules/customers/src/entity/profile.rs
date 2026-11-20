@@ -26,6 +26,7 @@ pub struct Model {
     pub first_order_at: Option<DateTimeUtc>,
     pub last_order_at: Option<DateTimeUtc>,
     pub custom_fields: String,
+    pub birthday_md: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

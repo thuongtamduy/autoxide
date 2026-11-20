@@ -2,6 +2,7 @@
 //! một dòng vào cuối [`all`].
 
 mod m0001_create_customers;
+mod m0006_loyalty;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -21,5 +22,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             ],
         ),
         autoxide_kernel::event::outbox_access_migration("k0001_event_access", "customers"),
+        // Điểm thưởng, hạng, voucher tặng (bước 47 mục 3, 6).
+        Box::new(m0006_loyalty::Migration),
     ]
 }

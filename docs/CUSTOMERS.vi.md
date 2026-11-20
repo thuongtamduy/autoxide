@@ -55,6 +55,29 @@ của mình không bị che ở `GET /api/v1/customers/me`.
 - Giỏ hàng của `orders` nhận ID nhóm của người mua (cho khuyến mại giới hạn theo nhóm), hạng thành
   viên và mã nhóm giá.
 
+## Điểm thưởng và hạng
+
+- **Quy tắc** (`POST /api/v1/customers/loyalty/rules`) là dữ liệu có ngày hiệu lực: đơn vị tích
+  (`earn_per_minor`, vd 10.000 đ → `points_per_unit` điểm), giá trị một điểm, số tháng hiệu lực, số điểm
+  tối thiểu để đổi, phần tối đa của đơn được trả bằng điểm. Bản mới bắt đầu ở `effective_from` (lúc này
+  hay sau) và không bao giờ sửa quá khứ.
+- Điểm được **tích khi đơn hoàn tất**, trên tiền người mua trả cho hàng hoá (định nghĩa ở trên), nhân hệ
+  số hạng. Mỗi lần tích là một **lô** hết hạn vào cuối ngày (giờ Việt Nam) sau `points_valid_months`
+  tháng. Đổi điểm dùng lô hết hạn sớm nhất trước.
+- **Trả bằng điểm**: gửi `"tenders": [{"kind": "points", "input": {"points": 500}}]` tới
+  `POST /api/v1/orders/checkout`. Điểm được giữ tới khi đơn xác nhận (thì dùng) hay bị huỷ / quá hạn trả
+  (thì trả lại). Đối tác thanh toán chỉ thu phần còn lại.
+- **Hạng** (`POST /loyalty/tiers`): hạng cao nhất có ngưỡng chi tiêu 12 tháng đạt được, xét khi đơn hoàn
+  tất và mỗi ngày. Mã hạng vào giỏ hàng (khuyến mại theo hạng) và quy tắc nhóm (`tier_in`).
+- **Điều chỉnh tay**: `POST /api/v1/customers/{id}/points/adjustments` với `customers.loyalty.adjust`, mã
+  tham chiếu (không bao giờ áp hai lần) và lý do.
+- **Phần thưởng voucher** (`POST /loyalty/voucher-rewards`, loại `birthday`, `purchase`, `points`) cấp qua
+  module khuyến mại; sinh nhật một voucher mỗi năm, mỗi đơn một voucher, đổi điểm thì trừ điểm trước và
+  trả lại nếu không cấp được voucher. Người mua xem điểm, quy tắc hiện hành và phần thưởng ở
+  `GET /me/points`, `GET /me/points/rewards`, đổi bằng `POST /me/points/vouchers`.
+- **Sổ cái**: điểm chưa dùng là nghĩa vụ (`loyalty.liability`) theo giá trị lúc tích; đổi điểm ghi Có
+  `buyer.prepayments`, hết hạn ghi Có `loyalty.breakage`.
+
 ## Nhãn, ghi chú, trường tự định nghĩa
 
 Hồ sơ là bản ghi loại `customers.customer`: nhãn nội bộ, ghi chú và trường tự định nghĩa dùng
@@ -69,6 +92,8 @@ endpoint chung của kernel (`/api/v1/kernel/tags`, ghi chú trên bản ghi, đ
 | `customers.manage` | Đăng ký tại quầy, sửa hồ sơ, gắn nhãn |
 | `customers.contact.reveal` | Xem đủ số điện thoại, email (có audit) |
 | `customers.segments.manage` | Tạo, sửa, xoá nhóm và thành viên |
+| `customers.loyalty.manage` | Quy tắc điểm, hạng, phần thưởng voucher (cả cửa hàng) |
+| `customers.loyalty.adjust` | Cộng / trừ điểm bằng tay |
 
 Người mua không cần permission: `/me` chỉ cần tài khoản đã đăng nhập.
 

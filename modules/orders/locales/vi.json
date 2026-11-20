@@ -236,5 +236,7 @@
   "text:delivered": "đã giao thành công",
   "text:not delivered yet: the last attempt failed": "chưa giao được: lần giao gần nhất không thành",
   "text:on its way": "đang trên đường giao",
-  "text:waiting for payment": "đang chờ thanh toán"
+  "text:waiting for payment": "đang chờ thanh toán",
+  "orders.tender_unavailable": "Cửa hàng không nhận `{kind}` làm cách trả tiền.",
+  "field:is given twice": "được gửi hai lần"
 }

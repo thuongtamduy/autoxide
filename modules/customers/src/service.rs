@@ -26,6 +26,10 @@ pub(crate) struct CustomersService {
     /// Số đã xác thực của tài khoản (bước 37); thiếu `compliance` thì không gắn hồ sơ theo số.
     pub accounts: Option<Arc<dyn autoxide_compliance::api::AccountVerification>>,
     pub custom_fields: CustomFields,
+    /// Sổ cái (nghĩa vụ điểm); chưa cài thì không ghi bút toán.
+    pub ledger: Option<Arc<dyn autoxide_ledger::api::Ledger>>,
+    /// Cấp voucher tặng; chưa cài thì không tặng voucher.
+    pub promotions: Option<Arc<dyn autoxide_promotions::api::Promotions>>,
 }
 
 impl CustomersService {

@@ -32,6 +32,17 @@ pub(crate) const SEGMENTS_MANAGE: Permission = Permission::new(
 )
 .scoped();
 
+pub(crate) const LOYALTY_MANAGE: Permission = Permission::new(
+    "customers.loyalty.manage",
+    "Set the loyalty program: earning and redeeming rules, membership tiers and voucher rewards.",
+);
+
+pub(crate) const LOYALTY_ADJUST: Permission = Permission::new(
+    "customers.loyalty.adjust",
+    "Add or remove loyalty points of customers in your scope by hand, with a reference and a reason.",
+)
+.scoped();
+
 pub(crate) fn all() -> Vec<Permission> {
-    vec![READ, MANAGE, CONTACT_REVEAL, SEGMENTS_MANAGE]
+    vec![READ, MANAGE, CONTACT_REVEAL, SEGMENTS_MANAGE, LOYALTY_MANAGE, LOYALTY_ADJUST]
 }

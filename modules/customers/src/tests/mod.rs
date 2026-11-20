@@ -3,7 +3,9 @@
 //! event giống `orders::lifecycle::payload`), `OrderExtensions` giả giữ `BuyerGroups` được cắm vào,
 //! `AccountVerification` giả trả số đã xác thực.
 
+mod fake_ledger;
 mod groups;
+mod loyalty;
 mod profiles;
 
 use std::collections::HashMap;
@@ -24,14 +26,23 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 /// Mọi permission của module, độ sâu `tenant`.
-pub(crate) const ALL: [&str; 4] =
-    ["customers.read", "customers.manage", "customers.contact.reveal", "customers.segments.manage"];
+pub(crate) const ALL: [&str; 6] = [
+    "customers.read",
+    "customers.manage",
+    "customers.contact.reveal",
+    "customers.segments.manage",
+    "customers.loyalty.manage",
+    "customers.loyalty.adjust",
+];
 
 pub(crate) const BUYER: u128 = 101;
 
-/// `OrderExtensions` giả: giữ `BuyerGroups` mà `customers` cắm vào.
+/// `OrderExtensions` giả: giữ `BuyerGroups` và `Tender` mà `customers` cắm vào.
 #[derive(Default)]
-pub(crate) struct FakeExtensions(pub Mutex<Option<Arc<dyn BuyerGroups>>>);
+pub(crate) struct FakeExtensions(
+    pub Mutex<Option<Arc<dyn BuyerGroups>>>,
+    pub Mutex<Vec<Arc<dyn Tender>>>,
+);
 
 impl OrderExtensions for FakeExtensions {
     fn set_seller_split(&self, _split: Arc<dyn SellerSplit>) -> Result<(), Error> {
@@ -41,7 +52,8 @@ impl OrderExtensions for FakeExtensions {
         *self.0.lock().unwrap() = Some(groups);
         Ok(())
     }
-    fn add_tender(&self, _tender: Arc<dyn Tender>) -> Result<(), Error> {
+    fn add_tender(&self, tender: Arc<dyn Tender>) -> Result<(), Error> {
+        self.1.lock().unwrap().push(tender);
         Ok(())
     }
 }
@@ -105,6 +117,8 @@ macro_rules! fake_event {
 fake_event!(Placed, autoxide_orders::api::events::ORDER_PLACED);
 fake_event!(StatusChanged, autoxide_orders::api::events::ORDER_STATUS_CHANGED);
 fake_event!(Refunded, autoxide_orders::api::events::REFUND_COMPLETED);
+fake_event!(Confirmed, autoxide_orders::api::events::ORDER_CONFIRMED);
+fake_event!(Cancelled, autoxide_orders::api::events::ORDER_CANCELLED);
 fake_event!(UserDeleted, autoxide_kernel::privacy::USER_DELETED);
 
 /// Cây gốc → chuỗi → cửa hàng A, B.
@@ -118,6 +132,7 @@ pub(crate) struct Shop {
     pub tree: Tree,
     pub extensions: Arc<FakeExtensions>,
     pub accounts: Arc<FakeAccounts>,
+    pub promotions: Arc<FakePromotions>,
     orders: Arc<Mutex<Option<Outbox>>>,
     auth: Arc<Mutex<Option<Outbox>>>,
 }
@@ -138,6 +153,7 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
     let chain = org();
     let extensions = Arc::new(FakeExtensions::default());
     let accounts = Arc::new(FakeAccounts::default());
+    let promotions = Arc::new(FakePromotions::default());
     let orders = Arc::new(Mutex::new(None));
     let auth = Arc::new(Mutex::new(None));
     let all: Vec<(&str, Scope)> = ALL.iter().map(|name| (*name, Scope::Tenant)).collect();
@@ -155,12 +171,16 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
         .principal("buyer3", Principal::customer(Uuid::from_u128(103)))
         .provide::<dyn OrderExtensions>(extensions.clone())
         .provide::<dyn AccountVerification>(accounts.clone())
+        .provide::<dyn autoxide_promotions::api::Promotions>(promotions.clone())
+        .provide::<dyn autoxide_ledger::api::Ledger>(Arc::new(fake_ledger::FakeLedger::default()))
         .module(Emitter {
             name: "orders",
             events: vec![
                 autoxide_orders::api::events::ORDER_PLACED,
                 autoxide_orders::api::events::ORDER_STATUS_CHANGED,
                 autoxide_orders::api::events::REFUND_COMPLETED,
+                autoxide_orders::api::events::ORDER_CONFIRMED,
+                autoxide_orders::api::events::ORDER_CANCELLED,
             ],
             outbox: orders.clone(),
         })
@@ -179,7 +199,7 @@ pub(crate) async fn shop(test: &TestDatabase) -> Shop {
     OrgTree::insert(&write, DEFAULT_TENANT, tree.a, chain, 8).await.unwrap();
     OrgTree::insert(&write, DEFAULT_TENANT, tree.b, chain, 8).await.unwrap();
     write.commit().await.unwrap();
-    Shop { app, tree, extensions, accounts, orders, auth }
+    Shop { app, tree, extensions, accounts, promotions, orders, auth }
 }
 
 impl Shop {
@@ -198,6 +218,42 @@ impl Shop {
 
     pub(crate) async fn user_deleted(&self, user: Uuid) {
         self.emit(&self.auth, &UserDeleted(json!({"before": {"id": user}}))).await;
+    }
+
+    /// `Tender` loại `points` mà `customers` đã cắm vào `orders`.
+    pub(crate) fn points_tender(&self) -> Arc<dyn Tender> {
+        self.extensions
+            .1
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|tender| tender.kind() == "points")
+            .cloned()
+            .unwrap()
+    }
+
+    /// Chạy job định kỳ `kind` ngay (như lịch của database).
+    pub(crate) async fn run_job(&self, kind: &'static str) {
+        let queue = autoxide_kernel::job::JobQueue::new("customers");
+        let options = autoxide_kernel::job::EnqueueOptions::default;
+        let write = self.database().write();
+        match kind {
+            crate::jobs::EXPIRE_POINTS => {
+                queue.enqueue_database(write, &ExpirePointsNow {}, options()).await
+            }
+            crate::jobs::RELEASE_EXPIRED_HOLDS => {
+                queue.enqueue_database(write, &ReleaseHoldsNow {}, options()).await
+            }
+            crate::jobs::BIRTHDAY_VOUCHERS => {
+                queue.enqueue_database(write, &BirthdayNow {}, options()).await
+            }
+            crate::jobs::EVALUATE_TIERS => {
+                queue.enqueue_database(write, &TiersNow {}, options()).await
+            }
+            other => panic!("no test job for `{other}`"),
+        }
+        .unwrap();
+        drain(self).await;
     }
 
     /// `BuyerGroups` mà `customers` đã cắm vào `orders`.
@@ -233,6 +289,7 @@ impl Order {
             "order_id": self.id, "tenant_id": DEFAULT_TENANT, "org_id": self.org, "channel": "web",
             "number": format!("DH{}", &self.id.simple().to_string()[24..]), "status": status,
             "buyer_user_id": self.buyer, "buyer_key": self.buyer_key,
+            "hold_reference": format!("orders:{}", self.id),
             "placed_at": chrono::Utc::now(), "total": money(self.goods + 30_000),
             "goods_paid": money(self.goods), "lines": [],
         }})
@@ -244,6 +301,14 @@ impl Order {
 
     pub(crate) fn status(&self, status: &str) -> StatusChanged {
         StatusChanged(self.payload(status))
+    }
+
+    pub(crate) fn confirmed(&self) -> Confirmed {
+        Confirmed(self.payload("confirmed"))
+    }
+
+    pub(crate) fn cancelled(&self) -> Cancelled {
+        Cancelled(self.payload("cancelled"))
     }
 
     pub(crate) fn refunded(&self, refund_id: Uuid, amount: i64) -> Refunded {
@@ -313,3 +378,141 @@ pub(crate) async fn events_named(app: &TestApp, name: &str) -> Vec<Value> {
 pub(crate) fn minor(value: &Value) -> i64 {
     value["amount"].as_str().unwrap().parse().unwrap()
 }
+
+/// `Promotions` giả: chỉ `grant_voucher` (ghi lại, chống trùng theo `source_ref`; `fail` → lỗi).
+#[derive(Default)]
+pub(crate) struct FakePromotions {
+    pub granted: Mutex<Vec<autoxide_promotions::api::GrantVoucher>>,
+    pub fail: Mutex<bool>,
+}
+
+#[async_trait::async_trait]
+impl autoxide_promotions::api::Promotions for FakePromotions {
+    async fn evaluate(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: &autoxide_promotions::api::Cart,
+    ) -> Result<autoxide_promotions::api::Evaluation, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn eligible(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: &autoxide_promotions::api::Cart,
+    ) -> Result<autoxide_promotions::api::Eligibility, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn reserve(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: &autoxide_promotions::api::ReserveRequest,
+    ) -> Result<autoxide_kernel::reference::Submitted<autoxide_promotions::api::Redemption>, Error>
+    {
+        Err(Error::internal("not used"))
+    }
+    async fn confirm(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: Uuid,
+    ) -> Result<autoxide_promotions::api::Redemption, Error> {
+        Err(Error::internal("not used"))
+    }
+    async fn release(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: Uuid,
+    ) -> Result<Option<autoxide_promotions::api::Redemption>, Error> {
+        Ok(None)
+    }
+    async fn redemption(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: Uuid,
+    ) -> Result<Option<autoxide_promotions::api::Redemption>, Error> {
+        Ok(None)
+    }
+    async fn grant_voucher(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        request: &autoxide_promotions::api::GrantVoucher,
+    ) -> Result<autoxide_kernel::reference::Submitted<autoxide_promotions::api::Voucher>, Error>
+    {
+        if *self.fail.lock().unwrap() {
+            return Err(Error::internal("promotions is down"));
+        }
+        let mut granted = self.granted.lock().unwrap();
+        let replay = granted
+            .iter()
+            .any(|old| old.source_ref == request.source_ref && old.user_id == request.user_id);
+        if !replay {
+            granted.push(request.clone());
+        }
+        let voucher: autoxide_promotions::api::Voucher = serde_json::from_value(json!({
+            "id": Uuid::now_v7(), "promotion_id": request.promotion_id, "holder_user_id": request.user_id,
+            "status": "available", "source": request.source, "source_ref": request.source_ref,
+            "valid_from": chrono::Utc::now(), "expires_at": chrono::Utc::now() + chrono::Duration::days(30),
+            "issued_at": chrono::Utc::now(), "used_order_id": null,
+        }))
+        .unwrap();
+        Ok(if replay {
+            autoxide_kernel::reference::Submitted::Replayed(voucher)
+        } else {
+            autoxide_kernel::reference::Submitted::Created(voucher)
+        })
+    }
+    async fn vouchers_of(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: Uuid,
+        _: Option<autoxide_promotions::api::VoucherStatus>,
+    ) -> Result<Vec<autoxide_promotions::api::Voucher>, Error> {
+        Ok(Vec::new())
+    }
+    async fn automatic_prices(
+        &self,
+        _: &autoxide_kernel::tenancy::TenantContext,
+        _: OrgId,
+        _: chrono::DateTime<chrono::Utc>,
+        _: &[(Uuid, autoxide_kernel::money::Money)],
+    ) -> Result<Vec<autoxide_promotions::api::AutomaticPrice>, Error> {
+        Ok(Vec::new())
+    }
+}
+
+/// Đẩy mốc hết hạn của mọi lô điểm và chỗ giữ về quá khứ (giả lập thời gian trôi).
+pub(crate) async fn age_points(app: &TestApp) {
+    use sea_orm::{ConnectionTrait, Statement};
+    let write = app.database().write();
+    let past = chrono::Utc::now() - chrono::Duration::days(1);
+    for table in ["customers_points_lots", "customers_point_holds"] {
+        let sql = match write.get_database_backend() {
+            sea_orm::DatabaseBackend::Postgres => format!("UPDATE {table} SET expires_at = $1"),
+            _ => format!("UPDATE {table} SET expires_at = ?"),
+        };
+        write
+            .execute_raw(Statement::from_sql_and_values(
+                write.get_database_backend(),
+                sql,
+                [past.into()],
+            ))
+            .await
+            .unwrap();
+    }
+}
+
+/// Job định kỳ chạy ngay: mỗi loại một kiểu (`Job::KIND` là hằng).
+macro_rules! now_job {
+    ($kind:ident, $name:expr) => {
+        #[derive(Debug, serde::Serialize)]
+        struct $kind {}
+
+        impl autoxide_kernel::job::Job for $kind {
+            const KIND: &'static str = $name;
+        }
+    };
+}
+
+now_job!(ExpirePointsNow, crate::jobs::EXPIRE_POINTS);
+now_job!(ReleaseHoldsNow, crate::jobs::RELEASE_EXPIRED_HOLDS);
+now_job!(BirthdayNow, crate::jobs::BIRTHDAY_VOUCHERS);
+now_job!(TiersNow, crate::jobs::EVALUATE_TIERS);
