@@ -185,6 +185,98 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
 
+  sdk-mobile:
+    # Bước 69 P1 (D-20261119-step69-sdk): sinh và biên dịch SDK Swift, Kotlin, Dart từ docs/openapi.json
+    # bằng công cụ ghim phiên bản. Gate không cần Swift hay JDK — nó chỉ kiểm cấu hình (`xtask sdk --check`).
+    # Chỉ làm việc khi PR đổi hợp đồng API hay SDK; kiểm đường dẫn trong một bước (không dùng `paths:` ở
+    # trigger) để job vẫn báo xong khi nó là check bắt buộc.
+    name: Mobile SDK (${{ matrix.sdk }})
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    # Swift: ở PR chỉ kiểm manifest và phụ thuộc (nhẹ); biên dịch đầy đủ (dựng cả swift-syntax của plugin
+    # sinh mã) chỉ khi push vào main, có cache — không chặn hàng đợi merge.
+    timeout-minutes: ${{ (matrix.sdk == 'swift' && github.event_name != 'pull_request') && 30 || 15 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [swift, kotlin, dart]
+    steps:
+      - uses: actions/checkout@v7
+      - name: changed
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --quiet --depth=1 origin "${{ github.base_ref }}"
+          if git diff --name-only FETCH_HEAD HEAD \
+            | grep -qE '^(docs/openapi\.json|sdk/|Package\.swift|xtask/src/sdk_mobile\.rs|\.github/workflows/ci\.yml)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "Neither the API contract nor the SDKs changed: nothing to build."
+          fi
+      # Swift: plugin swift-openapi-generator sinh mã lúc build từ sdk/swift/Sources/Autoxide/openapi.json.
+      - name: swift package resolve (pull request)
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name == 'pull_request'
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble \
+            sh -c 'swift package dump-package > /dev/null && swift package resolve'
+          jq empty sdk/swift/Sources/Autoxide/openapi.json
+          cmp docs/openapi.json sdk/swift/Sources/Autoxide/openapi.json
+      - uses: actions/cache@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name != 'pull_request'
+        with:
+          path: .build
+          key: swift-${{ hashFiles('Package.swift') }}-${{ hashFiles('sdk/swift/Sources/Autoxide/openapi.json') }}
+          restore-keys: swift-${{ hashFiles('Package.swift') }}-
+      - name: swift build
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name != 'pull_request'
+        run: docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble swift build --product Autoxide
+      - uses: actions/setup-java@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
+        with:
+          distribution: temurin
+          java-version: "21"
+      # Phiên bản openapi-generator và tham số của từng SDK ở sdk/openapitools.json; tải jar thẳng từ
+      # Maven Central (bản bọc npm dùng API tìm kiếm của Maven, hay bị giới hạn lượt gọi).
+      - name: generate
+        if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
+        run: |
+          config=sdk/openapitools.json
+          version=$(jq -r '."generator-cli".version' "$config")
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/openapi-generator.jar" \
+            "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/$version/openapi-generator-cli-$version.jar"
+          generator=".\"generator-cli\".generators.${{ matrix.sdk }}"
+          java -jar "$RUNNER_TEMP/openapi-generator.jar" generate \
+            -g "$(jq -r "$generator.generatorName" "$config")" \
+            $(jq -r "$generator.library // empty | \"--library=\" + ." "$config") \
+            -i docs/openapi.json \
+            -o "sdk/${{ matrix.sdk }}/generated" \
+            --additional-properties="$(jq -r "$generator.additionalProperties | to_entries | map(\"\(.key)=\(.value)\") | join(\",\")" "$config")"
+      # Tải và cache bản Gradle mà wrapper do generator sinh cần (tải thẳng hay quá thời gian chờ).
+      - uses: gradle/actions/setup-gradle@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'kotlin'
+      - name: gradle build
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'kotlin'
+        working-directory: sdk/kotlin/generated
+        # Hàng trăm model: trình biên dịch Kotlin cần nhiều bộ nhớ hơn mặc định.
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon -Dorg.gradle.jvmargs=-Xmx6g -Pkotlin.compiler.execution.strategy=in-process assemble
+      - uses: dart-lang/setup-dart@v1
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'dart'
+        with:
+          sdk: "3.14.1"
+      - name: dart analyze
+        if: steps.changed.outputs.run == 'true' && matrix.sdk == 'dart'
+        working-directory: sdk/dart/generated
+        run: |
+          dart pub get
+          dart run build_runner build
+          dart analyze --no-fatal-warnings
+
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
