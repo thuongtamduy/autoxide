@@ -6,7 +6,7 @@
 
 use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::module::Module;
-use autoxide_testkit::{TestApp, TestDatabase};
+use autoxide_testkit::{TestApp, TestDatabase, template_enabled};
 use sea_orm::{ConnectionTrait, Statement};
 
 struct M0001Items;
@@ -71,7 +71,8 @@ async fn database_con_nguyen_thi_chep_mau_va_khong_lot_du_lieu() {
     for round in 0..2 {
         TestDatabase::run(async |test| {
             let app = TestApp::builder(test).module(TplCheck).build().await.unwrap();
-            assert!(app.from_template(), "round {round}: the template was not used");
+            // `TEST_DATABASE_TEMPLATE=off` tắt mẫu: khi đó migrate từ đầu, kết quả như nhau.
+            assert_eq!(app.from_template(), template_enabled(), "round {round}");
             // Bảng có, trống: dữ liệu của vòng trước không nằm trong mẫu.
             assert_eq!(count(&app).await, 0, "round {round}");
             insert(&app, 1).await;
@@ -141,6 +142,6 @@ async fn nhieu_bai_test_cung_luc_dung_chung_mot_mau() {
         })
         .collect();
     for task in tasks {
-        assert_eq!(task.await.unwrap(), (true, 1));
+        assert_eq!(task.await.unwrap(), (template_enabled(), 1));
     }
 }

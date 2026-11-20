@@ -44,9 +44,9 @@ pub(crate) const POSTGRES_PREFIX: &str = "autoxide_tpl_";
 /// Thư mục chứa file mẫu SQLite (`<khoá>.sqlite`, `<khoá>.lock`) dưới thư mục tạm.
 pub(crate) const SQLITE_DIRECTORY: &str = "autoxide-templates";
 
-/// Đã tắt bằng [`TEST_DATABASE_TEMPLATE`]?
-fn disabled() -> bool {
-    std::env::var(TEST_DATABASE_TEMPLATE)
+/// Database mẫu có được dùng không: không tắt bằng [`TEST_DATABASE_TEMPLATE`].
+pub fn enabled() -> bool {
+    !std::env::var(TEST_DATABASE_TEMPLATE)
         .is_ok_and(|value| matches!(value.trim(), "off" | "0" | "false" | "no"))
 }
 
@@ -57,7 +57,7 @@ fn disabled() -> bool {
 /// database của testkit, hay lỗi) — bên gọi vẫn chạy `migrator.up` như thường, lúc đó nó làm hết
 /// việc; sau khi chép thì `up` không còn gì để làm.
 pub async fn prepare(config: &DatabaseConfig, migrator: &Migrator) -> bool {
-    if disabled() {
+    if !enabled() {
         return false;
     }
     let Ok(key) = key(config.url.backend(), migrator) else {

@@ -71,7 +71,9 @@ pub use s3::{
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
 pub use store::FakeStorePurchases;
-pub use template::{TEST_DATABASE_TEMPLATE, prepare as prepare_from_template};
+pub use template::{
+    TEST_DATABASE_TEMPLATE, enabled as template_enabled, prepare as prepare_from_template,
+};
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
 pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
