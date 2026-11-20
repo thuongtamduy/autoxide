@@ -14,6 +14,9 @@ targets = [
 ]
 
 [advisories]
+# Ghim rõ: thư viện bị bỏ hoang tính cả khi chỉ là phụ thuộc gián tiếp (cargo-deny cũ mặc định như vậy, bản mới mặc định
+# chỉ tính phụ thuộc trực tiếp nên gate trên máy và CI từng cho kết quả khác nhau). D-20261120-deny-unmaintained-all.
+unmaintained = "all"
 # Mặc định: lỗ hổng và thư viện bị bỏ hoang đều là lỗi. Ngoại lệ phải ghi lý do
 # ở đây VÀ ở docs/DECISIONS.md. Gate chạy với `-D advisory-not-detected`: ngoại
 # lệ không còn cần nữa thì gate đỏ cho tới khi gỡ dòng đó đi.
@@ -22,6 +25,7 @@ ignore = [
   { id = "RUSTSEC-2026-0387", reason = "crypto-bigint < 0.7.6: timing side channels on SECRET integers. Only reached through webauthn_rp (p256/p384 0.13) for public-key signature verification; no secret is ever processed. See docs/DECISIONS.md D-077." },
   { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained (no vulnerability). sqlx and sea-orm (the database layer) are built on it, so it cannot be replaced alone; move to jiff/time when they do. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained (no vulnerability), only used to read IANA time zone names; replaced together with chrono. See docs/DECISIONS.md D-346." },
+  { id = "RUSTSEC-2026-0542", reason = "humantime unmaintained because it wraps chrono (no vulnerability); required by object_store 0.14.2 (latest), so it cannot be replaced alone; replaced together with chrono. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0459", reason = "SQLite bundled by libsqlite3-sys < 0.39; sqlx-sqlite 0.9.0 (latest) requires < 0.38, so no fixed version can be selected yet. Only exploitable through a database file supplied by an untrusted party, which Autoxide never opens. See docs/DECISIONS.md D-032." },
 ]
 

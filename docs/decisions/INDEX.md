@@ -87,6 +87,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 - **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19
+- **[D-20261120-deny-unmaintained-all](D-20261120-deny-unmaintained-all.md)** Ghim `unmaintained = "all"` cho cargo-deny và khôi phục ngoại lệ RUSTSEC-2026-0542 — 2026-11-20
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 
 ## Kiến trúc module và kernel
