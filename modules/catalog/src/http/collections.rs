@@ -96,6 +96,8 @@ pub(crate) struct CollectionResponse {
     texts: BTreeMap<String, CollectionTextDto>,
     /// Number of chosen products (`manual`).
     items: u64,
+    /// The texts were written with an AI's suggestion; show an AI label next to them.
+    ai_assisted: bool,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -129,6 +131,7 @@ pub(crate) fn collection_response(detail: CollectionDetail) -> CollectionRespons
             })
             .collect(),
         items: detail.items,
+        ai_assisted: row.ai_assisted,
         created_at: row.created_at,
         updated_at: row.updated_at,
     }
@@ -159,6 +162,10 @@ pub(crate) struct CreateCollectionRequest {
     /// Texts by language, at least one.
     #[schema(value_type = BTreeMap<String, CollectionTextDto>)]
     texts: BTreeMap<String, CollectionTextDto>,
+    /// The texts were written with an AI's suggestion (default `false`); the public page then
+    /// carries an AI label.
+    #[serde(default)]
+    ai_assisted: bool,
 }
 
 // Trường JSON có ba trạng thái: không gửi (`None`), `null` (`Some(None)`), có giá trị.
@@ -192,6 +199,8 @@ pub(crate) struct UpdateCollectionRequest {
     #[serde(default)]
     #[schema(value_type = BTreeMap<String, CollectionTextDto>)]
     texts: BTreeMap<String, CollectionTextDto>,
+    /// The texts were written with an AI's suggestion; omitted: unchanged.
+    ai_assisted: Option<bool>,
 }
 
 fn texts(texts: BTreeMap<String, CollectionTextDto>) -> BTreeMap<String, CollectionText> {
@@ -270,6 +279,7 @@ async fn create_collection(
         starts_at: input.starts_at,
         ends_at: input.ends_at,
         texts: texts(input.texts),
+        ai_assisted: input.ai_assisted,
     };
     let detail = service.create_collection(&tenant, &principal, new).await?;
     let version = detail.collection.updated_at;
@@ -344,6 +354,7 @@ async fn update_collection(
         starts_at: input.starts_at,
         ends_at: input.ends_at,
         texts: texts(input.texts),
+        ai_assisted: input.ai_assisted,
     };
     let detail = service.update_collection(&tenant, &principal, id, patch, expected).await?;
     Ok(Tagged { version: detail.collection.updated_at, data: collection_response(detail) })
@@ -462,6 +473,8 @@ pub(crate) struct PublicCollectionResponse {
     meta_description: String,
     /// Picture (public media item).
     media_id: Option<Uuid>,
+    /// The texts were written with an AI's suggestion: show an AI label next to them.
+    ai_assisted: bool,
     /// One page of its products, in the collection's order; same card as
     /// `GET /api/v1/catalog/public/products`.
     products: Vec<PublicCardResponse>,
@@ -522,6 +535,7 @@ async fn get_public_collection(
         meta_title: text.meta_title,
         meta_description: text.meta_description,
         media_id: found.collection.media_id,
+        ai_assisted: found.collection.ai_assisted,
         products,
         pagination: found.products.pagination,
     };

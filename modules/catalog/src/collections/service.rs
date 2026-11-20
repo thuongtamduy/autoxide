@@ -48,6 +48,8 @@ pub(crate) struct NewCollection {
     pub starts_at: Option<DateTime<Utc>>,
     pub ends_at: Option<DateTime<Utc>>,
     pub texts: BTreeMap<String, CollectionText>,
+    /// Chữ soạn từ gợi ý của AI (Luật Trí tuệ nhân tạo — cần đối chiếu); tool MCP mặc định `true`.
+    pub ai_assisted: bool,
 }
 
 /// Sửa một phần: trường không gửi giữ nguyên; `Some(None)` xoá giá trị. `texts` thay bản của các
@@ -61,6 +63,7 @@ pub(crate) struct CollectionPatch {
     pub starts_at: Option<Option<DateTime<Utc>>>,
     pub ends_at: Option<Option<DateTime<Utc>>>,
     pub texts: BTreeMap<String, CollectionText>,
+    pub ai_assisted: Option<bool>,
 }
 
 /// Bộ sưu tập kèm chữ theo mọi ngôn ngữ và số sản phẩm chọn tay.
@@ -187,6 +190,7 @@ impl CatalogService {
             ends_at: input.ends_at.map(micros),
             created_at: at,
             updated_at: at,
+            ai_assisted: input.ai_assisted,
         };
         self.check_row(tenant, &row).await?;
         let transaction = tenant.database().begin_write().await?;
@@ -225,6 +229,7 @@ impl CatalogService {
             status: patch.status.unwrap_or_else(|| found.status.clone()),
             starts_at: patch.starts_at.unwrap_or(found.starts_at).map(micros),
             ends_at: patch.ends_at.unwrap_or(found.ends_at).map(micros),
+            ai_assisted: patch.ai_assisted.unwrap_or(found.ai_assisted),
             updated_at: now(),
             ..found.clone()
         };

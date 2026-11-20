@@ -712,6 +712,8 @@ pub(crate) mod collection {
         pub created_at: DateTimeUtc,
         /// Phiên bản (`ETag`).
         pub updated_at: DateTimeUtc,
+        /// Chữ soạn từ gợi ý của AI (nhãn khi công khai).
+        pub ai_assisted: bool,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

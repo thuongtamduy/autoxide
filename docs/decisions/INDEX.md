@@ -501,13 +501,14 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step45-buyer-returns](D-20261119-step45-buyer-returns.md)** Trả hàng phía người mua: ảnh kèm qua `Media::uploaders`, xem trước không ghi, thời gian hoàn là dữ liệu có ngày hiệu lực — 2026-11-19
 - **[D-20261119-step45-pickup-preorder](D-20261119-step45-pickup-preorder.md)** Nhận tại cửa hàng và hàng đặt trước của `orders` — 2026-11-19
 - **[D-20261119-step45-returns](D-20261119-step45-returns.md)** Đổi trả và hoàn tiền của `orders`: một đường hoàn, tiền hoàn tính lúc nhận hàng, bút toán đảo — 2026-11-19
-- **[D-20261119-step55-collections](D-20261119-step55-collections.md)** Bước 55: bộ sưu tập sản phẩm dùng bộ lọc storefront sẵn có, permission `catalog.collections.manage` — 2026-11-19
+- **[D-20261119-step55-collections](D-20261119-step55-collections.md)** Bước 55: bộ sưu tập sản phẩm dùng bộ lọc storefront sẵn có, permission `catalog.collections.manage` — 2026-11-19 · *thay một phần bởi D-20261120-step55-close*
 - **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 - **[D-20261119-step61-voice](D-20261119-step61-voice.md)** Gọi điện trong chat (bước 61 mục 4): hợp đồng ở kernel, mặc định, ghi âm, sandbox — 2026-11-19
 - **[D-20261120-catalog-recommendations](D-20261120-catalog-recommendations.md)** Bán chạy, đánh giá, mua cùng và sản phẩm tương tự của `catalog` — 2026-11-20
 - **[D-20261120-step45-einvoice-pos](D-20261120-step45-einvoice-pos.md)** Hoá đơn điện tử, thư trạng thái và bán tại quầy của `orders`: `invoices` không ghi doanh thu lần hai, hoá đơn điều chỉnh qua trait, ca quầy hai người duyệt — 2026-11-20
 - **[D-20261120-step45-guest-orders](D-20261120-step45-guest-orders.md)** Mua không cần tài khoản của `orders`: mã một lần, header `Order-Token`, khoá liên hệ theo khách, gắn đơn bằng token — 2026-11-20
 - **[D-20261120-step45-reviews-risk-reports](D-20261120-step45-reviews-risk-reports.md)** Đánh giá sau mua đặt ở `orders`, phiếu "hữu ích", tóm tắt AI chờ duyệt, chống bom hàng COD theo khoá liên hệ, báo cáo bán hàng truy vấn thẳng — 2026-11-20
+- **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
 
 ## Vận hành và hiệu năng
 

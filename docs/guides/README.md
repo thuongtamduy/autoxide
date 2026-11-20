@@ -6,6 +6,7 @@ and TypeScript examples with the SDK in [`sdk/typescript`](../../sdk/typescript/
 Vietnamese: [`README.vi.md`](README.vi.md).
 
 - [Showing posts and pictures on a website](website.md): public endpoints, `srcset` and WebP, ETag and 304
+- [Building a shop's home page from the API](storefront.md): placements and banners, collections, brand and contact details, cache
 - [Signing in and staying signed in](authentication.md): access and refresh tokens, signing out
 - [Signing in with Google, Microsoft, GitHub or OpenID Connect](oidc.md): providers per tenant, linking accounts safely
 - [API keys for programs and AI agents](api-keys.md): least permissions, rate limit, revoking

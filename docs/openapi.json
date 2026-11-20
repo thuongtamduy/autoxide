@@ -3402,6 +3402,10 @@
       "CatalogCollection": {
         "description": "A product collection.",
         "properties": {
+          "ai_assisted": {
+            "description": "The texts were written with an AI's suggestion; show an AI label next to them.",
+            "type": "boolean"
+          },
           "created_at": {
             "format": "date-time",
             "type": "string"
@@ -3483,6 +3487,7 @@
           "status",
           "texts",
           "items",
+          "ai_assisted",
           "created_at",
           "updated_at"
         ],
@@ -3671,6 +3676,10 @@
         "additionalProperties": false,
         "description": "A new collection.",
         "properties": {
+          "ai_assisted": {
+            "description": "The texts were written with an AI's suggestion (default `false`); the public page then\ncarries an AI label.",
+            "type": "boolean"
+          },
           "ends_at": {
             "format": "date-time",
             "type": [
@@ -5347,6 +5356,10 @@
       "CatalogPublicCollection": {
         "description": "A collection page of the website.",
         "properties": {
+          "ai_assisted": {
+            "description": "The texts were written with an AI's suggestion: show an AI label next to them.",
+            "type": "boolean"
+          },
           "description": {
             "type": "string"
           },
@@ -5396,6 +5409,7 @@
           "description",
           "meta_title",
           "meta_description",
+          "ai_assisted",
           "products",
           "pagination"
         ],
@@ -6427,6 +6441,13 @@
         "additionalProperties": false,
         "description": "Changes to a collection: fields left out stay; `null` clears; `texts` replaces the languages\ngiven.",
         "properties": {
+          "ai_assisted": {
+            "description": "The texts were written with an AI's suggestion; omitted: unchanged.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "ends_at": {
             "format": "date-time",
             "type": [
@@ -16829,6 +16850,10 @@
           "data": {
             "description": "A product collection.",
             "properties": {
+              "ai_assisted": {
+                "description": "The texts were written with an AI's suggestion; show an AI label next to them.",
+                "type": "boolean"
+              },
               "created_at": {
                 "format": "date-time",
                 "type": "string"
@@ -16910,6 +16935,7 @@
               "status",
               "texts",
               "items",
+              "ai_assisted",
               "created_at",
               "updated_at"
             ],
@@ -17534,6 +17560,10 @@
           "data": {
             "description": "A collection page of the website.",
             "properties": {
+              "ai_assisted": {
+                "description": "The texts were written with an AI's suggestion: show an AI label next to them.",
+                "type": "boolean"
+              },
               "description": {
                 "type": "string"
               },
@@ -17583,6 +17613,7 @@
               "description",
               "meta_title",
               "meta_description",
+              "ai_assisted",
               "products",
               "pagination"
             ],
@@ -62284,6 +62315,10 @@
             "items": {
               "description": "A product collection.",
               "properties": {
+                "ai_assisted": {
+                  "description": "The texts were written with an AI's suggestion; show an AI label next to them.",
+                  "type": "boolean"
+                },
                 "created_at": {
                   "format": "date-time",
                   "type": "string"
@@ -62365,6 +62400,7 @@
                 "status",
                 "texts",
                 "items",
+                "ai_assisted",
                 "created_at",
                 "updated_at"
               ],

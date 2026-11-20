@@ -3124,6 +3124,13 @@
         "additionalProperties": false,
         "description": "A collection to draft. Without `id`: a new draft. With `id` and `version`: change it (fields\nleft out stay).",
         "properties": {
+          "ai_assisted": {
+            "description": "The texts came from AI; defaults to `true` for a tool.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
           "ends_at": {
             "format": "date-time",
             "type": [

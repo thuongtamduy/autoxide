@@ -1211,6 +1211,8 @@ export type CatalogCategoryText = {
 
 /** A product collection. */
 export type CatalogCollection = {
+  /** The texts were written with an AI's suggestion; show an AI label next to them. */
+  ai_assisted: boolean;
   created_at: string;
   ends_at?: string | null;
   id: string;
@@ -1305,6 +1307,11 @@ export type CatalogCreateCategory = {
 
 /** A new collection. */
 export type CatalogCreateCollection = {
+  /**
+   * The texts were written with an AI's suggestion (default `false`); the public page then
+   * carries an AI label.
+   */
+  ai_assisted?: boolean;
   ends_at?: string | null;
   /** `manual` or `rule`. */
   kind: string;
@@ -1836,6 +1843,8 @@ export type CatalogPublicCategory = {
 
 /** A collection page of the website. */
 export type CatalogPublicCollection = {
+  /** The texts were written with an AI's suggestion: show an AI label next to them. */
+  ai_assisted: boolean;
   description: string;
   id: string;
   locale: string;
@@ -2186,6 +2195,8 @@ export type CatalogUpdateCategory = {
  * given.
  */
 export type CatalogUpdateCollection = {
+  /** The texts were written with an AI's suggestion; omitted: unchanged. */
+  ai_assisted?: boolean | null;
   ends_at?: string | null;
   media_id?: string | null;
   rules?: Record<string, unknown> | null;
@@ -5672,6 +5683,8 @@ export type Data_CatalogCategoryRestrictions = {
 export type Data_CatalogCollection = {
   /** A product collection. */
   data: {
+    /** The texts were written with an AI's suggestion; show an AI label next to them. */
+    ai_assisted: boolean;
     created_at: string;
     ends_at?: string | null;
     id: string;
@@ -5874,6 +5887,8 @@ export type Data_CatalogPublicCategory = {
 export type Data_CatalogPublicCollection = {
   /** A collection page of the website. */
   data: {
+    /** The texts were written with an AI's suggestion: show an AI label next to them. */
+    ai_assisted: boolean;
     description: string;
     id: string;
     locale: string;
@@ -20271,6 +20286,8 @@ export type Page_CampaignResponse = {
 export type Page_CatalogCollection = {
   /** The items of this page, in the requested order. */
   data: {
+    /** The texts were written with an AI's suggestion; show an AI label next to them. */
+    ai_assisted: boolean;
     created_at: string;
     ends_at?: string | null;
     id: string;

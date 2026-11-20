@@ -3,7 +3,7 @@
 //! theo nút.
 
 use autoxide_kernel::resource::ResourceDirectory;
-use autoxide_testkit::{TestApp, TestDatabase};
+use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 
@@ -210,6 +210,69 @@ async fn cua_hang_chi_quan_bo_suu_tap_cua_minh() {
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{again}");
         assert_eq!(again["code"], "catalog.slug_taken");
+    })
+    .await
+    .unwrap();
+}
+
+/// Tool MCP dùng chung service với REST: soạn bản nháp mang dấu `ai_assisted`, không tự bật; người
+/// bật bằng REST thì trang công khai mang dấu đó cho giao diện gắn nhãn AI.
+#[tokio::test]
+async fn tool_mcp_soan_nhap_mang_dau_ai() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let client = app.mcp("boss").await.unwrap();
+        let input = json!({
+            "kind": "rule",
+            "rules": {"new_within_days": 30},
+            "texts": {"vi": {"title": "Hàng mới", "description": "Gợi ý từ AI"}},
+        });
+        let made = client.call_tool(tool("catalog.save_collection", input)).await.unwrap();
+        assert_eq!(made.is_error, Some(false), "{made:?}");
+        let made = made.structured_content.unwrap();
+        let id = made["data"]["id"].as_str().unwrap().to_owned();
+        assert_eq!(
+            (made["data"]["status"].as_str(), made["data"]["ai_assisted"].as_bool()),
+            (Some("draft"), Some(true))
+        );
+
+        let activate = json!({"id": id, "version": made["data"]["version"], "status": "active"});
+        let refused = client.call_tool(tool("catalog.save_collection", activate)).await.unwrap();
+        assert_eq!(
+            refused.structured_content.unwrap()["code"],
+            "catalog.collection_activation_needs_person"
+        );
+
+        let listed = client.call_tool(tool("catalog.list_collections", json!({}))).await.unwrap();
+        assert_eq!(listed.structured_content.unwrap()["data"][0]["id"], id.as_str());
+        client.cancel().await.unwrap();
+
+        let (status, on) = send_with(
+            &app,
+            "PATCH",
+            &format!("/collections/{id}"),
+            "*",
+            json!({"status": "active"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{on}");
+        assert_eq!(on["data"]["ai_assisted"], true);
+        let site = tree.chain.as_uuid();
+        let (status, page, _) =
+            public(&app, &format!("/collections/hang-moi?locale=vi&site={site}"), None).await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        assert_eq!(page["data"]["ai_assisted"], true);
+
+        // Người sửa lại chữ thì gỡ dấu qua REST.
+        let (status, off) = send_with(
+            &app,
+            "PATCH",
+            &format!("/collections/{id}"),
+            "*",
+            json!({"ai_assisted": false}),
+        )
+        .await;
+        assert_eq!((status, off["data"]["ai_assisted"].as_bool()), (StatusCode::OK, Some(false)));
     })
     .await
     .unwrap();
