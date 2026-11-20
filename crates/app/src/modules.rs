@@ -199,6 +199,11 @@ mod tests {
         TestDatabase::run(async |database| {
             let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
             let mut settings = crate::settings::read(&source).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
@@ -241,6 +246,11 @@ mod tests {
         TestDatabase::run(async |database| {
             let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
             let mut settings = crate::settings::read(&source).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
@@ -295,6 +305,11 @@ mod tests {
         TestDatabase::run(async |database| {
             let source = ConfigSource::from_pairs([("DATABASE_URL", database.url())]);
             let settings = crate::settings::read(&source).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();

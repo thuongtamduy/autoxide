@@ -337,6 +337,11 @@ mod tests {
     /// Database có một quản trị viên và hai file.
     async fn seed(database_url: &str, files: &Path) {
         let settings = settings(database_url, files);
+        autoxide_testkit::prepare_from_template(
+            &settings.config.database,
+            &settings.modules.migrator().unwrap(),
+        )
+        .await;
         let database = Database::connect(&settings.config.database).await.unwrap();
         settings.modules.migrator().unwrap().up(&database).await.unwrap();
         database.close().await.unwrap();

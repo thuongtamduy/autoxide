@@ -7,3 +7,4 @@
 mod app;
 mod isolation;
 mod ownership;
+mod template;

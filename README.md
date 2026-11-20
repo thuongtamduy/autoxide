@@ -349,6 +349,13 @@ TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --
 `./gate.sh` does this for you with Docker. To make the gate use an existing
 server instead, set `GATE_POSTGRES_URL` to the same kind of URL.
 
+Tests that build the whole application copy a template database that already has
+every migration applied, instead of migrating each empty database again. The
+templates live in the system temporary directory (`autoxide-templates/`) and, on
+PostgreSQL, as databases named `autoxide_tpl_…`; both are rebuilt when the test
+program or its migrations change, and removed after an hour. Set
+`TEST_DATABASE_TEMPLATE=off` to migrate every test database from scratch.
+
 File storage tests also run against S3 when `TEST_S3_ENDPOINT` points at an
 S3-compatible service with a bucket named `autoxide-test`. The gate starts a throwaway
 S3 emulator ([moto](https://github.com/getmoto/moto)) in Docker for this; set

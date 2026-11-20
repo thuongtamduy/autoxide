@@ -40,8 +40,11 @@ pub(crate) async fn start(database_url: &str, storage: &[(&'static str, String)]
     let source =
         ConfigSource::from_pairs(pairs.iter().map(|(name, value)| (*name, value.as_str())));
     let settings = crate::settings::read(&source).unwrap();
+    let migrator = settings.modules.migrator().unwrap();
+    // Chép database mẫu đã migrate khi được (D-20261120-test-db-template); `up` làm phần còn lại.
+    autoxide_testkit::prepare_from_template(&settings.config.database, &migrator).await;
     let database = Database::connect(&settings.config.database).await.unwrap();
-    settings.modules.migrator().unwrap().up(&database).await.unwrap();
+    migrator.up(&database).await.unwrap();
     database.close().await.unwrap();
     runtime::start(settings, Migrations::RequireApplied).await.unwrap()
 }

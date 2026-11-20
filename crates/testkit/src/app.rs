@@ -98,6 +98,8 @@ pub struct TestApp {
     database: Database,
     registry: DatabaseRegistry,
     dns: FakeDns,
+    /// Database đã được chép từ database mẫu thay vì migrate từ đầu.
+    from_template: bool,
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -116,6 +118,8 @@ pub struct TestAppBuilder<'a> {
     tenant_users: Vec<(String, String, Principal)>,
     /// Tên miền đã xác minh của khách: (slug, tên miền).
     domains: Vec<(String, String)>,
+    /// Migrate trên database trống thay vì chép database mẫu ([`TestAppBuilder::empty_database`]).
+    empty_database: bool,
 }
 
 // `for<'c>`: hàm nhận `StartContext` với lifetime bất kỳ — lifetime thật chỉ biết lúc
@@ -136,7 +140,14 @@ impl TestApp {
             placements: Vec::new(),
             tenant_users: Vec::new(),
             domains: Vec::new(),
+            empty_database: false,
         }
+    }
+
+    /// Database của app được chép từ database mẫu đã migrate (D-20261120-test-db-template) thay vì
+    /// migrate từ đầu. Chỉ để testkit tự kiểm; bài test không cần biết.
+    pub fn from_template(&self) -> bool {
+        self.from_template
     }
 
     /// Sổ database của app (chế độ, placement, tra khách).
@@ -429,7 +440,16 @@ impl<'a> TestAppBuilder<'a> {
         self
     }
 
-    /// Đọc cấu hình, chạy mọi migration, khởi động module, ghép router.
+    /// Chạy mọi migration trên database trống của bài test, không chép database mẫu đã migrate
+    /// (D-20261120-test-db-template) — cho bài test cần chính lần migrate đó (vd đo hay kiểm
+    /// migration). Kết quả như nhau; chỉ chậm hơn.
+    pub fn empty_database(mut self) -> Self {
+        self.empty_database = true;
+        self
+    }
+
+    /// Đọc cấu hình, chạy mọi migration (chép database mẫu đã migrate khi được), khởi động module,
+    /// ghép router.
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
         pairs.extend(self.settings);
@@ -448,9 +468,15 @@ impl<'a> TestAppBuilder<'a> {
             .finish(config.and_then(|config| configured.map(|()| config)))
             .map_err(|e| fail("configuration", e))?;
 
+        let migrator = modules.migrator().map_err(|e| fail("migrations", e))?;
+        let mut from_template = false;
+        if !self.empty_database {
+            // Chép database mẫu đã migrate (D-20261120-test-db-template); không chép được thì
+            // `up` bên dưới làm hết việc như trước.
+            from_template = crate::template::prepare(&config.database, &migrator).await;
+        }
         let database =
             Database::connect(&config.database).await.map_err(|e| fail("database", e))?;
-        let migrator = modules.migrator().map_err(|e| fail("migrations", e))?;
         migrator.up(&database).await.map_err(|e| fail("migrations", e))?;
         let registry = if self.multi {
             // Đặt thẳng chế độ (đặt `AUTOXIDE_TENANCY_MODE=multi` thì phải có cả khoá gốc); các
@@ -565,6 +591,7 @@ impl<'a> TestAppBuilder<'a> {
             database,
             registry,
             dns,
+            from_template,
         })
     }
 }
