@@ -517,6 +517,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step45-preorder-advance](D-20261120-step45-preorder-advance.md)** Trả trước một phần cho hàng đặt trước: một cài đặt điều kiện, phép chia thuần, phần còn lại qua link của `ledger`, giữ lại theo điều kiện đã chụp — 2026-11-20
 - **[D-20261120-step45-reviews-risk-reports](D-20261120-step45-reviews-risk-reports.md)** Đánh giá sau mua đặt ở `orders`, phiếu "hữu ích", tóm tắt AI chờ duyệt, chống bom hàng COD theo khoá liên hệ, báo cáo bán hàng truy vấn thẳng — 2026-11-20
 - **[D-20261120-step45-warranty-installment-fields](D-20261120-step45-warranty-installment-fields.md)** Bảo hành theo serial hay theo dòng mở khi giao xong, trả góp chỉ qua đối tác của `ledger`, ô người mua nhập lúc đặt hàng, hạn của người mua và cách trả trên giỏ — 2026-11-20
+- **[D-20261120-step47-customers](D-20261120-step47-customers.md)** Module `customers` (bước 47 mục 1–2): nhận diện theo số đã xác thực, người mua không cần permission, tổng chi từ event, che liên hệ, nhóm theo quy tắc là điều kiện SQL — 2026-11-20
 - **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
 
 ## Vận hành và hiệu năng

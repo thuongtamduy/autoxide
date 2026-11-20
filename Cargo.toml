@@ -70,6 +70,7 @@ autoxide-bookings = { path = "modules/bookings" }
 autoxide-conversations = { path = "modules/conversations" }
 autoxide-promotions = { path = "modules/promotions" }
 autoxide-orders = { path = "modules/orders" }
+autoxide-customers = { path = "modules/customers" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

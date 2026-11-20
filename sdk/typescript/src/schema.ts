@@ -4742,6 +4742,21 @@ export type CreateCommentRequest = {
   trap?: string | null;
 };
 
+/** A new customer group. */
+export type CreateCustomerGroupRequest = {
+  /** Up to 500 characters. */
+  description?: string | null;
+  /** `manual` (default: staff add members) or `rule` (members follow `rule`). */
+  kind?: string | null;
+  /** 1 to 100 characters, unique in the shop. */
+  name: string;
+  /** Unit of the group; only customers of that unit and below can match. Omitted: the root unit. */
+  org_id?: string | null;
+  /** Customer group code for price lists (`a-z`, `0-9`, `_`), e.g. `vip`. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+};
+
 /** A new endpoint. */
 export type CreateEndpointRequest = {
   /** What the endpoint is for, up to 200 characters. */
@@ -5105,6 +5120,100 @@ export type CustomerBookingRequest = {
   service_id: string;
   /** A `starts_at` from the availability. */
   starts_at: string;
+};
+
+/** Full contact details of a customer. */
+export type CustomerContact = {
+  email?: string | null;
+  /** E.164 form, e.g. `+84912345678`. */
+  phone?: string | null;
+};
+
+/** How many customers match a group now. */
+export type CustomerGroupPreview = {
+  matching: number;
+};
+
+/** A customer group. */
+export type CustomerGroupResponse = {
+  created_at: string;
+  description?: string | null;
+  id: string;
+  /** `manual` (staff add members) or `rule` (members follow the rule). */
+  kind: string;
+  /** Number of members (only when reading one group). */
+  members?: number | null;
+  name: string;
+  /** Unit of the group; the root unit means the whole shop. */
+  org_id: string;
+  /** Customer group code for price lists, if any. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+  updated_at: string;
+};
+
+/** Rule of a rule group: a customer belongs when ALL given conditions hold. */
+export type CustomerGroupRule = {
+  /** Ordered within the last N days (1 to 3650). */
+  last_order_within_days?: number | null;
+  /** At least this many orders (cancelled orders do not count). */
+  orders_count_min?: number | null;
+  /** Registered or first bought at one of these units or below them. */
+  org_in?: string[];
+  /** Has at least one of these tags (ids from `/api/v1/kernel/tags`). */
+  tags_any?: string[];
+  /** Membership tier code is one of these. */
+  tier_in?: string[];
+  /**
+   * Total spent at least this much, in the smallest unit of the shop's currency (e.g. `5000000`
+   * for 5,000,000 VND).
+   */
+  total_spent_min?: number | null;
+};
+
+/** One order in a customer's purchase history. */
+export type CustomerOrder = {
+  /** `web`, `pos` or a channel code. */
+  channel: string;
+  completed_at?: string | null;
+  /** Paid for goods: after discounts, with tax, without shipping. */
+  net: Money;
+  number: string;
+  order_id: string;
+  /** Selling unit. */
+  org_id: string;
+  placed_at: string;
+  refunded: Money;
+  /** Order status as last reported by orders. */
+  status: string;
+};
+
+/** A customer profile, as staff see it: phone and email are masked. */
+export type CustomerProfile = {
+  birthday?: string | null;
+  created_at: string;
+  /** Values of the shop's custom fields for customers. */
+  custom_fields: Record<string, unknown>;
+  /** Masked email, e.g. `n•••@gmail.com`. */
+  email_masked?: string | null;
+  first_order_at?: string | null;
+  full_name?: string | null;
+  /** `female`, `male` or `other`. */
+  gender?: string | null;
+  id: string;
+  last_order_at?: string | null;
+  /** Orders placed and not cancelled. */
+  orders_count: number;
+  /** Unit where the customer registered or first bought. */
+  org_id: string;
+  /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+  phone_masked?: string | null;
+  /** Membership tier code. */
+  tier?: string | null;
+  total_spent?: Money | null;
+  updated_at: string;
+  /** The buyer account of the profile, if linked. */
+  user_id?: string | null;
 };
 
 /** A customer account of the tenant's shop. */
@@ -7544,6 +7653,76 @@ export type Data_CustomFieldView = {
 };
 
 /** Envelope of a single result. */
+export type Data_CustomerContact = {
+  /** Full contact details of a customer. */
+  data: {
+    email?: string | null;
+    /** E.164 form, e.g. `+84912345678`. */
+    phone?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerGroupPreview = {
+  /** How many customers match a group now. */
+  data: {
+    matching: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerGroupResponse = {
+  /** A customer group. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    id: string;
+    /** `manual` (staff add members) or `rule` (members follow the rule). */
+    kind: string;
+    /** Number of members (only when reading one group). */
+    members?: number | null;
+    name: string;
+    /** Unit of the group; the root unit means the whole shop. */
+    org_id: string;
+    /** Customer group code for price lists, if any. */
+    price_group?: string | null;
+    rule?: CustomerGroupRule | null;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CustomerProfile = {
+  /** A customer profile, as staff see it: phone and email are masked. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    /** Values of the shop's custom fields for customers. */
+    custom_fields: Record<string, unknown>;
+    /** Masked email, e.g. `n•••@gmail.com`. */
+    email_masked?: string | null;
+    first_order_at?: string | null;
+    full_name?: string | null;
+    /** `female`, `male` or `other`. */
+    gender?: string | null;
+    id: string;
+    last_order_at?: string | null;
+    /** Orders placed and not cancelled. */
+    orders_count: number;
+    /** Unit where the customer registered or first bought. */
+    org_id: string;
+    /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+    phone_masked?: string | null;
+    /** Membership tier code. */
+    tier?: string | null;
+    total_spent?: Money | null;
+    updated_at: string;
+    /** The buyer account of the profile, if linked. */
+    user_id?: string | null;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CustomerResponse = {
   /** A customer account of the tenant's shop. */
   data: {
@@ -9241,6 +9420,24 @@ export type Data_ModuleInfo = {
     subscriptions: string[];
     /** MCP tools the module offers at `/mcp`. */
     tools: ModuleTool[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_MyCustomerProfile = {
+  /** The buyer's own profile: nothing is masked. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    email?: string | null;
+    full_name?: string | null;
+    gender?: string | null;
+    id: string;
+    orders_count: number;
+    /** The verified phone of the account, in E.164 form. */
+    phone?: string | null;
+    tier?: string | null;
+    total_spent?: Money | null;
   };
 };
 
@@ -18542,6 +18739,21 @@ export type MoveUnitRequest = {
   parent_id: string;
 };
 
+/** The buyer's own profile: nothing is masked. */
+export type MyCustomerProfile = {
+  birthday?: string | null;
+  created_at: string;
+  email?: string | null;
+  full_name?: string | null;
+  gender?: string | null;
+  id: string;
+  orders_count: number;
+  /** The verified phone of the account, in E.164 form. */
+  phone?: string | null;
+  tier?: string | null;
+  total_spent?: Money | null;
+};
+
 /** A permission the caller holds. */
 export type MyPermission = {
   /** What it allows, in the language of `Accept-Language`. */
@@ -21438,6 +21650,81 @@ export type Page_ConversationReport = {
     /** `open` or `resolved`. */
     status: string;
     thread_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerGroupResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    created_at: string;
+    description?: string | null;
+    id: string;
+    /** `manual` (staff add members) or `rule` (members follow the rule). */
+    kind: string;
+    /** Number of members (only when reading one group). */
+    members?: number | null;
+    name: string;
+    /** Unit of the group; the root unit means the whole shop. */
+    org_id: string;
+    /** Customer group code for price lists, if any. */
+    price_group?: string | null;
+    rule?: CustomerGroupRule | null;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerOrder = {
+  /** The items of this page, in the requested order. */
+  data: {
+    /** `web`, `pos` or a channel code. */
+    channel: string;
+    completed_at?: string | null;
+    /** Paid for goods: after discounts, with tax, without shipping. */
+    net: Money;
+    number: string;
+    order_id: string;
+    /** Selling unit. */
+    org_id: string;
+    placed_at: string;
+    refunded: Money;
+    /** Order status as last reported by orders. */
+    status: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CustomerProfile = {
+  /** The items of this page, in the requested order. */
+  data: {
+    birthday?: string | null;
+    created_at: string;
+    /** Values of the shop's custom fields for customers. */
+    custom_fields: Record<string, unknown>;
+    /** Masked email, e.g. `n•••@gmail.com`. */
+    email_masked?: string | null;
+    first_order_at?: string | null;
+    full_name?: string | null;
+    /** `female`, `male` or `other`. */
+    gender?: string | null;
+    id: string;
+    last_order_at?: string | null;
+    /** Orders placed and not cancelled. */
+    orders_count: number;
+    /** Unit where the customer registered or first bought. */
+    org_id: string;
+    /** Masked phone, e.g. `09•• ••• 412`; `GET /customers/{id}/contact` shows it in full. */
+    phone_masked?: string | null;
+    /** Membership tier code. */
+    tier?: string | null;
+    total_spent?: Money | null;
+    updated_at: string;
+    /** The buyer account of the profile, if linked. */
+    user_id?: string | null;
   }[];
   pagination: Pagination;
 };
@@ -26733,6 +27020,25 @@ export type RefreshRequest = {
   refresh_token: string;
 };
 
+/** A customer registered at the counter. */
+export type RegisterCustomerRequest = {
+  birthday?: string | null;
+  /** Values of the shop's custom fields for customers. */
+  custom_fields?: Record<string, unknown> | null;
+  email?: string | null;
+  /** Up to 200 characters. */
+  full_name?: string | null;
+  /** `female`, `male` or `other`. */
+  gender?: string | null;
+  /**
+   * Unit where the customer registers; you need `customers.manage` there. Omitted: the root
+   * unit.
+   */
+  org_id?: string | null;
+  /** Phone number, e.g. `0912345678` or `+84912345678`. */
+  phone: string;
+};
+
 /** A new account created by its owner. */
 export type RegisterRequest = {
   /** Email; also the sign-in name. */
@@ -30130,6 +30436,27 @@ export type UpdateCommentRequest = {
   status: CommentStatus;
 };
 
+/** Changes to a customer group. Omitted fields stay as they are; the kind and unit never change. */
+export type UpdateCustomerGroupRequest = {
+  /** An empty string clears it. */
+  description?: string | null;
+  name?: string | null;
+  /** An empty string clears it. */
+  price_group?: string | null;
+  rule?: CustomerGroupRule | null;
+};
+
+/** Changes to a customer. Omitted fields stay as they are; an empty string clears a text. */
+export type UpdateCustomerProfileRequest = {
+  birthday?: string | null;
+  /** Custom field values to set; `null` clears a field. */
+  custom_fields?: Record<string, unknown> | null;
+  email?: string | null;
+  full_name?: string | null;
+  /** `female`, `male`, `other` or an empty string. */
+  gender?: string | null;
+};
+
 /** Changes to a customer account. Omitted fields stay as they are. */
 export type UpdateCustomerRequest = {
   /** `true` disables the account and signs it out everywhere; `false` enables it. */
@@ -30243,6 +30570,16 @@ export type UpdateMeRequest = {
   name?: string | null;
   /** Preferred IANA time zone, e.g. `Asia/Ho_Chi_Minh`; `null` clears it. */
   time_zone?: string | null;
+};
+
+/** Changes to your profile. Omitted fields stay as they are; an empty string clears a text. */
+export type UpdateMyCustomerProfileRequest = {
+  birthday?: string | null;
+  email?: string | null;
+  /** Up to 200 characters. */
+  full_name?: string | null;
+  /** `female`, `male`, `other` or an empty string. */
+  gender?: string | null;
 };
 
 /**
@@ -37151,6 +37488,226 @@ export interface paths {
         403: Problem;
         404: Problem;
         413: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers": {
+    /** List the customers in your scope. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { q?: string; group_id?: string; tier?: string; tags?: string; org_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Register a customer at the counter by phone number. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: RegisterCustomerRequest;
+      responses: {
+        201: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups": {
+    /** List customer groups. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a customer group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateCustomerGroupRequest;
+      responses: {
+        201: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}": {
+    /** Get a customer group with its number of members. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a customer group. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerGroupRequest;
+      responses: {
+        200: Data_CustomerGroupResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Delete a customer group and its memberships. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}/members/{profile_id}": {
+    /** Add a customer to a manual group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; profile_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+    /** Remove a customer from a manual group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string; profile_id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/groups/{id}/preview": {
+    /** Count the customers a group matches now. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerGroupPreview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me": {
+    /** Get your customer profile (created on first visit). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_MyCustomerProfile;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Change your customer profile. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: UpdateMyCustomerProfileRequest;
+      responses: {
+        200: Data_MyCustomerProfile;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/orders": {
+    /** List your orders as the shop's customer history sees them. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerOrder;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}": {
+    /** Get a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Change a customer. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: UpdateCustomerProfileRequest;
+      responses: {
+        200: Data_CustomerProfile;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        412: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/contact": {
+    /** Show the full phone number and email of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { reason?: string }; };
+      responses: {
+        200: Data_CustomerContact;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/orders": {
+    /** List the orders of a customer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CustomerOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

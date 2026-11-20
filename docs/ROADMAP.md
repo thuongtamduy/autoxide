@@ -692,10 +692,12 @@ Bắt đầu SAU bước 45 và 37. Sàn là một khách; người bán là nú
 
 Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (bước 34); module này giữ hồ sơ bán hàng.
 
-- [ ] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi; nhãn, ghi chú, trường tự định nghĩa dùng chỗ
-      chung của bước 51 (D-237); che số điện thoại / email, xem đủ cần permission và ghi audit (D-226)
-- [ ] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
-      hạng thành viên làm điều kiện khuyến mại (D-222)
+- [x] Hồ sơ khách: lịch sử mua (từ event của `orders`), tổng chi; nhãn, ghi chú, trường tự định nghĩa dùng chỗ
+      chung của bước 51 (D-237); che số điện thoại / email, xem đủ cần permission và ghi audit (D-226) —
+      D-20261120-step47-customers
+- [x] Nhóm và phân khúc theo quy tắc, dùng cho bảng giá (bước 41) và khuyến mại (bước 43); phân khúc và
+      hạng thành viên làm điều kiện khuyến mại (D-222) — nhóm cắm vào `orders` qua `BuyerGroups`; hạng có giá trị
+      khi mục điểm thưởng / hạng xong
 - [ ] Điểm thưởng và hạng thành viên: sổ điểm chỉ thêm, điểm có hạn dùng, quy tắc tích / đổi là dữ liệu;
       điểm chưa dùng là nghĩa vụ ghi trong sổ cái; cơ sở tính điểm thống nhất (D-226)
 - [ ] Thẻ quà tặng và số dư cửa hàng: chỉ dùng mua hàng của chính khách đó, không rút ra tiền, không chuyển
