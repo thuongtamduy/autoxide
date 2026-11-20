@@ -9,10 +9,14 @@
 //! # }
 //! ```
 //!
-//! App của test không chạy việc nền (bộ phát event, job) nên mọi câu ghi lại là của chính việc
-//! được đo.
+//! App của test không chạy việc nền (bộ phát event, job). Riêng nhật ký request được một tác vụ
+//! nền ghi theo lô, có thể rơi đúng vào lượt đo (đỏ ngẫu nhiên trên Postgres) và không thuộc đường
+//! xử lý của request — câu ghi vào `kernel_request_log` không được đếm.
 
 use std::sync::{Arc, Mutex, PoisonError};
+
+/// Câu ghi nhật ký request của tác vụ nền (xem đầu file) — bỏ qua khi đếm.
+const REQUEST_LOG_INSERT: &str = "INSERT INTO \"kernel_request_log\"";
 
 /// Sổ ghi câu SQL: chỉ ghi khi đang có một lượt đo.
 #[derive(Default)]
@@ -29,7 +33,9 @@ impl StatementLog {
         Arc::new(move |sql: &str| {
             // Một test panic giữa chừng làm Mutex "nhiễm độc"; dữ liệu bên trong vẫn dùng được.
             let mut recording = log.recording.lock().unwrap_or_else(PoisonError::into_inner);
-            if let Some(statements) = recording.as_mut() {
+            if let Some(statements) = recording.as_mut()
+                && !sql.starts_with(REQUEST_LOG_INSERT)
+            {
                 statements.push(sql.to_owned());
             }
         })
