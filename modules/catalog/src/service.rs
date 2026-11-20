@@ -66,6 +66,8 @@ pub(crate) struct CatalogService {
     pub(crate) listing_gate: std::sync::OnceLock<Arc<dyn crate::api::ListingGate>>,
     /// Sổ nguồn gợi ý tìm của mọi module (kernel), cho `GET /public/search/suggest`.
     pub(crate) suggestions: autoxide_kernel::suggest::SuggestSources,
+    /// `dyn Embedder` của module `ai` khi đã cài: sản phẩm tương tự theo ý nghĩa.
+    pub(crate) embedder: Option<Arc<dyn autoxide_kernel::ai::Embedder>>,
 }
 
 impl crate::api::CatalogExtensions for CatalogService {

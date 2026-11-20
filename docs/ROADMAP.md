@@ -463,7 +463,7 @@ bước 35.
 - [x] Đọc công khai cho website: danh sách, lọc theo danh mục / thuộc tính / khoảng giá, tìm (hợp đồng tìm kiếm
       của kernel), ETag và cache như `content`, sitemap; giá sau giảm tự động và lọc `on_sale`; sản phẩm của
       người bán trên website của chuỗi (`seller`, `sold_by`, facet, `ProductCard.seller`)
-- [ ] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm gom sản phẩm, danh mục, bài viết, cửa hàng qua một
+- [x] Tìm và lọc như các site hàng đầu (D-201): gợi ý tìm gom sản phẩm, danh mục, bài viết, cửa hàng qua một
       trait; khớp đúng dấu xếp trước không dấu; từ đồng nghĩa theo khách; sắp bán chạy và đánh giá; số đếm theo
       từng giá trị lọc (có giới hạn, có index, cả hai database)
 - [x] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
@@ -476,7 +476,7 @@ bước 35.
 - [ ] Loại sản phẩm: hàng vật lý, hàng số (link ký có hạn qua `files`, giới hạn lượt tải), dịch vụ (không
       giao hàng), combo / bộ sản phẩm trừ kho từng thành phần; hàng đặt trước (`sale_mode`, ngày dự kiến có
       hàng, giới hạn suất — D-204)
-- [ ] Gợi ý sản phẩm: sản phẩm tương tự theo ý nghĩa (embedding sẵn có của module `ai`); "thường mua cùng"
+- [x] Gợi ý sản phẩm: sản phẩm tương tự theo ý nghĩa (embedding sẵn có của module `ai`); "thường mua cùng"
 - [ ] Hỏi đáp và ảnh song ngữ (D-202): `catalog.product` trong sổ đối tượng, nhãn `seller` (permission quản lý
       sản phẩm ở nút sở hữu), event vòng đời (lưu trữ / xoá → đóng và ẩn hỏi đáp); `catalog_product_media`
       ghi đè `alt` theo ngôn ngữ như `media_alt_translations`
@@ -932,17 +932,18 @@ khai là tự chạy.
 Core chỉ có API nên app điện thoại, app máy tính, máy bán hàng tại quầy đã dùng được phần lớn; bước này lấp phần còn
 thiếu. Các bước nền đã xong: bắt đầu được ngay, song song với 41–49.
 
-- [ ] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
+- [x] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
       sinh lại; gate kiểm khớp OpenAPI, CI biên dịch; đăng lên kho gói cần tài khoản — dừng hỏi chủ dự án
+      (chưa đăng: chờ chủ dự án cấp tài khoản Swift Package Index, Maven Central, pub.dev)
 - [x] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
       (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database
-- [ ] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
+- [x] WebSocket hai chiều `GET /kernel/events/ws` dùng chung `StreamHub` và bộ lọc quyền của SSE, nối lại không mất
       event, chỉ nhận lệnh điều khiển (đăng ký, đang gõ, online) — ghi dữ liệu vẫn qua REST
 - [x] Mua trong ứng dụng: trait `StorePurchases` (App Store Server API, Google Play Developer API, thông báo máy chủ
       có kiểm chữ ký) + bộ giả, `plans` nối vào thuê bao và quyền dùng, gọi lại không cấp trùng; tiền do Apple /
       Google giữ (D-187); căn cứ thuế ghi trong quyết định; bộ nối thật cần tài khoản — dừng hỏi chủ dự án
-- [ ] Hướng dẫn `docs/guides/mobile.md` + `.vi.md`: đăng nhập và làm mới token, PKCE cho app, thông báo đẩy, tải ảnh
+- [x] Hướng dẫn `docs/guides/mobile.md` + `.vi.md`: đăng nhập và làm mới token, PKCE cho app, thông báo đẩy, tải ảnh
       thẳng lên S3, nhận event, đồng bộ ngoại tuyến, mua trong ứng dụng, dùng SDK; ví dụ chạy như test
 
 ## Sau core (chưa mở)

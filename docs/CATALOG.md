@@ -122,6 +122,8 @@ Every answer has an `ETag` (send it back in `If-None-Match` to get 304) and
 | `GET /public/products/by-slug/{slug}?locale=vi` | the product page: variants with current prices, images, attributes, categories, other languages |
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | visible categories (a category under a hidden one is hidden) |
 | `GET /public/sitemap` | every product address in every language, at most 200 per page |
+| `GET /public/products/{id}/similar?locale=vi` | up to 12 products whose texts mean something close (AI embeddings); without embeddings, products of the same categories, best sellers first |
+| `GET /public/products/{id}/frequently-bought-together?locale=vi` | up to 12 products found in the same completed orders over the last 90 days, most orders first |
 
 Product cards carry `variant_summary` ("3 sizes"), `brand` (the attribute with code `brand`) and
 `unit_price` (price per kg, l, m or piece) when a variant has a net content (`net_quantity` +
@@ -137,6 +139,13 @@ Search helpers:
   attribute value and per seller (the counts of one filter ignore that filter).
 - `GET` / `PUT /synonyms` — the tenant's synonym groups (`[["áo thun", "áo phông", "tee"]]`); search
   and suggestions use them (`catalog.categories.manage`).
+
+Best sellers and ratings come from module `orders`: each completed order (`orders.order_completed`)
+counts its products once (a redelivered event is not counted twice), over a rolling 90-day window that
+a daily job (`catalog.refresh_sales`) moves forward; review events carry the product's current review
+count and star total. The same orders feed "frequently bought together". "Similar" needs the `ai`
+module with embeddings on (`AUTOXIDE_EMBEDDING_PROVIDER` and the other `AUTOXIDE_EMBEDDING_*` settings): each product on sale gets one vector per
+language, and its list of similar products is computed when it is indexed, not on each read.
 
 Which products a website shows: those of its own unit, of the units above it, and of sellers below
 it (`seller.own = false` on the card). A store hides a product of its chain with

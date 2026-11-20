@@ -66,6 +66,14 @@ pub(crate) const MAX_PER_USER: Setting = Setting::new(
 )
 .with_default("5");
 
+pub(crate) const WS_RECHECK_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_EVENTS_WS_RECHECK_SECONDS",
+    "How often (seconds, 1 to 3600) an open WebSocket of `GET /api/v1/kernel/events/ws` checks \
+     its credentials again; when they no longer hold (token expired, account locked) the server \
+     closes it with code 4401.",
+)
+.with_default("60");
+
 /// Lùi lại chừng này mỗi lượt hỏi (xem đầu file): transaction ghi phải ngắn (luật dữ liệu), nên
 /// 5 giây giữa lúc ghi event và lúc commit là dư.
 pub(crate) const GRACE: Duration = Duration::from_secs(5);
@@ -92,6 +100,8 @@ pub(crate) struct StreamConfig {
     pub max_connections: usize,
     pub max_per_tenant: usize,
     pub max_per_user: usize,
+    /// WebSocket xét lại thông tin xác thực sau mỗi khoảng này (bước 69 P3).
+    pub ws_recheck: Duration,
 }
 
 impl Default for StreamConfig {
@@ -102,6 +112,7 @@ impl Default for StreamConfig {
             max_connections: 1000,
             max_per_tenant: 200,
             max_per_user: 5,
+            ws_recheck: Duration::from_secs(60),
         }
     }
 }
@@ -117,12 +128,14 @@ impl StreamConfig {
         let total = reader.get_with(&MAX_CONNECTIONS, |raw| parse_in_range(raw, 1usize, 100_000));
         let tenant = reader.get_with(&MAX_PER_TENANT, |raw| parse_in_range(raw, 1usize, 100_000));
         let user = reader.get_with(&MAX_PER_USER, |raw| parse_in_range(raw, 1usize, 1000));
+        let recheck = reader.get_with(&WS_RECHECK_SECONDS, |raw| parse_in_range(raw, 1u64, 3600));
         Ok(StreamConfig {
             enabled: enabled?,
             poll: Duration::from_millis(poll?),
             max_connections: total?,
             max_per_tenant: tenant?,
             max_per_user: user?,
+            ws_recheck: Duration::from_secs(recheck?),
         })
     }
 }
@@ -256,6 +269,11 @@ impl StreamHub {
         self.0.config.enabled
     }
 
+    /// Khoảng WebSocket xét lại thông tin xác thực.
+    pub(crate) fn ws_recheck(&self) -> Duration {
+        self.0.config.ws_recheck
+    }
+
     /// Số stream đang mở ở tiến trình này.
     pub fn open_streams(&self) -> usize {
         lock(&self.0.counts).total
@@ -337,13 +355,35 @@ impl StreamHub {
         filter: StreamFilter,
         last_event_id: Option<Uuid>,
     ) -> Result<mpsc::Receiver<Frame>, Error> {
-        if *self.0.closed.borrow() {
+        let ticket = self.session(tenant, filter.user)?;
+        Ok(self.connect(tenant, filter, last_event_id, Some(ticket)))
+    }
+
+    /// Giữ một chỗ kết nối cho cả một phiên (WebSocket, bước 69 P3): phiên đổi bộ lọc nhiều lần,
+    /// mỗi lần [`connect`](Self::connect) không vé, vẫn chỉ tính một kết nối. Hub đang đóng → 503.
+    pub(crate) fn session(&self, tenant: &TenantContext, user: Uuid) -> Result<Ticket, Error> {
+        if self.is_closed() {
             return Err(Error::unavailable(
                 "shutting_down",
                 "The server is shutting down. Connect again; another server will answer.",
             ));
         }
-        let ticket = self.admit(tenant.id(), filter.user)?;
+        self.admit(tenant.id(), user)
+    }
+
+    /// Hub đã đóng (tiến trình đang tắt).
+    pub(crate) fn is_closed(&self) -> bool {
+        *self.0.closed.borrow()
+    }
+
+    /// Nối một luồng khung với bộ lọc `filter`; `ticket`: chỗ đã giữ (`None` khi phiên giữ chỗ).
+    pub(crate) fn connect(
+        &self,
+        tenant: &TenantContext,
+        filter: StreamFilter,
+        last_event_id: Option<Uuid>,
+        ticket: Option<Ticket>,
+    ) -> mpsc::Receiver<Frame> {
         let source = self.attach(tenant);
         // Đăng ký nhận TRƯỚC khi đọc bù: event phát trong lúc đọc bù không lọt giữa hai bên.
         let live = self.0.sender.subscribe();
@@ -361,7 +401,7 @@ impl StreamHub {
             _source: source,
         };
         tokio::spawn(connection.run());
-        Ok(receiver)
+        receiver
     }
 
     /// Giữ một chỗ trong giới hạn kết nối (trả lại khi vé bị bỏ).
@@ -570,7 +610,7 @@ struct Connection {
     delivered: HashMap<Uuid, DateTime<Utc>>,
     /// ID cuối đã gửi (hay client báo qua `Last-Event-ID`).
     last: Option<Uuid>,
-    _ticket: Ticket,
+    _ticket: Option<Ticket>,
     _source: Attachment,
 }
 
@@ -658,7 +698,7 @@ impl Connection {
 }
 
 /// Chỗ đã giữ trong giới hạn kết nối; bỏ thì trả lại.
-struct Ticket {
+pub(crate) struct Ticket {
     hub: StreamHub,
     tenant: TenantId,
     user: Uuid,

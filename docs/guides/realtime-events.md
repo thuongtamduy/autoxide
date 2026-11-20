@@ -55,6 +55,10 @@ Delivery is **at least once**. When the connection drops, reconnect with the `La
 
 Events are kept 7 days. When your last id is older, the stream sends `event: reset` first: reload your data over REST, then keep listening. The server also closes each stream after 30 minutes (so a removed permission takes effect) and when it shuts down; reconnect the same way. Several servers behind a load balancer are fine: every server reads events from the database, so you may reconnect to any of them.
 
+## Two-way: WebSocket
+
+Apps that also send live signals ("typing", "online") — chat, a courier's position screen — use `GET /api/v1/kernel/events/ws` instead: the same events, permissions, resuming and limits over a WebSocket, plus control messages from the app. Data is still written over REST. See [Building a mobile or desktop app](mobile.md#7-real-time-events-and-live-signals).
+
 ## Limits
 
 Each server keeps at most `AUTOXIDE_EVENTS_STREAM_MAX_PER_USER` streams per user (default 5), `AUTOXIDE_EVENTS_STREAM_MAX_PER_TENANT` per tenant (200) and `AUTOXIDE_EVENTS_STREAM_MAX_CONNECTIONS` in all (1000); more answer `429 kernel.stream_too_many`. Open one stream per screen with every event name it needs, not one per event. Behind Nginx, the response already carries `X-Accel-Buffering: no`; other proxies must not buffer `text/event-stream`.

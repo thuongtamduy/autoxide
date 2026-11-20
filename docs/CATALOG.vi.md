@@ -113,6 +113,8 @@ lại trong `If-None-Match` để nhận 304) và `Cache-Control: public, no-cac
 | `GET /public/products/by-slug/{slug}?locale=vi` | trang sản phẩm: biến thể kèm giá hiện tại, ảnh, thuộc tính, danh mục, ngôn ngữ khác |
 | `GET /public/categories?locale=vi` · `GET /public/categories/{slug}?locale=vi` | danh mục đang hiện (danh mục nằm dưới danh mục ẩn cũng ẩn) |
 | `GET /public/sitemap` | mọi đường dẫn sản phẩm ở mọi ngôn ngữ, tối đa 200 mỗi trang |
+| `GET /public/products/{id}/similar?locale=vi` | tối đa 12 sản phẩm có nội dung gần nghĩa (embedding của AI); không có embedding thì sản phẩm cùng danh mục, bán chạy trước |
+| `GET /public/products/{id}/frequently-bought-together?locale=vi` | tối đa 12 sản phẩm nằm cùng đơn hoàn tất trong 90 ngày qua, nhiều đơn nhất trước |
 
 Thẻ sản phẩm có `variant_summary` ("3 cỡ"), `brand` (thuộc tính mã `brand`) và `unit_price` (giá mỗi
 kg, l, m hay cái) khi biến thể có lượng tịnh (`net_quantity` + `net_unit`, vd 500 và `g`). Trang sản
@@ -128,6 +130,13 @@ Hỗ trợ tìm:
   trị thuộc tính và theo người bán (số đếm của một bộ lọc không lọc theo chính nó).
 - `GET` / `PUT /synonyms` — nhóm từ đồng nghĩa của khách (`[["áo thun", "áo phông", "tee"]]`); tìm và
   gợi ý dùng chúng (`catalog.categories.manage`).
+
+Bán chạy và điểm đánh giá lấy từ module `orders`: mỗi đơn hoàn tất (`orders.order_completed`) đếm
+sản phẩm của nó một lần (event nhận lại không đếm hai lần), trong cửa sổ 90 ngày mà job hằng ngày
+(`catalog.refresh_sales`) dời tới; event đánh giá mang tổng số đánh giá và tổng số sao hiện tại của sản
+phẩm. Cũng các đơn đó cho "thường mua cùng". "Tương tự" cần module `ai` bật embedding
+(`AUTOXIDE_EMBEDDING_PROVIDER` và các biến `AUTOXIDE_EMBEDDING_*` khác): mỗi sản phẩm đang bán có một vector mỗi ngôn ngữ, danh sách sản phẩm tương
+tự tính lúc lập index, không tính lúc đọc.
 
 Website hiện sản phẩm nào: của chính nút đó, của các nút cấp trên, và của người bán bên dưới nó
 (`seller.own = false` trên thẻ). Cửa hàng ẩn một sản phẩm của chuỗi bằng

@@ -287,9 +287,11 @@ impl CatalogService {
             .scoped(tenant)
             .all(&transaction)
             .await?;
-        // Giữ cột do module khác ghi (bán chạy, đánh giá, giá sau giảm): chỉ ghi đè cột tính ở đây.
+        // Giữ giá sau giảm do `promotions` ghi: chỉ ghi đè cột tính ở đây. Bán chạy và điểm đánh
+        // giá lấy từ `catalog_product_stats` (nguồn của hai cột đó), kể cả dòng mới dựng.
         let keep: HashMap<(Uuid, Uuid), &storefront_entry::Model> =
             existing.iter().map(|row| ((row.org_id, row.product_id), row)).collect();
+        let stats = self.product_stats(&transaction, tenant, ids).await?;
         storefront_entry::Entity::delete_many()
             .filter(storefront_entry::Column::ProductId.is_in(ids.iter().copied()))
             .scoped(tenant)
@@ -297,17 +299,21 @@ impl CatalogService {
             .await?;
         for (mut entry, sale_computed) in entries {
             let key = (*entry.org_id.as_ref(), *entry.product_id.as_ref());
-            if let Some(old) = keep.get(&key) {
-                entry.best_selling = Set(old.best_selling);
-                entry.rating_x100 = Set(old.rating_x100);
-                entry.rating_count = Set(old.rating_count);
-                if !sale_computed {
-                    entry.sale_price_minor = Set(old.sale_price_minor);
-                    entry.sale_ends_at = Set(old.sale_ends_at);
-                }
+            if let Some((units, score, count)) = stats.get(&key.1) {
+                entry.best_selling = Set(*units);
+                entry.rating_x100 = Set(*score);
+                entry.rating_count = Set(*count);
+            }
+            if let Some(old) = keep.get(&key)
+                && !sale_computed
+            {
+                entry.sale_price_minor = Set(old.sale_price_minor);
+                entry.sale_ends_at = Set(old.sale_ends_at);
             }
             entry.insert(&transaction).await?;
         }
+        // Chữ hay trạng thái đổi thì vector của sản phẩm tương tự cũng phải lập lại.
+        self.queue_embeddings(&transaction, tenant, ids).await?;
         transaction.commit().await?;
         Ok(())
     }

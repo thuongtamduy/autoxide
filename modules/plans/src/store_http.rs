@@ -193,10 +193,10 @@ pub(crate) struct ClaimRequest {
     responses(
         (status = 200, description = "Your subscription after the purchase.", body = Data<SubscriptionResponse>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `plans.billing.manage` (`permission_denied`), or the platform tenant (`plans.platform_exempt`).", body = Problem),
+        (status = 403, description = "Missing `plans.billing.manage`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such store; code `plans.store_unknown`.", body = Problem),
         (status = 409, description = "The purchase pays for another tenant (`plans.store_purchase_taken`), is no longer active (`plans.store_purchase_inactive`), or the plan is not sold (`plans.plan_not_active`).", body = Problem),
-        (status = 422, description = "The store does not confirm the purchase (`errors` on `proof`), or its product is not linked to a plan (`plans.store_product_unknown`).", body = Problem),
+        (status = 422, description = "The store does not confirm the purchase (`errors` on `proof`), its product is not linked to a plan (`plans.store_product_unknown`), or the tenant is the platform, which no plan limits (`plans.platform_exempt`).", body = Problem),
         (status = 503, description = "This store is not set up on the server; code `plans.store_unavailable`.", body = Problem),
     )
 )]
