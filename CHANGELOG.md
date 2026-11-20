@@ -1400,6 +1400,10 @@ endpoints are marked deprecated with a sunset date first.
 
 ### Fixed
 
+- Event stream (`GET /api/v1/kernel/events`, `/events/ws`): reconnecting with `Last-Event-ID` no longer
+  sends that same event again when its live broadcast arrives after the reconnect.
+- `catalog`: two storefront rebuilds of the same product running at once on PostgreSQL no longer both
+  record `catalog.display_price_changed` (product rows are locked during the rebuild).
 - `lettre` 0.11.24 (mail over SMTP): fixes RUSTSEC-2026-0560 … 0565 (STARTTLS reply injection, SMTP command
   injection, panics on malformed replies, wrong recipient for quoted local parts).
 - The fake e-invoice provider of `autoxide-testkit` gives the same answer to every status check of one submission, so

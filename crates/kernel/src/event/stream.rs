@@ -389,13 +389,17 @@ impl StreamHub {
         let live = self.0.sender.subscribe();
         self.start_poller();
         let (sender, receiver) = mpsc::channel(256);
+        // Client nối lại đã có event `Last-Event-ID`: coi như đã gửi, kẻo bản phát trực tiếp của
+        // chính event đó đến trễ (poller chưa phát lúc client ngắt) lại gửi lần nữa.
+        let delivered: HashMap<Uuid, DateTime<Utc>> =
+            last_event_id.and_then(|id| time_of(id).map(|at| (id, at))).into_iter().collect();
         let connection = Connection {
             hub: self.clone(),
             database: tenant.database().clone(),
             filter,
             live,
             sender,
-            delivered: HashMap::new(),
+            delivered,
             last: last_event_id,
             _ticket: ticket,
             _source: source,
