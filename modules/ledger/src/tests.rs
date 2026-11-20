@@ -933,3 +933,52 @@ async fn kiem_chuoi_bam_cua_so_theo_yeu_cau() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn nang_san_dong_thoi_voi_ghi_khong_xuong_duoi_san() {
+    TestDatabase::run(async |test| {
+        let (app, _) = app(test).await;
+        let tenant = app.default_tenant();
+        let ledger = ledger(&app);
+        ledger
+            .post(&tenant, Actor::system(), transfer("cash.on_hand", "equity.opening", 100, "OPEN"))
+            .await
+            .unwrap();
+        let cash = account_id(&app, &tenant, "cash.on_hand").await;
+        // Nâng sàn lên đúng số dư trong lúc các khoản chi đang ghi. Thứ tự nào cũng được, nhưng số dư
+        // không bao giờ dưới sàn: Postgres từng cho bút toán dùng sàn cũ (chưa có) sau khi sàn mới
+        // đã chốt.
+        let spends: Vec<_> = (0..10)
+            .map(|index| {
+                let (ledger, tenant) = (ledger.clone(), tenant.clone());
+                tokio::spawn(async move {
+                    let entry = transfer(
+                        "expense.gateway_fee",
+                        "cash.on_hand",
+                        10,
+                        &format!("FEE-{index}"),
+                    );
+                    ledger.post(&tenant, Actor::system(), entry).await
+                })
+            })
+            .collect();
+        let floor = json!({"floor": {"amount": "100", "currency": "VND"}});
+        let (status, answer) =
+            call(&app, "PATCH", &format!("/accounts/{cash}"), "acct", Some(floor)).await;
+        for spend in spends {
+            if let Err(error) = spend.await.unwrap() {
+                assert_eq!(error.code(), "ledger.insufficient_balance");
+            }
+        }
+        let balance = balance_of(&app, &tenant, "cash.on_hand").await;
+        let (_, got) = call(&app, "GET", &format!("/accounts/{cash}"), "acct", None).await;
+        if status == StatusCode::OK {
+            assert_eq!(got["data"]["floor"]["amount"], "100", "{got}");
+            assert!(balance >= 100, "balance {balance} below the floor");
+        } else {
+            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{answer}");
+        }
+    })
+    .await
+    .unwrap();
+}

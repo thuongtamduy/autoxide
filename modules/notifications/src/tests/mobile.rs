@@ -154,3 +154,24 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn dang_ky_cung_token_dong_thoi_van_gui_duoc() {
+    TestDatabase::run(async |test| {
+        let fx = fixture(test).await;
+        // Ứng dụng đăng ký lại token hai lần cùng lúc (mở app, làm mới token). Postgres từng cho cả
+        // hai cùng thấy "chưa có": bản mã gắn ID của bên thua nằm trong dòng mang ID bên thắng, gửi
+        // tin không giải mã được, và bên thua nhận 500.
+        let (first, second) = tokio::join!(
+            register(&fx, "alice", "apns-token-race"),
+            register(&fx, "alice", "apns-token-race")
+        );
+        assert_eq!(first, second);
+        fx.notifier.notify(DEFAULT_TENANT, to_alice(&PUSHED, "m-race")).await.unwrap();
+        run_jobs(&fx.app).await;
+        assert_eq!(statuses(&fx.app, "m-race").await["mobile_push"].0, "sent");
+        assert_eq!(fx.mobile_push.count(), 1);
+    })
+    .await
+    .unwrap();
+}

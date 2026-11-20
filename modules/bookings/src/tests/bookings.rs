@@ -548,3 +548,89 @@ async fn cua_hang_dat_ho_va_nhan_vien_thay_lich_cua_minh() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn coc_ve_dung_luc_het_han_khong_xac_nhan_tren_cho_da_nha() {
+    TestDatabase::run(async |test| {
+        let (shop, ledger) = shop(test).await;
+        let lan = staff(&shop, "Lan").await;
+        let deposit = json!({"deposit": {"kind": "percent", "value": 50}});
+        let haircut = service(&shop, 60, 0, deposit, &[&lan]).await;
+        let day = next_monday();
+        for (hour, who) in [(9, "ann"), (10, "cam"), (11, "dan")] {
+            let start = at(day, hour, 0);
+            let (status, body) = book(&shop, who, &haircut, start, json!({})).await;
+            assert_eq!(status, StatusCode::CREATED, "{body}");
+            let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
+            sql(
+                &shop,
+                "UPDATE bookings_bookings SET hold_expires_at = created_at WHERE status = 'held'",
+            )
+            .await;
+            // Tiền cọc về đúng lúc job hết hạn chạy. Thứ tự nào cũng được, nhưng lịch `confirmed`
+            // thì chỗ phải còn giữ; Postgres từng ghi `expired` thành `confirmed` sau khi chỗ đã nhả.
+            tokio::join!(expire_now(&shop), paid(&shop, &ledger, &id));
+            drain(&shop).await;
+            let (_, got) =
+                call(&shop, "GET", &format!("/bookings/bookings/{id}"), Some(who), None).await;
+            let (status, body) = book(&shop, "ben", &haircut, start, json!({})).await;
+            match got["data"]["status"].as_str() {
+                Some("confirmed") => assert_eq!(status, StatusCode::CONFLICT, "{body}"),
+                Some("expired") => {
+                    assert_eq!(status, StatusCode::CREATED, "{body}");
+                    assert_eq!(got["data"]["deposit"]["status"], "refunded");
+                }
+                other => panic!("unexpected status {other:?}"),
+            }
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn hai_lan_doi_gio_cung_luc_khong_ro_cho() {
+    TestDatabase::run(async |test| {
+        let (shop, _) = shop(test).await;
+        let lan = staff(&shop, "Lan").await;
+        let haircut = service(&shop, 60, 0, json!({}), &[&lan]).await;
+        let day = next_monday();
+        let (status, body) = book(&shop, "ann", &haircut, at(day, 9, 0), json!({})).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
+        let path = format!("/bookings/bookings/{id}/reschedule");
+        // Hai lần đổi giờ cùng lúc: Postgres từng cho cả hai cùng trả chỗ 9:00 rồi mỗi bên giữ một
+        // chỗ mới — chỗ của lần thua kẹt lại mãi.
+        let (first, second) = tokio::join!(
+            call(&shop, "POST", &path, Some("admin"), Some(json!({"starts_at": at(day, 10, 0)}))),
+            call(&shop, "POST", &path, Some("admin"), Some(json!({"starts_at": at(day, 11, 0)}))),
+        );
+        for (status, body) in [&first, &second] {
+            assert!(matches!(*status, StatusCode::OK | StatusCode::CONFLICT), "{body}");
+        }
+        let (_, got) =
+            call(&shop, "GET", &format!("/bookings/bookings/{id}"), Some("ann"), None).await;
+        let kept: DateTime<Utc> = got["data"]["starts_at"].as_str().unwrap().parse().unwrap();
+        // Mọi giờ khác giờ lịch đang giữ đều trống.
+        for hour in [9, 10, 11] {
+            let start = at(day, hour, 0);
+            let (status, body) = book(&shop, "ben", &haircut, start, json!({})).await;
+            let taken = kept == start;
+            let expected = if taken { StatusCode::CONFLICT } else { StatusCode::CREATED };
+            assert_eq!(status, expected, "{hour}h: {body}");
+            if status == StatusCode::CREATED {
+                let ben = body["data"]["booking"]["id"].as_str().unwrap();
+                admin(
+                    &shop,
+                    "POST",
+                    &format!("/bookings/bookings/{ben}/cancel"),
+                    Some(json!({})),
+                    StatusCode::OK,
+                )
+                .await;
+            }
+        }
+    })
+    .await
+    .unwrap();
+}

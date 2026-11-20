@@ -38,6 +38,27 @@ pub(crate) async fn load<C: ConnectionTrait>(
     Ok(views.pop())
 }
 
+/// Như [`load`], nhưng khoá dòng chương trình tới hết `transaction` ghi trước khi đọc (D-181): hai
+/// lần đổi trạng thái cùng lúc (tạm dừng và kết thúc, hai lần kích hoạt) nối đuôi nhau trên
+/// Postgres — bên sau thấy trạng thái bên trước vừa ghi, không cùng xuất phát từ trạng thái cũ rồi
+/// phát event / nhả suất hạn mức cho bước chuyển không xảy ra. SQLite vốn một bên ghi mỗi lúc.
+pub(crate) async fn load_locked<C: ConnectionTrait>(
+    transaction: &C,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<Option<PromotionView>, Error> {
+    let Some(row) = autoxide_kernel::rows::lock_one(
+        transaction,
+        promotion::Entity::find_by_id(id).scoped(tenant),
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let mut views = load_children(transaction, tenant, vec![row]).await?;
+    Ok(views.pop())
+}
+
 /// Đọc phần con của nhiều chương trình một lượt (vài câu query, không phụ thuộc số chương trình).
 pub(crate) async fn load_children<C: ConnectionTrait>(
     connection: &C,

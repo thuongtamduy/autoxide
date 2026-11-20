@@ -729,6 +729,18 @@ impl OrgDirectory for OrgService {
         Ok(row.map(|row| to_unit(&row)))
     }
 
+    async fn units(&self, tenant: &TenantContext, ids: &[OrgId]) -> Result<Vec<Unit>, Error> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = unit::Entity::find()
+            .filter(unit::Column::Id.is_in(ids.iter().map(|id| id.as_uuid())))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        Ok(rows.iter().map(to_unit).collect())
+    }
+
     async fn root(&self, tenant: &TenantContext) -> Result<Unit, Error> {
         Ok(to_unit(&self.ensure_root(tenant).await?))
     }

@@ -581,3 +581,50 @@ async fn ben_lap_tu_ghi_so_thi_phat_hanh_khong_ghi_lan_hai_va_dieu_chinh_qua_tra
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_nhap_thay_the_cung_mot_hoa_don_chi_phat_hanh_mot() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        series(&app, "vat_invoice", "1C26TAA", Some("fake")).await;
+        let tenant = app.default_tenant();
+        let first = draft(&app, "R-1", 100_000).await;
+        invoices(&app).issue(&tenant, Actor::system(), first.id).await.unwrap();
+        drain(&app).await;
+        let mut drafts = Vec::new();
+        for reference in ["REPL-1", "REPL-2", "REPL-3"] {
+            let (status, replacement) = call(
+                &app,
+                "POST",
+                &format!("/documents/{}/replace", first.id),
+                Some(json!({"reference": reference, "lines": [{"description": "Service fee", "kind": "service",
+                    "unit_price": {"amount": "150000", "currency": "VND"}, "tax_category": "vat.standard"}]})),
+            )
+            .await;
+            assert_eq!(status, StatusCode::CREATED, "{replacement}");
+            drafts.push(replacement["data"]["id"].as_str().unwrap().parse::<uuid::Uuid>().unwrap());
+        }
+        // Hai nháp thay thế phát hành cùng lúc: chỉ một được (Postgres từng cho cả hai, doanh thu
+        // ghi hai lần).
+        let service = invoices(&app);
+        let (one, two) = tokio::join!(
+            service.issue(&tenant, Actor::system(), drafts[0]),
+            service.issue(&tenant, Actor::system(), drafts[1]),
+        );
+        let (issued, refused) = match (one, two) {
+            (Ok(issued), Err(error)) | (Err(error), Ok(issued)) => (issued, error),
+            (one, two) => panic!("exactly one replacement must issue: {one:?} / {two:?}"),
+        };
+        assert_eq!(refused.code(), "invoices.not_correctable");
+        // Nháp thứ ba, phát hành sau: cũng bị từ chối.
+        let refused = service.issue(&tenant, Actor::system(), drafts[2]).await.unwrap_err();
+        assert_eq!(refused.code(), "invoices.not_correctable");
+        drain(&app).await;
+        // Bút toán gốc đảo một lần, chỉ bút toán của một hoá đơn thay thế còn lại.
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, issued.total.minor());
+        let current = service.document(&tenant, first.id).await.unwrap().unwrap();
+        assert_eq!(current.status, "replaced");
+    })
+    .await
+    .unwrap();
+}

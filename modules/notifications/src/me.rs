@@ -278,13 +278,17 @@ impl NotificationsService {
             .filter(push_subscription::Column::EndpointKey.eq(key.as_str()))
             .one(&transaction)
             .await?;
-        let id = existing.as_ref().map_or_else(Uuid::now_v7, |row| row.id);
-        let sealed =
-            sealer.seal(tenant.id(), PUSH_AUTH_PURPOSE, &id.to_string(), input.auth.as_bytes())?;
+        let candidate = existing.as_ref().map_or_else(Uuid::now_v7, |row| row.id);
+        let sealed = sealer.seal(
+            tenant.id(),
+            PUSH_AUTH_PURPOSE,
+            &candidate.to_string(),
+            input.auth.as_bytes(),
+        )?;
         let at = now();
         // Cùng trình duyệt đăng ký lại (có thể bởi người khác trên cùng máy): cập nhật dòng cũ.
         push_subscription::Entity::insert(push_subscription::ActiveModel {
-            id: Set(id),
+            id: Set(candidate),
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(principal.user_id()),
             endpoint: Set(endpoint),
@@ -312,6 +316,33 @@ impl NotificationsService {
         )
         .exec_without_returning(&transaction)
         .await?;
+        // Dòng thật của endpoint này (D-181). Hai lần đăng ký cùng trình duyệt chạy cùng lúc đều
+        // thấy "chưa có", mỗi bên sinh một ID; trên Postgres bên sau rơi vào nhánh cập nhật của dòng
+        // bên trước — dòng giữ ID bên trước nhưng bản mã gắn ID bên sau, gửi push hỏng mãi. Bản mã
+        // gắn ID nên niêm lại theo ID của dòng.
+        let row = autoxide_kernel::rows::lock_one(
+            &transaction,
+            push_subscription::Entity::find()
+                .scoped(tenant)
+                .filter(push_subscription::Column::EndpointKey.eq(key.as_str())),
+        )
+        .await?
+        .ok_or_else(|| Error::internal("a push subscription vanished"))?;
+        let id = row.id;
+        if id != candidate {
+            let sealed = sealer.seal(
+                tenant.id(),
+                PUSH_AUTH_PURPOSE,
+                &id.to_string(),
+                input.auth.as_bytes(),
+            )?;
+            push_subscription::Entity::update_many()
+                .col_expr(push_subscription::Column::AuthSecret, Expr::value(sealed))
+                .filter(push_subscription::Column::Id.eq(id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+        }
         let event = events::PushSubscriptionAdded(
             json!({"id": id, "user_id": principal.user_id(), "channel": Channel::WebPush.as_str()}),
         );
@@ -411,20 +442,20 @@ impl NotificationsService {
             .filter(device_token::Column::TokenKey.eq(key.as_str()))
             .one(&transaction)
             .await?;
-        let id = existing.as_ref().map_or_else(Uuid::now_v7, |row| row.id);
+        let candidate = existing.as_ref().map_or_else(Uuid::now_v7, |row| row.id);
         let sealed = sealer.seal(
             tenant.id(),
             DEVICE_TOKEN_PURPOSE,
-            &id.to_string(),
+            &candidate.to_string(),
             input.token.as_bytes(),
         )?;
         device_token::Entity::insert(device_token::ActiveModel {
-            id: Set(id),
+            id: Set(candidate),
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(principal.user_id()),
             platform: Set(input.platform),
             token: Set(sealed),
-            token_key: Set(key),
+            token_key: Set(key.clone()),
             app_id: Set(input.app_id),
             locale: Set(locale),
             failures: Set(0),
@@ -445,6 +476,31 @@ impl NotificationsService {
         )
         .exec_without_returning(&transaction)
         .await?;
+        // Dòng thật của token này: như đăng ký web push ở trên, hai lần đăng ký cùng lúc thì bản
+        // mã phải gắn ID của dòng, không phải ID bên này đã sinh.
+        let row = autoxide_kernel::rows::lock_one(
+            &transaction,
+            device_token::Entity::find()
+                .scoped(tenant)
+                .filter(device_token::Column::TokenKey.eq(key.as_str())),
+        )
+        .await?
+        .ok_or_else(|| Error::internal("a device token vanished"))?;
+        let id = row.id;
+        if id != candidate {
+            let sealed = sealer.seal(
+                tenant.id(),
+                DEVICE_TOKEN_PURPOSE,
+                &id.to_string(),
+                input.token.as_bytes(),
+            )?;
+            device_token::Entity::update_many()
+                .col_expr(device_token::Column::Token, Expr::value(sealed))
+                .filter(device_token::Column::Id.eq(id))
+                .scoped(tenant)
+                .exec(&transaction)
+                .await?;
+        }
         let event = events::PushSubscriptionAdded(
             json!({"id": id, "user_id": principal.user_id(), "channel": Channel::MobilePush.as_str()}),
         );

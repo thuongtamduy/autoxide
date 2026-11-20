@@ -20,9 +20,11 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use chrono::{DateTime, Duration, Utc};
+use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
     QueryOrder, QuerySelect, Set,
@@ -288,53 +290,72 @@ impl ComplianceService {
         change: &BannerChange,
         by: Option<Uuid>,
     ) -> Result<(), Error> {
-        let current = cookie_setting::Entity::find_by_id((tenant.id().as_uuid(), org))
-            .one(transaction)
-            .await?;
-        let tags = Self::active_tags(transaction, tenant, org).await?;
-        let configured: Vec<String> = match (&change.categories, &current) {
-            (Some(categories), _) => categories.clone(),
-            (None, Some(row)) => serde_json::from_str(&row.categories).unwrap_or_default(),
-            (None, None) => Vec::new(),
-        };
-        let categories = effective(&configured, &tags);
-        let signature = signature(&categories, &tags);
+        // Khoá dòng banner rồi mới đọc tag đang bật (D-181): hai lần thêm / sửa tag cùng lúc nối
+        // đuôi nhau, bên sau thấy tag bên trước vừa commit và chữ ký bên trước vừa ghi — không thì
+        // Postgres cho cả hai cùng tính chữ ký thiếu tag của bên kia, `policy_version` chỉ tăng một
+        // lần và người dùng không bị hỏi đồng ý lại cho nhà cung cấp mới.
+        let key = (tenant.id().as_uuid(), org);
+        let mut current =
+            rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key)).await?;
         let at = now();
-        match current {
-            None => {
-                cookie_setting::ActiveModel::from(cookie_setting::Model {
+        if current.is_none() {
+            // Chưa có banner: tạo. Hai bên cùng tạo thì bên sau không chèn được (khoá chính), khoá
+            // dòng bên kia vừa tạo rồi cập nhật như thường.
+            let tags = Self::active_tags(transaction, tenant, org).await?;
+            let configured = change.categories.clone().unwrap_or_default();
+            let categories = effective(&configured, &tags);
+            let inserted = cookie_setting::Entity::insert(cookie_setting::ActiveModel::from(
+                cookie_setting::Model {
                     tenant_id: tenant.id().as_uuid(),
                     org_id: org,
                     enabled: change.enabled.unwrap_or(true),
                     categories: json!(configured).to_string(),
                     policy_version: 1,
-                    signature,
+                    signature: signature(&categories, &tags),
                     position: change.position.clone().unwrap_or_else(|| "bottom".to_owned()),
                     updated_by: by,
                     updated_at: at,
-                })
-                .insert(transaction)
-                .await?;
+                },
+            ))
+            .on_conflict(
+                OnConflict::columns([
+                    cookie_setting::Column::TenantId,
+                    cookie_setting::Column::OrgId,
+                ])
+                .do_nothing()
+                .to_owned(),
+            )
+            .exec_without_returning(transaction)
+            .await?;
+            if inserted > 0 {
+                return Ok(());
             }
-            Some(row) => {
-                let bump = row.signature != signature;
-                let mut active: cookie_setting::ActiveModel = row.clone().into();
-                if let Some(enabled) = change.enabled {
-                    active.enabled = Set(enabled);
-                }
-                if let Some(position) = &change.position {
-                    active.position = Set(position.clone());
-                }
-                active.categories = Set(json!(configured).to_string());
-                if bump {
-                    active.policy_version = Set(row.policy_version + 1);
-                    active.signature = Set(signature);
-                }
-                active.updated_by = Set(by);
-                active.updated_at = Set(at);
-                active.update(transaction).await?;
-            }
+            current = rows::lock_one(transaction, cookie_setting::Entity::find_by_id(key)).await?;
         }
+        let row = current.ok_or_else(|| Error::internal("cookie banner row vanished"))?;
+        let tags = Self::active_tags(transaction, tenant, org).await?;
+        let configured: Vec<String> = match &change.categories {
+            Some(categories) => categories.clone(),
+            None => serde_json::from_str(&row.categories).unwrap_or_default(),
+        };
+        let categories = effective(&configured, &tags);
+        let signature = signature(&categories, &tags);
+        let bump = row.signature != signature;
+        let mut active: cookie_setting::ActiveModel = row.clone().into();
+        if let Some(enabled) = change.enabled {
+            active.enabled = Set(enabled);
+        }
+        if let Some(position) = &change.position {
+            active.position = Set(position.clone());
+        }
+        active.categories = Set(json!(configured).to_string());
+        if bump {
+            active.policy_version = Set(row.policy_version + 1);
+            active.signature = Set(signature);
+        }
+        active.updated_by = Set(by);
+        active.updated_at = Set(at);
+        active.update(transaction).await?;
         Ok(())
     }
 

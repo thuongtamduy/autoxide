@@ -88,6 +88,17 @@ pub(crate) struct FxSnapshot {
     pub base_total: Money,
 }
 
+/// Trạng thái của chứng từ còn thay thế / điều chỉnh được.
+const CORRECTABLE: [&str; 3] = ["issued", "submitting", "accepted"];
+
+fn not_correctable(status: &str) -> Error {
+    Error::conflict(
+        "invoices.not_correctable",
+        "Only an issued document can be adjusted or replaced (this one is `{status}`).",
+    )
+    .with_param("status", status)
+}
+
 fn rate_missing(base: Currency, quote: Currency, on: chrono::NaiveDate) -> Error {
     Error::new(
         autoxide_kernel::error::ErrorKind::Validation,
@@ -291,13 +302,28 @@ impl InvoicesService {
                 // Chứng từ sửa sai: đánh dấu chứng từ gốc.
                 if let (Some(original), Some(relation)) = (saved.related_document_id, saved.relation.as_deref()) {
                     let status = if relation == "replacement" { "replaced" } else { "adjusted" };
-                    document::Entity::update_many()
+                    // Chỉ đánh dấu khi gốc còn sửa được (D-181): hai nháp thay thế cùng một chứng
+                    // từ, hay thay thế đua với huỷ, thì bên sau thấy gốc đã `replaced` /
+                    // `cancelled` và không phát hành — không thì doanh thu bị ghi hai lần. Câu
+                    // `UPDATE` có điều kiện khoá dòng gốc trên Postgres: bên sau chờ bên trước
+                    // commit rồi xét lại điều kiện.
+                    let corrected = document::Entity::update_many()
                         .col_expr(document::Column::Status, status.into())
                         .col_expr(document::Column::UpdatedAt, at.into())
                         .filter(document::Column::Id.eq(original))
                         .filter(document::Column::TenantId.eq(tenant.id().as_uuid()))
+                        .filter(document::Column::Status.is_in(CORRECTABLE))
                         .exec(&transaction)
                         .await?;
+                    if corrected.rows_affected == 0 {
+                        let now_status = document::Entity::find_by_id(original)
+                            .filter(document::Column::TenantId.eq(tenant.id().as_uuid()))
+                            .one(&transaction)
+                            .await?
+                            .map(|row| row.status)
+                            .unwrap_or_default();
+                        return Err(not_correctable(&now_status));
+                    }
                     let event = events::DocumentCorrected(json!({
                         "document_id": original, "relation": relation, "by_document_id": saved.id,
                     }));
@@ -753,12 +779,8 @@ impl InvoicesService {
         correction: Correction,
     ) -> Result<Submitted<Document>, Error> {
         let Correction { relation, direction, buyer, lines, reference } = correction;
-        if !["issued", "submitting", "accepted"].contains(&original.status.as_str()) {
-            return Err(Error::conflict(
-                "invoices.not_correctable",
-                "Only an issued document can be adjusted or replaced (this one is `{status}`).",
-            )
-            .with_param("status", original.status));
+        if !CORRECTABLE.contains(&original.status.as_str()) {
+            return Err(not_correctable(&original.status));
         }
         let direction = direction.unwrap_or_else(|| "increase".to_owned());
         if relation == "adjustment" && !["increase", "decrease"].contains(&direction.as_str()) {

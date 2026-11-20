@@ -48,6 +48,7 @@ mod s3;
 mod schema;
 mod sqlite;
 mod stale;
+mod statements;
 mod storage;
 mod store;
 mod template;

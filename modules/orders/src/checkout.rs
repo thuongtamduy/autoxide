@@ -544,12 +544,7 @@ impl OrdersService {
                     numbering::next(&transaction, tenant.id(), &format!("orders.order:{year}"))
                         .await?;
                 let number = format!("{year}-{sequence:06}");
-                for (row, taxes) in draft.lines(tenant)? {
-                    row.insert(&transaction).await?;
-                    for tax in taxes {
-                        tax.insert(&transaction).await?;
-                    }
-                }
+                insert_lines(&transaction, draft.lines(tenant)?).await?;
                 let (status, payment_status) = if draft.method == Method::Cod {
                     (OrderStatus::Confirmed, payments::COD_PENDING)
                 } else {
@@ -751,6 +746,29 @@ impl Draft<'_> {
 }
 
 /// Dòng đơn và thuế của dòng từ báo giá `quote` (đặt hàng online và bán tại quầy dùng chung).
+/// Số dòng mỗi câu `INSERT` nhiều dòng: dòng đơn ~40 cột × 200 = 8 000 tham số, dưới giới hạn của
+/// SQLite (32 766) và Postgres (65 535).
+const INSERT_BATCH: usize = 200;
+
+/// Ghi dòng đơn rồi dòng thuế của chúng, mỗi bảng một câu `INSERT` cho mỗi lô
+/// (D-20261120-step39-hot-paths; trước: một câu mỗi dòng và mỗi dòng thuế — đơn 6 dòng tốn thêm
+/// 5–10 câu trong transaction ghi). Mọi trường của hai kiểu dòng đều `Set` nên gộp không đổi giá
+/// trị nào.
+pub(crate) async fn insert_lines(
+    transaction: &sea_orm::DatabaseTransaction,
+    rows: Vec<(line::ActiveModel, Vec<line_tax::ActiveModel>)>,
+) -> Result<(), Error> {
+    let (lines, taxes): (Vec<_>, Vec<_>) = rows.into_iter().unzip();
+    let taxes: Vec<line_tax::ActiveModel> = taxes.into_iter().flatten().collect();
+    for chunk in lines.chunks(INSERT_BATCH) {
+        line::Entity::insert_many(chunk.to_vec()).exec_without_returning(transaction).await?;
+    }
+    for chunk in taxes.chunks(INSERT_BATCH) {
+        line_tax::Entity::insert_many(chunk.to_vec()).exec_without_returning(transaction).await?;
+    }
+    Ok(())
+}
+
 pub(crate) fn quoted_rows(
     tenant: &TenantContext,
     order_id: Uuid,

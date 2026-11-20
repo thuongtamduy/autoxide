@@ -536,4 +536,6 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step39-cdn-cache](D-20261119-step39-cdn-cache.md)** Header cache cho CDN do một lớp của kernel chốt; đọc công khai `s-maxage` 60 giây — 2026-11-19
 - **[D-20261119-step39-compression](D-20261119-step39-compression.md)** Nén response ngay trong app (gzip, brotli mức 1), tắt được khi proxy đã nén — 2026-11-19
 - **[D-20261119-step39-semantic-scan](D-20261119-step39-semantic-scan.md)** Tìm theo ý nghĩa trên dữ liệu lớn: `dot` dùng SIMD, duyệt chia nhiều nhân ngoài thread async — 2026-11-19
+- **[D-20261120-step39-checkout-batch](D-20261120-step39-checkout-batch.md)** Đặt hàng ghi mọi dòng đơn và dòng thuế bằng `INSERT` nhiều dòng — 2026-11-20
+- **[D-20261120-step39-hot-paths](D-20261120-step39-hot-paths.md)** Đo đường nóng của sản phẩm, đếm câu SQL mỗi request, gộp N+1 ở đọc công khai của cửa hàng — 2026-11-20
 - **[D-20261120-step39-index-review](D-20261120-step39-index-review.md)** Rà index bằng EXPLAIN trên bộ dữ liệu `full`: không thêm migration — 2026-11-20

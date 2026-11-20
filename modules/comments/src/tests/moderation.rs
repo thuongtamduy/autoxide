@@ -861,3 +861,38 @@ async fn vu_viec_an_roi_hien_lai_binh_luan() {
     .await
     .unwrap();
 }
+
+/// Quản trị ẩn đích đúng lúc đích bị đổi hạn đóng: lệnh ẩn không bị ghi đè. Postgres từng cho bên
+/// đổi hạn đọc `hidden = false` trước khi lệnh ẩn commit rồi ghi lại giá trị cũ.
+#[tokio::test]
+async fn an_dich_dong_thoi_voi_doi_han_khong_mat_lenh_an() {
+    TestDatabase::run(async |test| {
+        let h = service(test, open_config()).await;
+        let client = visitor("203.0.113.14");
+        as_guest(&h.service, &client, guest("Ada", "Mở đích")).await.unwrap();
+        let later = Some(Some(crate::service::now() + chrono::Duration::days(30)));
+        for _ in 0..4 {
+            let hide =
+                crate::posting::targets::TargetChange { hidden: Some(true), ..Default::default() };
+            let extend =
+                crate::posting::targets::TargetChange { closes_at: later, ..Default::default() };
+            let admin = admin();
+            let (hidden, extended) = tokio::join!(
+                h.service.set_target(&h.tenant, &admin, KIND, POST, hide, None),
+                h.service.set_target(&h.tenant, &admin, KIND, POST, extend, None),
+            );
+            hidden.unwrap();
+            extended.unwrap();
+            let target = h.service.target(&h.tenant, KIND, POST).await.unwrap();
+            assert!(target.hidden, "{target:?}");
+            let show = crate::posting::targets::TargetChange {
+                state: Some("open".to_owned()),
+                hidden: Some(false),
+                closes_at: None,
+            };
+            h.service.set_target(&h.tenant, &admin, KIND, POST, show, None).await.unwrap();
+        }
+    })
+    .await
+    .unwrap();
+}
