@@ -50,6 +50,7 @@ pub struct Model {
     pub cancel_reason: Option<String>,
     pub preorder_accepted_at: Option<DateTimeUtc>,
     pub version: i32,
+    pub custom_fields: Option<String>,
     pub created_at: DateTimeUtc,
     pub updated_at: DateTimeUtc,
 }

@@ -70,6 +70,25 @@ pub(crate) struct CheckoutRequest {
     /// Where the payment partner sends the buyer back.
     #[validate(length(min = 1, max = 2000))]
     return_url: Option<String>,
+    /// Values of the shop's buyer fields (custom fields of `orders.order` with visibility
+    /// `buyer_input`, e.g. a preferred delivery time), by key.
+    #[schema(value_type = Option<Object>)]
+    custom_fields: Option<serde_json::Map<String, serde_json::Value>>,
+    /// With `payment_method: installment`: the licensed partner and the number of months.
+    installment: Option<InstallmentRequest>,
+}
+
+/// Pay in instalments through a licensed partner (the partner pays the shop in full).
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[schema(as = OrdersInstallmentRequest)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct InstallmentRequest {
+    /// Code of the instalment partner (a payment connector).
+    #[schema(example = "fundiin")]
+    partner: String,
+    /// 3, 6, 9, 12, 18 or 24.
+    #[schema(example = 6)]
+    months: i32,
 }
 
 /// Place an order from a cart.
@@ -132,6 +151,11 @@ pub(crate) async fn checkout(
         accept_preorder_terms: input.accept_preorder_terms.unwrap_or(false),
         invoice_request: input.invoice_request,
         return_url: input.return_url,
+        custom_fields: input.custom_fields,
+        installment: input.installment.map(|plan| crate::checkout::Installment {
+            partner: plan.partner,
+            months: plan.months,
+        }),
     };
     let placed = service.checkout(&tenant, &owner, &key, request).await?;
     let (created, placed) = match placed {

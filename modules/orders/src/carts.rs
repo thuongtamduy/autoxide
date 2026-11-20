@@ -79,6 +79,8 @@ pub(crate) struct CartView {
     pub ship_to: Option<ShipTo>,
     pub attribution: Option<Attribution>,
     pub quote: Quote,
+    /// Cách trả dùng được cho giỏ này (website hiện trước khi đặt).
+    pub payment_methods: Vec<String>,
 }
 
 /// Giỏ vừa tạo; `token` chỉ có với giỏ vãng lai mới.
@@ -240,7 +242,9 @@ impl OrdersService {
         let input = self.price_input(tenant, &row, owner, &lines).await?;
         let quote =
             pricing::quote(&self.sources, tenant, &input, self.config.quote_ttl_minutes).await?;
+        let payment_methods = self.payment_methods(tenant, &row, &quote).await?;
         Ok(CartView {
+            payment_methods,
             codes: json_list(&row.codes),
             voucher_ids: json_list(&row.voucher_ids),
             ship_to: row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok()),
@@ -248,6 +252,29 @@ impl OrdersService {
             quote,
             cart: row,
         })
+    }
+
+    /// Cách trả dùng được cho giỏ, cùng điều kiện checkout kiểm: COD khi giỏ cần giao và nút bán
+    /// bật `orders.cod_enabled` (chống bom hàng theo người mua chỉ kiểm lúc đặt, khi đã có số điện
+    /// thoại); chuyển khoản, cổng thanh toán và trả góp qua đối tác khi có `ledger`.
+    async fn payment_methods(
+        &self,
+        tenant: &TenantContext,
+        row: &cart::Model,
+        quote: &Quote,
+    ) -> Result<Vec<String>, Error> {
+        let mut methods = Vec::new();
+        if quote.requires_shipping {
+            let org = autoxide_kernel::tenancy::OrgId::from_uuid(row.org_id);
+            let cod = self.setting(tenant, org, &crate::policy::COD_ENABLED).await?;
+            if cod.as_ref().and_then(serde_json::Value::as_bool).unwrap_or(true) {
+                methods.push("cod".to_owned());
+            }
+        }
+        if self.ledger.is_some() {
+            methods.extend(["bank_transfer", "gateway", "installment"].map(str::to_owned));
+        }
+        Ok(methods)
     }
 
     /// Đầu vào báo giá của giỏ: dòng, lựa chọn của người mua, hồ sơ nhóm khách (bước 47 cắm vào).

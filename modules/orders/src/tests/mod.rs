@@ -15,6 +15,7 @@ mod preorders;
 mod returns;
 mod reviews;
 mod risk_reports;
+mod warranty_fields;
 
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
@@ -468,6 +469,7 @@ now_job!(RecoverNow, crate::jobs::RECOVER_CHECKOUTS);
 now_job!(CompleteNow, crate::jobs::COMPLETE_DELIVERED);
 now_job!(UnacceptedNow, crate::jobs::EXPIRE_UNACCEPTED);
 now_job!(PickupsNow, crate::jobs::EXPIRE_PICKUPS);
+now_job!(WarrantiesNow, crate::jobs::EXPIRE_WARRANTIES);
 
 /// Đưa job định kỳ `kind` vào hàng đợi của cả database rồi chạy hết.
 pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
@@ -492,6 +494,9 @@ pub(crate) async fn run_job(app: &TestApp, kind: &'static str) {
         }
         crate::jobs::EXPIRE_PICKUPS => {
             queue.enqueue_database(write, &PickupsNow {}, options()).await
+        }
+        crate::jobs::EXPIRE_WARRANTIES => {
+            queue.enqueue_database(write, &WarrantiesNow {}, options()).await
         }
         other => panic!("no test job for `{other}`"),
     }
