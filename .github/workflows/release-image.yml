@@ -1,0 +1,156 @@
+# Đăng image Docker cho một tag phát hành ĐÃ CÓ, không phát hành lại (D-20261120-upgrade-image).
+#
+# Dùng khi workflow Release của tag không đăng được image: tag đẩy lúc repo còn riêng tư (Release bị
+# bỏ qua, D-197), hay chạy lại Release trên tag cũ thì gate đỏ vì thứ mới xuất hiện sau ngày phát hành
+# (vd `cargo deny` gặp advisory mới). Job `upgrade` của CI kéo `ghcr.io/<owner>/<repo>:X.Y.Z` của bản
+# trước (`cargo xtask upgrade-test`); thiếu image thì nó build lại bản cũ từ tag (~10 phút mỗi lần).
+#
+# Chạy tay: Actions → "Release image (existing tag)" → Run workflow trên nhánh `main`, nhập tag
+# (vd `v0.14.0`). Workflow lấy file từ `main` và build mã nguồn của tag, nên sửa ở đây dùng được cho
+# tag cũ. Không chạy gate (tag đã qua gate lúc phát hành), không tạo bản phát hành GitHub, không đổi
+# tag. Tên và thẻ image giống hệt workflow Release: `X.Y.Z` và `X.Y`, cho `linux/amd64` và `linux/arm64`.
+name: Release image (existing tag)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag that already exists, e.g. v0.14.0"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  tag:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      minor: ${{ steps.version.outputs.minor }}
+    steps:
+      - id: version
+        name: The tag is a release tag
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          if [[ ! "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "Tag must look like vX.Y.Z, got '$TAG'" >&2
+            exit 1
+          fi
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "minor=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - name: Tag matches the version in Cargo.toml
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          [ "$version" = "$VERSION" ] || { echo "Cargo.toml at the tag says $version" >&2; exit 1; }
+
+  # Như job `image` của release.yml: mỗi kiến trúc build trên máy cùng kiến trúc, đẩy theo digest.
+  image:
+    needs: tag
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-24.04
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=${{ matrix.platform }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.platform }}
+      - name: Export the digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: digests-${{ strategy.job-index }}
+          path: digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: [tag, image]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    steps:
+      - name: Image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: digests-*
+          merge-multiple: true
+          path: digests
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Cùng hai thẻ như release.yml (`{{version}}`, `{{major}}.{{minor}}`); `X.Y.Z` là thẻ mà
+      # `cargo xtask upgrade-test` kéo.
+      - name: Create the multi-platform image with its tags
+        working-directory: digests
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+          MINOR: ${{ needs.tag.outputs.minor }}
+        run: |
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:$MINOR" \
+            $(printf "$IMAGE@sha256:%s " *)
+      - id: index
+        name: Digest of the multi-platform image
+        env:
+          VERSION: ${{ needs.tag.outputs.version }}
+        run: |
+          digest="$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+      - uses: actions/attest@v4
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.index.outputs.digest }}
+          push-to-registry: true
