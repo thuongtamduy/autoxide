@@ -116,6 +116,18 @@ của lệnh CLI), 8 (SBOM trên trang Release), 10 (trang xem API), 14 (đầu 
 
 ## Build từ mã nguồn
 
-Đang đo (`cargo build -p autoxide`, bản dev, 4 CPU, toolchain tự tải lần đầu); kết quả sẽ bổ sung
-sau khi build xong. README chỉ dẫn `cargo run -p autoxide -- <lệnh>` nên lần chạy đầu phải đợi biên
-dịch toàn bộ workspace: README chưa nói việc này mất bao lâu.
+Làm theo README ("Getting started"): `cargo run -p autoxide -- --help` trên máy 4 CPU, 15 GB RAM,
+chưa có toolchain.
+
+- `rustup` tự tải toolchain ghim (1.99.1) ở lần chạy `cargo` đầu: đúng như README nói.
+- `cargo build -p autoxide` (bản dev): **10 phút 41 giây** (37 phút CPU), thư mục `target/` **8,9 GB**,
+  binary dev 609 MB. README không nói thời gian và dung lượng này → **khó chịu**: người lạ gõ
+  `cargo run -- --help` sẽ chờ hơn 10 phút và tốn ~9 GB mà không được báo trước. Đề xuất: thêm một
+  câu vào README mục Requirements ("lần build đầu mất 10–15 phút, khoảng 9 GB đĩa"), và trỏ người chỉ
+  muốn thử sang image Docker (đã làm).
+- Binary vừa build: `migrate up`, `user create --admin`, `serve` (qua `AUTOXIDE_HTTP_ADDRESS`),
+  `/health/ready` đều đúng như đường Docker. Mặc định nghe `127.0.0.1:8080`.
+- `./gate.sh` (README nói để thử) cần `cargo-deny` (README có nói, `cargo install cargo-deny --locked`
+  mất ~2 phút) và, với `./gate.sh --quick`, một bản clone **đầy đủ**: trên clone nông (`--depth`)
+  `xtask api-diff` dừng với thông báo rõ cách sửa (`git fetch --unshallow --tags`). README mục
+  Contributing chưa nhắc điều này → nhỏ. `--quick` xanh sau 57 giây khi đã có cache build.
