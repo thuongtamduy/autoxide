@@ -254,8 +254,10 @@ mod tests {
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
-            let first = settings.modules.worker(4).unwrap();
-            let second = settings.modules.worker(4).unwrap();
+            // Mỗi worker nhận tối đa `concurrency` job của một module mỗi lượt: 8 để hai worker đủ chỗ
+            // cho module nhiều lịch nhất (`orders`, chín lịch).
+            let first = settings.modules.worker(8).unwrap();
+            let second = settings.modules.worker(8).unwrap();
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
