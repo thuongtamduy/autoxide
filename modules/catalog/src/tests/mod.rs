@@ -5,6 +5,7 @@ mod card;
 mod categories;
 mod changes;
 mod collections;
+mod display_price;
 mod extensions;
 mod pricing;
 mod products;
@@ -12,6 +13,8 @@ mod public;
 mod readiness;
 mod recommend;
 mod search;
+mod suggestions;
+mod transfers;
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
@@ -20,7 +23,7 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-pub(crate) const ALL: [&str; 9] = [
+pub(crate) const ALL: [&str; 11] = [
     "catalog.products.read",
     "catalog.products.write",
     "catalog.products.publish",
@@ -30,6 +33,8 @@ pub(crate) const ALL: [&str; 9] = [
     "catalog.categories.manage",
     "catalog.documents.manage",
     "catalog.collections.manage",
+    "catalog.import",
+    "catalog.export",
 ];
 
 /// Cây gốc → chuỗi; chuỗi → cửa hàng A, B. ID biết trước để khai người dùng, dựng cây sau.

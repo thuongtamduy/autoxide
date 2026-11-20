@@ -468,9 +468,9 @@ bước 35.
       từng giá trị lọc (có giới hạn, có index, cả hai database)
 - [x] Thẻ sản phẩm và JSON-LD (D-201): tóm tắt biến thể, điểm đánh giá, đơn giá theo đơn vị cơ sở; GTIN,
       thương hiệu, URL từng biến thể, giá gạch là giá ngay trước khuyến mại
-- [ ] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
+- [x] Nhập / xuất CSV bằng job (kiểm từng dòng, lỗi theo dòng, chống CSV injection, trạng thái của lần nhập /
       xuất); gợi ý mô tả và SEO bằng AI chỉ thành bản nháp, đánh dấu `ai_assisted` (bước 37)
-- [ ] API hợp đồng (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời điểm để chụp vào chứng từ, sàn
+- [x] API hợp đồng (`catalog::api`): đọc sản phẩm / biến thể / giá tại một thời điểm để chụp vào chứng từ, sàn
       giá cho `promotions`; điểm cắm `set_listing_gate` cho `marketplace`; event khi giá hay trạng thái đổi;
       tool MCP như REST
 - [ ] Loại sản phẩm: hàng vật lý, hàng số (link ký có hạn qua `files`, giới hạn lượt tải), dịch vụ (không

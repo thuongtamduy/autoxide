@@ -381,8 +381,8 @@ Quản trị:
 | `POST /price-lists/{id}/changes/{change}/approve` | `catalog.prices.approve` | `catalog.self_approval`, `catalog.price_change_not_previewed`; xếp job ghi giá |
 | `GET /variants/{id}/price?org_id=&customer_group=&currency=&at=` | `catalog.prices.read` | giá giải ra và vì sao (bảng nào thắng) — cho agent kiểm |
 | `PUT /stores/{org_id}/overrides/{product_id}` | `catalog.products.write` ở nút cửa hàng | ẩn / hiện |
-| `POST /imports` · `GET /imports/{id}` | `catalog.import` | CSV (multipart) → 202 + vị trí theo dõi; lỗi theo dòng; trạng thái như `catalog_transfers` |
-| `POST /exports` · `GET /exports/{id}` · `GET /exports/{id}/content` | `catalog.export` | |
+| `POST /imports?org_id=` · `GET /imports/{id}` | `catalog.import` (+ quyền ghi sản phẩm cho từng dòng) | thân là chính file (`text/csv`) → 201 + `Location`; job chạy bằng `PrincipalSnapshot` của người yêu cầu; khớp theo SKU, SKU mới thành sản phẩm nháp một biến thể; lỗi theo dòng `{row, field, code, message}`; chỉ người bắt đầu thấy (D-20261120-catalog-csv-ai-drafts) |
+| `POST /exports` · `GET /exports/{id}` · `GET /exports/{id}/content` | `catalog.export` | cùng cột với file nhập; chỉ người bắt đầu tải được (D-20261120-catalog-csv-ai-drafts) |
 | `POST /products/{id}/suggestions` · `POST /suggestions/{id}/apply` · `POST /suggestions/{id}/discard` | `catalog.products.write` | AI: mô tả, SEO; áp vào bản dịch và bật `ai_assisted` |
 | `GET /download-grants?order_id=` · `POST /download-grants/{id}/revoke` | `catalog.downloads.manage` | |
 
@@ -475,7 +475,7 @@ Nhận:
 
 ### Cấu hình (`Setting`, tiền tố `AUTOXIDE_CATALOG_`)
 
-`PRODUCT_PATH_PREFIX` (`/products`), `MAX_IMPORT_ROWS` (50000), `MAX_IMPORT_BYTES` (20 MiB),
+`PRODUCT_PATH_PREFIX` (`/products`); giới hạn nhập 50 000 dòng / 20 MiB là hằng số, không phải biến (D-20261120-catalog-csv-ai-drafts),
 `MAX_DIGITAL_FILE_BYTES` (500 MiB), `DOWNLOAD_LINK_SECONDS` (300), `DEFAULT_DOWNLOAD_LIMIT` (5),
 `DEFAULT_GRANT_DAYS` (30). Ngôn ngữ và tiền tệ của cửa hàng lấy từ cài đặt kế thừa (bước 34), không
 từ biến môi trường. Cài đặt kế thừa theo nút của bước này: `price_change_requires_second_person`
@@ -528,7 +528,7 @@ từ biến môi trường. Cài đặt kế thừa theo nút của bước này
 | `catalog.download_not_found` | 404 | Link tải không còn hiệu lực. |
 | `catalog.download_limit_reached` | 409 | Đã hết lượt tải cho link này. |
 
-Lỗi theo dòng của việc nhập dùng chung khuôn `FieldError` (`field` = `row:<n>.<cột>`).
+Lỗi theo dòng của việc nhập lưu `{row, field, code, message}` (`row` là dòng của file, tiêu đề là dòng 1; `row` = 0 khi lỗi cả file) — D-20261120-catalog-csv-ai-drafts. Thêm: `catalog.transfer_not_found` (404), `catalog.storage_unavailable` (503), `catalog.suggestion_not_found` (404), `catalog.suggestion_decided` (409), `catalog.ai_unavailable` (503).
 
 ## Thứ tự làm
 

@@ -763,3 +763,7 @@ pub(crate) mod collection_item {
 // Bán chạy, đánh giá, gợi ý sản phẩm (m0013) — file riêng để `entity.rs` không quá dài.
 mod recommend;
 pub(crate) use recommend::{co_purchase, embedding, product_stat, similar_product, sold_product};
+
+// Nhập / xuất CSV (m0014).
+mod transfer_entity;
+pub(crate) use transfer_entity::{suggestion, transfer};

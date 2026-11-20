@@ -189,6 +189,38 @@ vào danh sách công khai bằng `set_sale_price_source` (một `SalePriceSourc
 mở bán một sản phẩm bằng `set_listing_gate` (một `ListingGate`); lúc đó đổi trạng thái trả 422
 `catalog.listing_denied`.
 
+`catalog.display_price_changed` báo khi giá công khai của một sản phẩm trên một website đổi (giá sau giảm
+tự động nếu có, không thì giá thấp nhất của các biến thể; `null` khi không bán ở đó; không bao giờ là giá
+gạch `compare_at`). Dựng lại mà giá như cũ thì không gửi gì.
+
+## Nhập và xuất (CSV)
+
+Cả hai chạy nền và cần nơi lưu file (module `files`); không có thì trả 503 `catalog.storage_unavailable`.
+File giữ 7 ngày.
+
+- `POST /imports?org_id=<nút>` với thân là chính file (`Content-Type: text/csv`, UTF-8, tối đa 20 MiB và
+  50 000 dòng; `catalog.import`). Cột ở dòng đầu, thứ tự tuỳ ý: `sku` (bắt buộc), `name`, `locale`,
+  `short_description`, `description`, `kind`, `tax_category`, `barcode`, `weight_grams`. SKU đã có thì
+  sửa biến thể đó và nội dung của sản phẩm ở `locale` (giữ đường dẫn); SKU mới thì tạo sản phẩm **nháp**
+  một biến thể (cần `name` và `tax_category`). Nhập không bao giờ mở bán, nên nhập lại cùng file không
+  đổi gì. Mỗi dòng được kiểm như sửa tay bằng quyền của bạn: dòng sai được báo, các dòng khác vẫn ghi.
+- `GET /imports/{id}`: `status` là `queued`, `running`, `succeeded`, `succeeded_with_errors` (xem
+  `errors`: dòng, cột, mã, lời nhắn), `rejected` (file không hợp lệ; không ghi gì) hay `failed`. Chỉ người
+  bắt đầu thấy. Sản phẩm nhiều biến thể hay tuỳ chọn thì hoàn thiện qua API sau khi nhập.
+- `POST /exports` `{"org_id": …}` (`catalog.export`): mọi biến thể của sản phẩm bạn đọc được, cùng cột,
+  để sửa rồi nhập lại. Ô mà bảng tính sẽ chạy như công thức (`=`, `+`, `-`, `@`) có `'` ở đầu; khi nhập
+  lại, `'` đó được bỏ. Khi `GET /exports/{id}` báo `succeeded` thì tải `content_path`.
+
+Tool MCP: `catalog.start_import`, `catalog.import_status`.
+
+## Bản nháp AI cho mô tả và SEO
+
+`POST /products/{id}/suggestions` `{"locale": "vi"}` (`catalog.products.write`, tính năng gói
+`catalog.ai`, module `ai` đã bật) xin mô hình mô tả ngắn, mô tả và chữ SEO chỉ dựa trên điều nội dung sản
+phẩm đã nói. Kết quả là **bản nháp**: sản phẩm không đổi gì. `POST /suggestions/{id}/apply` ghi vào nội
+dung ở ngôn ngữ đó (giữ tên và đường dẫn) và đánh dấu sản phẩm `ai_assisted`; `POST
+/suggestions/{id}/discard` bỏ nó. Tool MCP: `catalog.suggest_copy`.
+
 ## Cấu hình
 
 | Biến | Mặc định | Ý nghĩa |

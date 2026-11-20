@@ -10,6 +10,8 @@ mod collections;
 mod net_content;
 mod recommend;
 mod search;
+mod suggestions;
+mod transfers;
 
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
@@ -36,6 +38,10 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(net_content::AddNetContent),
         // Bán chạy, điểm đánh giá, thường mua cùng, sản phẩm tương tự.
         Box::new(recommend::CreateRecommendations),
+        // Nhập / xuất CSV bằng job.
+        Box::new(transfers::CreateTransfers),
+        // Bản nháp AI cho mô tả và SEO.
+        Box::new(suggestions::CreateSuggestions),
     ]
 }
 

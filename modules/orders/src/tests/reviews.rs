@@ -152,6 +152,17 @@ async fn chi_nguoi_da_nhan_hang_danh_gia_va_an_can_ly_do_trong_danh_sach() {
         let (_, stats) = Call::as_guest(shop, None).send("GET", &stats_uri, None).await;
         assert_eq!(stats["data"]["count"], 1);
         assert_eq!(count_events(shop, "orders.review_moderated").await, 2);
+        // Hợp đồng với `catalog` (D-20261120-catalog-recommendations): event mang tổng hiện tại
+        // của sản phẩm, đọc bằng đúng bộ đọc `catalog` dùng. Đăng (1 sao) → ẩn → mở lại (đã sửa 2 sao).
+        let product_id: Uuid = product.parse().unwrap();
+        let mut totals = Vec::new();
+        for name in ["orders.review_published", "orders.review_moderated"] {
+            for payload in event_payloads(shop, name).await {
+                let read = autoxide_catalog::api::events::product_rating(&payload);
+                totals.push(read.unwrap_or_else(|| panic!("{name}: {payload}")));
+            }
+        }
+        assert_eq!(totals, vec![(product_id, 1, 1), (product_id, 0, 0), (product_id, 1, 2)]);
         // Nhân viên cửa hàng A chỉ có `orders.read`: không kiểm duyệt được.
         let (status, _) = Call::as_user(shop, "staff_a")
             .send("POST", &moderation, Some(json!({"action": "hide", "reason": "personal_data"})))
@@ -382,4 +393,17 @@ async fn tom_tat_ai_chi_cong_khai_khi_da_duyet() {
     })
     .await
     .unwrap();
+}
+
+/// Thân các event `name` đã ghi, theo thứ tự ghi.
+async fn event_payloads(shop: &Shop, name: &str) -> Vec<Value> {
+    use sea_orm::{ConnectionTrait as _, Statement};
+    let read = shop.database().read();
+    let sql = format!("SELECT payload FROM orders_events WHERE name = '{name}' ORDER BY id");
+    read.query_all_raw(Statement::from_string(read.get_database_backend(), sql))
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|row| serde_json::from_str(&row.try_get_by_index::<String>(0).unwrap()).unwrap())
+        .collect()
 }

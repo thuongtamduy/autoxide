@@ -159,6 +159,23 @@ async fn adjust_stats(
     Ok(())
 }
 
+/// Tổng hiện tại của sản phẩm `product` (`{"count", "sum"}`) cho event đánh giá: `catalog` ghi đè
+/// điểm trên storefront bằng nó, nên nhận lại hay lệch thứ tự vẫn đúng
+/// (D-20261120-catalog-recommendations). Đọc trong transaction vừa đổi thống kê.
+async fn product_rating(
+    connection: &impl ConnectionTrait,
+    tenant: &TenantContext,
+    product: Uuid,
+) -> Result<serde_json::Value, Error> {
+    let row = review_stat::Entity::find()
+        .filter(review_stat::Column::ProductId.eq(product))
+        .scoped(tenant)
+        .one(connection)
+        .await?;
+    let (count, sum) = row.map_or((0, 0), |row| (row.review_count, row.rating_sum));
+    Ok(json!({"count": count, "sum": sum}))
+}
+
 impl OrdersService {
     async fn review(&self, tenant: &TenantContext, id: Uuid) -> Result<review::Model, Error> {
         review::Entity::find_by_id(id)
@@ -263,11 +280,13 @@ impl OrdersService {
                     }
                     let saved = created.insert(&transaction).await?;
                     adjust_stats(&transaction, tenant, &saved, 1).await?;
+                    let totals = product_rating(&transaction, tenant, saved.product_id).await?;
                     let event = ReviewPublished(Change::after(json!({
                         "review_id": saved.id, "tenant_id": saved.tenant_id,
                         "org_id": saved.org_id, "order_id": saved.order_id,
                         "product_id": saved.product_id, "variant_id": saved.variant_id,
                         "rating": saved.rating, "photo_count": media_of(&saved).len(),
+                        "product_rating": totals,
                     })));
                     outbox
                         .record(&transaction, tenant, Actor::user(buyer), subject(saved.id), &event)
@@ -595,6 +614,7 @@ impl OrdersService {
                     edit.updated_at = Set(at);
                     let saved = edit.update(&transaction).await?;
                     adjust_stats(&transaction, tenant, &saved, if hide { -1 } else { 1 }).await?;
+                    let totals = product_rating(&transaction, tenant, saved.product_id).await?;
                     let event = ReviewModerated(Change {
                         before: Some(json!({"status": locked.status})),
                         after: Some(json!({
@@ -602,6 +622,7 @@ impl OrdersService {
                             "org_id": saved.org_id, "product_id": saved.product_id,
                             "status": saved.status, "reason": saved.hidden_reason,
                             "moderator": moderator, "author_user_id": saved.author_user_id,
+                            "product_rating": totals,
                         })),
                     });
                     outbox.record(&transaction, tenant, actor, subject(saved.id), &event).await?;

@@ -10,6 +10,7 @@ mod card;
 mod categories;
 mod collections;
 mod config;
+mod copywriting;
 mod derived;
 mod entity;
 mod errors;
@@ -37,6 +38,8 @@ mod storefront;
 mod suggest;
 mod synonyms;
 mod tools;
+mod tools_assist;
+mod transfers;
 mod variants;
 
 mod relocation;
@@ -128,6 +131,8 @@ impl Module for CatalogModule {
             listing_gate: std::sync::OnceLock::new(),
             suggestions: context.suggest_sources(),
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>().ok(),
+            storage: context.require::<dyn autoxide_kernel::storage::Storage>().ok(),
+            text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
         });
         // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).
         context.resource_type(
@@ -175,8 +180,17 @@ impl Module for CatalogModule {
                 JobRegistration::new(similar::INDEX, Arc::new(similar::Indexer(service.clone()))),
                 JobRegistration::new(
                     recommend::REFRESH_SALES,
-                    Arc::new(recommend::RefreshSales(service)),
+                    Arc::new(recommend::RefreshSales(service.clone())),
                 ),
+                JobRegistration::new(
+                    transfers::IMPORT,
+                    Arc::new(transfers::Transfers(service.clone())),
+                ),
+                JobRegistration::new(
+                    transfers::EXPORT,
+                    Arc::new(transfers::Transfers(service.clone())),
+                ),
+                JobRegistration::new(transfers::CLEANUP, Arc::new(transfers::Cleanup(service))),
             ]
         })
     }
@@ -191,6 +205,8 @@ impl Module for CatalogModule {
             Schedule::new(storefront::SCHEDULED_PRICES, storefront::SCHEDULED_PRICES, minute),
             // Số bán và mua cùng tính trong 90 ngày: bỏ dòng cũ mỗi ngày.
             Schedule::new(recommend::REFRESH_SALES, recommend::REFRESH_SALES, day),
+            // File nhập / xuất giữ 7 ngày.
+            Schedule::new(transfers::CLEANUP, transfers::CLEANUP, day),
         ]
     }
 
@@ -210,6 +226,15 @@ impl Module for CatalogModule {
 
     fn tools(&self) -> Vec<Tool> {
         self.service.as_ref().map_or_else(Vec::new, tools::all)
+    }
+
+    fn body_limits(&self) -> Vec<autoxide_kernel::http::BodyLimit> {
+        // File nhập CSV lớn hơn giới hạn chung của request JSON.
+        vec![autoxide_kernel::http::BodyLimit::new(
+            axum::http::Method::POST,
+            "/imports",
+            transfers::MAX_IMPORT_BYTES,
+        )]
     }
 
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {

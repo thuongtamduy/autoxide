@@ -199,6 +199,43 @@ emits `promotions.automatic_prices_changed` (`after.variant_ids`) when they chan
 module can refuse to put a product on sale with `set_listing_gate` (a `ListingGate`); the status
 change then answers 422 `catalog.listing_denied`.
 
+`catalog.display_price_changed` tells when the public price of a product on a website changes (the
+automatic sale price when there is one, otherwise the lowest variant price; `null` when it is not on
+sale there; never the crossed-out `compare_at`). A rebuild that leaves the price as it was sends
+nothing.
+
+## Import and export (CSV)
+
+Both run in the background and need file storage (module `files`); without it they answer 503
+`catalog.storage_unavailable`. Files are kept 7 days.
+
+- `POST /imports?org_id=<unit>` with the file itself as the body (`Content-Type: text/csv`, UTF-8, at
+  most 20 MiB and 50 000 rows; `catalog.import`). Columns, first line, any order: `sku` (required),
+  `name`, `locale`, `short_description`, `description`, `kind`, `tax_category`, `barcode`,
+  `weight_grams`. A known SKU updates that variant and the product's text in `locale` (the address
+  stays); a new SKU creates a **draft** product with one variant (needs `name` and `tax_category`).
+  Nothing is put on sale by an import, so importing the same file again changes nothing. Each row is
+  checked like a manual change with your rights: a bad row is reported and the others are written.
+- `GET /imports/{id}`: `status` is `queued`, `running`, `succeeded`, `succeeded_with_errors` (see
+  `errors`: line, column, code, message), `rejected` (the file is not valid; nothing was written) or
+  `failed`. Only the person who started it sees it. Products with several variants or options are
+  completed through the API after the import.
+- `POST /exports` `{"org_id": …}` (`catalog.export`): every variant of the products you can read, with
+  the same columns, so the file can be edited and imported back. Cells a spreadsheet would run as a
+  formula (`=`, `+`, `-`, `@`) start with `'`; an import removes that `'` again. When `GET
+  /exports/{id}` says `succeeded`, download `content_path`.
+
+MCP tools: `catalog.start_import`, `catalog.import_status`.
+
+## AI drafts of descriptions and SEO
+
+`POST /products/{id}/suggestions` `{"locale": "vi"}` (`catalog.products.write`, plan feature
+`catalog.ai`, the `ai` module on) asks the model for a short description, a description and SEO texts
+using only what the product's texts already say. The result is a **draft**: nothing on the product
+changes. `POST /suggestions/{id}/apply` writes it into that language's text (name and address unchanged)
+and marks the product `ai_assisted`; `POST /suggestions/{id}/discard` drops it. MCP tool:
+`catalog.suggest_copy`.
+
 ## Settings
 
 | Variable | Default | Meaning |

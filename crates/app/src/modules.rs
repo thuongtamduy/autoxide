@@ -269,8 +269,8 @@ mod tests {
             // `reporting` (đẩy số liệu, dọn số liệu cục bộ — bước 38), ba của `conversations` (xoá cuộc trò
             // chuyện quá hạn lưu, xoá bản ghi âm quá hạn, yêu cầu gọi lại quá hạn — bước 61), hai của `analytics` (gộp mỗi giờ,
             // dọn theo hạn lưu — bước 57), hai của `automations` (luật tới hạn, dọn nhật ký — bước 58),
-            // ba của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront, bỏ số bán
-            // quá 90 ngày — bước 41), một
+            // bốn của `catalog` (tính lại readiness theo giấy tờ, giá hẹn giờ cho storefront, bỏ số bán
+            // quá 90 ngày, dọn file nhập / xuất — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
             // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), bốn của
             // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher, nhắc flash sale — bước 43), bảy
@@ -278,7 +278,7 @@ mod tests {
             // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận, hết hạn giữ hàng chờ nhận tại
             // cửa hàng — bước 45), thêm một của
             // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 71);
+            assert_eq!(a.unwrap() + b.unwrap(), 72);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
