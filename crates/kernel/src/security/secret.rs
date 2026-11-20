@@ -36,6 +36,9 @@ pub use super::seal::{Sealer, is_sealed};
 /// Độ dài tối thiểu của `AUTOXIDE_SECRET_KEY`.
 const MIN_LENGTH: usize = 32;
 
+/// Nhãn dẫn khoá của [`SecretKey::phone_key`] / [`SecretKey::email_key`].
+const CONTACT_KEY_PURPOSE: &str = "autoxide/contact-key/v1";
+
 /// Tên dòng giữ khoá gốc trong `kernel_secrets`.
 const SIGNING_KEY: &str = "signing_key";
 
@@ -178,6 +181,45 @@ impl SecretKey {
         }
         // Byte 0 ngăn cách: không ghép (mục đích, khách) khác nhau thành cùng một nhãn.
         derive_from(self.master().await?, &format!("{purpose}\0tenant\0{tenant}"))
+    }
+
+    /// Khoá liên hệ của số điện thoại `phone` trong khách `tenant` (D-194, đặc tả 45 "Chống bom
+    /// hàng"): HMAC-SHA256 của số dạng E.164 bằng khoá riêng của khách, mã hoá base64url (43 ký tự).
+    /// Cùng số trong cùng khách luôn ra cùng khoá (gom đơn, thống kê giao hàng); hai khách ra hai
+    /// khoá khác nhau, nên không so được dữ liệu giữa các khách. Module lưu khoá này thay vì lưu số
+    /// để tra, không bao giờ để hiện cho người dùng.
+    pub async fn phone_key(
+        &self,
+        tenant: crate::tenancy::TenantId,
+        phone: &crate::sms::PhoneNumber,
+    ) -> Result<String, Error> {
+        self.contact_key(tenant, "phone", phone.as_str()).await
+    }
+
+    /// Như [`phone_key`](Self::phone_key) cho email: so không phân biệt hoa thường, bỏ khoảng trắng
+    /// đầu cuối.
+    pub async fn email_key(
+        &self,
+        tenant: crate::tenancy::TenantId,
+        email: &str,
+    ) -> Result<String, Error> {
+        self.contact_key(tenant, "email", &email.trim().to_lowercase()).await
+    }
+
+    async fn contact_key(
+        &self,
+        tenant: crate::tenancy::TenantId,
+        kind: &str,
+        normalized: &str,
+    ) -> Result<String, Error> {
+        let key = self.derive_for(tenant, CONTACT_KEY_PURPOSE).await?;
+        let mut mac = <Hmac<Sha256> as KeyInit>::new_from_slice(&key)
+            .map_err(|error| Error::internal(format!("hmac key: {error}")))?;
+        // Byte 0 ngăn cách loại và giá trị: số điện thoại không trùng khoá với email.
+        mac.update(kind.as_bytes());
+        mac.update(b"\0");
+        mac.update(normalized.as_bytes());
+        Ok(URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes()))
     }
 
     async fn master(&self) -> Result<&[u8], Error> {

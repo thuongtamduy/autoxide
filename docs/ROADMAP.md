@@ -618,7 +618,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [ ] Hoá đơn điện tử qua `EInvoiceProvider`, kể cả từ máy tính tiền; `invoice_timing = on_delivered` mặc
       định (D-215); khoản giảm, hàng khuyến mại trên hoá đơn (D-222, cần đối chiếu NĐ 123/2020 sửa bởi NĐ
       70/2025); mail xác nhận, cập nhật trạng thái qua job theo i18n; chứng từ của người mua
-- [ ] Mua không cần tài khoản (D-201, D-202): tra đơn bằng số đơn + OTP; token xem đơn để huỷ, đổi địa chỉ
+- [x] Mua không cần tài khoản (D-201, D-202, D-20261120-step45-guest-orders): tra đơn bằng số đơn + OTP; token xem đơn để huỷ, đổi địa chỉ
       (OTP lần hai), mở hỗ trợ ở `support` (D-204), qua cùng service; giới hạn tra / gửi lại OTP / hạn token
       là cấu hình; che số điện thoại, địa chỉ tới cấp phường; gắn đơn vãng lai vào tài khoản đã xác thực số
 - [ ] Bán tại quầy (POS) qua API cho chuỗi: đơn tạo tại cửa hàng, tiền mặt / thẻ / QR, trừ kho của cửa hàng
@@ -638,6 +638,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       nhận, trạng thái xử lý, hạn bảo hành
 - [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229) và `orders.cart_link` cho đầu
       trang (D-234); câu trả lời tự động về trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
+      — phần `FactSource` đã xong (D-20261120-step45-guest-orders); khối chờ `Module::blocks` của bước 67
 - [ ] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,

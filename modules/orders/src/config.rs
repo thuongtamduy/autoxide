@@ -56,6 +56,33 @@ pub(crate) const CHECKOUT_STUCK_MINUTES: Setting = Setting::new(
 )
 .with_default("10");
 
+pub(crate) const LOOKUP_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_LOOKUP_PER_HOUR",
+    "Guest order lookups (each sends a one-time code by SMS) allowed per hour for one order number \
+     and phone number (1 to 100).",
+)
+.with_default("5");
+
+pub(crate) const LOOKUP_IP_PER_HOUR: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_LOOKUP_IP_PER_HOUR",
+    "Guest order lookups allowed per hour from one client address (1 to 1000).",
+)
+.with_default("20");
+
+pub(crate) const LOOKUP_RESEND_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_LOOKUP_RESEND_SECONDS",
+    "Seconds a guest waits before asking for another one-time code for the same order (10 to \
+     3600).",
+)
+.with_default("60");
+
+pub(crate) const LOOKUP_TOKEN_MINUTES: Setting = Setting::new(
+    "AUTOXIDE_ORDERS_LOOKUP_TOKEN_MINUTES",
+    "Minutes a guest order access token (`Order-Token`) stays valid after the one-time code (5 to \
+     1440).",
+)
+.with_default("30");
+
 /// Cấu hình đã đọc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct OrdersConfig {
@@ -67,6 +94,10 @@ pub(crate) struct OrdersConfig {
     pub hold_minutes: i64,
     pub hold_grace_minutes: i64,
     pub checkout_stuck_minutes: i64,
+    pub lookup_per_hour: u32,
+    pub lookup_ip_per_hour: u32,
+    pub lookup_resend_seconds: i64,
+    pub lookup_token_minutes: i64,
 }
 
 impl Default for OrdersConfig {
@@ -80,6 +111,10 @@ impl Default for OrdersConfig {
             hold_minutes: 60,
             hold_grace_minutes: 10,
             checkout_stuck_minutes: 10,
+            lookup_per_hour: 5,
+            lookup_ip_per_hour: 20,
+            lookup_resend_seconds: 60,
+            lookup_token_minutes: 30,
         }
     }
 }
@@ -94,6 +129,10 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<OrdersConfig, Invali
     let hold = reader.get_with(&HOLD_MINUTES, |raw| parse_in_range(raw, 15i64, 1440));
     let grace = reader.get_with(&HOLD_GRACE_MINUTES, |raw| parse_in_range(raw, 1i64, 120));
     let stuck = reader.get_with(&CHECKOUT_STUCK_MINUTES, |raw| parse_in_range(raw, 1i64, 1440));
+    let lookups = reader.get_with(&LOOKUP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 100));
+    let lookups_ip = reader.get_with(&LOOKUP_IP_PER_HOUR, |raw| parse_in_range(raw, 1u32, 1000));
+    let resend = reader.get_with(&LOOKUP_RESEND_SECONDS, |raw| parse_in_range(raw, 10i64, 3600));
+    let token = reader.get_with(&LOOKUP_TOKEN_MINUTES, |raw| parse_in_range(raw, 5i64, 1440));
     Ok(OrdersConfig {
         cart_ttl_days: ttl?,
         cart_max_lines: lines?,
@@ -103,5 +142,9 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<OrdersConfig, Invali
         hold_minutes: hold?,
         hold_grace_minutes: grace?,
         checkout_stuck_minutes: stuck?,
+        lookup_per_hour: lookups?,
+        lookup_ip_per_hour: lookups_ip?,
+        lookup_resend_seconds: resend?,
+        lookup_token_minutes: token?,
     })
 }

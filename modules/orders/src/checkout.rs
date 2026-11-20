@@ -274,6 +274,15 @@ impl OrdersService {
             };
         }
 
+        // Khoá liên hệ tính trước khi giữ chỗ: lỗi ở đây không để lại chỗ giữ nào.
+        let buyer_key = match self.buyer_key(tenant, &input.contact.phone).await {
+            Ok(key) => key,
+            Err(error) => {
+                self.fail_checkout(tenant, order_id, error.code()).await?;
+                return Err(error);
+            }
+        };
+
         // 4–5. Giữ chỗ ngoài transaction.
         let org = OrgId::from_uuid(row.org_id);
         let hold_until = now + Duration::minutes(self.config.hold_minutes);
@@ -307,6 +316,7 @@ impl OrdersService {
             funds_flow,
             holds: &holds,
             due: now + Duration::minutes(self.config.hold_minutes - self.config.hold_grace_minutes),
+            buyer_key,
         };
         if let Err(error) = self.create_order(tenant, &draft).await {
             self.release_holds(tenant, order_id, &holds, ReleaseReason::CheckoutAborted).await;
@@ -513,6 +523,8 @@ struct Draft<'a> {
     holds: &'a Holds,
     /// Hạn thanh toán tạm, tới khi `ledger` trả hạn thật (D-218).
     due: chrono::DateTime<Utc>,
+    /// Khoá liên hệ của số điện thoại người mua (tra đơn, gắn đơn, chống bom hàng).
+    buyer_key: Option<String>,
 }
 
 impl Draft<'_> {
@@ -534,7 +546,7 @@ impl Draft<'_> {
             channel: Set("web".to_owned()),
             external_ref: Set(None),
             buyer_user_id: Set(self.buyer),
-            buyer_key: Set(None),
+            buyer_key: Set(self.buyer_key.clone()),
             contact: Set(json(&self.input.contact)?),
             ship_to: Set(self.ship_to.as_ref().map(|ship_to| json(ship_to)).transpose()?),
             shipping_option: Set(quote.shipping.as_ref().map(|option| {

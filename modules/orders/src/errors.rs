@@ -259,3 +259,77 @@ pub(crate) fn nothing_to_ship() -> Error {
          item was already requested.",
     )
 }
+
+pub(crate) fn lookup_failed() -> Error {
+    Error::not_found(
+        "orders.lookup_failed",
+        "No order with this order number and phone number. Check both and try again.",
+    )
+}
+
+pub(crate) fn lookup_resend_too_soon(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "orders.lookup_resend_too_soon",
+        "Wait {retry_after} seconds before asking for another code.",
+    )
+    .with_param("retry_after", retry_after)
+    .with_retry_after(retry_after)
+}
+
+pub(crate) fn lookup_too_many(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "orders.lookup_too_many",
+        "Too many order lookups. Try again in {retry_after} seconds.",
+    )
+    .with_param("retry_after", retry_after)
+    .with_retry_after(retry_after)
+}
+
+pub(crate) fn lookup_code_invalid() -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.lookup_code_invalid",
+        "The code is wrong, used or expired; ask for a new code if it has expired.",
+    )
+}
+
+pub(crate) fn lookup_token_invalid() -> Error {
+    Error::unauthenticated(
+        "orders.lookup_token_invalid",
+        "The order access token is missing, wrong or expired. Look the order up again with its \
+         number and phone number, then send the token in the `Order-Token` header.",
+    )
+}
+
+pub(crate) fn address_locked() -> Error {
+    Error::conflict(
+        "orders.address_locked",
+        "The goods have left the warehouse (or a shipment was requested); the delivery address \
+         can no longer change.",
+    )
+}
+
+pub(crate) fn address_change_needs_payment() -> Error {
+    Error::conflict(
+        "orders.address_change_needs_payment",
+        "The new address changes the shipping fee (or the shipping method is not available there); \
+         contact the shop to change it.",
+    )
+}
+
+pub(crate) fn support_unavailable() -> Error {
+    Error::not_found("orders.support_unavailable", "This shop has no customer support turned on.")
+}
+
+pub(crate) fn guest_key_reused(key: &str) -> Error {
+    Error::new(
+        ErrorKind::Validation,
+        "orders.idempotency_key_reused",
+        "The `Idempotency-Key` {key} was used for another request; send a new key.",
+    )
+    .with_param("key", key)
+}
+
+pub(crate) fn sms_unavailable() -> Error {
+    autoxide_kernel::sms::sms_disabled()
+}

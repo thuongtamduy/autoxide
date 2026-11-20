@@ -500,6 +500,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step55-collections](D-20261119-step55-collections.md)** Bước 55: bộ sưu tập sản phẩm dùng bộ lọc storefront sẵn có, permission `catalog.collections.manage` — 2026-11-19
 - **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 - **[D-20261119-step61-voice](D-20261119-step61-voice.md)** Gọi điện trong chat (bước 61 mục 4): hợp đồng ở kernel, mặc định, ghi âm, sandbox — 2026-11-19
+- **[D-20261120-step45-guest-orders](D-20261120-step45-guest-orders.md)** Mua không cần tài khoản của `orders`: mã một lần, header `Order-Token`, khoá liên hệ theo khách, gắn đơn bằng token — 2026-11-20
 
 ## Vận hành và hiệu năng
 

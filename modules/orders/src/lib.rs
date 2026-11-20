@@ -16,7 +16,9 @@ mod entity;
 mod errors;
 mod events;
 mod extensions;
+mod facts;
 mod fulfillments;
+mod guests;
 mod holds;
 mod http;
 mod jobs;
@@ -135,12 +137,21 @@ impl Module for OrdersModule {
             reasons: context.reason_codes(),
             // Ảnh kèm yêu cầu trả: hỏi `media` ai đã tải lên (chưa cài: không nhận ảnh).
             media: context.require::<dyn autoxide_media::api::Media>().ok(),
+            sms: context.require::<dyn autoxide_kernel::sms::SmsSender>().ok(),
+            // `support` đăng ký trước `orders`; chưa cài thì nút "mở hỗ trợ" trả 404.
+            support: context.require::<dyn autoxide_support::api::SupportIntake>().ok(),
+            translations: context.translations().clone(),
         };
         let service = Arc::new(OrdersService::new(parts, config));
         // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Orders>(service.clone())?;
         context.provide::<dyn api::OrderHolds>(service.clone())?;
         context.provide::<dyn api::OrderRefunds>(service.clone())?;
+        context.provide::<dyn api::OrderLookups>(service.clone())?;
+        // Trả lời tự động về trạng thái đơn cho `support` (D-230), khi có `support`.
+        if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
+            facts.attach(Arc::new(facts::OrderFacts::new(context.translations().clone())))?;
+        }
         self.service = Some(service);
         // `Arc<Extensions>` tự đổi thành `Arc<dyn OrderExtensions>`: module khác chỉ thấy trait.
         context.provide::<dyn api::OrderExtensions>(self.extensions.clone())?;

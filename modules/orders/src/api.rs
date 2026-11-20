@@ -93,6 +93,12 @@ pub mod events {
     pub const PREORDER_BALANCE_REQUESTED: &str = "orders.preorder_balance_requested";
     /// Quá hạn trả phần còn lại.
     pub const PREORDER_BALANCE_OVERDUE: &str = "orders.preorder_balance_overdue";
+    /// Người mua (vãng lai, qua mã lần hai) đổi địa chỉ giao trước khi hàng rời kho. `after`:
+    /// `order_id`, `number`, `by`; không mang địa chỉ.
+    pub const DELIVERY_ADDRESS_CHANGED: &str = "orders.delivery_address_changed";
+    /// Đơn vãng lai được gắn vào tài khoản đã chứng minh số điện thoại. `after`: `buyer_user_id`,
+    /// `order_ids`.
+    pub const ORDERS_CLAIMED: &str = "orders.orders_claimed";
 }
 
 /// Mã tham chiếu giữ chỗ chung của một đơn ở mọi bên giữ chỗ (`Tender`, nhật ký): `orders:<id>`.

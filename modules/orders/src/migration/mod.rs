@@ -6,6 +6,7 @@ mod m0006_orders;
 mod m0007_returns;
 mod m0008_pickups;
 mod m0009_preorders;
+mod m0010_guests;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -33,6 +34,14 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0008_pickups::Migration),
         // Hàng đặt trước, giao nhiều lần (mục 5).
         Box::new(m0009_preorders::Migration),
+        // Mua không cần tài khoản: mã một lần, token xem đơn, chống trùng thao tác vãng lai (mục 8).
+        Box::new(m0010_guests::Migration),
+        // Bảng `orders_throttle`: giới hạn tra đơn theo (số đơn, số điện thoại) và theo IP băm.
+        autoxide_kernel::throttle::throttle_migration("m0011_create_throttle", "orders"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0012_tenancy_throttle",
+            vec![autoxide_kernel::throttle::tenant_table("orders")],
+        ),
     ]
 }
 
