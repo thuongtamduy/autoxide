@@ -217,6 +217,10 @@ pub(crate) struct CartResponse {
     /// `bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`
     /// (through a partner).
     payment_methods: Vec<String>,
+    /// Pre-ordered items paid in part (when paying online; not with cash on delivery): what is
+    /// paid now and what is asked once the items are ready. Show it, then send
+    /// `accept_preorder_terms: true` at checkout. This is an advance payment, not a deposit.
+    advance: Option<CartAdvanceResponse>,
     attribution: Option<AttributionResponse>,
     totals: TotalsResponse,
     /// How much more to spend for free shipping (`0`: already free), when the option has a
@@ -230,6 +234,62 @@ pub(crate) struct CartResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     cart_token: Option<String>,
     updated_at: DateTime<Utc>,
+}
+
+/// Advance payment terms of a cart with pre-ordered items.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersCartAdvance)]
+pub(crate) struct CartAdvanceResponse {
+    /// Paid when ordering: items in stock and the advance.
+    upfront: Money,
+    /// Paid when the pre-ordered items are ready (`total − upfront`).
+    balance: Money,
+    /// Hours the buyer has to pay the balance once asked.
+    balance_due_hours: i64,
+    /// How the balance is paid: `payment_link`.
+    balance_methods: Vec<String>,
+    /// Kept from the advance of a line when the buyer cancels after its cut-off (basis points;
+    /// `0` = always refunded in full).
+    retention_bp: i64,
+    retention_max: Option<Money>,
+    lines: Vec<CartAdvanceLineResponse>,
+}
+
+/// The advance of one pre-ordered line.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersCartAdvanceLine)]
+pub(crate) struct CartAdvanceLineResponse {
+    line_key: String,
+    amount: Money,
+    /// Cancelling after this may keep part of the advance; `null`: always refunded in full.
+    commit_at: Option<DateTime<Utc>>,
+}
+
+impl CartAdvanceResponse {
+    fn new(planned: &crate::advance_flow::Planned, quote: &crate::pricing::Quote) -> Self {
+        let lines = quote
+            .lines
+            .iter()
+            .enumerate()
+            .filter_map(|(index, line)| {
+                let amount = *planned.split.line_advance.get(index)?;
+                (amount.minor() > 0).then(|| CartAdvanceLineResponse {
+                    line_key: line.key.clone(),
+                    amount,
+                    commit_at: planned.commit_at.get(index).copied().flatten(),
+                })
+            })
+            .collect();
+        CartAdvanceResponse {
+            upfront: planned.split.upfront,
+            balance: planned.split.balance,
+            balance_due_hours: planned.terms.balance_due_hours,
+            balance_methods: vec![crate::advance::PAYMENT_LINK.to_owned()],
+            retention_bp: planned.terms.retention_bp,
+            retention_max: planned.terms.retention_max,
+            lines,
+        }
+    }
 }
 
 impl CartResponse {
@@ -274,6 +334,7 @@ impl CartResponse {
             ship_to: view.ship_to.map(ShipToResponse::from),
             payment_method: view.cart.payment_method.clone(),
             payment_methods: view.payment_methods,
+            advance: view.advance.as_ref().map(|planned| CartAdvanceResponse::new(planned, quote)),
             attribution: view.attribution.map(|attribution| AttributionResponse {
                 click_id: attribution.click_id,
                 code: attribution.code,
@@ -407,6 +468,23 @@ pub(crate) struct OrderResponse {
     /// Until when a return can be requested (delivered orders); omitted in lists.
     #[serde(skip_serializing_if = "Option::is_none")]
     return_until: Option<DateTime<Utc>>,
+    /// Pre-ordered items paid in part; omitted in lists and for orders paid in full.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    advance: Option<OrderAdvanceResponse>,
+}
+
+/// The advance payment plan of an order.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersOrderAdvance)]
+pub(crate) struct OrderAdvanceResponse {
+    advance: Money,
+    upfront: Money,
+    balance: Money,
+    /// `awaiting_advance`, `advance_paid`, `balance_requested`, `balance_paid`, `balance_overdue`
+    /// or `cancelled`.
+    status: String,
+    /// Pay the balance before this (once asked).
+    balance_due_at: Option<DateTime<Utc>>,
 }
 
 /// An order waiting in store.
@@ -468,6 +546,7 @@ impl OrderResponse {
             buyer_cancel_until: None,
             buyer_can_cancel: None,
             return_until: None,
+            advance: None,
         })
     }
 
@@ -510,6 +589,19 @@ impl OrderResponse {
         response.buyer_cancel_until = Some(view.deadlines.buyer_cancel_until.as_str().to_owned());
         response.buyer_can_cancel = Some(view.deadlines.buyer_can_cancel);
         response.return_until = view.deadlines.return_until;
+        response.advance = match view.advance {
+            Some(plan) => {
+                let money = |minor: i64| Money::from_columns(minor, &plan.currency);
+                Some(OrderAdvanceResponse {
+                    advance: money(plan.advance_minor)?,
+                    upfront: money(plan.upfront_minor)?,
+                    balance: money(plan.balance_minor)?,
+                    status: plan.status,
+                    balance_due_at: plan.balance_due_at,
+                })
+            }
+            None => None,
+        };
         Ok(response)
     }
 

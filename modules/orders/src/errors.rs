@@ -503,3 +503,23 @@ pub(crate) fn warranty_claim_transition(from: &str, to: &str) -> Error {
     .with_param("from", from)
     .with_param("to", to)
 }
+
+pub(crate) fn balance_unpaid(amount: String) -> Error {
+    Error::conflict(
+        "orders.balance_unpaid",
+        "The order still has {amount} to pay; pre-ordered items cannot ship yet.",
+    )
+    .with_param("amount", amount)
+}
+
+pub(crate) fn balance_overdue() -> Error {
+    Error::conflict("orders.balance_overdue", "The time to pay the rest of this order has passed.")
+}
+
+pub(crate) fn balance_not_requested() -> Error {
+    Error::conflict(
+        "orders.balance_not_requested",
+        "Nothing is waiting to be paid on this order: the rest is asked for once the pre-ordered \
+         items are ready.",
+    )
+}

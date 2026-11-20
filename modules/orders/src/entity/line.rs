@@ -39,6 +39,8 @@ pub struct Model {
     pub allocated_quantity: i64,
     pub cancelled_quantity: i64,
     pub preorder_delayed_to: Option<Date>,
+    pub advance_minor: Option<i64>,
+    pub preorder_commit_at: Option<DateTimeUtc>,
     pub created_at: DateTimeUtc,
 }
 

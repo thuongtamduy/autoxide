@@ -23,6 +23,8 @@ pub(crate) struct OrderView {
     pub pickup: Option<crate::entity::pickup::Model>,
     /// Hạn người mua tự huỷ / đổi trả theo chính sách của nút bán (website hiện sẵn).
     pub deadlines: Deadlines,
+    /// Kế hoạch trả trước một phần (D-232).
+    pub advance: Option<crate::entity::advance_plan::Model>,
 }
 
 /// Hạn của người mua trên một đơn.
@@ -84,7 +86,8 @@ impl OrdersService {
                 .filter(|_| row.status != crate::api::OrderStatus::Cancelled.as_str())
                 .map(|at| at + chrono::Duration::days(policy.return_window_days)),
         };
-        Ok(OrderView { order: row, lines, payments, pickup, deadlines })
+        let advance = self.advance_plan(read, tenant, row.id).await?;
+        Ok(OrderView { order: row, lines, payments, pickup, deadlines, advance })
     }
 
     /// Đơn `id` của người mua `buyer` (đơn của người khác: 404).

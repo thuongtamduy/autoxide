@@ -92,6 +92,20 @@ pub(crate) const CANCELLED: NotificationKind = NotificationKind::new(
 )
 .sample(r#"{"number": "2026-000123", "link": "https://shop.example.com/orders/2026-000123"}"#);
 
+/// Hàng đặt trước đã về: mời trả phần còn lại (trả trước một phần, D-232).
+pub(crate) const BALANCE_REQUESTED: NotificationKind = NotificationKind::new(
+    Category::Transactional,
+    CHANNELS,
+    NotificationTemplate::new(
+        "orders.preorder_balance_requested",
+        "Your pre-order {number} is ready",
+        "The pre-ordered items of order {number} are ready. Pay the balance of {amount} from \
+         your order page to have them shipped.",
+        "Order {number}: pay {amount} to ship",
+    ),
+)
+.sample(r#"{"number": "2026-000123", "total": "1.000.000 ₫", "amount": "700.000 ₫", "link": "https://shop.example.com/orders/2026-000123"}"#);
+
 /// Đánh giá của người mua bị ẩn (Luật 19/2023: báo người viết, kèm lý do).
 pub(crate) const REVIEW_HIDDEN: NotificationKind = NotificationKind::new(
     Category::Transactional,
@@ -107,7 +121,8 @@ pub(crate) const REVIEW_HIDDEN: NotificationKind = NotificationKind::new(
 .sample(r#"{"reason": "personal_data"}"#);
 
 pub(crate) fn declare(notifier: &dyn Notifier) -> Result<(), Error> {
-    for kind in [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, REVIEW_HIDDEN] {
+    for kind in [PLACED, CONFIRMED, SHIPPED, DELIVERED, CANCELLED, REVIEW_HIDDEN, BALANCE_REQUESTED]
+    {
         notifier.declare(kind)?;
     }
     Ok(())
@@ -124,6 +139,7 @@ pub(crate) fn subscriptions(service: &Arc<OrdersService>) -> Vec<Subscription> {
         Subscription::new(names::ORDER_STATUS_CHANGED, on(SHIPPED)),
         Subscription::new(names::ORDER_DELIVERED, on(DELIVERED)),
         Subscription::new(names::ORDER_CANCELLED, on(CANCELLED)),
+        Subscription::new(names::PREORDER_BALANCE_REQUESTED, on(BALANCE_REQUESTED)),
     ]
 }
 
@@ -170,7 +186,12 @@ impl EventHandler for Notice {
             .as_deref()
             .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
             .unwrap_or_else(|| json!({}));
-        let params = json!({"number": row.number, "total": total.to_string(), "fields": fields});
+        let mut params =
+            json!({"number": row.number, "total": total.to_string(), "fields": fields});
+        // Số tiền của event (phần còn lại phải trả).
+        if let Ok(amount) = serde_json::from_value::<Money>(after["amount"].clone()) {
+            params["amount"] = json!(amount.to_string());
+        }
         let notification =
             Notification::new(self.kind.key(), recipient, params, format!("orders:{}", event.id))
                 .locale(row.locale.clone());
