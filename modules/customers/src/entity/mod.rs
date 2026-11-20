@@ -19,3 +19,7 @@ pub(crate) mod reminder_rule;
 pub(crate) mod tier;
 pub(crate) mod voucher_program;
 pub(crate) mod wishlist_item;
+pub(crate) mod gift_card;
+pub(crate) mod store_credit;
+pub(crate) mod stored_value_entry;
+pub(crate) mod stored_value_hold;

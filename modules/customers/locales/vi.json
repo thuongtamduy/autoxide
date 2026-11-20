@@ -74,5 +74,12 @@
   "text:A referred buyer's first order completed; both buyers were rewarded.": "Đơn đầu tiên của người được giới thiệu đã hoàn tất; cả hai người được thưởng.",
   "text:An abandoned cart reminder was sent to a consenting buyer.": "Đã gửi nhắc giỏ bỏ dở cho người mua có đồng ý.",
   "text:Set abandoned cart reminders and referral rewards.": "Đặt nhắc giỏ bỏ dở và thưởng giới thiệu bạn.",
-  "field:must be from 0 to 1000000": "phải từ 0 tới 1000000"
+  "field:must be from 0 to 1000000": "phải từ 0 tới 1000000",
+  "customers.face_value_too_high": "Mệnh giá một thẻ quà tặng tối đa là {max}.",
+  "customers.gift_card_inactive": "Thẻ quà tặng này đã hết hạn hoặc đã bị huỷ.",
+  "customers.gift_card_not_found": "Mã thẻ quà tặng không đúng.",
+  "customers.insufficient_balance": "Không đủ số dư (còn {available}).",
+  "customers.lookup_throttled": "Nhập sai mã thẻ quà tặng quá nhiều lần. Chờ {seconds} giây rồi thử lại.",
+  "customers.stored_value_disabled": "Thẻ quà tặng và số dư cửa hàng chưa được bật cho cửa hàng này.",
+  "customers.stored_value_need_account": "Đăng nhập để trả bằng thẻ quà tặng hoặc số dư cửa hàng."
 }

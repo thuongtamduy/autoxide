@@ -33,10 +33,7 @@ pub(crate) const PREPAYMENTS: &str = "buyer.prepayments";
 
 /// Bên thường của các tài khoản riêng của điểm.
 fn normal_side(purpose: &str) -> Side {
-    match purpose {
-        EXPENSE => Side::Debit,
-        _ => Side::Credit,
-    }
+    if purpose == EXPENSE || purpose.ends_with(".expense") { Side::Debit } else { Side::Credit }
 }
 
 /// Một dòng bút toán: mục đích tài khoản, Nợ (`debit`) hay Có, số tiền nhỏ nhất.

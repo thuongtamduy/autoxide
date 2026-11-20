@@ -12,7 +12,7 @@ use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
-use crate::entity::{loyalty_rule, point_hold, voucher_program};
+use crate::entity::{gift_card, loyalty_rule, point_hold, voucher_program};
 use crate::loyalty::ledger::{POST_LEDGER, PostLedgerJob};
 use crate::service::{CustomersService, now};
 
@@ -20,6 +20,7 @@ pub(crate) const EXPIRE_POINTS: &str = "customers.expire_points";
 pub(crate) const RELEASE_EXPIRED_HOLDS: &str = "customers.release_expired_holds";
 pub(crate) const EVALUATE_TIERS: &str = "customers.evaluate_tiers";
 pub(crate) const BIRTHDAY_VOUCHERS: &str = "customers.birthday_vouchers";
+pub(crate) const STORED_VALUE_SWEEP: &str = "customers.stored_value_sweep";
 
 const DAY: Duration = Duration::from_secs(24 * 3600);
 
@@ -47,6 +48,10 @@ pub(crate) fn registrations(service: &Arc<CustomersService>) -> Vec<JobRegistrat
             Arc::new(Sweep { service: service.clone(), kind: EVALUATE_TIERS }),
         ),
         JobRegistration::new(
+            STORED_VALUE_SWEEP,
+            Arc::new(Sweep { service: service.clone(), kind: STORED_VALUE_SWEEP }),
+        ),
+        JobRegistration::new(
             BIRTHDAY_VOUCHERS,
             Arc::new(Sweep { service: service.clone(), kind: BIRTHDAY_VOUCHERS }),
         ),
@@ -60,6 +65,8 @@ pub(crate) fn schedules() -> Vec<Schedule> {
         Schedule::new(RELEASE_EXPIRED_HOLDS, RELEASE_EXPIRED_HOLDS, Duration::from_secs(300)),
         Schedule::new(EVALUATE_TIERS, EVALUATE_TIERS, DAY),
         Schedule::new(BIRTHDAY_VOUCHERS, BIRTHDAY_VOUCHERS, DAY),
+        // Thẻ quà tặng / số dư (chỉ làm gì khi đã bật): chỗ giữ quá hạn, thẻ hết hạn.
+        Schedule::new(STORED_VALUE_SWEEP, STORED_VALUE_SWEEP, Duration::from_secs(300)),
         Schedule::new(
             crate::engagement::PURGE_RECENT_VIEWS,
             crate::engagement::PURGE_RECENT_VIEWS,
@@ -86,6 +93,18 @@ impl Sweep {
                     .select_only()
                     .column(point_hold::Column::TenantId)
                     .limit(1000)
+                    .into_tuple()
+                    .all(read)
+                    .await?
+            }
+            STORED_VALUE_SWEEP => {
+                if !self.service.config.stored_value_enabled {
+                    return Ok(Vec::new());
+                }
+                gift_card::Entity::find()
+                    .select_only()
+                    .column(gift_card::Column::TenantId)
+                    .distinct()
                     .into_tuple()
                     .all(read)
                     .await?
@@ -118,6 +137,7 @@ impl Sweep {
             EXPIRE_POINTS => self.service.expire_lots(tenant, now()).await,
             RELEASE_EXPIRED_HOLDS => self.service.release_expired_holds(tenant).await,
             EVALUATE_TIERS => self.service.evaluate_tiers(tenant).await,
+            STORED_VALUE_SWEEP => self.service.stored_value_sweep(tenant).await,
             _ => self.service.birthday_vouchers(tenant).await,
         }
     }

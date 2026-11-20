@@ -4,6 +4,7 @@
 mod m0001_create_customers;
 mod m0006_loyalty;
 mod m0007_engagement;
+mod m0008_stored_value;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 
@@ -27,5 +28,13 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0006_loyalty::Migration),
         // Yêu thích, vừa xem, nhắc giỏ bỏ dở, giới thiệu bạn (bước 47 mục 5).
         Box::new(m0007_engagement::Migration),
+        // Thẻ quà tặng và số dư cửa hàng, tắt mặc định (bước 47 mục 4).
+        Box::new(m0008_stored_value::Migration),
+        // Đếm lượt tra mã thẻ (chống dò mã).
+        autoxide_kernel::throttle::throttle_migration("m0009_create_throttle", "customers"),
+        autoxide_kernel::tenancy::migration::adopt(
+            "m0010_tenancy_throttle",
+            vec![autoxide_kernel::throttle::tenant_table("customers")],
+        ),
     ]
 }

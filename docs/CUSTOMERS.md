@@ -98,6 +98,34 @@ The buyer sees their own profile unmasked at `GET /api/v1/customers/me`.
   When that first order completes with enough goods, both are rewarded once, with points and optional
   vouchers (`POST /referral-rules`). The same phone or email as the referrer is refused.
 
+## Gift cards and store credit (off by default)
+
+Prepaid value can fall under payment rules (Decree 52/2024/ND-CP in Vietnam). Both layers must be on
+before anything works: `AUTOXIDE_CUSTOMERS_STORED_VALUE_ENABLED=true` (only after a qualified person
+checked the rules for your shop) **and** the plan features `customers.gift_cards` /
+`customers.store_credit`. Otherwise every endpoint below answers 403
+`customers.stored_value_disabled`, and checkout does not offer them. `autoxide doctor` warns while
+they are on.
+
+- Value is spent only on orders of the shop that issued it. There is **no** way to withdraw, cash
+  out, top up with money or move value to another person.
+- **Gift cards** (`customers.stored_value.manage`): `POST /gift-cards` issues a card worth at most
+  `AUTOXIDE_CUSTOMERS_GIFT_CARD_MAX_MINOR`; the 16-character code is in that answer only (the shop keeps
+  a hash and the last 4 characters). The same `reference` never issues a second card.
+  `POST /gift-cards/lookup` finds a card by code; `POST /gift-cards/{id}/void` ends a lost card.
+- Wrong codes are counted per person: after `AUTOXIDE_CUSTOMERS_GIFT_CARD_LOOKUPS_PER_HOUR` wrong codes in
+  an hour, lookups answer 429 `customers.lookup_throttled` for the rest of the hour. Correct codes are
+  not counted.
+- **Store credit** comes only from staff compensation:
+  `POST /{id}/store-credit/adjustments` with a `reference` and a reason (the same reference applies
+  once; it never goes below zero).
+- **Buyers**: `GET /me/gift-cards`, `POST /me/gift-cards/attach` (with the code), `GET /me/store-credit`.
+  At checkout, pay part or all of an order with the tenders `gift_card` (`{"code": "…"}`) or
+  `store_credit` (`{"amount": <at most>}`, optional); a signed-in account is required. The value is held
+  until the order is confirmed and comes back if the order is cancelled or the hold runs out.
+- The ledger shows what is still owed on cards and store credit (`gift_card.liability`,
+  `store_credit.liability`).
+
 ## Tags, notes, custom fields
 
 Profiles are records of kind `customers.customer`: internal tags, notes and custom fields come from
@@ -115,6 +143,7 @@ target `customers.customer`). Filter the list by tags with `?tags=<id>,<id>`.
 | `customers.loyalty.manage` | Loyalty rules, tiers and voucher rewards (whole shop) |
 | `customers.loyalty.adjust` | Add or remove points by hand |
 | `customers.engagement.manage` | Cart reminders and referral rewards |
+| `customers.stored_value.manage` | Issue, look up and void gift cards; change store credit |
 
 Buyers need no permission: `/me` only needs a signed-in account.
 
