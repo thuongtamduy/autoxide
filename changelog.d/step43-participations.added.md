@@ -1,1 +1,0 @@
-- Sellers join platform flash sales: `POST`/`GET /api/v1/promotions/promotions/{id}/participations`, approve or reject by the platform; approved products join the sale and their discount is paid by the seller.

@@ -9,6 +9,8 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-20
+
 ### Added
 
 - `auth`: `POST /api/v1/auth/api-keys/{id}/rotate` (and MCP tool `auth.rotate_api_key`) replaces an API key with a new
@@ -1065,6 +1067,268 @@ endpoints are marked deprecated with a sunset date first.
   decisions are one file each, `docs/decisions/D-<YYYYMMDD>-<short-name>.md`, so parallel branches never pick the same
   number. `cargo xtask check` flags a stale index, duplicate or malformed decision IDs, references to decisions that do
   not exist, and `.rs` files over 1200 lines (warns over 800; older long files are listed and must not grow).
+- Module `catalog`: products (`catalog.product`) and categories (`catalog.category`) in the object
+  directory — product Q&A through `comments` with a `seller` badge and lifecycle events, website menus
+  with category children by display order.
+- Module `catalog`: image alternative texts by language (`PUT /api/v1/catalog/products/{id}/media/{media_id}/alts/{locale}`)
+  and attribute values per variant with translations (`PUT /api/v1/catalog/variants/{id}/attributes`), shown on
+  the public product page.
+- Module `catalog`: best sellers and ratings now come from module `orders` (completed orders over a
+  rolling 90 days, review totals), so `sort=best_selling` / `sort=rating` and `min_rating` work on
+  public product lists.
+- Module `catalog`: `GET /api/v1/catalog/public/products/{id}/similar` (AI embeddings, or the same
+  categories when embeddings are off) and `GET /api/v1/catalog/public/products/{id}/frequently-bought-together`.
+- Module `catalog`: CSV import (`POST /api/v1/catalog/imports`) and export (`POST /api/v1/catalog/exports`)
+  run as background jobs, with errors by row, re-import by SKU without duplicates and protection
+  against CSV formula injection; MCP tools `catalog.start_import` and `catalog.import_status`.
+- Module `catalog`: AI drafts of product descriptions and SEO texts (`POST /api/v1/catalog/products/{id}/suggestions`,
+  then `apply` or `discard`); applying marks the product `ai_assisted`. MCP tool `catalog.suggest_copy`.
+- Module `catalog`: event `catalog.display_price_changed` when a product's public price changes.
+- Kernel: modules can run a synchronous step when a tenant split or merge switches over
+  (`Relocation::on_switch`, trait `tenancy::SwitchHook`). It runs in the same transaction that opens the new
+  tenant; if it fails, the new tenant stays closed and the relocation can be run again.
+- Website search suggestions (`GET /api/v1/catalog/public/search/suggest`) now also include published posts and pages (`content.entry`) and public stores (`organizations.store`), ranked with exact-accent matches first.
+- A new sandbox starts with a copy of its tenant's configuration: settings that are not secret,
+  roles, pages (published ones stay published) and the notification templates in use. Users,
+  buyers, orders, documents, files and secrets are never copied.
+- `POST /api/v1/kernel/sandboxes/{id}/promote` (MCP `kernel.promote_sandbox`) brings records tried
+  in a sandbox back to the real tenant as drafts — never published, never overwriting what is live;
+  `GET /api/v1/kernel/sandboxes/promotable` lists the kinds (`content.page` for now). Modules take
+  part through the new `Module::sandbox_copy` and `Module::promotable` hooks.
+- Guide [Trying changes in a sandbox](docs/guides/sandbox.md) (also in Vietnamese), and a section on
+  sandboxes in the module guide: simulated partners, `Module::sandbox_copy` and `Module::promotable`.
+- Sandboxes are isolated: every partner contract (payments, payouts, bank feeds, SMS, Zalo, push,
+  e-invoices, identity checks, mail) is wrapped by the kernel, so a sandbox always gets simulated
+  results (`SANDBOX-…` references) and never reaches a real partner. Mail only reaches staff who
+  may enter the sandbox, webhooks only URLs listed in `kernel.sandbox.webhook_urls` (otherwise the
+  delivery is `sandboxed`), and everything held back is listed at
+  `GET /api/v1/kernel/sandbox/messages` and the MCP tool `kernel.list_sandbox_messages`.
+- A sandbox uses the plan of its real tenant, shows a "test copy" label instead of the ministry
+  badge, has an empty public sitemap, and shipping in it always uses the simulated carrier.
+- AVIF copies of images (step 39): with `AUTOXIDE_MEDIA_AVIF=true` (off by default) a background job makes an AVIF
+  copy of every smaller copy of an image, about a third lighter than the WebP copy at the same quality. Each variant
+  gains `avif_url` and `avif_size` (`null` until made); `…/content?…&w=…&format=avif` serves it, falling back to the
+  WebP copy until then. `autoxide task media.refresh_variants` queues copies for older images.
+- Caching by a CDN (step 39): public reads of a website now say `public, max-age=0, s-maxage=60,
+  stale-while-revalidate=300` with an `ETag` and `Vary: Accept-Language, Accept-Encoding`, so a CDN keeps them for
+  `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` (default 60; `0` to always ask again). A request with `Authorization` or a
+  cookie never gets a `public` response. `docs/DEPLOY.md` explains how to set up the CDN.
+- Response compression (step 39): JSON and text responses of 1 KiB or more are compressed with brotli or gzip
+  when the client accepts it (a page of 20 posts goes from 136 KB to about 26 KB). Images and other files are never
+  compressed again. `AUTOXIDE_HTTP_COMPRESSION=false` turns it off when a reverse proxy or CDN already compresses.
+- Looking into one tenant (step 39): request log lines and the spans of background jobs, event deliveries and
+  MCP tools carry `tenant_id` (also as a trace attribute with OpenTelemetry). Metrics still have no tenant label.
+  `docs/DEPLOY.md` (Monitoring) shows how to filter by it.
+- `catalog` (step 41): richer public product cards — option summary (`variant_summary`), brand (the
+  attribute with code `brand`) and price per base unit from a variant's new net content
+  (`net_quantity` + `net_unit`); product pages give each variant its own `path`, `unit_price`,
+  `price_valid_until` and `regular_price` (the price just before a temporary reduction) for
+  structured data.
+- `catalog` (step 41): `autoxide_catalog::api::CatalogExtensions::set_listing_gate` lets a module
+  (the marketplace) refuse to put a product on sale; the status change then answers 422
+  `catalog.listing_denied` with the module's reason.
+- `catalog` (step 41): search suggestions as the shopper types at
+  `GET /api/v1/catalog/public/search/suggest`, gathered from every module through the new kernel trait
+  `autoxide_kernel::suggest::SuggestSource` (exact Vietnamese accents first); per-tenant search synonyms
+  (`GET` / `PUT /api/v1/catalog/synonyms`); filter counts per attribute value and per seller at
+  `GET /api/v1/catalog/public/products/facets`.
+- Module `inventory`: listens to `orders.preorder_cancelled` and releases only the cancelled pre-order lines of an
+  order that stays open — the reserved stock and the pre-order places come back once, even when the event is delivered
+  again.
+- Module `inventory`: public availability `GET /api/v1/inventory/public/availability?variant_ids&store_id` — `in_stock`,
+  `low` (with the quantity, only below `AUTOXIDE_INVENTORY_PUBLIC_LOW_THRESHOLD`), `out` or `preorder` per variant and
+  store, never a large number; `ETag` and a 5-second cache. `Inventory::in_stock_at` uses the same rule (warehouse
+  sources, bundles).
+- Module `inventory`: back-in-stock alerts per store — `POST /api/v1/inventory/public/restock-alerts` (separate
+  consent, anti-spam, two-step confirmation through `AUTOXIDE_INVENTORY_RESTOCK_CONFIRM_URL`; signed-in buyers alerted
+  on their account), one message per restock wave through `notifications`, stop link in every message;
+  `Inventory::restock_alerts_of` answers.
+- `GET /api/v1/promotions/public/promotions/for-product/{product_id}`: public coupons that lower the price of a product variant, with the price with the coupon and the real uses left.
+- `cargo bench -p autoxide-promotions`: benchmark of cart evaluation (50 lines, 500 running promotions); numbers in `docs/BENCHMARKS.md`.
+- Flash sale reminders: `POST`/`DELETE /api/v1/promotions/public/promotions/{id}/reminders` record a consent to one reminder, sent through notifications ten minutes before the start (job `promotions.send_reminders`).
+- `GET /api/v1/promotions/{id}/notice-export?format=json|csv` and MCP tool `promotions.export_notice`: data of a promotion notice for each authority (required or not, last day to submit, legal basis, what was recorded).
+- Sellers join platform flash sales: `POST`/`GET /api/v1/promotions/promotions/{id}/participations`, approve or reject by the platform; approved products join the sale and their discount is paid by the seller.
+- Promotion planning endpoints: `POST /api/v1/promotions/promotions/{id}/simulate` (MCP tool `promotions.simulate`), `GET …/{id}/conflicts`, `GET …/calendar` and `GET …/{id}/stats`.
+- Resource type `promotions.promotion` (website menus can link to a running public promotion, path `/promotions/<id>`).
+- `GET /api/v1/promotions/public/promotions/flash-sales`: public flash sales running now or starting within a day, with sale prices and the real units left.
+- `GET /api/v1/promotions/public/promotions`: running public promotions of a website, with their conditions, the notices recorded with the authorities and the legal discount limit in force.
+- `shipping`: automatic answers for `support` about where a parcel is (intent `shipping.tracking`), only for the owner of the order (buyer account or verified phone number); read permission `shipping.cod.read` for COD statements and discrepancies.
+- Module `orders`: buyer side of returns — `POST /me/orders/{id}/returns/preview` shows the refund (with discounts taken
+  back), the ways to send items back (`pickup`, `drop_off`, `in_store`) and their fee, when the refund should arrive and
+  the deadline, without saving anything; photos must be uploaded by the buyer and are required for the reasons in the
+  new setting `orders.return_photo_reasons`; approving a `pickup` return asks the shipping module for a carrier pickup
+  (`orders.return_pickup_requested`).
+- Module `orders` (step 45): checkout (`POST /checkout`, `Idempotency-Key` required, same key → same order even
+  days later) holds stock and promotion uses per order, numbers orders without gaps (`<year>-000001`), takes payment
+  through the ledger (payment partner or VietQR to the seller's account, `payment_actions[]`) or on delivery,
+  confirms on `ledger.payment_succeeded`, cancels unpaid orders at the ledger's payment deadline and refunds late
+  payments; public payment status for the QR screen (`GET /public/payments/{token}`); `GET /me/orders`,
+  `GET /` and `GET /{id}` for staff.
+- Module `orders`: electronic invoices for orders through `invoices`, at the time the shop's policy
+  says (`orders.invoice_timing`, by default on delivery) or on request with company details; an
+  adjustment invoice after a return; buyers list and print their documents (also with an
+  `Order-Token`); order confirmation and status messages through `notifications`.
+- Module `orders`: point of sale for chains — cash register shifts (one open shift per register),
+  sales at the counter that take stock from the store only, cash with change, card terminal and
+  VietQR, the same `reference` returning the same sale, a cash register invoice; closing a shift
+  books the cash difference with a listed reason, and a difference above the threshold waits for
+  another person's approval.
+- Module `invoices`: `NewDocument::booked_by_source` (the source module already booked the
+  revenue, issuing books nothing) and `Invoices::adjust` for adjustment invoices from other modules.
+- Module `orders`: guests look an order up by its number and phone number, confirm a one-time SMS
+  code and get an `Order-Token` that opens that one order (phone, name and address masked); with it
+  they cancel under the shop's policy, change the delivery address with a second code before the
+  goods leave, or open a support ticket. Signed-in buyers attach their guest orders with
+  `POST /me/orders/claim` and open support tickets from their orders.
+- Module `orders`: answers "what is the status of my order?" for automatic support replies, only to
+  the order's owner.
+- Kernel: `SecretKey::phone_key` and `SecretKey::email_key` give a per-tenant keyed hash of a phone
+  number or email, to match buyers without storing or comparing raw contact data across tenants.
+- Module `orders`: order lifecycle — staff moves orders with `If-Match` (`POST /{id}/transitions`), buyers cancel
+  their own orders up to the shop's policy (`POST /me/orders/{id}/cancel`), cancelled paid orders are refunded through
+  the ledger, `POST /{id}/shipments` asks the shipping module for a shipment (cash to collect included), carrier events
+  move orders to shipping / delivered / delivery failed, revenue is posted to the ledger on delivery, orders complete
+  when the return window ends unless held (`OrderHolds`), shops can be given hours to accept orders; per-unit
+  settings `orders.buyer_cancel_until`, `orders.acceptance_hours`, `orders.return_window_days`,
+  `orders.cod_enabled`; `POST /{id}/payment-link`; MCP tools `orders.list_orders`, `orders.get_order`,
+  `orders.transition_order`, `orders.request_shipment`.
+- Module `orders`: collecting in store and pre-orders — `POST /{id}/pickup/ready` gives the buyer a 6-digit pickup code
+  and holds the items for the pickup method's hold days; `POST /{id}/pickup/handover` with the code or the proxy given
+  when ordering (`contact.proxy_name`, `contact.proxy_phone`); a reminder 24 hours before the hold ends, then
+  `orders.pickup_expired_action` (`cancel_refund` by default, or `keep_waiting`). Checkout requires
+  `accept_preorder_terms` when the cart has pre-order items; orders mixing in-stock and pre-order items ship in two
+  deliveries (cash on delivery collected per delivery); a later pre-order date notifies the buyer and allows free
+  cancellation; a pre-order variant switched off cancels and refunds the items not yet arrived. Order lists filter
+  `pickup_org_id` and `pickup_status`; `orders.nothing_to_ship` when nothing is ready.
+- Module `orders`: partial advance payment for pre-orders (`orders.preorder_advance` setting) —
+  carts show what is paid now and later, buyers paying online pay the items in stock plus the
+  advance when ordering, are asked for the balance once the items are ready
+  (`POST /me/orders/{id}/payments`), pre-ordered items ship only once paid, overdue balances
+  cancel the pre-ordered items, and a buyer cancelling after the cut-off may have part of the
+  advance kept as published. It is an advance payment, not a deposit.
+- Module `orders`: returns and refunds — buyers ask to return items of a delivered order inside the shop's return window
+  with an allowed reason (`POST /me/orders/{id}/returns`, setting `orders.allowed_return_reasons`); staff (`orders.read` to read) approve,
+  reject, receive (restocked or damaged, sent to inventory), refund and close returns (`/returns`,
+  `POST /returns/{id}/transitions`); refunds are proportional to what was paid, add the shipping fee when the seller is
+  at fault, take back order discounts or gift values per the promotion snapshot, and never exceed what was paid, even
+  when sent concurrently; `POST /{id}/refunds` and `GET /{id}/refunds`; refunds go through the payment partner or are
+  recorded as paid by the shop, with reversing ledger entries; MCP tools `orders.refund_order`, `orders.list_returns`,
+  `orders.decide_return`.
+- Module `orders`: product reviews by buyers who received the item (one per order line, published at
+  once, editable for 30 days), public list with star and photo filters and a "helpful" sort, star
+  counts, "helpful" votes (one per person, not for your own review nor by the shop's moderators),
+  hiding only with a listed reason (the author is told), shop replies, AI summary drafts that are
+  public only once staff approve them, and a `verified_buyer` badge on product questions.
+- Module `orders`: cash-on-delivery protection — delivery results per buyer kept as a per-tenant
+  keyed hash of the phone number, rules with effective dates that require paying in advance for
+  risky buyers or large orders, and time-limited block lists with listed reasons.
+- Module `orders`: sales report by shop, channel, product, day or month within your scope, and order
+  export through the shared list export.
+- Module `orders`: warranties opened when an order is delivered — per serial number recorded while
+  preparing the order, or per order line — looked up by serial or buyer phone, listed for the buyer,
+  and warranty claims with a claim number, a due date and a handling status (MCP tools
+  `lookup_warranty`, `update_warranty_claim`).
+- Module `orders`: installment payments through a licensed partner chosen at checkout
+  (`payment_method: installment` with `{partner, months}`).
+- Module `orders`: shop-defined fields buyers fill in at checkout (`custom_fields`, custom field
+  target `orders.order`), shown on the order and available to confirmation messages.
+- Module `orders`: orders show `buyer_cancel_until`, `buyer_can_cancel` and `return_until`; carts
+  list the usable `payment_methods`; review statistics count reviews per variant.
+- `auth`: the tenant setting `auth.api_keys.require_approval` makes new API keys wait (`status: pending`, requests
+  get 401 `auth.api_key_pending`) until someone with the new permission `auth.api_keys.approve` approves them with
+  `POST /api/v1/auth/all-api-keys/{id}/approve`; keys made by approvers work at once, rotated keys keep their state.
+  `GET /api/v1/auth/all-api-keys` filters by `status` and is open to approvers for pending keys. Keys show `status`,
+  `approved_by` and `approved_at`.
+- `auth`: guardrails for child tenants. A tenant above another sets the most permissions it can use
+  (`PUT /api/v1/auth/guardrails/{tenant_id}`, permission `auth.guardrails.manage`); no role there or in tenants below
+  it, not even administrators or people entering by delegation, gets more, and refusals carry
+  `reason: outside_guardrail`. Guardrails from several tenants above all apply. `GET /api/v1/auth/guardrails` lists
+  the ones a tenant set, `GET /api/v1/auth/guardrails/applied` the ones limiting it.
+- Sensitive actions (permissions with `risk` `destructive` or `money`) need a sign-in or a
+  confirmation from the last `AUTOXIDE_AUTH_STEP_UP_MINUTES` minutes (15 by default). Otherwise the answer is 401
+  `step_up_required` with an RFC 9470 `WWW-Authenticate` challenge; `POST /api/v1/auth/me/reauth` now also returns a
+  fresh `access_token` to retry with. On by default; a tenant turns it off with the setting `auth.step_up`. API keys
+  are not asked.
+- Module `content`: display placements and banners for storefronts (step 55, D-236). A placement
+  (`/api/v1/content/placements`, `content.manage`) says how the website draws it (`single`,
+  `carousel`, `grid`, `stack`, `strip`, `popup`), which banners and picture sizes it takes, on which
+  devices and kinds of pages; new tenants get a standard set (`POST /placements/presets` adds it to
+  existing ones). Banners (`/api/v1/content/banners`, new permission `content.banners` per
+  organization unit) have a time window, a fixed order (`PUT /placements/{key}/order` with
+  `If-Match`), links to an address or to any object of the object directory, and can be limited to
+  some pages. `GET /api/v1/content/public/placements?keys=` reads every placement of a page in one
+  call, with `max-age` up to the next banner start or end. Banners linking to a promotion are
+  archived when it ends. MCP tools `content.list_banners`, `content.save_banner` (drafts only),
+  `content.order_placement`.
+- Module `catalog`: product collections (step 55). `/api/v1/catalog/collections` (new permission
+  `catalog.collections.manage`) keeps manual collections (chosen products in order) and rule
+  collections (categories, attributes, price range, new products, on promotion; at most 10
+  conditions), sorted by chosen order, newest, price or best sellers, with texts and SEO per
+  language. `GET /api/v1/catalog/public/collections/{slug}` shows a collection page with the same
+  product cards as the product list. Collections are in the object directory
+  (`catalog.collection`) for banners and menus. MCP tools `catalog.list_collections` and
+  `catalog.save_collection` (drafts only).
+- Module `organizations`: public store information for websites (step 55).
+  `GET /api/v1/organizations/public/storefront` returns the brand (name, logo, site icon, phone,
+  email, social profiles) inherited down the organization tree, the unit's public location profile,
+  its time zone and whether it is open now. The brand is managed with the new unit settings
+  `organizations.brand_name`, `organizations.brand_logo`, `organizations.brand_icon`,
+  `organizations.contact_phone`, `organizations.contact_email` and `organizations.social_links`.
+- Module `catalog`: product collections carry `ai_assisted` (texts written with an AI's suggestion); MCP
+  tool `catalog.save_collection` sets it by default and the public collection page returns it, so the
+  website can show an AI label.
+- Guide [`docs/guides/storefront.md`](docs/guides/storefront.md) (+ Vietnamese): building a shop's home page
+  from placements, banners, collections and store information.
+- New module `conversations` (`/api/v1/conversations`): customers chat with a shop or a marketplace
+  store about a product or an order. Messages are append-only, resending with the same `client_id`
+  never duplicates, and authors may recall a message within 2 minutes. Staff share an inbox with
+  unread counts, assignment, read cursors, AI drafts, hand-over to a support ticket, blocking and
+  reports of abuse. Simple questions get automatic answers through support's approved answers;
+  people offline get one batched notice. Conversations are deleted
+  `AUTOXIDE_CONVERSATIONS_RETENTION_DAYS` after the last message; deleting an account erases the
+  customer's own messages. MCP tools: `conversations.list_threads`, `get_thread`, `reply`,
+  `suggest_reply`.
+- Event streams: an event can also reach the users it names (`stream_audience` in the module
+  catalog), so customers receive chat events on `GET /api/v1/kernel/events/stream` without any
+  permission.
+- Calls in customer chat (module `conversations`): a shop sets up a phone line per unit
+  (`PUT /voice/lines/{org_id}`); customers call from the browser or ask to be called back at their
+  verified phone number within the shop's call-back hours; open requests show in the work inbox;
+  agents call back with the shop's hotline shown; each call ends with one summary line in the
+  conversation. Recording is off by default, needs a provider that plays a notice and the
+  customer's confirmation, is kept `AUTOXIDE_CONVERSATIONS_RECORDING_RETENTION_DAYS` (90) days and
+  can be deleted on request. Phone numbers are never shown in full. MCP tools
+  `conversations.list_callbacks`, `conversations.list_calls`.
+- Kernel contract `autoxide_kernel::voice::VoiceProvider` for voice provider connectors (with
+  `FakeVoiceProvider` in `autoxide-testkit`); sandboxes never reach a real voice provider.
+- Guide for app makers, `docs/guides/mobile.md` (Vietnamese: `mobile.vi.md`): picking the Swift,
+  Kotlin or Dart SDK, signing in and refreshing tokens, sign-in with Google / Microsoft / GitHub
+  from an app (PKCE), push notifications, uploading photos straight to storage, offline sync,
+  WebSocket events and live signals, and in-app purchases. Its `curl` examples run as tests.
+- Swift, Kotlin and Dart SDKs (step 69), generated from `docs/openapi.json` with pinned standard
+  tools: Swift through Apple's swift-openapi-generator (`Package.swift` at the repository root,
+  sources in `sdk/swift`), Kotlin and Dart through openapi-generator (`sdk/openapitools.json`). CI
+  builds all three; they are not published to package registries.
+- In-app purchases (step 69): trait `StorePurchases` in the kernel for App Store and Google Play
+  (verify a purchase, receive signed server notifications) with `FakeStorePurchases` in the
+  testkit. Module `plans` links store products to plans, takes purchases from the app
+  (`POST /api/v1/plans/store/purchases`) and store notifications
+  (`POST /api/v1/plans/store/notifications/{store}`): renewals extend the subscription, refunds end
+  access at once, the same purchase or notification never grants twice. Apple and Google collect
+  the money; real store connectors need the owner's developer accounts.
+- Offline sync (step 69): a module declares `Module::sync_resources` and gets a change feed
+  (`GET /api/v1/<module>/<path>/changes?cursor=`) with the current record or a deletion mark,
+  filtered like its list; an old cursor answers `410 sync_cursor_expired`
+  (`AUTOXIDE_SYNC_RETENTION_DAYS`). A stale `If-Match` answers `412` with the current record in
+  the problem's `current` and its `ETag`. `POST /api/v1/kernel/sync/batch` runs queued writes one
+  by one through their REST endpoints (`GET /api/v1/kernel/sync/resources` lists what syncs).
+  Module `notes` is the worked example.
+- `GET /api/v1/kernel/events/ws` (step 69): the events of the SSE stream over a WebSocket, with
+  the same permissions, resuming and connection limits; the client sends only control messages
+  (`subscribe`, `unsubscribe`, `ack`, `join`, `leave`, `typing`, `ping`) — data is still written
+  over REST. Credentials are checked again every `AUTOXIDE_EVENTS_WS_RECHECK_SECONDS` (close code
+  `4401` when they expired). Modules open live "typing" / "online" signals in their topics with
+  `SignalTopics`.
 
 ### Changed
 
@@ -1126,9 +1390,20 @@ endpoints are marked deprecated with a sunset date first.
   hash `argon2` with `opt-level = 3`) in dev and test builds — your own code stays unoptimised, so rebuilds take
   as long as before. `./gate.sh --quick` tests only what changed since its last green run (not since `main`), and
   both gates run the test binaries in parallel (`cargo xtask test-all` in the full gate).
+- Contributing: pull requests no longer edit `CHANGELOG.md`; they add a fragment to `changelog.d/`
+  (`<name>.<section>.md`), folded into the changelog at release time by `cargo xtask changelog`.
+- Module `orders`: events `orders.review_published` and `orders.review_moderated` now carry
+  `product_rating` (`count`, `sum`: the product's current totals), which `catalog` uses for ratings.
+- Search by meaning is faster on large sites (step 39): the vector comparison uses the CPU's vector instructions and
+  the scan is split over the CPU cores outside the request thread — 50,000 posts in one language (100,000 chunks of
+  1,024 dimensions) went from 137 ms to 20 ms on 4 cores, with the same results.
 
 ### Fixed
 
+- Event stream (`GET /api/v1/kernel/events`, `/events/ws`): reconnecting with `Last-Event-ID` no longer
+  sends that same event again when its live broadcast arrives after the reconnect.
+- `catalog`: two storefront rebuilds of the same product running at once on PostgreSQL no longer both
+  record `catalog.display_price_changed` (product rows are locked during the rebuild).
 - `lettre` 0.11.24 (mail over SMTP): fixes RUSTSEC-2026-0560 … 0565 (STARTTLS reply injection, SMTP command
   injection, panics on malformed replies, wrong recipient for quoted local parts).
 - The fake e-invoice provider of `autoxide-testkit` gives the same answer to every status check of one submission, so
@@ -1165,6 +1440,10 @@ endpoints are marked deprecated with a sunset date first.
   about twice as slow after the multi-tenant change). For module authors: `tenancy::migration::list_index`.
 - `./gate.sh` ran `cargo xtask api-diff` and `cargo xtask sdk --check` before it stopped on errors, so a
   breaking API change or an outdated SDK did not turn the gate red. They now run as steps like the others.
+- `catalog`: the OpenAPI schema of an attribute `value` now allows any JSON value (text, number,
+  `true` / `false`, list), as the API always returned and accepted.
+- `auth`: a tenant split off a guarded tenant gets the guardrails in the same step that opens it, so it never serves
+  a request without them.
 
 ## [0.14.0] - 2026-11-15
 
@@ -1781,7 +2060,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/thuongtamduy/autoxide/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/thuongtamduy/autoxide/compare/v0.11.0...v0.12.0

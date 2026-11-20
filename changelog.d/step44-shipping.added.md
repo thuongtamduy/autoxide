@@ -1,1 +1,0 @@
-- `shipping`: automatic answers for `support` about where a parcel is (intent `shipping.tracking`), only for the owner of the order (buyer account or verified phone number); read permission `shipping.cod.read` for COD statements and discrepancies.

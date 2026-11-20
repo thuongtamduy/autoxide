@@ -636,7 +636,16 @@ async fn relocation_api_chi_nhan_su_nen_tang_mac_dinh_dry_run_khach_chi_gui_yeu_
             .await
             .unwrap();
         assert_eq!(other.status(), 404);
-        let work = app.get("/api/v1/kernel/work").token("platform").send().await.unwrap();
+        // Hộp việc bỏ nguồn trả chậm vào `incomplete` thay vì chờ: máy CI
+        // bận có thể làm nguồn này quá hạn một lần — thử lại tới khi đủ nguồn.
+        let mut work = app.get("/api/v1/kernel/work").token("platform").send().await.unwrap();
+        for _ in 0..5 {
+            if work.json()["data"]["incomplete"].as_array().is_none_or(Vec::is_empty) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            work = app.get("/api/v1/kernel/work").token("platform").send().await.unwrap();
+        }
         assert_eq!(work.status(), 200, "{}", work.text());
         assert!(work.text().contains(&request_id), "{}", work.text());
 

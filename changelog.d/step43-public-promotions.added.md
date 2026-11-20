@@ -1,1 +1,0 @@
-- `GET /api/v1/promotions/public/promotions`: running public promotions of a website, with their conditions, the notices recorded with the authorities and the legal discount limit in force.
