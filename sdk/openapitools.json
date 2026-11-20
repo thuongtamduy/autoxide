@@ -12,7 +12,7 @@
         "additionalProperties": {
           "groupId": "dev.autoxide",
           "artifactId": "autoxide-sdk",
-          "artifactVersion": "0.15.0",
+          "artifactVersion": "0.16.0",
           "packageName": "dev.autoxide.sdk",
           "serializationLibrary": "moshi",
           "enumUnknownDefaultCase": true,
@@ -25,7 +25,7 @@
         "output": "#{cwd}/dart/generated",
         "additionalProperties": {
           "pubName": "autoxide_sdk",
-          "pubVersion": "0.15.0",
+          "pubVersion": "0.16.0",
           "pubDescription": "Autoxide API client generated from the OpenAPI document.",
           "serializationLibrary": "built_value",
           "enumUnknownDefaultCase": true
