@@ -9,7 +9,7 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::EntityTrait;
 use uuid::Uuid;
 
-use crate::api::{Document, Invoices, NewDocument, RenderFormat, Rendered};
+use crate::api::{Document, Invoices, NewDocument, NewDocumentLine, RenderFormat, Rendered};
 use crate::entity::document;
 use crate::service::{InvoicesService, describe, document_not_found};
 
@@ -41,6 +41,30 @@ impl Invoices for Provider {
             Some(row) => Ok(Some(describe(read, tenant, row).await?)),
             None => Ok(None),
         }
+    }
+
+    async fn adjust(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        original: Uuid,
+        direction: &str,
+        lines: Vec<NewDocumentLine>,
+        reference: String,
+    ) -> Result<Submitted<Document>, Error> {
+        let found = document::Entity::find_by_id(original)
+            .scoped(tenant)
+            .one(tenant.database().read())
+            .await?
+            .ok_or_else(document_not_found)?;
+        let correction = crate::issue::Correction {
+            relation: "adjustment",
+            direction: Some(direction.to_owned()),
+            buyer: None,
+            lines,
+            reference,
+        };
+        self.0.correct_document(tenant, actor, found, correction).await
     }
 
     async fn cancel(

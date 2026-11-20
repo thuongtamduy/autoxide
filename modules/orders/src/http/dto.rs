@@ -66,7 +66,7 @@ pub(crate) struct CartLineResponse {
 }
 
 impl CartLineResponse {
-    fn new(line: &QuotedLine) -> Self {
+    pub(crate) fn new(line: &QuotedLine) -> Self {
         let variant = line.variant.as_ref();
         let problem = line.problem.as_ref().map(|problem| match problem {
             LineProblem::Unavailable => {
@@ -575,5 +575,40 @@ impl PublicPaymentResponse {
             order_number: order.number.clone(),
             order_status: order.status.clone(),
         })
+    }
+}
+
+/// A cart at the counter, priced (nothing is saved).
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersPosQuote)]
+pub(crate) struct PosQuoteResponse {
+    lines: Vec<CartLineResponse>,
+    /// Promotions applied, with their terms.
+    #[schema(value_type = Vec<Object>)]
+    promotions: Vec<AppliedPromotion>,
+    /// Codes that do not apply, with the reason; the sale goes on without them.
+    #[schema(value_type = Vec<Object>)]
+    rejected_codes: Vec<RejectedCode>,
+    totals: TotalsResponse,
+}
+
+impl PosQuoteResponse {
+    pub(crate) fn new(quote: &crate::pricing::Quote) -> Self {
+        let evaluation = quote.evaluation.as_ref();
+        PosQuoteResponse {
+            lines: quote.lines.iter().map(CartLineResponse::new).collect(),
+            promotions: evaluation.map(|evaluation| evaluation.applied.clone()).unwrap_or_default(),
+            rejected_codes: evaluation
+                .map(|evaluation| evaluation.rejected_codes.clone())
+                .unwrap_or_default(),
+            totals: TotalsResponse {
+                subtotal: quote.subtotal,
+                discount: quote.discount,
+                shipping_fee: quote.shipping_fee,
+                shipping_discount: quote.shipping_discount,
+                tax: quote.tax,
+                total: quote.total,
+            },
+        }
     }
 }

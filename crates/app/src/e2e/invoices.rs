@@ -523,3 +523,61 @@ async fn tong_hop_gtgt_dau_ra_theo_ky() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn ben_lap_tu_ghi_so_thi_phat_hanh_khong_ghi_lan_hai_va_dieu_chinh_qua_trait() {
+    TestDatabase::run(async |test| {
+        let Setup { app, .. } = setup(test).await;
+        series(&app, "vat_invoice", "1C26TAA", None).await;
+        let tenant = app.default_tenant();
+        // `orders` đã ghi doanh thu khi giao: hoá đơn của nó mang `booked_by_source`.
+        let draft = sale("ORD-1", 200_000).booked_by_source();
+        let created = invoices(&app)
+            .create_document(&tenant, Actor::system(), draft)
+            .await
+            .unwrap()
+            .into_inner();
+        let issued = invoices(&app).issue(&tenant, Actor::system(), created.id).await.unwrap();
+        assert_eq!(issued.status, "issued");
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
+        assert_eq!(balance(&app, &tenant, "revenue.sales").await, 0);
+        // Hoá đơn điều chỉnh qua `dyn Invoices::adjust` (trả hàng): kế thừa cờ, không ghi sổ.
+        let line = NewDocumentLine::new("Service fee", rust_decimal::Decimal::ONE, vnd(50_000))
+            .service()
+            .tax_category("vat.standard");
+        let adjustment = invoices(&app)
+            .adjust(
+                &tenant,
+                Actor::system(),
+                created.id,
+                "decrease",
+                vec![line.clone()],
+                "ORD-1-R1".to_owned(),
+            )
+            .await
+            .unwrap();
+        assert!(matches!(adjustment, autoxide_kernel::reference::Submitted::Created(_)));
+        let adjustment = adjustment.into_inner();
+        assert_eq!(adjustment.relation.as_deref(), Some("adjustment"));
+        assert_eq!(adjustment.direction, "decrease");
+        // Gọi lại cùng mã: chứng từ cũ.
+        let again = invoices(&app)
+            .adjust(
+                &tenant,
+                Actor::system(),
+                created.id,
+                "decrease",
+                vec![line],
+                "ORD-1-R1".to_owned(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(again.into_inner().id, adjustment.id);
+        invoices(&app).issue(&tenant, Actor::system(), adjustment.id).await.unwrap();
+        let original = invoices(&app).document(&tenant, created.id).await.unwrap().unwrap();
+        assert_eq!(original.status, "adjusted");
+        assert_eq!(balance(&app, &tenant, "receivable.customer").await, 0);
+    })
+    .await
+    .unwrap();
+}

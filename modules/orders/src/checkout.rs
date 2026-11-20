@@ -288,7 +288,7 @@ impl OrdersService {
         let hold_until = now + Duration::minutes(self.config.hold_minutes);
         let mut holds = Holds::default();
         let held = self
-            .hold_all(tenant, order_id, org, &quote, &price_input, hold_until, &mut holds)
+            .hold_all(tenant, order_id, org, None, &quote, &price_input, hold_until, &mut holds)
             .await;
         if let Err(error) = held {
             self.release_holds(tenant, order_id, &holds, ReleaseReason::CheckoutAborted).await;
@@ -365,12 +365,14 @@ impl OrdersService {
     }
 
     /// Giữ tồn rồi lượt khuyến mại; ghi lại chỗ đã giữ vào `holds` để trả khi hỏng.
+    /// `fixed`: chỉ lấy hàng từ kho này (bán tại quầy: kho của cửa hàng).
     #[expect(clippy::too_many_arguments, reason = "một lượt giữ cần chừng đó dữ liệu")]
-    async fn hold_all(
+    pub(crate) async fn hold_all(
         &self,
         tenant: &TenantContext,
         order_id: Uuid,
         org: OrgId,
+        fixed: Option<OrgId>,
         quote: &Quote,
         input: &pricing::PriceInput,
         until: chrono::DateTime<Utc>,
@@ -386,6 +388,7 @@ impl OrdersService {
             && !tracked.is_empty()
         {
             let mut request = ReserveRequest::new(order_id, org, until, tracked);
+            request.fixed_org_id = fixed;
             if let Some(destination) = &input.destination {
                 request = request.ship_to(destination.province_code.clone());
             }
@@ -554,6 +557,7 @@ impl Draft<'_> {
                     "method_code": option.method_code, "name": option.name,
                     "carrier_code": option.carrier_code, "amount": option.amount,
                     "pickup_org_id": option.pickup_org_id, "eta": option.eta,
+                    "tax_category": option.tax_category,
                     "hold_days": option.hold_days})
                 .to_string()
             })),
@@ -606,39 +610,7 @@ impl Draft<'_> {
         &self,
         tenant: &TenantContext,
     ) -> Result<Vec<(line::ActiveModel, Vec<line_tax::ActiveModel>)>, Error> {
-        let evaluation = self.quote.evaluation.as_ref();
-        self.quote
-            .lines
-            .iter()
-            .map(|quoted| {
-                let id = Uuid::now_v7();
-                let discounts: Vec<_> = evaluation
-                    .map(|evaluation| {
-                        evaluation
-                            .lines
-                            .iter()
-                            .filter(|d| d.line_key == quoted.key)
-                            .cloned()
-                            .collect()
-                    })
-                    .unwrap_or_default();
-                let row = line_row(tenant, self.order_id, id, quoted, &discounts)?;
-                let taxes = quoted
-                    .taxes
-                    .iter()
-                    .map(|tax| line_tax::ActiveModel {
-                        tenant_id: Set(tenant.id().as_uuid()),
-                        line_id: Set(id),
-                        tax_code: Set(tax.tax_kind.clone()),
-                        rate: Set(tax.rate_percent.clone()),
-                        exempt: Set(tax.exempt),
-                        base_minor: Set(quoted.net.minor()),
-                        amount_minor: Set(tax.amount.minor()),
-                    })
-                    .collect();
-                Ok((row, taxes))
-            })
-            .collect()
+        quoted_rows(tenant, self.order_id, self.quote)
     }
 
     fn payment_row(&self, tenant: &TenantContext, order: &order::Model) -> payment::ActiveModel {
@@ -664,6 +636,42 @@ impl Draft<'_> {
             updated_at: Set(now),
         }
     }
+}
+
+/// Dòng đơn và thuế của dòng từ báo giá `quote` (đặt hàng online và bán tại quầy dùng chung).
+pub(crate) fn quoted_rows(
+    tenant: &TenantContext,
+    order_id: Uuid,
+    quote: &Quote,
+) -> Result<Vec<(line::ActiveModel, Vec<line_tax::ActiveModel>)>, Error> {
+    let evaluation = quote.evaluation.as_ref();
+    quote
+        .lines
+        .iter()
+        .map(|quoted| {
+            let id = Uuid::now_v7();
+            let discounts: Vec<_> = evaluation
+                .map(|evaluation| {
+                    evaluation.lines.iter().filter(|d| d.line_key == quoted.key).cloned().collect()
+                })
+                .unwrap_or_default();
+            let row = line_row(tenant, order_id, id, quoted, &discounts)?;
+            let taxes = quoted
+                .taxes
+                .iter()
+                .map(|tax| line_tax::ActiveModel {
+                    tenant_id: Set(tenant.id().as_uuid()),
+                    line_id: Set(id),
+                    tax_code: Set(tax.tax_kind.clone()),
+                    rate: Set(tax.rate_percent.clone()),
+                    exempt: Set(tax.exempt),
+                    base_minor: Set(quoted.net.minor()),
+                    amount_minor: Set(tax.amount.minor()),
+                })
+                .collect();
+            Ok((row, taxes))
+        })
+        .collect()
 }
 
 fn line_row(
