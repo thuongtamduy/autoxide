@@ -292,6 +292,12 @@ impl Modules {
         self.modules.iter().map(|module| module.name()).collect()
     }
 
+    /// Số lịch định kỳ (`Module::schedules`) của từng module, theo thứ tự đăng ký — cho test và công
+    /// cụ so với số lịch thật sự khai thay vì một con số viết tay.
+    pub fn schedule_counts(&self) -> Vec<(&'static str, usize)> {
+        self.modules.iter().map(|module| (module.name(), module.schedules().len())).collect()
+    }
+
     pub fn is_empty(&self) -> bool {
         // Hai module nội bộ `kernel` và `antispam` luôn có, không tính.
         self.modules.len() <= 2
