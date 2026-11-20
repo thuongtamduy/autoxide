@@ -276,6 +276,21 @@ pub(crate) async fn cards(
     locale: &str,
     rows: &[PublicCard],
 ) -> Result<Vec<PublicCardResponse>, Error> {
+    let products: Vec<Uuid> = rows.iter().map(|row| row.product.id).collect();
+    let options = service.option_counts(tenant, &products, locale).await?;
+    cards_with(service, tenant, site, locale, rows, options).await
+}
+
+/// Như [`cards`], với số giá trị tuỳ chọn đã có (trang sản phẩm đã đọc tuỳ chọn, không đọc lại —
+/// D-20261120-step39-hot-paths).
+async fn cards_with(
+    service: &CatalogService,
+    tenant: &TenantContext,
+    site: &Site,
+    locale: &str,
+    rows: &[PublicCard],
+    options: HashMap<Uuid, Vec<crate::card::OptionCount>>,
+) -> Result<Vec<PublicCardResponse>, Error> {
     let images: Vec<Uuid> =
         rows.iter().filter_map(|row| row.image.as_ref().map(|image| image.media_id)).collect();
     let owners: Vec<Uuid> = rows.iter().map(|row| row.entry.owner_org_id).collect();
@@ -283,7 +298,7 @@ pub(crate) async fn cards(
     let data = CardData {
         media: service.public_media(tenant, &images).await?,
         sellers: service.seller_names(tenant, &owners).await?,
-        options: service.option_counts(tenant, &products, locale).await?,
+        options,
         brands: service.brands(tenant, &products, locale).await?,
     };
     rows.iter().map(|row| card(service, site, row, &data)).collect()
@@ -769,12 +784,23 @@ async fn get_public_product(
     let ids: Vec<Uuid> = product.media.iter().map(|row| row.media_id).collect();
     // `alt` theo ngôn ngữ của trang (D-202): media theo ngôn ngữ, bản ghi đè của sản phẩm.
     let media = service.public_media_in(&tenant, &ids, &locale).await?;
+    // Bản ghi đè `alt` và tuỳ chọn đã đọc cùng sản phẩm: lọc lại, không đọc lần hai.
     let alts = AltData {
-        overrides: service.media_alts_in(&tenant, product.card.product.id, &locale).await?,
+        overrides: product
+            .media_alts
+            .iter()
+            .filter(|row| row.locale == locale)
+            .map(|row| (row.media_id, row.alt.clone()))
+            .collect(),
         is_default_locale: product.card.product.default_locale == locale,
     };
+    let options = HashMap::from([(
+        product.card.product.id,
+        crate::card::option_counts_of(&product.options, &locale),
+    )]);
     let mut rows =
-        cards(&service, &tenant, &site, &locale, std::slice::from_ref(&product.card)).await?;
+        cards_with(&service, &tenant, &site, &locale, std::slice::from_ref(&product.card), options)
+            .await?;
     let pricing = autoxide_kernel::tenancy::OrgId::from_uuid(product.card.entry.org_id);
     let regular = service.regular_prices(&tenant, pricing, &product.prices).await?;
     let card = rows.pop().ok_or_else(|| crate::errors::product_slug_not_found(&slug))?;

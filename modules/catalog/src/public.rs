@@ -93,6 +93,8 @@ pub(crate) struct PublicProduct {
     pub media: Vec<product_media::Model>,
     pub categories: Vec<(category::Model, category_translation::Model)>,
     pub attributes: Vec<PublicAttribute>,
+    /// Bản ghi đè `alt` của ảnh, mọi ngôn ngữ (trang lọc theo ngôn ngữ của nó).
+    pub media_alts: Vec<crate::entity::media_alt::Model>,
 }
 
 /// Một thuộc tính hiển thị trên trang sản phẩm.
@@ -467,6 +469,7 @@ impl CatalogService {
             media: detail.media,
             categories,
             attributes,
+            media_alts: detail.media_alts,
             card,
         })
     }
@@ -601,14 +604,13 @@ impl CatalogService {
         owners: &[Uuid],
     ) -> Result<HashMap<Uuid, String>, Error> {
         let Some(directory) = &self.organizations else { return Ok(HashMap::new()) };
+        // Một lần tra cho cả trang (D-20261120-step39-hot-paths; trước: một câu mỗi người bán).
+        let mut wanted: Vec<OrgId> = owners.iter().map(|owner| OrgId::from_uuid(*owner)).collect();
+        wanted.sort_unstable_by_key(|id| id.as_uuid());
+        wanted.dedup();
         let mut names = HashMap::new();
-        for owner in owners {
-            if names.contains_key(owner) {
-                continue;
-            }
-            if let Some(unit) = directory.unit(tenant, OrgId::from_uuid(*owner)).await? {
-                names.insert(*owner, unit.name);
-            }
+        for unit in directory.units(tenant, &wanted).await? {
+            names.insert(unit.id.as_uuid(), unit.name);
         }
         Ok(names)
     }

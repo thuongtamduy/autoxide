@@ -15,6 +15,7 @@
 
 use std::fmt;
 use std::future::Future;
+use std::sync::Arc;
 use std::time::Duration;
 
 use sea_orm::sqlx::sqlite::{SqliteJournalMode, SqliteSynchronous};
@@ -87,6 +88,18 @@ impl Database {
             write: DatabaseConnection::default(),
             backend: DatabaseBackend::Sqlite,
         }
+    }
+
+    /// Gọi `observer` với câu SQL của mọi lệnh chạy qua hai pool (kể cả trong transaction), sau
+    /// khi lệnh chạy xong. Dùng để đếm câu SQL mỗi request trong test và bài đo
+    /// (D-20261120-step39-hot-paths); không bật ở máy chủ thật.
+    ///
+    /// Phải gọi TRƯỚC khi clone `Database` cho ai khác: mỗi bản clone giữ observer của lúc clone.
+    pub fn observe_statements(&mut self, observer: Arc<dyn Fn(&str) + Send + Sync>) {
+        // `move` + clone `Arc`: mỗi pool giữ một con trỏ tới cùng một observer.
+        let read = Arc::clone(&observer);
+        self.read.set_metric_callback(move |info| read(&info.statement.sql));
+        self.write.set_metric_callback(move |info| observer(&info.statement.sql));
     }
 
     /// Kết nối cho lệnh ĐỌC. Ghi qua kết nối này bị database từ chối.

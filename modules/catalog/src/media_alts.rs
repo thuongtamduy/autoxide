@@ -114,24 +114,6 @@ impl CatalogService {
         transaction.commit().await?;
         self.detail(tenant, after).await
     }
-
-    /// Bản ghi đè `alt` của sản phẩm `id` ở ngôn ngữ `locale`: ảnh → `alt`.
-    pub(crate) async fn media_alts_in(
-        &self,
-        tenant: &TenantContext,
-        id: Uuid,
-        locale: &str,
-    ) -> Result<HashMap<Uuid, String>, Error> {
-        Ok(media_alt::Entity::find()
-            .filter(media_alt::Column::ProductId.eq(id))
-            .filter(media_alt::Column::Locale.eq(locale))
-            .scoped(tenant)
-            .all(tenant.database().read())
-            .await?
-            .into_iter()
-            .map(|row| (row.media_id, row.alt))
-            .collect())
-    }
 }
 
 /// `alt` công khai của ảnh `row` ở `locale` (thứ tự ở đầu file). `media_alt`: `alt` của media theo
