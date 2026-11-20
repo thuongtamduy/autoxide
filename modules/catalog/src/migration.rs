@@ -6,6 +6,7 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod collection_ai;
 mod collections;
 mod net_content;
 mod recommend;
@@ -36,6 +37,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(net_content::AddNetContent),
         // Bán chạy, điểm đánh giá, thường mua cùng, sản phẩm tương tự.
         Box::new(recommend::CreateRecommendations),
+        // Dấu `ai_assisted` của bộ sưu tập (bước 55).
+        Box::new(collection_ai::AddCollectionAiAssisted),
     ]
 }
 

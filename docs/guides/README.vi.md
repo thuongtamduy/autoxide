@@ -6,6 +6,7 @@ và ví dụ TypeScript dùng SDK ở [`sdk/typescript`](../../sdk/typescript/).
 Tiếng Anh: [`README.md`](README.md).
 
 - [Hiện bài viết và ảnh trên website](website.vi.md): endpoint công khai, `srcset` và WebP, ETag và 304
+- [Dựng trang chủ của cửa hàng từ API](storefront.vi.md): vị trí và banner, bộ sưu tập, thương hiệu và liên hệ, cache
 - [Đăng nhập và giữ phiên đăng nhập](authentication.vi.md): access token và refresh token, đăng xuất
 - [Đăng nhập bằng Google, Microsoft, GitHub hay OpenID Connect](oidc.vi.md): nhà cung cấp theo khách, liên kết tài khoản an toàn
 - [API key cho chương trình và AI agent](api-keys.vi.md): ít permission nhất, giới hạn tốc độ, thu hồi

@@ -165,12 +165,15 @@ và `PUT /collections/{id}/items` cần `If-Match`.
 - `texts` theo ngôn ngữ: `title`, `slug` (không trùng trong ngôn ngữ), `description`, `meta_title`,
   `meta_description`; `media_id` (ảnh công khai); `status` (`draft`, `active`, `archived`) và `starts_at` /
   `ends_at` tuỳ chọn.
+- `ai_assisted`: chữ soạn từ gợi ý của AI; trang công khai trả kèm để website gắn nhãn AI (Luật Trí tuệ nhân
+  tạo — cần đối chiếu văn bản gốc). Tool MCP mặc định đặt dấu này; người viết lại chữ thì gỡ bằng `PATCH`.
 
 Website đọc `GET /api/v1/catalog/public/collections/{slug}?locale=vi` (công khai; `site` hay tên miền): chữ của
 bộ sưu tập và một trang sản phẩm, cùng thẻ như `/public/products`, chỉ sản phẩm còn hiện trên website đó, theo
 thứ tự của bộ sưu tập. Chỉ bộ sưu tập `active` trong khung giờ, của website hay nút cấp trên, là công khai. Banner
 và menu trỏ tới bộ sưu tập bằng `catalog.collection` của sổ đối tượng (`/collections/<slug>`). Tool MCP:
 `catalog.list_collections`, `catalog.save_collection` (chỉ bản nháp: người dùng bật `active`).
+Ví dụ dựng trang chủ: [`docs/guides/storefront.vi.md`](guides/storefront.vi.md).
 
 ## Cho module khác
 

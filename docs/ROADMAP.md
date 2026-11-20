@@ -371,7 +371,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [ ] Trang có thân `layout` (cây khối JSON) cạnh thân `rich`: kiểm từ chối mặc định, theo cỡ màn hình, theo ngôn
       ngữ; sửa từng phần bằng JSON Patch + `If-Match`; khoá sửa; nháp, lịch sử, xem trước, hẹn giờ dùng lại `content`
 - [ ] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý) và khối của
-      `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238); chân trang pháp lý tự gắn cho
+      `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238), `content` (`content.placement`:
+      vị trí banner trong trang và đầu trang, D-20261120-step55-close); chân trang pháp lý tự gắn cho
       website bán hàng
 - [ ] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
       đo p99 trang 50 khối trên cả hai database
@@ -758,29 +759,32 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
       `srcset` và WebP, cache tới mốc bắt đầu / kết thúc gần nhất; banner trỏ tới chương trình khuyến
       mại tự ẩn khi chương trình kết thúc (event tuỳ chọn của `promotions`) — quảng cáo không được hứa
       ưu đãi đã hết (Luật 19/2023, Luật Quảng cáo — cần đối chiếu)
-- [ ] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
+- [x] Bộ sưu tập sản phẩm (`catalog`): chọn tay (có thứ tự) hay theo quy tắc (danh mục, thuộc tính,
       khoảng giá, hàng mới, đang khuyến mại), sắp theo mới nhất / giá / bán chạy (số bán nhận từ event
       tuỳ chọn của `orders`); trang công khai có slug, SEO, ảnh; dùng được trong menu và banner
-      — xong trừ ghi số bán từ event của `orders` (kiểu sắp `best_selling` dùng cột sẵn có;
-      D-20261119-step55-collections)
+      — số bán dùng nguồn 90 ngày sẵn có từ `orders.order_completed` (D-20261119-step55-collections,
+      D-20261120-step55-close)
 - [x] Thông tin cửa hàng công khai (`organizations`): thương hiệu (tên, logo, biểu tượng trang, liên hệ, mạng xã
       hội) là cài đặt kế thừa theo cây (chuỗi đặt, cửa hàng ghi đè); địa chỉ, giờ mở cửa, ngày nghỉ lấy từ hồ sơ
       địa điểm của bước 34, không lưu hai chỗ (D-237); chân trang lấy thêm thông tin chủ sở hữu và logo Bộ Công
       Thương từ bước 37 — chân trang pháp lý lấy từ endpoint công khai của `compliance` (D-20261119-step55-store-info)
-- [ ] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
+- [x] Liên kết tới đối tượng của module đăng ký sau (sản phẩm, bộ sưu tập, chương trình) qua điểm cắm
       `ContentLinks` trong `content::api`: module đó gắn bộ dựng đường dẫn và bộ kiểm "còn hiển thị
-      không"; thiếu module thì link loại đó bị từ chối khi lưu
-- [ ] Tool MCP cho banner và bộ sưu tập (soạn, lên lịch, sắp xếp) như REST; AI chỉ gợi ý chữ, đánh dấu
-      `ai_assisted` (bước 37); hướng dẫn cho người làm giao diện (EN + VI)
-- [ ] Kiểu vị trí banner (D-236): cách hiện (một banner, trượt, lưới, xếp dọc, dải chữ, popup), cỡ và tỉ lệ ảnh
+      không"; thiếu module thì link loại đó bị từ chối khi lưu — làm bằng sổ đối tượng của kernel thay
+      `ContentLinks` (D-20261119-step55-banners)
+- [x] Tool MCP cho banner và bộ sưu tập (soạn, lên lịch, sắp xếp) như REST; AI chỉ gợi ý chữ, đánh dấu
+      `ai_assisted` (bước 37); hướng dẫn cho người làm giao diện (EN + VI) — `docs/guides/storefront.md`
+      (D-20261120-step55-close)
+- [x] Kiểu vị trí banner (D-236): cách hiện (một banner, trượt, lưới, xếp dọc, dải chữ, popup), cỡ và tỉ lệ ảnh
       kiểm khi lưu, thiết bị, loại trang dùng được; bộ vị trí chuẩn có sẵn cho khách mới (dải trên, banner chính,
       giữa trang chủ, đầu danh mục, cột trái / phải, giữa nội dung, trên chân trang, popup); banner chọn trang hiện
       (loại trang, danh mục / sản phẩm / bài cụ thể); banner dạng chữ màu theo theme; đọc nhiều vị trí một lần;
       khối `content.placement` cho trang dựng từ khối và đầu trang
-      — xong trừ khối `content.placement` (chờ sổ khối của bước 67); link và trang được chọn dùng sổ đối tượng thay
-      `ContentLinks` (D-20261119-step55-banners)
+      — khối `content.placement` chuyển sang bước 67 (cần sổ khối, D-20261120-step55-close); link và trang được
+      chọn dùng sổ đối tượng thay `ContentLinks` (D-20261119-step55-banners)
 - [ ] Banner trong gian hàng người bán trên sàn (D-233): người bán tự quản trong nút của mình, sàn duyệt theo
       chính sách, link chỉ tới hàng của chính người bán, không phải quảng cáo trong sàn
+      — **chờ bước 46** (`marketplace` chưa có); không làm trước (D-20261120-step55-close)
 
 ## 56. Chuyển dữ liệu từ nền tảng khác (`imports`, D-219)
 
