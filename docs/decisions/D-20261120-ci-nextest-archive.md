@@ -24,7 +24,15 @@ Quyết định:
 Lý do: trước đây mỗi job test tự build lại cả workspace (7–11 phút có cache, D-20261119-ci-faster), nên chia thêm máy
 không rút ngắn được: mỗi máy trả thêm một lần build. Đo trên run 44614887150 (main): mỗi phần test 13–24 phút. Build
 một lần rồi phát archive thì thời gian là build + phần chạy chậm nhất, và chia thêm máy chỉ tốn thời gian tải archive.
-Số đo sau: xem pull request của thay đổi này.
+Số đo sau (chạy đầy đủ bằng workflow_dispatch trên nhánh, run 44670917141; 12 shard, mỗi shard một phần tư của 2189 test,
+đều xanh, chỉ `lint` đỏ vì advisory `humantime` đã được sửa ở main): `build tests` 9,1 phút (cache nguội một phần); mỗi shard
+2,5–4,8 phút, trong đó tải archive 1,3 GB (~1 phút) và giải nén (~20 giây); phần test thật 36 giây (shard sqlite 1/4: 563
+test). Đường găng khi có đủ máy: build 9,1 + shard chậm nhất 4,8 ≈ 14 phút, so với 17–25 phút (trung vị ~21) của năm lần
+chạy đầy đủ gần nhất trên main (run 463: 21,7; 461: 17,3; 456: 24,5; 465: 19,5; 459: 18,4). Tổng thời gian wall của chính
+run này là 27 phút vì 12 shard xếp hàng chờ máy (nhiều run chạy cùng lúc, giới hạn máy đồng thời của GitHub) — số 14 phút
+là đường găng, không phải wall đo được. Phần chạy test (đã tính database mẫu của #221) không còn là chỗ tốn: build và tải
+archive mới là chỗ tốn; job `upgrade` (11,7–15,4 phút, build lại bản cũ) giờ dài hơn cả chuỗi build + test và sẽ ngắn lại
+khi chủ dự án chạy workflow image cho v0.14.0 (D-20261120-upgrade-image).
 
 nextest chạy mỗi test trong một tiến trình riêng: test không còn chia trạng thái trong tiến trình (dọn rác của testkit
 chạy ở mỗi test — một truy vấn nhỏ). Database mẫu đã migrate của testkit (pull request riêng) dùng chung giữa các tiến
