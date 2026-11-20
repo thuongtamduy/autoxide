@@ -291,6 +291,11 @@ mod tests {
     async fn phuc_vu_request_roi_dung_em_khi_nhan_tin_hieu() {
         TestDatabase::run(async |database| {
             let settings = settings(database);
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();
@@ -325,6 +330,11 @@ mod tests {
                 ("AUTOXIDE_PROCESS_ROLE", "worker"),
             ]);
             let settings = settings::read_with(&source, vec![Box::new(Notes)]).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();
@@ -359,6 +369,11 @@ mod tests {
                 ("AUTOXIDE_HTTP_DRAIN_SECONDS", "2"),
             ]);
             let settings = settings::read_with(&source, vec![Box::new(Notes)]).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             db.close().await.unwrap();

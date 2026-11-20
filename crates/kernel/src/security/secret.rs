@@ -216,6 +216,12 @@ impl KeyConfig {
         *keys = Keys { configured, previous };
     }
 
+    /// `AUTOXIDE_SECRET_KEY` có đặt không (không thì khoá gốc sinh ra và lưu trong database).
+    pub(crate) fn is_configured(&self) -> bool {
+        let keys = self.0.read().unwrap_or_else(std::sync::PoisonError::into_inner);
+        keys.configured.is_some()
+    }
+
     /// `SecretKey` của chương trình trên `database`.
     pub(crate) fn key_for(&self, database: &Database) -> SecretKey {
         let keys = self.0.read().unwrap_or_else(std::sync::PoisonError::into_inner);

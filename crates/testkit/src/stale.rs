@@ -24,6 +24,11 @@ pub(crate) fn is_stale(name: &str, prefix: &str, now: SystemTime) -> bool {
     now.duration_since(created_at).is_ok_and(|age| age > STALE_AFTER)
 }
 
+/// `name` có dạng `<prefix><UUIDv7>` (cũ hay mới đều được): database của testkit.
+pub(crate) fn has_shape(name: &str, prefix: &str) -> bool {
+    name.strip_prefix(prefix).and_then(created_at).is_some()
+}
+
 /// `name` là thư mục tạm của một bài test dạng `autoxide-<việc>-<UUIDv7>` (vd `autoxide-catalog-…`,
 /// `autoxide-plans-…`) và đã cũ hơn [`STALE_AFTER`]?
 ///

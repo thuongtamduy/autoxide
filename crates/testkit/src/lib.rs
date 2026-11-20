@@ -28,6 +28,9 @@
 //! nó xoá xong, để sót database. `run` thì `await` được việc xoá: chắc chắn
 //! xong, không chặn ai.
 //!
+//! [`TestApp`] không migrate từ đầu mỗi database: nó chép một database mẫu đã migrate (module
+//! `template`, D-20261120-test-db-template). Database vẫn riêng của từng bài test.
+//!
 //! Crate này chỉ được khai ở `[dev-dependencies]` (`cargo xtask check` kiểm).
 
 pub mod ai;
@@ -47,6 +50,7 @@ mod sqlite;
 mod stale;
 mod storage;
 mod store;
+mod template;
 mod tenancy;
 mod voice;
 
@@ -67,6 +71,7 @@ pub use s3::{
 pub use schema::{ColumnSnapshot, IndexSnapshot, SchemaSnapshot, TableSnapshot, schema_snapshot};
 pub use storage::{MemoryStorage, MemoryStorageOpener};
 pub use store::FakeStorePurchases;
+pub use template::{TEST_DATABASE_TEMPLATE, prepare as prepare_from_template};
 pub use tenancy::{FakeTenantSettings, schema_tenancy_violations};
 pub use voice::{FAKE_RECORDING, FAKE_VOICE_PROVIDER, FakeVoiceProvider};
 
@@ -291,14 +296,16 @@ async fn remove_stale(
 ) -> Result<usize, TestDatabaseError> {
     // Thư mục tạm dọn với MỌI loại database: test chạy trên Postgres vẫn tạo thư mục tạm
     // (nơi lưu file, bản backup…) dưới `temp_dir`.
-    let directories = sqlite::remove_stale_directories(sqlite_parent, now);
+    let directories = sqlite::remove_stale_directories(sqlite_parent, now)
+        + template::remove_stale_sqlite(sqlite_parent, now);
     match target {
         Target::Sqlite => Ok(directories),
         Target::Postgres(admin_url) => {
             let admin = postgres::connect_admin(admin_url).await?;
             let removed = postgres::remove_stale_databases(&admin, now).await;
+            let templates = template::remove_stale_postgres(&admin, now).await;
             admin.close().await?;
-            Ok(directories + removed?)
+            Ok(directories + removed? + templates?)
         }
     }
 }

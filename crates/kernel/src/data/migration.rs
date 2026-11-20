@@ -245,6 +245,30 @@ impl Migrator {
         self
     }
 
+    /// Tên mọi migration và upgrade dữ liệu theo đúng thứ tự `up` chạy, dạng `<module>/<tên>`.
+    /// Không cần database. Dùng làm khoá cache của database mẫu đã migrate trong test
+    /// (`autoxide-testkit`, D-20261120-test-db-template): đổi migration thì khoá đổi.
+    pub fn names(&self) -> Vec<String> {
+        let mut names = Vec::new();
+        for set in &self.modules {
+            for entry in set.entries() {
+                let name = match entry {
+                    Entry::Schema(migration) => migration.name().to_owned(),
+                    Entry::Upgrade(upgrade) => upgrade.name().to_owned(),
+                };
+                names.push(format!("{}/{name}", set.module));
+            }
+        }
+        names
+    }
+
+    /// Khoá gốc của chương trình có được cấu hình (`AUTOXIDE_SECRET_KEY`) không. Không thì upgrade
+    /// dữ liệu cần khoá sinh khoá gốc và lưu nó trong database đang migrate — kết quả migration khác
+    /// nhau, nên khoá cache của database mẫu trong test có phần này (D-20261120-test-db-template).
+    pub fn uses_configured_key(&self) -> bool {
+        self.keys.is_configured()
+    }
+
     /// Trạng thái mọi migration, theo thứ tự module đăng ký rồi thứ tự khai báo.
     /// Chỉ đọc: không tạo bảng nào, chạy được trên database trống.
     pub async fn status(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
@@ -503,6 +527,19 @@ mod tests {
         assert!(migrator.is_ok());
         assert!(Migrator::new(Vec::new()).is_ok());
         assert_eq!(ModuleMigrations::new("auth", one()).history_table(), "auth_migrations");
+    }
+
+    #[test]
+    fn ten_migration_theo_thu_tu_chay() {
+        let migrator = Migrator::new(vec![
+            ModuleMigrations::new("auth", one()),
+            ModuleMigrations::new(
+                "notes",
+                vec![Box::new(Named("m0001_a")), Box::new(Named("m0002_b"))],
+            ),
+        ])
+        .unwrap();
+        assert_eq!(migrator.names(), ["auth/m0001_first", "notes/m0001_a", "notes/m0002_b"]);
     }
 
     #[test]

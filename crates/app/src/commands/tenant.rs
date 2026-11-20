@@ -469,6 +469,11 @@ mod tests {
         TestDatabase::run(async |test| {
             let source = ConfigSource::from_pairs([("DATABASE_URL", test.url())]);
             let settings = crate::settings::read(&source).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let database = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&database).await.unwrap();
             database.close().await.unwrap();
@@ -514,6 +519,11 @@ mod tests {
                 ("AUTOXIDE_HTTP_REQUEST_TIMEOUT_SECONDS", "1"),
             ]);
             let settings = crate::settings::read(&source).unwrap();
+            autoxide_testkit::prepare_from_template(
+                &settings.config.database,
+                &settings.modules.migrator().unwrap(),
+            )
+            .await;
             let database = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&database).await.unwrap();
             database.close().await.unwrap();

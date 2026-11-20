@@ -344,6 +344,11 @@ mod tests {
             assert!(lines[2].message.contains(" more"), "{}", lines[2].message);
 
             let setup = settings(test.url(), &dir);
+            autoxide_testkit::prepare_from_template(
+                &setup.config.database,
+                &setup.modules.migrator().unwrap(),
+            )
+            .await;
             let database = Database::connect(&setup.config.database).await.unwrap();
             setup.modules.migrator().unwrap().up(&database).await.unwrap();
             database.close().await.unwrap();

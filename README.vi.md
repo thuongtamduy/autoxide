@@ -343,6 +343,12 @@ TEST_DATABASE_URL=postgres://user:password@localhost:5432/postgres cargo test --
 `./gate.sh` làm việc này giúp bạn bằng Docker. Muốn gate dùng một máy chủ có sẵn
 thì đặt `GATE_POSTGRES_URL` bằng một URL cùng dạng.
 
+Test dựng cả ứng dụng chép một database mẫu đã chạy sẵn mọi migration, thay vì
+migrate lại từng database trống. Mẫu nằm trong thư mục tạm của hệ thống
+(`autoxide-templates/`) và, trên PostgreSQL, là các database tên `autoxide_tpl_…`;
+cả hai được dựng lại khi chương trình test hay migration đổi, và bị xoá sau một giờ.
+Đặt `TEST_DATABASE_TEMPLATE=off` để mọi database test migrate từ đầu.
+
 Test lưu file chạy thêm trên S3 khi `TEST_S3_ENDPOINT` trỏ tới một dịch vụ tương thích
 S3 có bucket tên `autoxide-test`. Gate tự dựng một máy chủ S3 giả lập dùng xong bỏ
 ([moto](https://github.com/getmoto/moto)) bằng Docker; muốn dùng dịch vụ có sẵn thì
