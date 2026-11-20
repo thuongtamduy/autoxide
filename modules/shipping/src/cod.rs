@@ -251,8 +251,11 @@ impl ShippingService {
         }
         .insert(&transaction)
         .await?;
+        // Chốt theo ID vận đơn tăng dần: `settle_shipment` khoá từng vận đơn, hai bảng kê chồng
+        // nhau khoá cùng thứ tự thì không deadlock.
+        settled.sort_by_key(|(_, shipment)| shipment.id);
         for (line_id, shipment) in settled {
-            self.settle_shipment(&transaction, tenant, &shipment, line_id).await?;
+            self.settle_shipment(&transaction, tenant, shipment.id, line_id).await?;
         }
         transaction.commit().await?;
         Ok((row, true))
@@ -280,13 +283,18 @@ impl ShippingService {
         &self,
         transaction: &sea_orm::DatabaseTransaction,
         tenant: &TenantContext,
-        row: &shipment::Model,
+        shipment_id: Uuid,
         line_id: Uuid,
     ) -> Result<(), Error> {
+        // Khoá vận đơn rồi mới xét `settled` (D-181): hai bảng kê cùng có tracking này (khác mã, hay
+        // một bảng kê lặp dòng) nối đuôi nhau — bên sau thấy vận đơn đã chốt và không ghi sổ lần
+        // hai. Bản đọc lúc đối chiếu dòng không khoá nên có thể đã cũ; ghi từ bản vừa khoá để không
+        // đè cột webhook vừa đổi.
+        let row = crate::shipments::lock_shipment(transaction, tenant, shipment_id).await?;
         if row.cod_status == "settled" {
             return Ok(());
         }
-        let mut after = row.clone();
+        let mut after = row;
         after.cod_status = "settled".to_owned();
         after.updated_at = now();
         let after = shipment::Entity::update(
@@ -548,11 +556,14 @@ impl ShippingService {
             return Err(Error::validation(problems));
         }
         let transaction = tenant.database().begin_write().await?;
-        let row = cod_discrepancy::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| errors::discrepancy_not_found(id))?;
+        // Khoá chênh lệch rồi mới xét `resolved` (D-181): hai người xử lý cùng lúc thì bên sau thấy
+        // đã xử lý — không ghi đè cách xử lý của bên trước trong khi job xoá nợ của bên đó đã xếp.
+        let row = autoxide_kernel::rows::lock_one(
+            &transaction,
+            cod_discrepancy::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
+        .ok_or_else(|| errors::discrepancy_not_found(id))?;
         if row.status == "resolved" {
             return Err(errors::discrepancy_resolved());
         }
