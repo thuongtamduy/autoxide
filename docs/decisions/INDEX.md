@@ -507,6 +507,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-catalog-recommendations](D-20261120-catalog-recommendations.md)** Bán chạy, đánh giá, mua cùng và sản phẩm tương tự của `catalog` — 2026-11-20
 - **[D-20261120-step45-einvoice-pos](D-20261120-step45-einvoice-pos.md)** Hoá đơn điện tử, thư trạng thái và bán tại quầy của `orders`: `invoices` không ghi doanh thu lần hai, hoá đơn điều chỉnh qua trait, ca quầy hai người duyệt — 2026-11-20
 - **[D-20261120-step45-guest-orders](D-20261120-step45-guest-orders.md)** Mua không cần tài khoản của `orders`: mã một lần, header `Order-Token`, khoá liên hệ theo khách, gắn đơn bằng token — 2026-11-20
+- **[D-20261120-step45-reviews-risk-reports](D-20261120-step45-reviews-risk-reports.md)** Đánh giá sau mua đặt ở `orders`, phiếu "hữu ích", tóm tắt AI chờ duyệt, chống bom hàng COD theo khoá liên hệ, báo cáo bán hàng truy vấn thẳng — 2026-11-20
 
 ## Vận hành và hiệu năng
 

@@ -9390,6 +9390,23 @@ export type Data_OrdersAccessToken = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersBuyerRisk = {
+  /** Delivery statistics of a buyer, in this shop only. */
+  data: {
+    block_reason?: string | null;
+    /** Until when cash on delivery is blocked, if it is. */
+    blocked_until?: string | null;
+    delivered: number;
+    /** `(failed + refused) / all`, in basis points (10000 = 100%). */
+    fail_ratio_bp: number;
+    /** Delivery attempts that failed. */
+    failed: number;
+    /** Orders cancelled after they left (refused, returned). */
+    refused: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersCart = {
   /** A cart with its quote, computed again by the server on every read. */
   data: {
@@ -9442,6 +9459,37 @@ export type Data_OrdersClaimed = {
   /** Guest orders attached to your account. */
   data: {
     order_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersCodBlock = {
+  /** A buyer blocked from paying on delivery. */
+  data: {
+    created_at: string;
+    created_by: string;
+    expires_at: string;
+    id: string;
+    lifted_at?: string | null;
+    note?: string | null;
+    /** Code of the list `orders.cod_block`. */
+    reason_code: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersCodRule = {
+  /** A cash-on-delivery rule. */
+  data: {
+    /** `require_prepayment`. */
+    action: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    max_fail_ratio_bp: number;
+    max_order_value?: Money | null;
+    min_orders: number;
+    org_id: string;
   };
 };
 
@@ -9670,6 +9718,85 @@ export type Data_OrdersReturnPreview = {
     refund: Money;
     refund_breakdown: OrdersReturnRefundBreakdown;
     refund_eta?: OrdersRefundEta | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReview = {
+  /** A product review. */
+  data: {
+    body: string;
+    created_at: string;
+    helpful_count: number;
+    /** Code of the list `orders.review_hidden`, when hidden. */
+    hidden_reason?: string | null;
+    id: string;
+    media_ids: string[];
+    product_id: string;
+    rating: number;
+    replied_at?: string | null;
+    /** The shop's public answer. */
+    reply?: string | null;
+    /** `published` or `hidden`. */
+    status: string;
+    updated_at: string;
+    variant_id: string;
+    /** Always `true`: only buyers who received the item can review it. */
+    verified_buyer: boolean;
+    /** Signed in: whether you voted "helpful" for it. */
+    voted_by_me?: boolean | null;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReviewCount = {
+  /** A count of reviews. */
+  data: {
+    count: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReviewHelpful = {
+  /** "Helpful" votes of a review. */
+  data: {
+    helpful_count: number;
+    voted_by_me: boolean;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReviewStats = {
+  /** Star counts and the approved AI summary of a product's reviews. */
+  data: {
+    /** Average stars with one decimal (`"4.5"`); `null` without reviews. */
+    average?: string | null;
+    count: number;
+    /** Number of reviews with 1, 2, 3, 4 and 5 stars. */
+    stars: number[];
+    summary?: OrdersReviewSummary | null;
+    /** Reviews with photos. */
+    with_media: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersReviewSummary = {
+  /** A summary of reviews written with AI and approved by staff. */
+  data: {
+    /** Always `true`: shown with an "AI-generated" label (D-109). */
+    ai_generated: boolean;
+    body?: string | null;
+    generated_at?: string | null;
+    id: string;
+    locale: string;
+    product_id: string;
+    reviewed_at?: string | null;
+    source_review_count: number;
+    /** `pending`, `draft`, `approved`, `rejected`, `superseded` or `failed`. */
+    status: string;
+    /** Themes buyers often mention. */
+    themes: string[];
   };
 };
 
@@ -13413,6 +13540,35 @@ export type Data_Vec_NotificationTemplateVersion = {
 };
 
 /** Envelope of a single result. */
+export type Data_Vec_OrdersCodBlock = {
+  data: {
+    created_at: string;
+    created_by: string;
+    expires_at: string;
+    id: string;
+    lifted_at?: string | null;
+    note?: string | null;
+    /** Code of the list `orders.cod_block`. */
+    reason_code: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersCodRule = {
+  data: {
+    /** `require_prepayment`. */
+    action: string;
+    effective_from: string;
+    effective_to?: string | null;
+    id: string;
+    max_fail_ratio_bp: number;
+    max_order_value?: Money | null;
+    min_orders: number;
+    org_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
 export type Data_Vec_OrdersDocument = {
   data: {
     document_id: string;
@@ -13478,6 +13634,23 @@ export type Data_Vec_OrdersRefund = {
      */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersSalesRow = {
+  data: {
+    discount: Money;
+    /** What buyers paid: after discounts, taxes included. */
+    gross: Money;
+    /** Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`. */
+    key: string;
+    orders: number;
+    /** Units sold (by product only). */
+    quantity?: number | null;
+    /** Refunded so far (not by product). */
+    refunded: Money;
+    tax: Money;
   }[];
 };
 
@@ -18824,6 +18997,20 @@ export type OrdersAttribution = {
   live_session_id?: string | null;
 };
 
+/** Delivery statistics of a buyer, in this shop only. */
+export type OrdersBuyerRisk = {
+  block_reason?: string | null;
+  /** Until when cash on delivery is blocked, if it is. */
+  blocked_until?: string | null;
+  delivered: number;
+  /** `(failed + refused) / all`, in basis points (10000 = 100%). */
+  fail_ratio_bp: number;
+  /** Delivery attempts that failed. */
+  failed: number;
+  /** Orders cancelled after they left (refused, returned). */
+  refused: number;
+};
+
 /** A cart with its quote, computed again by the server on every read. */
 export type OrdersCart = {
   attribution?: OrdersAttribution | null;
@@ -18986,6 +19173,56 @@ export type OrdersCloseShiftRequest = {
   variance_reason?: string | null;
 };
 
+/** A buyer blocked from paying on delivery. */
+export type OrdersCodBlock = {
+  created_at: string;
+  created_by: string;
+  expires_at: string;
+  id: string;
+  lifted_at?: string | null;
+  note?: string | null;
+  /** Code of the list `orders.cod_block`. */
+  reason_code: string;
+};
+
+/** Block a buyer from paying on delivery. */
+export type OrdersCodBlockRequest = {
+  /** Required; at most 365 days from now (no block is permanent). */
+  expires_at: string;
+  note?: string | null;
+  /** Phone number of the buyer (kept only as a keyed hash). */
+  phone: string;
+  /** A code of the list `orders.cod_block`. */
+  reason_code: string;
+};
+
+/** A cash-on-delivery rule. */
+export type OrdersCodRule = {
+  /** `require_prepayment`. */
+  action: string;
+  effective_from: string;
+  effective_to?: string | null;
+  id: string;
+  max_fail_ratio_bp: number;
+  max_order_value?: Money | null;
+  min_orders: number;
+  org_id: string;
+};
+
+/** A new cash-on-delivery rule. */
+export type OrdersCodRuleRequest = {
+  /** Default: now. */
+  effective_from?: string | null;
+  effective_to?: string | null;
+  /** Failed or refused deliveries, in basis points, from which the buyer must pay in advance. */
+  max_fail_ratio_bp: number;
+  max_order_value?: Money | null;
+  /** Orders with a delivery result the buyer needs before the ratio counts (1 to 1000). */
+  min_orders: number;
+  /** The shop (or the tenant's root node for every shop). */
+  org_id: string;
+};
+
 /** A one-time code was sent by SMS. */
 export type OrdersCodeSent = {
   /** The code works until then. */
@@ -19100,6 +19337,14 @@ export type OrdersMaskedContact = {
   name: string;
   /** First 3 and last 3 digits (`090•••567`). */
   phone: string;
+};
+
+/** Hide or reopen a review. */
+export type OrdersModerateReviewRequest = {
+  /** `hide` or `reopen`. */
+  action: string;
+  /** Required to hide: a code of the list `orders.review_hidden`. */
+  reason?: string | null;
 };
 
 /** Open a shift. */
@@ -19382,6 +19627,11 @@ export type OrdersRefundRequest = {
   reference: string;
 };
 
+/** The shop's answer. */
+export type OrdersReplyReviewRequest = {
+  reply: string;
+};
+
 /** A return. */
 export type OrdersReturn = {
   /** End of the return window of the order. */
@@ -19506,6 +19756,95 @@ export type OrdersReturnTransitionRequest = {
   warehouse_org_id?: string | null;
 };
 
+/** A product review. */
+export type OrdersReview = {
+  body: string;
+  created_at: string;
+  helpful_count: number;
+  /** Code of the list `orders.review_hidden`, when hidden. */
+  hidden_reason?: string | null;
+  id: string;
+  media_ids: string[];
+  product_id: string;
+  rating: number;
+  replied_at?: string | null;
+  /** The shop's public answer. */
+  reply?: string | null;
+  /** `published` or `hidden`. */
+  status: string;
+  updated_at: string;
+  variant_id: string;
+  /** Always `true`: only buyers who received the item can review it. */
+  verified_buyer: boolean;
+  /** Signed in: whether you voted "helpful" for it. */
+  voted_by_me?: boolean | null;
+};
+
+/** A count of reviews. */
+export type OrdersReviewCount = {
+  count: number;
+};
+
+/** "Helpful" votes of a review. */
+export type OrdersReviewHelpful = {
+  helpful_count: number;
+  voted_by_me: boolean;
+};
+
+/** A review to write or edit. */
+export type OrdersReviewRequest = {
+  /** Up to 5000 characters; may be empty. */
+  body?: string;
+  /** Photos you uploaded (`POST /api/v1/media/me/uploads`), at most 6. */
+  media_ids?: string[];
+  /** 1 to 5 stars. */
+  rating: number;
+};
+
+/** Star counts and the approved AI summary of a product's reviews. */
+export type OrdersReviewStats = {
+  /** Average stars with one decimal (`"4.5"`); `null` without reviews. */
+  average?: string | null;
+  count: number;
+  /** Number of reviews with 1, 2, 3, 4 and 5 stars. */
+  stars: number[];
+  summary?: OrdersReviewSummary | null;
+  /** Reviews with photos. */
+  with_media: number;
+};
+
+/** A summary of reviews written with AI and approved by staff. */
+export type OrdersReviewSummary = {
+  /** Always `true`: shown with an "AI-generated" label (D-109). */
+  ai_generated: boolean;
+  body?: string | null;
+  generated_at?: string | null;
+  id: string;
+  locale: string;
+  product_id: string;
+  reviewed_at?: string | null;
+  source_review_count: number;
+  /** `pending`, `draft`, `approved`, `rejected`, `superseded` or `failed`. */
+  status: string;
+  /** Themes buyers often mention. */
+  themes: string[];
+};
+
+/** A row of the sales report. */
+export type OrdersSalesRow = {
+  discount: Money;
+  /** What buyers paid: after discounts, taxes included. */
+  gross: Money;
+  /** Shop id, channel code, product id, `YYYY-MM-DD` or `YYYY-MM`. */
+  key: string;
+  orders: number;
+  /** Units sold (by product only). */
+  quantity?: number | null;
+  /** Refunded so far (not by product). */
+  refunded: Money;
+  tax: Money;
+};
+
 /** A shipment requested from the shipping module. */
 export type OrdersShipmentRequested = {
   cod_amount?: Money | null;
@@ -19530,6 +19869,12 @@ export type OrdersShippingOption = {
   option_key: string;
   /** Store of a pickup option. */
   pickup_org_id?: string | null;
+};
+
+/** Ask for an AI summary draft. */
+export type OrdersSummaryRequest = {
+  /** `vi` (default) or `en`. */
+  locale?: string | null;
 };
 
 /** A message to customer support about an order. */
@@ -22000,6 +22345,34 @@ export type Page_OrdersReturn = {
     updated_at: string;
     /** Warehouse that received the items. */
     warehouse_org_id?: string | null;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_OrdersReview = {
+  /** The items of this page, in the requested order. */
+  data: {
+    body: string;
+    created_at: string;
+    helpful_count: number;
+    /** Code of the list `orders.review_hidden`, when hidden. */
+    hidden_reason?: string | null;
+    id: string;
+    media_ids: string[];
+    product_id: string;
+    rating: number;
+    replied_at?: string | null;
+    /** The shop's public answer. */
+    reply?: string | null;
+    /** `published` or `hidden`. */
+    status: string;
+    updated_at: string;
+    variant_id: string;
+    /** Always `true`: only buyers who received the item can review it. */
+    verified_buyer: boolean;
+    /** Signed in: whether you voted "helpful" for it. */
+    voted_by_me?: boolean | null;
   }[];
   pagination: Pagination;
 };
@@ -41325,6 +41698,36 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/lines/{line_id}/review": {
+    /** Edit your review of an item. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; line_id: string }; };
+      requestBody: OrdersReviewRequest;
+      responses: {
+        200: Data_OrdersReview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+    /** Review an item you received. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; line_id: string }; };
+      requestBody: OrdersReviewRequest;
+      responses: {
+        201: Data_OrdersReview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/orders/{id}/returns": {
     /** Ask to return items. */
     post: {
@@ -41478,6 +41881,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/products/{product_id}/review-summaries": {
+    /** Write an AI summary draft of a product's reviews. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; };
+      requestBody: OrdersSummaryRequest;
+      responses: {
+        201: Data_OrdersReviewSummary;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/public/orders/lookup": {
     /** Look up a guest order by number and phone. */
     post: {
@@ -41621,6 +42039,69 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/public/products/{product_id}/reviews": {
+    /** List reviews of a product. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { rating?: number; has_media?: boolean; sort?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersReview;
+        400: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/products/{product_id}/reviews/stats": {
+    /** Star counts of a product's reviews. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { product_id: string }; query: { locale?: string }; };
+      responses: {
+        200: Data_OrdersReviewStats;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/reviews/{id}/helpful": {
+    /** Vote a review "helpful". */
+    put: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReviewHelpful;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+    /** Take back a "helpful" vote. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReviewHelpful;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/reports/sales": {
+    /** Sales report. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { group_by: string; from: string; to: string; currency?: string }; };
+      responses: {
+        200: Data_Vec_OrdersSalesRow;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/returns": {
     /** List returns. */
     get: {
@@ -41659,6 +42140,176 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/review-summaries/{id}/approve": {
+    /** Approve an AI summary draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReviewSummary;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/review-summaries/{id}/reject": {
+    /** Reject an AI summary draft. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersReviewSummary;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/reviews": {
+    /** List reviews to moderate. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; created_after?: string; product_id?: string; limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_OrdersReview;
+        400: Problem;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/reviews/count": {
+    /** Count reviews to moderate. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { status?: string; created_after?: string; product_id?: string }; };
+      responses: {
+        200: Data_OrdersReviewCount;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/reviews/{id}/moderation": {
+    /** Hide or reopen a review. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersModerateReviewRequest;
+      responses: {
+        200: Data_OrdersReview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/reviews/{id}/reply": {
+    /** Answer a review publicly. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersReplyReviewRequest;
+      responses: {
+        200: Data_OrdersReview;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/risk/buyers": {
+    /** Delivery statistics of a buyer. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { phone: string }; };
+      responses: {
+        200: Data_OrdersBuyerRisk;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/risk/cod-blocks": {
+    /** List active cash-on-delivery blocks. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_OrdersCodBlock;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Block a buyer from paying on delivery. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersCodBlockRequest;
+      responses: {
+        201: Data_OrdersCodBlock;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/risk/cod-blocks/{id}": {
+    /** Lift a cash-on-delivery block. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersCodBlock;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/risk/cod-rules": {
+    /** List cash-on-delivery rules. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_OrdersCodRule;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Add a cash-on-delivery rule. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersCodRuleRequest;
+      responses: {
+        201: Data_OrdersCodRule;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/risk/cod-rules/{id}": {
+    /** End a cash-on-delivery rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersCodRule;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
