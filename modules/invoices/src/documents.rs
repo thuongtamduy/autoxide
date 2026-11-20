@@ -431,6 +431,7 @@ impl InvoicesService {
                 base_currency: Set(None),
                 base_total_minor: Set(None),
                 buyer_purged_at: Set(None),
+                booked_by_source: Set(draft.booked_by_source),
             })
             .exec_with_returning(&transaction)
             .await?;

@@ -7,6 +7,7 @@ mod m0007_returns;
 mod m0008_pickups;
 mod m0009_preorders;
 mod m0010_guests;
+mod m0013_invoices_pos;
 
 use autoxide_kernel::migration::prelude::*;
 
@@ -42,6 +43,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             "m0012_tenancy_throttle",
             vec![autoxide_kernel::throttle::tenant_table("orders")],
         ),
+        // Hoá đơn điện tử của đơn, ca và lượt bán tại quầy (mục 7, 9).
+        Box::new(m0013_invoices_pos::Migration),
     ]
 }
 

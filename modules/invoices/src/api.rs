@@ -173,6 +173,9 @@ pub struct NewDocument {
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
+    /// Bên lập đã tự ghi doanh thu vào sổ (vd `orders` ghi khi giao xong): phát hành không ghi bút
+    /// toán, chứng từ chỉ là hoá đơn. Mặc định `false`.
+    pub booked_by_source: bool,
 }
 
 impl NewDocument {
@@ -198,7 +201,15 @@ impl NewDocument {
             source_module: source_module.into(),
             source_id: None,
             reference: reference.into(),
+            booked_by_source: false,
         }
+    }
+
+    /// Bên lập đã tự ghi doanh thu (xem [`NewDocument::booked_by_source`]).
+    #[must_use]
+    pub fn booked_by_source(mut self) -> Self {
+        self.booked_by_source = true;
+        self
     }
 
     #[must_use]
@@ -352,6 +363,19 @@ pub trait Invoices: Send + Sync {
 
     /// Một chứng từ, hoặc `None`.
     async fn document(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<Document>, Error>;
+
+    /// Lập nháp hoá đơn điều chỉnh (`direction`: `increase` / `decrease`) của chứng từ đã phát hành
+    /// `original`, dòng là phần chênh lệch (vd hàng trả lại). Cùng `reference` + cùng nội dung →
+    /// `Replayed`. Phát hành nháp bằng [`Invoices::issue`] mới đánh dấu chứng từ gốc `adjusted`.
+    async fn adjust(
+        &self,
+        tenant: &TenantContext,
+        actor: Actor,
+        original: Uuid,
+        direction: &str,
+        lines: Vec<NewDocumentLine>,
+        reference: String,
+    ) -> Result<Submitted<Document>, Error>;
 
     /// Huỷ chứng từ đã phát hành (thông báo sai sót với nhà cung cấp, đảo bút toán).
     async fn cancel(

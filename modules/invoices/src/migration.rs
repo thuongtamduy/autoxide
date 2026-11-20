@@ -18,6 +18,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             vec![autoxide_kernel::job::tenant_table("invoices")],
         ),
         Box::new(AddPrintExportArchive),
+        Box::new(AddBookedBySource),
     ]
 }
 
@@ -379,5 +380,40 @@ impl MigrationTrait for AddPrintExportArchive {
                 .await?;
         }
         Ok(())
+    }
+}
+
+/// Cờ `booked_by_source`: chứng từ do module khác lập mà module đó đã tự ghi doanh thu (vd `orders`
+/// ghi khi giao xong) — phát hành không ghi bút toán lần hai (D-20261120-step45-einvoice-pos).
+struct AddBookedBySource;
+
+impl MigrationName for AddBookedBySource {
+    fn name(&self) -> &str {
+        "m0008_booked_by_source"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddBookedBySource {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("invoices_documents")
+                    .add_column(schema::boolean("booked_by_source").default(false))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("invoices_documents")
+                    .drop_column("booked_by_source")
+                    .to_owned(),
+            )
+            .await
     }
 }

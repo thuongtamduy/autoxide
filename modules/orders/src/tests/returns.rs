@@ -22,7 +22,7 @@ use super::{
 use crate::entity::{line, order};
 
 /// Đơn COD (2 × 100.000 + phí giao 30.000) đã giao và đã thu tiền; trả (ID đơn, ID dòng áo).
-async fn delivered_order(shop: &Shop) -> (Uuid, Uuid) {
+pub(super) async fn delivered_order(shop: &Shop) -> (Uuid, Uuid) {
     let id = cod_order(shop).await;
     emit_from(
         shop,
@@ -43,11 +43,11 @@ async fn delivered_order(shop: &Shop) -> (Uuid, Uuid) {
     (id, line_id)
 }
 
-fn return_body(line: Uuid, quantity: i64, reason: &str) -> Value {
+pub(super) fn return_body(line: Uuid, quantity: i64, reason: &str) -> Value {
     json!({"lines": [{"line_id": line, "quantity": quantity}], "reason_code": reason})
 }
 
-async fn step(shop: &Shop, id: &str, body: Value) -> (StatusCode, Value) {
+pub(super) async fn step(shop: &Shop, id: &str, body: Value) -> (StatusCode, Value) {
     Call::as_user(shop, "boss")
         .send("POST", &format!("/returns/{id}/transitions"), Some(body))
         .await

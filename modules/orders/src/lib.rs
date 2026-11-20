@@ -21,14 +21,17 @@ mod fulfillments;
 mod guests;
 mod holds;
 mod http;
+mod invoicing;
 mod jobs;
 mod lifecycle;
 mod migration;
+mod notices;
 mod orders_read;
 mod payments;
 mod permissions;
 mod pickups;
 mod policy;
+mod pos;
 mod preorders;
 mod pricing;
 mod reasons;
@@ -141,7 +144,13 @@ impl Module for OrdersModule {
             // `support` đăng ký trước `orders`; chưa cài thì nút "mở hỗ trợ" trả 404.
             support: context.require::<dyn autoxide_support::api::SupportIntake>().ok(),
             translations: context.translations().clone(),
+            // `invoices`, `notifications` đăng ký trước `orders`; chưa cài thì bỏ bước đó.
+            invoices: context.require::<dyn autoxide_invoices::api::Invoices>().ok(),
+            notifier: context.require::<dyn autoxide_notifications::api::Notifier>().ok(),
         };
+        if let Some(notifier) = &parts.notifier {
+            notices::declare(notifier.as_ref())?;
+        }
         let service = Arc::new(OrdersService::new(parts, config));
         // `Arc<OrdersService>` tự đổi thành `Arc<dyn Orders>`: module khác chỉ thấy trait.
         context.provide::<dyn api::Orders>(service.clone())?;
@@ -174,6 +183,8 @@ impl Module for OrdersModule {
         all.extend(accounting::subscriptions(&service));
         all.extend(shipping_events::subscriptions(&service));
         all.extend(preorders::subscriptions(&service));
+        all.extend(invoicing::subscriptions(&service));
+        all.extend(notices::subscriptions(&service));
         // Thanh toán xong ở `ledger` (có thể chưa cài: `optional`).
         all.push(autoxide_kernel::event::Subscription::optional(
             payments::LEDGER_PAYMENT_SUCCEEDED,

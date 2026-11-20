@@ -35,6 +35,8 @@ pub(crate) struct Parts {
     pub sms: Option<Arc<dyn autoxide_kernel::sms::SmsSender>>,
     pub support: Option<Arc<dyn SupportIntake>>,
     pub translations: Translations,
+    pub invoices: Option<Arc<dyn autoxide_invoices::api::Invoices>>,
+    pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
 }
 
 pub(crate) struct OrdersService {
@@ -54,6 +56,10 @@ pub(crate) struct OrdersService {
     /// Mở phiếu hỗ trợ từ trang đơn (chưa cài `support`: 404).
     pub support: Option<Arc<dyn SupportIntake>>,
     pub translations: Translations,
+    /// Lập hoá đơn điện tử của đơn (chưa cài `invoices`: không lập).
+    pub invoices: Option<Arc<dyn autoxide_invoices::api::Invoices>>,
+    /// Thư xác nhận, cập nhật trạng thái (chưa cài `notifications`: không gửi).
+    pub notifier: Option<Arc<dyn autoxide_notifications::api::Notifier>>,
     pub config: OrdersConfig,
 }
 
@@ -74,6 +80,8 @@ impl OrdersService {
             sms: parts.sms,
             support: parts.support,
             translations: parts.translations,
+            invoices: parts.invoices,
+            notifier: parts.notifier,
             config,
         }
     }

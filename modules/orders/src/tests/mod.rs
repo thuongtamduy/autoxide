@@ -8,6 +8,7 @@ mod checkout;
 mod fake_ledger;
 mod fakes;
 mod guests;
+mod invoices_pos;
 mod lifecycle;
 mod pickups;
 mod preorders;
