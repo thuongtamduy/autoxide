@@ -280,7 +280,7 @@ mod tests {
             // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận, hết hạn giữ hàng chờ nhận tại
             // cửa hàng, hết hạn bảo hành, quá hạn trả phần còn lại — bước 45), thêm một của
             // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 73);
+            assert_eq!(a.unwrap() + b.unwrap(), 74);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
