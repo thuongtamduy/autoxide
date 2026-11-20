@@ -181,6 +181,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Định dạng           | `cargo fmt` (cấu hình `rustfmt.toml`)                           |
 | Lint                | `cargo clippy`, cảnh báo tính là lỗi                            |
 | Test                | `cargo test` trên SQLite và Postgres                            |
+| Chạy test trên CI   | `cargo-nextest` (`cargo install cargo-nextest --locked`; CI cài bằng `taiki-e/install-action`) — build test một lần thành archive, chạy ở nhiều máy (`./gate.sh --only build`, `--archive`); gate trên máy không cần nó (D-20261120-ci-nextest-archive) |
 | Database cho test   | `autoxide-testkit` — mỗi test một database trống (D-033)        |
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |
 | Kiểm phụ thuộc      | `cargo-deny` (license, lỗ hổng đã công bố, nguồn) — cấu hình `deny.toml`, chạy trong gate |
