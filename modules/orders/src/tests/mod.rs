@@ -7,6 +7,7 @@ mod carts;
 mod checkout;
 mod fake_ledger;
 mod fakes;
+mod guests;
 mod lifecycle;
 mod pickups;
 mod preorders;

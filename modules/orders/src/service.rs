@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::event::Outbox;
+use autoxide_kernel::i18n::Translations;
 use autoxide_kernel::reasons::ReasonCodes;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::DatabaseRegistry;
@@ -12,6 +13,7 @@ use autoxide_ledger::api::Ledger;
 use autoxide_media::api::Media;
 use autoxide_organizations::api::OrgDirectory;
 use autoxide_shipping::api::AddressBook;
+use autoxide_support::api::SupportIntake;
 
 use crate::config::OrdersConfig;
 use crate::extensions::Extensions;
@@ -30,6 +32,9 @@ pub(crate) struct Parts {
     pub orgs: Option<Arc<dyn OrgDirectory>>,
     pub reasons: ReasonCodes,
     pub media: Option<Arc<dyn Media>>,
+    pub sms: Option<Arc<dyn autoxide_kernel::sms::SmsSender>>,
+    pub support: Option<Arc<dyn SupportIntake>>,
+    pub translations: Translations,
 }
 
 pub(crate) struct OrdersService {
@@ -44,6 +49,11 @@ pub(crate) struct OrdersService {
     pub orgs: Option<Arc<dyn OrgDirectory>>,
     pub reasons: ReasonCodes,
     pub media: Option<Arc<dyn Media>>,
+    /// Gửi mã một lần cho người mua vãng lai (chưa cài bộ gửi SMS: không tra đơn được).
+    pub sms: Option<Arc<dyn autoxide_kernel::sms::SmsSender>>,
+    /// Mở phiếu hỗ trợ từ trang đơn (chưa cài `support`: 404).
+    pub support: Option<Arc<dyn SupportIntake>>,
+    pub translations: Translations,
     pub config: OrdersConfig,
 }
 
@@ -61,6 +71,9 @@ impl OrdersService {
             orgs: parts.orgs,
             reasons: parts.reasons,
             media: parts.media,
+            sms: parts.sms,
+            support: parts.support,
+            translations: parts.translations,
             config,
         }
     }

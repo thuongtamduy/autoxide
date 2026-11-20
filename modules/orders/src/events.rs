@@ -55,6 +55,8 @@ event!(ReturnRequested, names::RETURN_REQUESTED);
 event!(ReturnPickupRequested, names::RETURN_PICKUP_REQUESTED);
 event!(ReturnReceived, names::RETURN_RECEIVED);
 event!(ReturnStatusChanged, names::RETURN_STATUS_CHANGED);
+event!(DeliveryAddressChanged, names::DELIVERY_ADDRESS_CHANGED);
+event!(OrdersClaimed, names::ORDERS_CLAIMED);
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
@@ -113,6 +115,14 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(
             names::PREORDER_CANCELLED,
             "Pre-order items not yet arrived were cancelled from an order and refunded.",
+        ),
+        EventInfo::new(
+            names::DELIVERY_ADDRESS_CHANGED,
+            "The buyer changed the delivery address of an order before it left the warehouse.",
+        ),
+        EventInfo::new(
+            names::ORDERS_CLAIMED,
+            "Guest orders were attached to the account of the buyer who proved the phone number.",
         ),
         EventInfo::new(names::INVOICE_LINKED, "An electronic invoice was linked to an order."),
         EventInfo::new(names::CART_ABANDONED, "A buyer left a cart without placing an order."),

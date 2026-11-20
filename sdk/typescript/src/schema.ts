@@ -9379,6 +9379,17 @@ export type Data_Option_PromotionsEligibility = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersAccessToken = {
+  /** Access to one guest order. */
+  data: {
+    /** Send it in the `Order-Token` header to see and act on this one order. Returned once. */
+    access_token: string;
+    expires_at: string;
+    order_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersCart = {
   /** A cart with its quote, computed again by the server on every read. */
   data: {
@@ -9423,6 +9434,40 @@ export type Data_OrdersCheckoutResult = {
     orders: OrdersOrder[];
     /** One per amount to pay (D-216). */
     payment_actions: OrdersPaymentAction[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersClaimed = {
+  /** Guest orders attached to your account. */
+  data: {
+    order_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersCodeSent = {
+  /** A one-time code was sent by SMS. */
+  data: {
+    /** The code works until then. */
+    expires_at: string;
+    /** Id of the code: confirm with it. */
+    lookup_id: string;
+    order_id: string;
+    /** Where the code went, masked (`090•••567`). */
+    phone: string;
+    /** Seconds to wait before asking for another code. */
+    resend_after: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersGuestOrder = {
+  /** An order seen with an `Order-Token`: personal data is masked. */
+  data: OrdersOrder & {
+    contact?: OrdersMaskedContact | null;
+    /** Delivery: recipient masked, address down to the commune / ward (no house number or street). */
+    ship_to?: Record<string, unknown> | null;
   };
 };
 
@@ -9577,6 +9622,18 @@ export type Data_OrdersShipmentRequested = {
     order_id: string;
     /** Key of the request at the shipping module. */
     request_key: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersSupportTicket = {
+  /** The support ticket opened. */
+  data: {
+    /** Guest: token to follow the ticket at `support`; only on the first answer. */
+    access_token?: string | null;
+    /** Number shown to the buyer. */
+    number: string;
+    ticket_id: string;
   };
 };
 
@@ -18670,6 +18727,14 @@ export type OrderRequest = {
   banner_ids: string[];
 };
 
+/** Access to one guest order. */
+export type OrdersAccessToken = {
+  /** Send it in the `Order-Token` header to see and act on this one order. Returned once. */
+  access_token: string;
+  expires_at: string;
+  order_id: string;
+};
+
 /** Referral of the cart. */
 export type OrdersAttribution = {
   click_id?: string | null;
@@ -18818,6 +18883,30 @@ export type OrdersCheckoutResult = {
   payment_actions: OrdersPaymentAction[];
 };
 
+/** Attach guest orders to your account. */
+export type OrdersClaimRequest = {
+  /** An `access_token` of a guest order lookup: it proves you own the phone number. */
+  lookup_token: string;
+};
+
+/** Guest orders attached to your account. */
+export type OrdersClaimed = {
+  order_ids: string[];
+};
+
+/** A one-time code was sent by SMS. */
+export type OrdersCodeSent = {
+  /** The code works until then. */
+  expires_at: string;
+  /** Id of the code: confirm with it. */
+  lookup_id: string;
+  order_id: string;
+  /** Where the code went, masked (`090•••567`). */
+  phone: string;
+  /** Seconds to wait before asking for another code. */
+  resend_after: number;
+};
+
 /** Contact for the order. */
 export type OrdersContactRequest = {
   email?: string | null;
@@ -18830,12 +18919,56 @@ export type OrdersContactRequest = {
   proxy_phone?: string | null;
 };
 
+/** A new delivery address. */
+export type OrdersGuestAddressRequest = {
+  address: AddressInput;
+  /** The code from `POST /public/orders/{id}/address/otp`. */
+  code: string;
+  /** New phone of the recipient; omitted: unchanged. */
+  phone?: string | null;
+  /** New recipient; omitted: unchanged. */
+  recipient_name?: string | null;
+};
+
+/** Cancel a guest order. */
+export type OrdersGuestCancelRequest = {
+  reason?: string | null;
+};
+
+/** An order seen with an `Order-Token`: personal data is masked. */
+export type OrdersGuestOrder = OrdersOrder & {
+  contact?: OrdersMaskedContact | null;
+  /** Delivery: recipient masked, address down to the commune / ward (no house number or street). */
+  ship_to?: Record<string, unknown> | null;
+};
+
 /** Why a cart line cannot be ordered now. */
 export type OrdersLineProblem = {
   /** Units left, for `orders.out_of_stock`. */
   available?: number | null;
   /** `orders.variant_unavailable`, `orders.out_of_stock` or `orders.preorder_closed`. */
   code: string;
+};
+
+/** The one-time code received by SMS. */
+export type OrdersLookupConfirmRequest = {
+  code: string;
+};
+
+/** Look up a guest order. */
+export type OrdersLookupRequest = {
+  /** Order number, as on the confirmation. */
+  number: string;
+  /** Phone number given when ordering. */
+  phone: string;
+};
+
+/** Contact of a guest order, masked. */
+export type OrdersMaskedContact = {
+  /** Initials of family and middle names, then the given name (`N. V. An`). */
+  name: string;
+  /** First 3 and last 3 digits (`090•••567`). */
+  phone: string;
 };
 
 /** An order. */
@@ -19173,6 +19306,20 @@ export type OrdersShippingOption = {
   option_key: string;
   /** Store of a pickup option. */
   pickup_org_id?: string | null;
+};
+
+/** A message to customer support about an order. */
+export type OrdersSupportRequest = {
+  message: string;
+};
+
+/** The support ticket opened. */
+export type OrdersSupportTicket = {
+  /** Guest: token to follow the ticket at `support`; only on the first answer. */
+  access_token?: string | null;
+  /** Number shown to the buyer. */
+  number: string;
+  ticket_id: string;
 };
 
 /** A status change of an order. */
@@ -40870,6 +41017,20 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/claim": {
+    /** Attach your guest orders to your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersClaimRequest;
+      responses: {
+        200: Data_OrdersClaimed;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/orders/{id}": {
     /** One of your orders. */
     get: {
@@ -40930,6 +41091,21 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/orders/{id}/support": {
+    /** Open a support ticket about one of your orders. */
+    post: {
+      parameters: { header: { "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersSupportRequest;
+      responses: {
+        201: Data_OrdersSupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/me/returns/{id}": {
     /** One of your returns. */
     get: {
@@ -40939,6 +41115,111 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/lookup": {
+    /** Look up a guest order by number and phone. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: OrdersLookupRequest;
+      responses: {
+        200: Data_OrdersCodeSent;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/lookup/{id}/confirm": {
+    /** Confirm a guest order lookup with the code. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: OrdersLookupConfirmRequest;
+      responses: {
+        200: Data_OrdersAccessToken;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}": {
+    /** See a guest order. */
+    get: {
+      parameters: { header: { "Order-Token": string; "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersGuestOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/address": {
+    /** Change the delivery address of a guest order. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersGuestAddressRequest;
+      responses: {
+        200: Data_OrdersGuestOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/address/otp": {
+    /** Ask for a code to change the delivery address. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersCodeSent;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        429: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/cancel": {
+    /** Cancel a guest order. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersGuestCancelRequest;
+      responses: {
+        200: Data_OrdersGuestOrder;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/public/orders/{id}/support": {
+    /** Open a support ticket about a guest order. */
+    post: {
+      parameters: { header: { "Order-Token": string; "Idempotency-Key"?: string | null; "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersSupportRequest;
+      responses: {
+        201: Data_OrdersSupportTicket;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
         default: Problem;
       };
     };

@@ -4,6 +4,7 @@
 
 mod carts;
 pub(crate) mod dto;
+mod guests;
 mod lifecycle;
 mod orders;
 mod pickups;
@@ -47,5 +48,14 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(returns::get_return))
         .routes(routes!(returns::transition_return))
         .routes(routes!(returns::refund_order, returns::order_refunds))
+        .routes(routes!(guests::lookup))
+        .routes(routes!(guests::confirm_lookup))
+        .routes(routes!(guests::get_guest_order))
+        .routes(routes!(guests::cancel_guest_order))
+        .routes(routes!(guests::send_address_code))
+        .routes(routes!(guests::change_address))
+        .routes(routes!(guests::guest_support))
+        .routes(routes!(guests::my_order_support))
+        .routes(routes!(guests::claim))
         .with_state(service)
 }
