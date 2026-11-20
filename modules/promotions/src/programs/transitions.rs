@@ -111,7 +111,8 @@ impl PromotionsService {
     ) -> Result<PromotionView, Error> {
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let view = store::load(&transaction, tenant, id).await?.ok_or_else(|| not_found(id))?;
+        let view =
+            store::load_locked(&transaction, tenant, id).await?.ok_or_else(|| not_found(id))?;
         writable(principal, &transaction, &PUBLISH, view.row.org_id, || not_found(id)).await?;
         if view.status() != Status::Draft {
             return Err(invalid_transition(view.status(), Status::Active));
@@ -169,7 +170,8 @@ impl PromotionsService {
     ) -> Result<PromotionView, Error> {
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let view = store::load(&transaction, tenant, id).await?.ok_or_else(|| not_found(id))?;
+        let view =
+            store::load_locked(&transaction, tenant, id).await?.ok_or_else(|| not_found(id))?;
         writable(principal, &transaction, &PUBLISH, view.row.org_id, || not_found(id)).await?;
         let from = view.status();
         let at = now();
