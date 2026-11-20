@@ -1,5 +1,5 @@
 # Phát hành khi đẩy tag `vX.Y.Z` (D-078, D-175): kiểm tag khớp phiên bản trong Cargo.toml, chạy
-# lại gate, build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
+# lại gate (chia nhiều máy, dùng chung gate.yml với ci.yml), build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
 # (không giả lập), đăng lên GitHub Container Registry bằng `GITHUB_TOKEN`, đính kèm chứng thực
 # nguồn gốc build và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú lấy từ CHANGELOG.md.
 # Quy trình: docs/RELEASING.md. Chỉ chạy khi repo công khai (D-197). Tag đã có mà thiếu image: workflow
@@ -16,26 +16,12 @@ permissions:
   contents: read
 
 jobs:
-  gate:
+  # Kiểm riêng của phát hành: tag khớp `version` trong Cargo.toml và CHANGELOG.md có mục của bản này.
+  # Chạy trước, vài giây, để tag sai không tốn một lần gate.
+  verify:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_PASSWORD: postgres
-        ports: ["5432:5432"]
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 2s --health-timeout 5s --health-retries 30
-      s3:
-        image: motoserver/moto:5.2.5
-        ports: ["5000:5000"]
-    env:
-      CARGO_INCREMENTAL: "0"
-      GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
-      GATE_S3_ENDPOINT: http://127.0.0.1:5000
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
       - name: Tag matches the version in Cargo.toml
@@ -48,24 +34,21 @@ jobs:
             exit 1
           fi
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "CHANGELOG.md has no section [$version]" >&2; exit 1; }
-      - run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deny
-      - name: Create the S3 test bucket
-        run: |
-          for _ in $(seq 1 30); do
-            curl --silent --fail --request PUT "$GATE_S3_ENDPOINT/autoxide-test" && exit 0
-            sleep 1
-          done
-          exit 1
-      - run: ./gate.sh
+
+  # Gate đầy đủ chia nhiều máy, dùng chung với ci.yml (build archive một lần rồi 8 shard; D-20261120-release-gate-sharded).
+  # Trước đây chạy cả gate trên MỘT máy (tới 60 phút). PostgreSQL 16 như trước: bản 18 đã chạy ở lần
+  # push lên main của cùng commit.
+  gate:
+    needs: verify
+    if: ${{ !github.event.repository.private }}
+    uses: ./.github/workflows/gate.yml
+    with:
+      postgres-18: false
 
   # Mỗi kiến trúc build trên máy cùng kiến trúc, đẩy image theo digest (chưa có tag); job
   # `publish` ghép các digest thành một image đa nền tảng.
   image:
-    needs: gate
+    needs: [verify, gate]
     strategy:
       fail-fast: true
       matrix:
