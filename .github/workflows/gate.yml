@@ -23,7 +23,7 @@ permissions:
 
 jobs:
   lint:
-    name: gate / lint
+    name: lint
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -50,7 +50,7 @@ jobs:
   # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
   # (push lên main) chạy doc-test ở đây.
   build:
-    name: gate / build tests
+    name: build tests
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -80,7 +80,7 @@ jobs:
           compression-level: 0
 
   tests:
-    name: gate / ${{ matrix.target.name }}
+    name: ${{ matrix.target.name }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
