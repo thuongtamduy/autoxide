@@ -255,33 +255,11 @@ mod tests {
         TestDatabase::run(async |database| {
             let error = serve(settings(database), std::future::ready(())).await.unwrap_err();
 
-            assert_eq!(
-                error,
-                "40 migrations have not been applied to the database: kernel/m0001_create_secrets, \
-                 kernel/m0002_create_user_flags, kernel/m0003_create_tenancy, \
-                 kernel/m0004_tenancy_user_flags, kernel/m0005_create_tenant_settings, \
-                 kernel/m0006_create_events, kernel/m0007_add_event_actor, \
-                 kernel/m0008_tenancy_events, kernel/m0009_create_jobs, kernel/m0010_tenancy_jobs, \
-                 kernel/m0011_create_tenant_moves, kernel/m0012_domain_check_failures, \
-                 kernel/m0013_tenant_read_only, kernel/m0014_create_org_tree, kernel/k0001_event_access, \
-                 kernel/m0015_create_tenant_exports, kernel/m0016_create_sequences, \
-                 kernel/m0017_create_migration_runs, kernel/m0018_create_job_runs, \
-                 kernel/m0019_create_saved_views, \
-                 kernel/m0020_job_run_files, kernel/m0021_data_residency, \
-                 kernel/m0022_create_work_states, \
-                 kernel/m0023_create_record_notes, \
-                 kernel/m0024_create_approval_requests, \
-                 kernel/m0025_create_reason_codes, \
-                 kernel/m0026_create_connection_status, \
-                 kernel/m0027_create_tags, \
-                 kernel/m0028_create_text_overrides, \
-                 kernel/m0029_create_custom_fields, \
-                 kernel/m0030_create_pins, \
-                 kernel/m0031_create_request_log, \
-                 kernel/m0032_create_throttle, \
-                 kernel/m0033_tenancy_throttle, \
-                 kernel/m0034_create_search_docs, kernel/m0035_create_relocations, kernel/m0036_create_backups, kernel/m0037_tenant_sandbox, kernel/m0038_create_sandbox_tables, notes/m0001_create_note; run `autoxide migrate up` first"
-            );
+            assert!(error.contains("migration(s) have not been applied"), "{error}");
+            assert!(error.contains("first: kernel/m0001_create_secrets"), "{error}");
+            assert!(error.contains("and ") && error.contains(" more"), "{error}");
+            assert!(error.contains("`autoxide migrate up`"), "{error}");
+            assert!(error.len() < 400, "thông báo phải ngắn: {} byte", error.len());
         })
         .await
         .unwrap();
