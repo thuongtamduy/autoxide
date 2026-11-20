@@ -55,3 +55,34 @@ async fn gia_hien_thi_doi_thi_phat_event() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_lan_dung_lai_dong_thoi_chi_phat_mot_event() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let list = price_list(&app, tree.chain).await;
+        let (_, variant) = on_sale(&app, &list, tree.chain, "D-2", "Quạt", 200_000).await;
+        drain(&app).await;
+        let body = json!({"reference": "cheaper", "prices": [{"variant_id": variant,
+            "amount": {"amount": "150000", "currency": "VND"}}]});
+        let (status, added) =
+            call(&app, "POST", &format!("/price-lists/{list}/prices"), "boss", Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{added}");
+        // Hai lần dựng lại cả khách cùng lúc, trước khi worker kịp chạy job của lần đổi giá:
+        // Postgres từng cho cả hai cùng thấy giá cũ và cùng ghi event.
+        let tasks = app.modules().tasks().unwrap();
+        let (_, task) =
+            tasks.iter().find(|(name, _)| name == "catalog.rebuild_storefront").unwrap();
+        let args = task.parse(&[]).unwrap();
+        let (first, second) = tokio::join!(task.run(&args), task.run(&args));
+        first.unwrap();
+        second.unwrap();
+        drain(&app).await;
+        assert_eq!(
+            display_prices(&app).await,
+            vec![json!([null, "200000"]), json!(["200000", "150000"])]
+        );
+    })
+    .await
+    .unwrap();
+}
