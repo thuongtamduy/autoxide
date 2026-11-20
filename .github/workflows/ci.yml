@@ -20,6 +20,9 @@ permissions:
 # không lưu được cache (bước Post của rust-cache không chạy), và trước đây mỗi lần merge huỷ lần
 # chạy main trước nên main không bao giờ có cache, mọi PR build từ đầu (D-20261119-ci-faster).
 # Không huỷ thì lần chạy main mới chờ lần đang chạy xong; GitHub chỉ giữ một lần chờ (lần mới nhất).
+# PR ghép lô của phiên điều phối (tiêu đề bắt đầu bằng "Lô:", D-20261119-merge-batches): đã kiểm trên máy
+# và merge ngay, lần chạy trên main mới là lưới kiểm — các job nặng bỏ qua để không chiếm máy của lần
+# chạy main; job `gate` vẫn báo xong. PR của phiên làm việc chạy đủ như cũ.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -34,7 +37,7 @@ concurrency:
 jobs:
   lint:
     name: gate / lint
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -62,7 +65,7 @@ jobs:
   # (push lên main) chạy doc-test ở đây.
   build:
     name: gate / build tests
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
@@ -93,7 +96,7 @@ jobs:
 
   tests:
     name: gate / ${{ matrix.target.name }}
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -208,13 +211,18 @@ jobs:
           LINT: ${{ needs.lint.result }}
           BUILD: ${{ needs.build.result }}
           TESTS: ${{ needs.tests.result }}
+          BATCH: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:') }}
         run: |
           echo "lint: $LINT, build: $BUILD, tests: $TESTS"
+          if [ "$BATCH" = true ]; then
+            echo "Batch PR (title starts with 'Lô:'): checked on the coordinator's machine and merged at once; main's run is the check."
+            exit 0
+          fi
           [ "$LINT" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ]
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -238,7 +246,7 @@ jobs:
     # Chỉ làm việc khi PR đổi hợp đồng API hay SDK; kiểm đường dẫn trong một bước (không dùng `paths:` ở
     # trigger) để job vẫn báo xong khi nó là check bắt buộc.
     name: Mobile SDK (${{ matrix.sdk }})
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     # Swift: ở PR chỉ kiểm manifest và phụ thuộc (nhẹ); biên dịch đầy đủ (dựng cả swift-syntax của plugin
     # sinh mã) chỉ khi push vào main, có cache — không chặn hàng đợi merge.
@@ -344,7 +352,7 @@ jobs:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
     name: upgrade from the last release (${{ matrix.database }})
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
