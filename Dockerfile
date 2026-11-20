@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
-# Image của Autoxide: build bằng toolchain Rust đã ghim, chạy trên Debian slim với một
-# người dùng không phải root. Xem docs/DEPLOY.md.
+# Image của Autoxide: build bằng toolchain Rust đã ghim (thư viện ngoài ở lớp riêng nhờ cargo-chef),
+# chạy trên Debian slim với một người dùng không phải root. Xem docs/DEPLOY.md.
 #
 #   docker build -t autoxide .
 #   docker run --rm -p 8080:8080 -v autoxide-data:/var/lib/autoxide/data autoxide
@@ -9,18 +9,33 @@
 # Cùng phiên bản với rust-toolchain.toml.
 ARG RUST_VERSION=1.99.1
 
-# --- build ---------------------------------------------------------------------
-FROM rust:${RUST_VERSION}-slim-trixie AS build
-# Dùng đúng toolchain của image; khỏi tải thêm thành phần chỉ dành cho máy dev
-# (rust-analyzer…) mà rust-toolchain.toml liệt kê.
+# --- công cụ ------------------------------------------------------------------
+# cargo-chef tách "build thư viện ngoài" khỏi "build code của mình" thành hai lớp Docker riêng, để cache
+# (cache gha của CI, hay lớp cục bộ) giữ được lớp thư viện: sửa code hay đổi số phiên bản phát hành không
+# làm build lại phần thư viện ngoài (phần lớn thời gian build) (D-20261120-docker-chef).
+FROM rust:${RUST_VERSION}-slim-trixie AS chef
+# ARG khai trước `FROM` chỉ dùng được trong `FROM`; muốn dùng trong stage phải khai lại.
+ARG RUST_VERSION
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION} \
     CARGO_INCREMENTAL=0
+RUN cargo install cargo-chef --locked --version 0.1.78
 WORKDIR /src
+
+# --- công thức: chỉ danh sách thư viện ngoài -----------------------------------
+# `recipe.json` chỉ chứa Cargo.toml / Cargo.lock đã gọt (không có mã nguồn, số phiên bản của crate trong
+# workspace bị bỏ), nên nó chỉ đổi khi thư viện ngoài đổi.
+FROM chef AS planner
 COPY . .
-# Cache thư viện tải về và thư mục build giữa các lần build trên cùng máy.
-RUN --mount=type=cache,target=/usr/local/cargo/registry \
-    --mount=type=cache,target=/src/target \
-    cargo build --release --locked -p autoxide \
+RUN cargo chef prepare --recipe-path recipe.json
+
+# --- build ---------------------------------------------------------------------
+FROM chef AS build
+COPY --from=planner /src/recipe.json recipe.json
+# Lớp thư viện: chỉ build lại khi recipe.json đổi. Không dùng `--mount=type=cache` cho `target/`: thư mục
+# đó nằm ngoài lớp nên cache lớp không giữ được nó (và cache mount không sống qua các máy chạy của GitHub).
+RUN cargo chef cook --release --locked -p autoxide --recipe-path recipe.json
+COPY . .
+RUN cargo build --release --locked -p autoxide \
     && cp target/release/autoxide /usr/local/bin/autoxide
 
 # --- chạy ----------------------------------------------------------------------

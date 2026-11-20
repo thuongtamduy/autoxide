@@ -74,6 +74,10 @@
 #   GATE_BASE            với --pr: so với ref này để biết crate nào bị sửa (mặc định origin/main).
 #   GATE_ARCHIVE_DIR     với --only build: thư mục ghi archive test và file filter (mặc định
 #                        target/gate-archive).
+#   GATE_DEPS_OPT_LEVEL  với --only build: mức tối ưu (0|1|2|3) của THƯ VIỆN NGOÀI trong archive test. Mặc định
+#                        `0` trên GitHub Actions (build một lần, chạy một lần: build từ đầu nhanh hơn ~23%,
+#                        D-20261120-build-faster), còn lại để nguyên `opt-level = 1` của Cargo.toml
+#                        (máy dev chạy test nhiều lần). Rỗng: không đổi.
 #   GATE_TARGET_MAX_GB   trần dung lượng của target/ (mặc định 40): vượt thì gate dọn trước khi build
 #                        (cache incremental trước, vẫn vượt thì `cargo clean`). 0: không dọn.
 #
@@ -248,8 +252,16 @@ fi
 if [ "$ONLY" = build ]; then
   ARCHIVE_DIR="${GATE_ARCHIVE_DIR:-target/gate-archive}"
   mkdir -p "$ARCHIVE_DIR"
+  # Thư viện ngoài tối ưu nhẹ (opt-level 1, D-299) làm test chạy nhanh hơn nhưng build lâu hơn; archive của
+  # CI chạy mỗi test đúng một lần nên chọn build nhanh. `--config` đè `[profile.dev.package."*"]`;
+  # argon2 và blake2 vẫn giữ mức riêng của chúng trong Cargo.toml. Doc-test dùng cùng cấu hình để khỏi build lại.
+  deps_opt="${GATE_DEPS_OPT_LEVEL-${GITHUB_ACTIONS:+0}}"
+  PROFILE_ARGS=()
+  if [ -n "$deps_opt" ]; then
+    PROFILE_ARGS=(--config "profile.dev.package.\"*\".opt-level=$deps_opt")
+  fi
   step "build every test program into a nextest archive ($ARCHIVE_DIR)"
-  cargo nextest archive --workspace --locked --archive-file "$ARCHIVE_DIR/tests.tar.zst"
+  cargo nextest archive --workspace --locked ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} --archive-file "$ARCHIVE_DIR/tests.tar.zst"
   if [ "$PR" = 1 ]; then
     BASE="${GATE_BASE:-origin/main}"
     step "tests to run: crates changed since $BASE and their dependents (cargo xtask test-filter)"
@@ -259,7 +271,7 @@ if [ "$ONLY" = build ]; then
     # Doc-test cần trình biên dịch nên chạy ở đây, không ở máy chạy archive; như bước 7 của gate
     # một máy, trên SQLite.
     step "doc tests"
-    env -u TEST_DATABASE_URL cargo test --workspace --locked --doc
+    env -u TEST_DATABASE_URL cargo test --workspace --locked ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} --doc
   fi
   printf 'filter: %s\n' "$(cat "$ARCHIVE_DIR/filter")"
   printf '\n\033[32mgate%s --only build: green — test archive built%s\033[0m\n' \

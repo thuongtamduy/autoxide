@@ -72,6 +72,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: refs/tags/${{ inputs.tag }}
+      # Dockerfile lấy từ commit của workflow này (main), không từ tag: tag cũ có Dockerfile cũ không tách lớp
+      # thư viện (cargo-chef), nên build lại từ đầu mỗi lần (D-20261120-docker-chef). Mã nguồn vẫn là của tag.
+      - uses: actions/checkout@v7
+        with:
+          path: .ci-files
+          sparse-checkout: Dockerfile
+          sparse-checkout-cone-mode: false
       - name: Image name
         run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
       - id: meta
@@ -88,6 +95,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: .
+          file: .ci-files/Dockerfile
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
