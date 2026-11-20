@@ -11345,6 +11345,42 @@
     },
     {
       "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Find warranties of shops in your scope by `serial` or buyer `phone` (either matches): product, order line, start, end and `active` / `expired`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Warranties to find.",
+        "properties": {
+          "phone": {
+            "description": "Phone number the buyer ordered with.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "serial": {
+            "description": "Serial number printed on the product.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "name": "orders.lookup_warranty",
+      "output_schema": null,
+      "permissions": [
+        "orders.warranty.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": true,
         "read_only": false,
         "requires_approval_for_agent": false,
@@ -11467,6 +11503,47 @@
       "output_schema": null,
       "permissions": [
         "orders.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Move a warranty claim on: `received` → `inspecting` / `rejected`; `inspecting` → `repairing` / `replacing` / `rejected`; `repairing` / `replacing` → `ready`; `ready` → `returned`. Optionally record what was done in `resolution`.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "A status change of a warranty claim.",
+        "properties": {
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "resolution": {
+            "description": "What was done (or why it was rejected).",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "`inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "to"
+        ],
+        "type": "object"
+      },
+      "name": "orders.update_warranty_claim",
+      "output_schema": null,
+      "permissions": [
+        "orders.warranty.manage"
       ]
     },
     {

@@ -19,8 +19,8 @@ use crate::http::dto::OrderResponse;
 use crate::http::returns::{
     ReceivedLineRequest, RefundResponse, ReturnResponse, ReturnTransitionRequest, return_action,
 };
-use crate::orders_read::OrderFilter;
 use crate::http::warranty::{ClaimResponse, WarrantyResponse};
+use crate::orders_read::OrderFilter;
 use crate::permissions::{MANAGE, READ, REFUND, RETURNS_MANAGE, WARRANTY_MANAGE};
 use crate::returns::ReturnFilter;
 use crate::service::OrdersService;
@@ -333,8 +333,9 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
                 }
             },
         )
-        .requires(WARRANTY_MANAGE)
-        .read_only(),
+        // Không đánh dấu `read_only`: `orders.warranty.manage` là quyền mức ghi (tiếp nhận, xử lý
+        // phiếu), không có quyền mức đọc riêng cho tra bảo hành.
+        .requires(WARRANTY_MANAGE),
         Tool::new(
             "update_warranty_claim",
             "Move a warranty claim on: `received` → `inspecting` / `rejected`; `inspecting` → \

@@ -461,7 +461,10 @@ impl OrderResponse {
             version: row.version,
             pickup_org_id: row.pickup_org_id,
             pickup: None,
-            custom_fields: row.custom_fields.as_deref().and_then(|text| serde_json::from_str(text).ok()),
+            custom_fields: row
+                .custom_fields
+                .as_deref()
+                .and_then(|text| serde_json::from_str(text).ok()),
             buyer_cancel_until: None,
             buyer_can_cancel: None,
             return_until: None,

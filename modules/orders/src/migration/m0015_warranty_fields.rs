@@ -23,12 +23,18 @@ impl MigrationTrait for Migration {
         // SQLite chỉ thêm được một cột mỗi câu `ALTER TABLE`.
         manager
             .alter_table(
-                Table::alter().table("orders_orders").add_column(schema::text_null("custom_fields")).to_owned(),
+                Table::alter()
+                    .table("orders_orders")
+                    .add_column(schema::text_null("custom_fields"))
+                    .to_owned(),
             )
             .await?;
         manager
             .alter_table(
-                Table::alter().table("orders_payments").add_column(schema::text_null("installment")).to_owned(),
+                Table::alter()
+                    .table("orders_payments")
+                    .add_column(schema::text_null("installment"))
+                    .to_owned(),
             )
             .await?;
         manager
@@ -44,8 +50,14 @@ impl MigrationTrait for Migration {
                     .to_owned(),
             )
             .await?;
-        index(manager, "orders_line_serials", "orders_line_serials_order_idx", &["tenant_id", "order_id"], false)
-            .await?;
+        index(
+            manager,
+            "orders_line_serials",
+            "orders_line_serials_order_idx",
+            &["tenant_id", "order_id"],
+            false,
+        )
+        .await?;
         manager
             .create_table(
                 Table::create()
@@ -71,12 +83,20 @@ impl MigrationTrait for Migration {
             )
             .await?;
         let t = "orders_warranties";
-        index(manager, t, "orders_warranties_line_key", &["tenant_id", "order_line_id", "serial_key"], true)
-            .await?;
+        index(
+            manager,
+            t,
+            "orders_warranties_line_key",
+            &["tenant_id", "order_line_id", "serial_key"],
+            true,
+        )
+        .await?;
         index(manager, t, "orders_warranties_serial_idx", &["tenant_id", "serial"], false).await?;
-        index(manager, t, "orders_warranties_buyer_idx", &["tenant_id", "buyer_user_id"], false).await?;
+        index(manager, t, "orders_warranties_buyer_idx", &["tenant_id", "buyer_user_id"], false)
+            .await?;
         index(manager, t, "orders_warranties_key_idx", &["tenant_id", "buyer_key"], false).await?;
-        index(manager, t, "orders_warranties_due_idx", &["tenant_id", "status", "ends_at"], false).await?;
+        index(manager, t, "orders_warranties_due_idx", &["tenant_id", "status", "ends_at"], false)
+            .await?;
         manager
             .create_table(
                 Table::create()
@@ -99,9 +119,24 @@ impl MigrationTrait for Migration {
             )
             .await?;
         let t = "orders_warranty_claims";
-        index(manager, t, "orders_warranty_claims_number_key", &["tenant_id", "number"], true).await?;
-        index(manager, t, "orders_warranty_claims_org_idx", &["tenant_id", "org_id", "status", "id"], false).await?;
-        index(manager, t, "orders_warranty_claims_warranty_idx", &["tenant_id", "warranty_id"], false).await
+        index(manager, t, "orders_warranty_claims_number_key", &["tenant_id", "number"], true)
+            .await?;
+        index(
+            manager,
+            t,
+            "orders_warranty_claims_org_idx",
+            &["tenant_id", "org_id", "status", "id"],
+            false,
+        )
+        .await?;
+        index(
+            manager,
+            t,
+            "orders_warranty_claims_warranty_idx",
+            &["tenant_id", "warranty_id"],
+            false,
+        )
+        .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -109,10 +144,14 @@ impl MigrationTrait for Migration {
             manager.drop_table(Table::drop().table(table).to_owned()).await?;
         }
         manager
-            .alter_table(Table::alter().table("orders_payments").drop_column("installment").to_owned())
+            .alter_table(
+                Table::alter().table("orders_payments").drop_column("installment").to_owned(),
+            )
             .await?;
         manager
-            .alter_table(Table::alter().table("orders_orders").drop_column("custom_fields").to_owned())
+            .alter_table(
+                Table::alter().table("orders_orders").drop_column("custom_fields").to_owned(),
+            )
             .await
     }
 }

@@ -136,10 +136,7 @@ pub(crate) fn all() -> Vec<EventInfo> {
         EventInfo::new(names::REVIEW_MODERATED, "A product review was hidden or reopened."),
         EventInfo::new(names::POS_SHIFT_CLOSED, "A cash register shift was closed."),
         EventInfo::new(names::COD_BLOCK_CHANGED, "The cash-on-delivery block list changed."),
-        EventInfo::new(
-            names::WARRANTY_CLAIM_CHANGED,
-            "A warranty claim was received or its handling status changed.",
-        ),
+        EventInfo::new(names::WARRANTY_CLAIM_CHANGED, "A warranty claim changed status."),
         EventInfo::new(
             names::PREORDER_BALANCE_REQUESTED,
             "The buyer was asked to pay the balance of a pre-order paid in part.",

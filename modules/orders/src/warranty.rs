@@ -20,8 +20,8 @@ use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use chrono::{Datelike, Duration, Months};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait,
-    QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
+    Set,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -392,10 +392,7 @@ impl OrdersService {
                     let changed = warranty_claim::Entity::update_many()
                         .col_expr(warranty_claim::Column::Status, Expr::value(to.clone()))
                         .col_expr(warranty_claim::Column::UpdatedAt, Expr::value(now()))
-                        .col_expr(
-                            warranty_claim::Column::Resolution,
-                            Expr::value(resolution),
-                        )
+                        .col_expr(warranty_claim::Column::Resolution, Expr::value(resolution))
                         .filter(warranty_claim::Column::Id.eq(id))
                         .filter(warranty_claim::Column::Status.eq(before.as_str()))
                         .scoped(tenant)

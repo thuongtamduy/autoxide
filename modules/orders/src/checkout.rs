@@ -713,11 +713,9 @@ impl Draft<'_> {
             action: Set(None),
             expires_at: Set(order.payment_due_at),
             succeeded_at: Set(None),
-            installment: Set(self
-                .input
-                .installment
-                .as_ref()
-                .map(|plan| json!({"partner": plan.partner.trim(), "months": plan.months}).to_string())),
+            installment: Set(self.input.installment.as_ref().map(|plan| {
+                json!({"partner": plan.partner.trim(), "months": plan.months}).to_string()
+            })),
             created_at: Set(now),
             updated_at: Set(now),
         }

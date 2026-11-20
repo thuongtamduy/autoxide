@@ -28537,6 +28537,13 @@
                   "null"
                 ]
               },
+              "payment_methods": {
+                "description": "Ways to pay this cart: `cod` (cash on delivery, when the shop allows it and the cart is\ndelivered; a buyer with too many refused deliveries may still be asked to pay first),\n`bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`\n(through a partner).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "promotions": {
                 "description": "Promotions applied, with their terms.",
                 "items": {
@@ -28603,6 +28610,7 @@
               "promotions",
               "rejected_codes",
               "shipping",
+              "payment_methods",
               "totals",
               "quote_token",
               "quote_expires_at",
@@ -28908,6 +28916,20 @@
           "data": {
             "description": "An order.",
             "properties": {
+              "buyer_can_cancel": {
+                "description": "Whether the buyer may cancel now; omitted in lists.",
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "buyer_cancel_until": {
+                "description": "Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or\n`preparing`); omitted in lists.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "buyer_user_id": {
                 "format": "uuid",
                 "type": [
@@ -28940,6 +28962,17 @@
               },
               "currency": {
                 "type": "string"
+              },
+              "custom_fields": {
+                "additionalProperties": {},
+                "description": "Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields).",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "type": [
+                  "object",
+                  "null"
+                ]
               },
               "fulfillment_status": {
                 "description": "`unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`.",
@@ -29004,6 +29037,14 @@
               "placed_at": {
                 "format": "date-time",
                 "type": "string"
+              },
+              "return_until": {
+                "description": "Until when a return can be requested (delivered orders); omitted in lists.",
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "status": {
                 "description": "`pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,\n`completed` or `cancelled`.",
@@ -29771,6 +29812,13 @@
                   "null"
                 ]
               },
+              "by_variant": {
+                "description": "Count and average stars per variant (size, colour…) that has reviews.",
+                "items": {
+                  "$ref": "#/components/schemas/OrdersReviewVariantStats"
+                },
+                "type": "array"
+              },
               "count": {
                 "format": "int64",
                 "type": "integer"
@@ -29802,7 +29850,8 @@
             "required": [
               "count",
               "stars",
-              "with_media"
+              "with_media",
+              "by_variant"
             ],
             "type": "object"
           }
@@ -29886,6 +29935,30 @@
         ],
         "type": "object"
       },
+      "Data_OrdersSerials": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "The serial numbers recorded for an order line.",
+            "properties": {
+              "serials": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "serials"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_OrdersShipmentRequested": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -29949,6 +30022,80 @@
             "required": [
               "ticket_id",
               "number"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_OrdersWarrantyClaim": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A warranty claim.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "due_at": {
+                "description": "When the seller must have handled the claim.",
+                "format": "date-time",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "issue": {
+                "type": "string"
+              },
+              "number": {
+                "description": "Claim number shown to the buyer (`BH<year>-<sequence>`).",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "The node that received the product.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "resolution": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`received`, `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`.",
+                "type": "string"
+              },
+              "updated_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "warranty_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "warranty_id",
+              "org_id",
+              "number",
+              "status",
+              "issue",
+              "due_at",
+              "created_by",
+              "created_at",
+              "updated_at"
             ],
             "type": "object"
           }
@@ -42104,6 +42251,78 @@
                 "discount",
                 "tax",
                 "refunded"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_OrdersWarranty": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A warranty of an order line (or of one serial number).",
+              "properties": {
+                "ends_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_line_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "product_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "serial": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "starts_at": {
+                  "description": "When the order was delivered.",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "status": {
+                  "description": "`active` or `expired`.",
+                  "type": "string"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "org_id",
+                "order_id",
+                "order_line_id",
+                "product_id",
+                "variant_id",
+                "starts_at",
+                "ends_at",
+                "status"
               ],
               "type": "object"
             },
@@ -58262,6 +58481,13 @@
               "null"
             ]
           },
+          "payment_methods": {
+            "description": "Ways to pay this cart: `cod` (cash on delivery, when the shop allows it and the cart is\ndelivered; a buyer with too many refused deliveries may still be asked to pay first),\n`bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`\n(through a partner).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "promotions": {
             "description": "Promotions applied, with their terms.",
             "items": {
@@ -58328,6 +58554,7 @@
           "promotions",
           "rejected_codes",
           "shipping",
+          "payment_methods",
           "totals",
           "quote_token",
           "quote_expires_at",
@@ -58637,6 +58864,24 @@
           },
           "contact": {
             "$ref": "#/components/schemas/OrdersContactRequest"
+          },
+          "custom_fields": {
+            "description": "Values of the shop's buyer fields (custom fields of `orders.order` with visibility\n`buyer_input`, e.g. a preferred delivery time), by key.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "installment": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/OrdersInstallmentRequest",
+                "description": "With `payment_method: installment`: the licensed partner and the number of months."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "invoice_request": {
             "description": "Company details for a VAT invoice (tax code, name, address).",
@@ -59161,6 +59406,28 @@
         ],
         "description": "An order seen with an `Order-Token`: personal data is masked."
       },
+      "OrdersInstallmentRequest": {
+        "additionalProperties": false,
+        "description": "Pay in instalments through a licensed partner (the partner pays the shop in full).",
+        "properties": {
+          "months": {
+            "description": "3, 6, 9, 12, 18 or 24.",
+            "example": 6,
+            "format": "int32",
+            "type": "integer"
+          },
+          "partner": {
+            "description": "Code of the instalment partner (a payment connector).",
+            "example": "fundiin",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partner",
+          "months"
+        ],
+        "type": "object"
+      },
       "OrdersInvoiceRequest": {
         "additionalProperties": false,
         "description": "Company details for a VAT invoice.",
@@ -59337,6 +59604,20 @@
       "OrdersOrder": {
         "description": "An order.",
         "properties": {
+          "buyer_can_cancel": {
+            "description": "Whether the buyer may cancel now; omitted in lists.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "buyer_cancel_until": {
+            "description": "Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or\n`preparing`); omitted in lists.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "buyer_user_id": {
             "format": "uuid",
             "type": [
@@ -59369,6 +59650,17 @@
           },
           "currency": {
             "type": "string"
+          },
+          "custom_fields": {
+            "additionalProperties": {},
+            "description": "Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields).",
+            "propertyNames": {
+              "type": "string"
+            },
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "fulfillment_status": {
             "description": "`unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`.",
@@ -59433,6 +59725,14 @@
           "placed_at": {
             "format": "date-time",
             "type": "string"
+          },
+          "return_until": {
+            "description": "Until when a return can be requested (delivered orders); omitted in lists.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "status": {
             "description": "`pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,\n`completed` or `cancelled`.",
@@ -60815,6 +61115,13 @@
               "null"
             ]
           },
+          "by_variant": {
+            "description": "Count and average stars per variant (size, colour…) that has reviews.",
+            "items": {
+              "$ref": "#/components/schemas/OrdersReviewVariantStats"
+            },
+            "type": "array"
+          },
           "count": {
             "format": "int64",
             "type": "integer"
@@ -60846,7 +61153,8 @@
         "required": [
           "count",
           "stars",
-          "with_media"
+          "with_media",
+          "by_variant"
         ],
         "type": "object"
       },
@@ -60915,6 +61223,29 @@
         ],
         "type": "object"
       },
+      "OrdersReviewVariantStats": {
+        "description": "Reviews of one variant.",
+        "properties": {
+          "average": {
+            "description": "Average stars with one decimal (`\"4.5\"`).",
+            "type": "string"
+          },
+          "count": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "count",
+          "average"
+        ],
+        "type": "object"
+      },
       "OrdersSalesRow": {
         "description": "A row of the sales report.",
         "properties": {
@@ -60956,6 +61287,41 @@
           "discount",
           "tax",
           "refunded"
+        ],
+        "type": "object"
+      },
+      "OrdersSerials": {
+        "description": "The serial numbers recorded for an order line.",
+        "properties": {
+          "serials": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "serials"
+        ],
+        "type": "object"
+      },
+      "OrdersSerialsRequest": {
+        "additionalProperties": false,
+        "description": "Serial numbers of an order line.",
+        "properties": {
+          "serials": {
+            "description": "Serial numbers to add (1 to 100 characters each, no repeats); at most the line quantity in\nall.",
+            "example": [
+              "SN-0001"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "serials"
         ],
         "type": "object"
       },
@@ -61123,6 +61489,179 @@
           },
           "to": {
             "description": "`preparing` (accept the order), `shipping`, `delivered`, `delivery_failed` or `cancelled`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to"
+        ],
+        "type": "object"
+      },
+      "OrdersWarranty": {
+        "description": "A warranty of an order line (or of one serial number).",
+        "properties": {
+          "ends_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_line_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "serial": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "starts_at": {
+            "description": "When the order was delivered.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "status": {
+            "description": "`active` or `expired`.",
+            "type": "string"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "order_id",
+          "order_line_id",
+          "product_id",
+          "variant_id",
+          "starts_at",
+          "ends_at",
+          "status"
+        ],
+        "type": "object"
+      },
+      "OrdersWarrantyClaim": {
+        "description": "A warranty claim.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "due_at": {
+            "description": "When the seller must have handled the claim.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "issue": {
+            "type": "string"
+          },
+          "number": {
+            "description": "Claim number shown to the buyer (`BH<year>-<sequence>`).",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The node that received the product.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "resolution": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`received`, `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`.",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "warranty_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "warranty_id",
+          "org_id",
+          "number",
+          "status",
+          "issue",
+          "due_at",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "OrdersWarrantyClaimRequest": {
+        "additionalProperties": false,
+        "description": "A product received for warranty.",
+        "properties": {
+          "issue": {
+            "description": "What is wrong, as the buyer tells it (1 to 5000 characters).",
+            "example": "The screen stays black.",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The node receiving the product.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "warranty_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "warranty_id",
+          "org_id",
+          "issue"
+        ],
+        "type": "object"
+      },
+      "OrdersWarrantyClaimTransition": {
+        "additionalProperties": false,
+        "description": "A change of a warranty claim's status.",
+        "properties": {
+          "resolution": {
+            "description": "What was done (or why it was rejected); kept when omitted.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "to": {
+            "description": "`inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`.",
+            "example": "inspecting",
             "type": "string"
           }
         },
@@ -69258,6 +69797,20 @@
             "items": {
               "description": "An order.",
               "properties": {
+                "buyer_can_cancel": {
+                  "description": "Whether the buyer may cancel now; omitted in lists.",
+                  "type": [
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "buyer_cancel_until": {
+                  "description": "Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or\n`preparing`); omitted in lists.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "buyer_user_id": {
                   "format": "uuid",
                   "type": [
@@ -69290,6 +69843,17 @@
                 },
                 "currency": {
                   "type": "string"
+                },
+                "custom_fields": {
+                  "additionalProperties": {},
+                  "description": "Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields).",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "type": [
+                    "object",
+                    "null"
+                  ]
                 },
                 "fulfillment_status": {
                   "description": "`unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`.",
@@ -69354,6 +69918,14 @@
                 "placed_at": {
                   "format": "date-time",
                   "type": "string"
+                },
+                "return_until": {
+                  "description": "Until when a return can be requested (delivered orders); omitted in lists.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 },
                 "status": {
                   "description": "`pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,\n`completed` or `cancelled`.",
@@ -198733,6 +199305,73 @@
         "x-permissions": []
       }
     },
+    "/api/v1/orders/me/warranties": {
+      "get": {
+        "description": "Signed in: warranties of products you ordered with your account, newest first.",
+        "operationId": "orders_list_my_warranties",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersWarranty"
+                }
+              }
+            },
+            "description": "Your warranties."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Your warranties.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/orders/pos/catalog": {
       "get": {
         "description": "Requires `orders.pos.sell` at the store of the open shift. Answers one unit priced like a sale\n(with stock problems, if any).",
@@ -202960,6 +203599,339 @@
         ]
       }
     },
+    "/api/v1/orders/warranties": {
+      "get": {
+        "description": "Requires `orders.warranty.manage`; only warranties of nodes in your scope. Give `serial`,\n`phone` or both (either matches), newest first.",
+        "operationId": "orders_find_warranties",
+        "parameters": [
+          {
+            "description": "Serial number printed on the product.",
+            "in": "query",
+            "name": "serial",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Phone number the buyer ordered with.",
+            "in": "query",
+            "name": "phone",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_OrdersWarranty"
+                }
+              }
+            },
+            "description": "The matching warranties."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.warranty.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Neither `serial` nor `phone`, or not a phone number (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Look up warranties.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.warranty.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/warranty-claims": {
+      "post": {
+        "description": "Requires `orders.warranty.manage` at the receiving node. The warranty must still be active.\nThe claim gets a number and a due date (`orders.warranty_claim_days` of the node).",
+        "operationId": "orders_create_warranty_claim",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersWarrantyClaimRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersWarrantyClaim"
+                }
+              }
+            },
+            "description": "The claim.",
+            "headers": {
+              "Location": {
+                "description": "Path of the claim.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.warranty.manage` at the node; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such warranty; code `orders.warranty_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The warranty has ended; code `orders.warranty_expired`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The issue is empty or too long (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Receive a product for warranty.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.warranty.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/warranty-claims/{id}/transitions": {
+      "post": {
+        "description": "Requires `orders.warranty.manage` at the claim's node. Allowed: `received` → `inspecting` or\n`rejected`; `inspecting` → `repairing`, `replacing` or `rejected`; `repairing` / `replacing` →\n`ready`; `ready` → `returned`. Asking for the current status again changes nothing.",
+        "operationId": "orders_transition_warranty_claim",
+        "parameters": [
+          {
+            "description": "Id of the claim.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersWarrantyClaimTransition"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersWarrantyClaim"
+                }
+              }
+            },
+            "description": "The claim."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.warranty.manage` at the node; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such claim; code `orders.warranty_claim_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not allowed from the current status; code `orders.warranty_claim_transition`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Invalid values (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Move a warranty claim on.",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.warranty.manage"
+        ]
+      }
+    },
     "/api/v1/orders/{id}": {
       "get": {
         "description": "Requires `orders.read` at the order's shop.",
@@ -203168,6 +204140,125 @@
           }
         },
         "summary": "Ask for the invoice of an order (staff).",
+        "tags": [
+          "orders"
+        ],
+        "x-permissions": [
+          "orders.manage"
+        ]
+      }
+    },
+    "/api/v1/orders/{id}/lines/{line_id}/serials": {
+      "post": {
+        "description": "Requires `orders.manage` at the selling node. Usually done while preparing the order; each\nserial gets its own warranty when the order is delivered (at once, if it already is). Adding\na serial that is already recorded changes nothing.",
+        "operationId": "orders_record_line_serials",
+        "parameters": [
+          {
+            "description": "Id of the order.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Id of the order line.",
+            "in": "path",
+            "name": "line_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrdersSerialsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_OrdersSerials"
+                }
+              }
+            },
+            "description": "Every serial recorded for the line."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; code `unauthenticated`."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `orders.manage` at the node; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such order or line; code `orders.order_not_found`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Empty, too long or repeated serials, or more than the quantity (see `errors`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Record serial numbers of an order line.",
         "tags": [
           "orders"
         ],

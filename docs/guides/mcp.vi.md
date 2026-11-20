@@ -293,9 +293,11 @@ Tool của phiên bản này, theo module (`docs/mcp-tools.json` có đủ schem
 | `orders.get_order` | `orders.read` | read-only |
 | `orders.list_orders` | `orders.read` | read-only |
 | `orders.list_returns` | `orders.read` | read-only |
+| `orders.lookup_warranty` | `orders.warranty.manage` | writes |
 | `orders.refund_order` | `orders.refund` | destructive |
 | `orders.request_shipment` | `orders.manage` | writes |
 | `orders.transition_order` | `orders.manage` | destructive |
+| `orders.update_warranty_claim` | `orders.warranty.manage` | writes |
 | `organizations.add_group_members` | `organizations.groups.manage` | writes |
 | `organizations.change_unit_status` | `organizations.units.manage` | destructive |
 | `organizations.create_group` | `organizations.groups.manage` | writes |

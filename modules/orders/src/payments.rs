@@ -109,51 +109,50 @@ impl OrdersService {
         let amount = Money::from_columns(row.amount_minor, &row.currency)?;
         let org = OrgId::from_uuid(order.org_id);
         let description = format!("Order {}", order.number);
-        let created = match Method::parse(&row.method) {
-            Method::Transfer => {
-                let request = NewTransferPayment::new(
-                    org,
-                    amount,
-                    description,
-                    "orders",
-                    row.reference.clone(),
-                )
-                .source_id(order_id.to_string());
-                ledger.create_transfer_payment(tenant, Actor::system(), request).await
-            }
-            Method::Gateway => {
-                let mut request = NewPayment::new(
-                    org,
-                    row.method.clone(),
-                    amount,
-                    description,
-                    "orders",
-                    row.reference.clone(),
-                )
-                .source_id(order_id.to_string());
-                // Trả góp: chọn đúng bộ nối của đối tác người mua chọn.
-                if let Some(plan) = row
-                    .installment
-                    .as_deref()
-                    .and_then(|raw| serde_json::from_str::<crate::checkout::Installment>(raw).ok())
-                {
-                    request.provider = Some(plan.partner);
+        let created =
+            match Method::parse(&row.method) {
+                Method::Transfer => {
+                    let request = NewTransferPayment::new(
+                        org,
+                        amount,
+                        description,
+                        "orders",
+                        row.reference.clone(),
+                    )
+                    .source_id(order_id.to_string());
+                    ledger.create_transfer_payment(tenant, Actor::system(), request).await
                 }
-                if let Some(url) = return_url {
-                    request = request.return_url(url);
+                Method::Gateway => {
+                    let mut request = NewPayment::new(
+                        org,
+                        row.method.clone(),
+                        amount,
+                        description,
+                        "orders",
+                        row.reference.clone(),
+                    )
+                    .source_id(order_id.to_string());
+                    // Trả góp: chọn đúng bộ nối của đối tác người mua chọn.
+                    if let Some(plan) = row.installment.as_deref().and_then(|raw| {
+                        serde_json::from_str::<crate::checkout::Installment>(raw).ok()
+                    }) {
+                        request.provider = Some(plan.partner);
+                    }
+                    if let Some(url) = return_url {
+                        request = request.return_url(url);
+                    }
+                    ledger.create_payment(tenant, Actor::system(), request).await
                 }
-                ledger.create_payment(tenant, Actor::system(), request).await
+                Method::Cod => return Ok(()),
             }
-            Method::Cod => return Ok(()),
-        }
-        .map_err(|error| {
-            if error.code() == "validation_failed" {
-                errors::payment_method_unavailable(&row.method)
-            } else {
-                error
-            }
-        })?
-        .into_inner();
+            .map_err(|error| {
+                if error.code() == "validation_failed" {
+                    errors::payment_method_unavailable(&row.method)
+                } else {
+                    error
+                }
+            })?
+            .into_inner();
         let action = Action {
             kind: if created.checkout_url.is_some() { "redirect" } else { "qr" }.to_owned(),
             redirect_url: created.checkout_url.clone(),
