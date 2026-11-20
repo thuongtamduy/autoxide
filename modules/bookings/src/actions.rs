@@ -160,6 +160,19 @@ impl BookingsService {
             .ok_or_else(|| booking_not_found(id))
     }
 
+    /// Đọc và khoá lịch `id` tới hết `transaction` ghi (D-181): mọi đường đổi lịch (huỷ, đổi giờ,
+    /// xác nhận…) đọc qua đây, nên hai thay đổi cùng lúc nối đuôi nhau trên Postgres — bên sau thấy
+    /// giờ / chỗ bên trước vừa ghi, không cùng trả chỗ cũ hai lần. SQLite vốn một bên ghi mỗi lúc.
+    pub(crate) async fn lock_booking(
+        transaction: &DatabaseTransaction,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Booking, Error> {
+        autoxide_kernel::rows::lock_one(transaction, booking::Entity::find_by_id(id).scoped(tenant))
+            .await?
+            .ok_or_else(|| booking_not_found(id))
+    }
+
     /// Lịch `id` nếu `caller` có vai với nó.
     pub(crate) async fn get_booking(
         &self,
@@ -227,7 +240,7 @@ impl BookingsService {
         let row = Self::booking_row(tenant.database().read(), tenant, id).await?;
         let policy = self.settings.policy(tenant, OrgId::from_uuid(row.org_id)).await?;
         let transaction = tenant.database().begin_write().await?;
-        let before = Self::booking_row(&transaction, tenant, id).await?;
+        let before = Self::lock_booking(&transaction, tenant, id).await?;
         let role = Self::role(&transaction, caller, &before).await?;
         let allowed = match action {
             Action::Confirm => role == Role::Shop,
@@ -329,7 +342,7 @@ impl BookingsService {
         let row = Self::booking_row(tenant.database().read(), tenant, id).await?;
         let policy = self.settings.policy(tenant, OrgId::from_uuid(row.org_id)).await?;
         let transaction = tenant.database().begin_write().await?;
-        let before = Self::booking_row(&transaction, tenant, id).await?;
+        let before = Self::lock_booking(&transaction, tenant, id).await?;
         let role = Self::role(&transaction, caller, &before).await?;
         if matches!(role, Role::Staff | Role::Viewer) {
             return Err(forbidden());
@@ -397,7 +410,7 @@ impl BookingsService {
         let candidates = self.candidates(read, tenant, &service, Some(wanted), starts_at).await?;
         let performer = candidates.first().ok_or_else(crate::booking::outside_hours)?;
         let transaction = tenant.database().begin_write().await?;
-        let before = Self::booking_row(&transaction, tenant, id).await?;
+        let before = Self::lock_booking(&transaction, tenant, id).await?;
         if let (Caller::Principal(principal), Role::Shop) = (caller, role) {
             principal.require_write_at(&transaction, &BOOKINGS_MANAGE, at(before.org_id)).await?;
             principal
