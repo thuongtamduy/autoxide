@@ -220,6 +220,7 @@
   "kernel.job_file_not_found": "Job `{id}` không có file để tải.",
   "kernel.job_not_failed": "Job `{id}` chưa hỏng; chỉ job đã hỏng mới chạy lại được.",
   "kernel.job_not_found": "Không có job `{id}`.",
+  "kernel.migrations_pending": "Database còn {count} migration chưa áp dụng (đầu tiên: {first}); chạy `autoxide migrate up` trước, hoặc `autoxide migrate status` để xem danh sách.",
   "kernel.migration_run_busy": "Đang có một lượt chạy migration (`{run}`); hãy chờ lượt đó xong.",
   "kernel.migration_run_not_found": "Không có lượt chạy migration `{run}`.",
   "kernel.module_not_found": "Không có module nào tên `{name}` được cài. `GET /api/v1/kernel/modules` liệt kê các module đã cài.",

@@ -317,8 +317,9 @@ steps to the first run are in the README, [Try it with Docker](../README.md#try-
 The rules that matter after that, with `IMAGE` and `RUN` as defined there:
 
 - The server never applies migrations by itself. Starting `serve` on an empty or older
-  database stops at once with `N migrations have not been applied … run autoxide migrate up
-  first`: run `$RUN $IMAGE migrate up`, then start it.
+  database stops at once with `N migration(s) have not been applied to the database (first: …); run
+  autoxide migrate up first` (the count and the first few names, not the whole list; `autoxide
+  migrate status` lists them all; error code `kernel.migrations_pending`): run `$RUN $IMAGE migrate up`, then start it.
 - Everything the server writes is in the volume `autoxide-data` (`/var/lib/autoxide/data`):
   the database, uploaded files, and mail until SMTP is configured. A container started without
   that volume keeps its data only until it is removed.
@@ -346,9 +347,10 @@ $RUN -v "$PWD/backups:/backups" $IMAGE backup "/backups/$(date +%F)"
 $RUN -v "$PWD/backups:/backups" $IMAGE restore /backups/2026-11-11
 ```
 
-Without the `chown`, the backup stops with `Permission denied (os error 13)`. A backup written
-to a path that is not mounted disappears with the container, and the command still says it
-succeeded.
+Without the `chown`, the backup stops with `permission denied` and says which directory to
+give to uid 10001. The command prints the absolute path of the backup when done. A backup written
+to a path that is not mounted disappears with the container: inside a container, `backup` warns
+on stderr when the target is not on a volume or bind mount (it still runs).
 
 ## Moving from SQLite to PostgreSQL
 
