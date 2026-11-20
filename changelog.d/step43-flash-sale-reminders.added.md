@@ -1,1 +1,0 @@
-- Flash sale reminders: `POST`/`DELETE /api/v1/promotions/public/promotions/{id}/reminders` record a consent to one reminder, sent through notifications ten minutes before the start (job `promotions.send_reminders`).

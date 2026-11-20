@@ -1,1 +1,0 @@
-- `GET /api/v1/promotions/{id}/notice-export?format=json|csv` and MCP tool `promotions.export_notice`: data of a promotion notice for each authority (required or not, last day to submit, legal basis, what was recorded).

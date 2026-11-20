@@ -1,1 +1,0 @@
-- `GET /api/v1/promotions/public/promotions/flash-sales`: public flash sales running now or starting within a day, with sale prices and the real units left.
