@@ -635,7 +635,8 @@ nhận đơn — D-209), `orders.fulfillment_requested`, `orders.return_pickup_r
 `orders.payment_recorded`, `orders.refund_completed` (dòng và số tiền hoàn), `orders.return_requested` (kèm
 `photo_count`, không có ID ảnh — D-202), `orders.return_received` (dòng nhập lại kho / hỏng), `orders.invoice_linked`,
 `orders.cart_abandoned` (người mua, tóm tắt giỏ — cho bước 47), `orders.review_published`,
-`orders.review_moderated`, `orders.pos_shift_closed`, `orders.warranty_claim_changed`,
+`orders.review_moderated` (cả hai mang `product_id` và `product_rating = {count, sum}` lấy từ
+`orders_review_stats` — tổng hiện tại, để `catalog` ghi đè điểm trên storefront; D-20261120-catalog-recommendations), `orders.pos_shift_closed`, `orders.warranty_claim_changed`,
 `orders.cod_block_changed`, `orders.preorder_balance_requested` (số tiền, hạn — cho thông báo),
 `orders.preorder_balance_overdue` (D-232). Không mang secret, token, `Cart-Token`. Không có event cho từng phiếu "hữu
 ích" (D-203) và không có `orders.support_requested` (D-204).

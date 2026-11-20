@@ -26,6 +26,9 @@
 //!   (chưa có thì so với `main`) và crate phụ thuộc vào chúng, trên SQLite; phần test của
 //!   `./gate.sh --quick` (xem `affected.rs`). `--base <ref> --keep-env`: trên database của
 //!   `TEST_DATABASE_URL` thay vì SQLite; phần test của `./gate.sh --pr` (CI cho pull request).
+//! - `test-filter --base <ref>` — in filterset của nextest chọn đúng các crate mà `test-affected
+//!   --base <ref>` chạy; CI dùng khi chạy test từ archive (`./gate.sh --pr --only build`,
+//!   D-20261120-ci-nextest-archive).
 //! - Hai lệnh test trên nhận thêm `--shard <k>/<n>` ở cuối: chỉ chạy phần thứ k trong n phần của
 //!   mọi test, để CI chạy n phần trên n máy cùng lúc (`./gate.sh --shard`, D-20261119-ci-faster).
 
@@ -60,6 +63,7 @@ const USAGE: &str = "usage: cargo xtask check
        cargo xtask test-affected [--base <ref>]   default base: the last green run, else origin/main
        cargo xtask test-affected --base <ref> --keep-env   on TEST_DATABASE_URL instead of SQLite
        cargo xtask test-all [--doc]               every test, on TEST_DATABASE_URL (default SQLite)
+       cargo xtask test-filter --base <ref>       nextest filterset of the crates test-affected would run
        ... test-all | test-affected ... --shard <k>/<n>   only part k of n of the tests";
 
 fn main() -> ExitCode {
@@ -100,6 +104,7 @@ fn main() -> ExitCode {
         ["test-affected"] => test_affected(None, false, shard),
         ["test-affected", "--base", base] => test_affected(Some(base), false, shard),
         ["test-affected", "--base", base, "--keep-env"] => test_affected(Some(base), true, shard),
+        ["test-filter", "--base", base] => test_filter(base),
         _ => {
             eprintln!("{USAGE}");
             ExitCode::FAILURE
@@ -336,6 +341,19 @@ fn test_affected(base: Option<&str>, keep_env: bool, shard: affected::Shard) -> 
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
             eprintln!("xtask test-affected: {error}");
+            ExitCode::FAILURE
+        }
+    }
+}
+
+fn test_filter(base: &str) -> ExitCode {
+    match workspace::load().and_then(|workspace| affected::filter(&workspace, base)) {
+        Ok(filter) => {
+            println!("{filter}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("xtask test-filter: {error}");
             ExitCode::FAILURE
         }
     }

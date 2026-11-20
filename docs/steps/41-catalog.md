@@ -236,12 +236,15 @@ chính) và `m0002…` (bảng phụ), mỗi cái có `down`; thêm `outbox_migr
 | `catalog_price_changes` | đổi giá hàng loạt (D-222): `id`, `tenant_id`, `price_list_id`, `filter` (JSON: danh mục, thuộc tính / thương hiệu, sản phẩm), `operation` (`set`/`percent`/`amount`), `value`, `rounding_rule_id?`, `valid_from`, `valid_to?` (giá tạm thời), `status` (`draft`/`previewed`/`approved`/`applied`/`cancelled`), `affected`, `created_by`, `approved_by?` | bắt đầu bằng `tenant_id` |
 | `catalog_storefront_entries` | bảng dẫn xuất cho đọc công khai: `tenant_id`, `org_id` (cửa hàng), `product_id`, `visible`, `min_price_minor?`, `max_price_minor?`, `currency`, `sale_price_minor?`, `sale_ends_at?` (giá sau giảm tự động, từ event của `promotions` — D-208…D-218), cột cho `sort=best_selling` / `rating` (cập nhật từ event của `orders` và đánh giá), tóm tắt biến thể ("3 cỡ"), điểm và số đánh giá, đơn giá theo đơn vị cơ sở cho hàng tiêu hao (D-201), `published_at`, `refreshed_at` | unique (`tenant_id`,`org_id`,`product_id`); (`tenant_id`,`org_id`,`visible`,`min_price_minor`,`product_id`); (`tenant_id`,`org_id`,`visible`,`published_at`,`product_id`) |
 | `catalog_store_overrides` | `org_id`, `product_id`, `hidden` (cửa hàng ẩn sản phẩm của chuỗi) | unique (`tenant_id`,`org_id`,`product_id`) |
-| `catalog_co_purchases` | bảng dẫn xuất "thường mua cùng" (B-c14; D-208…D-218): cặp sản phẩm, số lần cùng đơn trong 90 ngày, cập nhật từ `orders.order_completed` | bắt đầu bằng `tenant_id` |
+| `catalog_sold_products` | (đơn hoàn tất, sản phẩm, số lượng, lúc hoàn tất) từ `orders.order_completed` (D-20261120-catalog-recommendations) | unique (`tenant_id`,`order_id`,`product_id`); (`tenant_id`,`product_id`,`completed_at`) |
+| `catalog_product_stats` | số bán trong 90 ngày, số đánh giá, tổng số sao của sản phẩm — nguồn của cột bán chạy / điểm trên storefront (D-20261120-catalog-recommendations) | unique (`tenant_id`,`product_id`) |
+| `catalog_co_purchases` | bảng dẫn xuất "thường mua cùng" (B-c14; D-208…D-218): top 20 sản phẩm cùng đơn trong 90 ngày, tính lại từ `catalog_sold_products` | unique (`tenant_id`,`product_id`,`other_product_id`) |
 | `catalog_digital_assets` | `id`, `variant_id`, `file_name`, `content_type`, `size`, `sha256`, `storage_key` (`catalog/digital/<id>`), `download_limit`, `grant_days` | (`tenant_id`,`variant_id`) |
 | `catalog_download_grants` | `id`, `tenant_id`, `order_id`, `order_line_id`, `buyer_id?`, `asset_id`, `token_hash` (SHA-256), `remaining`, `expires_at`, `revoked_at?`, `created_at` | unique (`tenant_id`,`order_line_id`,`asset_id`); unique (`token_hash`); (`tenant_id`,`order_id`) |
 | `catalog_transfers` | việc nhập / xuất: `id`, `tenant_id`, `kind` (`import`/`export`), `status` (`queued`/`running`/`succeeded`/`succeeded_with_errors`/`rejected`/`failed` — xem dưới bảng), `file_key`, `total_rows`, `ok_rows`, `errors` (JSON, tối đa 1.000 lỗi), `created_by`, `created_at`, `finished_at?` | (`tenant_id`,`created_at`,`id`) |
 | `catalog_suggestions` | bản nháp AI: `id`, `product_id`, `locale`, `fields` (JSON), `status` (`pending`/`applied`/`discarded`), `created_by`, `created_at` | (`tenant_id`,`product_id`) |
-| `catalog_embeddings` | như `content_embeddings`: `product_id`, `locale`, `chunk_index`, `content_hash`, `model`, `dimensions`, `vector` (`binary`) | unique (`tenant_id`,`product_id`,`locale`,`chunk_index`) |
+| `catalog_embeddings` | một vector mỗi (sản phẩm, ngôn ngữ) — chữ sản phẩm ngắn, không cắt đoạn (D-20261120-catalog-recommendations): `product_id`, `locale`, `content_hash`, `model`, `dimensions`, `vector` (`binary`) | unique (`tenant_id`,`product_id`,`locale`) |
+| `catalog_similar_products` | 12 sản phẩm tương tự tính sẵn lúc lập index (cosine × 10 000), đọc công khai không duyệt vector (D-20261120-catalog-recommendations) | unique (`tenant_id`,`product_id`,`locale`,`other_product_id`); (`tenant_id`,`product_id`,`locale`,`score`) |
 
 Trạng thái của lần nhập / xuất (D-223…D-227): `queued` → `running` → `succeeded` / `succeeded_with_errors` /
 `rejected` (tệp sai định dạng, quá giới hạn — không dòng nào được ghi) / `failed` (lỗi hệ thống, chạy lại
@@ -408,9 +411,11 @@ câu trả lời như `content::http::public::fingerprint`, 304 khi khớp). C�
   dùng từ đồng nghĩa theo khách (`catalog_synonyms`). Tối đa 10 gợi ý trên máy tính, 8 trên điện thoại.
 - `GET /public/categories?locale` (cây) · `GET /public/categories/{slug}?locale`
 - `GET /public/sitemap?locale` (+ `PageQuery`, tối đa 200 / trang) — đường dẫn, bản dịch, `modified_at`.
-- `GET /public/products/{id}/similar?locale&limit` — theo embedding; embedding tắt thì cùng danh mục.
-- `GET /public/products/{id}/frequently-bought-together` — từ `catalog_co_purchases` (B-c14, ưu tiên
-  thấp; D-208…D-218).
+- `GET /public/products/{id}/similar?locale&limit` — từ `catalog_similar_products`; chưa có danh sách
+  (embedding tắt, chưa lập) thì cùng danh mục, bán chạy trước. `limit` 1–12, mặc định 8 (D-20261120-catalog-recommendations).
+- `GET /public/products/{id}/frequently-bought-together?locale&limit` — từ `catalog_co_purchases` (B-c14,
+  D-208…D-218). Hai endpoint trả `Data<[thẻ]>` (danh sách ngắn có giới hạn, không phân trang), 404
+  khi sản phẩm không hiện ở website.
 - `POST /public/downloads/{token}` — trừ một lượt (`rows::adjust` trên `remaining`, `NON_NEGATIVE`),
   trả URL ký sống `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS`; `GET /public/downloads/{token}/file?exp&sig`
   — phục vụ file qua `Storage::get_range` (nhận `Range`), không trừ lượt. URL ký mang khách (bước 33).
@@ -449,17 +454,21 @@ Nhận:
   `inventory.cost_changed` → `catalog_variant_costs` (D-222); event của `promotions` → `sale_price_minor`,
   `sale_ends_at` trên storefront (D-208…D-218); `orders.order_completed` → `catalog_co_purchases`
   (D-208…D-218); event của `orders` và đánh giá → cột bán chạy / điểm đánh giá trên storefront (D-201).
+  `orders.review_published` / `review_moderated` phải mang `after.product_id` và
+  `after.product_rating = {count, sum}` — tổng hiện tại của sản phẩm, không phải phần thay đổi (D-20261120-catalog-recommendations).
 
 ### Job và lịch
 
 - `catalog.import` (một dòng một transaction ngắn, gộp 100 dòng; dòng lỗi ghi vào `errors`, không dừng
   cả file), `catalog.export`, `catalog.refresh_storefront` (theo sản phẩm hay theo cửa hàng; xếp
-  trong cùng transaction với thay đổi giá / trạng thái / ẩn hiện), `catalog.index_embeddings`.
+  trong cùng transaction với thay đổi giá / trạng thái / ẩn hiện), `catalog.index_embeddings` (xếp trong
+  transaction dựng lại storefront khi embedding bật; bật embedding sau thì chạy `catalog.rebuild_storefront`
+  để lập index cho cả khách — D-20261120-catalog-recommendations).
 - `catalog.derive_prices` (ghi dòng giá của bảng suy ra) và job ghi dòng giá của một lần đổi giá hàng
   loạt đã duyệt: theo lô 500 biến thể, mỗi lô một transaction ngắn, chạy lại không nhân đôi (D-222).
 - Lịch: `catalog.apply_scheduled_prices` mỗi phút — dòng giá có `valid_from` / `valid_to` vừa qua
-  từ lần chạy trước: dựng lại storefront, phát `catalog.price_effective`; `catalog.catch_up_embeddings`
-  mỗi giờ; `catalog.cleanup_transfers` mỗi ngày (xoá file xuất cũ hơn 7 ngày); mỗi ngày tính lại
+  từ lần chạy trước: dựng lại storefront, phát `catalog.price_effective`; `catalog.refresh_sales` mỗi
+  ngày (bỏ dòng bán cũ hơn 90 ngày, tính lại bán chạy và mua cùng — D-20261120-catalog-recommendations); `catalog.cleanup_transfers` mỗi ngày (xoá file xuất cũ hơn 7 ngày); mỗi ngày tính lại
   `readiness` cho sản phẩm có giấy tờ hết hạn (D-223…D-227).
 - Task: `catalog.load_restrictions pack=vn` (nạp `modules/catalog/data/vn/restrictions.json` và bộ
   thuộc tính nhãn hàng hoá mẫu, ghi nguồn và ngày), `catalog.rebuild_storefront`.

@@ -88,6 +88,8 @@ pub(crate) struct ModuleCatalog {
     history: crate::ops::records::HistorySlot,
     /// Mô hình AI (module `ai` công bố), điền sau khi mọi module khởi động (bước 52).
     model: crate::ops::filter_parse::TextModelSlot,
+    /// Chủ đề tín hiệu WebSocket các module góp (bước 69 P3), điền sau khi mọi module khởi động.
+    signal_topics: crate::event::signals::SignalTopicsSlot,
     /// Schema bộ lọc của mọi danh sách (P7), điền khi dựng route.
     lists: crate::ops::list_exports::ListsHandle,
     /// Sổ điều hướng đã gom (bước 51 P1).
@@ -172,6 +174,10 @@ impl ModuleCatalog {
 
     pub(crate) fn text_model(&self) -> crate::ops::filter_parse::TextModelSlot {
         self.model.clone()
+    }
+
+    pub(crate) fn signal_topics(&self) -> crate::event::signals::SignalTopicsSlot {
+        self.signal_topics.clone()
     }
 
     pub(crate) fn history(&self) -> crate::ops::records::HistorySlot {

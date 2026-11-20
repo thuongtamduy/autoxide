@@ -14,12 +14,16 @@ targets = [
 ]
 
 [advisories]
+# Tính cả thư viện bỏ hoang ở phụ thuộc gián tiếp. cargo-deny 0.22 mặc định chỉ tính phụ thuộc
+# trực tiếp; ghim để máy và CI (khác phiên bản) cho cùng kết quả với `-D advisory-not-detected`.
+unmaintained = "all"
 # Mặc định: lỗ hổng và thư viện bị bỏ hoang đều là lỗi. Ngoại lệ phải ghi lý do
 # ở đây VÀ ở docs/DECISIONS.md. Gate chạy với `-D advisory-not-detected`: ngoại
 # lệ không còn cần nữa thì gate đỏ cho tới khi gỡ dòng đó đi.
 ignore = [
   { id = "RUSTSEC-2023-0071", reason = "rsa: timing side channel when using a PRIVATE key. Only reached through webauthn_rp, which verifies passkey signatures with PUBLIC keys; no secret is ever processed. See docs/DECISIONS.md D-077." },
   { id = "RUSTSEC-2026-0387", reason = "crypto-bigint < 0.7.6: timing side channels on SECRET integers. Only reached through webauthn_rp (p256/p384 0.13) for public-key signature verification; no secret is ever processed. See docs/DECISIONS.md D-077." },
+  { id = "RUSTSEC-2026-0542", reason = "humantime unmaintained (no vulnerability; flagged because it wraps chrono). Only reached through object_store (S3 storage of the files module); no maintained replacement upstream yet, removed together with chrono. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained (no vulnerability). sqlx and sea-orm (the database layer) are built on it, so it cannot be replaced alone; move to jiff/time when they do. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained (no vulnerability), only used to read IANA time zone names; replaced together with chrono. See docs/DECISIONS.md D-346." },
   { id = "RUSTSEC-2026-0459", reason = "SQLite bundled by libsqlite3-sys < 0.39; sqlx-sqlite 0.9.0 (latest) requires < 0.38, so no fixed version can be selected yet. Only exploitable through a database file supplied by an untrusted party, which Autoxide never opens. See docs/DECISIONS.md D-032." },

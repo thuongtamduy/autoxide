@@ -16,6 +16,7 @@
 mod dispatcher;
 mod migration;
 mod outbox;
+pub(crate) mod signals;
 pub(crate) mod stream;
 
 use std::collections::BTreeSet;
@@ -34,6 +35,7 @@ pub use migration::{
     outbox_access_migration, outbox_actor_migration, outbox_migration, tenant_table,
 };
 pub use outbox::Outbox;
+pub use signals::SignalTopics;
 pub use stream::StreamHub;
 
 /// Một loại event, khai bởi module phát nó.

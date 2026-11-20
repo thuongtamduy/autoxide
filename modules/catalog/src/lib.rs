@@ -26,10 +26,12 @@ mod products;
 mod public;
 mod public_filter;
 mod readiness;
+mod recommend;
 mod restrictions;
 mod rounding;
 mod rules_pack;
 mod service;
+mod similar;
 mod snapshots;
 mod storefront;
 mod suggest;
@@ -125,6 +127,7 @@ impl Module for CatalogModule {
             sale_prices: std::sync::OnceLock::new(),
             listing_gate: std::sync::OnceLock::new(),
             suggestions: context.suggest_sources(),
+            embedder: context.require::<dyn autoxide_kernel::ai::Embedder>().ok(),
         });
         // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).
         context.resource_type(
@@ -167,7 +170,12 @@ impl Module for CatalogModule {
                 ),
                 JobRegistration::new(
                     storefront::SCHEDULED_PRICES,
-                    Arc::new(storefront::ScheduledPrices(service)),
+                    Arc::new(storefront::ScheduledPrices(service.clone())),
+                ),
+                JobRegistration::new(similar::INDEX, Arc::new(similar::Indexer(service.clone()))),
+                JobRegistration::new(
+                    recommend::REFRESH_SALES,
+                    Arc::new(recommend::RefreshSales(service)),
                 ),
             ]
         })
@@ -181,6 +189,8 @@ impl Module for CatalogModule {
         vec![
             Schedule::new(rules_pack::REFRESH_DOCUMENTS, rules_pack::REFRESH_DOCUMENTS, day),
             Schedule::new(storefront::SCHEDULED_PRICES, storefront::SCHEDULED_PRICES, minute),
+            // Số bán và mua cùng tính trong 90 ngày: bỏ dòng cũ mỗi ngày.
+            Schedule::new(recommend::REFRESH_SALES, recommend::REFRESH_SALES, day),
         ]
     }
 

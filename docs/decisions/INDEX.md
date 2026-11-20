@@ -87,7 +87,10 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 - **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19
+- **[D-20261120-ci-nextest-archive](D-20261120-ci-nextest-archive.md)** CI build test một lần thành archive của nextest, các máy test chỉ tải về và chạy — 2026-11-20
+- **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
+- **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
 
 ## Kiến trúc module và kernel
 
@@ -150,6 +153,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-336** Bảy chỗ core trả khác mô tả OpenAPI — 2026-11-17
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 - **[D-20261119-step69-sync](D-20261119-step69-sync.md)** Đồng bộ khi mất mạng: luồng thay đổi `<module>_changes` theo con trỏ, `412` kèm bản hiện tại, lô ghi chạy từng lệnh như request REST — 2026-11-19
+- **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
 
 ## MCP, AI, agent dùng API
 
@@ -500,6 +504,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step55-collections](D-20261119-step55-collections.md)** Bước 55: bộ sưu tập sản phẩm dùng bộ lọc storefront sẵn có, permission `catalog.collections.manage` — 2026-11-19
 - **[D-20261119-step61-conversations](D-20261119-step61-conversations.md)** Module `conversations` (bước 61): cuộc trò chuyện, chống trùng, thu hồi, thông báo, chống lạm dụng, mặc định — 2026-11-19
 - **[D-20261119-step61-voice](D-20261119-step61-voice.md)** Gọi điện trong chat (bước 61 mục 4): hợp đồng ở kernel, mặc định, ghi âm, sandbox — 2026-11-19
+- **[D-20261120-catalog-recommendations](D-20261120-catalog-recommendations.md)** Bán chạy, đánh giá, mua cùng và sản phẩm tương tự của `catalog` — 2026-11-20
 - **[D-20261120-step45-einvoice-pos](D-20261120-step45-einvoice-pos.md)** Hoá đơn điện tử, thư trạng thái và bán tại quầy của `orders`: `invoices` không ghi doanh thu lần hai, hoá đơn điều chỉnh qua trait, ca quầy hai người duyệt — 2026-11-20
 - **[D-20261120-step45-guest-orders](D-20261120-step45-guest-orders.md)** Mua không cần tài khoản của `orders`: mã một lần, header `Order-Token`, khoá liên hệ theo khách, gắn đơn bằng token — 2026-11-20
 - **[D-20261120-step45-reviews-risk-reports](D-20261120-step45-reviews-risk-reports.md)** Đánh giá sau mua đặt ở `orders`, phiếu "hữu ích", tóm tắt AI chờ duyệt, chống bom hàng COD theo khoá liên hệ, báo cáo bán hàng truy vấn thẳng — 2026-11-20

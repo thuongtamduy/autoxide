@@ -126,6 +126,13 @@ Chủ dự án giữ repo riêng tư (D-199), nên đẩy tag không kích hoạ
 
 Khi chủ dự án công khai repo (bước 50 của lộ trình), bỏ phần này.
 
+## Image cho một tag đã phát hành
+
+Tag đã đẩy mà chưa có image trên ghcr.io (Release bị bỏ qua lúc repo riêng tư, hay chạy lại thì gate đỏ vì
+thứ mới sau ngày phát hành): Actions → "Release image (existing tag)" → Run workflow trên `main`, nhập tag
+(vd `v0.14.0`). Workflow build mã nguồn của tag và đăng `X.Y.Z`, `X.Y` như Release, không chạy gate, không
+tạo bản phát hành (D-20261120-upgrade-image). Job `upgrade` của CI kéo image này thay vì build lại bản cũ.
+
 Lần đầu workflow đăng image, gói trên GitHub Container Registry mặc định là riêng tư: chủ repo
 vào trang của gói (Packages → autoxide → Package settings → Change visibility) đổi thành Public
 một lần để người lạ tải được (GitHub không cho đổi bằng `GITHUB_TOKEN`).

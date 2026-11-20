@@ -150,7 +150,11 @@ fn old_image(root: &Path, tag: &str) -> Result<String, String> {
             return Ok(image);
         }
     }
-    println!("upgrade-test: no published image of {tag} could be pulled; using a local build");
+    println!(
+        "upgrade-test: no published image of {tag} could be pulled; using a local build. To publish \
+         it, run the GitHub workflow \"Release image (existing tag)\" with tag {tag} \
+         (D-20261120-upgrade-image)"
+    );
     let image = local_image(tag);
     if output(Command::new("docker").args(["image", "inspect", "--format", "{{.Id}}", &image]))
         .is_some()
@@ -364,5 +368,24 @@ mod tests {
             ["ghcr.io/owner/autoxide:0.13.0", "ghcr.io/owner/autoxide:v0.13.0"]
         );
         assert_eq!(local_image("v0.13.0"), "autoxide:v0.13.0");
+    }
+
+    /// Hai workflow đăng image (phát hành, và đăng lại cho tag đã có) đặt đúng tên và thẻ mà
+    /// `registry_images` kéo: `ghcr.io/<owner>/<repo>` viết thường, thẻ `X.Y.Z`
+    /// (D-20261120-upgrade-image). Trước đây job `upgrade` báo "manifest unknown" vì chưa từng có image.
+    #[test]
+    fn workflow_dang_image_dung_ten_upgrade_test_keo() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let read = |file: &str| {
+            std::fs::read_to_string(root.join(".github/workflows").join(file)).unwrap()
+        };
+        let image_name = r#"IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}"#;
+        let release = read("release.yml");
+        assert!(release.contains(image_name));
+        assert!(release.contains("type=semver,pattern={{version}}"));
+        let again = read("release-image.yml");
+        assert!(again.contains(image_name));
+        assert!(again.contains(r#"-t "$IMAGE:$VERSION""#));
+        assert!(again.contains(r#"echo "version=${TAG#v}""#));
     }
 }

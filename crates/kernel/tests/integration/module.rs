@@ -305,6 +305,7 @@ async fn module_nhan_database_va_khai_route() {
                     "/domains/{id}".to_owned(),
                     "/domains/{id}/verify".to_owned(),
                     "/events/stream".to_owned(),
+                    "/events/ws".to_owned(),
                     "/exports".to_owned(),
                     "/filters/parse".to_owned(),
                     "/find".to_owned(),

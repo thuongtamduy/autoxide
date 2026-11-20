@@ -759,3 +759,7 @@ pub(crate) mod collection_item {
     impl ActiveModelBehavior for ActiveModel {}
     tenant_scoped!();
 }
+
+// Bán chạy, đánh giá, gợi ý sản phẩm (m0013) — file riêng để `entity.rs` không quá dài.
+mod recommend;
+pub(crate) use recommend::{co_purchase, embedding, product_stat, similar_product, sold_product};

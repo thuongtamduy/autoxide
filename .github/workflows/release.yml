@@ -2,7 +2,8 @@
 # lại gate, build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
 # (không giả lập), đăng lên GitHub Container Registry bằng `GITHUB_TOKEN`, đính kèm chứng thực
 # nguồn gốc build và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú lấy từ CHANGELOG.md.
-# Quy trình: docs/RELEASING.md. Chỉ chạy khi repo công khai (D-197).
+# Quy trình: docs/RELEASING.md. Chỉ chạy khi repo công khai (D-197). Tag đã có mà thiếu image: workflow
+# release-image.yml (D-20261120-upgrade-image); tên và thẻ image ở hai file phải giống nhau (test của xtask kiểm).
 name: Release
 
 on:

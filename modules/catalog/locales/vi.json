@@ -169,5 +169,7 @@
   "text:See and revoke the download grants of digital products.": "Xem và thu hồi quyền tải của hàng số.",
   "text:See the price lists and prices in your scope.": "Xem bảng giá và giá trong phạm vi của bạn.",
   "text:See the products, variants and categories in your scope, including drafts.": "Xem sản phẩm, biến thể và danh mục trong phạm vi của bạn, kể cả bản nháp.",
-  "text:The expected availability date of a pre-order variant changed.": "Ngày dự kiến có hàng của một biến thể đặt trước thay đổi."
+  "text:The expected availability date of a pre-order variant changed.": "Ngày dự kiến có hàng của một biến thể đặt trước thay đổi.",
+  "field:must be between 1 and 12": "phải từ 1 đến 12",
+  "text:Test event.": "Event dùng trong test."
 }

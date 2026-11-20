@@ -20,21 +20,24 @@ permissions:
 # không lưu được cache (bước Post của rust-cache không chạy), và trước đây mỗi lần merge huỷ lần
 # chạy main trước nên main không bao giờ có cache, mọi PR build từ đầu (D-20261119-ci-faster).
 # Không huỷ thì lần chạy main mới chờ lần đang chạy xong; GitHub chỉ giữ một lần chờ (lần mới nhất).
+# PR ghép lô của phiên điều phối (tiêu đề bắt đầu bằng "Lô:", D-20261119-merge-batches): đã kiểm trên máy
+# và merge ngay, lần chạy trên main mới là lưới kiểm — các job nặng bỏ qua để không chiếm máy của lần
+# chạy main; job `gate` vẫn báo xong. PR của phiên làm việc chạy đủ như cũ.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Gate tách thành nhiều phần chạy song song, mỗi phần một máy (`./gate.sh --only lint|sqlite|postgres
-# --shard k/n`, cộng lại đúng bằng gate một máy), rồi job `gate` gộp kết quả dưới tên check cũ
-# (D-20261119-ci-faster).
+# Gate tách thành nhiều phần chạy song song, mỗi phần một máy (`./gate.sh --only lint`, `--only build`
+# rồi `--only sqlite|postgres --archive … --shard k/n`; cộng lại đúng bằng gate một máy), rồi job `gate`
+# gộp kết quả dưới tên check cũ (D-20261119-ci-faster, D-20261120-ci-nextest-archive).
 #
 # Cache (Swatinem/rust-cache): chỉ main ghi (`save-if`), pull request chỉ đọc. Cache của pull request
-# chỉ nhánh đó đọc được, nên ghi chỉ tốn chỗ trong 10 GB của repo và đẩy cache của main ra. Hai job
-# test build ra cùng một bộ file nên dùng chung `shared-key: test`; clippy build khác nên có khoá riêng.
+# chỉ nhánh đó đọc được, nên ghi chỉ tốn chỗ trong 10 GB của repo và đẩy cache của main ra. Job build
+# test có khoá `test`; clippy build khác nên có khoá riêng.
 jobs:
   lint:
     name: gate / lint
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -57,31 +60,77 @@ jobs:
           tool: cargo-deny
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only lint
 
+  # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
+  # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
+  # (push lên main) chạy doc-test ở đây.
+  build:
+    name: gate / build tests
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
+          fetch-depth: 0
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+      - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: test-archive
+          path: target/gate-archive
+          if-no-files-found: error
+          retention-days: 1
+          # Archive đã nén zstd.
+          compression-level: 0
+
   tests:
     name: gate / ${{ matrix.target.name }}
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
+    needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        # `part`: phần của `./gate.sh --only`; `shard`: phần của `./gate.sh --shard` — test đầu-cuối
-        # của `autoxide` (~7–10 phút trên một máy) chia đôi ra hai máy. Postgres thấp nhất được hỗ
-        # trợ (STACK.md) và mới nhất: pull request chỉ chạy bản thấp nhất (dễ hỏng nhất) để có kết quả
-        # sớm; push lên main và chạy tay thì chạy cả hai (D-20261118-public-ci-openapi-dup).
+        # `part`: phần của `./gate.sh --only`; `shard`: phần của `./gate.sh --shard` (nextest
+        # `--partition count:k/n`). Không build nên chia thêm máy rẻ: mỗi máy chỉ tải archive rồi chạy.
+        # Postgres thấp nhất được hỗ trợ (STACK.md) và mới nhất: pull request chỉ chạy bản thấp nhất
+        # (dễ hỏng nhất) để có kết quả sớm; push lên main và chạy tay thì chạy cả hai
+        # (D-20261118-public-ci-openapi-dup).
         target: >-
           ${{ github.event_name == 'pull_request' && fromJSON('[
-            {"name": "sqlite 1/2", "part": "sqlite", "shard": "1/2", "postgres": "16"},
-            {"name": "sqlite 2/2", "part": "sqlite", "shard": "2/2", "postgres": "16"},
-            {"name": "postgres 16 1/2", "part": "postgres", "shard": "1/2", "postgres": "16"},
-            {"name": "postgres 16 2/2", "part": "postgres", "shard": "2/2", "postgres": "16"}
+            {"name": "sqlite 1/4", "part": "sqlite", "shard": "1/4", "postgres": "16"},
+            {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
+            {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
+            {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
+            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
+            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
+            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"}
           ]') || fromJSON('[
-            {"name": "sqlite 1/2", "part": "sqlite", "shard": "1/2", "postgres": "16"},
-            {"name": "sqlite 2/2", "part": "sqlite", "shard": "2/2", "postgres": "16"},
-            {"name": "postgres 16 1/2", "part": "postgres", "shard": "1/2", "postgres": "16"},
-            {"name": "postgres 16 2/2", "part": "postgres", "shard": "2/2", "postgres": "16"},
-            {"name": "postgres 18 1/2", "part": "postgres", "shard": "1/2", "postgres": "18"},
-            {"name": "postgres 18 2/2", "part": "postgres", "shard": "2/2", "postgres": "18"}
+            {"name": "sqlite 1/4", "part": "sqlite", "shard": "1/4", "postgres": "16"},
+            {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
+            {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
+            {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
+            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
+            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
+            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"},
+            {"name": "postgres 18 1/4", "part": "postgres", "shard": "1/4", "postgres": "18"},
+            {"name": "postgres 18 2/4", "part": "postgres", "shard": "2/4", "postgres": "18"},
+            {"name": "postgres 18 3/4", "part": "postgres", "shard": "3/4", "postgres": "18"},
+            {"name": "postgres 18 4/4", "part": "postgres", "shard": "4/4", "postgres": "18"}
           ]') }}
     services:
       # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
@@ -99,22 +148,21 @@ jobs:
         image: motoserver/moto:5.2.5
         ports: ["5000:5000"]
     env:
-      CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
       # Database và S3 dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
       GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
       GATE_S3_ENDPOINT: http://127.0.0.1:5000
     steps:
+      # Mã nguồn cùng commit với archive: test đọc file của repo (bản dịch, docs/openapi.json…).
       - uses: actions/checkout@v7
+      # Không cài toolchain Rust: archive đã build, `gate.sh --archive` gọi thẳng `cargo-nextest`.
+      - uses: taiki-e/install-action@v2
         with:
-          # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
-          fetch-depth: 0
-      - run: rustup toolchain install
-      - uses: Swatinem/rust-cache@v2
+          tool: cargo-nextest
+      - uses: actions/download-artifact@v8
         with:
-          shared-key: test
-          # Một job ghi là đủ: các job test build ra cùng một bộ file.
-          save-if: ${{ github.ref == 'refs/heads/main' && matrix.target.name == 'sqlite 1/2' }}
+          name: test-archive
+          path: target/gate-archive
       # Service container không nhận tham số `-c` của postgres, nên cấu hình như container của
       # gate.sh (max_connections=300, bỏ fsync) bằng ALTER SYSTEM rồi khởi động lại. Mặc định 100
       # kết nối không đủ cho test chạy song song: test đỏ hàng loạt "too many clients".
@@ -141,11 +189,12 @@ jobs:
             sleep 1
           done
           exit 1
-      # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc, không doc-test; push lên
-      # main và chạy tay: gate đầy đủ (D-20261118-ci-pr-affected-tests).
+      # Pull request: chỉ test crate bị sửa (so với main) và crate phụ thuộc (file `filter` trong
+      # archive); push lên main và chạy tay: mọi test (D-20261118-ci-pr-affected-tests).
       - run: >-
           ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }}
-          --only ${{ matrix.target.part }} --shard ${{ matrix.target.shard }}
+          --only ${{ matrix.target.part }} --archive target/gate-archive
+          --shard ${{ matrix.target.shard }}
 
   # Tên check cũ, có thể là check bắt buộc của branch protection: chỉ xanh khi mọi phần của gate
   # xanh. `always()`: phần nào đỏ thì job này vẫn chạy và báo đỏ, không bị bỏ qua (check bị bỏ qua
@@ -153,21 +202,27 @@ jobs:
   gate:
     name: gate (PostgreSQL ${{ github.event_name == 'pull_request' && '16' || '16, 18' }})
     if: ${{ always() && !github.event.repository.private }}
-    needs: [lint, tests]
+    needs: [lint, build, tests]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Every part of the gate passed
         env:
           LINT: ${{ needs.lint.result }}
+          BUILD: ${{ needs.build.result }}
           TESTS: ${{ needs.tests.result }}
+          BATCH: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:') }}
         run: |
-          echo "lint: $LINT, tests: $TESTS"
-          [ "$LINT" = success ] && [ "$TESTS" = success ]
+          echo "lint: $LINT, build: $BUILD, tests: $TESTS"
+          if [ "$BATCH" = true ]; then
+            echo "Batch PR (title starts with 'Lô:'): checked on the coordinator's machine and merged at once; main's run is the check."
+            exit 0
+          fi
+          [ "$LINT" = success ] && [ "$BUILD" = success ] && [ "$TESTS" = success ]
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -191,7 +246,7 @@ jobs:
     # Chỉ làm việc khi PR đổi hợp đồng API hay SDK; kiểm đường dẫn trong một bước (không dùng `paths:` ở
     # trigger) để job vẫn báo xong khi nó là check bắt buộc.
     name: Mobile SDK (${{ matrix.sdk }})
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     # Swift: ở PR chỉ kiểm manifest và phụ thuộc (nhẹ); biên dịch đầy đủ (dựng cả swift-syntax của plugin
     # sinh mã) chỉ khi push vào main, có cache — không chặn hàng đợi merge.
@@ -205,11 +260,22 @@ jobs:
       - name: changed
         id: changed
         run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
+          # PR: so với nhánh đích. Push vào main: so với commit trước lần push (`before`) — phần lớn lần
+          # merge không đổi hợp đồng API nên khỏi build SDK (Swift trên Linux ~15 phút). Không lấy được
+          # commit trước (push đầu, force push) hay chạy tay thì build cho chắc.
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.base_ref }}"
+          elif [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.event.before }}" ] \
+            && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            base="${{ github.event.before }}"
+          else
             echo "run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          git fetch --quiet --depth=1 origin "${{ github.base_ref }}"
+          if ! git fetch --quiet --depth=1 origin "$base"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if git diff --name-only FETCH_HEAD HEAD \
             | grep -qE '^(docs/openapi\.json|sdk/|Package\.swift|xtask/src/sdk_mobile\.rs|\.github/workflows/ci\.yml)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
@@ -234,6 +300,11 @@ jobs:
       - name: swift build
         if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name != 'pull_request'
         run: docker run --rm -v "$PWD:/repo" -w /repo swift:6.4.2-noble swift build --product Autoxide
+      # Docker chạy bằng root nên `.build` thuộc root: trả quyền cho người dùng của runner để bước lưu cache
+      # (sau job) đóng gói được, lần sau build tiếp từ cache thay vì từ đầu.
+      - name: swift cache ownership
+        if: always() && steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name != 'pull_request'
+        run: sudo chown -R "$(id -u):$(id -g)" .build || true
       - uses: actions/setup-java@v6
         if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
         with:
@@ -281,7 +352,7 @@ jobs:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
     name: upgrade from the last release (${{ matrix.database }})
-    if: ${{ !github.event.repository.private }}
+    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:

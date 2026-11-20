@@ -56,6 +56,19 @@ pub mod events {
     /// [`SalePriceSource`](super::SalePriceSource) mà `promotions` cắm vào bằng
     /// [`CatalogExtensions`](super::CatalogExtensions). Thiếu trường thì bỏ qua event.
     pub const PROMOTIONS_AUTOMATIC_PRICES_CHANGED: &str = "promotions.automatic_prices_changed";
+
+    /// Event của module `orders` (bước 45): đơn hoàn tất. `catalog` đọc `after.order_id` và
+    /// `after.lines[].{product_id, quantity}` để đếm bán chạy (sắp `best_selling`) và "thường mua
+    /// cùng"; nhận lại cùng đơn không đếm hai lần.
+    pub const ORDERS_ORDER_COMPLETED: &str = "orders.order_completed";
+
+    /// Event đánh giá của module `orders` (bước 45): đăng, ẩn hay mở lại một đánh giá. `catalog`
+    /// đọc `after.product_id` và `after.product_rating = {"count": <số đánh giá đang hiện>, "sum":
+    /// <tổng số sao>}` — **tổng hiện tại** của sản phẩm (như `orders_review_stats`), không phải
+    /// phần thay đổi, để nhận lại hay nhận lệch thứ tự vẫn đúng. Thiếu trường thì bỏ qua event.
+    pub const ORDERS_REVIEW_PUBLISHED: &str = "orders.review_published";
+    /// Như [`ORDERS_REVIEW_PUBLISHED`], khi đánh giá bị ẩn hay mở lại.
+    pub const ORDERS_REVIEW_MODERATED: &str = "orders.review_moderated";
 }
 
 /// Loại sản phẩm.
