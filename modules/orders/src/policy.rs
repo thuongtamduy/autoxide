@@ -154,6 +154,19 @@ pub(crate) const CASH_VARIANCE_APPROVAL_MINOR: OrgSetting = OrgSetting::new(
     _ => Err("must be a whole number from 0 to 1000000000000".to_owned()),
 });
 
+/// Hạn xử lý phiếu bảo hành (ngày, tính từ lúc tiếp nhận). Mặc định 15 — cần đối chiếu quy định về
+/// thời hạn sửa chữa, thay thế của Luật 19/2023/QH15 và NĐ 55/2024/NĐ-CP.
+pub(crate) const WARRANTY_CLAIM_DAYS: OrgSetting = OrgSetting::new(
+    "orders.warranty_claim_days",
+    "Days the seller has to handle a warranty claim after receiving it (1 to 365).",
+)
+.with_default("15")
+.with_schema(r#"{"type":"integer","minimum":1,"maximum":365}"#)
+.checked(|value| match value.as_i64() {
+    Some(days) if (1..=365).contains(&days) => Ok(value.clone()),
+    _ => Err("must be a whole number from 1 to 365".to_owned()),
+});
+
 /// Mã lý do dạng `snake_case` (chữ thường, số, `_`; tối đa 64 ký tự).
 pub(crate) fn is_code(code: &str) -> bool {
     code.len() <= 64
@@ -173,6 +186,7 @@ pub(crate) fn all() -> Vec<OrgSetting> {
         INVOICE_TIMING,
         INVOICE_KIND,
         CASH_VARIANCE_APPROVAL_MINOR,
+        WARRANTY_CLAIM_DAYS,
     ]
 }
 

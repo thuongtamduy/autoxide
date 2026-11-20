@@ -13,6 +13,7 @@ mod pos;
 pub(crate) mod returns;
 mod reviews;
 mod risk;
+pub(crate) mod warranty;
 
 use std::sync::Arc;
 
@@ -90,5 +91,10 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(risk::list_blocks, risk::create_block))
         .routes(routes!(risk::lift_block))
         .routes(routes!(risk::sales_report))
+        .routes(routes!(warranty::record_serials))
+        .routes(routes!(warranty::find_warranties))
+        .routes(routes!(warranty::my_warranties))
+        .routes(routes!(warranty::create_claim))
+        .routes(routes!(warranty::transition_claim))
         .with_state(service)
 }

@@ -48,6 +48,8 @@ pub(crate) struct FakeLedger {
     pub payments: Mutex<Vec<Payment>>,
     /// Lượt hoàn đã nhận: (ID thanh toán, số tiền, lý do).
     pub refunds: Mutex<Vec<(Uuid, i64, String)>>,
+    /// Đối tác người gọi chọn cho từng lượt thu (trả góp), theo thứ tự.
+    pub providers: Mutex<Vec<Option<String>>>,
 }
 
 impl FakeLedger {
@@ -160,6 +162,7 @@ impl Ledger for FakeLedger {
         _: Actor,
         payment: NewPayment,
     ) -> Result<Submitted<Payment>, Error> {
+        self.providers.lock().unwrap().push(payment.provider.clone());
         Ok(self.payment_of(payment.org, &payment.method, payment.amount, &payment.reference, false))
     }
     async fn refund(

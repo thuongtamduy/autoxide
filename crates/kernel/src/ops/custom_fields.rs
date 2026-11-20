@@ -40,6 +40,9 @@ use crate::migration::prelude::*;
 use crate::response::{Created, Data, Problem};
 use crate::tenancy::TenantContext;
 
+mod index_migration;
+pub use index_migration::index_migration;
+
 const TABLE: &str = "kernel_custom_fields";
 /// Tối đa chừng này trường mỗi loại bản ghi (trần máy chủ).
 const MAX_PER_TARGET: usize = 100;
@@ -210,6 +213,36 @@ impl CustomFields {
         creating: bool,
     ) -> Result<Map<String, Value>, Error> {
         let fields = self.definitions(tenant, target).await?;
+        check_values(&fields, incoming, current, creating)
+    }
+
+    /// Như [`validate`](Self::validate) khi người dùng cuối tạo bản ghi (vd người mua đặt hàng —
+    /// D-235): chỉ xét trường mức `buyer_input` của `target` — khoá khác (kể cả trường `internal`)
+    /// là lỗi `unknown`, và trường `internal` bắt buộc không chặn người dùng cuối (nhân sự điền sau).
+    pub async fn validate_buyer_input(
+        &self,
+        tenant: &TenantContext,
+        target: &str,
+        incoming: Option<&Map<String, Value>>,
+    ) -> Result<Map<String, Value>, Error> {
+        let fields: Vec<CustomFieldView> = self
+            .definitions(tenant, target)
+            .await?
+            .into_iter()
+            .filter(|field| field.visibility == "buyer_input")
+            .collect();
+        check_values(&fields, incoming, None, true)
+    }
+}
+
+/// Kiểm `incoming` gộp vào `current` theo `fields` (định nghĩa đang bật), gom mọi lỗi một lần.
+fn check_values(
+    fields: &[CustomFieldView],
+    incoming: Option<&Map<String, Value>>,
+    current: Option<&Map<String, Value>>,
+    creating: bool,
+) -> Result<Map<String, Value>, Error> {
+    {
         let mut merged = current.cloned().unwrap_or_default();
         let mut problems = Vec::new();
         if let Some(incoming) = incoming {
@@ -235,7 +268,7 @@ impl CustomFields {
                 }
             }
         }
-        for field in &fields {
+        for field in fields {
             if creating
                 && !merged.contains_key(&field.key)
                 && let Some(default) = &field.default
@@ -271,7 +304,9 @@ impl CustomFields {
             Err(error)
         }
     }
+}
 
+impl CustomFields {
     /// Ghi index lọc của bản ghi `record` (module `module`) theo giá trị đã lưu: gọi cùng
     /// transaction với bản ghi. Chỉ trường `filterable`.
     pub async fn write_index<C: ConnectionTrait>(
@@ -610,65 +645,6 @@ fn index_values(field: &CustomFieldView, value: &Value) -> Vec<(Option<String>, 
             })
             .unwrap_or_default(),
         _ => vec![(value.as_str().map(crate::search::fold), None)],
-    }
-}
-
-/// Migration tạo bảng index lọc `<module>_custom_index` của module `module` (như `outbox_migration`).
-pub fn index_migration(name: &'static str, module: &'static str) -> Box<dyn MigrationTrait> {
-    Box::new(IndexMigration { name, module })
-}
-
-struct IndexMigration {
-    name: &'static str,
-    module: &'static str,
-}
-
-impl MigrationName for IndexMigration {
-    fn name(&self) -> &str {
-        self.name
-    }
-}
-
-#[async_trait::async_trait]
-impl MigrationTrait for IndexMigration {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        let table = format!("{}_custom_index", self.module);
-        manager
-            .create_table(
-                Table::create()
-                    .table(Alias::new(&table))
-                    .col(schema::pk_uuid("id"))
-                    .col(schema::uuid("tenant_id"))
-                    .col(schema::uuid("record_id"))
-                    .col(schema::uuid("field_id"))
-                    .col(schema::string_len_null("value_text", 400))
-                    .col(schema::big_integer_null("value_int"))
-                    .to_owned(),
-            )
-            .await?;
-        for (suffix, column) in
-            [("text", "value_text"), ("int", "value_int"), ("record", "record_id")]
-        {
-            let mut index = Index::create();
-            index
-                .name(format!("{table}_{suffix}_idx"))
-                .table(Alias::new(&table))
-                .col(Alias::new("tenant_id"));
-            if column != "record_id" {
-                index.col(Alias::new("field_id"));
-            }
-            index.col(Alias::new(column));
-            manager.create_index(index.to_owned()).await?;
-        }
-        Ok(())
-    }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        manager
-            .drop_table(
-                Table::drop().table(Alias::new(format!("{}_custom_index", self.module))).to_owned(),
-            )
-            .await
     }
 }
 

@@ -716,6 +716,7 @@ impl OrdersService {
                     cancel_reason: Set(None),
                     preorder_accepted_at: Set(None),
                     version: Set(1),
+                    custom_fields: Set(None),
                     created_at: Set(at),
                     updated_at: Set(at),
                 };
@@ -739,6 +740,7 @@ impl OrdersService {
                         action: Set(None),
                         expires_at: Set(None),
                         succeeded_at: Set(Some(at)),
+                        installment: Set(None),
                         created_at: Set(at),
                         updated_at: Set(at),
                     }

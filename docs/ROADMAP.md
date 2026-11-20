@@ -636,12 +636,12 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Chống "bom hàng" COD (D-194): tỉ lệ nhận hàng thành công của người mua chỉ trong dữ liệu của khách (có
       căn cứ xử lý theo Luật BVDLCN), quy tắc buộc trả trước khi rủi ro cao, danh sách chặn có lý do và thời
       hạn; không chia sẻ danh sách giữa các khách
-- [ ] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
+- [x] Trả góp qua đối tác (trait của bước 36); bảo hành theo số serial hay theo đơn: phiếu bảo hành, tiếp
       nhận, trạng thái xử lý, hạn bảo hành
 - [ ] Khối `orders.add_to_cart`, `buy_now`, `reviews` cho trang dựng từ khối (D-229) và `orders.cart_link` cho đầu
       trang (D-234); câu trả lời tự động về trạng thái đơn cho `support` (`FactSource`, chỉ cho chủ đơn — D-230)
       — phần `FactSource` đã xong (D-20261120-step45-guest-orders); khối chờ `Module::blocks` của bước 67
-- [ ] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
+- [x] Ô người mua nhập lúc đặt hàng (D-235): `orders.order` là đích trường tự định nghĩa (P19 của bước 51) có mức
       `buyer_input`; checkout kiểm cùng bộ gom lỗi; mail xác nhận đọc được các trường này
 - [ ] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
@@ -649,6 +649,8 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán; đơn có sẵn `return_until`,
       `buyer_cancel_until`; đánh giá: số đếm có ảnh và theo biến thể, "chủ đề người mua hay nhắc" kèm bản tóm tắt AI
       đã được người duyệt (D-109: AI chỉ là gợi ý)
+      — đã có cách trả, ngày giao dự kiến theo nơi bán, `return_until` / `buyer_cancel_until`, đếm có ảnh và theo
+      biến thể, chủ đề kèm tóm tắt đã duyệt (D-20261120-step45-warranty-installment-fields); số điểm chờ bước 47
 
 ## 46. Sàn (`marketplace`)
 

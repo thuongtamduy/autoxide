@@ -244,7 +244,27 @@ pub(crate) struct StatsResponse {
     stars: [i64; 5],
     /// Reviews with photos.
     with_media: i64,
+    /// Count and average stars per variant (size, colour…) that has reviews.
+    by_variant: Vec<VariantStatsResponse>,
     summary: Option<SummaryResponse>,
+}
+
+/// Reviews of one variant.
+#[derive(Debug, Serialize, ToSchema)]
+#[schema(as = OrdersReviewVariantStats)]
+pub(crate) struct VariantStatsResponse {
+    variant_id: Uuid,
+    count: i64,
+    /// Average stars with one decimal (`"4.5"`).
+    average: String,
+}
+
+/// Trung bình một chữ số thập phân, làm tròn nửa lên, tính bằng số nguyên.
+fn average(sum: i64, count: i64) -> Option<String> {
+    (count > 0).then(|| {
+        let tenths = (sum * 100 / count + 5) / 10;
+        format!("{}.{}", tenths / 10, tenths % 10)
+    })
 }
 
 /// A summary of reviews written with AI and approved by staff.
@@ -312,17 +332,22 @@ pub(crate) async fn review_stats(
 ) -> Result<Data<StatsResponse>, Error> {
     let locale = query.locale.unwrap_or_else(|| "vi".to_owned());
     let stats = service.review_stats(&tenant, product_id, &locale).await?;
-    let average = (stats.count > 0).then(|| {
-        // Một chữ số thập phân, làm tròn nửa lên, tính bằng số nguyên.
-        let tenths = (stats.rating_sum * 100 / stats.count + 5) / 10;
-        format!("{}.{}", tenths / 10, tenths % 10)
-    });
+    let by_variant = stats
+        .by_variant
+        .iter()
+        .map(|&(variant_id, count, sum)| VariantStatsResponse {
+            variant_id,
+            count,
+            average: average(sum, count).unwrap_or_default(),
+        })
+        .collect();
     Ok(Data {
         data: StatsResponse {
             count: stats.count,
-            average,
+            average: average(stats.rating_sum, stats.count),
             stars: stats.stars,
             with_media: stats.with_media,
+            by_variant,
             summary: stats.summary.map(SummaryResponse::from),
         },
     })

@@ -9438,6 +9438,13 @@ export type Data_OrdersCart = {
     /** The shop (or marketplace store) selling. */
     org_id: string;
     payment_method?: string | null;
+    /**
+     * Ways to pay this cart: `cod` (cash on delivery, when the shop allows it and the cart is
+     * delivered; a buyer with too many refused deliveries may still be asked to pay first),
+     * `bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`
+     * (through a partner).
+     */
+    payment_methods: string[];
     /** Promotions applied, with their terms. */
     promotions: Record<string, unknown>[];
     quote_expires_at: string;
@@ -9546,12 +9553,23 @@ export type Data_OrdersInvoiceRequested = {
 export type Data_OrdersOrder = {
   /** An order. */
   data: {
+    /** Whether the buyer may cancel now; omitted in lists. */
+    buyer_can_cancel?: boolean | null;
+    /**
+     * Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or
+     * `preparing`); omitted in lists.
+     */
+    buyer_cancel_until?: string | null;
     buyer_user_id?: string | null;
     cancel_reason?: string | null;
     cancelled_at?: string | null;
     channel: string;
     confirmed_at?: string | null;
     currency: string;
+    /** Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields). */
+    custom_fields?: {
+      [key: string]: unknown;
+    } | null;
     /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
     fulfillment_status: string;
     /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
@@ -9571,6 +9589,8 @@ export type Data_OrdersOrder = {
     /** Collecting in store: the shop, and the pickup once the order is ready. */
     pickup_org_id?: string | null;
     placed_at: string;
+    /** Until when a return can be requested (delivered orders); omitted in lists. */
+    return_until?: string | null;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
      * `completed` or `cancelled`.
@@ -9786,6 +9806,8 @@ export type Data_OrdersReviewStats = {
   data: {
     /** Average stars with one decimal (`"4.5"`); `null` without reviews. */
     average?: string | null;
+    /** Count and average stars per variant (size, colour…) that has reviews. */
+    by_variant: OrdersReviewVariantStats[];
     count: number;
     /** Number of reviews with 1, 2, 3, 4 and 5 stars. */
     stars: number[];
@@ -9816,6 +9838,14 @@ export type Data_OrdersReviewSummary = {
 };
 
 /** Envelope of a single result. */
+export type Data_OrdersSerials = {
+  /** The serial numbers recorded for an order line. */
+  data: {
+    serials: string[];
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_OrdersShipmentRequested = {
   /** A shipment requested from the shipping module. */
   data: {
@@ -9835,6 +9865,28 @@ export type Data_OrdersSupportTicket = {
     /** Number shown to the buyer. */
     number: string;
     ticket_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersWarrantyClaim = {
+  /** A warranty claim. */
+  data: {
+    created_at: string;
+    created_by: string;
+    /** When the seller must have handled the claim. */
+    due_at: string;
+    id: string;
+    issue: string;
+    /** Claim number shown to the buyer (`BH<year>-<sequence>`). */
+    number: string;
+    /** The node that received the product. */
+    org_id: string;
+    resolution?: string | null;
+    /** `received`, `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`. */
+    status: string;
+    updated_at: string;
+    warranty_id: string;
   };
 };
 
@@ -13666,6 +13718,24 @@ export type Data_Vec_OrdersSalesRow = {
     /** Refunded so far (not by product). */
     refunded: Money;
     tax: Money;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_OrdersWarranty = {
+  data: {
+    ends_at: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    org_id: string;
+    product_id: string;
+    serial?: string | null;
+    /** When the order was delivered. */
+    starts_at: string;
+    /** `active` or `expired`. */
+    status: string;
+    variant_id: string;
   }[];
 };
 
@@ -19041,6 +19111,13 @@ export type OrdersCart = {
   /** The shop (or marketplace store) selling. */
   org_id: string;
   payment_method?: string | null;
+  /**
+   * Ways to pay this cart: `cod` (cash on delivery, when the shop allows it and the cart is
+   * delivered; a buyer with too many refused deliveries may still be asked to pay first),
+   * `bank_transfer`, `gateway` (card, wallet… of the payment partner) and `installment`
+   * (through a partner).
+   */
+  payment_methods: string[];
   /** Promotions applied, with their terms. */
   promotions: Record<string, unknown>[];
   quote_expires_at: string;
@@ -19146,6 +19223,12 @@ export type OrdersCheckoutRequest = {
   accept_terms_version?: string | null;
   cart_id: string;
   contact: OrdersContactRequest;
+  /**
+   * Values of the shop's buyer fields (custom fields of `orders.order` with visibility
+   * `buyer_input`, e.g. a preferred delivery time), by key.
+   */
+  custom_fields?: Record<string, unknown> | null;
+  installment?: OrdersInstallmentRequest | null;
   /** Company details for a VAT invoice (tax code, name, address). */
   invoice_request?: Record<string, unknown> | null;
   note?: string | null;
@@ -19307,6 +19390,14 @@ export type OrdersGuestOrder = OrdersOrder & {
   ship_to?: Record<string, unknown> | null;
 };
 
+/** Pay in instalments through a licensed partner (the partner pays the shop in full). */
+export type OrdersInstallmentRequest = {
+  /** 3, 6, 9, 12, 18 or 24. */
+  months: number;
+  /** Code of the instalment partner (a payment connector). */
+  partner: string;
+};
+
 /** Company details for a VAT invoice. */
 export type OrdersInvoiceRequest = {
   address?: string | null;
@@ -19374,12 +19465,23 @@ export type OrdersOpenShiftRequest = {
 
 /** An order. */
 export type OrdersOrder = {
+  /** Whether the buyer may cancel now; omitted in lists. */
+  buyer_can_cancel?: boolean | null;
+  /**
+   * Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or
+   * `preparing`); omitted in lists.
+   */
+  buyer_cancel_until?: string | null;
   buyer_user_id?: string | null;
   cancel_reason?: string | null;
   cancelled_at?: string | null;
   channel: string;
   confirmed_at?: string | null;
   currency: string;
+  /** Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields). */
+  custom_fields?: {
+    [key: string]: unknown;
+  } | null;
   /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
   fulfillment_status: string;
   /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
@@ -19399,6 +19501,8 @@ export type OrdersOrder = {
   /** Collecting in store: the shop, and the pickup once the order is ready. */
   pickup_org_id?: string | null;
   placed_at: string;
+  /** Until when a return can be requested (delivered orders); omitted in lists. */
+  return_until?: string | null;
   /**
    * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
    * `completed` or `cancelled`.
@@ -19820,6 +19924,8 @@ export type OrdersReviewRequest = {
 export type OrdersReviewStats = {
   /** Average stars with one decimal (`"4.5"`); `null` without reviews. */
   average?: string | null;
+  /** Count and average stars per variant (size, colour…) that has reviews. */
+  by_variant: OrdersReviewVariantStats[];
   count: number;
   /** Number of reviews with 1, 2, 3, 4 and 5 stars. */
   stars: number[];
@@ -19845,6 +19951,14 @@ export type OrdersReviewSummary = {
   themes: string[];
 };
 
+/** Reviews of one variant. */
+export type OrdersReviewVariantStats = {
+  /** Average stars with one decimal (`"4.5"`). */
+  average: string;
+  count: number;
+  variant_id: string;
+};
+
 /** A row of the sales report. */
 export type OrdersSalesRow = {
   discount: Money;
@@ -19858,6 +19972,20 @@ export type OrdersSalesRow = {
   /** Refunded so far (not by product). */
   refunded: Money;
   tax: Money;
+};
+
+/** The serial numbers recorded for an order line. */
+export type OrdersSerials = {
+  serials: string[];
+};
+
+/** Serial numbers of an order line. */
+export type OrdersSerialsRequest = {
+  /**
+   * Serial numbers to add (1 to 100 characters each, no repeats); at most the line quantity in
+   * all.
+   */
+  serials: string[];
 };
 
 /** A shipment requested from the shipping module. */
@@ -19911,6 +20039,58 @@ export type OrdersTransitionRequest = {
   /** Why (kept in the order history; shown to the buyer when cancelling). */
   reason?: string | null;
   /** `preparing` (accept the order), `shipping`, `delivered`, `delivery_failed` or `cancelled`. */
+  to: string;
+};
+
+/** A warranty of an order line (or of one serial number). */
+export type OrdersWarranty = {
+  ends_at: string;
+  id: string;
+  order_id: string;
+  order_line_id: string;
+  org_id: string;
+  product_id: string;
+  serial?: string | null;
+  /** When the order was delivered. */
+  starts_at: string;
+  /** `active` or `expired`. */
+  status: string;
+  variant_id: string;
+};
+
+/** A warranty claim. */
+export type OrdersWarrantyClaim = {
+  created_at: string;
+  created_by: string;
+  /** When the seller must have handled the claim. */
+  due_at: string;
+  id: string;
+  issue: string;
+  /** Claim number shown to the buyer (`BH<year>-<sequence>`). */
+  number: string;
+  /** The node that received the product. */
+  org_id: string;
+  resolution?: string | null;
+  /** `received`, `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`. */
+  status: string;
+  updated_at: string;
+  warranty_id: string;
+};
+
+/** A product received for warranty. */
+export type OrdersWarrantyClaimRequest = {
+  /** What is wrong, as the buyer tells it (1 to 5000 characters). */
+  issue: string;
+  /** The node receiving the product. */
+  org_id: string;
+  warranty_id: string;
+};
+
+/** A change of a warranty claim's status. */
+export type OrdersWarrantyClaimTransition = {
+  /** What was done (or why it was rejected); kept when omitted. */
+  resolution?: string | null;
+  /** `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`. */
   to: string;
 };
 
@@ -22293,12 +22473,23 @@ export type Page_OrdersCartSummary = {
 export type Page_OrdersOrder = {
   /** The items of this page, in the requested order. */
   data: {
+    /** Whether the buyer may cancel now; omitted in lists. */
+    buyer_can_cancel?: boolean | null;
+    /**
+     * Last status in which the buyer may still cancel (`pending_payment`, `confirmed` or
+     * `preparing`); omitted in lists.
+     */
+    buyer_cancel_until?: string | null;
     buyer_user_id?: string | null;
     cancel_reason?: string | null;
     cancelled_at?: string | null;
     channel: string;
     confirmed_at?: string | null;
     currency: string;
+    /** Values of the shop's own fields (`custom_fields` given at checkout and staff-only fields). */
+    custom_fields?: {
+      [key: string]: unknown;
+    } | null;
     /** `unfulfilled`, `partial`, `fulfilled`, `returned_partial`, `returned`. */
     fulfillment_status: string;
     /** `self_collect`, `partner_collect`, `split_at_gateway`, `channel_collect`. */
@@ -22318,6 +22509,8 @@ export type Page_OrdersOrder = {
     /** Collecting in store: the shop, and the pickup once the order is ready. */
     pickup_org_id?: string | null;
     placed_at: string;
+    /** Until when a return can be requested (delivered orders); omitted in lists. */
+    return_until?: string | null;
     /**
      * `pending_payment`, `confirmed`, `preparing`, `shipping`, `delivered`, `delivery_failed`,
      * `completed` or `cancelled`.
@@ -41805,6 +41998,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/me/warranties": {
+    /** Your warranties. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_OrdersWarranty;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/pos/catalog": {
     /** Look up a product by barcode at the counter. */
     get: {
@@ -42331,6 +42536,51 @@ export interface paths {
       };
     };
   };
+  "/api/v1/orders/warranties": {
+    /** Look up warranties. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { serial?: string; phone?: string }; };
+      responses: {
+        200: Data_Vec_OrdersWarranty;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/warranty-claims": {
+    /** Receive a product for warranty. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: OrdersWarrantyClaimRequest;
+      responses: {
+        201: Data_OrdersWarrantyClaim;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/warranty-claims/{id}/transitions": {
+    /** Move a warranty claim on. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      requestBody: OrdersWarrantyClaimTransition;
+      responses: {
+        200: Data_OrdersWarrantyClaim;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/orders/{id}": {
     /** Read an order. */
     get: {
@@ -42355,6 +42605,21 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/{id}/lines/{line_id}/serials": {
+    /** Record serial numbers of an order line. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string; line_id: string }; };
+      requestBody: OrdersSerialsRequest;
+      responses: {
+        200: Data_OrdersSerials;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         422: Problem;
         default: Problem;
       };

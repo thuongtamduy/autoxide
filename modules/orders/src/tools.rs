@@ -19,8 +19,9 @@ use crate::http::dto::OrderResponse;
 use crate::http::returns::{
     ReceivedLineRequest, RefundResponse, ReturnResponse, ReturnTransitionRequest, return_action,
 };
+use crate::http::warranty::{ClaimResponse, WarrantyResponse};
 use crate::orders_read::OrderFilter;
-use crate::permissions::{MANAGE, READ, REFUND, RETURNS_MANAGE};
+use crate::permissions::{MANAGE, READ, REFUND, RETURNS_MANAGE, WARRANTY_MANAGE};
 use crate::returns::ReturnFilter;
 use crate::service::OrdersService;
 
@@ -123,11 +124,36 @@ pub(crate) struct DecideReturnInput {
     pub warehouse_org_id: Option<Uuid>,
 }
 
+/// Warranties to find.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrdersLookupWarrantyInput)]
+pub(crate) struct LookupWarrantyInput {
+    /// Serial number printed on the product.
+    pub serial: Option<String>,
+    /// Phone number the buyer ordered with.
+    pub phone: Option<String>,
+}
+
+/// A status change of a warranty claim.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+#[schema(as = OrdersUpdateWarrantyClaimInput)]
+pub(crate) struct UpdateWarrantyClaimInput {
+    pub id: Uuid,
+    /// `inspecting`, `repairing`, `replacing`, `ready`, `returned` or `rejected`.
+    pub to: String,
+    /// What was done (or why it was rejected).
+    #[validate(length(min = 1, max = 5000, message = "must be 1 to 5000 characters"))]
+    pub resolution: Option<String>,
+}
+
 pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
     // Mỗi tool giữ một bản `Arc` của service (clone `Arc` chỉ tăng bộ đếm tham chiếu).
     let s = || service.clone();
     let (list, get, transition, ship) = (s(), s(), s(), s());
     let (refund, returns, decide) = (s(), s(), s());
+    let (lookup, claim) = (s(), s());
     vec![
         Tool::new(
             "list_orders",
@@ -286,5 +312,45 @@ pub(crate) fn all(service: &Arc<OrdersService>) -> Vec<Tool> {
         )
         .requires(RETURNS_MANAGE)
         .destructive(),
+        Tool::new(
+            "lookup_warranty",
+            "Find warranties of shops in your scope by `serial` or buyer `phone` (either matches): \
+             product, order line, start, end and `active` / `expired`.",
+            move |tenant: TenantContext, principal: Principal, input: LookupWarrantyInput| {
+                let service = lookup.clone();
+                async move {
+                    let rows = service
+                        .find_warranties(
+                            &tenant,
+                            &principal,
+                            input.serial.as_deref(),
+                            input.phone.as_deref(),
+                        )
+                        .await?;
+                    Ok::<Vec<WarrantyResponse>, Error>(
+                        rows.into_iter().map(WarrantyResponse::new).collect(),
+                    )
+                }
+            },
+        )
+        // Không đánh dấu `read_only`: `orders.warranty.manage` là quyền mức ghi (tiếp nhận, xử lý
+        // phiếu), không có quyền mức đọc riêng cho tra bảo hành.
+        .requires(WARRANTY_MANAGE),
+        Tool::new(
+            "update_warranty_claim",
+            "Move a warranty claim on: `received` → `inspecting` / `rejected`; `inspecting` → \
+             `repairing` / `replacing` / `rejected`; `repairing` / `replacing` → `ready`; `ready` → \
+             `returned`. Optionally record what was done in `resolution`.",
+            move |tenant: TenantContext, principal: Principal, input: UpdateWarrantyClaimInput| {
+                let service = claim.clone();
+                async move {
+                    let row = service
+                        .transition_claim(&tenant, &principal, input.id, &input.to, input.resolution)
+                        .await?;
+                    Ok::<ClaimResponse, Error>(ClaimResponse::new(row))
+                }
+            },
+        )
+        .requires(WARRANTY_MANAGE),
     ]
 }

@@ -254,6 +254,7 @@ mod tests {
             checkout_id: None,
             number: "2026-000001".to_owned(),
             channel: "web".to_owned(),
+            custom_fields: None,
             external_ref: None,
             buyer_user_id: None,
             buyer_key: None,
