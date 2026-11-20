@@ -520,6 +520,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step47-customers](D-20261120-step47-customers.md)** Module `customers` (bước 47 mục 1–2): nhận diện theo số đã xác thực, người mua không cần permission, tổng chi từ event, che liên hệ, nhóm theo quy tắc là điều kiện SQL — 2026-11-20
 - **[D-20261120-step47-engagement](D-20261120-step47-engagement.md)** Yêu thích, vừa xem, nhắc giỏ bỏ dở, giới thiệu bạn của `customers` (bước 47 mục 5): nhắc chỉ khi có đồng ý quảng cáo, huỷ khi đặt đơn / rút đồng ý, thưởng giới thiệu bằng điểm — 2026-11-20
 - **[D-20261120-step47-loyalty](D-20261120-step47-loyalty.md)** Điểm thưởng, hạng và voucher tặng của `customers` (bước 47 mục 3, 6): tích khi hoàn tất, lô có hạn, điểm là tender của `orders`, nghĩa vụ ở sổ của nút gốc — 2026-11-20
+- **[D-20261120-step47-stored-value](D-20261120-step47-stored-value.md)** Thẻ quà tặng và số dư cửa hàng của `customers` (bước 47 mục 4): tắt hai lớp, khép kín trong khách phát hành, không đường rút tiền, chỉ đếm mã sai — 2026-11-20
 - **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
 
 ## Vận hành và hiệu năng

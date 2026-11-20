@@ -17,6 +17,13 @@ pub(crate) fn relocation() -> Relocation {
         .follow("customers_cart_reminders", "profile_id", "customers_profiles")
         .follow("customers_referral_codes", "profile_id", "customers_profiles")
         .follow("customers_referrals", "referee_profile_id", "customers_profiles")
+        .follow("customers_store_credits", "profile_id", "customers_profiles")
+        // Thẻ quà tặng là của cả khách (không theo nút): ở lại khách nguồn khi tách, chuyển khi gộp.
+        .stay(&[
+            "customers_gift_cards",
+            "customers_stored_value_entries",
+            "customers_stored_value_holds",
+        ])
         // Chương trình điểm chung của khách: tách khách thì khách mới có bản sao.
         .copy_on_split(&[
             "customers_loyalty_rules",
@@ -34,4 +41,6 @@ pub(crate) fn relocation() -> Relocation {
                 parent_column: "order_id",
             },
         )
+        // Bộ đếm tra mã sai: tạm, mất khi tách / gộp không sao (đếm lại từ đầu).
+        .ephemeral(&["customers_throttle"])
 }

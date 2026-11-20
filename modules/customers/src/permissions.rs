@@ -48,6 +48,11 @@ pub(crate) const ENGAGEMENT_MANAGE: Permission = Permission::new(
     "Set abandoned cart reminders and referral rewards.",
 );
 
+pub(crate) const STORED_VALUE_MANAGE: Permission = Permission::new(
+    "customers.stored_value.manage",
+    "Issue, look up and void gift cards and change customers' store credit (only when gift cards or store credit are turned on).",
+);
+
 pub(crate) fn all() -> Vec<Permission> {
     vec![
         READ,
@@ -57,5 +62,6 @@ pub(crate) fn all() -> Vec<Permission> {
         LOYALTY_MANAGE,
         LOYALTY_ADJUST,
         ENGAGEMENT_MANAGE,
+        STORED_VALUE_MANAGE,
     ]
 }

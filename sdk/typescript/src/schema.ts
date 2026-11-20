@@ -160,6 +160,16 @@ export type AdjustPointsRequest = {
   reference: string;
 };
 
+/** A change of store credit by staff (compensation, correction). */
+export type AdjustStoreCreditRequest = {
+  /** Positive adds, negative removes (never below zero). */
+  amount: Money;
+  /** Why, 1 to 500 characters. */
+  reason: string;
+  /** Your reference; the same reference never applies twice. */
+  reference: string;
+};
+
 /** An administrative unit. */
 export type AdministrativeUnit = {
   code: string;
@@ -8247,6 +8257,24 @@ export type Data_FunnelReport = {
 };
 
 /** Envelope of a single result. */
+export type Data_GiftCard = {
+  /** A gift card (the code is shown only when it is issued). */
+  data: {
+    balance: Money;
+    /** The full code: only in the answer to issuing; never stored in clear. */
+    code?: string | null;
+    /** Last 4 characters of the code. */
+    code_last4: string;
+    created_at: string;
+    expires_at?: string | null;
+    id: string;
+    initial: Money;
+    /** `active`, `void` or `expired`. */
+    status: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_GroupResponse = {
   /**
    * A unit group: any units of the tenant gathered to filter and group reports (e.g. "stores in
@@ -9894,6 +9922,14 @@ export type Data_Option_PromotionsEligibility = {
     best_total_discount: Money;
     ineligible: PromotionsIneligibleOffer[];
     usable: PromotionsOffer[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_Option_StoreCredit = {
+  data: null | {
+    balance: Money;
+    updated_at: string;
   };
 };
 
@@ -12064,6 +12100,15 @@ export type Data_StartedConversationCall = {
 };
 
 /** Envelope of a single result. */
+export type Data_StoreCredit = {
+  /** Store credit of a customer. */
+  data: {
+    balance: Money;
+    updated_at: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_StoreProductResponse = {
   /** A store product linked to a plan. */
   data: {
@@ -13839,6 +13884,23 @@ export type Data_Vec_FunnelInfo = {
     key: string;
     /** Event types of the steps, in order. */
     steps: string[];
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_GiftCard = {
+  data: {
+    balance: Money;
+    /** The full code: only in the answer to issuing; never stored in clear. */
+    code?: string | null;
+    /** Last 4 characters of the code. */
+    code_last4: string;
+    created_at: string;
+    expires_at?: string | null;
+    id: string;
+    initial: Money;
+    /** `active`, `void` or `expired`. */
+    status: string;
   }[];
 };
 
@@ -16301,6 +16363,27 @@ export type FunnelStep = {
   step: number;
 };
 
+/** A gift card (the code is shown only when it is issued). */
+export type GiftCard = {
+  balance: Money;
+  /** The full code: only in the answer to issuing; never stored in clear. */
+  code?: string | null;
+  /** Last 4 characters of the code. */
+  code_last4: string;
+  created_at: string;
+  expires_at?: string | null;
+  id: string;
+  initial: Money;
+  /** `active`, `void` or `expired`. */
+  status: string;
+};
+
+/** A gift card code to look up or attach. */
+export type GiftCardCodeRequest = {
+  /** The 16-character code; spaces and dashes are ignored. Sent in the body, never in the URL. */
+  code: string;
+};
+
 /** A unit in a group. */
 export type GroupMemberResponse = {
   added_at: string;
@@ -17451,6 +17534,16 @@ export type InvoicesVatSummaryRow = {
   rate_percent?: string | null;
   /** VAT: increases minus decrease adjustments. */
   tax: Money;
+};
+
+/** A gift card to issue. */
+export type IssueGiftCardRequest = {
+  /** Value of the card. */
+  amount: Money;
+  /** Your reference (e.g. the counter receipt); the same reference never issues twice. */
+  reference: string;
+  /** 1 to 120; omitted: no expiry. */
+  valid_months?: number | null;
 };
 
 /** A file written by a job. */
@@ -29365,6 +29458,12 @@ export type StepLog = {
   status: string;
 };
 
+/** Store credit of a customer. */
+export type StoreCredit = {
+  balance: Money;
+  updated_at: string;
+};
+
 /** A store product linked to a plan. */
 export type StoreProductResponse = {
   /** The base plan a purchase of this product gives. */
@@ -38022,6 +38121,62 @@ export interface paths {
       };
     };
   };
+  "/api/v1/customers/gift-cards": {
+    /** Issue a gift card. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: IssueGiftCardRequest;
+      responses: {
+        201: Data_GiftCard;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/gift-cards/lookup": {
+    /** Look up a gift card by its code. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: GiftCardCodeRequest;
+      responses: {
+        200: Data_GiftCard;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/gift-cards/{id}": {
+    /** Get a gift card. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_GiftCard;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/gift-cards/{id}/void": {
+    /** Void a gift card (lost, fraud). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_GiftCard;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/customers/groups": {
     /** List customer groups. */
     get: {
@@ -38239,6 +38394,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/customers/me/gift-cards": {
+    /** List your gift cards. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_GiftCard;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/gift-cards/attach": {
+    /** Attach a gift card to your account. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: GiftCardCodeRequest;
+      responses: {
+        200: Data_GiftCard;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        429: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/customers/me/orders": {
     /** List your orders as the shop's customer history sees them. */
     get: {
@@ -38339,6 +38521,18 @@ export interface paths {
         403: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/me/store-credit": {
+    /** Get your store credit. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Option_StoreCredit;
+        401: Problem;
+        403: Problem;
         default: Problem;
       };
     };
@@ -38533,6 +38727,22 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/customers/{id}/store-credit/adjustments": {
+    /** Add or remove store credit of a customer. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: AdjustStoreCreditRequest;
+      responses: {
+        200: Data_StoreCredit;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };
