@@ -723,4 +723,7 @@ lô mà autovacuum chưa phân tích thì planner chọn nested loop (gợi ý t
 | gợi ý tìm (đối chứng) | SQLite | 8 → 8 | 884 → 882 | 36.1 → 36.0 | 41.2 → 42.0 |
 | gợi ý tìm (đối chứng) | Postgres | 8 → 8 | 814 → 787 | 38.8 → 40.3 | 48.9 → 50.4 |
 
+Đặt hàng (`orders`, D-20261120-step39-checkout-batch): 26 câu với 1 dòng → 31 câu với 6 dòng trước; 26 câu dù bao nhiêu
+dòng sau (đếm trong test, cả hai database).
+
 Còn mở: danh sách sản phẩm trên SQLite chậm gấp đôi Postgres dưới 32 kết nối với cùng 10 câu — chưa đo nguyên nhân.
