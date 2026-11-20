@@ -968,12 +968,25 @@ async fn tim_nang_cao_va_mo_thang_theo_ma() {
             .await;
             assert_eq!(created.status(), StatusCode::CREATED, "{}", created.json());
         }
-        let find = |q: &str| {
+        // Tìm chung bỏ nguồn trả chậm vào `incomplete` thay vì chờ: máy CI bận có thể làm nguồn
+        // `content` quá hạn một lần — thử lại tới khi đủ nguồn.
+        let find = async |q: &str| {
             let uri = format!(
                 "/api/v1/kernel/find?q={}",
                 q.replace(' ', "%20").replace(':', "%3A").replace('>', "%3E")
             );
-            app.get(&uri).token("reader").send()
+            let mut response = app.get(&uri).token("reader").send().await;
+            for _ in 0..5 {
+                let complete = response.as_ref().is_ok_and(|found| {
+                    found.json()["data"]["incomplete"].as_array().is_none_or(Vec::is_empty)
+                });
+                if complete {
+                    break;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                response = app.get(&uri).token("reader").send().await;
+            }
+            response
         };
         let titles = |body: &Value| -> Vec<String> {
             body["data"]["groups"]
