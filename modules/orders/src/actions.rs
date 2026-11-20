@@ -110,7 +110,14 @@ impl OrdersService {
         if !delayed.is_empty()
             && matches!(status, OrderStatus::Shipping | OrderStatus::DeliveryFailed)
         {
-            self.cancel_preorder_lines(tenant, row.id, &delayed, "buyer_cancelled").await?;
+            self.cancel_preorder_lines(
+                tenant,
+                row.id,
+                &delayed,
+                "buyer_cancelled",
+                crate::preorders::LineCancel::default(),
+            )
+            .await?;
             return self.order(tenant, row.id).await;
         }
         let free = !delayed.is_empty();
@@ -133,7 +140,11 @@ impl OrdersService {
         };
         let applied = self.transition_if(tenant, row.id, &transition, &check).await?;
         if matches!(applied, Applied::Changed) {
-            self.refund_cancelled(tenant, row.id).await?;
+            // Trả trước một phần (D-232): huỷ sau mốc chốt thì giữ lại theo điều kiện đã chụp —
+            // trừ khi được huỷ miễn phí vì người bán dời ngày.
+            let keep = if free { 0 } else { self.retention_now(tenant, row.id).await? };
+            self.refund_cancelled_keeping(tenant, row.id, keep).await?;
+            self.post_retention(tenant, row.id, keep).await?;
         }
         self.order(tenant, row.id).await
     }
@@ -238,6 +249,11 @@ impl OrdersService {
         let row = self.order(tenant, id).await?;
         let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
         principal.require_at(tenant.database().read(), &MANAGE, target).await?;
+        // Phần còn lại của đơn trả trước một phần (D-232): mở lại link khi link trước đã hết hạn.
+        let plan = self.advance_plan(tenant.database().read(), tenant, id).await?;
+        if plan.is_some_and(|plan| plan.status == crate::advance::BALANCE_REQUESTED) {
+            return Ok(vec![self.reopen_balance(tenant, id).await?]);
+        }
         if row.status != OrderStatus::PendingPayment.as_str() {
             return Err(errors::invalid_transition(
                 OrderStatus::parse(&row.status).unwrap_or(OrderStatus::Cancelled),

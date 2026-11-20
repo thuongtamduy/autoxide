@@ -241,6 +241,8 @@ mod tests {
             allocated_quantity: 0,
             cancelled_quantity: 0,
             preorder_delayed_to: None,
+            advance_minor: None,
+            preorder_commit_at: None,
             created_at: Utc::now(),
         }
     }

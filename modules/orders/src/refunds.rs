@@ -363,6 +363,17 @@ impl OrdersService {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<(), Error> {
+        self.refund_cancelled_keeping(tenant, id, 0).await
+    }
+
+    /// Như [`refund_cancelled`](Self::refund_cancelled) nhưng giữ lại `keep` của khoản trả trước
+    /// (D-232: người mua huỷ sau mốc chốt). Mã tham chiếu như nhau: gọi lại không hoàn hai lần.
+    pub(crate) async fn refund_cancelled_keeping(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+        keep: i64,
+    ) -> Result<(), Error> {
         let database = tenant.database();
         let collected = payment::Entity::find()
             .filter(payment::Column::OrderId.eq(id))
@@ -384,7 +395,8 @@ impl OrdersService {
                 continue;
             }
             let used: i64 = earlier.iter().map(|refund| refund.amount_minor).sum();
-            let left = row.amount_minor - used;
+            let kept = if row.purpose == crate::advance::PURPOSE_ADVANCE { keep.max(0) } else { 0 };
+            let left = row.amount_minor - used - kept;
             if left <= 0 {
                 continue;
             }

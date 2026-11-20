@@ -80,7 +80,7 @@ fn has_revenue(row: &order::Model) -> bool {
 }
 
 /// Tài khoản phải thu của đơn (COD: theo đơn, vì `shipping` ghi phần đã thu vào đó).
-fn receivable_of(row: &order::Model, book: OrgId, currency: Currency) -> AccountKey {
+pub(crate) fn receivable_of(row: &order::Model, book: OrgId, currency: Currency) -> AccountKey {
     let receivable = AccountKey::new(book, "receivable.customer", currency);
     if Method::parse(&row.payment_method) == Method::Cod {
         receivable.with_counterparty(Counterparty::new("orders.order", row.id.to_string()))

@@ -9522,6 +9522,7 @@ export type Data_OrdersBuyerRisk = {
 export type Data_OrdersCart = {
   /** A cart with its quote, computed again by the server on every read. */
   data: {
+    advance?: OrdersCartAdvance | null;
     attribution?: OrdersAttribution | null;
     buyer_user_id?: string | null;
     /** Guests only, once, when the cart is created: send it back in the `Cart-Token` header. */
@@ -9650,6 +9651,7 @@ export type Data_OrdersInvoiceRequested = {
 export type Data_OrdersOrder = {
   /** An order. */
   data: {
+    advance?: OrdersOrderAdvance | null;
     /** Whether the buyer may cancel now; omitted in lists. */
     buyer_can_cancel?: boolean | null;
     /**
@@ -9696,6 +9698,31 @@ export type Data_OrdersOrder = {
     totals: OrdersOrderTotals;
     /** Changes on every update (for `If-Match`). */
     version: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_OrdersPaymentAction = {
+  /** What the buyer does next to pay one amount. */
+  data: {
+    amount: Money;
+    expires_at?: string | null;
+    /**
+     * `redirect` (go to `redirect_url`), `qr` (show `qr_payload`), `cod` (pay on delivery) or
+     * `none` (the payment could not be started yet; retry from the order).
+     */
+    kind: string;
+    order_id: string;
+    payment_id: string;
+    /** VietQR payload; the money goes to the seller's or the licensed partner's account. */
+    qr_payload?: string | null;
+    redirect_url?: string | null;
+    /** `pending`, `succeeded`, `failed`, `expired`… */
+    status: string;
+    /** For `GET /public/payments/{token}`. */
+    status_token: string;
+    /** Transfer content the bank transfer must carry. */
+    transfer_code?: string | null;
   };
 };
 
@@ -19195,6 +19222,7 @@ export type OrdersBuyerRisk = {
 
 /** A cart with its quote, computed again by the server on every read. */
 export type OrdersCart = {
+  advance?: OrdersCartAdvance | null;
   attribution?: OrdersAttribution | null;
   buyer_user_id?: string | null;
   /** Guests only, once, when the cart is created: send it back in the `Cart-Token` header. */
@@ -19233,6 +19261,33 @@ export type OrdersCart = {
   updated_at: string;
   /** Vouchers of your wallet used for this cart. */
   voucher_ids: string[];
+};
+
+/** Advance payment terms of a cart with pre-ordered items. */
+export type OrdersCartAdvance = {
+  /** Paid when the pre-ordered items are ready (`total − upfront`). */
+  balance: Money;
+  /** Hours the buyer has to pay the balance once asked. */
+  balance_due_hours: number;
+  /** How the balance is paid: `payment_link`. */
+  balance_methods: string[];
+  lines: OrdersCartAdvanceLine[];
+  /**
+   * Kept from the advance of a line when the buyer cancels after its cut-off (basis points;
+   * `0` = always refunded in full).
+   */
+  retention_bp: number;
+  retention_max?: Money | null;
+  /** Paid when ordering: items in stock and the advance. */
+  upfront: Money;
+};
+
+/** The advance of one pre-ordered line. */
+export type OrdersCartAdvanceLine = {
+  amount: Money;
+  /** Cancelling after this may keep part of the advance; `null`: always refunded in full. */
+  commit_at?: string | null;
+  line_key: string;
 };
 
 /** One cart line, priced again by the server. */
@@ -19562,6 +19617,7 @@ export type OrdersOpenShiftRequest = {
 
 /** An order. */
 export type OrdersOrder = {
+  advance?: OrdersOrderAdvance | null;
   /** Whether the buyer may cancel now; omitted in lists. */
   buyer_can_cancel?: boolean | null;
   /**
@@ -19608,6 +19664,20 @@ export type OrdersOrder = {
   totals: OrdersOrderTotals;
   /** Changes on every update (for `If-Match`). */
   version: number;
+};
+
+/** The advance payment plan of an order. */
+export type OrdersOrderAdvance = {
+  advance: Money;
+  balance: Money;
+  /** Pay the balance before this (once asked). */
+  balance_due_at?: string | null;
+  /**
+   * `awaiting_advance`, `advance_paid`, `balance_requested`, `balance_paid`, `balance_overdue`
+   * or `cancelled`.
+   */
+  status: string;
+  upfront: Money;
 };
 
 /** A line of an order (as ordered). */
@@ -22570,6 +22640,7 @@ export type Page_OrdersCartSummary = {
 export type Page_OrdersOrder = {
   /** The items of this page, in the requested order. */
   data: {
+    advance?: OrdersOrderAdvance | null;
     /** Whether the buyer may cancel now; omitted in lists. */
     buyer_can_cancel?: boolean | null;
     /**
@@ -42160,6 +42231,20 @@ export interface paths {
         404: Problem;
         409: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/orders/me/orders/{id}/payments": {
+    /** Pay the balance of your order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_OrdersPaymentAction;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
         default: Problem;
       };
     };

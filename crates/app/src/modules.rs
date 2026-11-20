@@ -254,8 +254,10 @@ mod tests {
             let db = Database::connect(&settings.config.database).await.unwrap();
             settings.modules.migrator().unwrap().up(&db).await.unwrap();
             settings.modules.start(&db).unwrap();
-            let first = settings.modules.worker(4).unwrap();
-            let second = settings.modules.worker(4).unwrap();
+            // Mỗi worker nhận tối đa `concurrency` job của một module mỗi lượt: 8 để hai worker đủ chỗ
+            // cho module nhiều lịch nhất (`orders`, chín lịch).
+            let first = settings.modules.worker(8).unwrap();
+            let second = settings.modules.worker(8).unwrap();
 
             let (a, b) = tokio::join!(first.run_once(), second.run_once());
 
@@ -273,12 +275,12 @@ mod tests {
             // quá 90 ngày, dọn file nhập / xuất — bước 41), một
             // của `inventory` (trả chỗ giữ hàng quá hạn — bước 42), ba của `shipping` (hỏi lại vận đơn kẹt
             // khi đặt hãng, hỏi hành trình hãng không có webhook, COD quá hạn — bước 44), bốn của
-            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher, nhắc flash sale — bước 43), tám
+            // `promotions` (chuyển trạng thái theo giờ, hết hạn lượt giữ, hết hạn voucher, nhắc flash sale — bước 43), chín
             // của `orders` (giỏ bỏ dở, dọn giỏ hết hạn, huỷ đơn quá hạn thanh toán, trả chỗ của lượt
             // đặt treo, hoàn tất đơn đã giao, huỷ đơn không được nhận, hết hạn giữ hàng chờ nhận tại
-            // cửa hàng, hết hạn bảo hành — bước 45), thêm một của
+            // cửa hàng, hết hạn bảo hành, quá hạn trả phần còn lại — bước 45), thêm một của
             // `inventory` (trừ lô quá hạn — bước 42)) đúng một job.
-            assert_eq!(a.unwrap() + b.unwrap(), 73);
+            assert_eq!(a.unwrap() + b.unwrap(), 74);
             let done =
                 first.list("auth", autoxide_kernel::job::JobStatus::Completed, 10).await.unwrap();
             assert_eq!(done.len(), 1);
