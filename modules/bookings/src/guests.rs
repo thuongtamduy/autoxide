@@ -148,8 +148,13 @@ impl BookingsService {
     ) -> Result<String, Error> {
         let pepper = self.pepper(tenant).await?;
         let transaction = tenant.database().begin_write().await?;
-        let Some(row) =
-            guest_challenge::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        // Khoá lần gửi mã (D-181): N lần đoán cùng lúc nối đuôi nhau, mỗi lần thấy số lần thử của
+        // lần trước — không thì Postgres cho cả N cùng thấy dưới giới hạn và cùng được so mã.
+        let Some(row) = autoxide_kernel::rows::lock_one(
+            &transaction,
+            guest_challenge::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
         else {
             return Err(code_invalid());
         };

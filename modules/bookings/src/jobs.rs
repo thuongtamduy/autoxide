@@ -119,7 +119,13 @@ impl BookingsService {
         payment_id: Uuid,
     ) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
-        let Some(before) = booking::Entity::find_by_id(id).scoped(tenant).one(&transaction).await?
+        // Khoá lịch (D-181): lịch đang bị `expire` (held → expired, trả chỗ) thì chờ nó xong rồi đi
+        // nhánh hoàn cọc — không ghi đè `expired` thành `confirmed` trên chỗ đã nhả cho người khác.
+        let Some(before) = autoxide_kernel::rows::lock_one(
+            &transaction,
+            booking::Entity::find_by_id(id).scoped(tenant),
+        )
+        .await?
         else {
             return Ok(());
         };
