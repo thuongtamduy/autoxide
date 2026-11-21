@@ -9,7 +9,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, TenantContext, TenantId};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -68,8 +68,8 @@ pub struct KycStatus {
     /// `revoked`.
     pub status: String,
     pub profile_id: Option<Uuid>,
-    pub verified_at: Option<DateTime<Utc>>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub verified_at: Option<Timestamp>,
+    pub expires_at: Option<Timestamp>,
 }
 
 /// Cổng định danh.
@@ -110,7 +110,7 @@ pub struct KycSession {
     pub kind: String,
     pub url: Option<String>,
     pub token: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 /// How far an account is verified for posting content; `identity` includes `phone`.
@@ -283,8 +283,8 @@ pub struct Consent {
     pub channel: String,
     /// `granted` or `withdrawn`.
     pub state: String,
-    pub granted_at: Option<DateTime<Utc>>,
-    pub withdrawn_at: Option<DateTime<Utc>>,
+    pub granted_at: Option<Timestamp>,
+    pub withdrawn_at: Option<Timestamp>,
     /// The email or phone number (`null` for a user, or after erasure).
     pub subject_value: Option<String>,
 }
@@ -337,8 +337,8 @@ pub struct Rule {
     pub jurisdiction: String,
     pub key: String,
     pub version: i64,
-    pub effective_from: DateTime<Utc>,
-    pub effective_to: Option<DateTime<Utc>>,
+    pub effective_from: Timestamp,
+    pub effective_to: Option<Timestamp>,
     #[schema(value_type = Object)]
     pub body: serde_json::Value,
     pub legal_basis: String,
@@ -354,7 +354,7 @@ pub trait ComplianceRules: Send + Sync {
         &self,
         tenant: TenantId,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Rule>, Error>;
 }
 

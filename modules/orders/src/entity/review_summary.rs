@@ -1,5 +1,6 @@
 //! Bảng `orders_review_summaries`: bản nháp tóm tắt đánh giá bằng AI chờ nhân viên duyệt (D-109).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,10 +19,10 @@ pub struct Model {
     pub source_review_count: i32,
     pub model: Option<String>,
     pub requested_by: Uuid,
-    pub generated_at: Option<DateTimeUtc>,
+    pub generated_at: Option<Timestamp>,
     pub reviewed_by: Option<Uuid>,
-    pub reviewed_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub reviewed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

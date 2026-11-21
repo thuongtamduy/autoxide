@@ -10,9 +10,10 @@ use autoxide_kernel::money::Currency;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
+use autoxide_kernel::time::Timestamp;
 use autoxide_promotions::api::{Eligibility, GiftSelection};
 use autoxide_shipping::api::Address;
-use chrono::{DateTime, Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -147,7 +148,7 @@ impl OrdersService {
             abandoned_notified_at: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
-            expires_at: Set(now + Duration::days(self.config.cart_ttl_days)),
+            expires_at: Set(now + SignedDuration::from_hours(24 * self.config.cart_ttl_days)),
         };
         let inserted = match row.insert(tenant.database().write()).await {
             Ok(inserted) => inserted,
@@ -453,7 +454,7 @@ impl OrdersService {
         edit(&mut active);
         let now = crate::service::now();
         active.updated_at = Set(now);
-        active.expires_at = Set(now + Duration::days(self.config.cart_ttl_days));
+        active.expires_at = Set(now + SignedDuration::from_hours(24 * self.config.cart_ttl_days));
         active.abandoned_notified_at = Set(None);
         if active.status.as_ref() == ABANDONED {
             active.status = Set(ACTIVE.to_owned());
@@ -773,12 +774,15 @@ async fn touch(
     cart_id: Uuid,
     ttl_days: i64,
 ) -> Result<(), Error> {
-    let now: DateTime<Utc> = crate::service::now();
+    let now: Timestamp = crate::service::now();
     cart::Entity::update_many()
         .col_expr(cart::Column::Status, Expr::value(ACTIVE))
         .col_expr(cart::Column::UpdatedAt, Expr::value(now))
-        .col_expr(cart::Column::ExpiresAt, Expr::value(now + Duration::days(ttl_days)))
-        .col_expr(cart::Column::AbandonedNotifiedAt, Expr::value(Option::<DateTime<Utc>>::None))
+        .col_expr(
+            cart::Column::ExpiresAt,
+            Expr::value(now + SignedDuration::from_hours(24 * ttl_days)),
+        )
+        .col_expr(cart::Column::AbandonedNotifiedAt, Expr::value(Option::<Timestamp>::None))
         .filter(cart::Column::TenantId.eq(tenant_id))
         .filter(cart::Column::Id.eq(cart_id))
         .exec(connection)

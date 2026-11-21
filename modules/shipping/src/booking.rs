@@ -8,7 +8,7 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::Duration;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
@@ -269,7 +269,7 @@ impl ShippingService {
     ) -> Result<(), Error> {
         let row = find_shipment(tenant.database().read(), tenant, id).await?;
         if status_of(&row) != ShipmentStatus::Booking
-            || row.status_at > now() - Duration::minutes(10)
+            || row.status_at > now() - SignedDuration::from_mins(10)
         {
             return Ok(());
         }

@@ -5,6 +5,8 @@
 //! Lưu tối thiểu (Luật 91/2025): kết quả, mã tham chiếu, tên đã xác thực, băm + 4 số cuối của số giấy
 //! tờ. Không lưu ảnh khuôn mặt, dữ liệu sinh trắc học, số giấy tờ đầy đủ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -18,7 +20,6 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -335,7 +336,7 @@ impl ComplianceService {
             return Ok(());
         }
         let valid_days = self
-            .rule_for(tenant, "kyc.required_activities", Utc::now())
+            .rule_for(tenant, "kyc.required_activities", Timestamp::now())
             .await?
             .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
             .and_then(|body| body["valid_days"].as_i64())
@@ -460,7 +461,9 @@ impl ComplianceService {
                             active.reason_code = Set(None);
                             active.verified_at = Set(Some(at));
                             active.expires_at = Set(Some(
-                                outcome.expires_at.unwrap_or(at + Duration::days(valid_days)),
+                                outcome
+                                    .expires_at
+                                    .unwrap_or(at + SignedDuration::from_hours(24 * valid_days)),
                             ));
                         }
                         ("verified", None)
@@ -584,7 +587,7 @@ impl ComplianceService {
         principal.require(&KYC_REVIEW)?;
         require_session(principal)?;
         let valid_days = self
-            .rule_for(tenant, "kyc.required_activities", Utc::now())
+            .rule_for(tenant, "kyc.required_activities", Timestamp::now())
             .await?
             .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
             .and_then(|body| body["valid_days"].as_i64())
@@ -627,7 +630,8 @@ impl ComplianceService {
                         active.reason_code = Set(None);
                         active.review_note = Set(None);
                         active.verified_at = Set(Some(at));
-                        active.expires_at = Set(Some(at + Duration::days(valid_days)));
+                        active.expires_at =
+                            Set(Some(at + SignedDuration::from_hours(24 * valid_days)));
                         if row.method.is_none() {
                             active.method = Set(Some("manual".to_owned()));
                         }
@@ -851,8 +855,8 @@ impl ComplianceService {
     ) -> Result<KycStatus, Error> {
         Ok(match Self::find_profile(tenant.database().read(), tenant, subject).await? {
             Some(row) => {
-                let expired =
-                    row.status == "verified" && row.expires_at.is_some_and(|at| at <= Utc::now());
+                let expired = row.status == "verified"
+                    && row.expires_at.is_some_and(|at| at <= Timestamp::now());
                 KycStatus {
                     status: if expired { "expired".to_owned() } else { row.status },
                     profile_id: Some(row.id),
@@ -875,7 +879,7 @@ impl ComplianceService {
         subject: &Subject,
         activity: Activity,
     ) -> Result<(), Error> {
-        let rule = self.rule_for(tenant, "kyc.required_activities", Utc::now()).await?;
+        let rule = self.rule_for(tenant, "kyc.required_activities", Timestamp::now()).await?;
         let required = rule
             .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
             .is_some_and(|body| body[activity.as_str()].as_bool() == Some(true));
@@ -900,7 +904,7 @@ impl ComplianceService {
             .column(kyc_profile::Column::TenantId)
             .column(kyc_profile::Column::Id)
             .filter(kyc_profile::Column::Status.eq("verified"))
-            .filter(kyc_profile::Column::ExpiresAt.lt(Utc::now()))
+            .filter(kyc_profile::Column::ExpiresAt.lt(Timestamp::now()))
             .limit(500)
             .into_tuple()
             .all(database.read())
@@ -931,7 +935,8 @@ impl ComplianceService {
             expired += 1;
         }
         // Callback cũ quá hạn lưu: xoá.
-        let before: DateTime<Utc> = Utc::now() - Duration::days(self.callback_retention_days);
+        let before: Timestamp =
+            Timestamp::now() - SignedDuration::from_hours(24 * self.callback_retention_days);
         kyc_callback::Entity::delete_many()
             .filter(kyc_callback::Column::ReceivedAt.lt(before))
             .filter(kyc_callback::Column::ProcessedAt.is_not_null())

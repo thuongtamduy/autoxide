@@ -9,6 +9,8 @@
 //! / Có `receivable.customer`; hoàn → ngược lại. Doanh thu và thuế ghi lúc lập chứng từ (Nợ
 //! `receivable.customer` / Có `revenue.*`, `tax.*`), không ở đây.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -24,7 +26,6 @@ use autoxide_kernel::payment::{
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -149,7 +150,7 @@ struct StoredNotification {
     currency: String,
     reason: Option<String>,
     refund_provider_ref: Option<String>,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
 }
 
 impl StoredNotification {
@@ -290,7 +291,7 @@ impl LedgerService {
             "amount": input.amount.minor(), "currency": input.amount.currency().code(),
             "description": description, "source_id": input.source_id, "return_url": input.return_url,
         }))?;
-        let expiry = Duration::minutes(self.config.payment_expiry_minutes);
+        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (reference, fingerprint, input, book, description, provider) =
             (&reference, &fingerprint, &input, &book, &description, gateway.provider());
@@ -796,7 +797,7 @@ impl LedgerService {
             .column(payment::Column::TenantId)
             .column(payment::Column::Id)
             .filter(payment::Column::Status.eq("pending"))
-            .filter(payment::Column::ExpiresAt.lt(Utc::now()))
+            .filter(payment::Column::ExpiresAt.lt(Timestamp::now()))
             .limit(500)
             .into_tuple()
             .all(database.read())

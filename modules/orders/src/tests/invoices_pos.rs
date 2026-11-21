@@ -2,6 +2,7 @@
 //! người mua, thư xác nhận / trạng thái qua `notifications`, và bán tại quầy (ca, bán, đóng ca có
 //! chênh lệch, duyệt).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_invoices::api::{
@@ -44,7 +45,7 @@ fn document(draft: &NewDocument, relation: Option<(&str, Uuid, &str)>) -> Docume
             unit * quantity - line.discount.map_or(0, |discount| discount.minor())
         })
         .sum();
-    let at = chrono::Utc::now();
+    let at = Timestamp::now();
     Document {
         id: Uuid::now_v7(),
         org_id: draft.org.as_uuid(),

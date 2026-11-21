@@ -1,5 +1,6 @@
 //! Bảng `orders_completion_holds`: một lý do hoãn hoàn tất đơn (tranh chấp, trả hàng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub order_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub reference: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -3,6 +3,7 @@
 //! miền hay `?site=`). Có `ETag` là dấu vân tay của cả câu trả lời (→ 304) và
 //! `Cache-Control: public, no-cache` như `content` (D-102).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -164,7 +164,7 @@ pub(crate) struct PublicCardResponse {
     /// Price after an automatic discount (module `promotions`); `null` without one.
     pub sale_price: Option<Money>,
     /// When `sale_price` ends; `null`: no end set.
-    pub sale_ends_at: Option<DateTime<Utc>>,
+    pub sale_ends_at: Option<Timestamp>,
     /// Number of variants on sale.
     pub variant_count: i32,
     /// Average rating out of 5 (two decimals); `null` before the first rating.
@@ -227,7 +227,7 @@ fn card(
     };
     let owner = entry.owner_org_id;
     // Giá giảm đã hết (bảng dẫn xuất chưa kịp dựng lại): không hiện.
-    let sale_running = entry.sale_ends_at.is_none_or(|ends| ends > Utc::now());
+    let sale_running = entry.sale_ends_at.is_none_or(|ends| ends > Timestamp::now());
     Ok(PublicCardResponse {
         id: card.product.id,
         name: card.text.name.clone(),
@@ -509,7 +509,7 @@ pub(crate) struct PublicVariant {
     /// strike through in structured data); `null` otherwise.
     pub regular_price: Option<Money>,
     /// When `price` ends (a temporary price), for `priceValidUntil`; `null`: no end set.
-    pub price_valid_until: Option<DateTime<Utc>>,
+    pub price_valid_until: Option<Timestamp>,
     /// Price per base unit when the variant has a net content; `null` otherwise.
     pub unit_price: Option<UnitPrice>,
     /// Address of the product page with this variant chosen (for each `Offer` of a
@@ -518,7 +518,7 @@ pub(crate) struct PublicVariant {
     /// `in_stock`, `backorder` or `preorder`.
     pub sale_mode: String,
     /// For `preorder`: the expected date it is available.
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     /// For `preorder`: the message to show, in the language asked.
     pub preorder_message: Option<String>,
     pub image_media_id: Option<Uuid>,
@@ -902,7 +902,7 @@ pub(crate) struct SitemapItemResponse {
     /// Address of the product in each of its languages.
     pub translations: Vec<PublicTranslation>,
     /// Last change of the product, its texts or its price on this website.
-    pub modified_at: DateTime<Utc>,
+    pub modified_at: Timestamp,
 }
 
 /// List product addresses for the sitemap (public).

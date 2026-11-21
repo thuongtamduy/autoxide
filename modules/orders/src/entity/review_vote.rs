@@ -1,5 +1,6 @@
 //! Bảng `orders_review_votes`: phiếu "hữu ích", mỗi người một phiếu mỗi đánh giá (D-203).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub review_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: Uuid,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

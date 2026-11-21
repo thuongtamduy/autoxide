@@ -5,7 +5,8 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -33,8 +34,8 @@ pub(crate) struct PublicPromotion {
     pub title: String,
     /// Conditions, in full.
     pub terms: String,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     /// Discount in basis points (1000 = 10%), when the promotion has one.
     pub value_bp: Option<i32>,
     /// Discount amount in minor units of `currency`, when the promotion has one.
@@ -86,8 +87,8 @@ pub(crate) struct PublicFlashSale {
     pub title: String,
     /// Conditions, in full.
     pub terms: String,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub currency: String,
     pub items: Vec<PublicFlashItem>,
 }
@@ -209,7 +210,7 @@ impl PromotionsService {
     ) -> Result<Page<PublicFlashSale>, Error> {
         let read = tenant.database().read();
         let now = crate::service::now();
-        let horizon = now + chrono::Duration::hours(FLASH_SALE_HORIZON_HOURS);
+        let horizon = now + SignedDuration::from_hours(FLASH_SALE_HORIZON_HOURS);
         let select = promotion::Entity::find()
             .filter(promotion::Column::Kind.eq(Kind::FlashSale.as_str()))
             .filter(

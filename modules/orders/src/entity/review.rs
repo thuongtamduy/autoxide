@@ -1,5 +1,6 @@
 //! Bảng `orders_reviews`: đánh giá của người đã nhận hàng, một đánh giá mỗi dòng đơn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -22,13 +23,13 @@ pub struct Model {
     pub status: String,
     pub hidden_reason: Option<String>,
     pub hidden_by: Option<Uuid>,
-    pub hidden_at: Option<DateTimeUtc>,
+    pub hidden_at: Option<Timestamp>,
     pub reply: Option<String>,
     pub replied_by: Option<Uuid>,
-    pub replied_at: Option<DateTimeUtc>,
+    pub replied_at: Option<Timestamp>,
     pub helpful_count: i32,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

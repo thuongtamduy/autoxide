@@ -9,6 +9,7 @@
 //! Mọi bước đổi trạng thái chỗ giữ bằng cập nhật có điều kiện `status = 'held'`: xác nhận và trả
 //! cùng lúc chỉ một bên thắng.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -17,7 +18,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_orders::api::{Tender, events as orders};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -86,7 +86,7 @@ impl Tender for PointsTender {
         buyer: Option<Uuid>,
         input: &Value,
         max: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error> {
         let buyer = buyer.ok_or_else(need_account)?;
         let points = input["points"].as_i64().filter(|points| *points > 0).ok_or_else(|| {
@@ -112,7 +112,7 @@ impl CustomersService {
         buyer: Uuid,
         points: i64,
         max: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error> {
         let read = tenant.database().read();
         if let Some(existing) =

@@ -10,6 +10,7 @@
 //!   ledger chống trùng theo mã nên job chạy lại an toàn. Phiếu mang `ledger_status`
 //!   (`pending` / `posted` / `failed` / `not_applicable`); phiếu `failed` ghi lại được.
 
+use autoxide_kernel::time::Date;
 use std::collections::HashMap;
 
 use autoxide_catalog::api::VariantSnapshot;
@@ -25,7 +26,6 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_ledger::api::{
     AccountKey, Counterparty, LineAccount, NewEntry, NewLine, OpenAccount, Side,
 };
-use chrono::NaiveDate;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -86,7 +86,7 @@ pub(crate) struct ReceiptLineInput {
     pub quantity: i64,
     pub unit_cost: Money,
     pub lot_code: Option<String>,
-    pub expires_on: Option<NaiveDate>,
+    pub expires_on: Option<Date>,
     pub serials: Vec<String>,
 }
 
@@ -544,7 +544,8 @@ impl InventoryService {
                 &transaction,
                 tenant,
                 &PostReceipt { id },
-                EnqueueOptions::default().unique_key(format!("receipt:{id}:{}", now().timestamp())),
+                EnqueueOptions::default()
+                    .unique_key(format!("receipt:{id}:{}", now().as_unix_seconds())),
             )
             .await?;
         let row = receipt::Entity::find_by_id(id)

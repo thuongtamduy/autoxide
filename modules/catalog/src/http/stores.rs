@@ -1,5 +1,6 @@
 //! Tuỳ biến theo cửa hàng: cửa hàng ẩn (hay hiện lại) sản phẩm của chuỗi trên website của mình.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -40,7 +40,7 @@ pub(crate) struct StoreOverrideResponse {
     pub org_id: Uuid,
     pub product_id: Uuid,
     pub hidden: bool,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 /// Hide or show a product on a store's website.

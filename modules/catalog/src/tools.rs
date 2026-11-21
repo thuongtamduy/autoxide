@@ -2,6 +2,7 @@
 //! permission như endpoint REST tương ứng, thân là lời gọi service — không có logic riêng (luật
 //! kiến trúc 8).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::reference::Reference;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -128,9 +128,9 @@ pub(crate) struct PriceItemInput {
     /// Struck-through price in minor units, higher than `amount`.
     pub compare_at: Option<String>,
     /// When the price starts; omitted: now.
-    pub valid_from: Option<DateTime<Utc>>,
+    pub valid_from: Option<Timestamp>,
     /// End of a temporary price.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
 }
 
 fn minor(raw: &str, field: &str) -> Result<i64, Error> {
@@ -154,7 +154,7 @@ pub(crate) struct ResolvePriceInput {
     pub currency: String,
     pub customer_group: Option<String>,
     /// Default: now.
-    pub at: Option<DateTime<Utc>>,
+    pub at: Option<Timestamp>,
 }
 
 fn neither_create_nor_update() -> Error {
@@ -372,7 +372,7 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
                 let service = resolve.clone();
                 async move {
                     let currency = Currency::parse(&input.currency)?;
-                    let at = input.at.unwrap_or_else(Utc::now);
+                    let at = input.at.unwrap_or_else(Timestamp::now);
                     let mut query = PriceQuery::new(
                         OrgId::from_uuid(input.org_id),
                         currency,

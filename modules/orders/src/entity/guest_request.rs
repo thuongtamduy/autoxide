@@ -1,6 +1,7 @@
 //! Bảng `orders_guest_requests`: thao tác vãng lai đã làm theo `Idempotency-Key` (gọi lại không làm
 //! hai lần; lớp idempotency HTTP của kernel bỏ qua request chưa đăng nhập).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,7 +17,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub reference: String,
     pub fingerprint: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

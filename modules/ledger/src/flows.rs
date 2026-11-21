@@ -11,6 +11,8 @@
 //! Thứ tự khoá trong transaction (giống mọi đường ghi, không deadlock): dòng tạm giữ → dòng sổ (chia
 //! sẻ) → số dư theo `account_id` tăng dần.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -22,7 +24,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::{Reference, Submitted};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, TenantId, nearest};
-use chrono::{Duration, NaiveDate, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::json;
@@ -205,7 +206,7 @@ struct Plan {
     book: book::Model,
     book_org: OrgId,
     seller: OrgId,
-    day: NaiveDate,
+    day: Date,
     hold_days: i32,
     /// Khấu trừ thay đã tính: (GTGT, TNCN).
     withheld: Option<(Money, Money)>,
@@ -781,7 +782,7 @@ impl LedgerService {
             .column(hold::Column::TenantId)
             .column(hold::Column::Id)
             .filter(hold::Column::Status.eq("held"))
-            .filter(hold::Column::ReleaseAt.lte(Utc::now()))
+            .filter(hold::Column::ReleaseAt.lte(Timestamp::now()))
             .limit(500)
             .into_tuple()
             .all(database.read())
@@ -997,7 +998,7 @@ async fn settle_in(
     }
     if let Some(amount) = create_hold {
         let at = now();
-        let release_at = at + Duration::days(i64::from(plan.hold_days));
+        let release_at = at + SignedDuration::from_hours(24 * (i64::from(plan.hold_days)));
         hold::Entity::insert(hold::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),

@@ -6,7 +6,7 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -36,8 +36,8 @@ pub(crate) struct NoticeExport {
     pub title: String,
     /// Conditions shown to buyers.
     pub terms: String,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     /// Discount in basis points (1000 = 10%), when the promotion has one.
     pub value_bp: Option<i32>,
     /// Discount amount in minor units of `currency`, when the promotion has one.
@@ -69,11 +69,11 @@ pub(crate) struct NoticeEntry {
     pub status: String,
     /// Reference given by the authority, when recorded.
     pub reference: Option<String>,
-    pub submitted_at: Option<DateTime<Utc>>,
+    pub submitted_at: Option<Timestamp>,
     /// Days before the start the notice is due.
     pub days_before: Option<i32>,
     /// Last day to submit (Vietnam date), when a notice is required.
-    pub due_on: Option<NaiveDate>,
+    pub due_on: Option<Date>,
     /// Legal basis of the rule, with its date in force.
     pub legal_basis: Option<String>,
 }
@@ -117,9 +117,9 @@ impl PromotionsService {
                     reference: found.and_then(|row| row.reference.clone()),
                     submitted_at: found.and_then(|row| row.submitted_at),
                     days_before: Some(rule.days_before),
-                    due_on: rule
-                        .notice_required
-                        .then(|| start_day - chrono::Duration::days(i64::from(rule.days_before))),
+                    due_on: rule.notice_required.then(|| {
+                        start_day.checked_sub_days(i64::from(rule.days_before)).unwrap_or(start_day)
+                    }),
                     legal_basis: Some(rule.legal_basis.clone()),
                 });
             }

@@ -1,6 +1,7 @@
 //! `Ledger` giả cho test của `customers`: mở tài khoản theo mục đích, ghi bút toán (chống trùng theo
 //! `reference`), tính số dư theo bên thường. Các hàm khác không dùng.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -15,7 +16,6 @@ use autoxide_ledger::api::{
     LineAccount, NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment,
     OpenAccount, Payment, Payout, Refund, Settled, Settlement, Side,
 };
-use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
 
 #[derive(Default)]
@@ -44,8 +44,8 @@ impl Ledger for FakeLedger {
             book_id: Uuid::nil(),
             org_id: entry.book.as_uuid(),
             period_id: Uuid::nil(),
-            effective_date: Utc::now().date_naive(),
-            posted_at: Utc::now(),
+            effective_date: Timestamp::now().date_utc(),
+            posted_at: Timestamp::now(),
             description: entry.description.clone(),
             source_module: entry.source_module.clone(),
             source_kind: entry.source_kind.clone(),
@@ -110,7 +110,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         key: AccountKey,
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Money, Error> {
         let balance = self.balances.lock().unwrap().get(&key.purpose).copied().unwrap_or(0);
         Ok(Money::new(balance, key.currency))
@@ -141,7 +141,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: &[AccountKey],
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         unused()
     }
@@ -185,7 +185,7 @@ impl Ledger for FakeLedger {
         _: &TenantContext,
         _: Currency,
         _: Currency,
-        _: NaiveDate,
+        _: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         unused()
     }

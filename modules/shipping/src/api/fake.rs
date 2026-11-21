@@ -5,13 +5,13 @@
 //!
 //! Đây cũng là ví dụ cho người viết bộ nối thật (`docs/SHIPPING.md`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, NaiveDate, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
@@ -50,7 +50,7 @@ pub struct FakeWebhookUpdate {
     pub tracking_number: String,
     /// Trạng thái chung (`in_transit`, `delivered`…) — hãng giả dùng luôn trạng thái chung.
     pub status: ShipmentStatus,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     #[serde(default)]
     pub cod_collected: Option<Money>,
 }
@@ -286,8 +286,8 @@ impl ShippingCarrier for FakeCarrier {
     async fn cod_statement(
         &self,
         _account: &CarrierAccount,
-        _from: NaiveDate,
-        _to: NaiveDate,
+        _from: Date,
+        _to: Date,
     ) -> Result<Option<CodStatement>, Error> {
         self.check_available()?;
         Ok(self.state().statement.clone())

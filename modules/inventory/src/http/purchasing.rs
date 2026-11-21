@@ -1,5 +1,6 @@
 //! Endpoint nhập hàng: nhà cung cấp, đơn đặt hàng, phiếu nhập, trả hàng nhà cung cấp.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -76,8 +76,8 @@ pub(crate) struct SupplierResponse {
     /// installed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub payable: Option<Money>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Supplier> for SupplierResponse {
@@ -343,11 +343,11 @@ pub(crate) struct PurchaseOrderResponse {
     pub supplier_id: Uuid,
     /// `draft`, `ordered`, `partially_received`, `received`, `closed` or `cancelled`.
     pub status: String,
-    pub expected_on: Option<NaiveDate>,
+    pub expected_on: Option<Date>,
     pub total: Money,
     pub note: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     pub lines: Vec<PurchaseOrderLineResponse>,
 }
 
@@ -389,7 +389,7 @@ pub(crate) struct PurchaseOrderRequest {
     /// The receiving warehouse.
     pub org_id: Uuid,
     pub supplier_id: Uuid,
-    pub expected_on: Option<NaiveDate>,
+    pub expected_on: Option<Date>,
     /// Up to 500 characters.
     pub note: Option<String>,
     /// 1 to 500 lines, one per variant.
@@ -663,7 +663,7 @@ pub(crate) struct ReceiptLineRequest {
     pub unit_cost: Money,
     /// Required when the variant tracks lots.
     pub lot_code: Option<String>,
-    pub expires_on: Option<NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Exactly `quantity` serial numbers when the variant tracks serials.
     #[serde(default)]
     pub serials: Vec<String>,
@@ -694,7 +694,7 @@ pub(crate) struct ReceiptLineResponse {
     pub quantity: i64,
     pub unit_cost: Money,
     pub lot_code: Option<String>,
-    pub expires_on: Option<NaiveDate>,
+    pub expires_on: Option<Date>,
     pub serials: Vec<String>,
 }
 
@@ -709,13 +709,13 @@ pub(crate) struct ReceiptResponse {
     pub supplier_id: Option<Uuid>,
     pub purchase_order_id: Option<Uuid>,
     pub reference: String,
-    pub posted_at: DateTime<Utc>,
+    pub posted_at: Timestamp,
     pub total: Money,
     /// `pending`, `posted`, `failed` (retry with `POST /receipts/{id}/retry-ledger`) or
     /// `not_applicable` (no supplier, nothing to pay, or module `ledger` not installed).
     pub ledger_status: String,
     pub ledger_entry_id: Option<Uuid>,
-    pub ledger_posted_at: Option<DateTime<Utc>>,
+    pub ledger_posted_at: Option<Timestamp>,
     pub ledger_error_code: Option<String>,
     pub lines: Vec<ReceiptLineResponse>,
 }
@@ -971,7 +971,7 @@ pub(crate) struct ReturnResponse {
     pub supplier_id: Uuid,
     pub receipt_id: Option<Uuid>,
     pub reference: String,
-    pub posted_at: DateTime<Utc>,
+    pub posted_at: Timestamp,
     pub total: Money,
     /// `pending`, `posted`, `failed` or `not_applicable`.
     pub ledger_status: String,

@@ -10,6 +10,7 @@
 //!   hạn xử lý theo cài đặt `orders.warranty_claim_days` (cần đối chiếu quy định về thời hạn sửa
 //!   chữa, NĐ 55/2024 — dữ liệu, không viết cứng); event `orders.warranty_claim_changed`.
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -17,7 +18,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{Datelike, Duration, Months};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -99,7 +99,10 @@ impl OrdersService {
         let transaction = tenant.database().begin_write().await?;
         for item in &lines {
             let Some(months) = months_of(item) else { continue };
-            let ends_at = starts_at.checked_add_months(Months::new(months)).unwrap_or(starts_at);
+            let ends_at = i32::try_from(months)
+                .ok()
+                .and_then(|months| starts_at.checked_add_months(months))
+                .unwrap_or(starts_at);
             let own: Vec<Option<String>> = {
                 let found: Vec<Option<String>> = serials
                     .iter()
@@ -309,7 +312,7 @@ impl OrdersService {
             .ok_or_else(errors::warranty_not_found)?;
         let at = now();
         if found.status != ACTIVE || found.ends_at <= at {
-            return Err(errors::warranty_expired(found.ends_at.date_naive().to_string()));
+            return Err(errors::warranty_expired(found.ends_at.date_utc().to_string()));
         }
         let days = self
             .setting(tenant, org, &WARRANTY_CLAIM_DAYS)
@@ -326,7 +329,7 @@ impl OrdersService {
                 let issue = issue.clone();
                 async move {
                     let transaction = database.begin_write().await?;
-                    let year = at.year();
+                    let year = at.date_utc().year();
                     let sequence = autoxide_kernel::numbering::next(
                         &transaction,
                         tenant.id(),
@@ -342,7 +345,7 @@ impl OrdersService {
                         status: Set("received".to_owned()),
                         issue: Set(issue),
                         resolution: Set(None),
-                        due_at: Set(at + Duration::days(days)),
+                        due_at: Set(at + SignedDuration::from_hours(24 * days)),
                         created_by: Set(user),
                         created_at: Set(at),
                         updated_at: Set(at),

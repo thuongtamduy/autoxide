@@ -1,5 +1,6 @@
 //! Tool MCP của `ledger`: cùng service, cùng permission với REST.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -27,7 +27,7 @@ pub(crate) struct BalanceInput {
     /// Id of the account.
     account_id: Uuid,
     /// End of this day, `YYYY-MM-DD`; omit for the current balance.
-    as_of: Option<NaiveDate>,
+    as_of: Option<Date>,
 }
 
 /// The balance of an account.
@@ -36,7 +36,7 @@ pub(crate) struct BalanceItem {
     account_id: Uuid,
     purpose: String,
     currency: String,
-    as_of: Option<NaiveDate>,
+    as_of: Option<Date>,
     /// Balance on the normal side of the account.
     balance: Money,
 }
@@ -52,9 +52,9 @@ pub(crate) struct EntriesInput {
     /// Only entries for this source document.
     source_id: Option<String>,
     /// Only entries dated on or after this day.
-    from: Option<NaiveDate>,
+    from: Option<Date>,
     /// Only entries dated on or before this day.
-    to: Option<NaiveDate>,
+    to: Option<Date>,
     /// Maximum number of entries, 1 to 200. Defaults to 50.
     limit: Option<u32>,
     /// The `next_cursor` of the previous page.
@@ -68,9 +68,9 @@ pub(crate) struct TrialInput {
     /// Unit of the book; default the tenant's root.
     org_id: Option<Uuid>,
     /// First day, `YYYY-MM-DD`.
-    from: NaiveDate,
+    from: Date,
     /// Last day, `YYYY-MM-DD`.
-    to: NaiveDate,
+    to: Date,
 }
 
 // Trường phẳng (client MCP không đọc `$ref`): dòng khai inline, số tiền là chữ thập phân theo đơn
@@ -93,7 +93,7 @@ pub(crate) struct PostInput {
     /// Unit of the book; default the tenant's root.
     org_id: Option<Uuid>,
     /// Accounting day `YYYY-MM-DD`; default today. Must be in an open period.
-    effective_date: Option<NaiveDate>,
+    effective_date: Option<Date>,
     /// Fixed text, 1 to 200 characters, without personal data (kept for good).
     description: String,
     /// Your id of this entry: sending it again returns the entry already posted.
@@ -383,7 +383,7 @@ pub(crate) struct RateLookupInput {
     /// e.g. `VND`.
     quote: String,
     /// The day, `YYYY-MM-DD`.
-    on: NaiveDate,
+    on: Date,
 }
 
 /// An exchange rate to record.
@@ -397,5 +397,5 @@ pub(crate) struct RateRecordInput {
     /// Units of `quote` for one `base`, decimal string, e.g. `"25345.5"`.
     rate: String,
     /// First day the rate is used, `YYYY-MM-DD`.
-    effective_date: NaiveDate,
+    effective_date: Date,
 }

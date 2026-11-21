@@ -1,5 +1,6 @@
 //! Bảng `orders_returns`: một yêu cầu trả hàng.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -25,13 +26,13 @@ pub struct Model {
     pub currency: String,
     pub reject_reason: Option<String>,
     pub warehouse_org_id: Option<Uuid>,
-    pub requested_at: DateTimeUtc,
-    pub deadline_at: DateTimeUtc,
+    pub requested_at: Timestamp,
+    pub deadline_at: Timestamp,
     pub decided_by: Option<Uuid>,
-    pub decided_at: Option<DateTimeUtc>,
-    pub received_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub decided_at: Option<Timestamp>,
+    pub received_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

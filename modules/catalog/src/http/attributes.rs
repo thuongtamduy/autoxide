@@ -1,6 +1,7 @@
 //! Endpoint quản trị thuộc tính, thuộc tính và quy tắc hàng cấm của danh mục, giá trị thuộc tính
 //! và giấy tờ của sản phẩm, số liệu sản phẩm — dưới `/api/v1/catalog`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -70,7 +70,7 @@ pub(crate) struct AttributeResponse {
     /// Law the attribute comes from, for legally required label contents.
     pub legal_basis: Option<String>,
     pub options: Vec<AttributeOptionDto>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<AttributeDetail> for AttributeResponse {
@@ -293,9 +293,9 @@ pub(crate) struct CategoryAttributeDto {
     #[serde(default = "yes")]
     pub applies_to_descendants: bool,
     /// The rule applies from this day (e.g. when a new labelling rule takes effect).
-    pub effective_from: NaiveDate,
+    pub effective_from: Date,
     /// The rule stops applying on this day.
-    pub effective_to: Option<NaiveDate>,
+    pub effective_to: Option<Date>,
     /// Law the rule comes from.
     pub legal_basis: Option<String>,
 }
@@ -481,8 +481,8 @@ pub(crate) struct RestrictionRuleResponse {
     pub required_documents: Vec<String>,
     pub legal_basis: String,
     pub source_url: String,
-    pub effective_from: NaiveDate,
-    pub effective_to: Option<NaiveDate>,
+    pub effective_from: Date,
+    pub effective_to: Option<Date>,
     pub pack_version: String,
 }
 
@@ -555,7 +555,7 @@ pub(crate) struct StoredValueResponse {
     pub value_text: Option<String>,
     pub value_integer: Option<i64>,
     pub value_boolean: Option<bool>,
-    pub value_date: Option<NaiveDate>,
+    pub value_date: Option<Date>,
     pub option_id: Option<Uuid>,
 }
 
@@ -646,12 +646,12 @@ pub(crate) struct DocumentResponse {
     pub document_type: String,
     pub number: String,
     pub issued_by: String,
-    pub issued_on: NaiveDate,
+    pub issued_on: Date,
     /// The document is valid until the end of this day; `null`: no end.
-    pub expires_on: Option<NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Key of the scanned file in storage.
     pub file_key: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<product_document::Model> for DocumentResponse {
@@ -706,8 +706,8 @@ pub(crate) struct CreateDocumentRequest {
     pub document_type: String,
     pub number: String,
     pub issued_by: String,
-    pub issued_on: NaiveDate,
-    pub expires_on: Option<NaiveDate>,
+    pub issued_on: Date,
+    pub expires_on: Option<Date>,
     /// Key of a scanned file already stored.
     pub file_key: Option<String>,
 }

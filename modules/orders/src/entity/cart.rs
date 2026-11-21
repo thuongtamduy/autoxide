@@ -1,5 +1,6 @@
 //! Bảng `orders_carts`: một giỏ hàng (người mua đăng nhập hay vãng lai).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -24,10 +25,10 @@ pub struct Model {
     pub status: String,
     pub merged_into: Option<Uuid>,
     pub active_buyer_key: Option<String>,
-    pub abandoned_notified_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
-    pub expires_at: DateTimeUtc,
+    pub abandoned_notified_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub expires_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

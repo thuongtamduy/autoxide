@@ -12,6 +12,7 @@ mod public;
 mod purchasing;
 mod reservations;
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -28,7 +29,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, ro
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::Utc;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -63,7 +63,7 @@ pub(crate) fn physical(id: Uuid) -> VariantSnapshot {
         "requires_shipping": true, "track_inventory": true, "sale_mode": "in_stock",
         "preorder_available_on": null, "preorder_limit": null, "preorder_ends_at": null,
         "allow_backorder": false, "lot_tracked": false, "serial_tracked": false,
-        "warranty_months": null, "image_media_id": null, "updated_at": Utc::now(),
+        "warranty_months": null, "image_media_id": null, "updated_at": Timestamp::now(),
     });
     // `VariantSnapshot` là `#[non_exhaustive]`: crate khác dựng qua serde.
     serde_json::from_value(json).unwrap()

@@ -19,6 +19,7 @@ mod tools;
 #[cfg(test)]
 mod tests;
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Permission;
@@ -171,7 +172,7 @@ struct ExpiringRates(Arc<TaxService>);
 impl autoxide_kernel::doctor::Probe for ExpiringRates {
     async fn probe(&self) -> autoxide_kernel::doctor::Finding {
         use autoxide_kernel::doctor::Finding;
-        match self.0.expiring_rates(chrono::Utc::now().date_naive()).await {
+        match self.0.expiring_rates(Timestamp::now().date_utc()).await {
             Ok(None) => Finding::warning("No tax data pack is imported: taxes cannot be computed.")
                 .with_hint("Run `autoxide task tax.import_pack` to import the pack shipped with the server."),
             Ok(Some(expiring)) if expiring.is_empty() => Finding::ok("Every tax rate in force has a rate after it, or does not end."),

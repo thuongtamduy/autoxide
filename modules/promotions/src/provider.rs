@@ -2,6 +2,7 @@
 //! REST và MCP dùng. Thêm: `eligible` (bộ chọn mã của website, D-201) và `automatic_prices` (giá
 //! sau giảm tự động cho danh sách công khai, D-200).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -10,7 +11,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -92,7 +92,7 @@ impl PromotionsService {
                         cart.currency,
                     ),
                     remaining_uses: None,
-                    ends_at: DateTime::<Utc>::MAX_UTC,
+                    ends_at: Timestamp::MAX,
                 }),
                 None => {
                     let reason = result
@@ -122,7 +122,7 @@ impl PromotionsService {
                             terms: String::new(),
                             discount: Money::zero(cart.currency),
                             remaining_uses: None,
-                            ends_at: DateTime::<Utc>::MAX_UTC,
+                            ends_at: Timestamp::MAX,
                         },
                         reason,
                     });
@@ -227,7 +227,7 @@ impl PromotionsService {
         &self,
         tenant: &TenantContext,
         org_id: OrgId,
-        at: DateTime<Utc>,
+        at: Timestamp,
         prices: &[(Uuid, Money)],
     ) -> Result<Vec<AutomaticPrice>, Error> {
         let Some((_, first)) = prices.first() else {
@@ -333,7 +333,7 @@ impl Promotions for Provider {
         &self,
         tenant: &TenantContext,
         org_id: OrgId,
-        at: DateTime<Utc>,
+        at: Timestamp,
         prices: &[(Uuid, Money)],
     ) -> Result<Vec<AutomaticPrice>, Error> {
         self.0.automatic_prices(tenant, org_id, at, prices).await
@@ -350,7 +350,7 @@ impl autoxide_catalog::api::SalePriceSource for SalePrices {
         &self,
         tenant: &TenantContext,
         org_id: OrgId,
-        at: DateTime<Utc>,
+        at: Timestamp,
         prices: &[(Uuid, Money)],
     ) -> Result<Vec<autoxide_catalog::api::SalePrice>, Error> {
         let found = self.0.automatic_prices(tenant, org_id, at, prices).await?;

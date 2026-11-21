@@ -1,6 +1,7 @@
 //! Route REST của dữ liệu cá nhân (D-360) dưới `/api/v1/compliance`: sổ mục đích, thời hạn lưu, sổ
 //! hoạt động xử lý, nơi lưu, sự cố (mốc 72 giờ) và sổ yêu cầu của chủ thể qua kênh khác (D-217).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -13,7 +14,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -356,18 +356,18 @@ pub(crate) struct IncidentResponse {
     /// `open`, `contained`, `reported` or `closed`.
     pub status: String,
     /// When it was detected; the reporting deadline counts from here.
-    pub detected_at: DateTime<Utc>,
+    pub detected_at: Timestamp,
     /// Report to the authority before this time (72 hours by default, legal rule `privacy.incident`).
-    pub report_due_at: DateTime<Utc>,
+    pub report_due_at: Timestamp,
     /// `true` while not reported and past `report_due_at`.
     pub overdue: bool,
-    pub authority_notified_at: Option<DateTime<Utc>>,
+    pub authority_notified_at: Option<Timestamp>,
     pub authority_reference: Option<String>,
-    pub subjects_notified_at: Option<DateTime<Utc>>,
+    pub subjects_notified_at: Option<Timestamp>,
     pub data_categories: Vec<String>,
     pub affected_count: Option<i64>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// The log (`GET /incidents/{id}` only; absent in lists).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entries: Option<Vec<IncidentEntryResponse>>,
@@ -380,7 +380,7 @@ pub(crate) struct IncidentEntryResponse {
     pub id: Uuid,
     pub body: String,
     pub author_user_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<incident_entry::Model> for IncidentEntryResponse {
@@ -400,7 +400,7 @@ pub(crate) fn describe_incident(
 ) -> IncidentResponse {
     let overdue = row.authority_notified_at.is_none()
         && matches!(row.status.as_str(), "open" | "contained")
-        && row.report_due_at < Utc::now();
+        && row.report_due_at < Timestamp::now();
     IncidentResponse {
         id: row.id,
         data_categories: serde_json::from_str(&row.data_categories).unwrap_or_default(),
@@ -443,7 +443,7 @@ pub(crate) struct IncidentRequest {
     /// `low`, `medium`, `high` or `critical`.
     pub severity: String,
     /// When it was detected (not in the future); defaults to now.
-    pub detected_at: Option<DateTime<Utc>>,
+    pub detected_at: Option<Timestamp>,
     #[serde(default)]
     pub data_categories: Vec<String>,
     pub affected_count: Option<i64>,
@@ -462,11 +462,11 @@ pub(crate) struct IncidentChangeRequest {
     pub data_categories: Option<Vec<String>>,
     pub affected_count: Option<i64>,
     /// When the authority was notified (moves an open breach to `reported`).
-    pub authority_notified_at: Option<DateTime<Utc>>,
+    pub authority_notified_at: Option<Timestamp>,
     /// Reference of the report at the authority.
     pub authority_reference: Option<String>,
     /// When the people affected were told.
-    pub subjects_notified_at: Option<DateTime<Utc>>,
+    pub subjects_notified_at: Option<Timestamp>,
 }
 
 /// A line to add to the log.
@@ -742,9 +742,9 @@ pub(crate) struct SubjectRequestResponse {
     pub subject_kind: String,
     /// The user id, email address or phone number (E.164) of the person.
     pub subject: String,
-    pub received_at: DateTime<Utc>,
+    pub received_at: Timestamp,
     /// Answer before this time (legal rule `privacy.subject_requests`).
-    pub due_at: DateTime<Utc>,
+    pub due_at: Timestamp,
     /// `true` while not done and past `due_at`.
     pub overdue: bool,
     /// `received`, `in_progress`, `fulfilled` or `rejected`.
@@ -752,14 +752,14 @@ pub(crate) struct SubjectRequestResponse {
     pub reason: Option<String>,
     pub notes: Option<String>,
     pub handled_by: Option<Uuid>,
-    pub closed_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub closed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 pub(crate) fn describe_request(row: subject_request::Model) -> SubjectRequestResponse {
     let overdue =
-        matches!(row.status.as_str(), "received" | "in_progress") && row.due_at < Utc::now();
+        matches!(row.status.as_str(), "received" | "in_progress") && row.due_at < Timestamp::now();
     SubjectRequestResponse {
         id: row.id,
         kind: row.kind,
@@ -791,7 +791,7 @@ pub(crate) struct SubjectRequestRequest {
     /// The person: a user id, an email address or a phone number.
     pub subject: String,
     /// When it was received (not in the future); defaults to now. The due date counts from here.
-    pub received_at: Option<DateTime<Utc>>,
+    pub received_at: Option<Timestamp>,
     pub notes: Option<String>,
 }
 

@@ -7,6 +7,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Date;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
@@ -152,7 +153,7 @@ impl EventHandler for ErasedUsers {
             .col_expr(profile::Column::EmailLower, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::FullName, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::FullNameSearch, Expr::value(Option::<String>::None))
-            .col_expr(profile::Column::Birthday, Expr::value(Option::<chrono::NaiveDate>::None))
+            .col_expr(profile::Column::Birthday, Expr::value(Option::<Date>::None))
             .col_expr(profile::Column::Gender, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::BirthdayMd, Expr::value(Option::<String>::None))
             .col_expr(profile::Column::CustomFields, Expr::value("{}"))

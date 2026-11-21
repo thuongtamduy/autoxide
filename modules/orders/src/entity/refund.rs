@@ -1,5 +1,6 @@
 //! Bảng `orders_refunds`: một lượt hoàn tiền của đơn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -20,8 +21,8 @@ pub struct Model {
     pub ledger_refund_id: Option<Uuid>,
     pub reason: String,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

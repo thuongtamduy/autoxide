@@ -1,5 +1,6 @@
 //! Đối soát tiền thu hộ (COD): bảng kê của hãng và chênh lệch (`shipping.cod.manage`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,8 +32,8 @@ pub(crate) struct ImportRequest {
     /// The carrier's reference of the statement; importing it again with the same content does
     /// nothing.
     reference: Option<String>,
-    period_from: NaiveDate,
-    period_to: NaiveDate,
+    period_from: Date,
+    period_to: Date,
     /// ISO 4217 code of the amounts in the CSV (default `VND`).
     currency: Option<String>,
     /// The CSV text.
@@ -50,14 +50,14 @@ pub(crate) struct StatementBody {
     id: Uuid,
     carrier_account_id: Uuid,
     reference: String,
-    period_from: NaiveDate,
-    period_to: NaiveDate,
+    period_from: Date,
+    period_to: Date,
     total_cod: Money,
     total_fee: Money,
     net_paid: Money,
     /// `reconciled` or `has_mismatch`.
     status: String,
-    imported_at: DateTime<Utc>,
+    imported_at: Timestamp,
 }
 
 /// A line of a carrier statement.
@@ -253,8 +253,8 @@ pub(crate) struct DiscrepancyBody {
     resolution_code: Option<String>,
     resolution_note: String,
     resolved_by: Option<Uuid>,
-    resolved_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    resolved_at: Option<Timestamp>,
+    created_at: Timestamp,
 }
 
 pub(crate) fn discrepancy(row: cod_discrepancy::Model) -> DiscrepancyBody {

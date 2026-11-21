@@ -1,5 +1,6 @@
 //! Tool MCP của `tax`: cùng service, cùng permission với REST; đều chỉ đọc.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -41,7 +41,7 @@ pub(crate) struct QuoteInput {
     /// Tax jurisdiction, e.g. `VN`.
     jurisdiction: String,
     /// Day the tax applies, `YYYY-MM-DD`.
-    tax_point: NaiveDate,
+    tax_point: Date,
     /// The selling unit; default the tenant's root.
     seller_org_id: Option<Uuid>,
     /// `exclusive` (amounts before taxes) or `inclusive`.
@@ -60,7 +60,7 @@ pub(crate) struct RatesInput {
     /// Tax jurisdiction, e.g. `VN`.
     jurisdiction: String,
     /// Day, `YYYY-MM-DD`; default today.
-    on: Option<NaiveDate>,
+    on: Option<Date>,
 }
 
 /// A rate in force.
@@ -136,7 +136,7 @@ pub(crate) fn all(service: &Arc<TaxService>) -> Vec<Tool> {
                 let service = rates.clone();
                 async move {
                     principal.require(&READ)?;
-                    let on = input.on.unwrap_or_else(|| chrono::Utc::now().date_naive());
+                    let on = input.on.unwrap_or_else(|| Timestamp::now().date_utc());
                     let day = on.format("%Y-%m-%d").to_string();
                     let tables = service.tables().await?;
                     let list: Vec<RateItem> = tables

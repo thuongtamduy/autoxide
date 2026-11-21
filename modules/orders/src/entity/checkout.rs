@@ -1,5 +1,6 @@
 //! Bảng `orders_checkouts`: một lượt đặt hàng (chống trùng theo `Idempotency-Key`, giữ chỗ).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,8 +17,8 @@ pub struct Model {
     pub state: String,
     pub failure_code: Option<String>,
     pub holds: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -5,6 +5,8 @@ use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
 
@@ -35,7 +37,7 @@ pub(crate) struct Deadlines {
     /// Người mua huỷ được ngay lúc này không.
     pub buyer_can_cancel: bool,
     /// Hạn yêu cầu đổi trả (khi đã giao).
-    pub return_until: Option<chrono::DateTime<chrono::Utc>>,
+    pub return_until: Option<Timestamp>,
 }
 
 /// Bộ lọc danh sách đơn của nhân viên.
@@ -84,7 +86,7 @@ impl OrdersService {
             return_until: row
                 .delivered_at
                 .filter(|_| row.status != crate::api::OrderStatus::Cancelled.as_str())
-                .map(|at| at + chrono::Duration::days(policy.return_window_days)),
+                .map(|at| at + SignedDuration::from_hours(24 * policy.return_window_days)),
         };
         let advance = self.advance_plan(read, tenant, row.id).await?;
         Ok(OrderView { order: row, lines, payments, pickup, deadlines, advance })

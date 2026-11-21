@@ -1,6 +1,7 @@
 //! Endpoint đổi trả và hoàn tiền: người mua yêu cầu trả; nhân viên duyệt / nhận hàng / hoàn / đóng;
 //! nhân viên hoàn tay và xem các lượt hoàn của đơn.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -153,12 +153,12 @@ pub(crate) struct ReturnResponse {
     reject_reason: Option<String>,
     /// Warehouse that received the items.
     warehouse_org_id: Option<Uuid>,
-    requested_at: DateTime<Utc>,
+    requested_at: Timestamp,
     /// End of the return window of the order.
-    deadline_at: DateTime<Utc>,
-    decided_at: Option<DateTime<Utc>>,
-    received_at: Option<DateTime<Utc>>,
-    updated_at: DateTime<Utc>,
+    deadline_at: Timestamp,
+    decided_at: Option<Timestamp>,
+    received_at: Option<Timestamp>,
+    updated_at: Timestamp,
 }
 
 impl ReturnResponse {
@@ -262,7 +262,7 @@ pub(crate) struct ReturnPreviewResponse {
     /// Estimate from the payment method of the order; absent when unknown.
     refund_eta: Option<RefundEtaResponse>,
     /// Last moment to ask.
-    deadline_at: DateTime<Utc>,
+    deadline_at: Timestamp,
     /// Whether this reason needs photos.
     photos_required: bool,
 }
@@ -550,8 +550,8 @@ pub(crate) struct RefundResponse {
     status: String,
     reason: String,
     reference: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl RefundResponse {

@@ -10,7 +10,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
-use chrono::Duration;
+use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait,
     QueryFilter, Set,
@@ -99,8 +99,9 @@ impl GroupRule {
             condition = condition.add(profile::Column::OrdersCount.gte(min));
         }
         if let Some(days) = self.last_order_within_days {
-            condition =
-                condition.add(profile::Column::LastOrderAt.gte(now() - Duration::days(days)));
+            condition = condition.add(
+                profile::Column::LastOrderAt.gte(now() - SignedDuration::from_hours(24 * days)),
+            );
         }
         if !self.tier_in.is_empty() {
             condition = condition.add(profile::Column::TierCode.is_in(self.tier_in.clone()));

@@ -1,5 +1,6 @@
 //! Bảng `customers_referral_rules`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,8 +16,8 @@ pub struct Model {
     pub referee_promotion_id: Option<Uuid>,
     pub min_first_order_minor: i64,
     pub currency: String,
-    pub effective_from: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub effective_from: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

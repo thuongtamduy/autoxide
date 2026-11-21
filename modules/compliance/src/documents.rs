@@ -4,6 +4,7 @@
 //! nào, kèm SHA-256 của chính bản đã hiện. Bản đòi chấp nhận lại chặn ở `AcceptanceGate` tới khi chấp
 //! nhận.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde_json::json;
@@ -51,7 +51,7 @@ pub(crate) struct NewVersion {
     pub locale: String,
     pub title: String,
     pub body: String,
-    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_from: Option<Timestamp>,
     pub requires_reacceptance: bool,
     /// Thêm bản dịch cho số phiên bản đã có.
     pub version: Option<i32>,
@@ -311,7 +311,7 @@ impl ComplianceService {
         connection: &C,
         tenant: &TenantContext,
         doc: &document::Model,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<i32>, Error> {
         let rows = version::Entity::find()
             .scoped(tenant)
@@ -356,7 +356,7 @@ impl ComplianceService {
             .filter(document::Column::OrgKey.eq(""))
             .all(read)
             .await?;
-        let at = Utc::now();
+        let at = Timestamp::now();
         let mut pending = Vec::new();
         for doc in documents {
             let Some(required) = Self::required_version(read, tenant, &doc, at).await? else {
@@ -478,7 +478,8 @@ impl ComplianceService {
     ) -> Result<(), Error> {
         let read = tenant.database().read();
         let Some(doc) = Self::document_by_kind(read, tenant, kind).await? else { return Ok(()) };
-        let Some(required) = Self::required_version(read, tenant, &doc, Utc::now()).await? else {
+        let Some(required) = Self::required_version(read, tenant, &doc, Timestamp::now()).await?
+        else {
             return Ok(());
         };
         if Self::has_accepted(read, tenant, &doc, subject, required).await? {
@@ -501,7 +502,7 @@ impl ComplianceService {
         let current = version::Entity::find()
             .scoped(tenant)
             .filter(version::Column::DocumentId.eq(doc.id))
-            .filter(version::Column::EffectiveFrom.lte(Utc::now()))
+            .filter(version::Column::EffectiveFrom.lte(Timestamp::now()))
             .order_by_desc(version::Column::Version)
             .one(read)
             .await?;
@@ -568,7 +569,7 @@ impl ComplianceService {
         let latest = version::Entity::find()
             .scoped(tenant)
             .filter(version::Column::DocumentId.eq(doc.id))
-            .filter(version::Column::EffectiveFrom.lte(Utc::now()))
+            .filter(version::Column::EffectiveFrom.lte(Timestamp::now()))
             .order_by_desc(version::Column::Version)
             .one(read)
             .await?

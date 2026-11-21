@@ -1,12 +1,12 @@
 //! Tuỳ chọn (màu, cỡ…), biến thể (SKU, mã vạch, cân nặng, chế độ bán) và thành phần combo.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, QueryOrder, Set,
@@ -43,9 +43,9 @@ pub(crate) struct NewVariant {
     pub option_value_ids: Vec<Uuid>,
     pub active: Option<bool>,
     pub sale_mode: Option<SaleMode>,
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     pub preorder_limit: Option<i64>,
-    pub preorder_ends_at: Option<DateTime<Utc>>,
+    pub preorder_ends_at: Option<Timestamp>,
     pub preorder_messages: BTreeMap<String, String>,
     pub weight_grams: Option<i64>,
     /// Lượng tịnh (cùng `net_unit`): tính đơn giá theo đơn vị cơ sở (D-201).
@@ -67,9 +67,9 @@ pub(crate) struct VariantChecked {
     pub option_value_ids: Vec<Uuid>,
     pub active: bool,
     pub sale_mode: &'static str,
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     pub preorder_limit: Option<i64>,
-    pub preorder_ends_at: Option<DateTime<Utc>>,
+    pub preorder_ends_at: Option<Timestamp>,
     pub preorder_messages: Option<String>,
     pub weight_grams: Option<i64>,
     /// Lượng tịnh (cùng `net_unit`): tính đơn giá theo đơn vị cơ sở (D-201).
@@ -237,7 +237,7 @@ pub(crate) fn check_variant(
     if mode == SaleMode::Preorder {
         // Ngày có hàng phải sau hôm nay (D-204). So theo ngày UTC: lệch múi giờ của nút chỉ làm
         // ranh giới sớm / muộn vài giờ, không cho đặt một ngày đã qua.
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         if input.preorder_available_on.is_none_or(|day| day <= today) {
             problems.push(FieldError::new(
                 "preorder_available_on",
@@ -474,9 +474,9 @@ pub(crate) struct VariantChanges {
     pub option_value_ids: Option<Vec<Uuid>>,
     pub active: Option<bool>,
     pub sale_mode: Option<SaleMode>,
-    pub preorder_available_on: Option<Option<NaiveDate>>,
+    pub preorder_available_on: Option<Option<Date>>,
     pub preorder_limit: Option<Option<i64>>,
-    pub preorder_ends_at: Option<Option<DateTime<Utc>>>,
+    pub preorder_ends_at: Option<Option<Timestamp>>,
     pub preorder_messages: Option<BTreeMap<String, String>>,
     pub weight_grams: Option<Option<i64>>,
     pub net_quantity: Option<Option<i64>>,
@@ -744,7 +744,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         changes: VariantChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<variant::Model, Error> {
         let actor = Actor::from(principal);
         let position = changes.position;

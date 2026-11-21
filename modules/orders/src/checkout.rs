@@ -17,8 +17,9 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::numbering;
 use autoxide_kernel::reference::{self, Submitted};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_promotions::api::ReserveRequest as PromotionHold;
-use chrono::{Datelike, Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -375,7 +376,7 @@ impl OrdersService {
 
         // 4–5. Giữ chỗ ngoài transaction.
         let org = OrgId::from_uuid(row.org_id);
-        let hold_until = now + Duration::minutes(self.config.hold_minutes);
+        let hold_until = now + SignedDuration::from_mins(self.config.hold_minutes);
         let mut holds = Holds::default();
         let held = self
             .hold_all(tenant, order_id, org, None, &quote, &price_input, hold_until, &mut holds)
@@ -428,7 +429,10 @@ impl OrdersService {
             method,
             funds_flow,
             holds: &holds,
-            due: now + Duration::minutes(self.config.hold_minutes - self.config.hold_grace_minutes),
+            due: now
+                + SignedDuration::from_mins(
+                    self.config.hold_minutes - self.config.hold_grace_minutes,
+                ),
             buyer_key,
             custom_fields,
             advance,
@@ -492,7 +496,7 @@ impl OrdersService {
         fixed: Option<OrgId>,
         quote: &Quote,
         input: &pricing::PriceInput,
-        until: chrono::DateTime<Utc>,
+        until: Timestamp,
         holds: &mut Holds,
     ) -> Result<(), Error> {
         let tracked: Vec<ReserveLine> = quote
@@ -589,7 +593,7 @@ impl OrdersService {
                 if closed.rows_affected == 0 {
                     return Err(errors::cart_closed());
                 }
-                let year = now.year();
+                let year = now.date_utc().year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.order:{year}"))
                         .await?;
@@ -667,7 +671,7 @@ struct Draft<'a> {
     funds_flow: FundsFlow,
     holds: &'a Holds,
     /// Hạn thanh toán tạm, tới khi `ledger` trả hạn thật (D-218).
-    due: chrono::DateTime<Utc>,
+    due: Timestamp,
     /// Khoá liên hệ của số điện thoại người mua (tra đơn, gắn đơn, chống bom hàng).
     buyer_key: Option<String>,
     /// Ô người mua nhập đã kiểm (JSON).

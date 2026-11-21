@@ -7,6 +7,8 @@
 //! Gọi `Catalog` (qua `evaluate`) TRƯỚC khi mở transaction; transaction chạy lại được
 //! (`write_with_retry`) vì không gọi ra ngoài.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::error::Error;
@@ -14,7 +16,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Datelike, Utc};
 use sea_orm::ExprTrait;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
@@ -90,12 +91,12 @@ fn exhausted(counter: &Counter) -> Error {
 }
 
 /// Khoá kỳ của hạn mức mỗi người theo giờ địa phương.
-fn period_key(period: Period, local: chrono::NaiveDate) -> String {
+fn period_key(period: Period, local: Date) -> String {
     match period {
         Period::Lifetime => "lifetime".to_owned(),
         Period::Day => local.to_string(),
         Period::Week => {
-            let week = local.iso_week();
+            let week = local.to_jiff().iso_week_date();
             format!("{}-W{:02}", week.year(), week.week())
         }
         Period::Month => format!("{}-{:02}", local.year(), local.month()),
@@ -130,7 +131,7 @@ impl PromotionsService {
     ) -> Result<Vec<Counter>, Error> {
         let cart = &outcome.cart;
         let zone = self.timezone(tenant, cart.org_id).await?;
-        let local = cart.at.with_timezone(&zone).date_naive();
+        let local = cart.at.date_in(&zone);
         let mut keys: Vec<String> = cart.buyer_keys.clone();
         keys.sort();
         keys.dedup();
@@ -204,7 +205,7 @@ impl PromotionsService {
     ) -> Result<Submitted<Redemption>, Error> {
         let at = now();
         if request.expires_at <= at
-            || request.expires_at > at + chrono::Duration::hours(self.config.max_hold_hours)
+            || request.expires_at > at + SignedDuration::from_hours(self.config.max_hold_hours)
         {
             return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
                 "expires_at",
@@ -230,7 +231,7 @@ impl PromotionsService {
         }
         let counters = self.counters(tenant, &outcome).await?;
         let zone = self.timezone(tenant, request.cart.org_id).await?;
-        let day = request.cart.at.with_timezone(&zone).date_naive().to_string();
+        let day = request.cart.at.date_in(&zone).to_string();
         let order_value: i64 = request
             .cart
             .lines
@@ -770,7 +771,7 @@ async fn give_back<C: ConnectionTrait>(
     tenant: &TenantContext,
     found: &hold::Model,
     keep_usage: &[Uuid],
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<(), Error> {
     let tenant_id = tenant.id().as_uuid();
     let quantity = -found.quantity;
@@ -1042,10 +1043,11 @@ impl PromotionsService {
 #[cfg(test)]
 mod tests {
     use super::{Period, period_key};
+    use autoxide_kernel::time::Date;
 
     #[test]
     fn khoa_ky_theo_ngay_tuan_thang() {
-        let day = chrono::NaiveDate::from_ymd_opt(2026, 11, 18).unwrap();
+        let day = Date::new(2026, 11, 18).unwrap();
         assert_eq!(period_key(Period::Lifetime, day), "lifetime");
         assert_eq!(period_key(Period::Day, day), "2026-11-18");
         assert_eq!(period_key(Period::Week, day), "2026-W47");

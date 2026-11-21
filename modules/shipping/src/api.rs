@@ -15,12 +15,12 @@
 //! `shipping` **không phụ thuộc `orders`**: nhận yêu cầu giao qua event (tên ở [`events`]), payload
 //! `after.shipment` là [`ShipmentRequest`]; báo trạng thái qua event của chính nó.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::fmt;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -77,7 +77,7 @@ pub struct BuyerAddress {
     pub address: Address,
     pub postal_code: Option<String>,
     pub is_default: bool,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 /// Sổ địa chỉ của người mua, cho `orders` (giỏ, đặt hàng).
@@ -115,18 +115,13 @@ pub struct QuoteRequest {
     /// Giá trị đơn sau giảm giá, để xét miễn phí vận chuyển.
     pub order_value: Money,
     /// Lúc tính (ngày giao dự kiến, giờ chốt).
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     /// Ngôn ngữ của tên phương thức.
     pub locale: String,
 }
 
 impl QuoteRequest {
-    pub fn new(
-        org_id: OrgId,
-        items: Vec<QuoteItem>,
-        order_value: Money,
-        at: DateTime<Utc>,
-    ) -> Self {
+    pub fn new(org_id: OrgId, items: Vec<QuoteItem>, order_value: Money, at: Timestamp) -> Self {
         QuoteRequest {
             org_id,
             origin_org_id: None,
@@ -252,19 +247,19 @@ impl MethodKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[non_exhaustive]
 pub struct Eta {
-    pub earliest_date: NaiveDate,
-    pub latest_date: NaiveDate,
+    pub earliest_date: Date,
+    pub latest_date: Date,
     /// Đặt trước lúc này thì kịp chuyến hôm nay (giờ chốt còn trong ngày), không thì `None`.
-    pub order_by: Option<DateTime<Utc>>,
+    pub order_by: Option<Timestamp>,
     /// Múi giờ IANA của hai ngày trên, vd `Asia/Ho_Chi_Minh`.
     pub time_zone: String,
 }
 
 impl Eta {
     pub fn new(
-        earliest_date: NaiveDate,
-        latest_date: NaiveDate,
-        order_by: Option<DateTime<Utc>>,
+        earliest_date: Date,
+        latest_date: Date,
+        order_by: Option<Timestamp>,
         time_zone: impl Into<String>,
     ) -> Self {
         Eta { earliest_date, latest_date, order_by, time_zone: time_zone.into() }
@@ -296,7 +291,7 @@ pub struct ShippingOption {
     pub estimated_days: Option<(u16, u16)>,
     pub eta: Option<Eta>,
     /// Nhận tại cửa hàng: lúc hàng sẵn sàng (chuẩn bị + giờ mở cửa).
-    pub ready_at: Option<DateTime<Utc>>,
+    pub ready_at: Option<Timestamp>,
     /// Nhận tại cửa hàng: số ngày giữ hàng chờ nhận.
     pub hold_days: Option<u16>,
     /// Dấu vân tay (phương thức, số tiền, đích) — `orders` gửi lại khi đặt; lệch →
@@ -628,7 +623,7 @@ pub struct ShipmentEvent {
     pub carrier_code: Option<String>,
     /// Với `shipping.cod_collected` / `cod_settled`: số tiền COD của vận đơn.
     pub cod_amount: Option<Money>,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
 }
 
 pub use carrier::*;

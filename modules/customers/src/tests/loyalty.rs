@@ -3,10 +3,11 @@
 
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::root_of;
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::{AccountKey, Ledger};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Datelike, Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -165,7 +166,7 @@ async fn points_hold_released_when_order_cancelled_or_hold_expires() {
         let tenant = shop.default_tenant();
         let tender = shop.points_tender();
         let buyer = Some(Uuid::from_u128(BUYER));
-        let until = Utc::now() + Duration::minutes(30);
+        let until = Timestamp::now() + SignedDuration::from_mins(30);
 
         // Đơn bị huỷ → điểm về.
         let cancelled = Order::of(BUYER, shop.tree.a, 200_000);
@@ -258,7 +259,7 @@ async fn concurrent_redemptions_never_overdraw() {
             let tenant = tenant.clone();
             tasks.spawn(async move {
                 let reference = format!("orders:{}", Uuid::now_v7());
-                let until = Utc::now() + Duration::minutes(30);
+                let until = Timestamp::now() + SignedDuration::from_mins(30);
                 tender
                     .hold(
                         &tenant,
@@ -300,7 +301,7 @@ async fn points_ledger_liability_equals_outstanding_points_value() {
         let order = completed_order(&shop, 3_000_000).await; // 300 điểm × 1.000
         let tenant = shop.default_tenant();
         let paid = Order::of(BUYER, shop.tree.a, 1_000_000);
-        let until = Utc::now() + Duration::minutes(30);
+        let until = Timestamp::now() + SignedDuration::from_mins(30);
         shop.points_tender()
             .hold(
                 &tenant,
@@ -416,7 +417,7 @@ async fn voucher_sinh_nhat_moi_nam_mot_lan() {
     TestDatabase::run(async |test| {
         let shop = shop(test).await;
         reward(&shop, "birthday", json!({})).await;
-        let today = (Utc::now() + Duration::hours(7)).date_naive();
+        let today = (Timestamp::now() + SignedDuration::from_hours(7)).date_utc();
         let birthday = format!("1990-{:02}-{:02}", today.month(), today.day());
         let (status, body) =
             call(&shop, "PUT", "/me", "buyer", Some(json!({"birthday": birthday}))).await;

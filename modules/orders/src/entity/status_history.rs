@@ -1,5 +1,6 @@
 //! Bảng `orders_status_history`: một lần đổi trạng thái của đơn (chỉ thêm).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     pub cause: String,
     pub actor_id: Option<Uuid>,
     pub reason: Option<String>,
-    pub at: DateTimeUtc,
+    pub at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

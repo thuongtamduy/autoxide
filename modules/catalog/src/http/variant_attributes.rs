@@ -1,5 +1,6 @@
 //! Thuộc tính theo biến thể (website bán hàng): `GET` / `PUT /variants/{id}/attributes`.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -9,7 +10,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -60,7 +60,7 @@ pub(crate) struct VariantAttributeResponse {
     pub value_text: Option<String>,
     pub value_integer: Option<i64>,
     pub value_boolean: Option<bool>,
-    pub value_date: Option<NaiveDate>,
+    pub value_date: Option<Date>,
     pub option_id: Option<Uuid>,
     /// Translations of `value_text`.
     pub texts: BTreeMap<String, String>,

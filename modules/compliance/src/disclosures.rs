@@ -7,6 +7,8 @@
 //! NĐ 85/2021/NĐ-CP (cung cấp thông tin khi cơ quan yêu cầu), Luật Bảo vệ dữ liệu cá nhân
 //! 91/2025/QH15 (cung cấp dữ liệu cá nhân theo yêu cầu của cơ quan có thẩm quyền).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +16,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -49,7 +50,7 @@ pub(crate) struct NewDisclosure {
     pub authority: String,
     pub request_reference: String,
     pub legal_basis: String,
-    pub requested_at: Option<DateTime<Utc>>,
+    pub requested_at: Option<Timestamp>,
     pub subject: String,
     pub fields: Vec<String>,
 }
@@ -112,7 +113,7 @@ impl ComplianceService {
         }
         let at = now();
         let requested_at = input.requested_at.unwrap_or(at);
-        if requested_at > at + Duration::minutes(5) {
+        if requested_at > at + SignedDuration::from_mins(5) {
             problems.push(FieldError::new("requested_at", "range", "must not be in the future"));
         }
         if !problems.is_empty() {

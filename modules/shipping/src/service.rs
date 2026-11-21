@@ -5,11 +5,11 @@
 //! Mọi hàm chạm database nhận `&TenantContext` và lọc mọi truy vấn bằng `.scoped(tenant)` (bước
 //! 33). Không gọi hãng vận chuyển (mạng) trong transaction ghi.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::error::FieldError;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
 
 use crate::config::ShippingConfig;
@@ -99,8 +99,8 @@ impl ShippingService {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai
 /// database trả về cùng một giá trị và so bằng nhau được.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Kiểm độ dài chuỗi theo ký tự.
@@ -122,8 +122,8 @@ pub(crate) fn check_length(
 }
 
 /// Cắt một thời điểm tới micro giây (như [`now`]).
-pub(crate) fn micros(at: DateTime<Utc>) -> DateTime<Utc> {
-    at.trunc_subsecs(6)
+pub(crate) fn micros(at: Timestamp) -> Timestamp {
+    at.truncate(jiff::Unit::Microsecond)
 }
 
 /// Lỗi vi phạm unique: thông báo của database.

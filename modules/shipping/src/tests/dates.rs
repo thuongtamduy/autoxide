@@ -2,6 +2,8 @@
 //! chốt riêng, `eta` trong báo giá, giờ sẵn sàng và hạn giữ hàng của nhận tại cửa hàng, ước tính
 //! công khai bằng đúng báo giá của giỏ một dòng. Cả SQLite và Postgres.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::HashMap;
 
 use autoxide_catalog::api::{
@@ -10,7 +12,6 @@ use autoxide_catalog::api::{
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{Datelike, Utc};
 
 use super::rates::{Tree, method, rates, zone};
 use super::*;
@@ -34,7 +35,7 @@ impl FakeCatalog {
             "requires_shipping": true, "track_inventory": true, "sale_mode": "in_stock",
             "preorder_available_on": null, "preorder_limit": null, "preorder_ends_at": null,
             "allow_backorder": false, "lot_tracked": false, "serial_tracked": false,
-            "warranty_months": null, "image_media_id": null, "updated_at": Utc::now(),
+            "warranty_months": null, "image_media_id": null, "updated_at": Timestamp::now(),
         }))
         .unwrap();
         FakeCatalog { variant }
@@ -151,18 +152,18 @@ async fn dated_shop(test: &TestDatabase) -> (TestApp, Tree, String, String) {
 async fn ngay_giao_theo_lich_va_ngay_nghi() {
     TestDatabase::run(async |test| {
         let (app, tree, _, calendar) = dated_shop(test).await;
-        let tz = chrono_tz::Asia::Ho_Chi_Minh;
-        let today = Utc::now().with_timezone(&tz).date_naive();
+        let tz = autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let today = Timestamp::now().date_in(&tz);
         let body = json!({"org_id": tree.a.as_uuid(),
             "destination": {"country": "VN", "province_code": "01", "commune_code": "00004", "line": "1"},
             "items": [{"variant_id": Uuid::now_v7(), "quantity": 1, "weight_grams": 300}], "order_value": vnd(1)});
         let (_, quote) = call(&app, "POST", "/quote", "boss", Some(body.clone())).await;
         let eta = &quote["data"]["options"][0]["eta"];
         assert_eq!(eta["time_zone"], "Asia/Ho_Chi_Minh", "{quote}");
-        let earliest: chrono::NaiveDate = serde_json::from_value(eta["earliest_date"].clone()).unwrap();
-        assert!(earliest > today && earliest <= today + chrono::Duration::days(2), "{eta}");
+        let earliest: Date = serde_json::from_value(eta["earliest_date"].clone()).unwrap();
+        assert!(earliest > today && earliest <= today.checked_add_days(2).unwrap(), "{eta}");
         // Ngày mai nghỉ: ngày giao sớm nhất lùi qua ngày nghỉ.
-        let tomorrow = today.succ_opt().unwrap();
+        let tomorrow = today.succ().unwrap();
         let (status, _) = call(
             &app,
             "PUT",
@@ -173,7 +174,7 @@ async fn ngay_giao_theo_lich_va_ngay_nghi() {
         .await;
         assert_eq!(status, StatusCode::OK);
         let (_, quote) = call(&app, "POST", "/quote", "boss", Some(body)).await;
-        let later: chrono::NaiveDate =
+        let later: Date =
             serde_json::from_value(quote["data"]["options"][0]["eta"]["earliest_date"].clone()).unwrap();
         assert!(later > tomorrow, "{quote}");
         let (_, detail) = call(&app, "GET", &format!("/calendars/{calendar}"), "boss", None).await;
@@ -248,8 +249,8 @@ async fn nhan_tai_cua_hang_gio_san_sang_va_han_giu() {
         let option = &quote["data"]["options"][0];
         assert_eq!(option["kind"], "pickup", "{quote}");
         assert_eq!(option["hold_days"], 3);
-        let ready: chrono::DateTime<Utc> = serde_json::from_value(option["ready_at"].clone()).unwrap();
-        assert!(ready >= Utc::now() + chrono::Duration::minutes(119), "{option}");
+        let ready: Timestamp = serde_json::from_value(option["ready_at"].clone()).unwrap();
+        assert!(ready >= Timestamp::now() + SignedDuration::from_mins(119), "{option}");
     })
     .await
     .unwrap();

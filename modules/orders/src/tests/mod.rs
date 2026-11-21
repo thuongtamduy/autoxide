@@ -23,6 +23,8 @@ mod warranty_fields;
 pub(crate) use fake_ledger::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -40,7 +42,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext};
 use autoxide_shipping::api::{Quote, QuoteRequest, ShippingOption, ShippingRates};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -64,7 +65,7 @@ pub(crate) fn physical(id: Uuid, org: OrgId) -> VariantSnapshot {
         "track_inventory": true, "sale_mode": SaleMode::InStock, "preorder_available_on": null,
         "preorder_limit": null, "preorder_ends_at": null, "allow_backorder": false,
         "lot_tracked": false, "serial_tracked": false, "warranty_months": null,
-        "image_media_id": null, "updated_at": Utc::now(),
+        "image_media_id": null, "updated_at": Timestamp::now(),
     }))
     .unwrap()
 }
@@ -100,12 +101,12 @@ impl FakeCatalog {
         self.prices.lock().unwrap().insert(id, money(price));
     }
 
-    fn price(&self, id: Uuid, at: chrono::DateTime<Utc>) -> Option<PriceSnapshot> {
+    fn price(&self, id: Uuid, at: Timestamp) -> Option<PriceSnapshot> {
         let amount = *self.prices.lock().unwrap().get(&id)?;
         serde_json::from_value(json!({
             "variant_id": id, "price_list_id": Uuid::nil(), "price_id": Uuid::nil(),
             "amount": amount, "tax_inclusive": true, "compare_at": null,
-            "valid_from": at - Duration::days(60), "valid_to": null,
+            "valid_from": at - SignedDuration::from_hours(24 * 60), "valid_to": null,
         }))
         .ok()
     }
@@ -555,7 +556,7 @@ pub(crate) fn keyed_shipment_event(
         "shipment_id": uuid::Uuid::now_v7(), "order_id": order, "request_key": request_key,
         "direction": "outbound", "org_id": uuid::Uuid::nil(), "status": status,
         "tracking_number": "T1", "carrier_code": "fake", "cod_amount": cod.map(money),
-        "at": Utc::now(),
+        "at": Timestamp::now(),
     }})
 }
 

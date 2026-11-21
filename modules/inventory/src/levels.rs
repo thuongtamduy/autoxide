@@ -8,7 +8,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reasons::{ReasonDefault, ReasonList};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -58,8 +58,8 @@ pub(crate) struct MovementFilter {
     pub org_id: Option<Uuid>,
     pub variant_id: Option<Uuid>,
     pub kind: Option<MovementKind>,
-    pub from: Option<DateTime<Utc>>,
-    pub to: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
+    pub to: Option<Timestamp>,
 }
 
 /// Một dòng của lệnh điều chỉnh.
@@ -75,7 +75,7 @@ pub(crate) struct AdjustLine {
     /// Lô: bắt buộc khi thêm hàng của biến thể theo dõi lô; khi bớt thì trống = lô hết hạn trước.
     pub lot_code: Option<String>,
     /// Hạn dùng của lô khi thêm hàng.
-    pub expires_on: Option<chrono::NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Đủ `|quantity|` số serial khi biến thể theo dõi serial.
     pub serials: Vec<String>,
 }

@@ -3,6 +3,7 @@
 //! (`promotions.publish`); duyệt xong mới thành suất flash sale. Phần giảm của sản phẩm người bán
 //! góp do chính người bán trả (`funding`).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter,
@@ -70,9 +70,9 @@ pub(crate) struct ParticipationView {
     pub status: String,
     pub items: Vec<ParticipationItem>,
     pub reviewed_by: Option<Uuid>,
-    pub reviewed_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub reviewed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 fn items_of(row: &participation::Model) -> Vec<ParticipationItem> {

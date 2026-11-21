@@ -2,6 +2,7 @@
 //! lần, khớp đúng mã + số tiền, sai số tiền / không có mã / tiền lần hai / tiền đến muộn vào hàng
 //! chờ, xử lý tay ghi như đã thu, kiểu kéo theo con trỏ, webhook sai chữ ký.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
@@ -10,7 +11,6 @@ use autoxide_kernel::payment::BankFeed;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 use autoxide_testkit::{FakeBankFeed, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::Utc;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -191,7 +191,7 @@ async fn sai_so_tien_va_khong_ma_vao_hang_cho_roi_xu_ly_tay() {
             autoxide_kernel::payment::BankDirection::Debit,
             vnd(10_000),
             "phi",
-            Utc::now(),
+            Timestamp::now(),
         );
         push(&app, &[debit]).await;
         drain(&app).await;

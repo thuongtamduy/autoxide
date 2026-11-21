@@ -1,12 +1,12 @@
 //! `Tender` thẻ quà tặng / số dư cắm vào `orders`, và kiểm tra của `autoxide doctor`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_orders::api::Tender;
-use chrono::{DateTime, Utc};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -30,7 +30,7 @@ impl Tender for GiftCardTender {
         buyer: Option<Uuid>,
         input: &Value,
         max: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error> {
         // Cần tài khoản: bộ đếm tra sai theo người; khách vãng lai dùng chung một bộ đếm thì người
         // đoán mã sẽ chặn mọi khách vãng lai khác.
@@ -69,7 +69,7 @@ impl Tender for StoreCreditTender {
         buyer: Option<Uuid>,
         input: &Value,
         max: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error> {
         self.0.stored_value_allowed(tenant, &STORE_CREDIT).await?;
         let buyer = buyer.ok_or_else(need_account)?;

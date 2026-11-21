@@ -2,6 +2,7 @@
 //! ngoài cây bị bỏ; thuộc tính chỉ giữ giá trị đúng kiểu của danh mục; ảnh không có trong `media` bị
 //! từ chối ngay; mô hình không đọc ảnh → 503.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::ai::{Part, TextModel};
@@ -88,7 +89,7 @@ async fn shoes(app: &TestApp) -> String {
     assert_eq!(status, StatusCode::OK, "{saved}");
     let body = json!({"code": "pairs", "data_type": "integer", "names": {"vi": "Số đôi"}});
     let (_, pairs) = call(app, "POST", "/attributes", "boss", Some(body)).await;
-    let today = chrono::Utc::now().date_naive();
+    let today = Timestamp::now().date_utc();
     let body = json!({"attributes": [
         {"attribute_id": color, "required": false, "effective_from": today},
         {"attribute_id": pairs["data"]["id"], "required": true, "effective_from": today}

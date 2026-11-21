@@ -13,6 +13,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod product {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -38,9 +39,9 @@ pub(crate) mod product {
         pub default_locale: String,
         pub ai_assisted: bool,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
-        pub activated_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
+        pub activated_at: Option<Timestamp>,
         pub ever_active: bool,
     }
 
@@ -49,6 +50,7 @@ pub(crate) mod product {
 }
 
 pub(crate) mod translation {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -68,7 +70,7 @@ pub(crate) mod translation {
         pub meta_description: Option<String>,
         pub search_key: String,
         pub name_key: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -117,6 +119,8 @@ pub(crate) mod option_value {
 }
 
 pub(crate) mod variant {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -136,7 +140,7 @@ pub(crate) mod variant {
         pub sale_mode: String,
         pub preorder_available_on: Option<Date>,
         pub preorder_limit: Option<i64>,
-        pub preorder_ends_at: Option<DateTimeUtc>,
+        pub preorder_ends_at: Option<Timestamp>,
         /// JSON `{locale: lời nhắn}`.
         pub preorder_messages: Option<String>,
         pub weight_grams: Option<i64>,
@@ -144,8 +148,8 @@ pub(crate) mod variant {
         pub width_mm: Option<i64>,
         pub height_mm: Option<i64>,
         pub image_media_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// Lượng tịnh (m0012).
         pub net_quantity: Option<i64>,
         pub net_unit: Option<String>,
@@ -177,6 +181,7 @@ pub(crate) mod product_media {
 }
 
 pub(crate) mod category {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -190,8 +195,8 @@ pub(crate) mod category {
         pub depth: i32,
         pub position: i32,
         pub visible: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -275,6 +280,7 @@ pub(crate) mod bundle_component {
 }
 
 pub(crate) mod price_list {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -302,8 +308,8 @@ pub(crate) mod price_list {
         pub priority: i32,
         pub active: bool,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -311,6 +317,7 @@ pub(crate) mod price_list {
 }
 
 pub(crate) mod price {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -325,14 +332,14 @@ pub(crate) mod price {
         pub amount_minor: i64,
         pub amount_currency: String,
         pub compare_at_minor: Option<i64>,
-        pub valid_from: DateTimeUtc,
-        pub valid_to: Option<DateTimeUtc>,
+        pub valid_from: Timestamp,
+        pub valid_to: Option<Timestamp>,
         /// `manual`, `derived`, `bulk`, `import` (D-222).
         pub source: String,
         pub reference: Option<String>,
         pub reference_fingerprint: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -340,6 +347,7 @@ pub(crate) mod price {
 }
 
 pub(crate) mod price_guard {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -356,8 +364,8 @@ pub(crate) mod price_guard {
         pub min_margin_bp: Option<i64>,
         /// `warn` hay `block`.
         pub action: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -365,6 +373,7 @@ pub(crate) mod price_guard {
 }
 
 pub(crate) mod variant_cost {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -378,7 +387,7 @@ pub(crate) mod variant_cost {
         pub variant_id: Uuid,
         pub unit_cost_minor: i64,
         pub currency: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -386,6 +395,7 @@ pub(crate) mod variant_cost {
 }
 
 pub(crate) mod attribute {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -404,7 +414,7 @@ pub(crate) mod attribute {
         pub names: String,
         pub filterable: bool,
         pub legal_basis: Option<String>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -433,6 +443,7 @@ pub(crate) mod attribute_option {
 }
 
 pub(crate) mod category_attribute {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -456,6 +467,7 @@ pub(crate) mod category_attribute {
 }
 
 pub(crate) mod product_attribute {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -482,6 +494,7 @@ pub(crate) mod product_attribute {
 /// Dữ liệu luật dùng chung mọi khách (mặt điều khiển, D-198): không có `tenant_id`, đọc ở database
 /// điều khiển.
 pub(crate) mod restriction_rule {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -527,6 +540,8 @@ pub(crate) mod category_restriction {
 }
 
 pub(crate) mod product_document {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -544,7 +559,7 @@ pub(crate) mod product_document {
         pub issued_on: Date,
         pub expires_on: Option<Date>,
         pub file_key: Option<String>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -552,6 +567,7 @@ pub(crate) mod product_document {
 }
 
 pub(crate) mod rounding_rule {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -566,7 +582,7 @@ pub(crate) mod rounding_rule {
         /// `up`, `down`, `nearest`.
         pub mode: String,
         pub ending_minor: Option<i64>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -574,6 +590,7 @@ pub(crate) mod rounding_rule {
 }
 
 pub(crate) mod price_change {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -590,8 +607,8 @@ pub(crate) mod price_change {
         pub operation: String,
         pub value: i64,
         pub rounding_rule_id: Option<Uuid>,
-        pub valid_from: DateTimeUtc,
-        pub valid_to: Option<DateTimeUtc>,
+        pub valid_from: Timestamp,
+        pub valid_to: Option<Timestamp>,
         /// `draft`, `previewed`, `approved`, `applied`, `cancelled`.
         pub status: String,
         pub affected: i64,
@@ -599,8 +616,8 @@ pub(crate) mod price_change {
         pub preview: Option<String>,
         pub created_by: Option<Uuid>,
         pub approved_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -608,6 +625,7 @@ pub(crate) mod price_change {
 }
 
 pub(crate) mod storefront_entry {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -628,14 +646,14 @@ pub(crate) mod storefront_entry {
         pub max_price_minor: i64,
         pub compare_at_minor: Option<i64>,
         pub sale_price_minor: Option<i64>,
-        pub sale_ends_at: Option<DateTimeUtc>,
+        pub sale_ends_at: Option<Timestamp>,
         pub best_selling: i64,
         /// Điểm đánh giá × 100 (0 = chưa có).
         pub rating_x100: i32,
         pub rating_count: i64,
         pub variant_count: i32,
-        pub published_at: DateTimeUtc,
-        pub refreshed_at: DateTimeUtc,
+        pub published_at: Timestamp,
+        pub refreshed_at: Timestamp,
         /// Đơn giá theo đơn vị cơ sở của biến thể rẻ nhất có lượng tịnh (m0012).
         pub unit_price_minor: Option<i64>,
         pub unit_price_unit: Option<String>,
@@ -646,6 +664,7 @@ pub(crate) mod storefront_entry {
 }
 
 pub(crate) mod store_override {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -658,7 +677,7 @@ pub(crate) mod store_override {
         pub org_id: Uuid,
         pub product_id: Uuid,
         pub hidden: bool,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -666,6 +685,7 @@ pub(crate) mod store_override {
 }
 
 pub(crate) mod synonym {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -678,7 +698,7 @@ pub(crate) mod synonym {
         pub position: i32,
         /// JSON danh sách từ đã bỏ dấu, chữ thường (`search::fold`).
         pub terms: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -687,6 +707,7 @@ pub(crate) mod synonym {
 
 /// Bộ sưu tập sản phẩm (bước 55).
 pub(crate) mod collection {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -707,11 +728,11 @@ pub(crate) mod collection {
         pub media_id: Option<Uuid>,
         /// `draft`, `active`, `archived`.
         pub status: String,
-        pub starts_at: Option<DateTimeUtc>,
-        pub ends_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub starts_at: Option<Timestamp>,
+        pub ends_at: Option<Timestamp>,
+        pub created_at: Timestamp,
         /// Phiên bản (`ETag`).
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
         /// Chữ soạn từ gợi ý của AI (nhãn khi công khai).
         pub ai_assisted: bool,
     }

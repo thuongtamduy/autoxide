@@ -15,8 +15,9 @@ use autoxide_compliance::api::{ConsentEvidence, ConsentKey, ConsentSubject};
 use autoxide_kernel::entitlement::Feature;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_notifications::api::{Category, Channel, NotificationKind, NotificationTemplate};
-use chrono::{DateTime, Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -73,8 +74,8 @@ pub(crate) fn key() -> ConsentKey {
 }
 
 /// Còn trong thời gian chờ của loại đó không (đã báo trong 7 ngày qua).
-pub(crate) fn cooling(alerted_at: Option<DateTime<Utc>>, at: DateTime<Utc>) -> bool {
-    alerted_at.is_some_and(|when| when > at - Duration::days(COOLDOWN_DAYS))
+pub(crate) fn cooling(alerted_at: Option<Timestamp>, at: Timestamp) -> bool {
+    alerted_at.is_some_and(|when| when > at - SignedDuration::from_hours(24 * COOLDOWN_DAYS))
 }
 
 /// Giảm đủ ngưỡng: `mới × 10000 ≤ mốc × (10000 − bp)` (số nguyên `i128`, không làm tròn).

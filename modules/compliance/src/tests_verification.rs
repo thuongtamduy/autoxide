@@ -2,6 +2,8 @@
 //! qua SMS giả, số tài khoản mỗi số, số lần sai, hết hạn, giới hạn số mã, hai lần xác nhận cùng lúc
 //! chỉ một bên thắng, cổng đăng nội dung theo chính sách của khách, mức định danh từ KYC.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -270,7 +272,7 @@ async fn sai_qua_so_lan_het_han_va_gioi_han_so_ma() {
         phone_challenge::Entity::update_many()
             .col_expr(
                 phone_challenge::Column::ExpiresAt,
-                Expr::value(chrono::Utc::now() - chrono::Duration::minutes(1)),
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(1)),
             )
             .exec(app.database().write())
             .await

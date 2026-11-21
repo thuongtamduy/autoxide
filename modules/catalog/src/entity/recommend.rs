@@ -2,6 +2,7 @@
 
 /// Một sản phẩm trong một đơn hoàn tất (`orders.order_completed`).
 pub(crate) mod sold_product {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -14,7 +15,7 @@ pub(crate) mod sold_product {
         pub order_id: Uuid,
         pub product_id: Uuid,
         pub quantity: i64,
-        pub completed_at: DateTimeUtc,
+        pub completed_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -23,6 +24,7 @@ pub(crate) mod sold_product {
 
 /// Số bán trong 90 ngày và tổng điểm đánh giá của một sản phẩm.
 pub(crate) mod product_stat {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -37,7 +39,7 @@ pub(crate) mod product_stat {
         pub rating_count: i64,
         /// Tổng số sao của mọi đánh giá đang hiện (1–5 mỗi đánh giá).
         pub rating_sum: i64,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -46,6 +48,7 @@ pub(crate) mod product_stat {
 
 /// "Thường mua cùng": số đơn chứa cả `product_id` và `other_product_id` trong 90 ngày.
 pub(crate) mod co_purchase {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -58,7 +61,7 @@ pub(crate) mod co_purchase {
         pub product_id: Uuid,
         pub other_product_id: Uuid,
         pub orders_count: i64,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -67,6 +70,7 @@ pub(crate) mod co_purchase {
 
 /// Vector ý nghĩa của một sản phẩm ở một ngôn ngữ.
 pub(crate) mod embedding {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -84,7 +88,7 @@ pub(crate) mod embedding {
         pub dimensions: i32,
         /// `f32` little-endian nối nhau (`autoxide_kernel::ai::vector::encode`), đã chuẩn hoá.
         pub vector: Vec<u8>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -93,6 +97,7 @@ pub(crate) mod embedding {
 
 /// Một sản phẩm tương tự của `product_id` ở ngôn ngữ `locale`, tính sẵn lúc lập index.
 pub(crate) mod similar_product {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -107,7 +112,7 @@ pub(crate) mod similar_product {
         pub other_product_id: Uuid,
         /// Cosine × 10 000 (số nguyên để sắp như nhau trên hai database).
         pub score: i32,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

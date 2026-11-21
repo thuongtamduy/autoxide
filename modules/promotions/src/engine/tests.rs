@@ -1,11 +1,12 @@
 //! Test thuần của bộ tính: không database (bộ tính không chạm database), nên chạy giống nhau ở
 //! cả hai gate. Test qua service / REST ở `crate::tests`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::OrgId;
-use chrono::{DateTime, TimeZone, Utc};
 use uuid::Uuid;
 
 use super::caps::{self, LineCap};
@@ -17,8 +18,8 @@ fn vnd() -> Currency {
     Currency::parse("VND").unwrap()
 }
 
-fn at() -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 11, 18, 3, 0, 0).unwrap()
+fn at() -> Timestamp {
+    Timestamp::from_utc(2026, 11, 18, 3, 0, 0).unwrap()
 }
 
 /// Chương trình mặc định: giảm tự động 10% mọi dòng của cửa hàng `org`.
@@ -46,8 +47,8 @@ fn program(org: Uuid) -> Program {
         max_add_on_quantity: None,
         gift_quantity: None,
         first_order_only: false,
-        starts_at: at() - chrono::Duration::days(1),
-        ends_at: at() + chrono::Duration::days(1),
+        starts_at: at() - SignedDuration::from_hours(24),
+        ends_at: at() + SignedDuration::from_hours(24),
         priority: 0,
         exclusivity: Exclusivity::None,
         combines_with: [PromotionClass::Product, PromotionClass::Order, PromotionClass::Shipping]
@@ -119,7 +120,7 @@ impl Fixture {
             cart: &self.cart,
             variants: &self.variants,
             ancestors: &ancestors,
-            local: self.cart.at.naive_utc() + chrono::Duration::hours(7),
+            local: jiff::tz::Offset::constant(7).to_datetime(self.cart.at.to_jiff()),
             best_for_buyer: self.best,
             max_vouchers_per_class: 1,
             unlocked: &self.unlocked,

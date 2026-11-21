@@ -10,7 +10,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::NaiveDate;
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Map, Value, json};
@@ -30,7 +30,7 @@ pub(crate) const GENDERS: [&str; 3] = ["female", "male", "other"];
 pub(crate) struct Details {
     pub full_name: Option<String>,
     pub email: Option<String>,
-    pub birthday: Option<NaiveDate>,
+    pub birthday: Option<Date>,
     pub gender: Option<String>,
     pub custom_fields: Option<Map<String, Value>>,
 }
@@ -325,7 +325,7 @@ impl CustomersService {
         principal: &Principal,
         id: Uuid,
         details: Details,
-        expected: Option<chrono::DateTime<chrono::Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<profile::Model, Error> {
         let current = self.visible(tenant, principal, &MANAGE, id).await?;
         let mut problems = Vec::new();
@@ -375,7 +375,7 @@ impl CustomersService {
             ));
         }
         if let Some(birthday) = details.birthday
-            && birthday > now().date_naive()
+            && birthday > now().date_utc()
         {
             problems.push(FieldError::new("birthday", "invalid", "must not be in the future"));
         }
@@ -409,7 +409,7 @@ impl CustomersService {
         actor: Actor,
         id: Uuid,
         details: Details,
-        expected: Option<chrono::DateTime<chrono::Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<profile::Model, Error> {
         let transaction = tenant.database().begin_write().await?;
         let current = autoxide_kernel::rows::lock_one(
@@ -530,7 +530,7 @@ fn new_row(
     user_id: Option<Uuid>,
     phone_key: Option<String>,
     phone: Option<String>,
-    at: chrono::DateTime<chrono::Utc>,
+    at: Timestamp,
 ) -> profile::ActiveModel {
     profile::ActiveModel {
         id: Set(Uuid::now_v7()),

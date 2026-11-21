@@ -1,5 +1,6 @@
 //! Bảng `customers_order_facts`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,9 +19,9 @@ pub struct Model {
     pub currency: String,
     pub net_minor: i64,
     pub refunded_minor: i64,
-    pub placed_at: DateTimeUtc,
-    pub completed_at: Option<DateTimeUtc>,
-    pub updated_at: DateTimeUtc,
+    pub placed_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -3,6 +3,7 @@
 //! tới coi như mất trên đường) hay huỷ (chỉ khi còn nháp). Mọi chuyển trạng thái khoá dòng phiếu
 //! trước (`rows::lock_one`), nên gửi / nhận hai lần cùng lúc chỉ một lần có hiệu lực.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::numbering;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::Datelike;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait,
@@ -155,7 +155,7 @@ pub(crate) async fn document_number<C: ConnectionTrait>(
     tenant: &TenantContext,
     prefix: &str,
 ) -> Result<String, Error> {
-    let year = now().year();
+    let year = now().date_utc().year();
     let next =
         numbering::next(transaction, tenant.id(), &format!("inventory.{prefix}:{year}")).await?;
     Ok(format!("{prefix}-{year}-{next:06}"))
@@ -678,7 +678,7 @@ impl InventoryService {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct LotPiece {
     lot_code: Option<String>,
-    expires_on: Option<chrono::NaiveDate>,
+    expires_on: Option<Date>,
     quantity: i64,
 }
 
@@ -711,7 +711,7 @@ fn slice_pieces(
     pieces: &[LotPiece],
     skip: i64,
     take: i64,
-) -> Vec<(Option<String>, Option<chrono::NaiveDate>, i64)> {
+) -> Vec<(Option<String>, Option<Date>, i64)> {
     if pieces.is_empty() {
         return vec![(None, None, take)];
     }
@@ -760,6 +760,7 @@ impl InventoryService {
 #[cfg(test)]
 mod tests {
     use super::{LotPiece, slice_pieces};
+    use autoxide_kernel::time::Date;
 
     #[test]
     fn chia_lo_khi_nhan_tung_phan() {
@@ -769,7 +770,7 @@ mod tests {
             quantity,
         };
         let pieces = [piece("A", 3), piece("B", 4)];
-        let codes = |parts: Vec<(Option<String>, Option<chrono::NaiveDate>, i64)>| {
+        let codes = |parts: Vec<(Option<String>, Option<Date>, i64)>| {
             parts.into_iter().map(|(code, _, q)| (code.unwrap_or_default(), q)).collect::<Vec<_>>()
         };
         assert_eq!(codes(slice_pieces(&pieces, 0, 2)), [("A".to_owned(), 2)]);

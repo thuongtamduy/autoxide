@@ -12,7 +12,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::Utc;
+use autoxide_kernel::time::Timestamp;
 use serde_json::Value;
 
 use crate::http_cases::ComplaintChannelResponse;
@@ -47,7 +47,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         surface: &str,
     ) -> Result<(Vec<String>, Option<String>), Error> {
-        let rule = self.rule_for(tenant, "moderation.hide_reasons", Utc::now()).await?;
+        let rule = self.rule_for(tenant, "moderation.hide_reasons", Timestamp::now()).await?;
         let legal_basis = rule.as_ref().map(|row| row.legal_basis.clone());
         let body = rule.and_then(|row| serde_json::from_str::<Value>(&row.body).ok());
         Ok((reasons_of(body.as_ref(), surface), legal_basis))
@@ -71,7 +71,7 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
     ) -> Result<ComplaintChannelResponse, Error> {
-        let rule = self.rule_for(tenant, "cases.deadlines", Utc::now()).await?;
+        let rule = self.rule_for(tenant, "cases.deadlines", Timestamp::now()).await?;
         let legal_basis = rule.as_ref().map(|row| row.legal_basis.clone());
         let deadlines = self.deadlines_of(tenant, "consumer_complaint").await?;
         Ok(ComplaintChannelResponse {

@@ -1,11 +1,12 @@
 //! Event của `orders` (module giả phát): xác nhận, huỷ, nhập lại hàng trả về, huỷ riêng phần đặt
 //! trước — nhận lại nhiều lần vẫn chỉ áp một lần.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Outbox;
 use autoxide_testkit::{TestApp, TestDatabase};
-use chrono::{Duration, Utc};
 use serde_json::json;
 use std::sync::Mutex;
 use uuid::Uuid;
@@ -46,7 +47,7 @@ async fn nhan_lai_event_xac_nhan_huy_va_tra_hang() {
         let api = shop.api::<dyn Inventory>().unwrap();
         let tenant = shop.default_tenant();
         let reserve = |order: Uuid| {
-            ReserveRequest::new(order, shop.tree.a, Utc::now() + Duration::minutes(30), vec![ReserveLine::new("1", item, 3)])
+            ReserveRequest::new(order, shop.tree.a, Timestamp::now() + SignedDuration::from_mins(30), vec![ReserveLine::new("1", item, 3)])
         };
         let (kept, dropped) = (Uuid::now_v7(), Uuid::now_v7());
         api.reserve(&tenant, &reserve(kept)).await.unwrap();
@@ -123,7 +124,7 @@ async fn huy_rieng_phan_dat_truoc_tra_suat_dung_mot_lan() {
         let request = ReserveRequest::new(
             order,
             shop.tree.a,
-            Utc::now() + Duration::minutes(30),
+            Timestamp::now() + SignedDuration::from_mins(30),
             vec![ReserveLine::new("ready", ready, 2), ReserveLine::new("pre", pre, 4)],
         );
         api.reserve(&tenant, &request).await.unwrap();
@@ -133,7 +134,7 @@ async fn huy_rieng_phan_dat_truoc_tra_suat_dung_mot_lan() {
             ReserveRequest::new(
                 Uuid::now_v7(),
                 shop.tree.a,
-                Utc::now() + Duration::minutes(30),
+                Timestamp::now() + SignedDuration::from_mins(30),
                 vec![ReserveLine::new("pre", pre, quantity)],
             )
         };

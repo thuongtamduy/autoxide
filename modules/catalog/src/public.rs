@@ -3,12 +3,12 @@
 //! `catalog_storefront_entries` (xem `storefront.rs`); mọi bộ lọc thành subquery có index, không
 //! đổ danh sách ID ra bộ nhớ.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, Site, TenantContext};
-use chrono::Utc;
 use sea_orm::sea_query::Query;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::Value;
@@ -66,7 +66,7 @@ pub(crate) struct PublicFilter {
     /// Bộ sưu tập (bước 55): thuộc một trong các danh mục này (gồm danh mục con).
     pub category_ids: Vec<Uuid>,
     /// Bộ sưu tập: lên kệ từ thời điểm này.
-    pub published_after: Option<chrono::DateTime<Utc>>,
+    pub published_after: Option<Timestamp>,
     /// Bộ sưu tập chọn tay: chỉ sản phẩm đã chọn của bộ sưu tập này.
     pub collection: Option<Uuid>,
 }
@@ -121,7 +121,7 @@ pub(crate) struct PublicCategory {
 pub(crate) struct SitemapItem {
     pub entry: storefront_entry::Model,
     pub translations: Vec<translation::Model>,
-    pub modified_at: chrono::DateTime<Utc>,
+    pub modified_at: Timestamp,
 }
 
 /// Tên theo ngôn ngữ từ JSON `{locale: tên}`; thiếu thì tên đầu tiên.
@@ -431,7 +431,7 @@ impl CatalogService {
         let query = crate::api::PriceQuery::new(
             OrgId::from_uuid(card.entry.org_id),
             currency,
-            Utc::now(),
+            Timestamp::now(),
             variants.iter().map(|row| row.id).collect(),
         );
         let prices = self
@@ -527,7 +527,7 @@ impl CatalogService {
             select = select.filter(translation::Column::Locale.eq(locale));
         }
         let texts = select.order_by_asc(translation::Column::Locale).all(read).await?;
-        let products: HashMap<Uuid, chrono::DateTime<Utc>> = product::Entity::find()
+        let products: HashMap<Uuid, Timestamp> = product::Entity::find()
             .filter(product::Column::Id.is_in(ids))
             .scoped(tenant)
             .all(read)

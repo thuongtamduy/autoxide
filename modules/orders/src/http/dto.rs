@@ -2,8 +2,8 @@
 //! người gọi API.
 
 use autoxide_kernel::money::Money;
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_promotions::api::{AppliedPromotion, RejectedCode};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -26,9 +26,9 @@ pub(crate) struct LineProblemResponse {
 #[schema(as = OrdersPreorderInfo)]
 pub(crate) struct PreorderResponse {
     /// Expected date the item arrives (shop time zone).
-    available_on: Option<NaiveDate>,
+    available_on: Option<Date>,
     /// Pre-orders close at.
-    ends_at: Option<DateTime<Utc>>,
+    ends_at: Option<Timestamp>,
 }
 
 /// One cart line, priced again by the server.
@@ -125,8 +125,8 @@ pub(crate) struct ShippingOptionResponse {
     /// Store of a pickup option.
     pickup_org_id: Option<Uuid>,
     /// Earliest and latest expected delivery dates.
-    eta_earliest: Option<NaiveDate>,
-    eta_latest: Option<NaiveDate>,
+    eta_earliest: Option<Date>,
+    eta_latest: Option<Date>,
 }
 
 /// Delivery part of a cart.
@@ -229,11 +229,11 @@ pub(crate) struct CartResponse {
     /// Send it to `POST /checkout`: checkout refuses with `orders.quote_changed` when prices,
     /// discounts or fees changed since.
     quote_token: String,
-    quote_expires_at: DateTime<Utc>,
+    quote_expires_at: Timestamp,
     /// Guests only, once, when the cart is created: send it back in the `Cart-Token` header.
     #[serde(skip_serializing_if = "Option::is_none")]
     cart_token: Option<String>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 /// Advance payment terms of a cart with pre-ordered items.
@@ -262,7 +262,7 @@ pub(crate) struct CartAdvanceLineResponse {
     line_key: String,
     amount: Money,
     /// Cancelling after this may keep part of the advance; `null`: always refunded in full.
-    commit_at: Option<DateTime<Utc>>,
+    commit_at: Option<Timestamp>,
 }
 
 impl CartAdvanceResponse {
@@ -367,9 +367,9 @@ pub(crate) struct CartSummaryResponse {
     currency: String,
     buyer_user_id: Option<Uuid>,
     /// When `orders.cart_abandoned` was sent.
-    abandoned_notified_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    abandoned_notified_at: Option<Timestamp>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<crate::entity::cart::Model> for CartSummaryResponse {
@@ -446,10 +446,10 @@ pub(crate) struct OrderResponse {
     /// Lines; empty in lists.
     lines: Vec<OrderLineResponse>,
     /// Pay before this, or the order is cancelled.
-    payment_due_at: Option<DateTime<Utc>>,
-    placed_at: DateTime<Utc>,
-    confirmed_at: Option<DateTime<Utc>>,
-    cancelled_at: Option<DateTime<Utc>>,
+    payment_due_at: Option<Timestamp>,
+    placed_at: Timestamp,
+    confirmed_at: Option<Timestamp>,
+    cancelled_at: Option<Timestamp>,
     cancel_reason: Option<String>,
     /// Changes on every update (for `If-Match`).
     version: i32,
@@ -467,7 +467,7 @@ pub(crate) struct OrderResponse {
     buyer_can_cancel: Option<bool>,
     /// Until when a return can be requested (delivered orders); omitted in lists.
     #[serde(skip_serializing_if = "Option::is_none")]
-    return_until: Option<DateTime<Utc>>,
+    return_until: Option<Timestamp>,
     /// Pre-ordered items paid in part; omitted in lists and for orders paid in full.
     #[serde(skip_serializing_if = "Option::is_none")]
     advance: Option<OrderAdvanceResponse>,
@@ -484,7 +484,7 @@ pub(crate) struct OrderAdvanceResponse {
     /// or `cancelled`.
     status: String,
     /// Pay the balance before this (once asked).
-    balance_due_at: Option<DateTime<Utc>>,
+    balance_due_at: Option<Timestamp>,
 }
 
 /// An order waiting in store.
@@ -496,10 +496,10 @@ pub(crate) struct PickupResponse {
     /// The 6-digit code to show at the counter; only in your own order.
     #[serde(skip_serializing_if = "Option::is_none")]
     code: Option<String>,
-    ready_at: DateTime<Utc>,
+    ready_at: Timestamp,
     /// Held until then.
-    hold_until: DateTime<Utc>,
-    handed_over_at: Option<DateTime<Utc>>,
+    hold_until: Timestamp,
+    handed_over_at: Option<Timestamp>,
 }
 
 impl OrderResponse {
@@ -635,7 +635,7 @@ pub(crate) struct PaymentActionResponse {
     qr_payload: Option<String>,
     /// Transfer content the bank transfer must carry.
     transfer_code: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// For `GET /public/payments/{token}`.
     status_token: String,
 }
@@ -678,7 +678,7 @@ pub(crate) struct PublicPaymentResponse {
     /// `pending`, `succeeded`, `failed`, `expired`.
     status: String,
     amount: Money,
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     order_number: String,
     order_status: String,
 }

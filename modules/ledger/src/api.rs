@@ -11,7 +11,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -189,7 +189,7 @@ pub struct NewEntry {
     /// Nút sở hữu sổ (đơn vị kế toán).
     pub book: OrgId,
     /// Ngày hạch toán; bỏ trống: hôm nay theo múi giờ của nút.
-    pub effective_date: Option<NaiveDate>,
+    pub effective_date: Option<Date>,
     /// Chữ cố định của module (đi vào chuỗi băm, không xoá được): **không** chứa tên, email, số
     /// điện thoại — người và khách chỉ nêu bằng ID trong `source_id`.
     pub description: String,
@@ -230,7 +230,7 @@ impl NewEntry {
     }
 
     #[must_use]
-    pub fn on(mut self, day: NaiveDate) -> Self {
+    pub fn on(mut self, day: Date) -> Self {
         self.effective_date = Some(day);
         self
     }
@@ -256,7 +256,7 @@ pub struct NewReversal {
     pub source_module: String,
     pub reference: String,
     /// Bỏ trống: hôm nay theo múi giờ của nút.
-    pub effective_date: Option<NaiveDate>,
+    pub effective_date: Option<Date>,
 }
 
 impl NewReversal {
@@ -269,7 +269,7 @@ impl NewReversal {
     }
 
     #[must_use]
-    pub fn on(mut self, day: NaiveDate) -> Self {
+    pub fn on(mut self, day: Date) -> Self {
         self.effective_date = Some(day);
         self
     }
@@ -299,8 +299,8 @@ pub struct Entry {
     pub org_id: Uuid,
     pub period_id: Uuid,
     /// Accounting day, `YYYY-MM-DD`.
-    pub effective_date: NaiveDate,
-    pub posted_at: DateTime<Utc>,
+    pub effective_date: Date,
+    pub posted_at: Timestamp,
     pub description: String,
     pub source_module: String,
     pub source_kind: String,
@@ -315,7 +315,7 @@ pub struct Entry {
     /// Position in the book's hash chain; `null` until the entry is sealed (within seconds).
     pub sequence: Option<i64>,
     /// When the entry was sealed into the hash chain; `null` while not yet sealed.
-    pub sealed_at: Option<DateTime<Utc>>,
+    pub sealed_at: Option<Timestamp>,
 }
 
 /// A payment collected through a licensed partner.
@@ -347,14 +347,14 @@ pub struct Payment {
     pub transfer_code: Option<String>,
     /// Bank transfer payments: the receiving bank account (of the unit, never of the platform).
     pub bank_account_id: Option<Uuid>,
-    pub expires_at: DateTime<Utc>,
-    pub captured_at: Option<DateTime<Utc>>,
+    pub expires_at: Timestamp,
+    pub captured_at: Option<Timestamp>,
     /// Module that asked for the payment (`plans`, `orders`…) and its document.
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// A refund of (part of) a payment.
@@ -369,8 +369,8 @@ pub struct Refund {
     pub provider_ref: Option<String>,
     pub reason: String,
     pub reference: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Một lượt thu mới. `reference` bắt buộc (D-184): duy nhất theo (khách, `source_module`); gửi lại
@@ -539,7 +539,7 @@ pub struct FlowSettings {
     pub cod_remittance: CodRemittance,
     /// The settings come from a unit above.
     pub inherited: bool,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<Timestamp>,
 }
 
 /// Đường tiền của một lượt thu / hoàn.
@@ -601,7 +601,7 @@ pub struct Settlement {
     pub source_id: String,
     pub reference: String,
     /// Bỏ trống: hôm nay theo múi giờ của sổ.
-    pub effective_date: Option<NaiveDate>,
+    pub effective_date: Option<Date>,
 }
 
 impl Settlement {
@@ -623,7 +623,7 @@ impl Settlement {
     }
 
     #[must_use]
-    pub fn on(mut self, day: NaiveDate) -> Self {
+    pub fn on(mut self, day: Date) -> Self {
         self.effective_date = Some(day);
         self
     }
@@ -655,15 +655,15 @@ pub struct Hold {
     /// Held when the money came in.
     pub original: Money,
     /// When the job moves the money to the seller's available balance.
-    pub release_at: DateTime<Utc>,
+    pub release_at: Timestamp,
     /// `held` or `released`.
     pub status: String,
     pub source_module: String,
     pub source_id: String,
     /// The entry that moved the money to the available balance.
     pub release_entry_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// A payout of a seller's available balance through the payout partner.
@@ -686,8 +686,8 @@ pub struct Payout {
     pub failure_reason: Option<String>,
     pub description: String,
     pub reference: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Một lượt chi trả số dư khả dụng của người bán. `reference` duy nhất theo khách.
@@ -771,10 +771,10 @@ pub struct ExchangeRate {
     /// Units of `quote` for one unit of `base`, as a decimal string, e.g. `"25345.5"`.
     pub rate: DecimalString,
     /// First day the rate is used; it stays in force until a later rate of the same pair.
-    pub effective_date: NaiveDate,
+    pub effective_date: Date,
     /// `manual` (entered by a person) or `provider:<name>` (fetched from a rate source).
     pub source: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Dòng sổ nhật ký chung cần đọc (xuất kế toán): một khoảng ngày, một sổ hay mọi sổ.
@@ -784,15 +784,15 @@ pub struct JournalQuery {
     /// Chỉ sổ của nút này; bỏ trống: mọi sổ của khách.
     pub book: Option<OrgId>,
     /// Ngày hạch toán từ (gồm).
-    pub from: NaiveDate,
+    pub from: Date,
     /// Ngày hạch toán tới (gồm).
-    pub to: NaiveDate,
+    pub to: Date,
     /// Trang (theo ID dòng tăng dần).
     pub page: autoxide_kernel::pagination::PageRequest,
 }
 
 impl JournalQuery {
-    pub fn new(from: NaiveDate, to: NaiveDate) -> Self {
+    pub fn new(from: Date, to: Date) -> Self {
         JournalQuery {
             book: None,
             from,
@@ -825,8 +825,8 @@ pub struct JournalLine {
     pub entry_id: Uuid,
     /// The unit the book belongs to.
     pub org_id: Uuid,
-    pub effective_date: NaiveDate,
-    pub posted_at: DateTime<Utc>,
+    pub effective_date: Date,
+    pub posted_at: Timestamp,
     pub description: String,
     pub source_module: String,
     pub source_kind: String,
@@ -887,7 +887,7 @@ pub trait Ledger: Send + Sync {
         &self,
         tenant: &TenantContext,
         key: AccountKey,
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Money, Error>;
 
     /// Một bút toán, hoặc `None`.
@@ -920,7 +920,7 @@ pub trait Ledger: Send + Sync {
         &self,
         tenant: &TenantContext,
         keys: &[AccountKey],
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Vec<Money>, Error>;
 
     /// Cài đặt dòng tiền hiệu lực của nút `org` (kế thừa theo cây; chưa đặt: tự thu).
@@ -977,7 +977,7 @@ pub trait Ledger: Send + Sync {
         tenant: &TenantContext,
         base: Currency,
         quote: Currency,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Option<ExchangeRate>, Error>;
 
     /// Tiền hạch toán của sổ của nút `org` (sổ chưa mở: tiền mặc định của nút, hay VND).

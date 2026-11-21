@@ -1,5 +1,6 @@
 //! Bảng `customers_wishlist_alert_queue`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -19,7 +20,7 @@ pub struct Model {
     pub variant_id: Option<Uuid>,
     pub price_minor: Option<i64>,
     pub currency: Option<String>,
-    pub queued_at: DateTimeUtc,
+    pub queued_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

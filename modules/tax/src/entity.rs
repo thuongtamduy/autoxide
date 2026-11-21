@@ -2,6 +2,7 @@
 //! D-253); `tax_profiles` là bảng cấp khách hàng.
 
 pub(crate) mod pack {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -16,7 +17,7 @@ pub(crate) mod pack {
         pub source_note: String,
         pub content_sha256: String,
         pub imported_by: Option<Uuid>,
-        pub imported_at: DateTimeUtc,
+        pub imported_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -139,6 +140,7 @@ pub(crate) mod rule {
 }
 
 pub(crate) mod profile {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -161,7 +163,7 @@ pub(crate) mod profile {
         /// JSON `Address`, hay `None`.
         pub address: Option<String>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

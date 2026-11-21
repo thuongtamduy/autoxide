@@ -7,6 +7,7 @@
 //! Event nhận lại không cộng hai lần: dòng của đơn chèn kiểu "trùng thì bỏ qua", trạng thái đổi bằng
 //! câu cập nhật có điều kiện (đếm số dòng bị đổi), khoản hoàn khoá theo `refund_id`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -15,7 +16,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_orders::api::events as orders;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::Value;
@@ -60,7 +60,7 @@ struct OrderInfo {
     buyer_user_id: Option<Uuid>,
     buyer_key: Option<String>,
     goods_paid: Money,
-    placed_at: DateTime<Utc>,
+    placed_at: Timestamp,
 }
 
 fn uuid_of(value: &Value) -> Option<Uuid> {
@@ -79,7 +79,7 @@ fn read(after: &Value) -> Result<Option<OrderInfo>, Error> {
     let goods_paid: Money = serde_json::from_value(goods_paid.clone()).map_err(Error::internal)?;
     let placed_at = after["placed_at"]
         .as_str()
-        .and_then(|text| text.parse::<DateTime<Utc>>().ok())
+        .and_then(|text| text.parse::<Timestamp>().ok())
         .unwrap_or_else(now);
     Ok(Some(OrderInfo {
         order_id,

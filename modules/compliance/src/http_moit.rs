@@ -1,6 +1,7 @@
 //! Route REST của hồ sơ pháp lý, website, danh sách kiểm, bộ hồ sơ Bộ Công Thương và hai endpoint
 //! công khai cho giao diện (logo, thông tin chủ sở hữu) — dưới `/api/v1/compliance`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::{Address, AddressInput};
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext, TenantHint};
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -80,8 +80,8 @@ pub(crate) struct LegalProfileResponse {
     pub email: Option<String>,
     /// Identity verification (KYC) profile of the owner.
     pub kyc_profile_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<legal_profile::Model> for LegalProfileResponse {
@@ -350,7 +350,7 @@ pub(crate) struct PageResponse {
     pub page_kind: String,
     /// The linked object, e.g. `content.entry:<id>`.
     pub resource: String,
-    pub linked_at: DateTime<Utc>,
+    pub linked_at: Timestamp,
 }
 
 impl From<website_page::Model> for PageResponse {
@@ -378,8 +378,8 @@ pub(crate) struct WebsiteResponse {
     pub status: String,
     /// Number of the file at the ministry.
     pub reference: Option<String>,
-    pub submitted_at: Option<DateTime<Utc>>,
-    pub decided_at: Option<DateTime<Utc>>,
+    pub submitted_at: Option<Timestamp>,
+    pub decided_at: Option<Timestamp>,
     /// Logo link and image, once `notified` / `registered`.
     pub logo_link_url: Option<String>,
     pub logo_image_url: Option<String>,
@@ -388,8 +388,8 @@ pub(crate) struct WebsiteResponse {
     /// Linked mandatory pages (only on `GET /websites/{id}`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pages: Option<Vec<PageResponse>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 pub(crate) fn describe_website(
@@ -862,7 +862,7 @@ fn sandbox_badge(
         "Bản thử — không phải cửa hàng thật"
     };
     Tagged {
-        version: tenant.sandbox_expires_at().unwrap_or(DateTime::<Utc>::UNIX_EPOCH),
+        version: tenant.sandbox_expires_at().unwrap_or(Timestamp::UNIX_EPOCH),
         data: BadgeResponse {
             website_id: Uuid::nil(),
             domain: domain.unwrap_or_default(),

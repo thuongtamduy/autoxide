@@ -2,12 +2,12 @@
 //! sưu tập. Công khai khi `active` trong khung giờ và có chữ ở ngôn ngữ hỏi; đường dẫn
 //! `/collections/<slug>`. Bộ sưu tập chưa công khai không đưa tiêu đề ra ngoài module.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::resource::{Resource, ResourceResolver};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::Utc;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ impl ResourceResolver for CollectionResolver {
             .scoped(tenant)
             .all(read)
             .await?;
-        let now = Utc::now();
+        let now = Timestamp::now();
         Ok(rows
             .into_iter()
             .map(|row| {

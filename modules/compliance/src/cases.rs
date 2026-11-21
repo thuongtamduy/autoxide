@@ -14,6 +14,9 @@
 //! Sở hữu trí tuệ, NĐ 85/2021/NĐ-CP (gỡ khi cơ quan yêu cầu), Luật Bảo vệ quyền lợi người tiêu dùng
 //! 19/2023/QH15 và NĐ 55/2024/NĐ-CP (khiếu nại).
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
+use jiff::civil::Weekday;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -29,7 +32,6 @@ use autoxide_kernel::moderation::Restriction;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc, Weekday};
 use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
@@ -136,7 +138,7 @@ pub(crate) struct Deadlines {
     pub decide_days: i64,
     /// Với yêu cầu của cơ quan có thẩm quyền: phải quyết (gỡ) trong chừng này giờ.
     pub authority_hours: i64,
-    pub holidays: BTreeSet<NaiveDate>,
+    pub holidays: BTreeSet<Date>,
     /// Múi giờ tính ngày làm việc (phút so với UTC; Việt Nam +420).
     pub utc_offset_minutes: i64,
 }
@@ -155,7 +157,7 @@ pub(crate) fn deadlines(body: Option<&Value>, kind: &str) -> Deadlines {
             .and_then(|body| body.get("holidays"))
             .and_then(Value::as_array)
             .map(|items| {
-                items.iter().filter_map(|item| item.as_str()?.parse::<NaiveDate>().ok()).collect()
+                items.iter().filter_map(|item| item.as_str()?.parse::<Date>().ok()).collect()
             })
             .unwrap_or_default(),
         utc_offset_minutes: body
@@ -169,27 +171,31 @@ pub(crate) fn deadlines(body: Option<&Value>, kind: &str) -> Deadlines {
 /// `start` cộng `days` ngày làm việc (giờ trong ngày giữ nguyên theo giờ địa phương): bỏ thứ Bảy,
 /// Chủ nhật và ngày lễ trong `holidays`.
 pub(crate) fn add_working_days(
-    start: DateTime<Utc>,
+    start: Timestamp,
     days: i64,
-    holidays: &BTreeSet<NaiveDate>,
+    holidays: &BTreeSet<Date>,
     utc_offset_minutes: i64,
-) -> DateTime<Utc> {
-    let offset = Duration::minutes(utc_offset_minutes);
-    let local = start.naive_utc() + offset;
-    let mut date = local.date();
+) -> Timestamp {
+    let offset = SignedDuration::from_mins(utc_offset_minutes);
+    // Giờ địa phương = giờ UTC dời `offset`; đọc ngày và giờ như thể đó là giờ UTC.
+    let local = start + offset;
+    let clock = local.duration_since(local.date_utc().start_of_day_utc());
+    let mut date = local.date_utc();
     let mut counted = 0;
     // Tối đa vài năm: dữ liệu ngày lễ hỏng không làm treo vòng lặp.
     for _ in 0..3660 {
         if counted >= days {
             break;
         }
-        let Some(next) = date.succ_opt() else { break };
+        let Some(next) = date.succ() else { break };
         date = next;
-        if !matches!(date.weekday(), Weekday::Sat | Weekday::Sun) && !holidays.contains(&date) {
+        if !matches!(date.weekday(), Weekday::Saturday | Weekday::Sunday)
+            && !holidays.contains(&date)
+        {
             counted += 1;
         }
     }
-    DateTime::from_naive_utc_and_offset(date.and_time(local.time()) - offset, Utc)
+    date.start_of_day_utc() + clock - offset
 }
 
 // ---- Đầu vào -------------------------------------------------------------------------------------
@@ -405,7 +411,7 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         kind: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Deadlines, Error> {
         let rule = self.rule_for(tenant, "cases.deadlines", at).await?;
         let body = rule.and_then(|row| serde_json::from_str::<Value>(&row.body).ok());
@@ -418,7 +424,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         kind: &str,
     ) -> Result<Deadlines, Error> {
-        self.case_deadlines(tenant, kind, Utc::now()).await
+        self.case_deadlines(tenant, kind, Timestamp::now()).await
     }
 
     /// Ghi vụ việc mới; `spam` là lý do lớp chống spam giữ lại (khi đó không tự ẩn, không gửi mail).
@@ -448,7 +454,7 @@ impl ComplianceService {
         let rules = self.case_deadlines(tenant, &input.kind, at).await?;
         let authority = input.reporter.kind == "authority";
         let decide_by = if authority {
-            at + Duration::hours(rules.authority_hours)
+            at + SignedDuration::from_hours(rules.authority_hours)
         } else {
             add_working_days(at, rules.decide_days, &rules.holidays, rules.utc_offset_minutes)
         };
@@ -495,7 +501,7 @@ impl ComplianceService {
             restricted: restrict,
             decision: String::new(),
             decision_reason: None,
-            ack_due_at: at + Duration::hours(rules.ack_hours),
+            ack_due_at: at + SignedDuration::from_hours(rules.ack_hours),
             acknowledged_at: None,
             respond_by,
             decide_by,
@@ -748,7 +754,7 @@ impl ComplianceService {
         if filter.overdue {
             select = select
                 .filter(case::Column::Status.is_in(OPEN))
-                .filter(case::Column::DecideBy.lt(Utc::now()));
+                .filter(case::Column::DecideBy.lt(Timestamp::now()));
         }
         fetch_page(select, case::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
@@ -931,20 +937,20 @@ mod tests {
     #[test]
     fn han_xu_ly_tinh_ngay_lam_viec() {
         // Thứ Sáu 01/5/2026 17:00 giờ Việt Nam (lễ), 5 ngày làm việc: bỏ T7, CN, và lễ 01/5 → thứ Sáu 08/5.
-        let start: DateTime<Utc> = "2026-04-30T10:00:00Z".parse().unwrap();
-        let holidays: BTreeSet<NaiveDate> =
+        let start: Timestamp = "2026-04-30T10:00:00Z".parse().unwrap();
+        let holidays: BTreeSet<Date> =
             ["2026-05-01"].iter().map(|day| day.parse().unwrap()).collect();
         let due = add_working_days(start, 5, &holidays, 420);
-        assert_eq!(due, "2026-05-08T10:00:00Z".parse::<DateTime<Utc>>().unwrap());
+        assert_eq!(due, "2026-05-08T10:00:00Z".parse::<Timestamp>().unwrap());
         // Không có ngày lễ: thứ Năm 30/4 + 1 ngày làm việc = thứ Sáu 01/5.
         let next = add_working_days(start, 1, &BTreeSet::new(), 420);
-        assert_eq!(next, "2026-05-01T10:00:00Z".parse::<DateTime<Utc>>().unwrap());
+        assert_eq!(next, "2026-05-01T10:00:00Z".parse::<Timestamp>().unwrap());
         // Giờ địa phương sang ngày khác giờ UTC: 23:00 UTC thứ Sáu = 06:00 thứ Bảy ở Việt Nam →
         // 1 ngày làm việc là thứ Hai.
-        let late: DateTime<Utc> = "2026-05-08T23:00:00Z".parse().unwrap();
+        let late: Timestamp = "2026-05-08T23:00:00Z".parse().unwrap();
         assert_eq!(
             add_working_days(late, 1, &BTreeSet::new(), 420),
-            "2026-05-10T23:00:00Z".parse::<DateTime<Utc>>().unwrap()
+            "2026-05-10T23:00:00Z".parse::<Timestamp>().unwrap()
         );
     }
 

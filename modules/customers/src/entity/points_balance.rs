@@ -1,5 +1,6 @@
 //! Bảng `customers_points_balances`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub profile_id: Uuid,
     pub balance: i64,
     pub held: i64,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

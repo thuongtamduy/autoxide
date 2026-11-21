@@ -2,6 +2,7 @@
 //! permission như endpoint REST tương ứng, thân là lời gọi service — không có logic riêng (luật
 //! kiến trúc 8).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -49,9 +49,9 @@ pub(crate) struct ListMovementsInput {
     #[schema(inline)]
     pub kind: Option<KindDto>,
     /// Lines written at or after this time.
-    pub from: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
     /// Lines written before this time.
-    pub to: Option<DateTime<Utc>>,
+    pub to: Option<Timestamp>,
     /// Maximum number of lines, 1 to 200. Defaults to 50.
     pub limit: Option<u32>,
     /// The `next_cursor` of the previous page.
@@ -91,7 +91,7 @@ pub(crate) struct AdjustStockLine {
     /// Lot of the units (required when adding units of a lot-tracked variant).
     pub lot_code: Option<String>,
     /// Expiry date of the lot, `YYYY-MM-DD`, when adding.
-    pub expires_on: Option<chrono::NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Serial numbers when the variant tracks serials.
     #[serde(default)]
     pub serials: Vec<String>,
@@ -339,7 +339,7 @@ pub(crate) struct ToolReceiptLine {
     pub unit_cost_currency: String,
     pub lot_code: Option<String>,
     /// `YYYY-MM-DD`.
-    pub expires_on: Option<chrono::NaiveDate>,
+    pub expires_on: Option<Date>,
     #[serde(default)]
     pub serials: Vec<String>,
 }

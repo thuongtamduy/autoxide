@@ -1,9 +1,8 @@
 //! Test thuần của `invoices`. Test chạy cùng `tax` và `ledger` (phát hành, ghi sổ, hoá đơn điện tử)
 //! nằm ở `crates/app/src/e2e/invoices.rs`: luật ranh giới cấm module dựng module khác.
 
-use chrono::NaiveDate;
-
 use crate::service::{retention_until, valid_tax_code};
+use autoxide_kernel::time::Date;
 
 #[test]
 fn ma_so_thue_nguoi_mua() {
@@ -17,7 +16,7 @@ fn ma_so_thue_nguoi_mua() {
 
 #[test]
 fn han_luu_la_het_nam_cong_10() {
-    let day = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
+    let day = |y, m, d| Date::new(y, m, d).unwrap();
     assert_eq!(retention_until(day(2026, 3, 5)), day(2036, 12, 31));
     assert_eq!(retention_until(day(2026, 12, 31)), day(2036, 12, 31));
 }

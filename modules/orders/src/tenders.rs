@@ -12,7 +12,7 @@
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -62,7 +62,7 @@ impl OrdersService {
         buyer: Option<Uuid>,
         requests: &[TenderRequest],
         total: Money,
-        until: DateTime<Utc>,
+        until: Timestamp,
         held: &mut Vec<HeldTender>,
     ) -> Result<(), Error> {
         let mut problems = Vec::new();
@@ -130,7 +130,7 @@ pub(crate) fn payment_row(
     order_id: Uuid,
     currency: &str,
     part: &HeldTender,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> payment::ActiveModel {
     payment::ActiveModel {
         id: Set(Uuid::now_v7()),

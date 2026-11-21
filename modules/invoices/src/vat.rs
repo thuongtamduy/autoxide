@@ -3,6 +3,7 @@
 //! (chứng từ nào vào, điều chỉnh giảm trừ thế nào) **cần người có chuyên môn kế toán / thuế đối chiếu**.
 //! Thuế GTGT đầu vào cần chứng từ mua, chưa có (bước 42).
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use axum::extract::{Query, State};
-use chrono::NaiveDate;
 use sea_orm::sea_query::{Expr, ExprTrait as _, Func};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
 use serde::{Deserialize, Serialize};
@@ -57,8 +57,8 @@ pub(crate) struct VatRow {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[schema(as = InvoicesVatSummary)]
 pub(crate) struct VatSummary {
-    from: NaiveDate,
-    to: NaiveDate,
+    from: Date,
+    to: Date,
     /// The unit, or `null` for every unit in your scope.
     org_id: Option<Uuid>,
     /// One row per kind of document, currency and VAT rate.
@@ -70,9 +70,9 @@ pub(crate) struct VatSummary {
 #[into_params(parameter_in = Query)]
 pub(crate) struct VatQuery {
     /// First day, `YYYY-MM-DD`.
-    from: NaiveDate,
+    from: Date,
     /// Last day, `YYYY-MM-DD`; at most 366 days after `from`.
-    to: NaiveDate,
+    to: Date,
     /// Only the documents of this unit (seller); omit for every unit in your scope.
     org_id: Option<Uuid>,
 }
@@ -82,8 +82,8 @@ impl InvoicesService {
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
         org: Option<Uuid>,
     ) -> Result<Vec<VatRow>, Error> {
         principal.require(&READ)?;
@@ -94,7 +94,7 @@ impl InvoicesService {
                 "must not be before `from`",
             )]));
         }
-        if (to - from).num_days() >= MAX_DAYS {
+        if to.days_since(from) >= MAX_DAYS {
             return Err(Error::validation(vec![FieldError::new(
                 "to",
                 "range",

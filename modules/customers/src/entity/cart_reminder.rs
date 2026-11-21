@@ -1,5 +1,6 @@
 //! Bảng `customers_cart_reminders`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,10 +14,10 @@ pub struct Model {
     pub profile_id: Uuid,
     pub user_id: Uuid,
     pub step: i32,
-    pub run_at: DateTimeUtc,
+    pub run_at: Timestamp,
     pub status: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

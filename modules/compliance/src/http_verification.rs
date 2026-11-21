@@ -1,5 +1,6 @@
 //! Route REST của xác thực tài khoản đăng nội dung (NĐ 147/2024, D-356), dưới `/api/v1/compliance`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -41,8 +41,8 @@ pub(crate) struct VerificationResponse {
     pub level: VerificationLevel,
     /// The verified phone number, masked (e.g. `+8491****678`).
     pub phone: Option<String>,
-    pub phone_verified_at: Option<DateTime<Utc>>,
-    pub identity_verified_at: Option<DateTime<Utc>>,
+    pub phone_verified_at: Option<Timestamp>,
+    pub identity_verified_at: Option<Timestamp>,
 }
 
 impl From<Verification> for VerificationResponse {
@@ -81,12 +81,12 @@ pub(crate) struct ChallengeResponse {
     id: Uuid,
     /// The number the code went to, masked.
     phone: String,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     /// Wrong codes entered so far.
     attempts: i32,
     /// `true` once the code was used.
     confirmed: bool,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<phone_challenge::Model> for ChallengeResponse {

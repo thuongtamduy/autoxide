@@ -2,7 +2,7 @@
 //! viết tiếng Anh cho người gọi API.
 
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -65,9 +65,9 @@ pub(crate) struct PromotionResponse {
     pub texts: Vec<TextDto>,
     pub targets: Vec<TargetInput>,
     pub flash_items: Vec<FlashItemDto>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub activated_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub activated_at: Option<Timestamp>,
 }
 
 impl From<&PromotionView> for PromotionResponse {
@@ -120,8 +120,8 @@ pub(crate) struct PromotionListItem {
     pub title: String,
     pub kind: Kind,
     pub status: Status,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub usage_count: i64,
 }
 
@@ -134,7 +134,7 @@ pub(crate) struct CodeDto {
     pub purpose: crate::model::Purpose,
     pub usage_limit: Option<i64>,
     pub usage_count: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<&code::Model> for CodeDto {
@@ -171,7 +171,7 @@ pub(crate) struct VersionDto {
     #[schema(value_type = Object)]
     pub snapshot: serde_json::Value,
     pub changed_by: Option<Uuid>,
-    pub changed_at: DateTime<Utc>,
+    pub changed_at: Timestamp,
 }
 
 impl From<&version::Model> for VersionDto {

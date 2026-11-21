@@ -9,6 +9,7 @@
 //! bằng bộ dựng mẫu của kernel (D-351). Mọi thứ là bản nháp cần người có chuyên môn pháp lý duyệt;
 //! con người nộp trên online.gov.vn (không có API công khai).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -16,7 +17,6 @@ use autoxide_kernel::doctor::{Finding, Probe};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::template::Output;
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, TenantContext, TenantId};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -120,7 +120,7 @@ pub(crate) struct DossierDocument {
 #[schema(as = ComplianceDossier)]
 pub(crate) struct Dossier {
     pub website_id: Uuid,
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
     pub disclaimer: String,
     /// Fields of the declaration form (owner, website, identity verification, pages).
     #[schema(value_type = Object)]
@@ -328,7 +328,7 @@ impl ComplianceService {
                 .one(tenant.database().read())
                 .await?;
             return Ok(found.is_some_and(|row| {
-                row.status == "verified" && row.expires_at.is_none_or(|at| at > Utc::now())
+                row.status == "verified" && row.expires_at.is_none_or(|at| at > Timestamp::now())
             }));
         }
         let status =
@@ -341,7 +341,7 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         site: &website::Model,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Checklist, Error> {
         let rule =
             self.rule_for(tenant, &format!("moit.checklist.{}", site.website_kind), at).await?;
@@ -487,7 +487,7 @@ impl ComplianceService {
         id: Uuid,
     ) -> Result<Checklist, Error> {
         let site = self.get_website(tenant, principal, id).await?;
-        self.checklist_of(tenant, &site, Utc::now()).await
+        self.checklist_of(tenant, &site, Timestamp::now()).await
     }
 
     /// Bộ hồ sơ nháp của website `id`.
@@ -498,7 +498,7 @@ impl ComplianceService {
         id: Uuid,
     ) -> Result<Dossier, Error> {
         let site = self.get_website(tenant, principal, id).await?;
-        let at = Utc::now();
+        let at = Timestamp::now();
         let checklist = self.checklist_of(tenant, &site, at).await?;
         let profile = self.profile_for_org(tenant, OrgId::from_uuid(site.org_id)).await?;
         let kyc = match &profile {
@@ -631,7 +631,7 @@ impl Probe for ReadinessProbe {
                     // Khách đã xoá / dời: không phải việc của bước này.
                     Err(_) => continue,
                 };
-                match self.service.checklist_of(&tenant, &row, Utc::now()).await {
+                match self.service.checklist_of(&tenant, &row, Timestamp::now()).await {
                     Ok(checklist) if checklist.missing > 0 => lacking.push(format!(
                         "{} ({} missing; GET /api/v1/compliance/websites/{}/checklist)",
                         row.domain, checklist.missing, row.id

@@ -11,8 +11,8 @@
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_promotions::api::{GrantVoucher, Voucher, VoucherSource};
-use chrono::{Datelike, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
 
@@ -109,7 +109,7 @@ impl CustomersService {
         if programs.is_empty() {
             return Ok(0);
         }
-        let today = Utc::now().with_timezone(&local_offset()).date_naive();
+        let today = Timestamp::now().date_in(&local_offset());
         let rows = profile::Entity::find()
             .filter(profile::Column::BirthdayMd.eq(today.format("%m-%d").to_string()))
             .filter(profile::Column::UserId.is_not_null())

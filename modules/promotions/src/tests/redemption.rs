@@ -1,11 +1,12 @@
 //! Giữ → xác nhận → trả lượt, chạy đồng thời trên database thật (gate chạy cả SQLite và
 //! Postgres): không vượt giới hạn, không giữ hai lần, trả đúng bộ đếm đã giữ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::reference::Submitted;
 use autoxide_testkit::TestDatabase;
-use chrono::{Duration, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -15,7 +16,7 @@ use crate::api::{
 };
 
 fn hold(cart: Cart) -> ReserveRequest {
-    ReserveRequest::new(Uuid::now_v7(), cart, Utc::now() + Duration::hours(1))
+    ReserveRequest::new(Uuid::now_v7(), cart, Timestamp::now() + SignedDuration::from_hours(1))
 }
 
 /// Chạy `count` lần `reserve` đồng thời; trả số lần thành công và mã lỗi của các lần còn lại.

@@ -1,6 +1,7 @@
 //! Bộ sưu tập sản phẩm (bước 55 mục 3): quản trị dưới `/collections`, đọc công khai dưới
 //! `/public/collections/{slug}`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::Response;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -89,8 +89,8 @@ pub(crate) struct CollectionResponse {
     media_id: Option<Uuid>,
     /// `draft`, `active` or `archived`; only `active` ones in their time window are public.
     status: String,
-    starts_at: Option<DateTime<Utc>>,
-    ends_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
+    ends_at: Option<Timestamp>,
     /// Texts by language.
     #[schema(value_type = BTreeMap<String, CollectionTextDto>)]
     texts: BTreeMap<String, CollectionTextDto>,
@@ -98,8 +98,8 @@ pub(crate) struct CollectionResponse {
     items: u64,
     /// The texts were written with an AI's suggestion; show an AI label next to them.
     ai_assisted: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 pub(crate) fn collection_response(detail: CollectionDetail) -> CollectionResponse {
@@ -157,8 +157,8 @@ pub(crate) struct CreateCollectionRequest {
     media_id: Option<Uuid>,
     /// `draft` (default), `active` or `archived`.
     status: Option<String>,
-    starts_at: Option<DateTime<Utc>>,
-    ends_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
+    ends_at: Option<Timestamp>,
     /// Texts by language, at least one.
     #[schema(value_type = BTreeMap<String, CollectionTextDto>)]
     texts: BTreeMap<String, CollectionTextDto>,
@@ -191,11 +191,11 @@ pub(crate) struct UpdateCollectionRequest {
     media_id: Option<Option<Uuid>>,
     status: Option<String>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>)]
-    starts_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>)]
+    starts_at: Option<Option<Timestamp>>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>)]
-    ends_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>)]
+    ends_at: Option<Option<Timestamp>>,
     #[serde(default)]
     #[schema(value_type = BTreeMap<String, CollectionTextDto>)]
     texts: BTreeMap<String, CollectionTextDto>,
@@ -518,7 +518,7 @@ async fn get_public_collection(
     Query(mut paging): Query<PageQuery>,
 ) -> Result<Response, Error> {
     // Thứ tự của bộ sưu tập quyết `order`: chọn tay và giá tăng thì tăng dần, còn lại giảm dần.
-    let now = Utc::now();
+    let now = Timestamp::now();
     let found = service.find_public_collection(&tenant, &site, &query.locale, &slug, now).await?;
     let ascending = crate::collections::public::ascending(&found.0.sort);
     paging.order = Some(if ascending { "asc" } else { "desc" }.to_owned());

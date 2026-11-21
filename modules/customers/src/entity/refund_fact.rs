@@ -1,5 +1,6 @@
 //! Bảng `customers_refund_facts`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub refund_id: Uuid,
     pub order_id: Uuid,
     pub amount_minor: i64,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -5,9 +5,10 @@
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{DateTime, Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement};
 use serde::Serialize;
@@ -41,7 +42,7 @@ async fn events(database: &Database, name: &str) -> usize {
     database.read().query_all_raw(Statement::from_string(backend, sql)).await.unwrap().len()
 }
 
-fn at(value: &serde_json::Value) -> DateTime<Utc> {
+fn at(value: &serde_json::Value) -> Timestamp {
     value.as_str().unwrap().parse().unwrap()
 }
 
@@ -189,7 +190,7 @@ async fn enqueue_deadlines(app: &TestApp) {
 async fn han_72_gio_tinh_tu_luc_phat_hien() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let detected = (Utc::now() - Duration::hours(10)).to_rfc3339();
+        let detected = (Timestamp::now() - SignedDuration::from_hours(10)).to_rfc3339();
         let input = json!({
             "title": "Lost laptop", "severity": "high", "detected_at": detected,
             "data_categories": ["email", "phone"], "affected_count": 120,
@@ -197,10 +198,10 @@ async fn han_72_gio_tinh_tu_luc_phat_hien() {
         let (status, opened) = call(&app, "POST", "/incidents", "admin", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED, "{opened}");
         let due = at(&opened["data"]["report_due_at"]) - at(&opened["data"]["detected_at"]);
-        assert_eq!(due, Duration::hours(72));
+        assert_eq!(due, SignedDuration::from_hours(72));
         assert_eq!(opened["data"]["overdue"], false);
 
-        let future = json!({"title": "x", "severity": "low", "detected_at": (Utc::now() + Duration::hours(2)).to_rfc3339()});
+        let future = json!({"title": "x", "severity": "low", "detected_at": (Timestamp::now() + SignedDuration::from_hours(2)).to_rfc3339()});
         let (status, _) = call(&app, "POST", "/incidents", "admin", Some(future)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 
@@ -218,7 +219,7 @@ async fn han_72_gio_tinh_tu_luc_phat_hien() {
         assert_eq!(draft["data"]["locale"], "vi");
 
         // Báo cơ quan: chuyển `reported`.
-        let report = json!({"authority_notified_at": Utc::now().to_rfc3339(), "authority_reference": "A-1"});
+        let report = json!({"authority_notified_at": Timestamp::now().to_rfc3339(), "authority_reference": "A-1"});
         let (status, reported) = call(&app, "PATCH", &format!("/incidents/{id}"), "admin", Some(report)).await;
         assert_eq!(status, StatusCode::OK, "{reported}");
         assert_eq!(reported["data"]["status"], "reported");
@@ -235,7 +236,7 @@ async fn nhac_han_dung_moc_khong_nhac_trung() {
         let app = app(test).await;
         let input = json!({
             "title": "Leak", "severity": "critical",
-            "detected_at": (Utc::now() - Duration::hours(50)).to_rfc3339(),
+            "detected_at": (Timestamp::now() - SignedDuration::from_hours(50)).to_rfc3339(),
         });
         let (status, opened) = call(&app, "POST", "/incidents", "admin", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED, "{opened}");
@@ -252,7 +253,10 @@ async fn nhac_han_dung_moc_khong_nhac_trung() {
         assert_eq!(events(app.database(), "compliance.incident_deadline_near").await, 1);
         // Qua mốc 60 giờ: nhắc một lần nữa.
         incident::Entity::update_many()
-            .col_expr(incident::Column::DetectedAt, Expr::value(Utc::now() - Duration::hours(61)))
+            .col_expr(
+                incident::Column::DetectedAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(61)),
+            )
             .filter(incident::Column::Id.eq(id))
             .exec(app.database().write())
             .await
@@ -290,14 +294,14 @@ async fn so_yeu_cau_chu_the_han_la_du_lieu_va_xoa_gia_tri() {
 
         let (status, _) = call(&app, "GET", "/subject-requests", "alice", None).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
-        let received = Utc::now() - Duration::hours(2);
+        let received = Timestamp::now() - SignedDuration::from_hours(2);
         let input = json!({"kind": "erasure", "channel": "email", "subject": " Ada@Example.com ", "received_at": received.to_rfc3339()});
         let (status, recorded) = call(&app, "POST", "/subject-requests", "admin", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED, "{recorded}");
         assert_eq!(recorded["data"]["subject_kind"], "email");
         assert_eq!(recorded["data"]["subject"], "ada@example.com");
         let due = at(&recorded["data"]["due_at"]) - at(&recorded["data"]["received_at"]);
-        assert_eq!(due, Duration::hours(72), "{recorded}");
+        assert_eq!(due, SignedDuration::from_hours(72), "{recorded}");
 
         let id = recorded["data"]["id"].as_str().unwrap();
         let (status, done) =
@@ -325,7 +329,7 @@ async fn so_yeu_cau_chu_the_han_la_du_lieu_va_xoa_gia_tri() {
         assert!(done["data"]["export"]["compliance"]["consents"].is_array(), "{done}");
 
         // Quá hạn: lọc được.
-        let old = json!({"kind": "objection", "channel": "phone", "subject": "0912345678", "received_at": (Utc::now() - Duration::days(5)).to_rfc3339()});
+        let old = json!({"kind": "objection", "channel": "phone", "subject": "0912345678", "received_at": (Timestamp::now() - SignedDuration::from_hours(24 * 5)).to_rfc3339()});
         let (_, late) = call(&app, "POST", "/subject-requests", "admin", Some(old)).await;
         assert_eq!(late["data"]["overdue"], true, "{late}");
         let (_, overdue) = call(&app, "GET", "/subject-requests?overdue=true", "admin", None).await;
@@ -413,7 +417,7 @@ async fn muc_dich_kem_so_nguoi_dong_y_va_da_rut() {
 async fn tong_quan_chi_dem_khu_vuc_duoc_doc() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let received = Utc::now() - Duration::days(5);
+        let received = Timestamp::now() - SignedDuration::from_hours(24 * 5);
         let input = json!({"kind": "access", "channel": "email", "subject": "ada@example.com",
                            "received_at": received.to_rfc3339()});
         let (status, created) = call(&app, "POST", "/subject-requests", "admin", Some(input)).await;

@@ -1,5 +1,6 @@
 //! Bảng `orders_lookup_codes`: mã một lần gửi tới số điện thoại của đơn vãng lai (chỉ lưu bản băm).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,9 +15,9 @@ pub struct Model {
     pub token_id: Option<Uuid>,
     pub code_hash: String,
     pub attempts: i32,
-    pub expires_at: DateTimeUtc,
-    pub consumed_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub expires_at: Timestamp,
+    pub consumed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

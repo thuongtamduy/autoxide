@@ -12,6 +12,7 @@
 //! 5. cộng số dư từng tài khoản bằng `rows::adjust`, **theo `account_id` tăng dần**, chặn sàn;
 //! 6. chèn bút toán, dòng, event; commit.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
@@ -22,7 +23,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{Datelike, NaiveDate};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, Set};
 use serde_json::json;
@@ -37,7 +37,7 @@ use crate::service::{
     entry_not_found, exchange_rate_missing, now, valid_id, valid_name,
 };
 
-pub(crate) fn period_closed(on: NaiveDate) -> Error {
+pub(crate) fn period_closed(on: Date) -> Error {
     Error::conflict(
         "ledger.period_closed",
         "The accounting period holding {date} is closed. Post an adjusting entry in an open period.",
@@ -75,14 +75,14 @@ fn already_reversed() -> Error {
 }
 
 /// Ngày đầu và ngày cuối của kỳ (tháng) chứa `day`.
-pub(crate) fn month_of(day: NaiveDate) -> (NaiveDate, NaiveDate) {
-    let first = day.with_day(1).unwrap_or(day);
+pub(crate) fn month_of(day: Date) -> (Date, Date) {
+    let first = day.first_of_month();
     let next = if first.month() == 12 {
-        NaiveDate::from_ymd_opt(first.year() + 1, 1, 1)
+        Date::new(first.year() + 1, 1, 1)
     } else {
-        NaiveDate::from_ymd_opt(first.year(), first.month() + 1, 1)
+        Date::new(first.year(), first.month() + 1, 1)
     };
-    let last = next.and_then(|next| next.pred_opt()).unwrap_or(first);
+    let last = next.and_then(|next| next.pred()).unwrap_or(first);
     (first, last)
 }
 
@@ -178,7 +178,7 @@ fn checked(entry: &NewEntry, reverses: Option<Uuid>) -> Result<Checked, Error> {
 pub(crate) fn draft_for(
     entry: NewEntry,
     book: book::Model,
-    effective_date: NaiveDate,
+    effective_date: Date,
     reverses: Option<Uuid>,
     guard: Option<(Principal, Permission)>,
     rate: Option<Decimal>,
@@ -227,7 +227,7 @@ fn default_floor(purpose: &str) -> Option<i64> {
 /// Bút toán đã kiểm, sẵn sàng ghi.
 pub(crate) struct Draft {
     book: book::Model,
-    effective_date: NaiveDate,
+    effective_date: Date,
     description: String,
     source_module: String,
     source_kind: String,
@@ -474,7 +474,7 @@ pub(crate) async fn ensure_period(
     transaction: &DatabaseTransaction,
     tenant: &TenantContext,
     book: &book::Model,
-    day: NaiveDate,
+    day: Date,
 ) -> Result<period::Model, Error> {
     let (starts_on, ends_on) = month_of(day);
     let find = || {
@@ -756,7 +756,7 @@ mod tests {
 
     #[test]
     fn ky_la_thang_chua_ngay() {
-        let day = |y, m, d| NaiveDate::from_ymd_opt(y, m, d).unwrap();
+        let day = |y, m, d| Date::new(y, m, d).unwrap();
         assert_eq!(month_of(day(2026, 2, 14)), (day(2026, 2, 1), day(2026, 2, 28)));
         assert_eq!(month_of(day(2028, 2, 29)), (day(2028, 2, 1), day(2028, 2, 29)));
         assert_eq!(month_of(day(2026, 12, 31)), (day(2026, 12, 1), day(2026, 12, 31)));

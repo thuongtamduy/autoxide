@@ -4,6 +4,7 @@
 
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
@@ -194,7 +195,7 @@ async fn ho_so_thue_ke_thua_theo_cay_va_pham_vi() {
         // Yêu cầu hoá đơn: hộ có doanh thu từ 1 tỷ đ / năm dùng máy tính tiền.
         let engine = app.api::<dyn crate::api::TaxEngine>().unwrap();
         let tenant = app.default_tenant();
-        let day = chrono::NaiveDate::from_ymd_opt(2026, 6, 1).unwrap();
+        let day = Date::new(2026, 6, 1).unwrap();
         let needs = engine.invoice_requirements(&tenant, tree.store, day).await.unwrap();
         assert!(needs.cash_register_required);
         let none = engine.invoice_requirements(&tenant, tree.south, day).await.unwrap();
@@ -226,7 +227,10 @@ async fn goi_cu_bi_tu_choi_goi_trung_khong_doi_va_doctor() {
             (StatusCode::CONFLICT, Some("tax.pack_outdated"))
         );
         // Doctor: thuế suất hết hạn trong cửa sổ cảnh báo mà không có bản nối tiếp → cảnh báo.
-        let soon = (chrono::Utc::now().date_naive() + chrono::Duration::days(10))
+        let soon = Timestamp::now()
+            .date_utc()
+            .checked_add_days(10)
+            .unwrap()
             .format("%Y-%m-%d")
             .to_string();
         pack["version"] = json!(2);

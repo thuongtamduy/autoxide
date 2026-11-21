@@ -8,10 +8,11 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Recipient,
 };
-use chrono::{DateTime, Utc};
+use jiff::SignedDuration;
 use sea_orm::QuerySelect;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
@@ -51,9 +52,9 @@ pub(crate) const FLASH_SALE_STARTING: NotificationKind = NotificationKind::new(
 pub(crate) struct ReminderView {
     pub promotion_id: Uuid,
     /// When the reminder is sent.
-    pub remind_at: DateTime<Utc>,
+    pub remind_at: Timestamp,
     /// When it was sent; `null` until then.
-    pub sent_at: Option<DateTime<Utc>>,
+    pub sent_at: Option<Timestamp>,
 }
 
 fn present(row: &reminder::Model) -> ReminderView {
@@ -130,7 +131,7 @@ impl PromotionsService {
             None => None,
         };
         let remind_at =
-            (program.starts_at - chrono::Duration::minutes(REMINDER_LEAD_MINUTES)).max(at);
+            (program.starts_at - SignedDuration::from_mins(REMINDER_LEAD_MINUTES)).max(at);
         // Hai lần bấm cùng lúc: khoá duy nhất (khách, chương trình, người) giữ một dòng.
         reminder::Entity::insert(reminder::ActiveModel {
             id: Set(Uuid::now_v7()),

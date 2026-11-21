@@ -1,5 +1,6 @@
 //! Bảng `customers_loyalty_rules`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,8 +17,8 @@ pub struct Model {
     pub points_valid_months: i32,
     pub min_redeem_points: i64,
     pub max_redeem_ratio_bp: i32,
-    pub effective_from: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub effective_from: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

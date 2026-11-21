@@ -1,5 +1,6 @@
 //! Route REST của định danh (KYC), dưới `/api/v1/compliance`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -67,8 +67,8 @@ pub(crate) struct ProfileResponse {
     /// What the reviewer asked for (`needs_info`): `fields` and `message`.
     #[schema(value_type = Option<Object>)]
     info_request: Option<serde_json::Value>,
-    verified_at: Option<DateTime<Utc>>,
-    expires_at: Option<DateTime<Utc>>,
+    verified_at: Option<Timestamp>,
+    expires_at: Option<Timestamp>,
     reason_code: Option<String>,
     /// What the reviewer wrote to the person when refusing or revoking.
     review_note: Option<String>,
@@ -78,8 +78,8 @@ pub(crate) struct ProfileResponse {
     /// Name of the subject as known before verification: the account name for `user`, the unit
     /// name for `org`; `null` for other kinds, or when unknown. Compare with `verified_name`.
     subject_name: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl ProfileResponse {

@@ -1,5 +1,6 @@
 //! Bảng `orders_lookup_tokens`: token xem đơn vãng lai (chỉ lưu bản băm), mở đúng một đơn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,9 +13,9 @@ pub struct Model {
     pub order_id: Uuid,
     pub phone_hash: String,
     pub token_hash: String,
-    pub expires_at: DateTimeUtc,
-    pub otp_confirmed_at: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub expires_at: Timestamp,
+    pub otp_confirmed_at: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

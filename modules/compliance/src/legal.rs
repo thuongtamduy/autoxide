@@ -13,7 +13,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of, site_not_found};
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -168,7 +168,7 @@ impl ComplianceService {
         if row
             .registration_issued_on
             .as_deref()
-            .is_some_and(|day| NaiveDate::parse_from_str(day, "%Y-%m-%d").is_err())
+            .is_some_and(|day| Date::parse_from_str(day, "%Y-%m-%d").is_err())
         {
             problems.push(FieldError::new(
                 "registration_issued_on",
@@ -404,7 +404,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         input: ProfileFields,
     ) -> Result<legal_profile::Model, Error> {
         let before = self.profile_in_scope(tenant, principal, &LEGAL_MANAGE, id).await?;

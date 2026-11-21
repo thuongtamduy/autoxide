@@ -12,6 +12,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod series {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -30,8 +31,8 @@ pub(crate) mod series {
         pub einvoice_provider: Option<String>,
         /// `active` hay `inactive`.
         pub status: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -39,6 +40,8 @@ pub(crate) mod series {
 }
 
 pub(crate) mod document {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -82,10 +85,10 @@ pub(crate) mod document {
         pub reference: String,
         pub reference_fingerprint: String,
         pub issued_by: Option<Uuid>,
-        pub issued_at: Option<DateTimeUtc>,
+        pub issued_at: Option<Timestamp>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// Chứng từ ngoại tệ: ảnh chụp tỉ giá (1 `currency` = `exchange_rate` `base_currency`), chữ
         /// thập phân; không tính lại khi tỉ giá đổi.
         pub exchange_rate: Option<String>,
@@ -94,7 +97,7 @@ pub(crate) mod document {
         pub base_currency: Option<String>,
         pub base_total_minor: Option<i64>,
         /// Lúc ảnh chụp người mua cá nhân được ẩn danh (hết hạn lưu).
-        pub buyer_purged_at: Option<DateTimeUtc>,
+        pub buyer_purged_at: Option<Timestamp>,
         /// Bên lập (module nguồn) tự ghi sổ doanh thu: phát hành không ghi bút toán.
         pub booked_by_source: bool,
     }
@@ -135,6 +138,8 @@ pub(crate) mod line {
 }
 
 pub(crate) mod mandate {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -157,8 +162,8 @@ pub(crate) mod mandate {
         /// `active` hay `revoked`.
         pub status: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub revoked_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub revoked_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -166,6 +171,7 @@ pub(crate) mod mandate {
 }
 
 pub(crate) mod template {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -183,8 +189,8 @@ pub(crate) mod template {
         pub version: i32,
         pub body: String,
         pub updated_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -192,6 +198,8 @@ pub(crate) mod template {
 }
 
 pub(crate) mod export {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -215,8 +223,8 @@ pub(crate) mod export {
         pub row_count: Option<i64>,
         pub error: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -224,6 +232,8 @@ pub(crate) mod export {
 }
 
 pub(crate) mod archive {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -246,8 +256,8 @@ pub(crate) mod archive {
         pub retain_until: Option<Date>,
         pub error: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

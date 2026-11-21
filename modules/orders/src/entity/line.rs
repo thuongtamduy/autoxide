@@ -1,5 +1,7 @@
 //! Bảng `orders_lines`: một dòng của đơn (bản chụp lúc đặt).
 
+use autoxide_kernel::time::Date;
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -40,8 +42,8 @@ pub struct Model {
     pub cancelled_quantity: i64,
     pub preorder_delayed_to: Option<Date>,
     pub advance_minor: Option<i64>,
-    pub preorder_commit_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub preorder_commit_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

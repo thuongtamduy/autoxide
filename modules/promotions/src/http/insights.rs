@@ -1,5 +1,6 @@
 //! Chạy thử, xung đột, lịch, số liệu (D-222). Chỉ đọc.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::NaiveDate;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -114,18 +114,18 @@ async fn conflicts(
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct RangeQuery {
     /// First day, `YYYY-MM-DD`.
-    pub from: NaiveDate,
+    pub from: Date,
     /// Last day, `YYYY-MM-DD`; at most 366 days after `from`.
-    pub to: NaiveDate,
+    pub to: Date,
 }
 
 /// Days and unit of the calendar.
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct CalendarQuery {
     /// First day, `YYYY-MM-DD` (Vietnam date).
-    pub from: NaiveDate,
+    pub from: Date,
     /// Last day, `YYYY-MM-DD`; at most 366 days after `from`.
-    pub to: NaiveDate,
+    pub to: Date,
     /// Only promotions of this unit.
     pub org_id: Option<Uuid>,
 }
@@ -163,7 +163,7 @@ async fn calendar(
         org_id: query.org_id,
         window: Some((
             crate::compliance::day_start(query.from),
-            crate::compliance::day_start(query.to + chrono::Days::new(1)),
+            crate::compliance::day_start(query.to.succ().unwrap_or(query.to)),
         )),
         ..PromotionFilter::default()
     };

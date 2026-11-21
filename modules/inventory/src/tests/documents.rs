@@ -1,9 +1,10 @@
 //! Chuyển kho (đang đi đường, nhận một phần, giá vốn theo kho gửi) và kiểm kê (chênh lệch thành
 //! dòng sổ có lý do, kiểm kê khi đang bán, nhập CSV).
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, tool};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -23,7 +24,7 @@ async fn chuyen_kho_dang_di_duong_nhan_mot_phan() {
         let hold = ReserveRequest::new(
             Uuid::now_v7(),
             shop.tree.a,
-            Utc::now() + Duration::minutes(30),
+            Timestamp::now() + SignedDuration::from_mins(30),
             vec![ReserveLine::new("1", item, 4)],
         );
         api.reserve(&tenant, &hold).await.unwrap();
@@ -135,7 +136,7 @@ async fn kiem_ke_lech_thanh_dieu_chinh_co_ly_do_va_khi_dang_ban() {
         let hold = ReserveRequest::new(
             order,
             shop.tree.a,
-            Utc::now() + Duration::minutes(30),
+            Timestamp::now() + SignedDuration::from_mins(30),
             vec![ReserveLine::new("1", shirt, 3)],
         );
         api.reserve(&tenant, &hold).await.unwrap();

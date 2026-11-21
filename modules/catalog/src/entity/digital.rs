@@ -3,6 +3,7 @@
 /// Một file của biến thể hàng số. Nội dung là bản chép của file người bán tải lên qua `files`,
 /// nằm ở `storage_key` trong nơi lưu của khách.
 pub(crate) mod digital_asset {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -24,7 +25,7 @@ pub(crate) mod digital_asset {
         /// Quyền tải còn hiệu lực bao nhiêu ngày kể từ lúc phát.
         pub grant_days: i64,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -33,6 +34,7 @@ pub(crate) mod digital_asset {
 
 /// Quyền tải một file cho một dòng đơn đã trả tiền.
 pub(crate) mod download_grant {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -52,9 +54,9 @@ pub(crate) mod download_grant {
         /// SHA-256 (hex) của token trong link tải; token dạng đọc được không lưu.
         pub token_hash: String,
         pub remaining: i64,
-        pub expires_at: DateTimeUtc,
-        pub revoked_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub expires_at: Timestamp,
+        pub revoked_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

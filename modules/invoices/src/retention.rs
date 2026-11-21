@@ -19,6 +19,7 @@
 //!   từ còn trong hạn lưu. Sổ cái (`ledger_*`) của khách đã xoá giữ nguyên: chuỗi băm không cắt được
 //!   từng phần (D-355).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -29,7 +30,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId, TenantStatus};
 use bytes::Bytes;
-use chrono::{Datelike, NaiveDate, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
 use serde_json::{Value, json};
@@ -88,15 +88,15 @@ impl InvoicesService {
         };
         // Sổ nhật ký chung: mọi ngày.
         let (first, last) = (
-            NaiveDate::from_ymd_opt(1900, 1, 1).unwrap_or_default(),
-            NaiveDate::from_ymd_opt(9999, 12, 31).unwrap_or_default(),
+            Date::new(1900, 1, 1).unwrap_or_default(),
+            Date::new(9999, 12, 31).unwrap_or_default(),
         );
         let lines = self.journal_of(tenant, None, first, last).await?;
         let rows = journal_rows(&lines, &Default::default());
         put("ledger/journal.csv", to_csv(&JOURNAL_HEADER, &rows), rows.len()).await?;
         // Chứng từ: mỗi chứng từ một dòng JSON, đọc theo trang.
         let mut jsonl = Vec::new();
-        let (mut count, mut retain_until) = (0usize, None::<NaiveDate>);
+        let (mut count, mut retain_until) = (0usize, None::<Date>);
         let mut page = PageRequest::first(200, Order::Asc);
         loop {
             let found = fetch_page(
@@ -121,7 +121,7 @@ impl InvoicesService {
         }
         put("documents.jsonl", jsonl, count).await?;
         // Giữ bản lưu ít nhất tới hết hạn của chứng từ muộn nhất, hay 10 năm từ nay.
-        let floor = NaiveDate::from_ymd_opt(Utc::now().year() + 10, 12, 31).unwrap_or_default();
+        let floor = Date::new(Timestamp::now().date_utc().year() + 10, 12, 31).unwrap_or_default();
         let retain_until = retain_until.unwrap_or(floor).max(floor);
         let manifest = json!({
             "format": "autoxide-accounting-archive",
@@ -186,7 +186,7 @@ impl InvoicesService {
     pub(crate) async fn purge_expired(
         &self,
         database: &Database,
-        today: NaiveDate,
+        today: Date,
     ) -> Result<Purged, Error> {
         let mut report = Purged::default();
         // 1. Ẩn danh người mua cá nhân của chứng từ quá hạn lưu (index `…_retention_sweep_idx`).
@@ -249,7 +249,7 @@ impl InvoicesService {
 
     /// Xoá chứng từ đã quá hạn lưu (và nháp) của khách đã xoá hẳn `tenant`. Chứng từ còn trong hạn
     /// không bao giờ bị chạm.
-    async fn delete_expired(&self, tenant: &TenantContext, today: NaiveDate) -> Result<u64, Error> {
+    async fn delete_expired(&self, tenant: &TenantContext, today: Date) -> Result<u64, Error> {
         let doomed: Vec<Uuid> = document::Entity::find()
             .scoped(tenant)
             .filter(
@@ -295,7 +295,7 @@ pub(crate) struct PurgeExpiredJob(pub Arc<InvoicesService>);
 #[async_trait::async_trait]
 impl JobHandler for PurgeExpiredJob {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let report = self.0.purge_expired(&job.database, Utc::now().date_naive()).await?;
+        let report = self.0.purge_expired(&job.database, Timestamp::now().date_utc()).await?;
         if report != Purged::default() {
             tracing::info!(
                 anonymized = report.anonymized,

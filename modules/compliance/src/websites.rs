@@ -13,7 +13,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{
     OrgId, OrgTree, ScopeExt, TenantContext, normalize_domain, root_of,
 };
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -301,7 +301,8 @@ impl ComplianceService {
         tenant: &TenantContext,
         kind: &str,
     ) -> Result<LogoRule, Error> {
-        let rule = self.rule_for(tenant, &format!("moit.checklist.{kind}"), Utc::now()).await?;
+        let rule =
+            self.rule_for(tenant, &format!("moit.checklist.{kind}"), Timestamp::now()).await?;
         let body = rule.and_then(|row| serde_json::from_str::<Value>(&row.body).ok());
         Ok(LogoRule::of(kind, body.as_ref()))
     }
@@ -476,7 +477,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         row: &website::Model,
-        version: DateTime<Utc>,
+        version: Timestamp,
         event: &E,
     ) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
@@ -515,7 +516,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         change: WebsiteChange,
     ) -> Result<website::Model, Error> {
         let before = self.website_in_scope(tenant, principal, &LEGAL_MANAGE, id).await?;
@@ -569,7 +570,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         change: StatusChange,
     ) -> Result<website::Model, Error> {
         let before = self.website_in_scope(tenant, principal, &LEGAL_MANAGE, id).await?;
@@ -636,7 +637,11 @@ impl ComplianceService {
             "submitted" => {
                 row.submitted_at = Some(at);
                 let version = self
-                    .rule_for(tenant, &format!("moit.checklist.{}", row.website_kind), Utc::now())
+                    .rule_for(
+                        tenant,
+                        &format!("moit.checklist.{}", row.website_kind),
+                        Timestamp::now(),
+                    )
                     .await?
                     .and_then(|rule| i32::try_from(rule.version).ok());
                 row.checklist_version = version;

@@ -4,13 +4,14 @@
 //! cảnh báo không chặn. Hạn mức là dữ liệu (`promotions_legal_limits`); không có dữ liệu thì không
 //! tự cho qua (`promotions.no_legal_data`).
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, BTreeSet};
 
 use autoxide_catalog::api::{FloorAction, PriceQuery};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Datelike, NaiveDate, Utc};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -59,32 +60,32 @@ impl Check {
 }
 
 /// Ngày theo giờ của vùng luật (Việt Nam: UTC+7).
-pub(crate) fn legal_day(at: DateTime<Utc>) -> NaiveDate {
-    at.with_timezone(&chrono_tz::Asia::Ho_Chi_Minh).date_naive()
+pub(crate) fn legal_day(at: Timestamp) -> Date {
+    at.date_in(&legal_zone())
 }
 
 /// Đầu ngày `day` theo giờ của vùng luật, đổi ra UTC.
-pub(crate) fn day_start(day: NaiveDate) -> DateTime<Utc> {
-    use chrono::TimeZone;
-    let midnight = day.and_time(chrono::NaiveTime::MIN);
+pub(crate) fn day_start(day: Date) -> Timestamp {
+    let midnight = day.to_jiff().to_datetime(jiff::civil::Time::midnight());
     // Việt Nam không đổi giờ theo mùa: luôn có đúng một thời điểm; nhánh dự phòng chỉ để không
     // phải `unwrap`.
-    chrono_tz::Asia::Ho_Chi_Minh
-        .from_local_datetime(&midnight)
-        .earliest()
-        .map_or_else(|| midnight.and_utc(), |at| at.with_timezone(&Utc))
+    autoxide_kernel::time::from_local(&legal_zone(), midnight)
+        .unwrap_or_else(|| day.start_of_day_utc())
+}
+
+/// Múi giờ của vùng luật. Dữ liệu múi giờ đóng gói sẵn nên luôn có; UTC chỉ để không phải `unwrap`.
+fn legal_zone() -> jiff::tz::TimeZone {
+    autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap_or(jiff::tz::TimeZone::UTC)
 }
 
 /// Số ngày (theo lịch) chương trình chạy trong năm `year`.
-fn days_in_year(starts_at: DateTime<Utc>, ends_at: DateTime<Utc>, year: i32) -> i64 {
-    let (Some(first), Some(last)) =
-        (NaiveDate::from_ymd_opt(year, 1, 1), NaiveDate::from_ymd_opt(year, 12, 31))
-    else {
+fn days_in_year(starts_at: Timestamp, ends_at: Timestamp, year: i16) -> i64 {
+    let (Some(first), Some(last)) = (Date::new(year, 1, 1), Date::new(year, 12, 31)) else {
         return 0;
     };
     let from = legal_day(starts_at).max(first);
-    let to = legal_day(ends_at - chrono::Duration::microseconds(1)).min(last);
-    if to < from { 0 } else { (to - from).num_days() + 1 }
+    let to = legal_day(ends_at - SignedDuration::from_micros(1)).min(last);
+    if to < from { 0 } else { to.days_since(from) + 1 }
 }
 
 /// Mức giảm phần trăm lớn nhất chương trình có thể cho (biết trước, không cần giá).
@@ -248,7 +249,7 @@ impl PromotionsService {
         program: &Program,
         limit: &crate::legal::LegalLimit,
     ) -> Result<Check, Error> {
-        let own = ((program.ends_at - program.starts_at).num_seconds() + 86_399) / 86_400;
+        let own = ((program.ends_at - program.starts_at).as_secs() + 86_399) / 86_400;
         if let Some(max) = limit.max_days_per_program
             && own > i64::from(max)
         {
@@ -283,7 +284,7 @@ impl PromotionsService {
         tenant: &TenantContext,
         program: &Program,
         legal: &crate::legal::LegalData,
-        day: NaiveDate,
+        day: Date,
     ) -> Result<Vec<Check>, Error> {
         let Some(rule) = legal.rule(&self.config.jurisdiction, legal_kind(program), day) else {
             return Ok(Vec::new());
@@ -436,13 +437,12 @@ impl PromotionsService {
                 .filter(promotion::Column::EndsAt.gt(program.starts_at));
         } else {
             let year = legal_day(program.starts_at).year();
-            let first = NaiveDate::from_ymd_opt(year, 1, 1)
-                .and_then(|day| day.and_hms_opt(0, 0, 0))
-                .map(|day| day.and_utc() - chrono::Duration::hours(7));
+            let first = Date::new(year, 1, 1)
+                .map(|day| day.start_of_day_utc() - SignedDuration::from_hours(7));
             if let Some(first) = first {
-                select = select
-                    .filter(promotion::Column::EndsAt.gt(first))
-                    .filter(promotion::Column::StartsAt.lt(first + chrono::Duration::days(366)));
+                select = select.filter(promotion::Column::EndsAt.gt(first)).filter(
+                    promotion::Column::StartsAt.lt(first + SignedDuration::from_hours(24 * 366)),
+                );
             }
         }
         let rows = select.all(read).await?;
@@ -464,7 +464,7 @@ impl PromotionsService {
         authority: &str,
         status: &str,
         reference: Option<String>,
-        submitted_at: Option<DateTime<Utc>>,
+        submitted_at: Option<Timestamp>,
         by: Option<Uuid>,
     ) -> Result<notice::Model, Error> {
         use sea_orm::{ActiveModelTrait, Set};
@@ -516,7 +516,7 @@ impl PromotionsService {
         authority: &str,
         status: &str,
         reference: Option<String>,
-        submitted_at: Option<DateTime<Utc>>,
+        submitted_at: Option<Timestamp>,
     ) -> Result<notice::Model, Error> {
         let mut problems = Vec::new();
         if !matches!(status, "submitted" | "not_required") {
@@ -681,13 +681,13 @@ pub(crate) fn activation_error(failed: &[&Check]) -> Error {
 #[cfg(test)]
 mod tests {
     use super::days_in_year;
-    use chrono::{TimeZone, Utc};
+    use autoxide_kernel::time::Timestamp;
 
     #[test]
     fn dem_ngay_theo_gio_viet_nam() {
         // 17:00 UTC 31/12/2025 = 00:00 1/1/2026 giờ Việt Nam.
-        let start = Utc.with_ymd_and_hms(2025, 12, 31, 17, 0, 0).unwrap();
-        let end = Utc.with_ymd_and_hms(2026, 1, 10, 17, 0, 0).unwrap();
+        let start = Timestamp::from_utc(2025, 12, 31, 17, 0, 0).unwrap();
+        let end = Timestamp::from_utc(2026, 1, 10, 17, 0, 0).unwrap();
         assert_eq!(days_in_year(start, end, 2026), 10);
         assert_eq!(days_in_year(start, end, 2025), 0);
     }

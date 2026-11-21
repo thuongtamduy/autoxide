@@ -1,5 +1,6 @@
 //! Bảng `customers_groups`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,8 +16,8 @@ pub struct Model {
     pub kind: String,
     pub rule: Option<String>,
     pub price_group: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

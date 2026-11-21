@@ -1,5 +1,6 @@
 //! Bảng `customers_points_entries`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -19,7 +20,7 @@ pub struct Model {
     pub reference: String,
     pub reason: Option<String>,
     pub actor_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -29,7 +29,7 @@ use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_ledger::api::{
     AccountKey, Counterparty, LineAccount, NewEntry, NewLine, OpenAccount, Side,
 };
-use chrono::{Datelike, Duration};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
@@ -569,7 +569,7 @@ impl OrdersService {
         let order_id = Uuid::now_v7();
         let org = OrgId::from_uuid(shift.org_id);
         let mut holds = Holds::default();
-        let until = now() + Duration::minutes(self.config.hold_minutes);
+        let until = now() + SignedDuration::from_mins(self.config.hold_minutes);
         if let Err(error) =
             self.hold_all(tenant, order_id, org, Some(org), &quote, &input, until, &mut holds).await
         {
@@ -697,7 +697,7 @@ impl OrdersService {
                 if !matches!(inserted, sea_orm::TryInsertResult::Inserted(rows) if rows > 0) {
                     return Ok(false);
                 }
-                let year = at.year();
+                let year = at.date_utc().year();
                 let sequence = autoxide_kernel::numbering::next(
                     &transaction,
                     tenant.id(),

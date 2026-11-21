@@ -5,7 +5,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
@@ -26,7 +26,7 @@ impl CustomersService {
         id: Uuid,
         reference: &str,
         wanted: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error> {
         let key = (tenant.id().as_uuid(), reference.to_owned(), instrument.to_owned());
         let transaction = tenant.database().begin_write().await?;

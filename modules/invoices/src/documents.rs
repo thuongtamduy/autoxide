@@ -10,8 +10,8 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_tax::api::{PriceMode, TaxQuoteRequest, TaxableLine};
-use chrono::{NaiveDate, Utc};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -44,7 +44,7 @@ pub(crate) struct Spec<'a> {
     pub prices_include_tax: bool,
     pub currency: Currency,
     pub buyer: &'a Buyer,
-    pub on: NaiveDate,
+    pub on: Date,
     pub lines: &'a [NewDocumentLine],
 }
 
@@ -64,7 +64,7 @@ pub(crate) struct DraftChange {
     pub buyer: Option<Buyer>,
     pub lines: Option<Vec<NewDocumentLine>>,
     pub series: Option<Option<Uuid>>,
-    pub issue_date: Option<Option<NaiveDate>>,
+    pub issue_date: Option<Option<Date>>,
     pub prices_include_tax: Option<bool>,
 }
 
@@ -345,7 +345,7 @@ impl InvoicesService {
         let Some(reference) = reference else {
             return Err(Error::internal("a checked reference went missing"));
         };
-        let on = draft.issue_date.unwrap_or_else(|| Utc::now().date_naive());
+        let on = draft.issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
         let seller = draft.on_behalf_of.unwrap_or(draft.org);
         let computed = self
             .compute(
@@ -559,7 +559,7 @@ impl InvoicesService {
         };
         let currency = Currency::parse(&found.currency)?;
         let seller = OrgId::from_uuid(found.on_behalf_of_org_id.unwrap_or(found.org_id));
-        let on = issue_date.unwrap_or_else(|| Utc::now().date_naive());
+        let on = issue_date.unwrap_or_else(|| Timestamp::now().date_utc());
         let computed = match &lines {
             Some(lines) => Some(
                 self.compute(

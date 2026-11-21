@@ -1,10 +1,10 @@
 //! Kiểu dữ liệu vào / ra của REST và MCP (cùng kiểu cho hai đường). Doc comment `///` của kiểu
 //! `ToSchema` vào tài liệu OpenAPI: viết tiếng Anh cho người gọi API.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -182,11 +182,11 @@ pub(crate) struct VariantRequest {
     pub sale_mode: Option<SaleModeDto>,
     /// Expected availability date of a pre-order, after today
     /// (`catalog.preorder_date_invalid`).
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     /// Total pre-order units, above 0 (`catalog.preorder_limit_invalid`); omitted: no limit.
     pub preorder_limit: Option<i64>,
     /// Pre-orders stop being taken at this time.
-    pub preorder_ends_at: Option<DateTime<Utc>>,
+    pub preorder_ends_at: Option<Timestamp>,
     /// Public pre-order note per language, e.g. `{"en": "Ships from 15 December"}`.
     #[serde(default)]
     pub preorder_messages: BTreeMap<String, String>,
@@ -353,9 +353,9 @@ pub(crate) struct VariantResponse {
     pub position: i32,
     pub active: bool,
     pub sale_mode: SaleModeDto,
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     pub preorder_limit: Option<i64>,
-    pub preorder_ends_at: Option<DateTime<Utc>>,
+    pub preorder_ends_at: Option<Timestamp>,
     pub preorder_messages: BTreeMap<String, String>,
     pub weight_grams: Option<i64>,
     pub net_quantity: Option<i64>,
@@ -365,8 +365,8 @@ pub(crate) struct VariantResponse {
     pub width_mm: Option<i64>,
     pub height_mm: Option<i64>,
     pub image_media_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<&variant::Model> for VariantResponse {
@@ -462,9 +462,9 @@ pub(crate) struct ProductResponse {
     /// Alternative texts of the images in other languages (`PUT
     /// /products/{id}/media/{media_id}/alts/{locale}`).
     pub media_alts: Vec<MediaAltResponse>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub activated_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub activated_at: Option<Timestamp>,
 }
 
 impl From<ProductDetail> for ProductResponse {
@@ -524,7 +524,7 @@ pub(crate) struct ProductListItem {
     pub slug: String,
     pub default_locale: String,
     pub variant_count: u64,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<ProductSummary> for ProductListItem {
@@ -597,7 +597,7 @@ pub(crate) struct CategoryResponse {
     pub visible: bool,
     /// Name and slug per language.
     pub texts: BTreeMap<String, CategoryTextDto>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<CategoryDetail> for CategoryResponse {
@@ -653,8 +653,8 @@ pub(crate) struct PriceListResponse {
     pub adjust_minor: Option<i64>,
     pub rounding_rule_id: Option<Uuid>,
     pub active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<price_list::Model> for PriceListResponse {
@@ -692,12 +692,12 @@ pub(crate) struct PriceResponse {
     pub amount: Money,
     /// Struck-through price, for display only.
     pub compare_at: Option<Money>,
-    pub valid_from: DateTime<Utc>,
+    pub valid_from: Timestamp,
     /// End of a temporary price; the earlier price applies again after it.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
     /// `manual`, `derived`, `bulk` or `import`.
     pub source: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<price::Model> for PriceResponse {
@@ -751,7 +751,7 @@ pub(crate) struct PriceGuardResponse {
     /// Minimum margin over unit cost, in basis points (`1500` = 15%).
     pub min_margin_bp: Option<i64>,
     pub action: FloorActionDto,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<price_guard::Model> for PriceGuardResponse {

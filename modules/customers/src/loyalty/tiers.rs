@@ -6,7 +6,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::Duration;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
@@ -31,7 +31,9 @@ impl CustomersService {
             .filter(order_fact::Column::ProfileId.eq(profile_id))
             .filter(order_fact::Column::Status.eq("completed"))
             .filter(order_fact::Column::Currency.eq(currency))
-            .filter(order_fact::Column::CompletedAt.gte(now() - Duration::days(365)))
+            .filter(
+                order_fact::Column::CompletedAt.gte(now() - SignedDuration::from_hours(24 * 365)),
+            )
             .scoped(tenant)
             .select_only()
             .column(order_fact::Column::NetMinor)
@@ -95,11 +97,9 @@ impl CustomersService {
     /// Xét lại hạng mọi hồ sơ có hạng hay có đơn trong 13 tháng (job hằng ngày).
     pub(crate) async fn evaluate_tiers(&self, tenant: &TenantContext) -> Result<u64, Error> {
         let ids: Vec<Uuid> = profile::Entity::find()
-            .filter(
-                sea_orm::Condition::any()
-                    .add(profile::Column::TierCode.is_not_null())
-                    .add(profile::Column::LastOrderAt.gte(now() - Duration::days(400))),
-            )
+            .filter(sea_orm::Condition::any().add(profile::Column::TierCode.is_not_null()).add(
+                profile::Column::LastOrderAt.gte(now() - SignedDuration::from_hours(24 * 400)),
+            ))
             .scoped(tenant)
             .select_only()
             .column(profile::Column::Id)

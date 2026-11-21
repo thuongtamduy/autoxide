@@ -1,6 +1,7 @@
 //! Service của module `tax`: tra bảng thuế (bộ nhớ đệm), tính thuế, khấu trừ thay, hồ sơ thuế theo
 //! nút (kế thừa theo cây). Handler REST, tool MCP và bên cung cấp `dyn TaxEngine` chỉ gọi vào đây.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -11,7 +12,6 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, OrgTree, ScopeExt, TenantContext};
-use chrono::{DateTime, NaiveDate, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
@@ -25,8 +25,8 @@ use crate::entity::{category, jurisdiction, profile, rate, rule, withholding};
 use crate::events;
 use crate::permissions::{PROFILES_MANAGE, READ};
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Mọi bảng thuế (mặt điều khiển) trong bộ nhớ: vài trăm dòng.
@@ -99,7 +99,7 @@ fn category_unknown(jurisdiction: &str, category: &str) -> Error {
     .with_param("jurisdiction", jurisdiction)
 }
 
-fn rate_missing(category: &str, on: NaiveDate) -> Error {
+fn rate_missing(category: &str, on: Date) -> Error {
     Error::new(
         ErrorKind::Validation,
         "tax.rate_missing",
@@ -185,7 +185,7 @@ impl TaxService {
         tables: &Tables,
         jurisdiction: &str,
         category: &str,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Vec<ResolvedRate>, Error> {
         if !tables
             .categories
@@ -401,7 +401,7 @@ impl TaxService {
         &self,
         tenant: &TenantContext,
         org: OrgId,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<InvoiceRequirements, Error> {
         let Some(found) = self.nearest_profile(tenant, org).await? else {
             return Ok(InvoiceRequirements { cash_register_required: false, legal_basis: None });
@@ -437,17 +437,13 @@ impl TaxService {
 
     /// Thuế suất hết hạn trong `warning_days` ngày tính từ `today` mà không có thuế suất nối tiếp
     /// (cùng vùng, nhóm, tầng, bắt đầu đúng ngày hết hạn). `None`: chưa nhập gói nào.
-    pub(crate) async fn expiring_rates(
-        &self,
-        today: NaiveDate,
-    ) -> Result<Option<Vec<String>>, Error> {
+    pub(crate) async fn expiring_rates(&self, today: Date) -> Result<Option<Vec<String>>, Error> {
         let tables = self.tables().await?;
         if tables.rates.is_empty() {
             return Ok(None);
         }
         let start = today.format("%Y-%m-%d").to_string();
-        let limit =
-            (today + chrono::Duration::days(self.warning_days)).format("%Y-%m-%d").to_string();
+        let limit = today.checked_add_days(self.warning_days).unwrap_or(today).format("%Y-%m-%d");
         let mut found = Vec::new();
         for rate in &tables.rates {
             let Some(end) = rate.effective_to.as_deref() else { continue };
@@ -507,7 +503,7 @@ impl TaxService {
         principal: &Principal,
         org: OrgId,
         input: ProfileInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<profile::Model, Error> {
         // Không có permission ở đâu cả: từ chối trước khi kiểm dữ liệu (phạm vi nút kiểm trong
         // transaction bên dưới).

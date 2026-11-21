@@ -3,6 +3,8 @@
 //! công / bị từ chối (ghi lại số dư) / đồng thời không vượt số dư, nhả đồng thời một lần, số dư
 //! nhiều khoá, trạng thái niêm phong, bút toán theo chứng từ nguồn, tool MCP.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Actor;
@@ -14,7 +16,6 @@ use autoxide_testkit::{
     FakePaymentGateway, FakePayoutGateway, FakePayoutOutcome, TestApp, TestDatabase, tool,
 };
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -143,14 +144,14 @@ async fn book_balances(app: &TestApp, book: OrgId) {
         .as_str()
         .unwrap()
         .to_owned();
-    let today = Utc::now().date_naive();
+    let today = Timestamp::now().date_utc();
     let (status, trial) = call(
         app,
         "GET",
         &format!(
             "/trial-balance?book_id={id}&from={}&to={}",
-            today - Duration::days(1),
-            today + Duration::days(1)
+            today.checked_sub_days(1).unwrap(),
+            today.checked_add_days(1).unwrap()
         ),
         None,
     )
@@ -386,7 +387,10 @@ async fn flow_partner_collect_hold_release_payout() {
         assert_eq!(early.unwrap_err().code(), "ledger.insufficient_balance");
         // Hết hạn đổi trả: job nhả phần còn giữ.
         hold::Entity::update_many()
-            .col_expr(hold::Column::ReleaseAt, (Utc::now() - Duration::minutes(1)).into())
+            .col_expr(
+                hold::Column::ReleaseAt,
+                (Timestamp::now() - SignedDuration::from_mins(1)).into(),
+            )
             .filter(hold::Column::Id.eq(held.id))
             .exec(app.database().write())
             .await
@@ -710,7 +714,10 @@ async fn nha_dong_thoi_mot_but_toan_va_chi_tra_cho_ket_qua() {
         assert_eq!(sent.status, "sent");
         setup.payouts.settle(sent.id, false);
         payout::Entity::update_many()
-            .col_expr(payout::Column::UpdatedAt, (Utc::now() - Duration::minutes(5)).into())
+            .col_expr(
+                payout::Column::UpdatedAt,
+                (Timestamp::now() - SignedDuration::from_mins(5)).into(),
+            )
             .filter(payout::Column::Id.eq(sent.id))
             .exec(app.database().write())
             .await
@@ -768,7 +775,7 @@ async fn so_du_nhieu_khoa_niem_phong_va_tool_mcp() {
             found.iter().map(|money| money.minor()).collect::<Vec<_>>(),
             vec![500_000, 0, 500_000]
         );
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         let at_day = ledger(app).balances(&app.default_tenant(), &keys, Some(today)).await.unwrap();
         assert_eq!(at_day, found);
         // Niêm phong: trước và sau job.

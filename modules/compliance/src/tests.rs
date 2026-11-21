@@ -3,6 +3,7 @@
 //! người đăng nhập, cổng KYC theo quy tắc có ngày hiệu lực, văn bản có phiên bản + chấp nhận lại, sổ
 //! đồng ý (rút ở khoá rộng hơn thắng), nhập quy tắc chỉ thêm.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,7 +12,6 @@ use autoxide_kernel::identity::IdentityVerifier;
 use autoxide_kernel::tenancy::DEFAULT_TENANT;
 use autoxide_testkit::{FakeIdentityVerifier, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{TimeZone, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -176,8 +176,8 @@ async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
     TestDatabase::run(async |test| {
         let (app, _) = app(test).await;
         let rules = app.api::<dyn ComplianceRules>().unwrap();
-        let before = Utc.with_ymd_and_hms(2026, 6, 30, 16, 59, 0).unwrap();
-        let after = Utc.with_ymd_and_hms(2026, 6, 30, 17, 0, 0).unwrap();
+        let before = Timestamp::from_utc(2026, 6, 30, 16, 59, 0).unwrap();
+        let after = Timestamp::from_utc(2026, 6, 30, 17, 0, 0).unwrap();
         assert!(
             rules
                 .effective(DEFAULT_TENANT, "kyc.required_activities", before)
@@ -207,7 +207,7 @@ async fn quy_tac_theo_ngay_hieu_luc_va_nhap_chi_them() {
         assert_eq!(imported["data"]["imported"], 1);
         let (_, again) = call(&app, "POST", "/rules", "staff", Some(pack)).await;
         assert_eq!(again["data"]["imported"], 0);
-        let later = Utc.with_ymd_and_hms(2030, 1, 2, 0, 0, 0).unwrap();
+        let later = Timestamp::from_utc(2030, 1, 2, 0, 0, 0).unwrap();
         let rule = rules
             .effective(DEFAULT_TENANT, "kyc.required_activities", later)
             .await

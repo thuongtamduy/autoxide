@@ -1,5 +1,6 @@
 //! Bảng `customers_point_holds`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,8 +17,8 @@ pub struct Model {
     pub currency: String,
     pub lots: String,
     pub status: String,
-    pub expires_at: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub expires_at: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

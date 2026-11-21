@@ -1,6 +1,7 @@
 //! Nhắc hạn: lịch hằng giờ báo vụ còn mở đã quá hạn xác nhận hay hạn quyết định.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
 
 impl ComplianceService {
     /// Nhắc mọi vụ còn mở đã quá hạn xác nhận hay hạn quyết định trong `database` (lịch hằng giờ):
@@ -9,7 +10,7 @@ impl ComplianceService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
-        let at = Utc::now();
+        let at = Timestamp::now();
         let due: Vec<(Uuid, Uuid)> = case::Entity::find()
             .select_only()
             .column(case::Column::TenantId)
@@ -89,7 +90,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         row: &case::Model,
         step: &str,
-        due_at: DateTime<Utc>,
+        due_at: Timestamp,
     ) {
         let (Some(mailer), Some(email)) = (self.mailer.clone(), self.staff_email(tenant).await)
         else {

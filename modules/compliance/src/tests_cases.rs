@@ -3,6 +3,7 @@
 //! hồi sau hạn bị từ chối, quyết định cần phiên người, nhắc quá hạn không trùng, cung cấp thông tin
 //! cho cơ quan chỉ lưu tên trường, lý do được ẩn đánh giá.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::resource::{Resource, ResourceResolver};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement};
 use serde::Serialize;
@@ -93,7 +93,7 @@ async fn events(database: &Database, name: &str) -> Vec<Value> {
 
 /// Dời một mốc của vụ `id` (thời gian giả).
 async fn set_time(app: &TestApp, id: &str, column: case::Column, at: &str) {
-    let at: DateTime<Utc> = at.parse().unwrap();
+    let at: Timestamp = at.parse().unwrap();
     case::Entity::update_many()
         .col_expr(column, Expr::value(at))
         .filter(case::Column::Id.eq(id.parse::<Uuid>().unwrap()))

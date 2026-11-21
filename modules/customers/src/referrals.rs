@@ -8,7 +8,7 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_promotions::api::{GrantVoucher, VoucherSource};
-use chrono::Duration;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -120,7 +120,8 @@ impl CustomersService {
     ) -> Result<referral::Model, Error> {
         let profile = self.me(tenant, user).await?;
         if profile.orders_count > 0
-            || profile.created_at < now() - Duration::days(self.config.referral_apply_days)
+            || profile.created_at
+                < now() - SignedDuration::from_hours(24 * self.config.referral_apply_days)
         {
             return Err(not_eligible());
         }

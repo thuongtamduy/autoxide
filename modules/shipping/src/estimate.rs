@@ -7,7 +7,7 @@ use autoxide_catalog::api::{PriceQuery, ProductStatus};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::Utc;
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 use crate::addresses::address_of;
@@ -49,7 +49,7 @@ impl ShippingService {
             .filter(|variant| query.product_id.is_none_or(|product| product == variant.product_id))
             .ok_or_else(|| errors::variant_not_for_sale(query.variant_id))?;
         let org = query.org_id.map_or(variant.org_id, OrgId::from_uuid);
-        let at = Utc::now();
+        let at = Timestamp::now();
         let price = catalog
             .prices(tenant, &PriceQuery::new(org, query.currency, at, vec![variant.variant_id]))
             .await?

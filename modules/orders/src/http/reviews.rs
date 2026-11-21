@@ -1,6 +1,7 @@
 //! Endpoint đánh giá sau mua (D-201, D-202, D-203): người mua viết / sửa, danh sách và thống kê
 //! công khai, phiếu "hữu ích", kiểm duyệt và trả lời của nhân viên, bản nháp tóm tắt AI.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -60,13 +60,13 @@ pub(crate) struct ReviewResponse {
     hidden_reason: Option<String>,
     /// The shop's public answer.
     reply: Option<String>,
-    replied_at: Option<DateTime<Utc>>,
+    replied_at: Option<Timestamp>,
     helpful_count: i32,
     /// Signed in: whether you voted "helpful" for it.
     #[serde(skip_serializing_if = "Option::is_none")]
     voted_by_me: Option<bool>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl ReviewResponse {
@@ -282,8 +282,8 @@ pub(crate) struct SummaryResponse {
     /// Always `true`: shown with an "AI-generated" label (D-109).
     ai_generated: bool,
     source_review_count: i32,
-    generated_at: Option<DateTime<Utc>>,
-    reviewed_at: Option<DateTime<Utc>>,
+    generated_at: Option<Timestamp>,
+    reviewed_at: Option<Timestamp>,
 }
 
 impl From<review_summary::Model> for SummaryResponse {
@@ -422,7 +422,7 @@ pub(crate) struct StaffReviewQuery {
     /// `published` or `hidden`.
     status: Option<String>,
     /// Only reviews written after this time (e.g. the time you last looked).
-    created_after: Option<DateTime<Utc>>,
+    created_after: Option<Timestamp>,
     product_id: Option<Uuid>,
 }
 

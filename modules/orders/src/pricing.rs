@@ -9,6 +9,8 @@
 //! cách giao, kết quả khuyến mại). Đặt hàng tính lại và so: khác → `orders.quote_changed`. Sửa hạn
 //! trong token không có lợi gì — giá vẫn tính lại ở máy chủ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -23,7 +25,6 @@ use autoxide_promotions::api::{
 };
 use autoxide_shipping::api::{Address, QuoteItem, QuoteRequest, ShippingOption, ShippingRates};
 use autoxide_tax::api::{PriceMode, TaxComponent, TaxEngine, TaxQuoteRequest, TaxableLine};
-use chrono::{DateTime, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -63,7 +64,7 @@ pub(crate) struct PriceInput {
     /// `web` / `app` / `pos`.
     pub client: Option<String>,
     pub first_order: bool,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
 }
 
 /// Vì sao một dòng chưa đặt được.
@@ -123,7 +124,7 @@ pub(crate) struct Quote {
     pub free_shipping_remaining: Option<Money>,
     pub evaluation: Option<Evaluation>,
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl Quote {
@@ -150,9 +151,9 @@ pub(crate) fn token_fingerprint(token: &str) -> &str {
 }
 
 /// Hạn và dấu vân tay trong `quote_token`; token hỏng → `None`.
-pub(crate) fn parse_token(token: &str) -> Option<(DateTime<Utc>, &str)> {
+pub(crate) fn parse_token(token: &str) -> Option<(Timestamp, &str)> {
     let (expires, fingerprint) = token.split_once('.')?;
-    let expires = DateTime::from_timestamp(expires.parse().ok()?, 0)?;
+    let expires = Timestamp::from_unix_seconds(expires.parse().ok()?)?;
     Some((expires, fingerprint))
 }
 
@@ -257,7 +258,7 @@ pub(crate) async fn quote(
         &shipping_options,
         subtotal.checked_sub(discount)?,
     )?;
-    let expires_at = input.at + chrono::Duration::minutes(ttl_minutes);
+    let expires_at = input.at + SignedDuration::from_mins(ttl_minutes);
     let mut quote = Quote {
         lines,
         subtotal,
@@ -276,7 +277,7 @@ pub(crate) async fn quote(
         expires_at,
     };
     let fingerprint = fingerprint(&quote)?;
-    quote.token = format!("{}.{fingerprint}", expires_at.timestamp());
+    quote.token = format!("{}.{fingerprint}", expires_at.as_unix_seconds());
     Ok(quote)
 }
 
@@ -529,7 +530,7 @@ async fn apply_tax(
         let mode = if inclusive { PriceMode::Inclusive } else { PriceMode::Exclusive };
         let request = TaxQuoteRequest::new(
             jurisdiction.clone(),
-            input.at.date_naive(),
+            input.at.date_utc(),
             input.org_id,
             mode,
             input.currency,

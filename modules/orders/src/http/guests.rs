@@ -6,6 +6,7 @@
 //! `Authorization` là của đăng nhập — kernel xác thực mọi giá trị trong đó và trả 401 nếu không phải
 //! token đăng nhập (D-20261120-step45-guest-orders).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::AddressInput;
@@ -16,7 +17,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::HeaderMap;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -70,7 +70,7 @@ pub(crate) struct CodeSentResponse {
     lookup_id: Uuid,
     order_id: Uuid,
     /// The code works until then.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     /// Seconds to wait before asking for another code.
     resend_after: i64,
     /// Where the code went, masked (`090•••567`).
@@ -137,7 +137,7 @@ pub(crate) struct AccessResponse {
     /// Send it in the `Order-Token` header to see and act on this one order. Returned once.
     access_token: String,
     order_id: Uuid,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl From<AccessIssued> for AccessResponse {

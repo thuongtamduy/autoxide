@@ -13,7 +13,7 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, DatabaseTransaction, EntityTrait,
     QueryFilter, QueryOrder, Set,
@@ -57,7 +57,7 @@ pub(crate) struct StatusUpdate {
     pub event_key: String,
     pub status: ShipmentStatus,
     pub carrier_status: String,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     pub note: String,
     pub source: Source,
 }
@@ -443,7 +443,7 @@ impl ShippingService {
         actor: Actor,
         before: &shipment::Model,
         to: ShipmentStatus,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<bool, Error> {
         let mut after = before.clone();
         after.status = to.as_str().to_owned();

@@ -1,12 +1,13 @@
 //! Tình trạng hàng công khai (D-200): không lộ số lớn, đổi ngay sau khi giữ chỗ, ETag → 304,
 //! đặt trước hiện `preorder`, combo tính từ thành phần.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_catalog::api::SaleMode;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -88,7 +89,7 @@ async fn tinh_trang_cong_khai_khong_lo_so_lon() {
         let request = ReserveRequest::new(
             Uuid::now_v7(),
             shop.tree.store,
-            Utc::now() + Duration::minutes(30),
+            Timestamp::now() + SignedDuration::from_mins(30),
             vec![ReserveLine::new("1", item, 97)],
         );
         api.reserve(&shop.default_tenant(), &request).await.unwrap();

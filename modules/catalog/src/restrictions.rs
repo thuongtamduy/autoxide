@@ -6,13 +6,13 @@
 //! mặt điều khiển, D-198), nạp bằng `autoxide task catalog.load_restrictions` từ gói
 //! `data/vn/restrictions.json` — căn cứ ghi trong từng quy tắc, cần đối chiếu văn bản gốc (D-186).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{NaiveDate, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -59,13 +59,13 @@ pub(crate) struct NewDocument {
     pub document_type: String,
     pub number: String,
     pub issued_by: String,
-    pub issued_on: NaiveDate,
-    pub expires_on: Option<NaiveDate>,
+    pub issued_on: Date,
+    pub expires_on: Option<Date>,
     pub file_key: Option<String>,
 }
 
-fn today() -> NaiveDate {
-    Utc::now().date_naive()
+fn today() -> Date {
+    Timestamp::now().date_utc()
 }
 
 fn document_not_found(id: Uuid) -> Error {

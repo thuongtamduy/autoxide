@@ -6,6 +6,7 @@
 //! 33). Tồn thuộc nút kho của cây tổ chức (bước 34): đọc kiểm `require_at`, ghi kiểm
 //! `require_write_at` TRONG transaction ghi; ngoài phạm vi báo như không có (404).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_catalog::api::{Catalog, MAX_IDS, VariantSnapshot};
@@ -16,7 +17,6 @@ use autoxide_kernel::event::Outbox;
 use autoxide_kernel::reasons::ReasonCodes;
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, ScopeExt, TenantContext, root_of};
 use autoxide_organizations::api::OrgDirectory;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use uuid::Uuid;
 
@@ -193,8 +193,8 @@ impl InventoryService {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai
 /// database trả về cùng một giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Đích kiểm quyền của bản ghi thuộc nút `org`.

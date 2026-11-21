@@ -1,11 +1,11 @@
 //! Đầu vào của một chương trình (thân `POST /promotions`, tool `create_promotion`) và bộ kiểm.
 //! Service gom mọi lỗi để báo MỘT lần (D-083); chỉ service kiểm, không `#[validate]` trên trường.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeSet;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::money::{Currency, Money};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -118,9 +118,9 @@ pub(crate) struct PromotionInput {
     pub gift_quantity: Option<i32>,
     #[serde(default)]
     pub first_order_only: bool,
-    pub starts_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
     /// Required: every promotion announces its end (Commercial Law, art. 97).
-    pub ends_at: DateTime<Utc>,
+    pub ends_at: Timestamp,
     /// Higher first. Defaults to 0.
     #[serde(default)]
     pub priority: i32,

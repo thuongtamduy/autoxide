@@ -1,5 +1,6 @@
 //! Bảng `customers_wishlist_items`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,12 +16,12 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub variant_key: String,
     pub variant_id: Option<Uuid>,
-    pub added_at: DateTimeUtc,
+    pub added_at: Timestamp,
     pub baseline_price_minor: Option<i64>,
     pub baseline_currency: Option<String>,
-    pub baseline_at: Option<DateTimeUtc>,
-    pub back_in_stock_alerted_at: Option<DateTimeUtc>,
-    pub price_drop_alerted_at: Option<DateTimeUtc>,
+    pub baseline_at: Option<Timestamp>,
+    pub back_in_stock_alerted_at: Option<Timestamp>,
+    pub price_drop_alerted_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

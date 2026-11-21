@@ -1,5 +1,6 @@
 //! Route REST của module `ledger`, dưới `/api/v1/ledger`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -81,8 +81,8 @@ pub(crate) struct BookResponse {
     /// First month of the fiscal year, 1 to 12.
     fiscal_year_start_month: i32,
     /// Last day of the latest closed period: no entry may be dated on or before it.
-    closed_through: Option<NaiveDate>,
-    created_at: DateTime<Utc>,
+    closed_through: Option<Date>,
+    created_at: Timestamp,
 }
 
 impl From<book::Model> for BookResponse {
@@ -223,8 +223,8 @@ pub(crate) struct AccountResponse {
     status: String,
     /// Current balance on the normal side (entries dated in the future included).
     balance: Money,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 fn describe_account(view: AccountView) -> Result<AccountResponse, Error> {
@@ -481,7 +481,7 @@ pub(crate) struct LineResponse {
     amount: Money,
     base_amount: Money,
     exchange_rate: Option<String>,
-    effective_date: NaiveDate,
+    effective_date: Date,
 }
 
 fn describe_line(row: line::Model) -> Result<LineResponse, Error> {
@@ -536,7 +536,7 @@ async fn account_lines(
 pub(crate) struct BalanceResponse {
     account_id: Uuid,
     /// The day asked for; `null`: now.
-    as_of: Option<NaiveDate>,
+    as_of: Option<Date>,
     /// Balance on the normal side of the account.
     balance: Money,
 }
@@ -546,7 +546,7 @@ pub(crate) struct BalanceResponse {
 #[into_params(parameter_in = Query)]
 pub(crate) struct BalanceQuery {
     /// End of this day, `YYYY-MM-DD`; omit for the current balance.
-    as_of: Option<NaiveDate>,
+    as_of: Option<Date>,
 }
 
 /// Get the balance of an account, now or at the end of a day.
@@ -599,7 +599,7 @@ pub(crate) struct EntryRequest {
     /// Unit of the book; default the tenant's root.
     org_id: Option<Uuid>,
     /// Accounting day; default today in the unit's time zone. Must be in an open period.
-    effective_date: Option<NaiveDate>,
+    effective_date: Option<Date>,
     /// Fixed text, 1 to 200 characters. It is kept for good in the hash chain: no names, emails or
     /// phone numbers.
     #[schema(example = "Opening balance")]
@@ -627,9 +627,9 @@ pub(crate) struct EntriesQuery {
     /// Only entries for this source document.
     source_id: Option<String>,
     /// Only entries dated on or after this day.
-    from: Option<NaiveDate>,
+    from: Option<Date>,
     /// Only entries dated on or before this day.
-    to: Option<NaiveDate>,
+    to: Option<Date>,
 }
 
 /// A reversal.
@@ -640,7 +640,7 @@ pub(crate) struct ReversalRequest {
     /// Your id of the reversal: sending it again returns the reversal already posted.
     reference: String,
     /// Accounting day of the reversal; default today in the unit's time zone (an open period).
-    effective_date: Option<NaiveDate>,
+    effective_date: Option<Date>,
 }
 
 /// List entries in your scope.
@@ -796,11 +796,11 @@ async fn reverse_entry(
 pub(crate) struct PeriodResponse {
     id: Uuid,
     book_id: Uuid,
-    starts_on: NaiveDate,
-    ends_on: NaiveDate,
+    starts_on: Date,
+    ends_on: Date,
     /// `open` or `closed`.
     status: String,
-    closed_at: Option<DateTime<Utc>>,
+    closed_at: Option<Timestamp>,
     closed_by: Option<Uuid>,
     /// Number of entries dated in the period.
     #[schema(example = 120)]
@@ -931,8 +931,8 @@ pub(crate) struct TrialTotal {
 pub(crate) struct TrialBalanceResponse {
     book_id: Uuid,
     org_id: Uuid,
-    from: NaiveDate,
-    to: NaiveDate,
+    from: Date,
+    to: Date,
     accounts: Vec<TrialRowResponse>,
     totals: Vec<TrialTotal>,
 }
@@ -944,15 +944,15 @@ pub(crate) struct TrialQuery {
     /// The book.
     book_id: Uuid,
     /// First day, `YYYY-MM-DD`.
-    from: NaiveDate,
+    from: Date,
     /// Last day, `YYYY-MM-DD`.
-    to: NaiveDate,
+    to: Date,
 }
 
 pub(crate) fn describe_trial(
     book: book::Model,
-    from: NaiveDate,
-    to: NaiveDate,
+    from: Date,
+    to: Date,
     rows: Vec<TrialRow>,
 ) -> Result<TrialBalanceResponse, Error> {
     let mut totals: Vec<TrialTotal> = Vec::new();

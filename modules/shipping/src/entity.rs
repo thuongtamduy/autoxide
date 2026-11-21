@@ -13,6 +13,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod address {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -35,8 +36,8 @@ pub(crate) mod address {
         pub postal_code: Option<String>,
         pub is_default: bool,
         pub default_key: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -44,6 +45,7 @@ pub(crate) mod address {
 }
 
 pub(crate) mod zone {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -55,8 +57,8 @@ pub(crate) mod zone {
         pub tenant_id: Uuid,
         pub org_id: Uuid,
         pub name: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -84,6 +86,7 @@ pub(crate) mod zone_region {
 }
 
 pub(crate) mod method {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -115,8 +118,8 @@ pub(crate) mod method {
         pub same_day: bool,
         pub hold_days: Option<i16>,
         pub auto_book: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -170,6 +173,7 @@ pub(crate) mod pickup_point {
 }
 
 pub(crate) mod carrier_account {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -188,10 +192,10 @@ pub(crate) mod carrier_account {
         pub sandbox: bool,
         pub active: bool,
         pub check_status: String,
-        pub checked_at: Option<DateTimeUtc>,
+        pub checked_at: Option<Timestamp>,
         pub check_error_code: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -199,6 +203,7 @@ pub(crate) mod carrier_account {
 }
 
 pub(crate) mod shipment {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -223,7 +228,7 @@ pub(crate) mod shipment {
         pub service_code: Option<String>,
         pub tracking_number: Option<String>,
         pub status: String,
-        pub status_at: DateTimeUtc,
+        pub status_at: Timestamp,
         pub recipient_name: String,
         pub recipient_phone: String,
         pub country: String,
@@ -239,12 +244,12 @@ pub(crate) mod shipment {
         pub quoted_fee_minor: Option<i64>,
         pub actual_fee_minor: Option<i64>,
         pub cod_status: String,
-        pub delivered_at: Option<DateTimeUtc>,
+        pub delivered_at: Option<Timestamp>,
         pub attempts: i32,
         pub last_error_code: Option<String>,
         pub note: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -302,6 +307,7 @@ pub(crate) mod shipment_item {
 }
 
 pub(crate) mod tracking_event {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -316,9 +322,9 @@ pub(crate) mod tracking_event {
         pub event_key: String,
         pub status: String,
         pub carrier_status: String,
-        pub occurred_at: DateTimeUtc,
+        pub occurred_at: Timestamp,
         pub note: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -326,6 +332,7 @@ pub(crate) mod tracking_event {
 }
 
 pub(crate) mod webhook_inbox {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -336,7 +343,7 @@ pub(crate) mod webhook_inbox {
         pub id: Uuid,
         pub tenant_id: Uuid,
         pub carrier_account_id: Uuid,
-        pub received_at: DateTimeUtc,
+        pub received_at: Timestamp,
         pub headers: String,
         pub body: String,
         pub status: String,
@@ -348,6 +355,8 @@ pub(crate) mod webhook_inbox {
 }
 
 pub(crate) mod cod_statement {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -368,7 +377,7 @@ pub(crate) mod cod_statement {
         pub currency: String,
         pub status: String,
         pub imported_by: Option<Uuid>,
-        pub imported_at: DateTimeUtc,
+        pub imported_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -401,6 +410,7 @@ pub(crate) mod cod_statement_line {
 }
 
 pub(crate) mod cod_discrepancy {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -421,8 +431,8 @@ pub(crate) mod cod_discrepancy {
         pub resolution_code: Option<String>,
         pub resolution_note: String,
         pub resolved_by: Option<Uuid>,
-        pub resolved_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub resolved_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -430,6 +440,7 @@ pub(crate) mod cod_discrepancy {
 }
 
 pub(crate) mod calendar {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -444,8 +455,8 @@ pub(crate) mod calendar {
         pub time_zone: String,
         /// Bit 0 = thứ Hai … bit 6 = Chủ nhật.
         pub working_weekdays: i32,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -453,6 +464,7 @@ pub(crate) mod calendar {
 }
 
 pub(crate) mod calendar_day {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]

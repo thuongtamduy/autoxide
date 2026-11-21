@@ -1,6 +1,7 @@
 //! Route REST của tỉ giá (dưới `/api/v1/ledger`, D-237, D-352): danh sách, tỉ giá hiệu lực một
 //! ngày, ghi tay, lấy từ nguồn tỉ giá.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::NaiveDate;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -85,7 +85,7 @@ pub(crate) struct RateRequest {
     #[schema(value_type = String, example = "25345.5")]
     rate: DecimalString,
     /// First day the rate is used, `YYYY-MM-DD`.
-    effective_date: NaiveDate,
+    effective_date: Date,
 }
 
 /// Record an exchange rate by hand.
@@ -145,7 +145,7 @@ pub(crate) struct EffectiveQuery {
     /// e.g. `VND`.
     quote: String,
     /// The day, `YYYY-MM-DD`.
-    on: NaiveDate,
+    on: Date,
 }
 
 /// Get the exchange rate in force on a day.
@@ -190,7 +190,7 @@ pub(crate) struct FetchRequest {
     #[schema(example = "USD")]
     base: String,
     /// The day, `YYYY-MM-DD`; omit for today in the tenant's time zone.
-    on: Option<NaiveDate>,
+    on: Option<Date>,
 }
 
 /// Fetch exchange rates from a rate source.

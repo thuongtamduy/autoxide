@@ -18,7 +18,7 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
     PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -75,9 +75,9 @@ pub(crate) struct PriceInput {
     pub amount: Money,
     pub compare_at: Option<Money>,
     /// Trống: bây giờ.
-    pub valid_from: Option<DateTime<Utc>>,
+    pub valid_from: Option<Timestamp>,
     /// Giá tạm thời: hết hạn thì giá cũ tự hiệu lực lại.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
 }
 
 /// Kết quả của một lần thêm giá: các dòng đã ghi và cảnh báo sàn giá (`warn`).
@@ -219,7 +219,7 @@ async fn candidate_lists<C: ConnectionTrait>(
 /// hạn. Hai dòng cùng `valid_from`: dòng thêm sau (ID UUIDv7 lớn hơn) thắng.
 fn effective<'a>(
     rows: impl Iterator<Item = &'a price::Model>,
-    at: DateTime<Utc>,
+    at: Timestamp,
     before: bool,
 ) -> Option<&'a price::Model> {
     rows.filter(|row| if before { row.valid_from < at } else { row.valid_from <= at })
@@ -282,7 +282,7 @@ impl CatalogService {
         tenant: &TenantContext,
         lists: &[price_list::Model],
         variant_ids: &[Uuid],
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Vec<price::Model>, Error> {
         if lists.is_empty() {
             return Ok(Vec::new());
@@ -502,7 +502,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         changes: PriceListChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<price_list::Model, Error> {
         let mut problems = Vec::new();
         let name = changes.name.map(|name| name.trim().to_owned());

@@ -1,5 +1,6 @@
 //! Bảng `customers_store_credits`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub profile_id: Uuid,
     pub balance_minor: i64,
     pub currency: String,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

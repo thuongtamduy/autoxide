@@ -6,6 +6,7 @@
 //! (`tax.pack_outdated`); cùng nội dung (SHA-256) đã nhập thì không đổi gì. Một gói thay hẳn dữ liệu
 //! của các vùng thuế nó nêu, trong một transaction.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use chrono::NaiveDate;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
 use serde_json::json;
@@ -120,8 +120,8 @@ fn outdated(code: &str, current: i64) -> Error {
     .with_param("current", current)
 }
 
-fn date(text: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
+fn date(text: &str) -> Option<Date> {
+    Date::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
 /// Đọc và kiểm một gói; báo mọi chỗ sai một lần (tối đa 20).

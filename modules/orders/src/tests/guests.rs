@@ -1,6 +1,8 @@
 //! Mua không cần tài khoản (D-201, D-202, D-204): tra đơn bằng số đơn + mã một lần, token xem đơn,
 //! huỷ / đổi địa chỉ / mở hỗ trợ bằng token, gắn đơn vào tài khoản, trả lời tự động về trạng thái đơn.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::error::Error;
@@ -11,7 +13,6 @@ use autoxide_support::api::{
 };
 use autoxide_testkit::{FakeSmsSender, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -216,7 +217,7 @@ async fn gui_lai_otp_phai_cho_va_tra_qua_nhieu_bi_chan() {
         lookup_code::Entity::update_many()
             .col_expr(
                 lookup_code::Column::CreatedAt,
-                Expr::value(Utc::now() - Duration::minutes(2)),
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(2)),
             )
             .filter(lookup_code::Column::OrderId.eq(uuid::Uuid::parse_str(&order).unwrap()))
             .exec(guests.shop.database().write())
@@ -279,7 +280,7 @@ async fn token_xem_don_che_du_lieu_va_het_han() {
         lookup_token::Entity::update_many()
             .col_expr(
                 lookup_token::Column::ExpiresAt,
-                Expr::value(Utc::now() - Duration::minutes(1)),
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(1)),
             )
             .exec(guests.shop.database().write())
             .await
@@ -351,7 +352,10 @@ async fn huy_don_vang_lai_cung_chinh_sach_va_goi_lai_cung_khoa() {
 /// Tra lần nữa (bỏ chờ gửi lại của mã trước).
 async fn access_token_again(guests: &Guests, number: &str) -> String {
     lookup_code::Entity::update_many()
-        .col_expr(lookup_code::Column::CreatedAt, Expr::value(Utc::now() - Duration::minutes(5)))
+        .col_expr(
+            lookup_code::Column::CreatedAt,
+            Expr::value(Timestamp::now() - SignedDuration::from_mins(5)),
+        )
         .exec(guests.shop.database().write())
         .await
         .unwrap();

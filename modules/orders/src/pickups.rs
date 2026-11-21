@@ -9,7 +9,7 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::Duration;
+use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
@@ -143,7 +143,7 @@ impl OrdersService {
                     status: Set(READY.to_owned()),
                     code: Set(new_code()),
                     ready_at: Set(now),
-                    hold_until: Set(now + Duration::days(hold_days)),
+                    hold_until: Set(now + SignedDuration::from_hours(24 * hold_days)),
                     reminded_at: Set(None),
                     handed_over_at: Set(None),
                     handed_over_to: Set(None),
@@ -230,7 +230,7 @@ impl OrdersService {
     /// Job `orders.expire_pickups`: nhắc một lần khi còn dưới 24 giờ; hết hạn thì huỷ và hoàn
     /// tiền (`cancel_refund`, mặc định) hay chỉ đánh dấu hết hạn, vẫn giao được (`keep_waiting`).
     pub(crate) async fn expire_pickups(&self, database: &Database) -> Result<u64, Error> {
-        let soon = crate::service::now() + Duration::hours(24);
+        let soon = crate::service::now() + SignedDuration::from_hours(24);
         let due: Vec<(Uuid, Uuid)> = pickup::Entity::find()
             .select_only()
             .column(pickup::Column::TenantId)

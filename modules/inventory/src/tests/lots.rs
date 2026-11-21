@@ -1,12 +1,13 @@
 //! Lô và hạn dùng (hết hạn trước xuất trước, job trừ lô quá hạn, `expiry_state`), serial (không
 //! bán hai lần dù xuất cùng lúc), chuyển kho giữ lô và serial.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -16,7 +17,7 @@ use super::{assert_consistent, call, drain, level, shop};
 use crate::api::{FulfilLine, FulfilRequest, Inventory, ReserveLine, ReserveRequest};
 
 fn day(offset: i64) -> String {
-    (Utc::now().date_naive() + Duration::days(offset)).to_string()
+    Timestamp::now().date_utc().checked_add_days(offset).unwrap().to_string()
 }
 
 /// Thêm hàng có lô / serial bằng điều chỉnh `found`.
@@ -35,7 +36,7 @@ fn reserve(org: autoxide_kernel::tenancy::OrgId, variant: Uuid, quantity: i64) -
     ReserveRequest::new(
         Uuid::now_v7(),
         org,
-        Utc::now() + Duration::minutes(30),
+        Timestamp::now() + SignedDuration::from_mins(30),
         vec![ReserveLine::new("1", variant, quantity)],
     )
 }

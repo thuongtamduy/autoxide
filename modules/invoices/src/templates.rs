@@ -332,7 +332,7 @@ pub(crate) fn sample_document(kind: &str) -> Document {
         symbol: Some("1C26TAA".to_owned()),
         number: Some(123),
         status: "issued".to_owned(),
-        issue_date: Some(at.date_naive()),
+        issue_date: Some(at.date_utc()),
         prices_include_tax: false,
         currency: "VND".to_owned(),
         subtotal: vnd(1_000_000),

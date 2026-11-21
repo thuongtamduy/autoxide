@@ -13,6 +13,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod level {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -32,7 +33,7 @@ pub(crate) mod level {
         pub allow_negative: bool,
         pub average_cost_minor: i64,
         pub average_cost_currency: Option<String>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -40,6 +41,7 @@ pub(crate) mod level {
 }
 
 pub(crate) mod movement {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -63,7 +65,7 @@ pub(crate) mod movement {
         pub source_type: String,
         pub source_id: Uuid,
         pub actor_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -71,6 +73,7 @@ pub(crate) mod movement {
 }
 
 pub(crate) mod adjustment {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -86,7 +89,7 @@ pub(crate) mod adjustment {
         /// `adjustment` hay `count`.
         pub kind: String,
         pub actor_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -94,6 +97,7 @@ pub(crate) mod adjustment {
 }
 
 pub(crate) mod settings {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -108,7 +112,7 @@ pub(crate) mod settings {
         pub allow_split: bool,
         pub province_code: Option<String>,
         pub pickup: bool,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -136,6 +140,7 @@ pub(crate) mod source {
 }
 
 pub(crate) mod reservation {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -148,11 +153,11 @@ pub(crate) mod reservation {
         pub order_id: Uuid,
         pub selling_org_id: Uuid,
         pub status: String,
-        pub expires_at: Option<DateTimeUtc>,
+        pub expires_at: Option<Timestamp>,
         pub fingerprint: String,
         pub release_reason: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -190,6 +195,7 @@ pub(crate) mod reservation_line {
 }
 
 pub(crate) mod fulfilment {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -202,7 +208,7 @@ pub(crate) mod fulfilment {
         pub reservation_id: Uuid,
         pub fulfilment_key: String,
         pub fingerprint: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -210,6 +216,7 @@ pub(crate) mod fulfilment {
 }
 
 pub(crate) mod restock {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -224,7 +231,7 @@ pub(crate) mod restock {
         pub order_id: Option<Uuid>,
         pub org_id: Uuid,
         pub lines: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -232,6 +239,7 @@ pub(crate) mod restock {
 }
 
 pub(crate) mod transfer {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -245,12 +253,12 @@ pub(crate) mod transfer {
         pub from_org_id: Uuid,
         pub to_org_id: Uuid,
         pub status: String,
-        pub shipped_at: Option<DateTimeUtc>,
+        pub shipped_at: Option<Timestamp>,
         pub reference: Option<String>,
         pub note: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -284,6 +292,7 @@ pub(crate) mod transfer_line {
 }
 
 pub(crate) mod count {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -297,10 +306,10 @@ pub(crate) mod count {
         pub org_id: Uuid,
         pub status: String,
         pub note: String,
-        pub applied_at: Option<DateTimeUtc>,
+        pub applied_at: Option<Timestamp>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -308,6 +317,7 @@ pub(crate) mod count {
 }
 
 pub(crate) mod count_line {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -321,7 +331,7 @@ pub(crate) mod count_line {
         pub variant_id: Uuid,
         pub counted: i64,
         pub expected_at_count: i64,
-        pub counted_at: DateTimeUtc,
+        pub counted_at: Timestamp,
         pub reason_code: Option<String>,
     }
 
@@ -330,6 +340,8 @@ pub(crate) mod count_line {
 }
 
 pub(crate) mod lot {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -345,7 +357,7 @@ pub(crate) mod lot {
         pub lot_code: String,
         pub expires_on: Option<Date>,
         pub on_hand: i64,
-        pub received_at: DateTimeUtc,
+        pub received_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -353,6 +365,7 @@ pub(crate) mod lot {
 }
 
 pub(crate) mod serial {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -368,7 +381,7 @@ pub(crate) mod serial {
         /// `in_stock`, `in_transit`, `sold`, `returned`, `written_off`.
         pub status: String,
         pub order_id: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -376,6 +389,7 @@ pub(crate) mod serial {
 }
 
 pub(crate) mod supplier {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -397,8 +411,8 @@ pub(crate) mod supplier {
         pub payment_terms_days: i32,
         pub currency: String,
         pub active: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -406,6 +420,8 @@ pub(crate) mod supplier {
 }
 
 pub(crate) mod purchase_order {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -424,8 +440,8 @@ pub(crate) mod purchase_order {
         pub currency: String,
         pub note: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -455,6 +471,7 @@ pub(crate) mod purchase_order_line {
 }
 
 pub(crate) mod receipt {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -470,13 +487,13 @@ pub(crate) mod receipt {
         pub purchase_order_id: Option<Uuid>,
         pub reference: String,
         pub reference_fingerprint: String,
-        pub posted_at: DateTimeUtc,
+        pub posted_at: Timestamp,
         pub total_minor: i64,
         pub currency: String,
         pub created_by: Option<Uuid>,
         pub ledger_status: String,
         pub ledger_entry_id: Option<Uuid>,
-        pub ledger_posted_at: Option<DateTimeUtc>,
+        pub ledger_posted_at: Option<Timestamp>,
         pub ledger_error_code: Option<String>,
     }
 
@@ -485,6 +502,7 @@ pub(crate) mod receipt {
 }
 
 pub(crate) mod receipt_line {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -509,6 +527,7 @@ pub(crate) mod receipt_line {
 }
 
 pub(crate) mod supplier_return {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -524,13 +543,13 @@ pub(crate) mod supplier_return {
         pub receipt_id: Option<Uuid>,
         pub reference: String,
         pub reference_fingerprint: String,
-        pub posted_at: DateTimeUtc,
+        pub posted_at: Timestamp,
         pub total_minor: i64,
         pub currency: String,
         pub created_by: Option<Uuid>,
         pub ledger_status: String,
         pub ledger_entry_id: Option<Uuid>,
-        pub ledger_posted_at: Option<DateTimeUtc>,
+        pub ledger_posted_at: Option<Timestamp>,
         pub ledger_error_code: Option<String>,
     }
 
@@ -562,6 +581,7 @@ pub(crate) mod supplier_return_line {
 }
 
 pub(crate) mod preorder_counter {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -575,7 +595,7 @@ pub(crate) mod preorder_counter {
         /// Suất đang giữ / đã xác nhận; chỉ đổi bằng `rows::adjust`.
         pub reserved: i64,
         pub preorder_limit: i64,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -583,6 +603,7 @@ pub(crate) mod preorder_counter {
 }
 
 pub(crate) mod restock_alert {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     /// Đăng ký báo khi có hàng lại (D-201). `store_key` = nút cửa hàng, hay `Uuid::nil()` cho kho bán
@@ -612,9 +633,9 @@ pub(crate) mod restock_alert {
         pub armed: bool,
         /// Số lần đã báo; khoá chống trùng của tin là `id` + số này.
         pub sent_count: i64,
-        pub confirmed_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub confirmed_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -622,6 +643,7 @@ pub(crate) mod restock_alert {
 }
 
 pub(crate) mod line_release {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     /// Một lần trả riêng một phần chỗ giữ (D-20261119-step42-preorder-cancel); `reference` duy nhất.
@@ -637,7 +659,7 @@ pub(crate) mod line_release {
         pub reference: String,
         /// Các dòng đã huỷ (JSON `[{line_key, quantity}]`).
         pub lines: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

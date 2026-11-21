@@ -13,6 +13,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod promotion {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -43,8 +44,8 @@ pub(crate) mod promotion {
         pub max_add_on_quantity: Option<i32>,
         pub gift_quantity: Option<i32>,
         pub first_order_only: bool,
-        pub starts_at: DateTimeUtc,
-        pub ends_at: DateTimeUtc,
+        pub starts_at: Timestamp,
+        pub ends_at: Timestamp,
         pub priority: i32,
         pub exclusivity: String,
         pub combines_with: String,
@@ -68,9 +69,9 @@ pub(crate) mod promotion {
         pub public: bool,
         pub version: i32,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
-        pub activated_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
+        pub activated_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -235,6 +236,7 @@ pub(crate) mod gift_option {
 }
 
 pub(crate) mod code {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -250,7 +252,7 @@ pub(crate) mod code {
         pub purpose: String,
         pub usage_limit: Option<i64>,
         pub usage_count: i64,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -258,6 +260,7 @@ pub(crate) mod code {
 }
 
 pub(crate) mod voucher {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -272,11 +275,11 @@ pub(crate) mod voucher {
         pub status: String,
         pub source: String,
         pub source_ref: String,
-        pub valid_from: DateTimeUtc,
-        pub expires_at: DateTimeUtc,
-        pub issued_at: DateTimeUtc,
+        pub valid_from: Timestamp,
+        pub expires_at: Timestamp,
+        pub issued_at: Timestamp,
         pub used_order_id: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -327,6 +330,7 @@ pub(crate) mod funding {
 }
 
 pub(crate) mod participation {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -342,9 +346,9 @@ pub(crate) mod participation {
         /// JSON: danh sách `ParticipationItem`.
         pub items: String,
         pub reviewed_by: Option<Uuid>,
-        pub reviewed_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub reviewed_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -392,6 +396,7 @@ pub(crate) mod daily_usage {
 }
 
 pub(crate) mod redemption {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -412,9 +417,9 @@ pub(crate) mod redemption {
         pub order_value_minor: i64,
         pub currency: String,
         pub day: String,
-        pub expires_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub expires_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -465,6 +470,7 @@ pub(crate) mod stats {
 }
 
 pub(crate) mod version {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -479,7 +485,7 @@ pub(crate) mod version {
         pub action: String,
         pub snapshot: String,
         pub changed_by: Option<Uuid>,
-        pub changed_at: DateTimeUtc,
+        pub changed_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -487,6 +493,7 @@ pub(crate) mod version {
 }
 
 pub(crate) mod notice {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -500,9 +507,9 @@ pub(crate) mod notice {
         pub authority_code: String,
         pub status: String,
         pub reference: Option<String>,
-        pub submitted_at: Option<DateTimeUtc>,
+        pub submitted_at: Option<Timestamp>,
         pub submitted_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -510,6 +517,7 @@ pub(crate) mod notice {
 }
 
 pub(crate) mod reminder {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -523,9 +531,9 @@ pub(crate) mod reminder {
         pub user_id: Uuid,
         pub channel: String,
         pub consent_id: Option<Uuid>,
-        pub remind_at: DateTimeUtc,
-        pub sent_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub remind_at: Timestamp,
+        pub sent_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -533,6 +541,7 @@ pub(crate) mod reminder {
 }
 
 pub(crate) mod legal_pack {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -546,7 +555,7 @@ pub(crate) mod legal_pack {
         pub checked_on: String,
         pub source_note: String,
         pub content_sha256: String,
-        pub imported_at: DateTimeUtc,
+        pub imported_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

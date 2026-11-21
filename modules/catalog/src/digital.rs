@@ -16,6 +16,8 @@
 //! - **Thu hồi.** Đơn huỷ, hoàn tiền không gắn trả hàng, hay người quản lý thu hồi → `revoked_at`;
 //!   token và địa chỉ ký đã phát hết dùng ngay.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
@@ -24,7 +26,6 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::storage::{Storage as _, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -68,7 +69,7 @@ pub(crate) struct GrantView {
 #[derive(Debug, Clone)]
 pub(crate) struct FileLink {
     pub url: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     pub remaining: i64,
     pub file_name: String,
 }
@@ -332,7 +333,7 @@ impl CatalogService {
                     variant_id: Set(asset.variant_id),
                     token_hash: Set(autoxide_kernel::secret::sha256(&token)),
                     remaining: Set(asset.download_limit),
-                    expires_at: Set(now + Duration::days(asset.grant_days)),
+                    expires_at: Set(now + SignedDuration::from_hours(24 * asset.grant_days)),
                     revoked_at: Set(None),
                     created_at: Set(now),
                 };

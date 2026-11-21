@@ -5,6 +5,7 @@
 //! bulk:<lần đổi>:<biến thể>` theo lô (`applied`). `valid_to` cho giá tạm thời: hết hạn thì giá cũ
 //! tự hiệu lực lại. Hoàn tác = một lần đổi mới về giá cũ.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{OrgId, OrgSetting, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -74,8 +74,8 @@ pub(crate) struct NewChange {
     pub operation: String,
     pub value: i64,
     pub rounding_rule_id: Option<Uuid>,
-    pub valid_from: Option<DateTime<Utc>>,
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_from: Option<Timestamp>,
+    pub valid_to: Option<Timestamp>,
 }
 
 /// Một dòng của bản xem trước.

@@ -8,6 +8,7 @@
 //! nhân: ví có trong bản xuất; xoá tài khoản thì voucher chưa dùng bị thu hồi, voucher đã dùng giữ
 //! cho chứng từ nhưng bỏ liên kết người.
 
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -238,7 +239,7 @@ impl PromotionsService {
         }
         let valid_from = std::cmp::max(program.starts_at, at);
         let expires_at = program.voucher_valid_days.map_or(program.ends_at, |days| {
-            std::cmp::min(at + chrono::Duration::days(i64::from(days)), program.ends_at)
+            std::cmp::min(at + SignedDuration::from_hours(24 * (i64::from(days))), program.ends_at)
         });
         let id = Uuid::now_v7();
         let inserted = voucher::ActiveModel {

@@ -3,13 +3,13 @@
 //! ngày đã hứa → báo người mua, cho huỷ miễn phí) và biến thể đặt trước bị tắt / xoá (người bán ngừng
 //! bán → huỷ phần chưa có hàng, hoàn tiền tự động).
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -166,7 +166,7 @@ impl OrdersService {
         &self,
         tenant: &TenantContext,
         variant: Uuid,
-        day: NaiveDate,
+        day: Date,
     ) -> Result<(), Error> {
         for line in self.waiting_lines(tenant, variant).await? {
             if line.preorder_delayed_to == Some(day) {

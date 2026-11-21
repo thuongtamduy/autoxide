@@ -2,9 +2,10 @@
 //! hạn huỷ / đổi trả và cách trả trên giỏ cho website.
 
 use autoxide_kernel::access::Scope;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -84,9 +85,9 @@ async fn o_nguoi_mua_nhap_luc_dat_hang_va_han_cua_nguoi_mua() {
         deliver(&shop, id).await;
         let (_, mine) = buyer.send("GET", &format!("/me/orders/{id}"), None).await;
         assert_eq!(mine["data"]["buyer_can_cancel"], false);
-        let until: chrono::DateTime<Utc> =
+        let until: Timestamp =
             serde_json::from_value(mine["data"]["return_until"].clone()).unwrap();
-        let days = (until - Utc::now()).num_hours();
+        let days = (until - Timestamp::now()).as_hours();
         assert!((6 * 24..=7 * 24).contains(&days), "hạn đổi trả mặc định 7 ngày: {until}");
     })
     .await
@@ -210,8 +211,8 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
         let rows = found["data"].as_array().unwrap();
         assert_eq!(rows.len(), 1, "{found}");
         assert_eq!(rows[0]["status"], "active");
-        let ends: chrono::DateTime<Utc> = serde_json::from_value(rows[0]["ends_at"].clone()).unwrap();
-        assert!(ends > Utc::now() + Duration::days(360) && ends < Utc::now() + Duration::days(370));
+        let ends: Timestamp = serde_json::from_value(rows[0]["ends_at"].clone()).unwrap();
+        assert!(ends > Timestamp::now() + SignedDuration::from_hours(24 * 360) && ends < Timestamp::now() + SignedDuration::from_hours(24 * 370));
         let (_, by_phone) = tech.send("GET", "/warranties?phone=0901234567", None).await;
         assert_eq!(by_phone["data"].as_array().unwrap().len(), 3, "2 serial + 1 dòng: {by_phone}");
         let (_, mine) = Call::as_user(&shop, "buyer1").send("GET", "/me/warranties", None).await;
@@ -263,7 +264,7 @@ async fn bao_hanh_theo_serial_va_theo_dong_phieu_bao_hanh() {
 
         // Hết hạn: job đánh dấu, tiếp nhận bị từ chối.
         warranty::Entity::update_many()
-            .col_expr(warranty::Column::EndsAt, Expr::value(Utc::now() - Duration::days(1)))
+            .col_expr(warranty::Column::EndsAt, Expr::value(Timestamp::now() - SignedDuration::from_hours(24)))
             .filter(warranty::Column::Id.eq(warranty_id.parse::<Uuid>().unwrap()))
             .exec(shop.database().write())
             .await

@@ -2,6 +2,8 @@
 //! yêu cầu trả (hạn, lý do, cách gửi trả, ảnh kèm), xem trước tiền hoàn — không ghi gì, gọi được
 //! bao nhiêu lần cũng được — và yêu cầu hãng tới lấy hàng trả.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -10,7 +12,6 @@ use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_shipping::api::{
     Address, Direction, QuoteItem, QuoteRequest, ShipmentItem, ShipmentRequest,
 };
-use chrono::{DateTime, Duration, NaiveDate, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::Value;
 use uuid::Uuid;
@@ -29,7 +30,7 @@ const MAX_LINES: usize = 100;
 
 /// Kết quả kiểm phần không phụ thuộc dòng của yêu cầu trả.
 pub(crate) struct Checked {
-    pub deadline_at: DateTime<Utc>,
+    pub deadline_at: Timestamp,
     pub window_days: i64,
     pub photos_required: bool,
     /// Lỗi của đầu vào (gom cùng lỗi của dòng rồi báo một lần, D-083).
@@ -40,7 +41,7 @@ pub(crate) struct Checked {
 /// có `effective_from` mới nhất không sau hôm nay thắng. Đây là ước lượng cho người mua, không phải
 /// cam kết của đối tác thanh toán.
 struct EtaRow {
-    effective_from: (i32, u32, u32),
+    effective_from: (i16, i8, i8),
     /// `gateway` (thẻ, ví…), `transfer` (chuyển khoản, VietQR), `cash` (COD, tiền mặt).
     group: &'static str,
     min_days: u16,
@@ -82,7 +83,7 @@ pub(crate) struct RefundEta {
 }
 
 /// Thời gian hoàn dự kiến cho đơn trả bằng `payment_method`, vào ngày `today`.
-pub(crate) fn refund_eta(payment_method: &str, today: NaiveDate) -> Option<RefundEta> {
+pub(crate) fn refund_eta(payment_method: &str, today: Date) -> Option<RefundEta> {
     let group = match Method::parse(payment_method) {
         Method::Cod => "cash",
         Method::Transfer => "transfer",
@@ -93,7 +94,7 @@ pub(crate) fn refund_eta(payment_method: &str, today: NaiveDate) -> Option<Refun
         .filter(|row| row.group == group)
         .filter(|row| {
             let (year, month, day) = row.effective_from;
-            NaiveDate::from_ymd_opt(year, month, day).is_some_and(|from| from <= today)
+            Date::new(year, month, day).is_some_and(|from| from <= today)
         })
         .max_by_key(|row| row.effective_from)
         .map(|row| RefundEta {
@@ -119,7 +120,7 @@ pub(crate) struct Preview {
     pub lines: Vec<ReturnLine>,
     pub methods: Vec<MethodOption>,
     pub refund_eta: Option<RefundEta>,
-    pub deadline_at: DateTime<Utc>,
+    pub deadline_at: Timestamp,
     pub photos_required: bool,
 }
 
@@ -229,7 +230,7 @@ impl OrdersService {
             return Err(errors::return_not_allowed(status));
         }
         let delivered_at = row.delivered_at.unwrap_or(row.updated_at);
-        let deadline_at = delivered_at + Duration::days(policy.return_window_days);
+        let deadline_at = delivered_at + SignedDuration::from_hours(24 * policy.return_window_days);
         if crate::service::now() > deadline_at {
             return Err(errors::return_window_closed(policy.return_window_days));
         }
@@ -399,7 +400,7 @@ impl OrdersService {
             currency: row.currency.clone(),
             lines: plan.lines,
             methods,
-            refund_eta: refund_eta(&row.payment_method, Utc::now().date_naive()),
+            refund_eta: refund_eta(&row.payment_method, Timestamp::now().date_utc()),
             deadline_at: checked.deadline_at,
             photos_required: checked.photos_required,
         })
@@ -430,10 +431,11 @@ impl OrdersService {
             })
             .collect();
         let value = Money::from_columns(value, &row.currency).ok()?;
-        let request = QuoteRequest::new(OrgId::from_uuid(row.org_id), items, value, Utc::now())
-            .origin(OrgId::from_uuid(warehouse))
-            .destination(address)
-            .locale(row.locale.clone());
+        let request =
+            QuoteRequest::new(OrgId::from_uuid(row.org_id), items, value, Timestamp::now())
+                .origin(OrgId::from_uuid(warehouse))
+                .destination(address)
+                .locale(row.locale.clone());
         match rates.quote(tenant, &request).await {
             Ok(quote) => quote
                 .options
@@ -455,11 +457,11 @@ mod tests {
 
     #[test]
     fn thoi_gian_hoan_theo_cach_tra_va_ngay_hieu_luc() {
-        let today = NaiveDate::from_ymd_opt(2026, 11, 19).unwrap();
+        let today = Date::new(2026, 11, 19).unwrap();
         let card = refund_eta("card", today).unwrap();
         assert_eq!((card.min_days, card.max_days, card.channel), (5, 15, "original_payment"));
         assert_eq!(refund_eta("cod", today).unwrap().channel, "bank_transfer");
         // Trước ngày hiệu lực của mọi dòng: không có ước lượng.
-        assert!(refund_eta("card", NaiveDate::from_ymd_opt(2025, 1, 1).unwrap()).is_none());
+        assert!(refund_eta("card", Date::new(2025, 1, 1).unwrap()).is_none());
     }
 }

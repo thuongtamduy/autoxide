@@ -6,6 +6,7 @@
 //! Nạp: `autoxide task promotions.load_legal_data [pack=vn]`. Chạy lại cùng gói không đổi gì (so
 //! SHA-256); một gói thay hẳn dữ liệu của các vùng (jurisdiction) nó nêu, trong một transaction.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeSet;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -13,7 +14,6 @@ use std::time::{Duration, Instant};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use chrono::NaiveDate;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -92,8 +92,8 @@ pub(crate) struct LegalLimit {
     pub max_bp: i32,
     pub max_days_per_program: Option<i32>,
     pub max_days_per_year: Option<i32>,
-    pub effective_from: NaiveDate,
-    pub effective_to: Option<NaiveDate>,
+    pub effective_from: Date,
+    pub effective_to: Option<Date>,
     pub legal_basis: String,
     pub source_url: String,
     pub note: String,
@@ -108,13 +108,13 @@ pub(crate) struct NoticeRule {
     pub days_before: i32,
     /// `province_of_store` (Sở Công Thương nơi tổ chức) hay mã cơ quan cố định.
     pub authority: String,
-    pub effective_from: NaiveDate,
-    pub effective_to: Option<NaiveDate>,
+    pub effective_from: Date,
+    pub effective_to: Option<Date>,
     pub legal_basis: String,
     pub note: String,
 }
 
-fn covers(from: NaiveDate, to: Option<NaiveDate>, day: NaiveDate) -> bool {
+fn covers(from: Date, to: Option<Date>, day: Date) -> bool {
     from <= day && to.is_none_or(|to| day < to)
 }
 
@@ -132,7 +132,7 @@ impl LegalData {
         jurisdiction: &str,
         promotion_kind: &str,
         program_kind: ProgramKind,
-        day: NaiveDate,
+        day: Date,
     ) -> Option<&LegalLimit> {
         self.limits.iter().find(|limit| {
             limit.jurisdiction == jurisdiction
@@ -147,7 +147,7 @@ impl LegalData {
         &self,
         jurisdiction: &str,
         promotion_kind: &str,
-        day: NaiveDate,
+        day: Date,
     ) -> Option<&NoticeRule> {
         self.rules.iter().find(|rule| {
             rule.jurisdiction == jurisdiction
@@ -157,7 +157,7 @@ impl LegalData {
     }
 
     /// Có hạn mức nào hiệu lực cho `jurisdiction` ngày `day` không.
-    pub(crate) fn has_limits(&self, jurisdiction: &str, day: NaiveDate) -> bool {
+    pub(crate) fn has_limits(&self, jurisdiction: &str, day: Date) -> bool {
         self.limits.iter().any(|limit| {
             limit.jurisdiction == jurisdiction
                 && covers(limit.effective_from, limit.effective_to, day)
@@ -210,8 +210,8 @@ fn pack_invalid(reason: impl Into<String>) -> Error {
     .with_param("reason", reason.into())
 }
 
-fn date(text: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
+fn date(text: &str) -> Option<Date> {
+    Date::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
 /// Gói đã đọc và kiểm.
@@ -605,7 +605,7 @@ impl autoxide_kernel::doctor::Probe for LegalCheck {
     async fn probe(&self) -> autoxide_kernel::doctor::Finding {
         use autoxide_kernel::doctor::Finding;
         let jurisdiction = self.0.config.jurisdiction.clone();
-        let today = chrono::Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         match self.0.legal().await {
             Err(error) => Finding::failed(format!("Cannot read the promotion law data: {error}.")),
             Ok(data) if !data.has_limits(&jurisdiction, today) => Finding::warning(format!(
@@ -614,7 +614,7 @@ impl autoxide_kernel::doctor::Probe for LegalCheck {
             ))
             .with_hint("Run `autoxide task promotions.load_legal_data`."),
             Ok(data) => {
-                let soon = today + chrono::Duration::days(30);
+                let soon = today.checked_add_days(30).unwrap_or(today);
                 let ending = data.limits.iter().find(|limit| {
                     limit.jurisdiction == jurisdiction
                         && limit.effective_to.is_some_and(|to| to > today && to <= soon)
@@ -643,10 +643,9 @@ impl PromotionsService {
     /// Hạn mức hiệu lực ngày `day` (mặc định hôm nay theo giờ Việt Nam).
     pub(crate) async fn legal_limits_at(
         &self,
-        day: Option<NaiveDate>,
+        day: Option<Date>,
     ) -> Result<Vec<legal_limit::Model>, Error> {
-        let day =
-            day.unwrap_or_else(|| crate::compliance::legal_day(chrono::Utc::now())).to_string();
+        let day = day.unwrap_or_else(|| crate::compliance::legal_day(Timestamp::now())).to_string();
         Ok(legal_limit::Entity::find()
             .filter(legal_limit::Column::EffectiveFrom.lte(day.clone()))
             .filter(
@@ -663,10 +662,9 @@ impl PromotionsService {
     /// Quy tắc thông báo hiệu lực ngày `day`.
     pub(crate) async fn notice_rules_at(
         &self,
-        day: Option<NaiveDate>,
+        day: Option<Date>,
     ) -> Result<Vec<notice_rule::Model>, Error> {
-        let day =
-            day.unwrap_or_else(|| crate::compliance::legal_day(chrono::Utc::now())).to_string();
+        let day = day.unwrap_or_else(|| crate::compliance::legal_day(Timestamp::now())).to_string();
         Ok(notice_rule::Entity::find()
             .filter(notice_rule::Column::EffectiveFrom.lte(day.clone()))
             .filter(
@@ -688,7 +686,7 @@ mod tests {
     fn goi_vn_hop_le_va_tran_doi_theo_ngay() {
         let pack = parse_pack(BUNDLED_LIMITS, BUNDLED_RULES).unwrap();
         let data = LegalData { limits: pack.limits, rules: pack.rules };
-        let day = |text: &str| NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap();
+        let day = |text: &str| Date::parse_from_str(text, "%Y-%m-%d").unwrap();
         let before =
             data.limit("VN", "price_reduction", ProgramKind::Regular, day("2024-11-30")).unwrap();
         let after =

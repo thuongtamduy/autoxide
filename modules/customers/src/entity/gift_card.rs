@@ -1,5 +1,6 @@
 //! Bảng `customers_gift_cards`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,12 +17,12 @@ pub struct Model {
     pub balance_minor: i64,
     pub currency: String,
     pub status: String,
-    pub expires_at: Option<DateTimeUtc>,
+    pub expires_at: Option<Timestamp>,
     pub owner_profile_id: Option<Uuid>,
     pub issued_reference: String,
     pub issued_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -13,7 +13,8 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, Duration, NaiveTime, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -115,12 +116,12 @@ impl Terms {
     /// `commit_days`; không có cả hai thì không có mốc (người mua huỷ luôn được hoàn đủ).
     pub(crate) fn commit_at(
         &self,
-        ends_at: Option<DateTime<Utc>>,
-        available_on: Option<chrono::NaiveDate>,
-    ) -> Option<DateTime<Utc>> {
+        ends_at: Option<Timestamp>,
+        available_on: Option<Date>,
+    ) -> Option<Timestamp> {
         ends_at.or_else(|| {
             let (day, days) = (available_on?, self.commit_days?);
-            Some(day.and_time(NaiveTime::MIN).and_utc() - Duration::days(days))
+            Some(day.start_of_day_utc() - SignedDuration::from_hours(24 * days))
         })
     }
 

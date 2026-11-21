@@ -9,8 +9,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::{AccountKey, LineAccount, NewEntry, NewLine};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
@@ -28,7 +28,7 @@ pub(crate) const CANCELLATION_INCOME: &str = "orders.cancellation_income";
 
 /// Phần giữ lại khi huỷ lúc `at`: mỗi dòng đặt trước đã qua mốc chốt giữ `retention` của phần trả
 /// trước của dòng.
-pub(crate) fn retention_of(terms: &Terms, lines: &[line::Model], at: DateTime<Utc>) -> i64 {
+pub(crate) fn retention_of(terms: &Terms, lines: &[line::Model], at: Timestamp) -> i64 {
     lines
         .iter()
         .filter(|line| line.preorder_commit_at.is_some_and(|commit| commit <= at))

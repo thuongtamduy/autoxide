@@ -7,6 +7,7 @@
 //! hạn theo người, và việc gắn số vào tài khoản ([`ComplianceService::record_sign_in_phone`]) làm sau,
 //! khi `auth` đã biết tài khoản nào.
 
+use jiff::SignedDuration;
 use std::net::IpAddr;
 use std::sync::Arc;
 
@@ -66,7 +67,7 @@ impl ComplianceService {
         let id = Uuid::now_v7();
         let pepper = self.secret.derive_for(tenant.id(), OTP_PURPOSE).await?;
         let at = now();
-        let expires_at = at + chrono::Duration::seconds(otp.ttl_seconds);
+        let expires_at = at + SignedDuration::from_secs(otp.ttl_seconds);
         phone_challenge::Entity::insert(phone_challenge::ActiveModel {
             id: Set(id),
             tenant_id: Set(tenant.id().as_uuid()),

@@ -9,7 +9,7 @@ use autoxide_kernel::access::{OrgTarget, Permission, Principal, Scope};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, TenantContext, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ConnectionTrait, DbErr, SqlErr};
 use uuid::Uuid;
 
@@ -19,7 +19,7 @@ use autoxide_catalog::api::Catalog;
 use autoxide_kernel::entitlement::EntitlementsHandle;
 use autoxide_kernel::i18n::Translations;
 use autoxide_organizations::api::OrgDirectory;
-use chrono_tz::Tz;
+use jiff::tz::TimeZone;
 
 use crate::compiled::CompiledCache;
 use crate::config::PromotionsConfig;
@@ -61,24 +61,29 @@ impl PromotionsService {
     }
 
     /// Múi giờ của nút `org` (`organizations.timezone`, kế thừa); chưa đặt thì giờ Việt Nam.
-    pub(crate) async fn timezone(&self, tenant: &TenantContext, org: OrgId) -> Result<Tz, Error> {
+    pub(crate) async fn timezone(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<TimeZone, Error> {
         Ok(self
             .setting(tenant, org, "organizations.timezone")
             .await?
-            .and_then(|value| value.as_str().and_then(|name| name.parse::<Tz>().ok()))
-            .unwrap_or(chrono_tz::Asia::Ho_Chi_Minh))
+            .and_then(|value| value.as_str().and_then(autoxide_kernel::time::zone))
+            .or_else(|| autoxide_kernel::time::zone("Asia/Ho_Chi_Minh"))
+            .unwrap_or(TimeZone::UTC))
     }
 }
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai
 /// database trả về cùng một giá trị và so bằng nhau được.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Cắt một thời điểm client gửi tới micro giây (như [`now`]).
-pub(crate) fn micros(at: DateTime<Utc>) -> DateTime<Utc> {
-    at.trunc_subsecs(6)
+pub(crate) fn micros(at: Timestamp) -> Timestamp {
+    at.truncate(jiff::Unit::Microsecond)
 }
 
 /// Nút của chương trình mới khi người tạo không nêu: gốc nếu họ có `permission` cho cả khách; nút

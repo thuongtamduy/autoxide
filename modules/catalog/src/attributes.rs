@@ -3,12 +3,12 @@
 //! hoá theo NĐ 43/2017/NĐ-CP (sửa bởi NĐ 111/2021/NĐ-CP) nạp bằng `catalog.load_restrictions` —
 //! cần đối chiếu văn bản gốc.
 
+use autoxide_kernel::time::Date;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
 };
@@ -49,8 +49,8 @@ pub(crate) struct CategoryAttributeInput {
     pub attribute_id: Uuid,
     pub required: bool,
     pub applies_to_descendants: bool,
-    pub effective_from: NaiveDate,
-    pub effective_to: Option<NaiveDate>,
+    pub effective_from: Date,
+    pub effective_to: Option<Date>,
     pub legal_basis: Option<String>,
 }
 
@@ -78,7 +78,7 @@ pub(crate) struct Stored {
     pub text: Option<String>,
     pub integer: Option<i64>,
     pub boolean: Option<bool>,
-    pub date: Option<NaiveDate>,
+    pub date: Option<Date>,
     pub option_id: Option<Uuid>,
 }
 
@@ -153,7 +153,7 @@ pub(crate) fn parse_value(
             let raw = value
                 .as_str()
                 .ok_or_else(|| FieldError::new(field, "type", "must be a date like 2026-12-31"))?;
-            let date = NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+            let date = Date::parse_from_str(raw, "%Y-%m-%d")
                 .map_err(|_| FieldError::new(field, "type", "must be a date like 2026-12-31"))?;
             vec![Stored { date: Some(date), ..Stored::default() }]
         }

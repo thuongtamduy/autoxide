@@ -4,6 +4,7 @@
 //! hiện lệch số dư và sửa / xoá bút toán đã niêm phong, chuỗi không băm `tenant_id`, không rò rỉ
 //! sang nhánh anh em.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Scope;
@@ -13,7 +14,6 @@ use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, root_of};
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use chrono::NaiveDate;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -70,8 +70,8 @@ fn key(purpose: &str) -> AccountKey {
     AccountKey::new(root(), purpose, Currency::VND)
 }
 
-fn day(text: &str) -> NaiveDate {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap()
+fn day(text: &str) -> Date {
+    Date::parse_from_str(text, "%Y-%m-%d").unwrap()
 }
 
 /// Bút toán hai dòng: nợ `debit`, có `credit`.
@@ -444,7 +444,7 @@ async fn khoa_ky_can_ky_truoc_da_khoa_va_ky_da_het() {
         let (status, _) = call(&app, "POST", &format!("/periods/{feb}/close"), "acct", None).await;
         assert_eq!(status, StatusCode::OK);
         // Kỳ chưa hết thì chưa khoá được.
-        let today = chrono::Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         let now = ledger
             .post(
                 &tenant,
@@ -792,7 +792,7 @@ async fn so_tai_khoan_va_tool_mcp() {
             .unwrap();
         let text = serde_json::to_string(&answer.structured_content).unwrap();
         assert!(text.contains("\"2500\""), "{text}");
-        let today = chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string();
+        let today = Timestamp::now().date_utc().format("%Y-%m-%d").to_string();
         let answer = client
             .call_tool(tool("ledger.trial_balance", json!({"from": today, "to": today})))
             .await

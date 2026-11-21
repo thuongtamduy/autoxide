@@ -2,6 +2,7 @@
 //! và số dư ở [`crate::periods`], chuỗi băm ở [`crate::chain`]. Handler REST, tool MCP và bên cung
 //! cấp `dyn Ledger` chỉ gọi vào đây.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, ScopeExt, TenantContext};
 use autoxide_organizations::api::OrgDirectory;
-use chrono::{DateTime, NaiveDate, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
@@ -20,8 +20,8 @@ use crate::api::{AccountKey, Entry, EntryLine, Side, normal_side_of};
 use crate::entity::{account, balance, book, entry, line};
 use crate::permissions::{ACCOUNTS_MANAGE, READ};
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) struct LedgerService {
@@ -72,7 +72,7 @@ pub(crate) fn currency_mixed() -> Error {
     )
 }
 
-pub(crate) fn exchange_rate_missing(base: Currency, quote: Currency, on: NaiveDate) -> Error {
+pub(crate) fn exchange_rate_missing(base: Currency, quote: Currency, on: Date) -> Error {
     Error::new(
         ErrorKind::Validation,
         "ledger.exchange_rate_missing",
@@ -177,7 +177,7 @@ pub(crate) async fn describe_entries<C: ConnectionTrait>(
         .filter(entry::Column::ReversesEntryId.is_in(ids.clone()))
         .all(connection)
         .await?;
-    let seals: HashMap<uuid::Uuid, (i64, DateTime<Utc>)> = crate::entity::seal::Entity::find()
+    let seals: HashMap<uuid::Uuid, (i64, Timestamp)> = crate::entity::seal::Entity::find()
         .scoped(tenant)
         .filter(crate::entity::seal::Column::EntryId.is_in(ids.clone()))
         .all(connection)
@@ -254,8 +254,8 @@ pub(crate) struct EntryFilter {
     pub book_org: Option<OrgId>,
     pub source_module: Option<String>,
     pub source_id: Option<String>,
-    pub from: Option<NaiveDate>,
-    pub to: Option<NaiveDate>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
 }
 
 impl LedgerService {
@@ -273,14 +273,14 @@ impl LedgerService {
     }
 
     /// Hôm nay theo múi giờ của nút (`organizations.timezone`; mặc định UTC).
-    pub(crate) async fn today(&self, tenant: &TenantContext, org: OrgId) -> NaiveDate {
+    pub(crate) async fn today(&self, tenant: &TenantContext, org: OrgId) -> Date {
         let zone = self
             .setting(tenant, org, "organizations.timezone")
             .await
-            .and_then(|name| name.parse::<chrono_tz::Tz>().ok());
+            .and_then(|name| autoxide_kernel::time::zone(&name));
         match zone {
-            Some(zone) => Utc::now().with_timezone(&zone).date_naive(),
-            None => Utc::now().date_naive(),
+            Some(zone) => Timestamp::now().date_in(&zone),
+            None => Timestamp::now().date_utc(),
         }
     }
 
@@ -901,7 +901,7 @@ fn check_name(name: Option<&str>, problems: &mut Vec<FieldError>) {
 pub(crate) struct SealStatus {
     pub total: u64,
     pub sealed: u64,
-    pub oldest_unsealed_at: Option<DateTime<Utc>>,
+    pub oldest_unsealed_at: Option<Timestamp>,
 }
 
 /// Khoá tối đa của một lần [`LedgerService::balances_of_keys`].
@@ -914,7 +914,7 @@ impl LedgerService {
         &self,
         tenant: &TenantContext,
         keys: &[AccountKey],
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         use sea_orm::Condition;
         if keys.len() > MAX_BALANCE_KEYS {
@@ -1056,7 +1056,7 @@ impl LedgerService {
             .order_by_asc(entry::Column::Id)
             .select_only()
             .column(entry::Column::PostedAt)
-            .into_tuple::<DateTime<Utc>>()
+            .into_tuple::<Timestamp>()
             .one(read)
             .await?;
         Ok(SealStatus { total, sealed: total.saturating_sub(pending), oldest_unsealed_at: oldest })
