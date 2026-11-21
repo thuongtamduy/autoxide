@@ -42,6 +42,7 @@ use std::sync::Arc;
 
 use crate::statements::StatementLog;
 
+use crate::mcp::{CallToolRequestParams, McpClient};
 use autoxide_kernel::access::{Authenticator, Grant, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
@@ -56,11 +57,6 @@ use autoxide_kernel::tenancy::{
 use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, header};
-use rmcp::ServiceExt as _;
-use rmcp::model::CallToolRequestParams;
-use rmcp::service::{RoleClient, RunningService};
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use serde_json::Value;
 use tower::ServiceExt as _;
 use utoipa::openapi::OpenApi;
@@ -105,6 +101,19 @@ pub struct TestApp {
     /// Database đã được chép từ database mẫu thay vì migrate từ đầu.
     from_template: bool,
     statements: Arc<StatementLog>,
+    /// Thư mục tạm cho file tải lên và mail file của app; xoá khi `TestApp` bị bỏ.
+    _scratch: Option<ScratchDir>,
+}
+
+/// Thư mục tạm tự xoá khi bị bỏ (`Drop`). Rust gọi `drop` khi giá trị ra khỏi phạm vi — tương tự
+/// `finally` — nên test dù đỏ hay xanh cũng không để file lại.
+struct ScratchDir(std::path::PathBuf);
+
+impl Drop for ScratchDir {
+    fn drop(&mut self) {
+        // Lỗi xoá (thư mục chưa từng được tạo, đã mất) không đáng làm test hỏng.
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -284,32 +293,21 @@ impl TestApp {
         self.request(Method::DELETE, uri)
     }
 
-    /// Client MCP thật nối tới `/mcp` của app, xác thực bằng `token` (như [`TestRequest::token`]).
-    ///
-    /// Mở một cổng TCP cục bộ: transport Streamable HTTP của client cần máy chủ thật.
-    pub async fn mcp(&self, token: &str) -> Result<RunningService<RoleClient, ()>, TestAppError> {
+    /// Client MCP nối tới `/mcp` của app, xác thực bằng `token` (như [`TestRequest::token`]). Nói bản mới
+    /// của đặc tả (`2026-07-28`); bản cũ (`initialize`) dùng [`McpClient::legacy`] với [`TestApp::router`].
+    pub async fn mcp(&self, token: &str) -> Result<McpClient, TestAppError> {
         self.mcp_at(token, "/mcp").await
     }
 
     /// Như [`TestApp::mcp`], tới endpoint MCP ở `path` — vd `/mcp/notes`, endpoint riêng của một
     /// module.
-    pub async fn mcp_at(
-        &self,
-        token: &str,
-        path: &str,
-    ) -> Result<RunningService<RoleClient, ()>, TestAppError> {
-        let listener =
-            tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| fail("mcp", e))?;
-        let address = listener.local_addr().map_err(|e| fail("mcp", e))?;
-        let router = self.router.clone();
-        tokio::spawn(async move { axum::serve(listener, router).await });
-        autoxide_kernel::tls::install_crypto_provider();
-        let config =
-            StreamableHttpClientTransportConfig::with_uri(format!("http://{address}{path}"))
-                .auth_header(token.to_owned());
-        ().serve(StreamableHttpClientTransport::from_config(config))
-            .await
-            .map_err(|e| fail("mcp client", e))
+    ///
+    /// Nối xong thì gọi `server/discover` (như client bắt tay lúc nối): người gọi không vào được endpoint
+    /// (sai token, khách bị khoá…) thì lỗi ngay ở đây.
+    pub async fn mcp_at(&self, token: &str, path: &str) -> Result<McpClient, TestAppError> {
+        let client = McpClient::new(self.router.clone(), path, Some(token));
+        client.discover().await.map_err(|e| fail("mcp", e))?;
+        Ok(client)
     }
 }
 
@@ -467,6 +465,30 @@ impl<'a> TestAppBuilder<'a> {
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
         pairs.extend(self.settings);
+        // Mặc định của `files` và `mail` là thư mục tương đối `data/files`, `data/mail` — tức ngay trong
+        // thư mục chạy test (`crates/app`), và test upload để rác ở đó mãi. Bài test chưa chọn thư mục
+        // (hay S3) thì cho một thư mục tạm riêng, xoá khi `TestApp` bị bỏ.
+        let has = |pairs: &[(String, String)], name: &str| pairs.iter().any(|(n, _)| n == name);
+        let mut scratch = None;
+        let needs_files =
+            !has(&pairs, "AUTOXIDE_FILES_DIR") && !has(&pairs, "AUTOXIDE_FILES_S3_BUCKET");
+        let needs_mail = !has(&pairs, "AUTOXIDE_MAIL_FILE_DIR");
+        if needs_files || needs_mail {
+            let dir = std::env::temp_dir().join(format!("autoxide-testapp-{}", Uuid::now_v7()));
+            if needs_files {
+                pairs.push((
+                    "AUTOXIDE_FILES_DIR".to_owned(),
+                    dir.join("files").display().to_string(),
+                ));
+            }
+            if needs_mail {
+                pairs.push((
+                    "AUTOXIDE_MAIL_FILE_DIR".to_owned(),
+                    dir.join("mail").display().to_string(),
+                ));
+            }
+            scratch = Some(ScratchDir(dir));
+        }
         let source = ConfigSource::from_pairs(pairs);
         let mut reader = ConfigReader::new(&source);
         let config = Config::read(&mut reader);
@@ -610,6 +632,7 @@ impl<'a> TestAppBuilder<'a> {
             dns,
             from_template,
             statements,
+            _scratch: scratch,
         })
     }
 }

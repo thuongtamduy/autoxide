@@ -36,7 +36,7 @@ không còn xung đột ở `CHANGELOG.md`; xem `changelog.d/README.md`.
 ## Các bước phát hành
 
 Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`.github/workflows/release.yml`,
-D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-20261120-release-gate-sharded), build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
+D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-20261120-release-gate-sharded) — **trừ khi** workflow CI trên `main` của đúng SHA của tag đã `success` (gate SQLite + Postgres 16 và 18, upgrade-test, quét secret): khi đó job `ci-result` cho bỏ qua gate (D-20261121-ci-batch-release-faster); chưa có lần chạy, đang chạy hay đỏ thì gate chạy như cũ —, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
 repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag. **Repo đang riêng
@@ -47,9 +47,8 @@ bước 7.**
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
 2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
    theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
-   `sdk/typescript/package-lock.json`, `artifactVersion` / `pubVersion` trong `sdk/openapitools.json`
-   (SDK Kotlin, Dart), rồi `cargo xtask sdk` (chép hợp đồng cho SDK Swift) — `cargo xtask sdk --check`
-   của gate kiểm cả mấy chỗ này; bản phát hành mới
+   `sdk/typescript/package-lock.json` — `cargo xtask sdk --check`
+   của gate kiểm mấy chỗ này; bản phát hành mới
    nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
 3. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
    cuối mục của nó) và xoá các mảnh. Rồi trong `CHANGELOG.md`: đổi `## [Unreleased]` thành `## [X.Y.Z] - YYYY-MM-DD`, thêm một
@@ -59,9 +58,7 @@ bước 7.**
    mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
    gồm thay đổi phá vỡ của `autoxide-kernel` và `autoxide-testkit` so với tag trước; chép vào mục
    `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn `0.x` thì chỉ báo cáo, không chặn (D-167, D-242).
-4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Chạy CI bằng tay trên
-   nhánh release (Actions → CI → Run workflow) để build ba SDK di động Swift, Kotlin, Dart — PR và push thường không
-   build chúng (D-20261121-mobile-sdk-on-demand); đỏ thì sửa trước khi phát hành. Rồi
+4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
    không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
    Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.

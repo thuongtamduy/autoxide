@@ -72,9 +72,38 @@ async fn typed_query(Query(_): Query<Paging>) -> &'static str {
     "ok"
 }
 
-async fn slow() -> &'static str {
+/// Nhãn (`?tag=…`) của các request chậm đã vào tới handler: test tắt máy chủ chờ request của mình thật sự
+/// đang chạy rồi mới ra lệnh tắt, thay vì đoán bằng một khoảng ngủ (máy CI bận thì 100 ms chưa đủ để
+/// request tới nơi — kết nối bị đóng ngang, "Connection reset by peer").
+static SLOW_STARTED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+#[derive(Deserialize)]
+struct SlowQuery {
+    tag: Option<String>,
+}
+
+async fn slow(Query(query): Query<SlowQuery>) -> &'static str {
+    if let Some(tag) = query.tag {
+        SLOW_STARTED.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(tag);
+    }
     tokio::time::sleep(Duration::from_millis(300)).await;
     "done"
+}
+
+/// Chờ tới khi request chậm mang nhãn `tag` vào tới handler (tối đa 10 giây).
+async fn wait_slow_started(tag: &str) {
+    for _ in 0..1000 {
+        if SLOW_STARTED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .any(|t| t == tag)
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    panic!("the slow request `{tag}` never reached its handler");
 }
 
 async fn panics() -> &'static str {
@@ -467,8 +496,8 @@ async fn tat_may_chu_cho_request_dang_chay_xong() {
     ));
 
     // Một request chậm (300 ms) đang chạy thì có lệnh tắt.
-    let in_flight = tokio::spawn(raw_get(address, "/api/v1/notes/slow"));
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let in_flight = tokio::spawn(raw_get(address, "/api/v1/notes/slow?tag=graceful"));
+    wait_slow_started("graceful").await;
     stop.send(()).unwrap();
 
     // Request đang dở vẫn nhận đủ response…
@@ -495,8 +524,8 @@ async fn tat_may_chu_khong_cho_qua_thoi_gian_cho_phep() {
         Duration::from_millis(50),
     ));
 
-    let in_flight = tokio::spawn(raw_get(address, "/api/v1/notes/slow"));
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let in_flight = tokio::spawn(raw_get(address, "/api/v1/notes/slow?tag=timed-out"));
+    wait_slow_started("timed-out").await;
     let started = Instant::now();
     stop.send(()).unwrap();
 

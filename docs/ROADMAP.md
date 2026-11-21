@@ -935,7 +935,7 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
 - [ ] `/kernel/find`, `/kernel/work` bỏ nguồn chậm khi máy bận: đo lại hạn mỗi nguồn và để client hiện rõ phần thiếu
 - [ ] Tách kernel (nút thắt build: sửa kernel phải build lại gần hết, xem D-20261120-build-faster)
 - [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn; cài `cargo-semver-checks` cho bước phát hành
-- [ ] Đăng SDK lên npm / Maven / pub (chờ tài khoản của chủ dự án)
+- [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án)
 - [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); `chrono` không còn bảo trì (D-346, chờ sqlx / sea-orm)
 
 ## Chờ chủ dự án
@@ -966,9 +966,8 @@ khai là tự chạy.
 Core chỉ có API nên app điện thoại, app máy tính, máy bán hàng tại quầy đã dùng được phần lớn; bước này lấp phần còn
 thiếu. Các bước nền đã xong: bắt đầu được ngay, song song với 41–49.
 
-- [x] SDK Swift, Kotlin, Dart sinh từ `docs/openapi.json` bằng công cụ chuẩn (ghim phiên bản), `cargo xtask sdk`
-      sinh lại; gate kiểm khớp OpenAPI, CI biên dịch; đăng lên kho gói cần tài khoản — dừng hỏi chủ dự án
-      (chưa đăng: chờ chủ dự án cấp tài khoản Swift Package Index, Maven Central, pub.dev)
+- [x] ~~SDK Swift, Kotlin, Dart~~ — **đã bỏ** theo quyết định của chủ dự án (D-20261121-drop-mobile-sdk): chỉ giữ SDK
+      TypeScript (web, React Native, Node); app native / Flutter tự sinh client từ `docs/openapi.json`
 - [x] Đồng bộ khi mất mạng: `Module::sync_resources()`, luồng thay đổi theo con trỏ có dấu xoá
       (`<module>_changes` ghi cùng transaction), ghi có điều kiện `If-Match` → `412` kèm bản hiện tại, lô ghi
       `POST /kernel/sync/batch` qua đúng service như REST, con trỏ quá cũ trả `reset`; test đồng thời cả hai database

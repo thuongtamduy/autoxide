@@ -40,6 +40,14 @@ RUN cargo build --release --locked -p autoxide \
 
 # --- chạy ----------------------------------------------------------------------
 FROM debian:trixie-slim
+# Nhãn OCI: trang package trên GitHub (ghcr.io) và `docker inspect` đọc mô tả, mã nguồn, tài liệu từ đây.
+# Workflow phát hành (docker/metadata-action) có thể ghi đè title / description / source bằng thông tin
+# của repo; `documentation` thì chỉ có ở đây.
+LABEL org.opencontainers.image.title="Autoxide" \
+      org.opencontainers.image.description="Open-source Rust backend core on SQLite or PostgreSQL: REST + OpenAPI, MCP for AI agents, pluggable business modules. Quickstart: compose.quickstart.yml in the repository." \
+      org.opencontainers.image.source="https://github.com/thuongtamduy/autoxide" \
+      org.opencontainers.image.documentation="https://github.com/thuongtamduy/autoxide#readme" \
+      org.opencontainers.image.licenses="MIT OR Apache-2.0"
 # Chứng chỉ gốc cho TLS ra ngoài (SMTP, S3, OTLP, PostgreSQL có TLS).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates \

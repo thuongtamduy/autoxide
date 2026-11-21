@@ -334,7 +334,8 @@ pub(crate) mod testing {
         build(test, limits, ai, send_private, false).await
     }
 
-    /// Như [`service`], bật bản AVIF (`AUTOXIDE_MEDIA_AVIF=true`, bước 39 B8).
+    /// Như [`service`], bật bản AVIF (`AUTOXIDE_MEDIA_AVIF=true`, bước 39 B8); chỉ khi build có feature `avif`.
+    #[cfg(feature = "avif")]
     pub async fn service_avif(
         test: &TestDatabase,
     ) -> (Arc<MediaService>, Arc<MemoryStorage>, Database) {

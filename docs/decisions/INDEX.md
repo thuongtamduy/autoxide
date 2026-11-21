@@ -84,10 +84,10 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261119-changelog-fragments](D-20261119-changelog-fragments.md)** Thay đổi cho changelog ghi bằng file mảnh trong `changelog.d/`, gộp lúc phát hành — 2026-11-19
 - **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành nhiều job song song (theo phần và shard), main lưu cache, Postgres chia suất có sàn — 2026-11-19
-- **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
+- **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19 · *thay một phần bởi D-20261121-ci-batch-release-faster*
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
-- **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19 · *thay một phần bởi D-20261121-mobile-sdk-on-demand*
-- **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết**
+- **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19 · *thay một phần bởi D-20261121-drop-mobile-sdk, D-20261121-mobile-sdk-on-demand*
+- **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết** · *thay một phần bởi D-20261121-ci-batch-release-faster*
 - **[D-20261120-build-faster](D-20261120-build-faster.md)** Build nhanh hơn: archive test của CI dùng opt-level 0 cho thư viện ngoài; không dùng cargo-hakari; đề xuất tách kernel — 2026-11-20
 - **[D-20261120-ci-nextest-archive](D-20261120-ci-nextest-archive.md)** CI build test một lần thành archive của nextest, các máy test chỉ tải về và chạy — 2026-11-20
 - **[D-20261120-docker-chef](D-20261120-docker-chef.md)** Image Docker tách lớp thư viện ngoài bằng cargo-chef để cache gha giữ được — 2026-11-20
@@ -95,7 +95,10 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
-- **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-ci-sccache-build](D-20261121-ci-sccache-build.md)** sccache cho job build tests của CI, không cho lint — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
@@ -170,7 +173,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
 - **D-050** API key cho máy và AI agent — 2026-11-11
-- **D-068** MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11
+- **D-068** MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11 · *thay một phần bởi D-20261121-mcp-server*
 - **D-083** Bước 14: kiểm đầu vào ở service và báo mọi lỗi một lần; `Created`; header chung trong OpenAPI; MCP cùng envelope với REST — 2026-11-12
 - **D-109** Tính năng AI: tầng kết nối trung lập, hai adapter, quyền cho agent, mặc định tắt — 2026-11-12 · **chủ dự án quyết**
 - **D-110** Bước 18 (AI): những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12
@@ -190,6 +193,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 - **[D-20261119-step53-ai-mail](D-20261119-step53-ai-mail.md)** `support`: bản nháp AI lưu riêng, khoá trả lời email là HMAC theo phiếu, tool MCP dùng trường phẳng — 2026-11-19
 - **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
+- **[D-20261121-mcp-server](D-20261121-mcp-server.md)** MCP server tự viết trong kernel thay `rmcp`, phục vụ cả bản `2026-07-28` lẫn bản cũ — 2026-11-21
 
 ## Xác thực, phân quyền, bảo mật
 
@@ -428,8 +432,9 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-367** `newsletter` trên sổ đồng ý chung của `compliance`; chiến dịch `format = template` (bước 37 C3) — 2026-11-17
 - **D-368** Kênh đẩy cho ứng dụng di động: phần còn thiếu, đóng bước 37 (D-220) — 2026-11-17
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
-- **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19
+- **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19 · *thay một phần bởi D-20261121-avif-feature*
 - **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
+- **[D-20261121-avif-feature](D-20261121-avif-feature.md)** AVIF thành feature cargo `avif`, không bật mặc định — 2026-11-21
 - **[D-20261121-s3-client](D-20261121-s3-client.md)** Lưu file: `rusty-s3` + `reqwest` cho S3, ổ đĩa tự viết, thay `object_store` — 2026-11-21
 
 ## Tiền, thuế, chứng từ

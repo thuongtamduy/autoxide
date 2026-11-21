@@ -1,4 +1,4 @@
-//! Endpoint MCP qua HTTP, gọi bằng client MCP thật (`rmcp`): liệt kê và gọi tool theo
+//! Endpoint MCP qua HTTP, gọi bằng client MCP của testkit (`autoxide_testkit::mcp`, nói đặc tả 2026-07-28): liệt kê và gọi tool theo
 //! permission, lỗi của tool, xác thực.
 
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
@@ -15,13 +15,9 @@ use autoxide_kernel::mcp::{NoInput, Tool};
 use autoxide_kernel::module::{Module, Modules};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
 use autoxide_testkit::TestDatabase;
+use autoxide_testkit::mcp::{CallToolRequestParams, McpClient};
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use rmcp::ServiceExt as _;
-use rmcp::model::CallToolRequestParams;
-use rmcp::service::{RoleClient, RunningService};
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use serde::Deserialize;
 use serde_json::{Value, json};
 use tower::ServiceExt as _;
@@ -135,19 +131,26 @@ async fn router(test: &TestDatabase) -> axum::Router {
     http::build(&config, axum::Router::new().into(), Vec::new(), extras).router
 }
 
-/// Máy chủ thật trên một port ngẫu nhiên; trả URL của endpoint MCP.
-async fn serve(test: &TestDatabase) -> String {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let app = router(test).await;
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    format!("http://{address}{MCP_PATH}")
+/// Router của app và đường dẫn MCP (`url.at("/notes")`: endpoint riêng của một module). Client của
+/// testkit gửi request thẳng vào router, không cần mở cổng TCP.
+#[derive(Clone)]
+struct Endpoint {
+    router: axum::Router,
+    path: String,
 }
 
-async fn client(url: &str, token: &str) -> RunningService<RoleClient, ()> {
-    autoxide_kernel::tls::install_crypto_provider();
-    let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned()).auth_header(token);
-    ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap()
+impl Endpoint {
+    fn at(&self, suffix: &str) -> Endpoint {
+        Endpoint { router: self.router.clone(), path: format!("{}{suffix}", self.path) }
+    }
+}
+
+async fn serve(test: &TestDatabase) -> Endpoint {
+    Endpoint { router: router(test).await, path: MCP_PATH.to_owned() }
+}
+
+async fn client(endpoint: &Endpoint, token: &str) -> McpClient {
+    McpClient::new(endpoint.router.clone(), &endpoint.path, Some(token))
 }
 
 fn arguments(value: Value) -> serde_json::Map<String, Value> {
@@ -164,8 +167,8 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
         let writer = client(&url, "writer").await;
         let reader = client(&url, "reader").await;
 
-        let names = |tools: Vec<rmcp::model::Tool>| -> Vec<String> {
-            tools.into_iter().map(|tool| tool.name.into_owned()).collect()
+        let names = |tools: Vec<autoxide_testkit::mcp::Tool>| -> Vec<String> {
+            tools.into_iter().map(|tool| tool.name).collect()
         };
         let tools = writer.list_all_tools().await.unwrap();
         let add = tools.iter().find(|tool| tool.name == "notes.add").unwrap();
@@ -210,14 +213,9 @@ async fn chi_liet_ke_va_goi_duoc_tool_co_permission() {
 async fn endpoint_rieng_cua_module_chi_co_tool_cua_module() {
     TestDatabase::run(async |test| {
         let url = serve(test).await;
-        let notes = client(&format!("{url}/notes"), "writer").await;
-        let names: Vec<String> = notes
-            .list_all_tools()
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|tool| tool.name.into_owned())
-            .collect();
+        let notes = client(&url.at("/notes"), "writer").await;
+        let names: Vec<String> =
+            notes.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name).collect();
         assert_eq!(names, ["notes.whoami", "notes.add", "notes.issue_key", "notes.who"]);
         let call = CallToolRequestParams::new("notes.add")
             .with_arguments(arguments(json!({"a": 2, "b": 3})));
@@ -234,14 +232,9 @@ async fn endpoint_rieng_cua_module_chi_co_tool_cua_module() {
         assert!(other.contains("Unknown tool `kernel.list_custom_fields`"), "{other}");
         notes.cancel().await.unwrap();
 
-        let kernel = client(&format!("{url}/kernel"), "reader").await;
-        let names: Vec<String> = kernel
-            .list_all_tools()
-            .await
-            .unwrap()
-            .into_iter()
-            .map(|tool| tool.name.into_owned())
-            .collect();
+        let kernel = client(&url.at("/kernel"), "reader").await;
+        let names: Vec<String> =
+            kernel.list_all_tools().await.unwrap().into_iter().map(|tool| tool.name).collect();
         assert_eq!(names, ["kernel.list_custom_fields"]);
         kernel.cancel().await.unwrap();
 
@@ -502,6 +495,199 @@ async fn tool_can_duyet_tu_choi_agent() {
         let refused = tool.call(tenant.clone(), agent, Value::Null).await.unwrap_err();
         assert_eq!(refused.code(), "approval_required");
         assert_eq!(tool.call(tenant, person, Value::Null).await.unwrap(), Value::Bool(true));
+    })
+    .await
+    .unwrap();
+}
+
+/// `POST` một tin nhắn JSON-RPC thẳng vào router với các header cho trước; trả mã và thân JSON (nếu có).
+async fn raw(
+    endpoint: &Endpoint,
+    method: &str,
+    headers: &[(&str, &str)],
+    body: Option<Value>,
+) -> (StatusCode, Option<Value>) {
+    let mut request = Request::builder()
+        .method(method)
+        .uri(&endpoint.path)
+        .header(header::AUTHORIZATION, "Bearer writer");
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let body = body.map_or_else(Body::empty, |body| Body::from(body.to_string()));
+    let response = endpoint.router.clone().oneshot(request.body(body).unwrap()).await.unwrap();
+    let status = response.status();
+    let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, serde_json::from_slice(&bytes).ok())
+}
+
+const JSON_HEADERS: [(&str, &str); 2] =
+    [("content-type", "application/json"), ("accept", "application/json, text/event-stream")];
+
+fn modern_body(method: &str, params: Value) -> Value {
+    let mut params = params;
+    params["_meta"] = json!({
+        "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+        "io.modelcontextprotocol/clientCapabilities": {}
+    });
+    json!({"jsonrpc": "2.0", "id": 9, "method": method, "params": params})
+}
+
+#[tokio::test]
+async fn client_ban_cu_bat_tay_va_dung_duoc_moi_phien_ban() {
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        for version in ["2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25"] {
+            let legacy = McpClient::legacy(url.router.clone(), &url.path, Some("writer"), version)
+                .await
+                .unwrap();
+            // Máy chủ nhận đúng phiên bản client xin; client kiểm kết quả không mang trường của bản mới.
+            assert_eq!(legacy.protocol_version(), version);
+            let tools = legacy.list_all_tools().await.unwrap();
+            assert!(tools.iter().any(|tool| tool.name == "notes.add"), "{version}");
+            let call = CallToolRequestParams::new("notes.add")
+                .with_arguments(arguments(json!({"a": 2, "b": 3})));
+            let result = legacy.call_tool(call).await.unwrap();
+            assert_eq!(result.structured_content, Some(json!({"data": 5})), "{version}");
+            assert_eq!(legacy.request("ping", json!({})).await.unwrap(), json!({}));
+        }
+        // Phiên bản lạ hay bản không còn `initialize`: máy chủ trả bản cũ mới nhất.
+        for asked in ["1900-01-01", "2026-07-28"] {
+            let (status, body) = raw(
+                &url,
+                "POST",
+                &JSON_HEADERS,
+                Some(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+                    "protocolVersion": asked, "capabilities": {},
+                    "clientInfo": {"name": "t", "version": "1"}
+                }})),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let result = &body.unwrap()["result"];
+            assert_eq!(result["protocolVersion"], "2025-11-25", "{asked}");
+            assert_eq!(result["serverInfo"]["name"], "autoxide");
+            assert_eq!(
+                result["capabilities"],
+                json!({"prompts": {}, "resources": {}, "tools": {}})
+            );
+            assert!(result["instructions"].as_str().unwrap().contains("/mcp/<module>"));
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn ban_moi_discover_va_loi_theo_dac_ta() {
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        let modern = client(&url, "writer").await;
+        let discover = modern.discover().await.unwrap();
+        assert_eq!(discover["supportedVersions"][0], "2026-07-28");
+        assert!(discover["supportedVersions"].as_array().unwrap().contains(&json!("2024-11-05")));
+        assert_eq!(discover["capabilities"]["tools"], json!({}));
+
+        // Bản mới không còn `ping`; method lạ: 404 kèm lỗi JSON-RPC (bản cũ: 200).
+        let ping = modern.request("ping", json!({})).await.unwrap_err();
+        assert_eq!(
+            (ping.status, ping.error.unwrap()["code"].clone()),
+            (StatusCode::NOT_FOUND, json!(-32601))
+        );
+        let headers = |method: &'static str| {
+            let mut headers = JSON_HEADERS.to_vec();
+            headers.extend([("mcp-protocol-version", "2026-07-28"), ("mcp-method", method)]);
+            headers
+        };
+        let (status, body) =
+            raw(&url, "POST", &headers("nope/x"), Some(modern_body("nope/x", json!({})))).await;
+        assert_eq!(
+            (status, body.unwrap()["error"]["code"].clone()),
+            (StatusCode::NOT_FOUND, json!(-32601))
+        );
+        let (status, body) = raw(
+            &url,
+            "POST",
+            &JSON_HEADERS,
+            Some(json!({"jsonrpc": "2.0", "id": 1, "method": "nope/x"})),
+        )
+        .await;
+        assert_eq!(
+            (status, body.unwrap()["error"]["code"].clone()),
+            (StatusCode::OK, json!(-32601))
+        );
+
+        // Phiên bản không hỗ trợ: 400, liệt kê phiên bản hỗ trợ.
+        let mut unsupported = modern_body("tools/list", json!({}));
+        unsupported["params"]["_meta"]["io.modelcontextprotocol/protocolVersion"] =
+            json!("2099-01-01");
+        let mut odd = JSON_HEADERS.to_vec();
+        odd.extend([("mcp-protocol-version", "2099-01-01"), ("mcp-method", "tools/list")]);
+        let (status, body) = raw(&url, "POST", &odd, Some(unsupported)).await;
+        let error = body.unwrap()["error"].clone();
+        assert_eq!((status, error["code"].clone()), (StatusCode::BAD_REQUEST, json!(-32022)));
+        assert_eq!(error["data"]["requested"], "2099-01-01");
+
+        // Header không khớp thân: 400, -32020. Thiếu `clientCapabilities`: 400, -32602.
+        let mut wrong_name = headers("tools/call");
+        wrong_name.push(("mcp-name", "notes.whoami"));
+        let call =
+            modern_body("tools/call", json!({"name": "notes.add", "arguments": {"a": 1, "b": 1}}));
+        let (status, body) = raw(&url, "POST", &wrong_name, Some(call)).await;
+        assert_eq!(
+            (status, body.unwrap()["error"]["code"].clone()),
+            (StatusCode::BAD_REQUEST, json!(-32020))
+        );
+        let mut no_capabilities = modern_body("tools/list", json!({}));
+        no_capabilities["params"]["_meta"]
+            .as_object_mut()
+            .unwrap()
+            .remove("io.modelcontextprotocol/clientCapabilities");
+        let (status, body) = raw(&url, "POST", &headers("tools/list"), Some(no_capabilities)).await;
+        assert_eq!(
+            (status, body.unwrap()["error"]["code"].clone()),
+            (StatusCode::BAD_REQUEST, json!(-32602))
+        );
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn lop_http_kiem_phuong_thuc_accept_content_type_va_origin() {
+    TestDatabase::run(async |test| {
+        let url = serve(test).await;
+        // Không giữ phiên, không luồng GET.
+        assert_eq!(raw(&url, "GET", &JSON_HEADERS, None).await.0, StatusCode::METHOD_NOT_ALLOWED);
+        assert_eq!(
+            raw(&url, "DELETE", &JSON_HEADERS, None).await.0,
+            StatusCode::METHOD_NOT_ALLOWED
+        );
+        let list = json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"});
+        let json_only = [("content-type", "application/json"), ("accept", "application/json")];
+        assert_eq!(
+            raw(&url, "POST", &json_only, Some(list.clone())).await.0,
+            StatusCode::NOT_ACCEPTABLE
+        );
+        let text =
+            [("content-type", "text/plain"), ("accept", "application/json, text/event-stream")];
+        assert_eq!(
+            raw(&url, "POST", &text, Some(list.clone())).await.0,
+            StatusCode::UNSUPPORTED_MEDIA_TYPE
+        );
+        // Thông báo: 202, không thân. Thân không phải một tin nhắn JSON-RPC: 400 với lỗi -32600.
+        let notification = json!({"jsonrpc": "2.0", "method": "notifications/initialized"});
+        assert_eq!(
+            raw(&url, "POST", &JSON_HEADERS, Some(notification)).await,
+            (StatusCode::ACCEPTED, None)
+        );
+        let (status, body) = raw(&url, "POST", &JSON_HEADERS, Some(json!("{"))).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.unwrap()["error"]["code"], -32600);
+        // Không khai origin nào (mặc định): trình duyệt từ trang khác không gọi được.
+        let mut from_browser = JSON_HEADERS.to_vec();
+        from_browser.push(("origin", "https://evil.example"));
+        assert_eq!(raw(&url, "POST", &from_browser, Some(list)).await.0, StatusCode::FORBIDDEN);
     })
     .await
     .unwrap();

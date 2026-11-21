@@ -8,6 +8,9 @@ license.workspace = true
 publish.workspace = true
 
 [features]
+# Bản AVIF của ảnh thu nhỏ (`AUTOXIDE_MEDIA_AVIF`, D-20261121-avif-feature). Không bật mặc định: bộ mã hoá
+# `rav1e` kéo proc-macro `paste` đã ngừng bảo trì (RUSTSEC-2024-0436), nên bản build mặc định không có nó.
+avif = ["dep:ravif"]
 # Lệnh `media.bench_seed` sinh dữ liệu đo (bước 39 B1); bật qua feature `bench-seed` của `autoxide`.
 bench-seed = []
 
@@ -22,7 +25,7 @@ futures-util.workspace = true
 image.workspace = true
 imagesize.workspace = true
 webp.workspace = true
-ravif.workspace = true
+ravif = { workspace = true, optional = true }
 metrics.workspace = true
 sea-orm.workspace = true
 serde.workspace = true

@@ -17,7 +17,13 @@ const EMAIL: &str = "first-admin@example.com";
 const PASSWORD: &str = "correct horse battery staple";
 
 fn settings(url: &str, extra: &[(&str, &str)]) -> Settings {
+    // Mặc định của `files` và `mail` là thư mục tương đối trong thư mục chạy test: dùng thư mục tạm.
+    let scratch = std::env::temp_dir().join(format!("autoxide-startup-{}", uuid::Uuid::now_v7()));
+    let files = scratch.join("files").display().to_string();
+    let mail = scratch.join("mail").display().to_string();
     let mut pairs = vec![
+        ("AUTOXIDE_FILES_DIR", files.as_str()),
+        ("AUTOXIDE_MAIL_FILE_DIR", mail.as_str()),
         ("DATABASE_URL", url),
         ("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"),
         ("AUTOXIDE_HTTP_DRAIN_SECONDS", "0"),

@@ -49,7 +49,6 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | ORM                | `sea-orm`                       | 2.0       | Một bộ code cho SQLite và Postgres                  |
 | Migration          | Kernel tự chạy (`autoxide_kernel::migration`: `MigrationTrait`, `SchemaManager`, `schema::*` — cùng tên `sea-orm-migration` cũ) | — | Viết bằng Rust, chạy được trên cả hai database; mỗi migration một transaction; thay `sea-orm-migration` (bật bộ feature mặc định của SeaORM, kéo `chrono`; D-20261121-own-migrations) |
 | OpenAPI            | `utoipa` + `utoipa-axum`        | 6.0 / 0.3 | Route và tài liệu đăng ký cùng một lệnh, không lệch |
-| SDK di động        | swift-openapi-generator; openapi-generator (`kotlin`, `dart-dio`) | 1.14.4; 7.27.0 | Sinh từ `docs/openapi.json` (bước 69, D-20261119-step69-sdk); không phải thư viện của Rust, CI sinh và biên dịch |
 | Trang xem API      | `utoipa-scalar`                 | 0.4       | Tắt mặc định; bật bằng `AUTOXIDE_HTTP_API_DOCS=true` |
 | JSON               | `serde` + `serde_json`          | 1.0       |                                                     |
 | Validate đầu vào   | `validator`                     | 0.21      |                                                     |
@@ -92,7 +91,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Kích thước ảnh | `imagesize` 0.15 (MIT, không phụ thuộc gì; chỉ bật `jpeg`, `png`, `gif`, `webp`, `heif`) — đọc chiều rộng / cao từ header ảnh, không giải mã ảnh; module `media` dùng. Nhận loại thật theo chữ ký đầu file thì tự viết (D-089) |
 | Ảnh thu nhỏ | `image` 0.25 (MIT / Apache-2.0, thuần Rust; chỉ bật `jpeg`, `png`, `gif`, `webp`, không `rayon`) — giải mã, xoay theo EXIF, đổi cỡ, mã hoá JPEG / PNG cho ảnh thu nhỏ của module `media`, chạy trong job nền (D-093) |
 | Ảnh thu nhỏ WebP | `webp` 0.3 (MIT / Apache-2.0; không bật feature `img`) bọc `libwebp` qua `libwebp-sys` (crate MIT, mã C của libwebp BSD-3-Clause, biên dịch kèm bằng trình biên dịch C như SQLite) — mã hoá WebP nén mất dữ liệu, có kênh trong suốt, cho bản WebP bên cạnh bản JPEG / PNG (D-176, D-196). `image` chỉ mã hoá WebP không mất dữ liệu |
-| Ảnh thu nhỏ AVIF | `ravif` 0.13 (BSD-3-Clause) trên `rav1e` 0.8 (BSD-2-Clause), Rust thuần — không bật `asm` (cần `nasm` lúc build) hay `threading` — mã hoá bản AVIF của ảnh thu nhỏ bằng job nền, tắt mặc định (`AUTOXIDE_MEDIA_AVIF`, D-20261119-step39-avif). Vì sao: cùng chất lượng, nhẹ hơn bản WebP sẵn có ~34% (đo D-232); WebP vẫn là mặc định. Chi phí: build sạch +5–8%, binary +1% |
+| Ảnh thu nhỏ AVIF | `ravif` 0.13 (BSD-3-Clause) trên `rav1e` 0.8 (BSD-2-Clause), Rust thuần — không bật `asm` (cần `nasm` lúc build) hay `threading` — mã hoá bản AVIF của ảnh thu nhỏ bằng job nền, tắt mặc định (`AUTOXIDE_MEDIA_AVIF`, D-20261119-step39-avif). Chỉ có trong bản build bật feature cargo `avif` (`rav1e` kéo proc-macro `paste` ngừng bảo trì; D-20261121-avif-feature). Vì sao: cùng chất lượng, nhẹ hơn bản WebP sẵn có ~34% (đo D-232); WebP vẫn là mặc định. Chi phí: build sạch +5–8%, binary +1% |
 | Tìm không dấu | `unicode-normalization` 0.1 (MIT / Apache-2.0; đã có sẵn trong cây phụ thuộc qua `webauthn_rp`) — tách chữ khỏi dấu (NFD) để `search::fold` của kernel bỏ dấu: "da lat" tìm ra "Đà Lạt" (D-104) |
 | Slug | `slug` 0.1 (MIT / Apache-2.0; kéo theo `deunicode`) — tạo slug từ tiêu đề: bỏ dấu, `đ` → `d`, chữ thường nối bằng `-` ("Đường đến Đà Lạt" → `duong-den-da-lat`); module `content` dùng (D-102, D-105) |
 | Markdown của bình luận | `pulldown-cmark` 0.13 (MIT; tắt feature mặc định `html`, `getopts`; kéo `bitflags`, `memchr`, `unicase`) — chỉ bộ phân tích; HTML do module `comments` tự dựng theo danh sách thẻ cho phép, không thêm bộ lọc HTML như `ammonia` (D-252) |
@@ -102,7 +101,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Excel | `rust_xlsxwriter` 0.102 (MIT / Apache-2.0; không bật feature nào; kéo `zip` có `deflate`) — file `.xlsx` của bản xuất kế toán; CSV tự viết (D-354) |
 | i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
-| MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |
+| MCP endpoint   | Tự viết trong kernel theo đặc tả công khai (`http/mcp/`: JSON-RPC 2.0 + Streamable HTTP, bản `2026-07-28` và các bản cũ còn `initialize`); thay `rmcp`, vốn bắt buộc `chrono` (D-20261121-mcp-server) — module khai báo tool, gắn permission. Client cho test: `autoxide_testkit::mcp` |
 | Email          | `lettre` 0.11 (rustls + ring, không native-tls) — SMTP sau trait `Mailer` của kernel, gửi qua job queue; chưa cấu hình SMTP thì ghi file `.eml` (D-061) |
 | Tra DNS (TXT) | `hickory-resolver` 0.26 (MIT / Apache-2.0; tắt feature mặc định, chỉ bật `tokio` và `system-config`; không DNS-over-TLS / HTTPS / QUIC, không DNSSEC) — tra bản ghi TXT `_autoxide-challenge.<domain>` khi xác minh tên miền riêng của khách, sau trait `DnsTxtLookup` của kernel; đọc cấu hình DNS của hệ điều hành (`/etc/resolv.conf`); test dùng `FakeDns` của testkit. Thư viện chuẩn của Rust không tra được TXT (D-190) |
 | Webhook        | Module `webhooks`: chữ ký theo chuẩn Standard Webhooks (`hmac` + `sha2` + `base64` sẵn có), gửi bằng `reqwest` 0.13 sẵn có qua job queue; không thêm thư viện (D-081) |
@@ -185,6 +184,7 @@ repo này; giao diện là dự án riêng dùng API.
 | Lint                | `cargo clippy`, cảnh báo tính là lỗi                            |
 | Test                | `cargo test` trên SQLite và Postgres                            |
 | Chạy test trên CI   | `cargo-nextest` (`cargo install cargo-nextest --locked`; CI cài bằng `taiki-e/install-action`) — build test một lần thành archive, chạy ở nhiều máy (`./gate.sh --only build`, `--archive`); gate trên máy không cần nó (D-20261120-ci-nextest-archive) |
+| Cache biên dịch trên CI | `sccache` qua `mozilla-actions/sccache-action` (cache GitHub Actions) — chỉ job build tests của `gate.yml`; nhanh hơn 37% khi đổi một crate lá, lint không dùng vì chậm hơn (D-20261121-ci-sccache-build) |
 | Cache lớp Docker      | `cargo-chef` 0.1.78 (cài trong Dockerfile bằng `cargo install --locked`, không cần cài ở máy dev) — tách build thư viện ngoài khỏi build code của mình để cache gha giữ được lớp thư viện (D-20261120-docker-chef) |
 | Database cho test   | `autoxide-testkit` — mỗi test một database trống (D-033)        |
 | Kiểm ranh giới      | `cargo xtask check` — bố cục, license, lint, chiều phụ thuộc, bề mặt module (D-031) |

@@ -16,6 +16,9 @@ bench-seed = [
   "autoxide-content/bench-seed",
   "autoxide-comments/bench-seed",
 ]
+# Bản AVIF của ảnh thu nhỏ (`AUTOXIDE_MEDIA_AVIF`): `cargo build --release --features avif`. Không bật mặc định
+# (D-20261121-avif-feature): bộ mã hoá `rav1e` kéo proc-macro `paste` đã ngừng bảo trì.
+avif = ["autoxide-media/avif"]
 
 [dependencies]
 jiff.workspace = true

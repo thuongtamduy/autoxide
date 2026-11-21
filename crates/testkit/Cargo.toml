@@ -11,18 +11,15 @@ publish.workspace = true
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
+# Client MCP cho test (`mcp.rs`): mã hoá header `Mcp-Name`, đọc thân response.
+base64.workspace = true
 bytes.workspace = true
 rust_decimal.workspace = true
 futures-util.workspace = true
+http-body-util.workspace = true
 jiff.workspace = true
-# Client MCP thật cho `TestApp::mcp` (testkit chỉ là dev-dependency, nên feature client không
-# lọt vào binary).
-rmcp = { workspace = true, features = [
-  "client",
-  "transport-streamable-http-client-reqwest",
-  "reqwest-tls-no-provider",
-] }
 sea-orm.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 tower.workspace = true
