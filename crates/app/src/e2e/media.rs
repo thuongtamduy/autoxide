@@ -37,6 +37,11 @@ fn backends() -> Vec<Vec<(&'static str, String)>> {
 pub(crate) async fn start(database_url: &str, storage: &[(&'static str, String)]) -> Runtime {
     let mut pairs = vec![("DATABASE_URL", database_url.to_owned())];
     pairs.extend(storage.iter().cloned());
+    // Mail file mặc định là `data/mail` trong thư mục chạy test: cho một thư mục tạm.
+    if !pairs.iter().any(|(name, _)| *name == "AUTOXIDE_MAIL_FILE_DIR") {
+        let mail = std::env::temp_dir().join(format!("autoxide-mail-{}", uuid::Uuid::now_v7()));
+        pairs.push(("AUTOXIDE_MAIL_FILE_DIR", mail.display().to_string()));
+    }
     let source =
         ConfigSource::from_pairs(pairs.iter().map(|(name, value)| (*name, value.as_str())));
     let settings = crate::settings::read(&source).unwrap();
