@@ -401,6 +401,7 @@ impl Module for AuthModule {
         });
         let invitations = Arc::new(invitation::Invitations {
             users: users.clone(),
+            roles: roles.clone(),
             sessions: sessions.clone(),
             jobs: context.jobs(),
             mailer: mailer.clone(),

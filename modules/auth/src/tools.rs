@@ -527,6 +527,7 @@ mod tests {
             }),
             invitations: Arc::new(crate::invitation::Invitations {
                 users: services.users.clone(),
+                roles: services.roles.clone(),
                 sessions: services.sessions.clone(),
                 jobs: autoxide_kernel::job::JobQueue::new("auth"),
                 mailer: services.mails.clone(),

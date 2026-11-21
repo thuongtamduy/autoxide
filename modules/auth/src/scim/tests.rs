@@ -545,3 +545,114 @@ pub(crate) fn urlencode(text: &str) -> String {
         })
         .collect()
 }
+
+/// Token SCIM do người quyền thấp tạo không nhận về, khoá hay đổi email tài khoản quyền cao hơn
+/// người đó; email đổi qua SCIM của tài khoản được nhận về không tự coi là đã xác minh.
+#[tokio::test]
+async fn token_scim_khong_vuot_quyen_nguoi_tao() {
+    use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+    TestDatabase::run(async |test| {
+        let (app, services, _, admin_token) = setup(test).await;
+        let tenant = &services.tenant;
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "it".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.scim.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let it_role = services.roles.create(tenant, Actor::system(), input).await.unwrap();
+        let it = NewUser {
+            email: "it@example.com".to_owned(),
+            name: "IT".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let it = services.users.create(tenant, Actor::system(), it).await.unwrap();
+        let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+        let boss = autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::now_v7())
+            .in_tenant(tenant.id());
+        services.roles.set_memberships(tenant, &boss, it.id, vec![(root, vec![it_role.id])]).await.unwrap();
+        let it_bearer = bearer(&app, "it@example.com", PASSWORD).await;
+        let low_token = scim_token(&app, &it_bearer, None).await;
+
+        // Tài khoản admin có sẵn: token của IT không nhận về được.
+        let (status, body) = scim(
+            &app,
+            "POST",
+            "/Users",
+            &low_token,
+            Some(user_body("boss@example.com", "x-boss")),
+        )
+        .await;
+        assert_scim_error(status, &body, StatusCode::FORBIDDEN, None);
+
+        // Tài khoản thường có sẵn: nhận về được; đổi email thì email mới chưa xác minh.
+        let plain = NewUser {
+            email: "plain@example.com".to_owned(),
+            name: "Plain".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let plain = services.users.create(tenant, Actor::system(), plain).await.unwrap();
+        crate::user::entity::Entity::update_many()
+            .col_expr(
+                crate::user::entity::Column::EmailVerifiedAt,
+                sea_orm::sea_query::Expr::value(Some(autoxide_kernel::time::Timestamp::now())),
+            )
+            .filter(crate::user::entity::Column::Id.eq(plain.id))
+            .exec(services.database.write())
+            .await
+            .unwrap();
+        let (status, claimed) = scim(
+            &app,
+            "POST",
+            "/Users",
+            &low_token,
+            Some(user_body("plain@example.com", "x-plain")),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CREATED, "{claimed}");
+        assert_eq!(claimed["id"], plain.id.to_string());
+        let patch = json!({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "emails[type eq \"work\"].value", "value": "plain2@example.com"}],
+        });
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{}", plain.id), &low_token, Some(patch)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let account = services.users.get(tenant, plain.id).await.unwrap().unwrap();
+        assert_eq!(account.email, "plain2@example.com");
+        assert!(account.email_verified_at.is_none(), "email mới của tài khoản nhận về chưa xác minh");
+
+        // Tài khoản do SCIM tạo: email đổi qua SCIM vẫn coi là đã xác minh.
+        let (_, created) =
+            scim(&app, "POST", "/Users", &low_token, Some(user_body("new@example.com", "x-new")))
+                .await;
+        let new_id = created["id"].as_str().unwrap().to_owned();
+        let patch = json!({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "path": "emails[type eq \"work\"].value", "value": "new2@example.com"}],
+        });
+        let (status, body) =
+            scim(&app, "PATCH", &format!("/Users/{new_id}"), &low_token, Some(patch)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let id = uuid::Uuid::parse_str(&new_id).unwrap();
+        assert!(services.users.get(tenant, id).await.unwrap().unwrap().email_verified_at.is_some());
+
+        // Tài khoản được nâng quyền sau khi SCIM tạo: token của IT không khoá được nữa; token của
+        // admin thì được.
+        crate::role::grant_admin(services.database.write(), tenant, id).await.unwrap();
+        let deactivate = json!({
+            "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+            "Operations": [{"op": "replace", "value": {"active": false}}],
+        });
+        let path = format!("/Users/{new_id}");
+        let (status, body) = scim(&app, "PATCH", &path, &low_token, Some(deactivate.clone())).await;
+        assert_scim_error(status, &body, StatusCode::FORBIDDEN, None);
+        let (status, body) = scim(&app, "PATCH", &path, &admin_token, Some(deactivate)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["active"], false);
+    })
+    .await
+    .unwrap();
+}
