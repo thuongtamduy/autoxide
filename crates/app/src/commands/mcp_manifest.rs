@@ -14,7 +14,8 @@ use crate::runtime;
 use crate::settings::{self, Settings};
 
 pub fn run() -> ExitCode {
-    let settings = match settings::load() {
+    // Hợp đồng đầy đủ: mọi module, kể cả module bản cài này đang tắt (bước 70 P1).
+    let settings = match settings::load_everything() {
         Ok(settings) => settings,
         Err(errors) => return report_invalid_configuration(&errors),
     };

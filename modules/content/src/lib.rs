@@ -121,6 +121,12 @@ impl Module for ContentModule {
         "content"
     }
 
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["ai", "media"]
+    }
+
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
     }

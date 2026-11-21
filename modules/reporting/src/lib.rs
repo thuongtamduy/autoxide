@@ -70,6 +70,11 @@ impl Module for ReportingModule {
         "reporting"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         use autoxide_kernel::tenancy::Relocation;

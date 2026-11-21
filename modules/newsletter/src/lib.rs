@@ -83,6 +83,17 @@ impl Module for NewsletterModule {
         "newsletter"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["mail"]
+    }
+
     // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         use autoxide_kernel::tenancy::Relocation;

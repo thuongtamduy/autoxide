@@ -68,6 +68,12 @@ impl Module for PromotionsModule {
         "promotions"
     }
 
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["catalog"]
+    }
+
     fn description(&self) -> &'static str {
         "Promotions as rules: automatic discounts, coupons and vouchers, flash sales, tiers, \
          bundles and gifts, stacking in three classes, usage holds for orders and legal limits as \

@@ -171,6 +171,12 @@ docker compose up -d --build
 
 Service `migrate` áp dụng migration mới trước khi máy chủ mới khởi động.
 
+**Cập nhật từ 0.17 trở về trước:** module thử nghiệm (bookings, newsletter, comments, support,
+conversations, analytics, reporting, automations) không còn chạy nếu `AUTOXIDE_MODULES` không nêu
+tên. Không gì bị xoá, và log khởi động lẫn `autoxide doctor` báo khi database còn dữ liệu của một
+module đang tắt, kèm dòng cần thêm — xem
+[MODULES.vi.md](MODULES.vi.md#nâng-cấp-từ-017-trở-về-trước). Điều này áp dụng cả cho cách B và C.
+
 ### 6. Backup và khôi phục
 
 ```bash
@@ -375,6 +381,7 @@ database mới.
 | Biến | Dùng để |
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
+| `AUTOXIDE_MODULES` | Module nào chạy: `official` (mặc định), `core`, `all`, tên để thêm, `-tên` để bỏ. Module thử nghiệm phải nêu tên. Xem [MODULES.vi.md](MODULES.vi.md) |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
