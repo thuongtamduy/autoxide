@@ -13295,7 +13295,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Compute the promotions of a cart without holding anything: discounts per line with reasons, gifts, codes and vouchers that do not apply, and the fingerprint.",
+      "description": "Compute the promotions of a cart without holding anything: discounts per line with reasons, gifts, codes and vouchers that do not apply, and the fingerprint. The unit of the cart must be in your scope.",
       "input_schema": {
         "additionalProperties": false,
         "description": "A cart to compute.",

@@ -25,4 +25,3 @@ tenant-scope 1 modules/webhooks/src/delivery.rs  # dòng 386 — job: xoá lần
 
 mcp-principal 1 modules/catalog/src/tools.rs  # dòng 307 `list_categories` — nhầm: REST cũng đọc cả khách; thêm chú thích
 mcp-principal 1 modules/content/src/tools.rs  # dòng 637 `resolve` — nghi: tra địa chỉ công khai (chỉ bản đã đăng); có thể cố ý, cần chú thích
-mcp-principal 1 modules/promotions/src/tools.rs  # dòng 303 `list_vouchers_of_user` — nghi: service không nhận `principal` (sửa ở PR #337)
