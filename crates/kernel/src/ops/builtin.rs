@@ -447,6 +447,8 @@ impl Module for KernelModule {
             crate::tenancy::sandbox::SANDBOX_EXTENDED,
             crate::tenancy::sandbox::SANDBOX_DELETED,
             crate::tenancy::sandbox::SANDBOX_PROMOTED,
+            crate::tenancy::exports::TENANT_EXPORT_REQUESTED,
+            crate::tenancy::exports::TENANT_EXPORT_ACCESSED,
         ]
     }
 
@@ -868,6 +870,7 @@ impl Module for KernelModule {
             context.tenancy().clone(),
             self.move_setup.clone(),
             context.jobs(),
+            context.outbox()?,
             self.export_days,
         ));
         self.exports = Some(exports.clone());

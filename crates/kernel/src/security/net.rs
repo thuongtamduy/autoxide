@@ -9,10 +9,18 @@
 //! - lúc gọi: tên miền được phân giải bằng [`PublicOnly`], bỏ mọi IP không public. Lọc lúc
 //!   kết nối (không phải lúc kiểm URL) chặn được cả "DNS rebinding" — tên miền trả IP public
 //!   khi kiểm rồi IP nội bộ khi gọi.
+//!
+//! Giao thức không đi qua reqwest (SMTP của khách…) dùng cùng hai bước: [`check_target_url`] lúc
+//! lưu, [`resolve_target`] ngay trước khi kết nối rồi kết nối vào ĐÚNG IP nó trả (D-20261121-ssrf-targets).
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use reqwest::dns::{Addrs, Name, Resolve, Resolving};
+
+use crate::error::FieldError;
+
+/// URL đã kiểm (dùng lại kiểu của reqwest để module không phải khai thêm thư viện `url`).
+pub use reqwest::Url;
 
 /// `ip` có phải địa chỉ public trên Internet không (không loopback, mạng riêng, link-local,
 /// CGNAT, multicast, địa chỉ dành cho tài liệu hay dự trữ).
@@ -82,15 +90,78 @@ pub fn is_local_name(host: &str) -> bool {
 /// Host của `url` không bị biết trước là nội bộ: IP thì phải public, tên thì không phải
 /// `localhost` (tên miền khác được kiểm lúc gửi, bằng [`PublicOnly`]).
 pub fn is_public_host(url: &reqwest::Url) -> bool {
-    let Some(host) = url.host_str() else {
-        return false;
-    };
+    url.host_str().is_some_and(is_public_host_name)
+}
+
+/// Như [`is_public_host`], cho host trần (`smtp.example.com`, `10.0.0.1`, `[::1]`).
+pub fn is_public_host_name(host: &str) -> bool {
     // IPv6 trong URL nằm trong ngoặc vuông: `https://[::1]/`.
     let bare = host.trim_start_matches('[').trim_end_matches(']');
     match bare.parse::<IpAddr>() {
         Ok(ip) => is_public(ip),
-        Err(_) => !is_local_name(host),
+        Err(_) => !bare.is_empty() && !is_local_name(bare),
     }
+}
+
+/// Kiểm địa chỉ người dùng chọn cho máy chủ gọi tới, lúc LƯU (cấu hình của khách): đọc được là URL,
+/// scheme thuộc `schemes`, có host, và — trừ khi `allow_private` — host không bị biết trước là nội
+/// bộ (IP không public, `localhost`). Tên miền khác chỉ biết lúc kết nối: [`resolve_target`]. Lỗi
+/// là lỗi của ô `value` (như bộ kiểm cấu hình của khách).
+pub fn check_target_url(
+    raw: &str,
+    schemes: &[&str],
+    allow_private: bool,
+) -> Result<Url, FieldError> {
+    let invalid = || {
+        FieldError::new(
+            "value",
+            "invalid",
+            "must be an address such as `{example}`, with one of the schemes {schemes}",
+        )
+        .with_param("example", format!("{}://host.example", schemes.first().unwrap_or(&"https")))
+        .with_param(
+            "schemes",
+            schemes.iter().map(|s| format!("`{s}`")).collect::<Vec<_>>().join(", "),
+        )
+    };
+    let url = Url::parse(raw.trim()).map_err(|_| invalid())?;
+    if !schemes.contains(&url.scheme()) {
+        return Err(invalid());
+    }
+    let Some(host) = url.host_str().filter(|host| !host.is_empty()) else {
+        return Err(invalid());
+    };
+    if !allow_private && !is_public_host_name(host) {
+        return Err(FieldError::new(
+            "value",
+            "private_address",
+            "must point to a server on the public Internet, not a private or local network",
+        ));
+    }
+    Ok(url)
+}
+
+/// Phân giải `host` (tên hay IP) ngay trước khi kết nối và chỉ giữ IP public (trừ khi
+/// `allow_private`); không còn IP nào thì lỗi [`PrivateAddress`]. Bên gọi kết nối vào chính các
+/// địa chỉ trả về — không phân giải lại — nên tên miền không đổi được sang IP nội bộ giữa lúc kiểm và
+/// lúc gọi (DNS rebinding).
+pub async fn resolve_target(
+    host: &str,
+    port: u16,
+    allow_private: bool,
+) -> Result<Vec<SocketAddr>, std::io::Error> {
+    let bare = host.trim_start_matches('[').trim_end_matches(']');
+    if !allow_private && is_local_name(bare) {
+        return Err(std::io::Error::other(PrivateAddress));
+    }
+    let found: Vec<SocketAddr> = tokio::net::lookup_host((bare, port))
+        .await?
+        .filter(|address| allow_private || is_public(address.ip()))
+        .collect();
+    if found.is_empty() {
+        return Err(std::io::Error::other(PrivateAddress));
+    }
+    Ok(found)
 }
 
 /// Bộ phân giải tên miền chỉ trả IP public; không còn IP nào thì báo lỗi.
@@ -112,17 +183,17 @@ impl Resolve for PublicOnly {
     fn resolve(&self, name: Name) -> Resolving {
         let host = name.as_str().to_owned();
         Box::pin(async move {
-            if is_local_name(&host) {
-                return Err(PrivateAddress.into());
-            }
             // Cổng 0: reqwest thay bằng cổng của URL.
-            let found: Vec<SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
-                .await?
-                .filter(|address| is_public(address.ip()))
-                .collect();
-            if found.is_empty() {
-                return Err(PrivateAddress.into());
-            }
+            let found = resolve_target(&host, 0, false).await.map_err(|error| {
+                // Giữ `PrivateAddress` là lỗi gốc: bên gọi nhận ra nó trong chuỗi lỗi.
+                match error.into_inner() {
+                    Some(inner) if inner.is::<PrivateAddress>() => {
+                        Box::new(PrivateAddress) as Box<dyn std::error::Error + Send + Sync>
+                    }
+                    Some(inner) => inner,
+                    None => Box::new(std::io::Error::other("lookup failed")),
+                }
+            })?;
             let addresses: Addrs = Box::new(found.into_iter());
             Ok(addresses)
         })
@@ -183,6 +254,41 @@ mod tests {
         assert!(is_local_name("localhost"));
         assert!(is_local_name("api.LOCALHOST."));
         assert!(!is_local_name("localhost.example.com"));
+    }
+
+    #[test]
+    fn dia_chi_luu_phai_dung_scheme_va_khong_noi_bo() {
+        let smtp = ["smtp", "smtps"];
+        assert!(check_target_url("smtps://u:p@smtp.example.com:465", &smtp, false).is_ok());
+        assert!(check_target_url("smtp://smtp.example.com?tls=required", &smtp, false).is_ok());
+        for raw in ["http://smtp.example.com", "not a url", "smtp://", "file:///etc/passwd"] {
+            let problem = check_target_url(raw, &smtp, false).unwrap_err();
+            assert_eq!(problem.code, "invalid", "{raw}");
+        }
+        for raw in [
+            "smtp://127.0.0.1:6379",
+            "smtp://localhost:25",
+            "smtps://[::1]:465",
+            "smtp://169.254.169.254",
+            "smtp://10.0.0.5:2525",
+            "smtp://db.localhost",
+        ] {
+            let problem = check_target_url(raw, &smtp, false).unwrap_err();
+            assert_eq!(problem.code, "private_address", "{raw}");
+            assert!(check_target_url(raw, &smtp, true).is_ok(), "{raw}");
+        }
+    }
+
+    #[tokio::test]
+    async fn phan_giai_dich_chi_tra_ip_public() {
+        for host in ["localhost", "127.0.0.1", "[::1]", "10.1.2.3"] {
+            let error = resolve_target(host, 25, false).await.unwrap_err();
+            assert!(error.into_inner().unwrap().is::<PrivateAddress>(), "{host}");
+        }
+        let found = resolve_target("127.0.0.1", 2525, true).await.unwrap();
+        assert_eq!(found, vec!["127.0.0.1:2525".parse().unwrap()]);
+        let public = resolve_target("93.184.216.34", 25, false).await.unwrap();
+        assert_eq!(public, vec!["93.184.216.34:25".parse().unwrap()]);
     }
 
     #[tokio::test]
