@@ -10,6 +10,13 @@ PostgreSQL**, có REST API mô tả bằng OpenAPI, và được thiết kế đ
 Autoxide là nền cho sản phẩm mới. Nó không gắn với một công ty hay một ngành nào:
 core không chứa khái niệm nghiệp vụ — những thứ đó thuộc về module.
 
+**Backend thương mại sẵn cho thị trường Việt Nam.** Thuế (gói dữ liệu thuế có ngày hiệu lực), chứng từ
+kế toán và hoá đơn, danh mục đơn vị hành chính chính thức cho địa chỉ và các quy định pháp luật (thương
+mại điện tử, dữ liệu cá nhân, lưu trữ chứng từ) có sẵn. AI agent dùng được qua MCP và hợp đồng OpenAPI,
+với cùng permission như con người. Core giữ trung lập, module cắm vào. Nhà cung cấp thanh toán, SMS,
+vận chuyển và hoá đơn điện tử nằm sau các interface hiện mới đi kèm bộ giả lập: việc nối nhà cung cấp
+thật vẫn chưa làm.
+
 ## Chạy nhanh
 
 Một lệnh, không phải biên dịch gì: SQLite trong một Docker volume, bảng được tạo, có quản trị viên

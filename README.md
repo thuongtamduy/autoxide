@@ -10,6 +10,13 @@ to be used by AI agents as well as by people.
 It is a foundation for new products. It is not tied to any company or industry:
 the core contains no business concepts — those belong to modules.
 
+**A commerce-ready backend for the Vietnamese market.** Taxes (a dated tax data pack), accounting
+documents and invoices, the official list of administrative units for addresses and the legal rules
+(e-commerce, personal data, record keeping) come built in. AI agents use it through MCP and the
+OpenAPI contract, with the same permissions as people. The core stays neutral and modules plug in.
+Payment, SMS, shipping and e-invoice providers sit behind interfaces that ship today with
+simulated providers only: connecting a real provider is still to be done.
+
 ## Quickstart
 
 One command, nothing to compile: SQLite in a Docker volume, the tables created, a first
