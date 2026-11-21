@@ -4417,6 +4417,21 @@ export type ConnectionTest = {
   tested_at: string;
 };
 
+/** A webhook address of this tenant at a partner connection. */
+export type ConnectionWebhook = {
+  /** The connection, `<module>.connection.<kind>`. */
+  connection: string;
+  /** Where to paste the address at the partner. */
+  description: string;
+  /** Path of the address; its last part identifies this tenant and cannot be guessed. */
+  path: string;
+  /**
+   * Full address, when the server has `AUTOXIDE_HTTP_PUBLIC_URL`; otherwise put the server's
+   * public address in front of `path`.
+   */
+  url?: string | null;
+};
+
 /** A mandatory page template. */
 export type ContentTemplate = {
   /**
@@ -14084,6 +14099,23 @@ export type Data_Vec_ComplianceTrackingProvider = {
     /** Key to use in `provider`, e.g. `ga4`. */
     key: string;
     name: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ConnectionWebhook = {
+  data: {
+    /** The connection, `<module>.connection.<kind>`. */
+    connection: string;
+    /** Where to paste the address at the partner. */
+    description: string;
+    /** Path of the address; its last part identifies this tenant and cannot be guessed. */
+    path: string;
+    /**
+     * Full address, when the server has `AUTOXIDE_HTTP_PUBLIC_URL`; otherwise put the server's
+     * public address in front of `path`.
+     */
+    url?: string | null;
   }[];
 };
 
@@ -41511,6 +41543,18 @@ export interface paths {
       };
     };
   };
+  "/api/v1/kernel/connections/webhooks": {
+    /** List the webhook addresses of this tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ConnectionWebhook;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/kernel/custom-fields": {
     /** List custom fields. */
     get: {
@@ -42842,6 +42886,22 @@ export interface paths {
       };
     };
   };
+  "/api/v1/ledger/bank-feeds/{provider}/{hook}": {
+    /** Receive bank account transactions from a bank feed at a tenant's own address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { provider: string; hook: string }; };
+      requestBody: string;
+      responses: {
+        200: Data_LedgerBankFeedReceipt;
+        204: void;
+        401: Problem;
+        404: Problem;
+        413: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/ledger/books": {
     /** List the books in your scope. */
     get: {
@@ -43292,6 +43352,22 @@ export interface paths {
       responses: {
         200: Data_LedgerWebhookReceipt;
         401: Problem;
+        413: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/ledger/webhooks/{provider}/{hook}": {
+    /** Receive a notification from a payment partner at a tenant's own address. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; path: { provider: string; hook: string }; };
+      requestBody: string;
+      responses: {
+        200: Data_LedgerWebhookReceipt;
+        204: void;
+        401: Problem;
+        404: Problem;
         413: Problem;
         422: Problem;
         default: Problem;
