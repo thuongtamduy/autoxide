@@ -110,13 +110,16 @@ impl BookingsService {
         Ok(())
     }
 
-    /// `ledger` báo đã thu cọc của lịch `id`: lịch còn giữ → `confirmed`; lịch đã hết hạn / huỷ →
-    /// hoàn đủ (tiền về muộn). Đã xử lý rồi thì thôi (event đến lại).
+    /// `ledger` báo đã thu cọc của lịch `id` với số thực thu `received` (`None`: đủ cọc): lịch còn
+    /// giữ và thu đủ → `confirmed`; lịch đã hết hạn / huỷ (tiền về muộn), hay thu thiếu cọc → không
+    /// xác nhận, hoàn lại đúng số đã thu (lịch thu thiếu vẫn `held` tới khi hết hạn giữ). Đã xử lý
+    /// rồi thì thôi (event đến lại).
     pub(crate) async fn deposit_paid(
         &self,
         tenant: &TenantContext,
         id: Uuid,
         payment_id: Uuid,
+        received: Option<Money>,
     ) -> Result<(), Error> {
         let transaction = tenant.database().begin_write().await?;
         // Khoá lịch (D-181): lịch đang bị `expire` (held → expired, trả chỗ) thì chờ nó xong rồi đi
@@ -134,16 +137,29 @@ impl BookingsService {
         {
             return Ok(());
         }
+        let deposit = Money::from_columns(before.deposit_minor, &before.currency)?;
+        if received.is_some_and(|money| money.currency() != deposit.currency()) {
+            // Lượt thu `bookings` tự tạo luôn cùng loại tiền với cọc: khác thì không tự xác nhận
+            // hay hoàn theo số đó — để người xử lý ở `ledger`.
+            tracing::error!(booking_id = %id, "deposit payment in another currency; left for review");
+            return Ok(());
+        }
+        let covered =
+            received.is_none_or(|money| money.compare(deposit).is_ok_and(|o| o.is_ge()));
         let mut after = before.clone();
         after.payment_id = Some(payment_id);
         after.updated_at = now();
-        if before.status == HELD {
+        if before.status == HELD && covered {
             after.status = CONFIRMED.to_owned();
             after.deposit_status = "paid".to_owned();
             after.hold_expires_at = None;
         } else {
+            if before.status == HELD {
+                tracing::warn!(booking_id = %id, "deposit payment does not cover the deposit");
+            }
             after.deposit_status = "refund_pending".to_owned();
-            after.refund_minor = before.deposit_minor;
+            // Hoàn đúng số đã thu (thu thiếu hay thừa), không phải số cọc.
+            after.refund_minor = received.map_or(before.deposit_minor, Money::minor);
         }
         let active: booking::ActiveModel =
             sea_orm::IntoActiveModel::into_active_model(after).reset_all();
@@ -207,6 +223,14 @@ impl EventHandler for PaymentListener {
         let (Some(id), Some(payment)) = (parse("source_id"), parse("payment_id")) else {
             return Ok(());
         };
-        self.0.deposit_paid(&event.tenant, id, payment).await
+        // Số thực thu (`ledger` ghi cả khoản thiếu khi đối soát `accept_received`). Event không mang
+        // số (bản cũ) thì coi như thu đủ cọc — như trước.
+        let received = match event.payload.get("amount") {
+            Some(amount) if !amount.is_null() => {
+                Some(serde_json::from_value::<Money>(amount.clone()).map_err(Error::internal)?)
+            }
+            _ => None,
+        };
+        self.0.deposit_paid(&event.tenant, id, payment, received).await
     }
 }
