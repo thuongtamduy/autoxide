@@ -363,3 +363,19 @@ async fn lich_chay_dung_moc_mot_lan() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn chay_cung_luc_khong_vuot_so_lan_moi_gio() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::with(test, &[("AUTOXIDE_AUTOMATIONS_MAX_RUNS_PER_HOUR", "2")]).await;
+        let rule = harness.rule(json!({"type": "manual"}), json!(null), tag_action()).await;
+        // Bốn lần chạy tay cùng lúc. Trước đây đếm số lần trong giờ không khoá: Postgres cho
+        // nhiều bên cùng đếm thiếu và vượt `max_runs_per_hour`.
+        let run = || harness.service.run_rule(&harness.tenant, &harness.owner, rule.id, json!({}));
+        let _ = tokio::join!(run(), run(), run(), run());
+        assert_eq!(harness.runs(rule.id).await.len(), 2);
+        assert_eq!(harness.reload(rule.id).await.status, PAUSED);
+    })
+    .await
+    .unwrap();
+}

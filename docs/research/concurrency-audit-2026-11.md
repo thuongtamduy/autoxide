@@ -50,8 +50,14 @@ rồi xác nhận xanh trên cả hai database.
   (`auth`).
 - Mỗi PR có test đồng thời. Ba chỗ test không tái hiện được thứ tự đua (mục 3, 29, 34): sửa theo
   phân tích, test giữ để chặn hồi quy.
-- Ứng viên còn lại ghi "Chưa sửa", xếp theo mức nghiêm trọng, để phiên sau làm tiếp. Nên làm trước các
-  mục 6, 8, 9, 10, 14, 16, 18, 31.
+- Lượt 2 (21/11/2026) sửa thêm 17 mục trong 6 PR: #293 (`promotions`, mục 6, 18), #294 (`plans`, mục 7,
+  8 — đối soát thiết kế lại theo D-20261121-plans-reconcile-snapshot), #295 (`orders`, mục 9, 10), #299
+  (`compliance`, phần còn lại của mục 13, mục 14 với migration `m0020_kyc_verified_document`, mục 16),
+  #304 (kernel, mục 31 với migration `m0039_migration_run_active_key`), và PR các mục thấp (`bookings`
+  12, `conversations` 32 và 37, `automations` 35, `content` 36, `newsletter` 38, `tax` 39). Hai chỗ
+  test chưa tái hiện được thứ tự đua (mục 32, 37): sửa theo phân tích.
+- Còn mở: mục 17 (một phần, `catalog` — đổi hạn chế của danh mục chưa khoá) và mục 24 (`auth/oidc`
+  `unlink`), thuộc vùng của phiên khác; nhóm mức thấp cuối bảng chưa làm.
 
 ## Ứng viên, xếp theo mức nghiêm trọng
 
@@ -75,7 +81,7 @@ rồi xác nhận xanh trên cả hai database.
 | # | Chỗ | Mẫu | Hậu quả khi đua | Trạng thái |
 |---|-----|-----|-----------------|------------|
 | 11 | `modules/bookings/src/actions.rs` `reschedule`, `cancel` | `save` chỉ điều kiện `status` không đổi; `reschedule` giữ nguyên status | Hai lần đổi giờ đua nhau: rò slot, `sessions.booked` bị trừ hai lần, lớp học nhận vượt sức chứa | Đã sửa (#265) — đỏ 2/9 trên Postgres |
-| 12 | `modules/bookings/src/booking.rs` `reserve` (lớp sức chứa N) | Hai người đầu tiên cùng mở một buổi; bên sau vướng unique | Bên sau nhận `bookings.slot_taken` dù lớp còn chỗ | Chưa sửa (thấp) |
+| 12 | `modules/bookings/src/booking.rs` `reserve` (lớp sức chứa N) | Hai người đầu tiên cùng mở một buổi; bên sau vướng unique | Bên sau nhận `bookings.slot_taken` dù lớp còn chỗ | Đã sửa (lượt 2, `bookings`): lớp học vướng unique khi mở buổi thì chạy lại một lần, lần này lấy chỗ trong buổi vừa mở — đỏ 3/3 trên Postgres |
 
 ### Pháp lý
 
@@ -110,14 +116,14 @@ rồi xác nhận xanh trên cả hai database.
 | 29 | `modules/notifications/src/me.rs` `add_push_subscription`, `add_device_token` | Tìm theo key, không có thì sinh id; id là AAD của bản mã; upsert giữ id cũ | Đăng ký lại song song: bản mã gắn id sai, push hỏng vĩnh viễn; request nhận 500 | Đã sửa (#268) — test chưa tái hiện được đua (0/9); sửa theo phân tích |
 | 30 | `modules/comments/src/posting/targets.rs` `change_target` | Đọc đích không khoá, ghi cả `state` lẫn `hidden` | Lệnh ẩn đích (gỡ vì pháp lý) bị ghi đè bởi handler event của module chủ; `TargetClosed` trùng | Đã sửa (#269) — đỏ 2/3 trên Postgres |
 | 31 | `crates/kernel/src/data/tenancy/migration_runs.rs` `start` | "Đang có lượt chạy thì 409" nhưng không khoá, không unique | Hai lượt migration placement chạy song song | Chưa sửa: không có dòng để khoá, cần migration kernel (cột `active_key` có unique index) — để phiên sau |
-| 32 | `modules/conversations/src/assist.rs` `auto_reply` | Đọc lại thread không khoá để xét `closed` / tạm dừng | Tin tự động chèn vào hội thoại vừa đóng hay vừa xin gặp người | Chưa sửa |
+| 32 | `modules/conversations/src/assist.rs` `auto_reply` | Đọc lại thread không khoá để xét `closed` / tạm dừng | Tin tự động chèn vào hội thoại vừa đóng hay vừa xin gặp người | Đã sửa (lượt 2, `conversations`): đọc lại hội thoại bằng `lock_one` trong transaction — sửa theo phân tích, chưa có test tái hiện (khoảng hở nằm giữa hai câu trong một transaction) |
 | 33 | `modules/catalog/src/variants.rs` `update_variant` (không If-Match) | Đọc biến thể không khoá | `PreorderDateChanged` phát trùng (cùng mẫu với #246) | Đã sửa (#273) — đỏ 3/3 trên Postgres |
 | 34 | `modules/automations/src/service/rules.rs` `update_rule` | `version = before.version + 1` không khoá | Hai bản sửa cùng số version | Đã sửa (#272) — test chưa tái hiện được (0/9) |
-| 35 | `modules/automations/src/runner/mod.rs` `start_run` | Đếm lần chạy trong giờ rồi chèn | Vượt `max_runs_per_hour` | Chưa sửa (thấp) |
-| 36 | `modules/content/src/banners/items.rs` `create_banner` | Đếm < `max_items` và `max + 1` không khoá; index không unique | Vượt `max_items`, trùng `position` | Chưa sửa (thấp) |
-| 37 | `modules/conversations/src/threads.rs` `mark_read` | Update con trỏ không điều kiện | Con trỏ đã đọc lùi | Chưa sửa (thấp) |
-| 38 | `modules/newsletter/src/public.rs` `confirm` | Đọc `unconfirmed` rồi update không điều kiện | Người vừa huỷ đăng ký bị ghi lại thành đã xác nhận (đồng ý nhận thư, D-367) | Chưa sửa (thấp) |
-| 39 | `modules/tax/src/service.rs` `set_profile` | So If-Match với `updated_at` mà không khoá | Mất cập nhật | Chưa sửa (thấp) |
+| 35 | `modules/automations/src/runner/mod.rs` `start_run` | Đếm lần chạy trong giờ rồi chèn | Vượt `max_runs_per_hour` | Đã sửa (lượt 2, `automations`): khoá dòng luật trước khi đếm — đỏ 1/3 trên Postgres |
+| 36 | `modules/content/src/banners/items.rs` `create_banner` | Đếm < `max_items` và `max + 1` không khoá; index không unique | Vượt `max_items`, trùng `position` | Đã sửa (lượt 2, `content`): khoá dòng vị trí banner trước khi đếm và lấy `position` — đỏ 2/3 trên Postgres |
+| 37 | `modules/conversations/src/threads.rs` `mark_read` | Update con trỏ không điều kiện | Con trỏ đã đọc lùi | Đã sửa (lượt 2, `conversations`): chèn nếu chưa có rồi cập nhật có điều kiện "con trỏ cũ nhỏ hơn" — test chưa tái hiện được (0/3), giữ để chặn hồi quy |
+| 38 | `modules/newsletter/src/public.rs` `confirm` | Đọc `unconfirmed` rồi update không điều kiện | Người vừa huỷ đăng ký bị ghi lại thành đã xác nhận (đồng ý nhận thư, D-367) | Đã sửa (lượt 2, `newsletter`): khoá dòng đăng ký khi xác nhận — đỏ 2/3 trên Postgres |
+| 39 | `modules/tax/src/service.rs` `set_profile` | So If-Match với `updated_at` mà không khoá | Mất cập nhật | Đã sửa (lượt 2, `tax`): khoá hồ sơ trước khi so `If-Match` — đỏ 3/3 trên Postgres |
 
 Mức thấp khác (ghi để biết, hậu quả nhỏ hoặc dữ liệu vẫn đúng):
 

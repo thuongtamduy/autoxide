@@ -129,9 +129,14 @@ impl ConversationsService {
             .await?;
         let at = now();
         let transaction = tenant.database().begin_write().await?;
-        // Đọc lại trong transaction: người mua vừa bấm "gặp nhân viên" thì thôi.
-        let Some(current) =
-            thread::Entity::find_by_id(thread_id).scoped(tenant).one(&transaction).await?
+        // Đọc lại và khoá hội thoại trong transaction (D-181): người mua vừa bấm "gặp nhân viên"
+        // hay nhân viên vừa đóng thì thôi — đọc không khoá thì Postgres vẫn thấy trạng thái cũ
+        // trong lúc lệnh kia chưa commit, tin tự động chèn vào hội thoại đã đóng.
+        let Some(current) = autoxide_kernel::rows::lock_one(
+            &transaction,
+            thread::Entity::find_by_id(thread_id).scoped(tenant),
+        )
+        .await?
         else {
             return Ok(());
         };

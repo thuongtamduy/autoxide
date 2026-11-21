@@ -465,27 +465,25 @@ impl ConversationsService {
         let user = viewer.user_id();
         let at = now();
         let transaction = tenant.database().begin_write().await?;
-        let cursor =
-            read::Entity::find_by_id((tenant.id().as_uuid(), id, user)).one(&transaction).await?;
-        match cursor {
-            Some(cursor) if cursor.last_read_message_id >= upto => {}
-            Some(cursor) => {
-                let mut row = cursor.into_active_model();
-                row.last_read_message_id = Set(upto);
-                row.read_at = Set(at);
-                row.update(&transaction).await?;
-            }
-            None => {
-                let row = read::ActiveModel {
-                    tenant_id: Set(tenant.id().as_uuid()),
-                    thread_id: Set(id),
-                    user_id: Set(user),
-                    last_read_message_id: Set(upto),
-                    read_at: Set(at),
-                };
-                insert_ignoring_duplicate(&transaction, row).await?;
-            }
-        }
+        // Con trỏ chỉ tiến (D-181): chèn nếu chưa có, rồi đổi có điều kiện "con trỏ cũ nhỏ hơn".
+        // Trước đây đọc rồi ghi tuyệt đối: hai thiết bị đánh dấu cùng lúc làm con trỏ lùi.
+        let row = read::ActiveModel {
+            tenant_id: Set(tenant.id().as_uuid()),
+            thread_id: Set(id),
+            user_id: Set(user),
+            last_read_message_id: Set(upto),
+            read_at: Set(at),
+        };
+        insert_ignoring_duplicate(&transaction, row).await?;
+        read::Entity::update_many()
+            .col_expr(read::Column::LastReadMessageId, Expr::value(upto))
+            .col_expr(read::Column::ReadAt, Expr::value(at))
+            .filter(read::Column::TenantId.eq(tenant.id().as_uuid()))
+            .filter(read::Column::ThreadId.eq(id))
+            .filter(read::Column::UserId.eq(user))
+            .filter(read::Column::LastReadMessageId.lt(upto))
+            .exec(&transaction)
+            .await?;
         if upto >= latest.id {
             let column = if viewer.is_staff() {
                 thread::Column::UnreadStaff

@@ -262,3 +262,52 @@ async fn goi_cu_bi_tu_choi_goi_trung_khong_doi_va_doctor() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_lan_sua_cung_phien_ban_chi_mot_lan_qua() {
+    TestDatabase::run(async |test| {
+        let (app, tree) = app(test).await;
+        let uri = format!("/api/v1/tax/profiles/{}", tree.north.as_uuid());
+        let first = json!({"jurisdiction": "VN", "regime": "household"});
+        let (status, body) = call(
+            &app,
+            "PUT",
+            &format!("/profiles/{}", tree.north.as_uuid()),
+            "north-admin",
+            Some(first),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        for round in 0..3 {
+            let read = app.get(&uri).token("north-admin").send().await.unwrap();
+            let etag = read.header("etag").to_owned();
+            // Hai lần sửa cùng `If-Match`. Trước đây so phiên bản không khoá: Postgres cho cả hai
+            // cùng qua, bản sau đè mất bản trước.
+            let put = |regime: &'static str| {
+                let etag = etag.clone();
+                let app = &app;
+                let uri = &uri;
+                async move {
+                    app.request(Method::PUT, uri)
+                        .token("north-admin")
+                        .header("If-Match", &etag)
+                        .json(json!({"jurisdiction": "VN", "regime": regime}))
+                        .send()
+                        .await
+                        .unwrap()
+                        .status()
+                }
+            };
+            let (one, two) = tokio::join!(put("vat_credit"), put("household"));
+            let mut statuses = [one, two];
+            statuses.sort();
+            assert_eq!(
+                statuses,
+                [StatusCode::OK, StatusCode::PRECONDITION_FAILED],
+                "round {round}"
+            );
+        }
+    })
+    .await
+    .unwrap();
+}

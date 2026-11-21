@@ -594,11 +594,13 @@ impl TaxService {
         principal
             .require_write_at(&transaction, &PROFILES_MANAGE, OrgTarget::new(org, None))
             .await?;
-        let current = profile::Entity::find()
-            .scoped(tenant)
-            .filter(profile::Column::OrgId.eq(org.as_uuid()))
-            .one(&transaction)
-            .await?;
+        // Khoá hồ sơ trước khi so `If-Match` (D-181): hai lần sửa cùng phiên bản từng cùng qua
+        // trên Postgres, bản sau đè mất bản trước.
+        let current = autoxide_kernel::rows::lock_one(
+            &transaction,
+            profile::Entity::find().scoped(tenant).filter(profile::Column::OrgId.eq(org.as_uuid())),
+        )
+        .await?;
         if let (Some(expected), Some(current)) = (expected, &current)
             && expected != current.updated_at
         {

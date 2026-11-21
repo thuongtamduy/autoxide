@@ -810,3 +810,34 @@ async fn vi_tri_day_va_cong_cu_ai_chi_tao_nhap() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn tao_banner_cung_luc_khong_vuot_max_items_khong_trung_vi_tri() {
+    TestDatabase::run(async |test| {
+        let h = harness(test).await;
+        let mut small = placement("top", "strip", "text");
+        small.max_items = Some(2);
+        h.service.create_placement(&h.tenant, &manager(), small).await.unwrap();
+        // Bốn lần tạo cùng lúc. Trước đây đếm và lấy `position` kế tiếp không khoá: Postgres cho
+        // nhiều bên cùng đếm thiếu, vượt `max_items` và trùng `position`.
+        let boss = manager();
+        let create = |title: &'static str| {
+            h.service.create_banner(&h.tenant, &boss, text("top", title), Via::Rest)
+        };
+        let (a, b, c, d) = tokio::join!(create("a"), create("b"), create("c"), create("d"));
+        let outcomes = [a, b, c, d];
+        let mut positions = Vec::new();
+        for outcome in outcomes {
+            match outcome {
+                Ok((banner, _)) => positions.push(banner.position),
+                Err(error) => assert_eq!(error.code(), "content.placement_full"),
+            }
+        }
+        assert_eq!(positions.len(), 2, "{positions:?}");
+        positions.sort_unstable();
+        positions.dedup();
+        assert_eq!(positions.len(), 2, "trùng vị trí");
+    })
+    .await
+    .unwrap();
+}
