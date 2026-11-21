@@ -259,6 +259,7 @@ impl CustomersService {
         connection: &C,
     ) -> Result<u64, Error> {
         let cutoff = now() - SignedDuration::from_hours(24 * self.config.recent_views_days);
+        // tenant-scope: job hằng ngày, xoá lượt xem cũ của mọi khách trên database.
         Ok(recent_view::Entity::delete_many()
             .filter(recent_view::Column::ViewedAt.lt(cutoff))
             .exec(connection)

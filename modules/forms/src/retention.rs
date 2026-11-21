@@ -100,6 +100,7 @@ impl FormsService {
         let ip_before =
             now - SignedDuration::from_hours(24 * (i64::from(self.config.ip_retention_days)));
         let write = database.write();
+        // tenant-scope: job hạn lưu IP, chạy cho mọi khách trên database.
         cleaned.fingerprints = submission::Entity::update_many()
             .col_expr(submission::Column::IpFingerprint, Expr::value(Option::<String>::None))
             .filter(submission::Column::IpFingerprint.is_not_null())
@@ -110,6 +111,7 @@ impl FormsService {
         // Bài mà form không còn (không có foreign key; nhận bài đã khoá dòng form nên không
         // còn đường tạo bài mồ côi, đây là lưới an toàn cho dữ liệu cũ): xoá, dữ liệu cá nhân
         // không ai đọc được thì không giữ.
+        // tenant-scope: job xoá bài mồ côi của mọi khách trên database.
         cleaned.orphans = submission::Entity::delete_many()
             .filter(submission::Column::FormId.not_in_subquery(
                 Query::select().column(form::Column::Id).from(form::Entity).to_owned(),
