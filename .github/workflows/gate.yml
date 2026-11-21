@@ -56,12 +56,18 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # sccache (cache của GitHub Actions) cho job build tests: cache từng crate đã biên dịch, nên PR chỉ
+      # biên dịch lại crate bị đổi và crate phụ thuộc. Chỉ job này: ở lint (clippy) nó làm chậm hơn. Số đo:
+      # docs/BENCHMARKS.md, D-20261121-ci-sccache-build.
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v7
         with:
           # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
           fetch-depth: 0
       - run: rustup toolchain install
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
@@ -70,6 +76,8 @@ jobs:
         with:
           tool: cargo-nextest
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
+      - run: sccache --show-stats
+        if: always()
       - uses: actions/upload-artifact@v7
         with:
           name: test-archive
