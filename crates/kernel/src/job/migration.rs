@@ -1,7 +1,7 @@
 //! Migration tạo bảng job của một module.
 
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::schema;
+use crate::migration::prelude::*;
+use crate::migration::schema;
 
 /// Migration tạo bảng `<module>_jobs`. Module dùng job queue thêm nó vào danh sách
 /// migration của mình, như [`outbox_migration`](crate::event::outbox_migration).

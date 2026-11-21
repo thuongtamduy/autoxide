@@ -22,9 +22,10 @@ use std::collections::BTreeSet;
 use std::fmt;
 use std::sync::Arc;
 
-use sea_orm::DbErr;
-use sea_orm::sea_query::{Alias, DynIden, IntoIden};
-use sea_orm_migration::{MigrationName, MigrationTrait, MigratorTraitSelf, SchemaManager};
+use sea_orm::{DbErr, TransactionTrait as _};
+
+use self::manager::SchemaManager;
+pub use self::manager::{MigrationName, MigrationTrait};
 
 use crate::database::Database;
 use crate::error::Error;
@@ -32,6 +33,8 @@ use crate::module::{is_identifier, module_name_problems};
 use crate::secret::{KeyConfig, SecretKey};
 
 mod lock;
+mod manager;
+pub mod schema;
 pub use lock::MigrationLock;
 
 /// Một upgrade dữ liệu của module. Xem đầu file.
@@ -77,9 +80,15 @@ impl UpgradeContext {
 }
 
 /// Những thứ cần để viết một migration.
+//
+// Cùng các tên `sea-orm-migration` từng cung cấp (kernel tự giữ phần đó, D-20261121-own-migrations), nên
+// migration của module không phải sửa.
 pub mod prelude {
-    pub use sea_orm_migration::prelude::*;
-    pub use sea_orm_migration::schema;
+    pub use super::manager::{MigrationName, MigrationTrait, SchemaManager};
+    pub use super::schema;
+    pub use async_trait;
+    pub use sea_orm::sea_query::{self, *};
+    pub use sea_orm::{self, ConnectionTrait, DbErr, DeriveIden};
 }
 
 /// Lỗi khi khai báo hoặc chạy migration.
@@ -277,14 +286,11 @@ impl Migrator {
     pub async fn status(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
         let mut states = Vec::new();
         for set in &self.modules {
-            let migrations = ModuleMigrator { set, context: None }
-                .get_migration_with_status_read_only(database.read())
-                .await
-                .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
-            states.extend(migrations.iter().map(|migration| MigrationState {
+            let applied = applied_names(set, database.read()).await?;
+            states.extend(set.entries().iter().map(|entry| MigrationState {
                 module: set.module,
-                name: migration.name().to_owned(),
-                applied: migration.status() == sea_orm_migration::MigrationStatus::Applied,
+                name: entry.name().to_owned(),
+                applied: applied.contains(entry.name()),
             }));
         }
         Ok(states)
@@ -302,28 +308,33 @@ impl Migrator {
     /// Áp dụng mọi migration còn thiếu của mọi module. Trả về những migration vừa
     /// áp dụng. Gặp lỗi thì dừng; các migration trước đó vẫn được giữ.
     pub async fn up(&self, database: &Database) -> Result<Vec<MigrationState>, MigrationError> {
-        let mut applied = Vec::new();
+        let mut done = Vec::new();
         let context = self.context(database);
         for set in &self.modules {
-            let migrator = ModuleMigrator { set, context: Some(context.clone()) };
-            let pending = migrator
-                .get_pending_migrations_read_only(database.read())
-                .await
-                .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
+            let applied = applied_names(set, database.read()).await?;
+            let pending: Vec<Entry> =
+                set.entries().into_iter().filter(|entry| !applied.contains(entry.name())).collect();
             if pending.is_empty() {
                 continue;
             }
-            migrator
-                .up(database.write(), None)
-                .await
-                .map_err(|error| failure(set.module, "cannot apply migrations", &error))?;
-            applied.extend(pending.iter().map(|migration| MigrationState {
-                module: set.module,
-                name: migration.name().to_owned(),
-                applied: true,
-            }));
+            let table = set.history_table();
+            let write = database.write();
+            manager::install(write, &table).await.map_err(|error| {
+                failure(set.module, "cannot create the migration history", &error)
+            })?;
+            for entry in pending {
+                entry
+                    .run(set.module, &table, database, &context, Direction::Up)
+                    .await
+                    .map_err(|error| failure(set.module, "cannot apply migrations", &error))?;
+                done.push(MigrationState {
+                    module: set.module,
+                    name: entry.name().to_owned(),
+                    applied: true,
+                });
+            }
         }
-        Ok(applied)
+        Ok(done)
     }
 
     /// Gỡ `steps` migration mới nhất của MỘT module. Trả về những migration vừa gỡ,
@@ -341,31 +352,60 @@ impl Migrator {
                 if known.is_empty() { "(none)".to_owned() } else { known.join(", ") }
             ))
         })?;
-        let migrator = ModuleMigrator { set, context: Some(self.context(database)) };
-        let applied = migrator
-            .get_migration_with_status_read_only(database.read())
-            .await
-            .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
-        let reverted: Vec<MigrationState> = applied
-            .iter()
-            .filter(|migration| migration.status() == sea_orm_migration::MigrationStatus::Applied)
+        let context = self.context(database);
+        let applied = applied_names(set, database.read()).await?;
+        let reverting: Vec<Entry> = set
+            .entries()
+            .into_iter()
+            .filter(|entry| applied.contains(entry.name()))
             .rev()
             .take(steps as usize)
-            .map(|migration| MigrationState {
-                module: set.module,
-                name: migration.name().to_owned(),
-                applied: false,
-            })
             .collect();
-        if reverted.is_empty() {
-            return Ok(reverted);
+        let table = set.history_table();
+        let mut reverted = Vec::new();
+        for entry in reverting {
+            entry
+                .run(set.module, &table, database, &context, Direction::Down)
+                .await
+                .map_err(|error| failure(set.module, "cannot revert migrations", &error))?;
+            reverted.push(MigrationState {
+                module: set.module,
+                name: entry.name().to_owned(),
+                applied: false,
+            });
         }
-        migrator
-            .down(database.write(), Some(steps))
-            .await
-            .map_err(|error| failure(set.module, "cannot revert migrations", &error))?;
         Ok(reverted)
     }
+}
+
+/// Tên các migration (và upgrade) đã áp dụng của module. Tên có trong database mà không có trong code là lỗi:
+/// database được bản khác (mới hơn) của chương trình migrate.
+async fn applied_names<C: sea_orm::ConnectionTrait>(
+    set: &ModuleMigrations,
+    connection: &C,
+) -> Result<BTreeSet<String>, MigrationError> {
+    let recorded = manager::applied(connection, &set.history_table())
+        .await
+        .map_err(|error| failure(set.module, "cannot read migration status", &error))?;
+    let known: BTreeSet<String> = set.names().into_iter().collect();
+    let missing: Vec<String> = recorded
+        .iter()
+        .filter(|name| !known.contains(*name))
+        .map(|name| {
+            format!(
+                "Migration file of version '{name}' is missing, this migration has been applied but \
+                 its file is missing"
+            )
+        })
+        .collect();
+    if !missing.is_empty() {
+        return Err(failure(
+            set.module,
+            "cannot read migration status",
+            &DbErr::Custom(missing.join("\n")),
+        ));
+    }
+    Ok(recorded.into_iter().collect())
 }
 
 fn failure(module: &str, action: &str, error: &DbErr) -> MigrationError {
@@ -385,103 +425,66 @@ enum Entry {
     Upgrade(Arc<dyn DataUpgrade>),
 }
 
-/// Nối một [`ModuleMigrations`] vào bộ máy của sea-orm-migration. `context`: `None` khi chỉ đọc
-/// trạng thái (upgrade không chạy).
-struct ModuleMigrator<'a> {
-    set: &'a ModuleMigrations,
-    context: Option<UpgradeContext>,
+#[derive(Clone, Copy)]
+enum Direction {
+    Up,
+    Down,
 }
 
-impl MigratorTraitSelf for ModuleMigrator<'_> {
-    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
-        self.set
-            .entries()
-            .into_iter()
-            // `as Box<dyn …>`: đổi kiểu cụ thể thành "bất kỳ kiểu nào cài trait này".
-            .map(|entry| match entry {
-                Entry::Schema(migration) => {
-                    Box::new(Transactional(migration)) as Box<dyn MigrationTrait>
+impl Entry {
+    fn name(&self) -> &str {
+        match self {
+            Entry::Schema(migration) => migration.name(),
+            Entry::Upgrade(upgrade) => upgrade.name(),
+        }
+    }
+
+    /// Áp dụng (hay gỡ) rồi ghi (hay xoá) dòng lịch sử. Migration schema: cả hai trong MỘT transaction, trên
+    /// database nào cũng vậy — hỏng giữa chừng thì không để lại gì. Upgrade dữ liệu: ngoài transaction (nó tự
+    /// mở transaction của mình), ghi lịch sử sau khi xong.
+    async fn run(
+        &self,
+        module: &str,
+        table: &str,
+        database: &Database,
+        context: &UpgradeContext,
+        direction: Direction,
+    ) -> Result<(), DbErr> {
+        match self {
+            Entry::Schema(migration) => {
+                let transaction = database.write().begin().await?;
+                let schema = SchemaManager::new(&transaction);
+                match direction {
+                    Direction::Up => {
+                        migration.up(&schema).await?;
+                        manager::record(&transaction, table, migration.name()).await?;
+                    }
+                    Direction::Down => {
+                        migration.down(&schema).await?;
+                        manager::forget(&transaction, table, migration.name()).await?;
+                    }
                 }
-                Entry::Upgrade(upgrade) => Box::new(Upgrading {
-                    module: self.set.module,
-                    upgrade,
-                    context: self.context.clone(),
-                }) as Box<dyn MigrationTrait>,
-            })
-            .collect()
-    }
-
-    fn migration_table_name(&self) -> DynIden {
-        Alias::new(self.set.history_table()).into_iden()
-    }
-}
-
-/// Một upgrade dữ liệu trong bộ máy migration: chạy ngoài transaction (upgrade tự mở transaction).
-struct Upgrading {
-    module: &'static str,
-    upgrade: Arc<dyn DataUpgrade>,
-    context: Option<UpgradeContext>,
-}
-
-impl Upgrading {
-    fn context(&self) -> Result<&UpgradeContext, DbErr> {
-        self.context.as_ref().ok_or_else(|| {
-            DbErr::Custom(format!(
-                "data upgrade `{}` of module `{}` needs the configuration; run it with \
-                 `autoxide migrate up`",
-                self.upgrade.name(),
-                self.module
-            ))
-        })
-    }
-}
-
-impl MigrationName for Upgrading {
-    fn name(&self) -> &str {
-        self.upgrade.name()
-    }
-}
-
-#[sea_orm_migration::async_trait::async_trait]
-impl MigrationTrait for Upgrading {
-    async fn up(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
-        let context = self.context()?;
-        self.upgrade.up(context).await.map_err(|error| DbErr::Custom(error.to_string()))
-    }
-
-    async fn down(&self, _manager: &SchemaManager) -> Result<(), DbErr> {
-        let context = self.context()?;
-        self.upgrade.down(context).await.map_err(|error| DbErr::Custom(error.to_string()))
-    }
-
-    fn use_transaction(&self) -> Option<bool> {
-        Some(false)
-    }
-}
-
-/// Bọc một migration để nó luôn chạy trong transaction, trên database nào cũng vậy.
-struct Transactional(Arc<dyn MigrationTrait>);
-
-impl MigrationName for Transactional {
-    fn name(&self) -> &str {
-        self.0.name()
-    }
-}
-
-// `async fn` trong trait dùng qua `dyn` chưa được Rust hỗ trợ trực tiếp; macro
-// `async_trait` của thư viện lo việc đó.
-#[sea_orm_migration::async_trait::async_trait]
-impl MigrationTrait for Transactional {
-    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        self.0.up(manager).await
-    }
-
-    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        self.0.down(manager).await
-    }
-
-    fn use_transaction(&self) -> Option<bool> {
-        Some(true)
+                transaction.commit().await
+            }
+            Entry::Upgrade(upgrade) => {
+                let outcome = match direction {
+                    Direction::Up => upgrade.up(context).await,
+                    Direction::Down => upgrade.down(context).await,
+                };
+                outcome.map_err(|error| {
+                    DbErr::Custom(format!(
+                        "data upgrade `{}` of module `{module}`: {error}",
+                        upgrade.name()
+                    ))
+                })?;
+                match direction {
+                    Direction::Up => manager::record(database.write(), table, upgrade.name()).await,
+                    Direction::Down => {
+                        manager::forget(database.write(), table, upgrade.name()).await
+                    }
+                }
+            }
+        }
     }
 }
 

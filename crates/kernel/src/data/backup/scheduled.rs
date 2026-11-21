@@ -13,13 +13,13 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use sea_orm::{ConnectionTrait, SqlErr};
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 use uuid::Uuid;
 
 use super::{BACKUP_PREFIX, BackupSink, StorageSink, write_backup};

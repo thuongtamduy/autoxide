@@ -20,7 +20,7 @@ use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
-use sea_orm_migration::MigrationTrait;
+use crate::migration::MigrationTrait;
 use utoipa_axum::router::OpenApiRouter;
 
 use crate::access::{Permission, PermissionCatalog};
