@@ -5,8 +5,7 @@
 //! - `semver [--base <tag>] [--deny] [--markdown]` — báo thay đổi phá vỡ của hợp đồng Rust
 //!   (kernel, testkit) bằng `cargo semver-checks`; chạy lúc phát hành (xem `semver.rs`).
 //! - `sdk [--check | --extract-examples <dir>]` — sinh kiểu TypeScript của SDK từ
-//!   `docs/openapi.json` và chép hợp đồng cho SDK Swift; `--check` (trong gate) báo khi file đã
-//!   commit hay cấu hình SDK Kotlin / Dart lệch (xem `sdk.rs`, `sdk_mobile.rs`).
+//!   `docs/openapi.json`; `--check` (trong gate) báo khi file đã commit lệch (xem `sdk.rs`).
 //! - `upgrade-test [--from <tag>] [--image <image>] [--database …]` — test nâng cấp từ bản phát
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
@@ -44,7 +43,6 @@ mod lengths;
 mod metric_labels;
 mod scaffold;
 mod sdk;
-mod sdk_mobile;
 mod semver;
 mod tenancy;
 mod upgrade;
@@ -165,10 +163,7 @@ fn semver(args: &[&str]) -> ExitCode {
 fn sdk(check: bool) -> ExitCode {
     let result = workspace::load().map_err(|error| error.to_string()).and_then(|workspace| {
         let version = semver::workspace_version(&workspace.root)?;
-        // Cả hai luôn chạy: báo mọi chỗ lệch một lần.
-        let typescript = sdk::run(&workspace.root, check, &version)?;
-        let mobile = sdk_mobile::run(&workspace.root, check, &version)?;
-        Ok(typescript && mobile)
+        sdk::run(&workspace.root, check, &version)
     });
     match result {
         Ok(true) => ExitCode::SUCCESS,

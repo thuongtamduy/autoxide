@@ -1,14 +1,12 @@
 # File sinh tự động: GitHub không tính vào thống kê ngôn ngữ và thu gọn trong diff của PR.
 # Không sửa tay; sinh lại bằng:
 #   sdk/typescript/src/schema.ts  cargo xtask sdk
-#   sdk/swift/Sources/Autoxide/openapi.json  cargo xtask sdk
 #   docs/openapi.json             cargo run -p autoxide -- openapi
 #   docs/mcp-tools.json           cargo run -p autoxide -- mcp-manifest
 sdk/typescript/src/schema.ts linguist-generated=true
 docs/openapi.json linguist-generated=true
 docs/mcp-tools.json linguist-generated=true
 sdk/typescript/package-lock.json linguist-generated=true
-sdk/swift/Sources/Autoxide/openapi.json linguist-generated=true
 
 # Ghép lô (D-20261119-merge-batches): khi gộp nhiều PR trên máy, file sinh tự động không cần gộp tay.
 # Bật một lần trên máy: `git config merge.generated.driver true` (giữ bản của nhánh đang đứng),
@@ -16,6 +14,5 @@ sdk/swift/Sources/Autoxide/openapi.json linguist-generated=true
 docs/openapi.json merge=generated
 docs/mcp-tools.json merge=generated
 sdk/typescript/src/schema.ts merge=generated
-sdk/swift/Sources/Autoxide/openapi.json merge=generated
 docs/decisions/INDEX.md merge=generated
 .env.example merge=generated
