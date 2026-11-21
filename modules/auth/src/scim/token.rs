@@ -190,7 +190,7 @@ impl ScimService {
             }
         }
         tracing::debug!(token_id = %row.id, "SCIM request authenticated");
-        Ok(ScimCaller { tenant })
+        Ok(ScimCaller { tenant, created_by: row.created_by })
     }
 }
 

@@ -23,10 +23,12 @@ use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of}
 use serde_json::json;
 
 mod admins;
+mod grants;
 mod members;
 mod principal;
 mod scim_grants;
 pub(crate) use admins::*;
+pub(crate) use grants::*;
 pub(crate) use members::*;
 pub(crate) use principal::*;
 pub(crate) use scim_grants::forget_scim_grants;
@@ -747,82 +749,6 @@ pub(crate) async fn role_by_name(
         .one(tenant.database().read())
         .await?
         .map(|row| row.id))
-}
-
-/// Vì sao `actor` không gán được các role `roles` ở nút `org_id` (rỗng: gán được): nút phải có
-/// trong khách và trong phạm vi của người gán, role phải có, `admin` chỉ ở gốc, và người gán phải
-/// có mọi permission của role (không tự nâng quyền). `field`: tiền tố tên ô (`memberships[0].`).
-/// Dùng cho membership và lời mời.
-pub(crate) async fn grant_problems<C: ConnectionTrait>(
-    connection: &C,
-    tenant: &TenantContext,
-    actor: &Principal,
-    field: &str,
-    org_id: Uuid,
-    roles: &BTreeSet<Uuid>,
-) -> Result<Vec<FieldError>, Error> {
-    let mut problems = Vec::new();
-    let root = root_of(tenant.id()).as_uuid();
-    let org = OrgId::from_uuid(org_id);
-    if org_id != root && OrgTree::ancestors(connection, tenant.id(), org).await?.is_empty() {
-        problems.push(FieldError::new(
-            format!("{field}org_id"),
-            "unknown",
-            "is not an organization unit of this tenant",
-        ));
-        return Ok(problems);
-    }
-    if !actor.reaches(connection, org).await? {
-        problems.push(FieldError::new(
-            format!("{field}org_id"),
-            "out_of_scope",
-            "must be a unit you work in (one of your roles covers it)",
-        ));
-    }
-    let found = role::Entity::find()
-        .filter(role::Column::Id.is_in(roles.iter().copied()))
-        .scoped(tenant)
-        .all(connection)
-        .await?;
-    let mut grants = permissions_of(connection, tenant, found.iter().map(|row| row.id)).await?;
-    for role_id in roles {
-        let Some(row) = found.iter().find(|row| row.id == *role_id) else {
-            problems.push(FieldError::new(
-                format!("{field}role_ids"),
-                "unknown",
-                "every entry must be the id of an existing role",
-            ));
-            continue;
-        };
-        if row.all_permissions && org_id != root {
-            problems.push(FieldError::new(
-                format!("{field}role_ids"),
-                "root_only",
-                "the `admin` role can only be given at the root unit",
-            ));
-        }
-        let covers = if row.all_permissions {
-            actor.has_all_permissions()
-        } else {
-            grants
-                .remove(&row.id)
-                .unwrap_or_default()
-                .grants
-                .iter()
-                .all(|(permission, _)| actor.allows(permission))
-        };
-        if !covers {
-            problems.push(
-                FieldError::new(
-                    format!("{field}role_ids"),
-                    "more_than_you_have",
-                    "role `{role}` has permissions you do not have; you cannot give it",
-                )
-                .with_param("role", &row.name),
-            );
-        }
-    }
-    Ok(problems)
 }
 
 #[cfg(test)]

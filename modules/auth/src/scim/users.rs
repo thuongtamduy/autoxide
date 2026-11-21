@@ -343,6 +343,24 @@ impl ScimService {
         Ok(())
     }
 
+    /// `Ok` nếu người tạo token SCIM của `caller` bao trùm mọi permission của tài khoản `target`
+    /// (D-079): token do người quyền thấp tạo không nhận về, khoá hay đổi email tài khoản quyền cao
+    /// hơn. Người tạo đã bị xoá hay khoá coi như không có permission nào.
+    async fn require_creator_covers(
+        &self,
+        caller: &ScimCaller,
+        target: Uuid,
+    ) -> Result<(), ScimError> {
+        let tenant = &caller.tenant;
+        let creator = match self.roles.user_principal(tenant, caller.created_by).await? {
+            Some((user, principal)) if user.is_active() && user.realm == Realm::Staff => principal,
+            _ => autoxide_kernel::access::Principal::new(caller.created_by, [])
+                .in_tenant(tenant.id()),
+        };
+        self.roles.require_covers(tenant, &creator, target).await?;
+        Ok(())
+    }
+
     /// Ghi `input` cho tài khoản `existing` (đã khoá dòng; `None`: tạo / nhận tài khoản) trong
     /// `transaction`.
     async fn save(
@@ -414,6 +432,8 @@ impl ScimService {
                             input.email
                         )));
                     }
+                    // Nhận về tài khoản có sẵn: người tạo token phải bao trùm quyền của nó.
+                    self.require_creator_covers(caller, account.id).await?;
                     (Some(snapshot(&account)), account, None)
                 }
                 None => {
@@ -452,6 +472,9 @@ impl ScimService {
             0
         };
         let email_changed = account.email != input.email;
+        if link_before.is_some() && (email_changed || was_active != input.active) {
+            self.require_creator_covers(caller, id).await?;
+        }
         let mut update = user::Entity::update_many()
             .col_expr(user::Column::UpdatedAt, Expr::value(now))
             .col_expr(user::Column::Name, Expr::value(input.name.clone()))
@@ -461,7 +484,13 @@ impl ScimService {
                 Expr::value(crate::user::search_text(&input.email, &input.name)),
             );
         if email_changed {
-            update = update.col_expr(user::Column::EmailVerifiedAt, Expr::value(Some(now)));
+            // Tài khoản do SCIM tạo (liên kết và tài khoản sinh cùng lúc): hệ thống danh tính là
+            // nguồn của email (D-20261121-scim). Tài khoản có sẵn được nhận về: email mới chưa ai
+            // xác nhận — để chủ tài khoản xác minh lại (D-20261121-scim-claim-covers).
+            let created_by_scim =
+                link_before.as_ref().is_some_and(|link| link.created_at == account.created_at);
+            let verified = created_by_scim.then_some(now);
+            update = update.col_expr(user::Column::EmailVerifiedAt, Expr::value(verified));
         }
         update = match (was_active, input.active) {
             (true, false) => update.col_expr(user::Column::DisabledAt, Expr::value(Some(now))),
