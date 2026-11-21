@@ -29,12 +29,12 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-018** Được chia agent và subagent — 2026-11-11 · **chủ dự án quyết**
 - **D-021** License: MIT hoặc Apache-2.0 — 2026-11-11 · **chủ dự án quyết**
 - **D-023** Ngôn ngữ tài liệu: tách cho người ngoài và nội bộ — 2026-11-11 · **chủ dự án quyết**
-- **D-032** Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11
+- **D-032** Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11 · *thay bởi D-20261121-sqlx-091*
 - **D-033** Database cho test: mỗi test một database, qua `TestDatabase::run` — 2026-11-11
 - **D-041** OpenAPI: sinh từ code, nằm trong repo, kiểm trong gate — 2026-11-11
 - **D-072** Docker: build multi-stage, chạy Debian slim không root; compose có bước migrate — 2026-11-11
 - **D-074** CI trên GitHub Actions: gate đầy đủ trên PostgreSQL 16 và 18, quét secret bằng gitleaks — 2026-11-11 · *thay một phần bởi D-107, D-108*
-- **D-075** Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11
+- **D-075** Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11 · *thay bởi D-20261121-sqlx-091*
 - **D-078** Phát hành: SemVer một số cho cả workspace, CHANGELOG, image trên GHCR, Dependabot — 2026-11-11 · *thay một phần bởi D-107*
 - **D-082** Gate kiểm tài liệu OpenAPI hợp lệ và mô tả gửi ra ngoài là tiếng Anh — 2026-11-12
 - **D-092** Dependabot bỏ qua `p256` ≥ 0.14 cho tới khi `webauthn_rp` nâng theo — 2026-11-12 · **chủ dự án quyết**
@@ -75,7 +75,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-300** Gate đầy đủ chỉ bắt buộc trước khi phát hành — 2026-11-16 · **chủ dự án quyết**
 - **D-316** Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16
 - **D-340** Giỏ ở quầy bán (yêu cầu W-053 của giao diện) vào đặc tả bước 45 — 2026-11-17
-- **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17
+- **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17 · *thay một phần bởi D-20261121-time-library*
 - **[D-20261118-build-size](D-20261118-build-size.md)** Build gọn: test tích hợp mỗi crate một chương trình, bỏ debug info của thư viện ngoài, gate không incremental và tự dọn `target/` (D-299, D-20261118-ci-pr-affected-tests) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-ci-pr-affected-tests](D-20261118-ci-pr-affected-tests.md)** CI của pull request chỉ test crate bị sửa, trên cả SQLite và Postgres, không doc-test (`./gate.sh --pr`; D-299, D-300, D-20261118-public-ci-openapi-dup) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-decision-ids](D-20261118-decision-ids.md)** Quyết định mới mỗi mục một file, ID theo ngày và tên; mục lục tự sinh — 2026-11-18
@@ -95,6 +95,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
 
@@ -140,6 +141,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
+- **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
 
 ## HTTP, REST, OpenAPI
 

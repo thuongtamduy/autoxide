@@ -70,6 +70,7 @@ mod tenant_move;
 mod tenant_settings;
 mod texts;
 mod throttle;
+mod time;
 mod tokens;
 mod transfer;
 mod user_flags;

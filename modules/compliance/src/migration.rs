@@ -5,6 +5,8 @@
 
 use autoxide_kernel::migration::prelude::*;
 
+mod kyc_document_key;
+
 pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
     vec![
         Box::new(KycAndRules),
@@ -41,6 +43,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         ),
         Box::new(ConsentStatsIndex),
         Box::new(KycReviewNote),
+        Box::new(kyc_document_key::KycVerifiedDocument),
     ]
 }
 

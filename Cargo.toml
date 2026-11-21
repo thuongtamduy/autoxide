@@ -108,7 +108,9 @@ sea-orm-migration = { version = "2.0", default-features = false, features = [
   "with-json",
   "with-uuid",
 ] }
-utoipa = { version = "6.0", features = ["axum_extras", "chrono", "uuid"] }
+# `jiff_0_2`: `utoipa` nhận kiểu theo TÊN lúc biên dịch (`Timestamp` → `date-time`, `Date` → `date`), không kéo crate
+# `jiff` 0.2 nào — để kiểu của `autoxide_kernel::time` cho cùng OpenAPI như `chrono` (D-20261121-time-library).
+utoipa = { version = "6.0", features = ["axum_extras", "chrono", "jiff_0_2", "uuid"] }
 utoipa-axum = "0.3"
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 serde = { version = "1.0", features = ["derive"] }
@@ -135,6 +137,11 @@ skrifa = "0.50"
 # File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
 rust_xlsxwriter = { version = "0.102.0", default-features = false }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["std"] }
+# Thời gian thay `chrono` / `chrono-tz` (đã ngừng bảo trì; D-20261121-time-library): lớp `autoxide_kernel::time`
+# dựng trên `jiff`. Bỏ `tz-system` / `tzdb-zoneinfo` (đọc `/usr/share/zoneinfo` của máy): cơ sở dữ liệu múi giờ
+# luôn nhúng vào binary (`tzdb-bundle-always`) như `chrono-tz`, để mọi máy (kể cả image không có zoneinfo) tính
+# giờ địa phương giống nhau.
+jiff = { version = "1.0.1", default-features = false, features = ["std", "tz-fat", "tzdb-bundle-always", "perf-inline"] }
 clap = { version = "4.6", features = ["derive", "env"] }
 # Trait có hàm `async` dùng được qua `dyn` (hợp đồng giữa các module). Rust chưa
 # hỗ trợ trực tiếp; SeaORM vốn đã kéo thư viện này vào cây phụ thuộc.

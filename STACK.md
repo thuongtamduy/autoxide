@@ -54,9 +54,9 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 | JSON               | `serde` + `serde_json`          | 1.0       |                                                     |
 | Validate đầu vào   | `validator`                     | 0.21      |                                                     |
 | ID                 | `uuid` (v7)                     | 1.29      |                                                     |
-| Thời gian          | `chrono`                        | 0.4       | Lưu UTC                                             |
+| Thời gian          | `jiff` qua `autoxide_kernel::time` (`Timestamp`, `Date`) | 1.0 | Lưu UTC; dạng lưu, JSON, OpenAPI như `chrono` trước đây. Đang chuyển: module chưa chuyển còn `chrono` 0.4 (D-20261121-time-library) |
 | Số thập phân       | `rust_decimal` (chỉ `std`)      | 1.43      | Chỉ để TÍNH tiền, thuế, tỉ giá; lưu tiền vẫn là số nguyên `Money`, lưu số thập phân dạng chữ (D-322). Đã có trong cây phụ thuộc qua SeaORM |
-| Múi giờ IANA       | `chrono-tz` (chỉ `std`)         | 0.10      | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306) |
+| Múi giờ IANA       | `jiff::tz` (cơ sở dữ liệu múi giờ nhúng trong binary) | 1.0 | Kiểm tên múi giờ của nút (`organizations.timezone`, D-306). Đang thay `chrono-tz` 0.10 (D-20261121-time-library) |
 | CLI                | `clap`                          | 4.6       | `serve`, `migrate`, `user`, `db copy`…              |
 | Đọc file `.env`    | `dotenvy`                       | 0.15      | Chỉ đọc thành cặp tên / giá trị; biến môi trường thật thắng |
 | Trait `async` qua `dyn` | `async-trait`                | 0.1       | Hợp đồng giữa các module (`api`); đã có sẵn trong cây phụ thuộc qua SeaORM |
@@ -65,6 +65,8 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
 binary không phụ thuộc OpenSSL của hệ điều hành.
+`sqlx` (nền của SeaORM, phụ thuộc gián tiếp) ≥ 0.9.1: SQLite đóng gói kèm từ `libsqlite3-sys` 0.40,
+đã vá RUSTSEC-2026-0459 (D-20261121-sqlx-091).
 
 ### Bảo mật
 
