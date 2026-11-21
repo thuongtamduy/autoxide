@@ -487,6 +487,7 @@ mod tests {
                 },
                 client: crate::oidc::OidcClient::new(false).unwrap(),
                 users: services.users.clone(),
+                roles: services.roles.clone(),
                 sessions: services.sessions.clone(),
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
                 secrets: autoxide_kernel::secret::SecretKey::new(services.database.clone(), None),
@@ -527,6 +528,7 @@ mod tests {
             }),
             invitations: Arc::new(crate::invitation::Invitations {
                 users: services.users.clone(),
+                roles: services.roles.clone(),
                 sessions: services.sessions.clone(),
                 jobs: autoxide_kernel::job::JobQueue::new("auth"),
                 mailer: services.mails.clone(),

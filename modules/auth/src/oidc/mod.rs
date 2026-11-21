@@ -69,12 +69,18 @@ struct StateData {
     redirect_uri: String,
     /// Lượt liên kết từ phần tài khoản (`/me/identities/{slug}/start`): người đang đăng nhập.
     link_user_id: Option<Uuid>,
+    /// Bản băm của `browser_secret` khi giao diện xin gắn lượt vào trình duyệt đang dùng
+    /// (D-20261121-oidc-browser-binding). Lượt mở trước khi có trường này: vắng.
+    #[serde(default)]
+    browser: Option<String>,
 }
 
 /// Lượt vừa mở.
 pub(crate) struct Started {
     pub authorization_url: String,
     pub expires_in: u64,
+    /// Chỉ khi xin gắn trình duyệt: gửi lại ở callback.
+    pub browser_secret: Option<String>,
 }
 
 /// Liên kết kèm nhà cung cấp, cho danh sách của người dùng.
@@ -91,6 +97,8 @@ pub(crate) struct OidcService {
     pub providers: ProviderService,
     pub client: OidcClient,
     pub users: Arc<UserService>,
+    /// Quyền của người cấu hình nhà cung cấp, so với tài khoản trước khi tự liên kết theo email.
+    pub roles: Arc<crate::role::RoleService>,
     pub sessions: Arc<SessionService>,
     pub outbox: Outbox,
     pub secrets: SecretKey,
@@ -125,13 +133,16 @@ impl OidcService {
         Ok(providers)
     }
 
-    /// Mở lượt đăng nhập (hay liên kết, khi `link_user_id`) với nhà cung cấp `slug`.
+    /// Mở lượt đăng nhập (hay liên kết, khi `link_user_id`) với nhà cung cấp `slug`. `bind_browser`:
+    /// sinh `browser_secret` mà callback phải gửi lại — `state` và `code` lộ ra ngoài (log, lịch
+    /// sử trình duyệt) không đủ để kết thúc lượt ở nơi khác.
     pub(crate) async fn start(
         &self,
         tenant: &TenantContext,
         slug: &str,
         redirect_uri: &str,
         link_user_id: Option<Uuid>,
+        bind_browser: bool,
     ) -> Result<Started, Error> {
         self.require_enabled()?;
         let provider = self.providers.enabled_by_slug(tenant, slug).await?;
@@ -155,11 +166,13 @@ impl OidcService {
             tracing::warn!(provider_id = %provider.id, why = ?problem, "authorization endpoint refused");
             client::unavailable()
         })?;
+        let browser_secret = if bind_browser { Some(random_token(32)?) } else { None };
         let data = StateData {
             nonce: random_token(32)?,
             verifier: random_token(32)?,
             redirect_uri: redirect_uri.to_owned(),
             link_user_id,
+            browser: browser_secret.as_deref().map(autoxide_kernel::secret::sha256),
         };
         let challenge = URL_SAFE_NO_PAD.encode(Sha256::digest(data.verifier.as_bytes()));
         let plain = serde_json::to_string(&data).map_err(Error::internal)?;
@@ -180,7 +193,11 @@ impl OidcService {
             .append_pair("nonce", &data.nonce)
             .append_pair("code_challenge", &challenge)
             .append_pair("code_challenge_method", "S256");
-        Ok(Started { authorization_url: url.to_string(), expires_in: STATE_TTL_SECONDS })
+        Ok(Started {
+            authorization_url: url.to_string(),
+            expires_in: STATE_TTL_SECONDS,
+            browser_secret,
+        })
     }
 
     /// Kết thúc lượt đăng nhập: trả khách (lấy từ `state`) và kết quả như `/login`.
@@ -190,10 +207,12 @@ impl OidcService {
         slug: &str,
         code: &str,
         state: &str,
+        browser_secret: Option<&str>,
         user_agent: Option<&str>,
     ) -> Result<(TenantContext, LoginOutcome), Error> {
         self.require_enabled()?;
-        let (tenant, provider, data) = self.take_state(request, slug, code, state).await?;
+        let (tenant, provider, data) =
+            self.take_state(request, slug, code, state, browser_secret).await?;
         if data.link_user_id.is_some() {
             return Err(state_invalid());
         }
@@ -211,9 +230,11 @@ impl OidcService {
         slug: &str,
         code: &str,
         state: &str,
+        browser_secret: Option<&str>,
     ) -> Result<LinkedIdentity, Error> {
         self.require_enabled()?;
-        let (tenant, provider, data) = self.take_state(Some(tenant), slug, code, state).await?;
+        let (tenant, provider, data) =
+            self.take_state(Some(tenant), slug, code, state, browser_secret).await?;
         if data.link_user_id != Some(user_id) {
             return Err(state_invalid());
         }
@@ -324,6 +345,7 @@ impl OidcService {
         slug: &str,
         code: &str,
         state: &str,
+        browser_secret: Option<&str>,
     ) -> Result<(TenantContext, Provider, StateData), Error> {
         let problems: Vec<FieldError> = FieldError::blank("code", code)
             .into_iter()
@@ -348,6 +370,13 @@ impl OidcService {
         let row = provider.id.to_string();
         let plain = sealer.open(tenant.id(), STATE_PURPOSE, &row, &sealed)?;
         let data: StateData = serde_json::from_slice(&plain).map_err(|_| state_invalid())?;
+        // Lượt gắn trình duyệt: chỉ nơi giữ `browser_secret` kết thúc được (state đã tiêu: lần
+        // thử sai làm hỏng lượt, giao diện mở lượt mới).
+        if let Some(expected) = &data.browser
+            && browser_secret.map(autoxide_kernel::secret::sha256).as_ref() != Some(expected)
+        {
+            return Err(state_invalid().with_reason("browser"));
+        }
         Ok((tenant, provider, data))
     }
 
@@ -534,7 +563,12 @@ impl OidcService {
             Some(user) => {
                 // Một trong hai phía chưa xác minh: không gộp (ai đó dựng sẵn tài khoản bằng email
                 // của người khác, hay nhà cung cấp cho đặt email tuỳ ý).
-                if !external.email_verified || user.email_verified_at.is_none() {
+                // Nhà cung cấp do người quyền thấp hơn chủ tài khoản cấu hình: không tự gộp
+                // (D-20261121-oidc-link-covers) — chủ tài khoản đăng nhập rồi tự liên kết.
+                if !external.email_verified
+                    || user.email_verified_at.is_none()
+                    || !self.configurer_covers(tenant, provider, &user).await?
+                {
                     return Err(Error::conflict(
                         "auth.oidc_link_required",
                         "An account with this email already exists. Sign in the usual way, then \
@@ -553,6 +587,35 @@ impl OidcService {
                 self.signup(tenant, provider, external, realm, email).await
             }
         }
+    }
+
+    /// Người cấu hình nhà cung cấp `provider` có mọi permission của tài khoản `user` không. Người
+    /// mua không có permission; tài khoản nhân sự không có permission nào thì luôn được.
+    async fn configurer_covers(
+        &self,
+        tenant: &TenantContext,
+        provider: &Provider,
+        user: &crate::api::User,
+    ) -> Result<bool, Error> {
+        if user.realm == Realm::Customer {
+            return Ok(true);
+        }
+        let target = self.roles.principal(tenant, user.id).await?;
+        if !target.has_all_permissions() && target.permissions().is_empty() {
+            return Ok(true);
+        }
+        let Some(configured_by) = provider.configured_by else { return Ok(false) };
+        let Some((by, actor)) = self.roles.user_principal(tenant, configured_by).await? else {
+            return Ok(false);
+        };
+        if !by.is_active() || by.realm != Realm::Staff {
+            return Ok(false);
+        }
+        Ok(if target.has_all_permissions() {
+            actor.has_all_permissions()
+        } else {
+            target.permissions().iter().all(|permission| actor.allows(permission))
+        })
     }
 
     /// Thêm liên kết cho người dùng `user_id` và ghi event.

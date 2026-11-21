@@ -41,6 +41,7 @@ mod m0042_session_authenticated_at;
 mod m0043_phone_accounts;
 mod m0044_scim;
 mod m0045_scim_groups;
+mod m0046_oidc_configured_by;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -132,6 +133,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0044_scim::Migration),
         // Nhóm SCIM, luật ánh xạ nhóm → role ở nút (bước 66).
         Box::new(m0045_scim_groups::Migration),
+        // Người cấu hình nhà cung cấp OIDC: giới hạn việc tự liên kết theo email.
+        Box::new(m0046_oidc_configured_by::Migration),
     ]
 }
 

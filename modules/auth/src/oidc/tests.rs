@@ -973,3 +973,121 @@ async fn provider_cua_khach_a_khong_dung_duoc_o_khach_b() {
     .await
     .unwrap();
 }
+
+/// Nhà cung cấp do người chỉ có `auth.oidc.manage` cấu hình không tự gộp vào tài khoản có quyền
+/// cao hơn người đó; tài khoản không có permission nào thì vẫn gộp theo email đã xác minh.
+#[tokio::test]
+async fn khong_tu_gop_tai_khoan_quyen_cao_hon_nguoi_cau_hinh() {
+    TestDatabase::run(async |test| {
+        let fake = fake_server().await;
+        let (app, services, _) = app(test, true).await;
+        let tenant = services.tenant.clone();
+        let input = crate::role::RoleInput {
+            denies: Vec::new(),
+            requires_mfa: false,
+            name: "sso".to_owned(),
+            description: String::new(),
+            permissions: vec!["auth.oidc.manage".to_owned()],
+            grants: Vec::new(),
+        };
+        let role = services.roles.create(&tenant, Actor::system(), input).await.unwrap();
+        let manager = NewUser {
+            email: "sso@example.com".to_owned(),
+            name: "SSO".to_owned(),
+            password: Some(PASSWORD.to_owned()),
+        };
+        let manager = services.users.create(&tenant, Actor::system(), manager).await.unwrap();
+        let root_unit = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+        let boss = autoxide_kernel::access::Principal::with_all_permissions(uuid::Uuid::now_v7())
+            .in_tenant(tenant.id());
+        services
+            .roles
+            .set_memberships(&tenant, &boss, manager.id, vec![(root_unit, vec![role.id])])
+            .await
+            .unwrap();
+        let manager_token = token(&app, "sso@example.com").await;
+        provider(&app, &manager_token, oidc_body(&fake, "idp", false)).await;
+        for email in ["root@example.com", "ada@example.com"] {
+            let user = services.users.find_by_email(&tenant, email).await.unwrap().unwrap();
+            let transaction = tenant.database().begin_write().await.unwrap();
+            services
+                .users
+                .apply_verified_email(&tenant, &transaction, user.id, email, Timestamp::now())
+                .await
+                .unwrap();
+            transaction.commit().await.unwrap();
+        }
+        let (status, body) =
+            sign_in(&app, &fake, "idp", claims(&fake, "idp", "s-root", "root@example.com", true))
+                .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["code"], "auth.oidc_link_required");
+        let (status, body) =
+            sign_in(&app, &fake, "idp", claims(&fake, "idp", "s-ada", "ada@example.com", true))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Lượt gắn trình duyệt (`bind_browser`): `code` + `state` không kèm `browser_secret` đúng thì
+/// không kết thúc được; kèm đúng thì đăng nhập như thường.
+#[tokio::test]
+async fn luot_gan_trinh_duyet_doi_browser_secret() {
+    TestDatabase::run(async |test| {
+        let fake = fake_server().await;
+        let (app, services, admin) = app(test, true).await;
+        provider(&app, &admin, oidc_body(&fake, "idp", false)).await;
+        // Ada (không role) đã xác minh email: đăng nhập lần đầu tự liên kết.
+        let tenant = services.tenant.clone();
+        let ada = services.users.find_by_email(&tenant, "ada@example.com").await.unwrap().unwrap();
+        let transaction = tenant.database().begin_write().await.unwrap();
+        services
+            .users
+            .apply_verified_email(&tenant, &transaction, ada.id, &ada.email, Timestamp::now())
+            .await
+            .unwrap();
+        transaction.commit().await.unwrap();
+        let bound = async || {
+            let body = json!({"redirect_uri": REDIRECT, "bind_browser": true});
+            let response = app.post("/api/v1/auth/oidc/idp/start").json(body).send().await.unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{}", response.json());
+            let data = response.json()["data"].clone();
+            let url = reqwest::Url::parse(data["authorization_url"].as_str().unwrap()).unwrap();
+            let query: HashMap<String, String> =
+                url.query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
+            (query, data["browser_secret"].as_str().unwrap().to_owned())
+        };
+        let finish = async |code: &str, state: &str, secret: Option<&str>| {
+            let mut body = json!({"code": code, "state": state});
+            if let Some(secret) = secret {
+                body["browser_secret"] = json!(secret);
+            }
+            let response =
+                app.post("/api/v1/auth/oidc/idp/callback").json(body).send().await.unwrap();
+            (response.status(), response.json())
+        };
+        for wrong in [None, Some("not-the-secret")] {
+            let (query, _) = bound().await;
+            let code = approve(&fake, &query, claims(&fake, "idp", "s-1", "ada@example.com", true));
+            let (status, body) = finish(&code, &query["state"], wrong).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+            assert_eq!(body["code"], "auth.oidc_state_invalid");
+        }
+        let (query, secret) = bound().await;
+        let code = approve(&fake, &query, claims(&fake, "idp", "s-1", "ada@example.com", true));
+        let (status, body) = finish(&code, &query["state"], Some(&secret)).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        // Không xin gắn: như trước, không có `browser_secret`.
+        let response = app
+            .post("/api/v1/auth/oidc/idp/start")
+            .json(json!({"redirect_uri": REDIRECT}))
+            .send()
+            .await
+            .unwrap();
+        assert!(response.json()["data"].get("browser_secret").is_none());
+    })
+    .await
+    .unwrap();
+}

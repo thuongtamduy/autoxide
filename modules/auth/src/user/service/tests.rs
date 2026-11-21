@@ -364,3 +364,44 @@ async fn dat_mat_khau_dau_tien_dong_thoi_chi_mot_ben_duoc() {
     .await
     .unwrap();
 }
+
+/// Lấy lại tài khoản bằng mail đặt lại mật khẩu: liên kết OIDC, link đăng nhập và token xác nhận
+/// lại phát trước đó không còn dùng được.
+#[tokio::test]
+async fn lay_lai_tai_khoan_go_lien_ket_va_token_cho() {
+    TestDatabase::run(async |test| {
+        let (users, tenant) = service(test).await;
+        let user =
+            users.create(&tenant, Actor::system(), new_user("ada@example.com")).await.unwrap();
+        let external = crate::oidc::identity::External {
+            subject: "sub-1".to_owned(),
+            email: Some("ada@example.com".to_owned()),
+            email_verified: true,
+            name: None,
+        };
+        let write = tenant.database().write();
+        crate::oidc::identity::insert(write, &tenant, user.id, Uuid::now_v7(), &external)
+            .await
+            .unwrap();
+        let tokens = OneTimeTokens::new("auth");
+        let subject = user.id.to_string();
+        let ttl = jiff::SignedDuration::from_mins(10);
+        let mut issued = Vec::new();
+        for purpose in ["login_link", "reauth"] {
+            let token = tokens.issue(write, &tenant, purpose, &subject, None, ttl).await.unwrap();
+            issued.push((purpose, token.token));
+        }
+        users
+            .recover_password(&tenant, Actor::system(), user.id, "another good password".to_owned())
+            .await
+            .unwrap();
+        let linked = crate::oidc::identity::for_user(&tenant, user.id).await.unwrap();
+        assert!(linked.is_empty(), "liên kết OIDC bị gỡ");
+        for (purpose, token) in issued {
+            let used = tokens.consume(write, &tenant, purpose, &token).await.unwrap();
+            assert!(used.is_none(), "{purpose} bị thu hồi");
+        }
+    })
+    .await
+    .unwrap();
+}

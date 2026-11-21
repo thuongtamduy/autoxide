@@ -197,7 +197,8 @@ sẵn lệnh.
   ghép lô: gộp PR, sinh lại file tự động, chạy `cargo xtask check` + `cargo xtask sdk --check`, push PR lô (tiêu đề
   không cần đặc biệt, CI chạy đủ) rồi **chờ CI xanh mới merge** (D-20261121-ci-batch-release-faster, thay phần "kiểm
   trên máy" của D-20261119-merge-batches và D-20261120-batch-postgres); PR chỉ xung đột ở file sinh tự động thì không
-  cần gộp `main` lại (D-20261119-merge-batches). Phát hành dùng lại CI xanh của đúng commit trên `main`.
+  cần gộp `main` lại (D-20261119-merge-batches). Phát hành dùng lại CI xanh của đúng commit trên `main`; merge PR phát hành là đủ, tag và Release tự chạy
+  (D-20261121-auto-release).
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
   bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
@@ -255,7 +256,8 @@ sẵn lệnh.
    `principal.require(&NOTES_WRITE)?`; tài liệu của handler nêu permission cần có.
    Module nghiệp vụ không phụ thuộc module `auth` (D-046).
 8. **REST và MCP dùng chung service.** Tool MCP không có logic riêng và không được
-   phép làm điều mà REST với cùng permission không làm được.
+   phép làm điều mà REST với cùng permission không làm được: permission mà REST giới hạn theo phạm vi
+   thì tool phải truyền `principal` vào service (gate `mcp-principal`, D-20261121-security-lints).
 9. **Core chỉ có API.** Không có giao diện web hay trang quản trị trong repo này;
    giao diện là dự án riêng dùng API. (Trang xem tài liệu API sinh tự động thì được.)
 
@@ -267,7 +269,8 @@ sẵn lệnh.
   thập phân của database.
 - **Thời gian:** lưu UTC.
 - **Đa khách (D-185, từ bước 33):** bảng cấp khách hàng có `tenant_id` (kể cả khi khách có
-  database riêng); mọi truy vấn lọc theo khách qua công cụ của kernel; dữ liệu nghiệp vụ theo tổ
+  database riêng); mọi truy vấn lọc theo khách qua công cụ của kernel (`.scoped(&tenant)`; gate
+  `tenant-scope` chặn chỗ quên, cố ý quét mọi khách thì ghi `// tenant-scope: <lý do>`, D-20261121-security-lints); dữ liệu nghiệp vụ theo tổ
   chức có `org_id`. Không bao giờ trả dữ liệu của khách hay nhánh mà người gọi không có quyền.
 - **Hai database:** xem "Luật số một".
 - **Đọc và ghi tách kết nối.** Đọc qua `Database::read()`, ghi qua

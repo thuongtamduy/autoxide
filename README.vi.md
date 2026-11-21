@@ -121,7 +121,7 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 
 Như mục [Chạy nhanh](#chạy-nhanh), làm từng bước bằng `docker run` (dùng được với mọi bản phát
 hành): không phải biên dịch gì, SQLite nằm trong một Docker volume. Bạn cần [Docker](https://docs.docker.com/get-docker/) và `openssl`.
-Image nặng khoảng 630 MB trên đĩa, máy chủ sẵn sàng khoảng một giây sau khi khởi động.
+Image nặng khoảng 410 MB trên đĩa, máy chủ sẵn sàng khoảng một giây sau khi khởi động.
 
 ```bash
 # Hai secret, tự sinh ở đây và giữ trong một file (dùng đúng giá trị này ở mọi lần chạy; không commit)
@@ -129,7 +129,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
 chmod 600 autoxide.env
 
-IMAGE=ghcr.io/thuongtamduy/autoxide:0.15.0   # một bản phát hành ở trang GitHub Releases
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.17.0   # một bản phát hành ở trang GitHub Releases
 RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
 
 # 1. Tạo bảng (máy chủ không khởi động được nếu chưa làm bước này; làm lại sau mỗi lần cập nhật)

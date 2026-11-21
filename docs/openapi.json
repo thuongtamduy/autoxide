@@ -2762,6 +2762,13 @@
         "additionalProperties": false,
         "description": "What the provider sent back to `redirect_uri`.",
         "properties": {
+          "browser_secret": {
+            "description": "The `browser_secret` from the start call, when it asked to bind the browser.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "code": {
             "description": "The `code` query parameter.",
             "type": "string"
@@ -37741,6 +37748,13 @@
                 "description": "Open this address in the browser. The provider comes back to `redirect_uri` with `code`\nand `state` in the query.",
                 "type": "string"
               },
+              "browser_secret": {
+                "description": "Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "expires_in": {
                 "description": "Seconds left to finish; after that, start again.",
                 "format": "int64",
@@ -57890,6 +57904,10 @@
         "additionalProperties": false,
         "description": "Start linking a provider to your account; proves it is you first.",
         "properties": {
+          "bind_browser": {
+            "description": "`true`: the link can only be finished together with the `browser_secret` returned here.",
+            "type": "boolean"
+          },
           "current_password": {
             "description": "Your current password.",
             "type": "string"
@@ -93100,6 +93118,10 @@
         "additionalProperties": false,
         "description": "Where the interface wants the provider to send the browser back.",
         "properties": {
+          "bind_browser": {
+            "description": "`true`: the sign-in can only be finished together with the `browser_secret` returned\nhere, so a leaked `code` and `state` cannot be used from another browser. Keep the secret\nin the browser (for example in session storage) and send it to the callback. Recommended.",
+            "type": "boolean"
+          },
           "redirect_uri": {
             "description": "A page of the interface, exactly as listed in the provider's `redirect_uris`.",
             "example": "https://app.example.com/sign-in/callback",
@@ -93117,6 +93139,13 @@
           "authorization_url": {
             "description": "Open this address in the browser. The provider comes back to `redirect_uri` with `code`\nand `state` in the query.",
             "type": "string"
+          },
+          "browser_secret": {
+            "description": "Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback.",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "expires_in": {
             "description": "Seconds left to finish; after that, start again.",
@@ -109112,7 +109141,7 @@
                 }
               }
             },
-            "description": "The `state` is unknown, used or expired; code `auth.oidc_state_invalid`. Start again."
+            "description": "The `state` is unknown, used or expired, or `browser_secret` does not match (`reason` `browser`); code `auth.oidc_state_invalid`. Start again."
           },
           "401": {
             "content": {

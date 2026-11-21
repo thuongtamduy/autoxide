@@ -6,14 +6,16 @@
 #   docker build -t autoxide .
 #   docker run --rm -p 8080:8080 -v autoxide-data:/var/lib/autoxide/data autoxide
 
-# Cùng phiên bản với rust-toolchain.toml.
+# Cùng phiên bản với rust-toolchain.toml — và với thẻ của image `rust` ở `FROM … AS chef` dưới đây.
 ARG RUST_VERSION=1.99.1
 
 # --- công cụ ------------------------------------------------------------------
 # cargo-chef tách "build thư viện ngoài" khỏi "build code của mình" thành hai lớp Docker riêng, để cache
 # (cache gha của CI, hay lớp cục bộ) giữ được lớp thư viện: sửa code hay đổi số phiên bản phát hành không
 # làm build lại phần thư viện ngoài (phần lớn thời gian build) (D-20261120-docker-chef).
-FROM rust:${RUST_VERSION}-slim-trixie AS chef
+# Image nền ghim theo digest (thẻ chỉ để người đọc và Dependabot): thẻ bị đẩy lại không đổi được build.
+# Dependabot (`.github/dependabot.yml`, docker) đề xuất digest mới mỗi tuần.
+FROM rust:1.99.1-slim-trixie@sha256:f6c4a35d21dbb3c89d7a8d056c193e94fc09037f2b58dd858b09c39a47dd02d7 AS chef
 # ARG khai trước `FROM` chỉ dùng được trong `FROM`; muốn dùng trong stage phải khai lại.
 ARG RUST_VERSION
 ENV RUSTUP_TOOLCHAIN=${RUST_VERSION} \
@@ -39,7 +41,7 @@ RUN cargo build --release --locked -p autoxide \
     && cp target/release/autoxide /usr/local/bin/autoxide
 
 # --- chạy ----------------------------------------------------------------------
-FROM debian:trixie-slim
+FROM debian:trixie-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 # Nhãn OCI: trang package trên GitHub (ghcr.io) và `docker inspect` đọc mô tả, mã nguồn, tài liệu từ đây.
 # Workflow phát hành (docker/metadata-action) có thể ghi đè title / description / source bằng thông tin
 # của repo; `documentation` thì chỉ có ở đây.

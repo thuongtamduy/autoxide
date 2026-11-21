@@ -1,5 +1,4 @@
-# Dependabot đề xuất nâng cấp bằng pull request; CI trên GitHub đã tắt (D-107), nên người
-# duyệt (hoặc agent) chạy `./gate.sh` trên nhánh của PR trước khi merge (D-078). Gom theo nhóm để mỗi tuần một PR mỗi loại.
+# Dependabot đề xuất nâng cấp bằng pull request; CI chạy trên PR như mọi PR khác. Gom theo nhóm để mỗi tuần một PR mỗi loại.
 version: 2
 updates:
   - package-ecosystem: cargo
@@ -19,3 +18,16 @@ updates:
     directory: /
     schedule:
       interval: weekly
+  # Image nền trong compose.yml (Postgres) cũng ghim theo digest.
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+  # Action của GitHub ghim theo SHA đầy đủ (kèm comment phiên bản): Dependabot nâng cả SHA và comment.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]

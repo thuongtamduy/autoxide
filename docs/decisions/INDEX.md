@@ -95,10 +95,14 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-auto-release](D-20261121-auto-release.md)** Merge PR phát hành là phát hành: GitHub tự tạo tag và chạy Release khi CI của commit đó xanh — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-ci-mold-shards](D-20261121-ci-mold-shards.md)** CI: mold làm linker cho job build tests; test Postgres chia 6 phần — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-sccache-build](D-20261121-ci-sccache-build.md)** sccache cho job build tests của CI, không cho lint — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
+- **[D-20261121-pin-ci-deps](D-20261121-pin-ci-deps.md)** Ghim action, công cụ CI và image nền theo SHA / digest, Dependabot nâng — 2026-11-21
+- **[D-20261121-security-lints](D-20261121-security-lints.md)** Hai luật gate chặn lỗi phân quyền tái phát: `tenant-scope` và `mcp-principal`, kèm danh sách chỗ cũ chờ sửa — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
@@ -257,8 +261,12 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-grant-scope-check](D-20261121-grant-scope-check.md)** Cấp role: so cả phạm vi của permission, kiểm lại người mời lúc nhận lời mời — 2026-11-21
+- **[D-20261121-oidc-browser-binding](D-20261121-oidc-browser-binding.md)** Lượt đăng nhập OIDC gắn trình duyệt bằng `browser_secret` (tuỳ chọn) — 2026-11-21
+- **[D-20261121-oidc-link-covers](D-20261121-oidc-link-covers.md)** OIDC tự liên kết theo email chỉ khi người cấu hình nhà cung cấp bao trùm quyền tài khoản — 2026-11-21
+- **[D-20261121-scim-claim-covers](D-20261121-scim-claim-covers.md)** SCIM chỉ tác động lên tài khoản mà người tạo token bao trùm quyền — 2026-11-21
 - **[D-20261121-scim-groups](D-20261121-scim-groups.md)** Bước 66: nhóm SCIM → role ở nút qua luật ánh xạ; chỉ membership do SCIM tạo bị SCIM gỡ; đồng bộ từng người sau khi ghi nhóm — 2026-11-21
-- **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21
+- **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21 · *thay một phần bởi D-20261121-scim-claim-covers*
 
 ## Đa khách, tổ chức, gói
 
@@ -539,6 +547,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step47-stored-value](D-20261120-step47-stored-value.md)** Thẻ quà tặng và số dư cửa hàng của `customers` (bước 47 mục 4): tắt hai lớp, khép kín trong khách phát hành, không đường rút tiền, chỉ đếm mã sai — 2026-11-20
 - **[D-20261120-step47-wishlist-alerts](D-20261120-step47-wishlist-alerts.md)** Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (bước 47, D-233): tự bật kèm đồng ý riêng, chỉ giảm thật so với mốc, gom lô theo khung giờ — 2026-11-20
 - **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
+- **[D-20261121-buyer-keys](D-20261121-buyer-keys.md)** Khoá người mua cho hạn mức khuyến mãi và cờ đơn đầu — 2026-11-21
 - **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
 - **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
