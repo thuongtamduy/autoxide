@@ -10,9 +10,14 @@
 #    data/initial-admin-password in the data volume, never to the log).
 #
 # 2. docker compose -f compose.quickstart.yml up -d
-#    docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
+#    docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 #
-# 3. Open http://127.0.0.1:8080/ (links), http://127.0.0.1:8080/api/docs (API reference).
+#    The file (`/var/lib/autoxide/data/initial-admin-password` in the `data` volume, readable only by
+#    the server's user) holds the administrator's email and generated password. Delete it once you
+#    have changed the password: docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password
+#
+# 3. Open http://127.0.0.1:8080/ (links). The API reference at /api/docs is off unless you add
+#    AUTOXIDE_HTTP_API_DOCS=true to `.env`.
 #
 # On start the server applies the migrations, creates the first administrator while there is none,
 # and loads the reference data shipped with it (addresses, taxes, promotion limits); each start
