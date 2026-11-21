@@ -75,7 +75,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-300** Gate đầy đủ chỉ bắt buộc trước khi phát hành — 2026-11-16 · **chủ dự án quyết**
 - **D-316** Mục "tạo tài khoản từ số điện thoại" chuyển sang bước 45 — 2026-11-16
 - **D-340** Giỏ ở quầy bán (yêu cầu W-053 của giao diện) vào đặc tả bước 45 — 2026-11-17
-- **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17
+- **D-346** Chấp nhận tạm `chrono` / `chrono-tz` / `humantime` "không còn bảo trì" — 2026-11-17 · *thay một phần bởi D-20261121-time-library*
 - **[D-20261118-build-size](D-20261118-build-size.md)** Build gọn: test tích hợp mỗi crate một chương trình, bỏ debug info của thư viện ngoài, gate không incremental và tự dọn `target/` (D-299, D-20261118-ci-pr-affected-tests) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-ci-pr-affected-tests](D-20261118-ci-pr-affected-tests.md)** CI của pull request chỉ test crate bị sửa, trên cả SQLite và Postgres, không doc-test (`./gate.sh --pr`; D-299, D-300, D-20261118-public-ci-openapi-dup) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261118-decision-ids](D-20261118-decision-ids.md)** Quyết định mới mỗi mục một file, ID theo ngày và tên; mục lục tự sinh — 2026-11-18
@@ -140,6 +140,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
+- **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
 
 ## HTTP, REST, OpenAPI
 
