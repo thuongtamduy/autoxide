@@ -16,7 +16,6 @@ use validator::Validate;
 
 use crate::api::{Cart, Evaluation, Voucher, VoucherStatus};
 use crate::codes::{Generated, NewCodes};
-use crate::evaluate::Options;
 use crate::http::dto::{CodeDto, CodesAdded, PromotionListItem, PromotionResponse};
 use crate::model::{Kind, Purpose, Status};
 use crate::permissions::{CODES_MANAGE, PUBLISH, READ, VOUCHERS_GRANT, WRITE};
@@ -265,13 +264,13 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
         Tool::new(
             "evaluate_cart",
             "Compute the promotions of a cart without holding anything: discounts per line with \
-             reasons, gifts, codes and vouchers that do not apply, and the fingerprint.",
-            move |tenant: TenantContext, _principal: Principal, input: EvaluateInput| {
+             reasons, gifts, codes and vouchers that do not apply, and the fingerprint. The unit of \
+             the cart must be in your scope.",
+            move |tenant: TenantContext, principal: Principal, input: EvaluateInput| {
                 let service = evaluate.clone();
                 async move {
                     let cart: Cart = parse("cart", input.cart)?;
-                    let outcome =
-                        service.evaluate_cart(&tenant, &cart, &Options::default()).await?;
+                    let outcome = service.evaluate_for(&tenant, &principal, &cart).await?;
                     Ok::<Evaluation, Error>(outcome.evaluation)
                 }
             },

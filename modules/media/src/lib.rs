@@ -377,6 +377,7 @@ pub(crate) mod testing {
             avif,
             alt_locales: vec!["en".to_owned(), "vi".to_owned()],
             direct: crate::config::Direct::default(),
+            image_jobs: 2,
         };
         let service = MediaService::new(
             storage.clone(),

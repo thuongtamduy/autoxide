@@ -272,18 +272,56 @@ async fn bootstrap_admin(runtime: &Runtime, admin: &AdminBootstrap) -> Result<()
         .await
         .map_err(|error| format!("cannot create the first administrator: {}", describe(&error)))?;
     if generated {
-        // Ngoại lệ có chủ ý của luật "không ghi secret vào log" (D-20261121-migrate-on-start):
-        // người vận hành chưa có cách nào khác để biết mật khẩu; chỉ một lần, lúc tạo.
+        // Mật khẩu tự sinh không vào log (log hay được gom về hệ thống khác): ghi vào một file chỉ
+        // chủ tiến trình đọc được, trong thư mục dữ liệu; log chỉ nói đường dẫn
+        // (D-20261121-admin-password-file, thay phần "ghi vào log" của D-20261121-migrate-on-start).
+        let path = std::path::Path::new(ADMIN_PASSWORD_FILE);
+        write_private(path, &format!("{}\n{password}\n", user.email)).map_err(|error| {
+            format!(
+                "created the first administrator `{}` but cannot write its generated password to \
+                 `{}`: {error}; reset the password of that account",
+                user.email,
+                path.display()
+            )
+        })?;
         tracing::warn!(
             email = %user.email,
-            password = %password,
-            "created the first administrator with a generated password, shown only this once: \
-             sign in and change it"
+            file = %path.display(),
+            "created the first administrator with a generated password, written to the file \
+             (readable only by this server's user): sign in, change the password, then delete \
+             the file"
         );
     } else {
         tracing::info!(email = %user.email, "created the first administrator");
     }
     Ok(())
+}
+
+/// File nhận mật khẩu tự sinh của quản trị viên đầu tiên, theo thư mục làm việc (trong image
+/// Docker: `/var/lib/autoxide/data/…`, nằm trong volume dữ liệu).
+const ADMIN_PASSWORD_FILE: &str = "data/initial-admin-password";
+
+/// Ghi `text` vào `path` (tạo thư mục cha), quyền `0600` trên Unix: chỉ chủ file đọc được.
+fn write_private(path: &std::path::Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write as _;
+    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create(true).truncate(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt as _;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    // File có sẵn (lần chạy trước) giữ quyền cũ: đặt lại cho chắc.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    }
+    file.write_all(text.as_bytes())
 }
 
 /// Dòng đầu của file, bỏ ký tự xuống dòng cuối.
@@ -339,6 +377,23 @@ mod tests {
         let mut reader = ConfigReader::new(&source);
         let config = StartupConfig::read(&mut reader);
         reader.finish(config).map(|(config, _)| config).map_err(|errors| errors.to_string())
+    }
+
+    #[test]
+    fn mat_khau_tu_sinh_ghi_file_chi_chu_doc_duoc() {
+        let dir = std::env::temp_dir().join(format!("autoxide-admin-{}", uuid::Uuid::now_v7()));
+        let path = dir.join("data").join("initial-admin-password");
+        write_private(&path, "a@example.com\nfirst\n").unwrap();
+        // Ghi lại (lần chạy sau trên database trống) thay nội dung, vẫn chỉ chủ đọc được.
+        write_private(&path, "a@example.com\nsecond\n").unwrap();
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "a@example.com\nsecond\n");
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

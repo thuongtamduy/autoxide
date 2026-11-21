@@ -926,7 +926,11 @@ impl OrdersService {
                         .scoped(tenant)
                         .exec(&transaction)
                         .await?;
-                    review::Entity::delete_by_id(row.id).exec(&transaction).await?;
+                    review::Entity::delete_many()
+                        .filter(review::Column::Id.eq(row.id))
+                        .scoped(tenant)
+                        .exec(&transaction)
+                        .await?;
                 }
                 transaction.commit().await?;
                 Ok(())

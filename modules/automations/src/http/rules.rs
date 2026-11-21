@@ -51,7 +51,8 @@ pub(crate) struct RuleResponse {
     /// `paused` (stopped by itself; see `status_reason`).
     #[schema(example = "active")]
     status: String,
-    /// Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.
+    /// Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
+    /// `credential_revoked` (the API key that created or enabled it was revoked).
     status_reason: Option<String>,
     /// IANA time zone of the schedule.
     #[schema(example = "Asia/Ho_Chi_Minh")]

@@ -14,8 +14,9 @@ x-autoxide: &autoxide
   environment:
     DATABASE_URL: postgres://autoxide:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/autoxide
     AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?set AUTOXIDE_AUTH_TOKEN_SECRET in .env}
-    # Không bắt buộc (rỗng = chưa đặt): thiếu thì khoá nằm trong database và máy chủ cảnh báo.
-    AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:-}
+    # Bắt buộc ở bản chạy thật: thiếu thì khoá gốc nằm trong database, bản sao lưu database mở được
+    # mọi secret đã mã hoá. (Bản chạy thử `compose.quickstart.yml` không bắt buộc.)
+    AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:?set AUTOXIDE_SECRET_KEY in .env}
     AUTOXIDE_MAIL_SMTP_URL: ${AUTOXIDE_MAIL_SMTP_URL:-}
     AUTOXIDE_MAIL_FROM: ${AUTOXIDE_MAIL_FROM:-Autoxide <noreply@localhost>}
   volumes:

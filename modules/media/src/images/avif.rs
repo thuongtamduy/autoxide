@@ -110,9 +110,7 @@ impl MediaService {
             return Ok(0);
         }
         let original = read_all(self.read(tenant, &item, None).await?).await?;
-        let rendered = tokio::task::spawn_blocking(move || render_avif(&original, &widths))
-            .await
-            .map_err(Error::internal)?;
+        let rendered = self.decode_image(move || render_avif(&original, &widths)).await?;
         let rendered = match rendered {
             Ok(rendered) => rendered,
             Err(problem) => {

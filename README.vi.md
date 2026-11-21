@@ -24,16 +24,18 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
 
 docker compose -f compose.quickstart.yml up -d
-# Quản trị viên admin@example.com có mật khẩu tự sinh, ghi vào log một lần
-docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
+# Quản trị viên admin@example.com có mật khẩu tự sinh, ghi một lần vào một file trong volume dữ liệu
+# mà chỉ người dùng của máy chủ đọc được (không bao giờ vào log)
+docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 ```
 
-Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn), <http://127.0.0.1:8080/api/docs>
-(trang xem API) và đăng nhập:
+Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn) và đăng nhập (đổi mật khẩu xong thì
+xoá file đó). Trang xem API (`/api/docs`, nạp script từ CDN) tắt trong bản chạy nhanh: thêm
+`AUTOXIDE_HTTP_API_DOCS=true` vào `.env` để bật.
 
 ```bash
 curl -sS http://127.0.0.1:8080/api/v1/auth/login \
-  --json '{"email":"admin@example.com","password":"<mật khẩu trong log>"}'
+  --json '{"email":"admin@example.com","password":"<mật khẩu trong file>"}'
 ```
 
 Muốn tự chọn thì thêm `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` và `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…`

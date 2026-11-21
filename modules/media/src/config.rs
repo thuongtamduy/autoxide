@@ -65,6 +65,14 @@ pub(crate) const AVIF: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const IMAGE_JOBS: Setting = Setting::new(
+    "AUTOXIDE_MEDIA_IMAGE_JOBS",
+    "How many images this server decodes at the same time to make smaller copies, AVIF copies \
+     or AI previews (1 to 64). Decoding a large image takes up to a few hundred MB of memory, so \
+     the others wait their turn; raise it on servers with much memory and many cores.",
+)
+.with_default("2");
+
 pub(crate) const AI_SEND_PRIVATE: Setting = Setting::new(
     "AUTOXIDE_MEDIA_AI_SEND_PRIVATE",
     "Allow sending private images to the AI provider for alt text suggestions (`true` or \
@@ -94,6 +102,8 @@ pub(crate) struct MediaConfig {
     pub alt_locales: Vec<String>,
     /// Tải thẳng lên S3 (bước 40 P4).
     pub direct: Direct,
+    /// Số ảnh giải mã cùng lúc (`AUTOXIDE_MEDIA_IMAGE_JOBS`).
+    pub image_jobs: usize,
 }
 
 /// Tải thẳng lên S3 (bước 40 P4).
@@ -223,7 +233,9 @@ impl MediaConfig {
         });
         let direct_seconds =
             reader.get_with(&DIRECT_UPLOAD_SECONDS, |raw| parse_in_range(raw, 60u64, 3600));
+        let image_jobs = reader.get_with(&IMAGE_JOBS, |raw| parse_in_range(raw, 1usize, 64));
         Ok(MediaConfig {
+            image_jobs: image_jobs?,
             direct: Direct {
                 max_bytes: direct_max?,
                 ttl: std::time::Duration::from_secs(direct_seconds?),

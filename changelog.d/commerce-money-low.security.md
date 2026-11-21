@@ -6,3 +6,6 @@
 - Module `orders`: a cash-on-delivery collection for a shipment with no matching delivery is
   counted once, even when the event arrives again.
 - Module `promotions`: `%` and `_` in the `q` search of promotions match themselves.
+- Module `promotions`: `POST /promotions/evaluate` and the MCP tool `promotions.evaluate_cart`
+  need `promotions.read` covering the unit of the cart (`org_out_of_scope` otherwise).
+- Modules `customers` and `orders`: every lookup by id is filtered by tenant.
