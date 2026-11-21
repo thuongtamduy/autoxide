@@ -39,7 +39,8 @@ pub const BOOTSTRAP_ADMIN_EMAIL: Setting = Setting::new(
      administrator account with this email on start; once an administrator exists it does \
      nothing. The password comes from AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD or \
      AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_FILE; with neither, a random password is generated and \
-     written to the log once. Needs the migrations applied (see AUTOXIDE_MIGRATE_ON_START).",
+     written once to AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT (never to the log). Needs the \
+     migrations applied (see AUTOXIDE_MIGRATE_ON_START).",
 )
 .with_example("admin@example.com");
 
@@ -56,6 +57,15 @@ pub const BOOTSTRAP_ADMIN_PASSWORD_FILE: Setting = Setting::new(
      creates (e.g. a Docker secret under /run/secrets). Use this or \
      AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD, not both.",
 );
+
+pub const BOOTSTRAP_ADMIN_PASSWORD_OUT: Setting = Setting::new(
+    "AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT",
+    "File where `autoxide serve` writes the email and generated password of the first \
+     administrator when AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL is set without a password; readable only \
+     by the server's user. Relative paths start from the working directory (in the Docker image, \
+     the data volume). Delete it once the password is changed.",
+)
+.with_default("data/initial-admin-password");
 
 pub const STARTUP_TASKS: Setting = Setting::new(
     "AUTOXIDE_STARTUP_TASKS",
@@ -87,6 +97,8 @@ pub struct StartupConfig {
 pub struct AdminBootstrap {
     pub email: String,
     pub password: PasswordSource,
+    /// Nơi ghi mật khẩu tự sinh (`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT`).
+    pub password_out: PathBuf,
 }
 
 /// Mật khẩu của quản trị viên đầu tiên lấy từ đâu.
@@ -115,8 +127,9 @@ impl StartupConfig {
         let password = reader.optional::<String>(&BOOTSTRAP_ADMIN_PASSWORD);
         let password_file = reader.optional::<PathBuf>(&BOOTSTRAP_ADMIN_PASSWORD_FILE);
         let tasks = reader.optional_with(&STARTUP_TASKS, parse_tasks);
-        let (migrate, email, password, password_file, tasks) =
-            (migrate?, email?, password?, password_file?, tasks?);
+        let password_out = reader.get::<PathBuf>(&BOOTSTRAP_ADMIN_PASSWORD_OUT);
+        let (migrate, email, password, password_file, tasks, password_out) =
+            (migrate?, email?, password?, password_file?, tasks?, password_out?);
         let email = email.map(|email| email.trim().to_owned()).filter(|email| !email.is_empty());
         let password = match (password, password_file) {
             (Some(_), Some(_)) => {
@@ -134,6 +147,7 @@ impl StartupConfig {
             (Some(email), password) => Some(AdminBootstrap {
                 email,
                 password: password.unwrap_or(PasswordSource::Generate),
+                password_out,
             }),
             (None, Some(_)) => {
                 return reader.reject(
@@ -275,7 +289,7 @@ async fn bootstrap_admin(runtime: &Runtime, admin: &AdminBootstrap) -> Result<()
         // Mật khẩu tự sinh không vào log (log hay được gom về hệ thống khác): ghi vào một file chỉ
         // chủ tiến trình đọc được, trong thư mục dữ liệu; log chỉ nói đường dẫn
         // (D-20261121-admin-password-file, thay phần "ghi vào log" của D-20261121-migrate-on-start).
-        let path = std::path::Path::new(ADMIN_PASSWORD_FILE);
+        let path = admin.password_out.as_path();
         write_private(path, &format!("{}\n{password}\n", user.email)).map_err(|error| {
             format!(
                 "created the first administrator `{}` but cannot write its generated password to \
@@ -296,10 +310,6 @@ async fn bootstrap_admin(runtime: &Runtime, admin: &AdminBootstrap) -> Result<()
     }
     Ok(())
 }
-
-/// File nhận mật khẩu tự sinh của quản trị viên đầu tiên, theo thư mục làm việc (trong image
-/// Docker: `/var/lib/autoxide/data/…`, nằm trong volume dữ liệu).
-const ADMIN_PASSWORD_FILE: &str = "data/initial-admin-password";
 
 /// Ghi `text` vào `path` (tạo thư mục cha), quyền `0600` trên Unix: chỉ chủ file đọc được.
 fn write_private(path: &std::path::Path, text: &str) -> std::io::Result<()> {
