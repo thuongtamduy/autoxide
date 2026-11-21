@@ -26,6 +26,15 @@ Module tự khai ba điều, đều có mặc định (D-038): `Module::stabilit
   `analytics`, `reporting`, `automations`. Không module chính thức nào buộc cần chúng (`orders`,
   `shipping`, `catalog` chỉ dùng `support` / `comments` "nếu có"). Gate chặn module chính thức
   phụ thuộc module thử nghiệm.
+- **Nghĩa của hai hạng** (phiên điều phối chốt, chủ dự án đồng ý để agent quyết). Chính thức: bật
+  sẵn; API không đổi kiểu phá vỡ trong cùng một dòng phiên bản (đổi thì endpoint mới + deprecation
+  có ngày gỡ, D-059); bản mới luôn đọc được dữ liệu bản cũ; lỗi bảo mật được vá cho cả dòng hỗ trợ
+  dài hạn. Thử nghiệm: tắt sẵn; API có thể đổi giữa các bản kể cả kiểu phá vỡ, mỗi lần ghi trong
+  changelog; không bao giờ tự xoá dữ liệu nhưng chuyển dữ liệu sang bản mới có thể cần bước làm
+  tay; có thể bị gỡ hoặc lên chính thức. Lên chính thức khi: không còn mục dở trong lộ trình, có
+  người dùng thật, API không phải đổi qua vài bản liên tiếp, và (bộ nối nhà cung cấp) đã chạy thử
+  với tài khoản thật. Chia theo cả module, không chia bên trong một module. Bộ nối nhà cung cấp
+  (hạng thử nghiệm) được phụ thuộc module chính thức; chiều ngược lại bị gate chặn.
 - **Hợp đồng trong repo vẫn đầy đủ**: `autoxide openapi`, `autoxide mcp-manifest`, `.env.example`
   luôn dựng với mọi module, bỏ qua biến; chỉ bản phục vụ lúc chạy phản ánh module đang bật.
 - **Người nâng cấp từ 0.17** (mọi module từng chạy): không tự bật theo dữ liệu, mà báo to. Khi

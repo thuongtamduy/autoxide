@@ -9,13 +9,22 @@ hình chọn chúng: `AUTOXIDE_MODULES`.
 
 - **core** — máy chủ không chạy được nếu thiếu (đăng nhập, lệnh ghi idempotent, và những thứ
   chúng cần). Luôn bật; không tắt được.
-- **official** (chính thức) — bật mặc định. API theo quy tắc tương thích của dự án: thay đổi phá
-  vỡ đi qua deprecation có ngày sunset.
-- **experimental** (thử nghiệm) — tắt mặc định. Chúng chạy được và được test trên SQLite lẫn
-  PostgreSQL như phần còn lại, nhưng API, tool MCP và bảng **còn có thể đổi giữa các bản phát
-  hành** mà không qua giai đoạn deprecation. Bật bằng cách nêu tên.
+- **official** (chính thức) — bật sẵn. API không đổi kiểu phá vỡ trong cùng một dòng phiên bản:
+  thay đổi làm hỏng client thì làm endpoint mới, endpoint cũ khai deprecated kèm ngày gỡ. Bản mới
+  luôn đọc được dữ liệu của bản cũ (migration tự chạy). Lỗi bảo mật được vá cho mọi dòng phiên bản
+  còn hỗ trợ dài hạn.
+- **experimental** (thử nghiệm) — tắt sẵn; bật bằng cách nêu tên. Chạy được và được test trên
+  SQLite lẫn PostgreSQL như phần còn lại, nhưng API **có thể đổi giữa các bản, kể cả kiểu phá
+  vỡ**; mỗi lần đổi được ghi trong changelog. Hệ thống không bao giờ tự xoá dữ liệu của nó, nhưng
+  chuyển dữ liệu sang bản mới có thể cần một bước làm tay, ghi trong ghi chú nâng cấp. Module thử
+  nghiệm có thể bị gỡ nếu không ai dùng, hoặc lên chính thức.
 
-Module chính thức không bao giờ phụ thuộc module thử nghiệm.
+Một module thuộc trọn một hạng; không chia hạng bên trong một module. Module chính thức không bao
+giờ phụ thuộc module thử nghiệm.
+
+**Điều kiện lên chính thức:** không còn mục dở trong lộ trình; đã có người dùng thật; API không
+phải đổi qua vài bản liên tiếp; riêng bộ nối tới nhà cung cấp bên ngoài: đã chạy thử với tài khoản
+thật.
 
 ## Các module
 

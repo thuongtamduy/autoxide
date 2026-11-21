@@ -9,13 +9,22 @@ One setting chooses them: `AUTOXIDE_MODULES`.
 
 - **core** — the server does not run without them (sign-in, idempotent writes, and what those
   need). Always on; they cannot be turned off.
-- **official** — on by default. Their API follows the compatibility rules of the project:
-  breaking changes go through a deprecation with a sunset date.
-- **experimental** — off by default. They work and are tested on SQLite and PostgreSQL like the
-  rest, but their API, MCP tools and tables **may still change between releases** without a
-  deprecation period. Turn one on by naming it.
+- **official** — on by default. Its API has no breaking change within one release line: a change
+  that would break clients is made as a new endpoint, and the old one is declared deprecated with
+  a removal date. A new release always reads the data of an older one (migrations run on their
+  own). Security fixes reach every release line that is under long-term support.
+- **experimental** — off by default; turn one on by naming it. It works and is tested on SQLite and
+  PostgreSQL like the rest, but its API **may change between releases, breaking changes
+  included**; each change is listed in the changelog. The system never deletes its data on its
+  own, but moving that data to a new release may need a manual step, described in the upgrade
+  notes. An experimental module can be removed if nobody uses it, or become official.
 
-An official module never depends on an experimental one.
+A module is in one tier as a whole; tiers do not split a module. An official module never depends
+on an experimental one.
+
+**Becoming official:** no open items left in the roadmap; real users; an API that did not have
+to change over several releases in a row; and, for a connector to an outside provider, a test run
+with a real account.
 
 ## The modules
 
