@@ -274,22 +274,74 @@ async fn doi_soat_bao_thieu_va_lech_roi_xu_ly_tay() {
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(exceptions(&app).await.len(), open.len());
         assert_eq!(clearing(&app).await, 600_000 - 1_100);
-        // Xử lý tay: chấp nhận số đối tác thực thu cho D.
+        // Xử lý tay. `match` khi đối tác thu khác số phải thu: từ chối, D vẫn chờ xem xét.
         let mismatch = open.iter().find(|item| item["kind"] == "amount_mismatch").unwrap();
+        let resolve_uri = format!("/exceptions/{}/resolve", mismatch["id"].as_str().unwrap());
+        let (status, refused) = call(
+            &app,
+            "POST",
+            &resolve_uri,
+            Some(json!({"action": "match", "payment_id": d.id, "note": "Partner short-paid"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "ledger.amount_differs");
+        assert_eq!(status_of(&app, d.id).await, "needs_review");
+        // Thanh toán khác với thanh toán mục chờ nêu: từ chối, kể cả khi xác nhận riêng.
+        let (status, refused) = call(
+            &app,
+            "POST",
+            &resolve_uri,
+            Some(json!({"action": "accept_received", "payment_id": c.id})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(status_of(&app, c.id).await, "succeeded");
+        // Giao dịch lạ 5 000 không ghi được cho thanh toán đã thu, cũng không thành số khác.
+        let unknown = open.iter().find(|item| item["kind"] == "unknown_in_statement").unwrap();
+        let (status, refused) = call(
+            &app,
+            "POST",
+            &format!("/exceptions/{}/resolve", unknown["id"].as_str().unwrap()),
+            Some(json!({"action": "match", "payment_id": a.id})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "ledger.payment_state");
+        assert_eq!(clearing(&app).await, 600_000 - 1_100);
+        // Xác nhận riêng: ghi đúng số thực thu, event mang số thực thu.
         let (status, resolved) = call(
             &app,
             "POST",
-            &format!("/exceptions/{}/resolve", mismatch["id"].as_str().unwrap()),
-            Some(json!({"action": "match", "payment_id": d.id, "note": "Partner short-paid"})),
+            &resolve_uri,
+            Some(json!({"action": "accept_received", "payment_id": d.id, "note": "Short-paid"})),
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{resolved}");
         assert_eq!(resolved["data"]["status"], "resolved");
+        assert_eq!(resolved["data"]["resolution"], "accept_received");
         assert_eq!(status_of(&app, d.id).await, "succeeded");
         assert_eq!(clearing(&app).await, 600_000 - 1_100 + 399_000);
+        assert_eq!(succeeded_amount(&app, d.id).await, "399000");
     })
     .await
     .unwrap();
+}
+
+/// Số tiền (`amount.amount`) của event `ledger.payment_succeeded` cho thanh toán `id`.
+async fn succeeded_amount(app: &TestApp, id: Uuid) -> String {
+    use sea_orm::{ConnectionTrait, Statement};
+    let read = app.database().read();
+    let sql = "SELECT payload FROM ledger_events WHERE name = 'ledger.payment_succeeded'";
+    let rows =
+        read.query_all_raw(Statement::from_string(read.get_database_backend(), sql)).await.unwrap();
+    let payloads: Vec<Value> = rows
+        .iter()
+        .map(|row| serde_json::from_str(&row.try_get::<String>("", "payload").unwrap()).unwrap())
+        .filter(|payload: &Value| payload["payment_id"] == json!(id))
+        .collect();
+    assert_eq!(payloads.len(), 1, "{payloads:?}");
+    payloads[0]["amount"]["amount"].as_str().unwrap().to_owned()
 }
 
 async fn status_of(app: &TestApp, id: Uuid) -> String {

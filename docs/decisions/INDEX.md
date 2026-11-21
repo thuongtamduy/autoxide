@@ -459,6 +459,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-353** Mẫu in chứng từ: HTML từ mẫu của khách, PDF bố cục cố định bằng `krilla`; in qua `dyn Invoices::render` (bước 36 mục 11) — 2026-11-17
 - **D-354** Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17
 - **[D-20261119-step69-store](D-20261119-step69-store.md)** Mua trong ứng dụng: trait `StorePurchases` của kernel, `plans` nối giao dịch của cửa hàng vào thuê bao, cửa hàng thu tiền — 2026-11-19
+- **[D-20261121-reconcile-accept](D-20261121-reconcile-accept.md)** Đối soát: `match` chỉ khi đúng số, số lệch cần `accept_received`; event mang số thực thu — 2026-11-21
 
 ## Pháp luật và tuân thủ
 
