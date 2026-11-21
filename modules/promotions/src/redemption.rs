@@ -90,6 +90,15 @@ fn exhausted(counter: &Counter) -> Error {
     error.with_param("title", &counter.title).with_param("variant", variant)
 }
 
+/// Chương trình giới hạn lượt mỗi người nhưng giỏ không có khoá người mua nào.
+fn buyer_unidentified(title: &str) -> Error {
+    Error::conflict(
+        "promotions.buyer_unidentified",
+        "Promotion `{title}` limits uses per buyer; sign in or give a phone number to use it.",
+    )
+    .with_param("title", title)
+}
+
 /// Khoá kỳ của hạn mức mỗi người theo giờ địa phương.
 fn period_key(period: Period, local: Date) -> String {
     match period {
@@ -155,6 +164,17 @@ impl PromotionsService {
             }
             if program.daily_usage_limit.is_some() {
                 push(&mut counters, "daily", format!("{pid}|{local}"), 1);
+            }
+            // Hạn mức mỗi người mà không có khoá người mua nào thì không đếm được: từ chối thay
+            // vì cho qua không đếm.
+            let per_customer = program.per_customer_limit.is_some()
+                || applied.lines.iter().filter(|part| part.units > 0).any(|part| {
+                    program
+                        .flash_item(cart.lines[part.line].variant_id)
+                        .is_some_and(|item| item.per_customer_quantity_limit.is_some())
+                });
+            if per_customer && keys.is_empty() {
+                return Err(buyer_unidentified(&title));
             }
             if program.per_customer_limit.is_some() {
                 let period = period_key(program.per_customer_period, local);

@@ -298,17 +298,22 @@ impl OrdersService {
         };
         let ship_to: Option<ShipTo> =
             row.ship_to.as_deref().and_then(|raw| serde_json::from_str(raw).ok());
-        let destination = match (&ship_to, buyer, &self.address_book) {
-            (Some(ShipTo { address: Some(address), .. }), _, _) => Some(address.clone()),
-            (Some(ShipTo { address_id: Some(id), .. }), Some(buyer), Some(book)) => {
-                book.get(tenant, buyer, *id).await.ok().map(|found| found.address)
+        // Số nhận hàng: số ghi ở giỏ, không có thì số của địa chỉ trong sổ.
+        let chosen_phone = ship_to.as_ref().and_then(|ship_to| ship_to.phone.clone());
+        let (destination, phone) = match (&ship_to, buyer, &self.address_book) {
+            (Some(ShipTo { address: Some(address), .. }), _, _) => {
+                (Some(address.clone()), chosen_phone)
             }
-            _ => None,
+            (Some(ShipTo { address_id: Some(id), .. }), Some(buyer), Some(book)) => {
+                match book.get(tenant, buyer, *id).await.ok() {
+                    Some(found) => (Some(found.address), chosen_phone.or(Some(found.phone))),
+                    None => (None, chosen_phone),
+                }
+            }
+            _ => (None, chosen_phone),
         };
-        let mut buyer_keys = Vec::new();
-        if let Some(buyer) = buyer {
-            buyer_keys.push(format!("user:{buyer}"));
-        }
+        let identity =
+            self.buyer_identity(tenant, buyer, phone.as_deref(), destination.as_ref()).await?;
         Ok(PriceInput {
             org_id: OrgId::from_uuid(row.org_id),
             currency: Currency::parse(&row.currency)?,
@@ -318,13 +323,13 @@ impl OrdersService {
             voucher_ids: json_list(&row.voucher_ids),
             gift_selections: json_list::<GiftSelection>(&row.gift_selections),
             buyer_id: buyer,
-            buyer_keys,
+            buyer_keys: identity.keys,
             profile,
             destination,
             shipping_option: row.shipping_option.clone(),
             payment_method: row.payment_method.clone(),
             client: Some("web".to_owned()),
-            first_order: false,
+            first_order: identity.first_order,
             at: crate::service::now(),
         })
     }
