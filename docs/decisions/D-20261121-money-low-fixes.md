@@ -16,6 +16,9 @@ Quyết định:
    lên chính nó trong một transaction có khoá dòng thanh toán. Thanh toán đã xong hay đã có biến động khác nhận →
    biến động này vào hàng chờ `duplicate_payment`. Hai lần chuyển cùng mã tới cùng lúc: một lần ghi đã thu, lần kia
    luôn vào hàng chờ (trước đây có thể mất mà không báo). Thêm index (`tenant_id`, `payment_id`) cho bảng biến động.
+4. **Tính khuyến mãi của giỏ cho nhân viên** (REST `POST /promotions/evaluate`, tool MCP `promotions.evaluate_cart`): cùng
+   một hàm service, cần `promotions.read` phủ nút bán của giỏ (`org_out_of_scope` nếu không) — trước đây tool bỏ qua
+   người gọi và REST chỉ kiểm quyền chung, nhân viên một cửa hàng xem được chương trình của cửa hàng khác.
 
 Lý do: ba chỗ tiền có thể đi sai mà không ai thấy — thưởng cho đơn đã hoàn, số dư thẻ của người khác, khoản chuyển thừa
 biến mất. Cách sửa chạy được trên cả SQLite và Postgres (khoá dòng của kernel, câu cập nhật có điều kiện).

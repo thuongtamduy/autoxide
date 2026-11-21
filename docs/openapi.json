@@ -36204,7 +36204,7 @@
                 "type": "string"
               },
               "status_reason": {
-                "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+                "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
                 "type": [
                   "string",
                   "null"
@@ -76511,7 +76511,7 @@
                   "type": "string"
                 },
                 "status_reason": {
-                  "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+                  "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
                   "type": [
                     "string",
                     "null"
@@ -88873,7 +88873,7 @@
             "type": "string"
           },
           "status_reason": {
-            "description": "Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`.",
+            "description": "Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or\n`credential_revoked` (the API key that created or enabled it was revoked).",
             "type": [
               "string",
               "null"
@@ -230918,7 +230918,7 @@
     },
     "/api/v1/promotions/evaluate": {
       "post": {
-        "description": "Requires `promotions.read`. The same computation `orders` uses: every discount shared out to\nthe lines with a reason the buyer can read, gifts, codes and vouchers that do not apply (with\nreasons, the cart still works), and the `fingerprint` to send back when the order holds them.",
+        "description": "Requires `promotions.read` covering the unit of the cart (`org_id`). The same computation `orders` uses: every discount shared out to\nthe lines with a reason the buyer can read, gifts, codes and vouchers that do not apply (with\nreasons, the cart still works), and the `fingerprint` to send back when the order holds them.",
         "operationId": "promotions_evaluate_promotions",
         "parameters": [
           {
@@ -230986,7 +230986,7 @@
                 }
               }
             },
-            "description": "Missing `promotions.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+            "description": "Missing `promotions.read` (`permission_denied`) or the unit of the cart is outside your scope (`org_out_of_scope`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
           },
           "422": {
             "content": {
@@ -250124,7 +250124,7 @@
         ]
       },
       "post": {
-        "description": "Requires `webhooks.manage`. From now on, every event it subscribes to is sent to\n`url` as a signed `POST` (Standard Webhooks headers `webhook-id`,\n`webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds\n(`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).\nOther answers are retried with growing delays for about two hours. The response\ncarries the signing secret, shown only once.",
+        "description": "Requires `webhooks.manage`, and for each subscribed event its `stream_permission` (`*`: all of\nthem), as for the event stream. From now on, every event it subscribes to is sent to\n`url` as a signed `POST` (Standard Webhooks headers `webhook-id`,\n`webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds\n(`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).\nOther answers are retried with growing delays for about two hours. The response\ncarries the signing secret, shown only once.",
         "operationId": "webhooks_create_webhook_endpoint",
         "parameters": [
           {
@@ -250200,7 +250200,7 @@
                 }
               }
             },
-            "description": "Missing permission `webhooks.manage`; code `permission_denied`."
+            "description": "Missing permission `webhooks.manage`, or the `stream_permission` of a subscribed event (see `GET /api/v1/kernel/modules`); code `permission_denied`."
           },
           "422": {
             "content": {
@@ -250897,7 +250897,7 @@
                 }
               }
             },
-            "description": "Missing permission `webhooks.manage`; code `permission_denied`."
+            "description": "Missing permission `webhooks.manage`, or the `stream_permission` of a subscribed event (see `GET /api/v1/kernel/modules`); code `permission_denied`."
           },
           "404": {
             "content": {

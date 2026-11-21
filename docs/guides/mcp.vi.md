@@ -417,7 +417,7 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 Làm trọn trên máy của bạn, từ một thư mục trống tới một trợ lý trả lời được câu hỏi về tồn kho và doanh số. Bắt đầu từ mục [Chạy nhanh](../../README.vi.md#chạy-nhanh) (`compose.quickstart.yml`), nên máy chủ ở `http://127.0.0.1:8080`.
 
-**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
+**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong file máy chủ đã ghi (`docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
 
 ```bash
 API=http://127.0.0.1:8080
@@ -463,7 +463,7 @@ Khởi động lại Claude Desktop; các tool hiện dưới biểu tượng c�
 
 Chạy Cursor với `AUTOXIDE_AGENT_KEY=axk1_…` trong môi trường, rồi xem Settings → MCP: `autoxide` phải liệt kê các tool. Muốn trợ lý hẹp hơn thì nối vào đúng một module, vd `http://127.0.0.1:8080/mcp/inventory`.
 
-**3. Giao việc thật.** Bản cài mới chưa có sản phẩm hay tồn kho: thêm trước (qua trang xem API `/api/docs`, hay giao diện của bạn). Rồi hỏi bằng lời thường; mô hình tự chọn tool, client hiện từng lần gọi trước hoặc sau khi chạy.
+**3. Giao việc thật.** Bản cài mới chưa có sản phẩm hay tồn kho: thêm trước (qua trang xem API `/api/docs` sau khi đặt `AUTOXIDE_HTTP_API_DOCS=true`, hay giao diện của bạn). Rồi hỏi bằng lời thường; mô hình tự chọn tool, client hiện từng lần gọi trước hoặc sau khi chạy.
 
 | Bạn hỏi | Tool agent gọi | Kết quả |
 |---|---|---|

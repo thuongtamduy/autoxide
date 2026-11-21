@@ -426,3 +426,39 @@ async fn count_tra_tong_so_khop_bo_loc_o_trang_dau() {
     .await
     .unwrap();
 }
+
+/// `search::starts_with` / `search::contains` thoát `%` và `_`: chuỗi người dùng đặt không thành ký
+/// tự đại diện của `LIKE` (slug `a_b` không khớp `axb-1`), trên cả SQLite và Postgres.
+#[tokio::test]
+async fn like_thoat_ky_tu_dai_dien() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        for kind in ["a_b-1", "axb-1", "a%b-1", "azzb-1", r"a\b-1"] {
+            item::ActiveModel { id: Set(Uuid::now_v7()), kind: Set(kind.to_owned()) }
+                .insert(db.write())
+                .await
+                .unwrap();
+        }
+        let kinds = async |condition| {
+            let mut found: Vec<String> = item::Entity::find()
+                .filter(condition)
+                .all(db.read())
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|row| row.kind)
+                .collect();
+            found.sort();
+            found
+        };
+        use autoxide_kernel::search;
+        assert_eq!(kinds(search::starts_with(item::Column::Kind, "a_b-")).await, ["a_b-1"]);
+        assert_eq!(kinds(search::starts_with(item::Column::Kind, "a%b")).await, ["a%b-1"]);
+        assert_eq!(kinds(search::starts_with(item::Column::Kind, r"a\b")).await, [r"a\b-1"]);
+        assert_eq!(kinds(search::contains(item::Column::Kind, "_b-")).await, ["a_b-1"]);
+        // Không thoát (cách cũ) thì `_` khớp mọi ký tự: cả `axb-1` lẫn `a%b-1`.
+        assert_eq!(kinds(item::Column::Kind.starts_with("a_b-")).await.len(), 4);
+    })
+    .await
+    .unwrap();
+}

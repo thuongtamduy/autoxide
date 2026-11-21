@@ -17,20 +17,11 @@ tenant-scope 3 modules/comments/src/retention.rs  # dòng 112, 122, 136 — job:
 tenant-scope 4 modules/conversations/src/privacy.rs  # dòng 170, 181, 186, 191 — job: xoá cuộc trò chuyện quá hạn lưu
 tenant-scope 1 modules/customers/src/engagement.rs  # dòng 262 — job: xoá lượt xem cũ
 tenant-scope 1 modules/customers/src/facts.rs  # dòng 297 — nhầm: điều kiện `same_currency` đã có `TenantId`
-tenant-scope 1 modules/customers/src/loyalty/points.rs  # dòng 375 — nghi: `profile` theo ID
-tenant-scope 1 modules/customers/src/loyalty/vouchers.rs  # dòng 83 — nghi: `profile` theo ID
-tenant-scope 1 modules/customers/src/referrals.rs  # dòng 333 — nghi: `profile` theo ID
-tenant-scope 2 modules/customers/src/stored_value/holds.rs  # dòng 49, 85 — nghi: hold / gift card theo ID
-tenant-scope 1 modules/customers/src/stored_value/mod.rs  # dòng 257 — nghi: gift card theo ID
 tenant-scope 2 modules/forms/src/retention.rs  # dòng 103, 113 — job: hạn lưu IP, bài mồ côi
 tenant-scope 1 modules/idempotency/src/store.rs  # dòng 169 — job: xoá idempotency key hết hạn
 tenant-scope 1 modules/orders/src/abandoned.rs  # dòng 34 — job: quét giỏ bỏ dở của mọi khách
-tenant-scope 1 modules/orders/src/payments.rs  # dòng 219 — nghi: payment theo ID
-tenant-scope 1 modules/orders/src/refunds.rs  # dòng 297 — nghi: payment theo ID
-tenant-scope 1 modules/orders/src/reviews.rs  # dòng 929 — nghi: xoá review theo ID
 tenant-scope 1 modules/orders/src/warranty.rs  # dòng 426 — job: hết hạn bảo hành
 tenant-scope 1 modules/webhooks/src/delivery.rs  # dòng 386 — job: xoá lần gửi webhook cũ
 
 mcp-principal 1 modules/catalog/src/tools.rs  # dòng 307 `list_categories` — nhầm: REST cũng đọc cả khách; thêm chú thích
 mcp-principal 1 modules/content/src/tools.rs  # dòng 637 `resolve` — nghi: tra địa chỉ công khai (chỉ bản đã đăng); có thể cố ý, cần chú thích
-mcp-principal 2 modules/promotions/src/tools.rs  # dòng 265 `evaluate_cart`, 303 `list_vouchers_of_user` — nghi: service không nhận `principal`

@@ -47,6 +47,7 @@ impl CustomersService {
         if inserted == 0 {
             transaction.rollback().await?;
             let existing = stored_value_hold::Entity::find_by_id(key)
+                .scoped(tenant)
                 .one(tenant.database().write())
                 .await?
                 .ok_or_else(|| Error::internal("stored value hold vanished"))?;
@@ -83,6 +84,7 @@ impl CustomersService {
             let read = tenant.database().read();
             let available = if instrument == GIFT_CARD {
                 gift_card::Entity::find_by_id(id)
+                    .scoped(tenant)
                     .one(read)
                     .await?
                     .map_or(0, |row| row.balance_minor)

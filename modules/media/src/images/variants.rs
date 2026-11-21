@@ -161,9 +161,7 @@ impl MediaService {
         }
         let original = read_all(self.read(tenant, &item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
-        let rendered = tokio::task::spawn_blocking(move || render(&original, &widths))
-            .await
-            .map_err(Error::internal)?;
+        let rendered = self.decode_image(move || render(&original, &widths)).await?;
         let rendered = match rendered {
             Ok(rendered) => rendered,
             Err(problem) => {

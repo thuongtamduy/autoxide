@@ -293,8 +293,10 @@ impl OrdersService {
                     .iter()
                     .map(|refund| refund.amount_minor)
                     .sum();
-                if let Some(paid) =
-                    payment::Entity::find_by_id(row.payment_id).one(&transaction).await?
+                if let Some(paid) = payment::Entity::find_by_id(row.payment_id)
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?
                 {
                     let state = if refunded_on_payment >= paid.amount_minor {
                         payments::REFUNDED

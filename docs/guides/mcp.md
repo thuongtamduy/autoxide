@@ -417,7 +417,7 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 A walk-through on your own machine, from an empty directory to an assistant that answers questions about stock and sales. It starts from the [Quickstart](../../README.md#quickstart) (`compose.quickstart.yml`), so the server is at `http://127.0.0.1:8080`.
 
-**1. Sign in and make a key for the assistant.** Use the administrator's password from the log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
+**1. Sign in and make a key for the assistant.** Use the administrator's password from the file the server wrote (`docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
 
 ```bash
 API=http://127.0.0.1:8080
@@ -463,7 +463,7 @@ Restart Claude Desktop; the tools appear under the tools icon of a new chat. (`m
 
 Start Cursor with `AUTOXIDE_AGENT_KEY=axk1_…` in its environment, then check Settings → MCP: `autoxide` should list its tools. For a narrower assistant, connect to one module only, e.g. `http://127.0.0.1:8080/mcp/inventory`.
 
-**3. Ask for real work.** A fresh installation has no products or stock yet: add some first (the API reference at `/api/docs`, or your own front end). Then ask in plain words; the model picks the tools, and the client shows each call before or after it runs.
+**3. Ask for real work.** A fresh installation has no products or stock yet: add some first (the API reference at `/api/docs` after setting `AUTOXIDE_HTTP_API_DOCS=true`, or your own front end). Then ask in plain words; the model picks the tools, and the client shows each call before or after it runs.
 
 | You ask | Tools the agent calls | What you get |
 |---|---|---|

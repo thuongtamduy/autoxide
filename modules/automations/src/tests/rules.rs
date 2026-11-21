@@ -201,3 +201,45 @@ async fn hai_lan_sua_dong_thoi_moi_lan_mot_phien_ban() {
     .await
     .unwrap();
 }
+
+/// Luật tạo bằng API key mang quyền của key, không phải mọi quyền của chủ key; key bị thu hồi thì
+/// luật tạm dừng (D-20261121-automation-credential).
+#[tokio::test]
+async fn luat_tao_bang_api_key_mang_quyen_cua_key() {
+    TestDatabase::run(async |test| {
+        let harness = Harness::new(test).await;
+        let key = Uuid::now_v7();
+        // Key chỉ có một phần quyền của chủ: không có `shop.read`.
+        let by_key = harness
+            .owner
+            .clone()
+            .only(["automations.read", "automations.manage", "shop.write"])
+            .via_api_key(key);
+        let actions =
+            json!([{"tool": "shop.tag_order", "arguments": {"order_id": "1", "tag": "x"}}]);
+        let rule =
+            harness.rule_by(&by_key, on_order(), json!(null), actions.clone()).await.unwrap();
+        assert_eq!(rule.status, ACTIVE);
+        assert_eq!(rule.run_as_api_key, Some(key));
+        let runner = harness.service.rule_principal(&harness.tenant, &rule).await.unwrap().unwrap();
+        assert!(runner.allows("shop.write"));
+        assert!(!runner.allows("shop.read"), "the rule never gets more than the key had");
+        assert_eq!(runner.api_key_id(), Some(key));
+        // Luật của người đăng nhập: quyền hiện tại của người đó, không gắn key.
+        let own = harness.rule(on_order(), json!(null), actions).await;
+        assert_eq!(own.run_as_api_key, None);
+        let runner = harness.service.rule_principal(&harness.tenant, &own).await.unwrap().unwrap();
+        assert!(runner.allows("shop.read"));
+
+        // Key bị thu hồi: luật của key tạm dừng (nhận lại event không đổi gì), luật kia vẫn chạy.
+        for _ in 0..2 {
+            harness.service.credential_revoked(&harness.tenant, key).await.unwrap();
+        }
+        let paused = harness.reload(rule.id).await;
+        assert_eq!(paused.status, crate::service::rules::PAUSED);
+        assert_eq!(paused.status_reason.as_deref(), Some("credential_revoked"));
+        assert_eq!(harness.reload(own.id).await.status, ACTIVE);
+    })
+    .await
+    .unwrap();
+}

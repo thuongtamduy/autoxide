@@ -465,7 +465,11 @@ async fn free_slug<C: ConnectionTrait>(
         .filter(Column::ParentKey.eq(candidate.parent_key))
         .filter(same_site(candidate))
         .filter(Column::Id.ne(candidate.id))
-        .filter(Column::Slug.eq(base).or(Column::Slug.starts_with(format!("{base}-"))))
+        .filter(
+            Column::Slug
+                .eq(base)
+                .or(autoxide_kernel::search::starts_with(Column::Slug, &format!("{base}-"))),
+        )
         .into_tuple::<String>()
         .all(connection)
         .await?

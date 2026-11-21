@@ -22,6 +22,10 @@ use crate::entity::delivery;
 use crate::service::{EndpointChanges, NewEndpoint, WebhookService};
 
 const DEMO_EVENT: &str = "demo.thing_happened";
+/// Event có `stream_permission`: chỉ người có `demo.read` được xem qua luồng event.
+const PRIVATE_EVENT: &str = "demo.secret_noted";
+const DEMO_READ: autoxide_kernel::access::Permission =
+    autoxide_kernel::access::Permission::new("demo.read", "Read demo things.");
 
 /// Máy nhận: ghi lại mọi request, trả lần lượt các mã trong `answers` (hết thì 200).
 #[derive(Clone, Default)]
@@ -112,7 +116,13 @@ async fn setup(test: &TestDatabase, allow_http: bool) -> Setup {
         .await
         .unwrap();
     let catalog = EventCatalog::new(vec![
-        ("demo", vec![EventInfo::new(DEMO_EVENT, "Something happened.")]),
+        (
+            "demo",
+            vec![
+                EventInfo::new(DEMO_EVENT, "Something happened."),
+                EventInfo::new(PRIVATE_EVENT, "Something only readers see.").streamable(DEMO_READ),
+            ],
+        ),
         ("webhooks", crate::events::all()),
     ])
     .unwrap();
@@ -751,6 +761,41 @@ async fn sandbox_chi_gui_toi_url_duoc_phep() {
         let row = delivery::Entity::find_by_id(next).one(setup.database.read()).await.unwrap();
         assert_eq!(row.unwrap().status, "succeeded");
         assert_eq!(receiver.requests.lock().unwrap().len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+/// Đăng ký webhook cũng đòi `stream_permission` của event như luồng event (SSE / WebSocket).
+#[tokio::test]
+async fn dang_ky_event_can_quyen_xem_event() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, false).await;
+        let service = &setup.service;
+        let root = autoxide_kernel::tenancy::root_of(autoxide_kernel::tenancy::DEFAULT_TENANT);
+        let person = |permissions: &[&str]| {
+            autoxide_kernel::access::Principal::with_grants(
+                Uuid::from_u128(7),
+                permissions.iter().map(|permission| {
+                    (
+                        (*permission).to_owned(),
+                        autoxide_kernel::access::Grant::new(
+                            root,
+                            autoxide_kernel::access::Scope::Tenant,
+                        ),
+                    )
+                }),
+            )
+        };
+        let manager = person(&["webhooks.manage"]);
+        let reader = person(&["webhooks.manage", "demo.read"]);
+        for events in [vec![PRIVATE_EVENT.to_owned()], vec!["*".to_owned()]] {
+            let error = service.require_event_permissions(&manager, &events).unwrap_err();
+            assert_eq!(error.code(), "permission_denied", "{events:?}");
+            service.require_event_permissions(&reader, &events).unwrap();
+        }
+        // Event không có `stream_permission`: như trước.
+        service.require_event_permissions(&manager, &[DEMO_EVENT.to_owned()]).unwrap();
     })
     .await
     .unwrap();

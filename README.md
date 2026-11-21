@@ -24,16 +24,18 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
 
 docker compose -f compose.quickstart.yml up -d
-# The administrator admin@example.com gets a generated password, written to the log once
-docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
+# The administrator admin@example.com gets a generated password, written once to a file in the
+# data volume that only the server's user can read (never to the log)
+docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 ```
 
-Then open <http://127.0.0.1:8080/> (name, version and links), <http://127.0.0.1:8080/api/docs>
-(the API reference) and sign in:
+Then open <http://127.0.0.1:8080/> (name, version and links) and sign in (delete the file once you
+have changed the password). The API reference page (`/api/docs`, it loads its script from a CDN) is
+off in the quickstart: add `AUTOXIDE_HTTP_API_DOCS=true` to `.env` to turn it on.
 
 ```bash
 curl -sS http://127.0.0.1:8080/api/v1/auth/login \
-  --json '{"email":"admin@example.com","password":"<the password from the log>"}'
+  --json '{"email":"admin@example.com","password":"<the password from the file>"}'
 ```
 
 To choose them yourself, add `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` and

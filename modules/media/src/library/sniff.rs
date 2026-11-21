@@ -135,8 +135,101 @@ pub(crate) struct ActiveMarkup {
     pub(crate) found: bool,
 }
 
-/// Độ dài phần đuôi giữ lại: dài hơn mẫu dài nhất.
-const ACTIVE_TAIL: usize = 32;
+/// Độ dài phần đuôi giữ lại: dài hơn mẫu dài nhất và tên thẻ dài nhất được nhận.
+const ACTIVE_TAIL: usize = 64;
+/// Tên thẻ dài hơn chừng này không phải thẻ SVG nào: coi là đáng ngờ.
+const MAX_TAG_NAME: usize = 40;
+
+/// Thẻ SVG được nhận (allowlist, chữ thường, tên sau `tiền_tố:`): hình, chữ, tô màu, bộ lọc, và
+/// siêu dữ liệu của trình vẽ (Inkscape, RDF). Không có thẻ chạy script hay nhúng tài liệu khác
+/// (`script`, `foreignobject`, `iframe`…), không có liên kết `a` và hoạt ảnh `set` / `animate*`
+/// (đặt được `href` thành `javascript:` viết bằng tham chiếu ký tự, mẫu chữ không bắt được).
+const ALLOWED_TAGS: &[&str] = &[
+    // SVG
+    "svg",
+    "g",
+    "defs",
+    "desc",
+    "title",
+    "metadata",
+    "symbol",
+    "use",
+    "image",
+    "switch",
+    "style",
+    "path",
+    "rect",
+    "circle",
+    "ellipse",
+    "line",
+    "polyline",
+    "polygon",
+    "text",
+    "tspan",
+    "textpath",
+    "lineargradient",
+    "radialgradient",
+    "stop",
+    "pattern",
+    "clippath",
+    "mask",
+    "marker",
+    "filter",
+    "view",
+    "solidcolor",
+    "feblend",
+    "fecolormatrix",
+    "fecomponenttransfer",
+    "fecomposite",
+    "feconvolvematrix",
+    "fediffuselighting",
+    "fedisplacementmap",
+    "fedistantlight",
+    "fedropshadow",
+    "feflood",
+    "fefunca",
+    "fefuncb",
+    "fefuncg",
+    "fefuncr",
+    "fegaussianblur",
+    "feimage",
+    "femerge",
+    "femergenode",
+    "femorphology",
+    "feoffset",
+    "fepointlight",
+    "fespecularlighting",
+    "fespotlight",
+    "fetile",
+    "feturbulence",
+    // Siêu dữ liệu của trình vẽ (sodipodi:, inkscape:, rdf:, cc:, dc:)
+    "namedview",
+    "guide",
+    "grid",
+    "page",
+    "perspective",
+    "path-effect",
+    "rdf",
+    "work",
+    "format",
+    "type",
+    "agent",
+    "license",
+    "permits",
+    "requires",
+    "prohibits",
+    "creator",
+    "publisher",
+    "rights",
+    "date",
+    "description",
+    "subject",
+    "language",
+    "source",
+    "contributor",
+    "identifier",
+    "bag",
+];
 
 impl ActiveMarkup {
     pub(crate) fn feed(&mut self, chunk: &[u8]) {
@@ -152,6 +245,64 @@ impl ActiveMarkup {
 }
 
 fn has_active_markup(text: &[u8]) -> bool {
+    blocked_tags(text) || has_known_patterns(text)
+}
+
+/// Thẻ ngoài [`ALLOWED_TAGS`], khai báo `<!DOCTYPE` / `<!ENTITY` / `<![CDATA[` (thực thể tự định
+/// nghĩa vượt được mọi mẫu chữ), chỉ thị xử lý khác `<?xml …?>` (vd `<?xml-stylesheet`), hay nội dung
+/// XHTML. Thẻ cắt ngang ở cuối cửa sổ được xét lại ở cửa sổ sau (đuôi giữ [`ACTIVE_TAIL`] byte).
+fn blocked_tags(text: &[u8]) -> bool {
+    if text.windows(XHTML.len()).any(|window| window == XHTML) {
+        return true;
+    }
+    for (index, _) in text.iter().enumerate().filter(|(_, byte)| **byte == b'<') {
+        let rest = &text[index + 1..];
+        match rest.first() {
+            Some(b'!') => {
+                if rest.len() >= 3 && !rest.starts_with(b"!--") {
+                    return true;
+                }
+            }
+            Some(b'?') => {
+                if rest.len() >= 5 {
+                    let declaration = rest.starts_with(b"?xml")
+                        && matches!(rest[4], b'?' | b' ' | b'\t' | b'\r' | b'\n');
+                    if !declaration {
+                        return true;
+                    }
+                }
+            }
+            Some(byte) if byte.is_ascii_alphabetic() => {
+                let length = rest
+                    .iter()
+                    .take_while(|b| {
+                        b.is_ascii_alphanumeric() || matches!(b, b':' | b'_' | b'-' | b'.')
+                    })
+                    .count();
+                if length > MAX_TAG_NAME {
+                    return true;
+                }
+                // Tên chạm cuối cửa sổ: có thể chưa trọn, xét ở cửa sổ sau.
+                if length == rest.len() {
+                    continue;
+                }
+                let name = &rest[..length];
+                let local = name.rsplit(|b| *b == b':').next().unwrap_or(name);
+                if !ALLOWED_TAGS.iter().any(|tag| tag.as_bytes() == local) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// Namespace XHTML (chữ thường): thẻ trong nó là HTML, chạy được trong SVG.
+const XHTML: &[u8] = b"http://www.w3.org/1999/xhtml";
+
+/// Mẫu chữ của nội dung chạy được (thẻ, liên kết `javascript:`, thuộc tính sự kiện).
+fn has_known_patterns(text: &[u8]) -> bool {
     const TAGS: [&[u8]; 7] = [
         b"<script",
         b"javascript:",
@@ -345,6 +496,35 @@ mod tests {
         assert!(scan(&["<svg onload", " = \"x()\">"]));
         assert!(scan(&["<svg><a href=\"JavaScript:x()\">"]));
         assert!(scan(&["<svg><foreignObject><div/></foreignObject>"]));
+    }
+
+    #[test]
+    fn svg_chi_nhan_the_trong_danh_sach() {
+        let scan = |parts: &[&str]| {
+            let mut scanner = ActiveMarkup::default();
+            for part in parts {
+                scanner.feed(part.as_bytes());
+            }
+            scanner.found
+        };
+        // File của trình vẽ: khai báo XML, chú thích, siêu dữ liệu Inkscape / RDF, bộ lọc.
+        let drawing = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- by hand -->\n\
+            <svg xmlns=\"http://www.w3.org/2000/svg\" xmlns:svg=\"http://www.w3.org/2000/svg\">\
+            <sodipodi:namedview id=\"n\"/><metadata><rdf:RDF><cc:Work><dc:format>image/svg+xml\
+            </dc:format></cc:Work></rdf:RDF></metadata><defs><linearGradient id=\"a\"><stop/>\
+            </linearGradient><filter><feGaussianBlur/></filter></defs><svg:g><text>1 < 2\
+            </text><use href=\"#a\"/></svg:g></svg>";
+        assert!(!scan(&[drawing]));
+        // Thực thể tự định nghĩa: vượt được mọi mẫu chữ, nên chặn khai báo.
+        assert!(scan(&["<?xml version=\"1.0\"?><!DOCTYPE svg [<!ENTITY x \"&#60;scr\">]><svg/>"]));
+        assert!(scan(&["<svg><style><![CDATA[a{}]]></style></svg>"]));
+        assert!(scan(&["<?xml-stylesheet href=\"x.xsl\" type=\"text/xsl\"?><svg/>"]));
+        // Thẻ ngoài danh sách, kể cả có tiền tố, kể cả cắt ngang hai mảnh.
+        assert!(scan(&["<svg><h:script xmlns:h=\"urn:x\">"]));
+        assert!(scan(&["<svg><a href=\"&#106;avascript:x()\">x</a></svg>"]));
+        assert!(scan(&["<svg><set attributeName=\"href\" to=\"x\"/></svg>"]));
+        assert!(scan(&["<svg><ifr", "ame/></svg>"]));
+        assert!(scan(&["<svg><g xmlns=\"http://www.w3.org/1999/XHTML\"/></svg>"]));
     }
 
     #[test]
