@@ -19,9 +19,7 @@ use crate::entity::promotion;
 use crate::events::{self, Change};
 use crate::model::Status;
 use crate::permissions::PUBLISH;
-use crate::service::{
-    PromotionsService, bump_revision, lock_revision, now, readable, writable,
-};
+use crate::service::{PromotionsService, bump_revision, lock_revision, now, readable, writable};
 
 /// Hạn mức số chương trình đang bật của một khách (bước 35).
 pub(crate) const ACTIVE_PROMOTIONS: Limit = Limit::count(
