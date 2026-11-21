@@ -109,3 +109,4 @@ impl Module for NotesModule {
         vec![service::NOTES_SYNC]
     }
 }
+pub const MEASURE_SCCACHE: u32 = 1;
