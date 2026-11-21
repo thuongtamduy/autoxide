@@ -7,13 +7,13 @@
 //! database cũ đọc tiếp được, không migration dữ liệu.
 
 use sea_orm::sea_query::{
-    Alias, Expr, ExprTrait as _, ForeignKeyCreateStatement, ForeignKeyDropStatement,
-    IndexCreateStatement, IndexDropStatement, IntoIden, Order, Query, TableAlterStatement,
+    Alias, ColumnDef, Expr, ExprTrait as _, ForeignKeyCreateStatement, ForeignKeyDropStatement,
+    IndexCreateStatement, IndexDropStatement, IntoIden, Order, Query, Table, TableAlterStatement,
     TableCreateStatement, TableDropStatement, TableRenameStatement, TableTruncateStatement,
 };
 use sea_orm::{
-    ConnectionTrait, DatabaseExecutor, DbBackend, DbErr, DynIden, FromQueryResult as _,
-    IntoDatabaseExecutor, Iterable as _, Schema, StatementBuilder,
+    ConnectionTrait, DatabaseExecutor, DbBackend, DbErr, DynIden, IntoDatabaseExecutor,
+    StatementBuilder,
 };
 
 /// Tên của một migration (`m0001_create_note`): ghi vào bảng lịch sử.
@@ -146,34 +146,24 @@ pub(super) async fn has_table<C: ConnectionTrait>(
     row.try_get("", "has_table")
 }
 
-/// Một dòng của bảng lịch sử `<m>_migrations`. Tên `seaql_migrations` chỉ là tên mặc định của entity (như
-/// `sea-orm-migration`); mọi câu lệnh đều đổi sang tên bảng của module.
-mod history {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "seaql_migrations")]
-    pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
-        pub version: String,
-        pub applied_at: i64,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
+/// Cột của bảng lịch sử `<m>_migrations` (như `seaql_migrations` của `sea-orm-migration`): `version` — tên
+/// migration, khoá chính; `applied_at` — giây Unix lúc áp dụng.
+const VERSION: &str = "version";
+const APPLIED_AT: &str = "applied_at";
 
 fn table_iden(table: &str) -> DynIden {
     Alias::new(table).into_iden()
 }
 
-/// Tạo bảng lịch sử nếu chưa có (cùng câu `CREATE TABLE` như `sea-orm-migration`).
+/// Tạo bảng lịch sử nếu chưa có — cùng cột, cùng kiểu như `sea-orm-migration` dựng từ entity của nó (`version`
+/// chuỗi không null làm khoá chính, `applied_at` số nguyên 64 bit không null).
 pub(super) async fn install<C: ConnectionTrait>(connection: &C, table: &str) -> Result<(), DbErr> {
-    let schema = Schema::new(connection.get_database_backend());
-    let mut statement = schema.create_table_from_entity(history::Entity);
-    statement.table(table_iden(table)).if_not_exists();
+    let statement = Table::create()
+        .table(table_iden(table))
+        .if_not_exists()
+        .col(ColumnDef::new(Alias::new(VERSION)).string().not_null().primary_key())
+        .col(ColumnDef::new(Alias::new(APPLIED_AT)).big_integer().not_null())
+        .take();
     connection.execute(&statement).await.map(drop)
 }
 
@@ -186,15 +176,15 @@ pub(super) async fn applied<C: ConnectionTrait>(
         return Ok(Vec::new());
     }
     let query = Query::select()
-        .columns(history::Column::iter().map(IntoIden::into_iden))
+        .column(Alias::new(VERSION))
         .from(table_iden(table))
-        .order_by(history::Column::Version, Order::Asc)
+        .order_by(Alias::new(VERSION), Order::Asc)
         .take();
     connection
         .query_all(&query)
         .await?
         .into_iter()
-        .map(|row| history::Model::from_query_result(&row, "").map(|model| model.version))
+        .map(|row| row.try_get::<String>("", VERSION))
         .collect()
 }
 
@@ -207,7 +197,7 @@ pub(super) async fn record<C: ConnectionTrait>(
     let applied_at = crate::time::Timestamp::now().as_unix_seconds();
     let statement = Query::insert()
         .into_table(table_iden(table))
-        .columns([history::Column::Version, history::Column::AppliedAt])
+        .columns([Alias::new(VERSION), Alias::new(APPLIED_AT)])
         .values([name.into(), applied_at.into()])
         .map_err(|error| DbErr::Custom(error.to_string()))?
         .take();
@@ -222,7 +212,7 @@ pub(super) async fn forget<C: ConnectionTrait>(
 ) -> Result<(), DbErr> {
     let statement = Query::delete()
         .from_table(table_iden(table))
-        .and_where(Expr::col(history::Column::Version).eq(name))
+        .and_where(Expr::col(Alias::new(VERSION)).eq(name))
         .take();
     connection.execute(&statement).await.map(drop)
 }
