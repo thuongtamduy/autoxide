@@ -174,18 +174,16 @@ imagesize = { version = "0.15", default-features = false, features = [
   "webp",
   "heif",
 ] }
-# Lưu file: một trait chung cho ổ đĩa cục bộ và S3 / dịch vụ tương thích S3. S3 dùng
-# `aws-base` + `ring` thay vì feature `aws` (kéo aws-lc-rs): một thư viện mật mã duy
-# nhất cho cả chương trình (D-043).
-object_store = { version = "0.14", default-features = false, features = [
-  "fs",
-  "aws-base",
-  "reqwest",
-  "ring",
-] }
-# Chỉ để chọn TLS cho HTTP client của `object_store`: rustls không kèm provider, dùng
-# provider `ring` sẵn có trong chương trình (feature `rustls` của reqwest kéo aws-lc-rs).
-reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+# S3 / dịch vụ tương thích S3 của module `files` (D-20261121-s3-client): chỉ dựng và ký request (AWS SigV4),
+# gửi bằng `reqwest` sẵn có. `rustcrypto`: ký bằng `hmac` / `sha2` đã có (không kéo aws-lc-rs); `full`: đọc
+# XML trả về (danh sách, multipart) và credential của IAM role (IMDS).
+rusty-s3 = { version = "0.12", default-features = false, features = ["rustcrypto", "full"] }
+# Địa chỉ cho `rusty-s3` (đã có trong cây phụ thuộc qua `reqwest`).
+url = "2"
+# HTTP client (S3 của `files`, OIDC, AI…). rustls không kèm provider: dùng provider `ring` sẵn có trong
+# chương trình (feature `rustls` của reqwest kéo aws-lc-rs). `stream`: đọc thân response thành luồng (tải
+# file lớn từ S3 không giữ cả file trong bộ nhớ).
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream"] }
 # Để kernel cài provider `ring` cho rustls (reqwest không tự chọn khi không kèm provider).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 # MCP endpoint (SDK chính thức của Model Context Protocol): server Streamable HTTP ở
@@ -222,7 +220,7 @@ sha2 = "0.11"
 base64 = "0.23"
 getrandom = "0.4"
 # Mã hoá secret khi lưu (AES-256-GCM, bước 33, D-257). Cả hai đã có trong cây phụ thuộc (`ring` qua
-# rustls / object_store, `zeroize` qua RustCrypto): không thêm crate nào để biên dịch.
+# rustls, `zeroize` qua RustCrypto): không thêm crate nào để biên dịch.
 ring = "0.17"
 zeroize = "1"
 # TOTP (RFC 6238). Chỉ bật `std` và `otpauth` (đường dẫn `otpauth://` cho ứng dụng
