@@ -122,7 +122,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-029** SeaORM mặc định, SQL trực tiếp chỉ khi đã đo — 2026-11-11
 - **D-030** Phiên bản database tối thiểu — 2026-11-11
 - **D-035** Chi tiết kết nối database tách đọc / ghi — 2026-11-11
-- **D-036** Migration theo module — 2026-11-11
+- **D-036** Migration theo module — 2026-11-11 · *thay một phần bởi D-20261121-migrate-on-start*
 - **D-037** Kiểm luật sở hữu bảng bằng cách hỏi chính database — 2026-11-11
 - **D-054** Event: transactional outbox — 2026-11-11
 - **D-055** Audit log là một module nhận mọi event — 2026-11-11
@@ -140,6 +140,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
+- **[D-20261121-migrate-on-start](D-20261121-migrate-on-start.md)** Tuỳ chọn tự migrate, tạo quản trị viên đầu tiên và chạy task khi `serve` khởi động — 2026-11-21
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 - **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
 
@@ -341,7 +342,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-062** Mẫu mail theo i18n key — 2026-11-11
 - **D-063** Đặt lại mật khẩu bằng token một lần qua mail — 2026-11-11
 - **D-065** Xác minh email và đổi email qua mail — 2026-11-11
-- **D-066** Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11
+- **D-066** Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11 · *thay một phần bởi D-20261121-s3-client*
 - **D-067** API file: thân request là nội dung thô, metadata trong `files_file` — 2026-11-11
 - **D-073** Backup là một thư mục trung lập: SQLite + file — 2026-11-11
 - **D-081** Webhook: module `webhooks`, chuẩn Standard Webhooks, gửi qua job queue — 2026-11-12
@@ -427,6 +428,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
 - **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19
 - **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
+- **[D-20261121-s3-client](D-20261121-s3-client.md)** Lưu file: `rusty-s3` + `reqwest` cho S3, ổ đĩa tự viết, thay `object_store` — 2026-11-21
 
 ## Tiền, thuế, chứng từ
 
