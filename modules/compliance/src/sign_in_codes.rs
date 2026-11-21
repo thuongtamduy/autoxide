@@ -18,6 +18,7 @@ use autoxide_kernel::rows;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -28,12 +29,24 @@ use crate::entity::{account_verification, phone_challenge};
 use crate::events;
 use crate::service::{ComplianceService, now};
 use crate::verification::{
-    HOUR, OTP_PURPOSE, SMS_TIMEOUT, challenge_not_found, code_hash, otp_attempts_exceeded,
+    CHALLENGE_KEEP_HOURS, HOUR, OTP_PURPOSE, SMS_TIMEOUT, challenge_not_found, code_hash, otp_attempts_exceeded,
     otp_invalid, otp_throttled, random_code, same,
 };
 
 /// Chủ của mã đăng nhập: chưa có tài khoản.
 const NOBODY: Uuid = Uuid::nil();
+/// Cửa sổ đếm lần nhập sai của một số.
+const WRONG_WINDOW: SignedDuration = SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
+
+/// Số điện thoại đã nhập sai mã quá hạn mức trong 24 giờ.
+pub(crate) fn otp_daily_limit(retry_after: u64) -> Error {
+    Error::too_many_requests(
+        "compliance.otp_daily_limit",
+        "Too many wrong codes for this phone number today. Wait {seconds} seconds, then try again.",
+    )
+    .with_param("seconds", retry_after)
+    .with_retry_after(retry_after)
+}
 
 impl ComplianceService {
     /// Gửi mã đăng nhập tới số `raw`.
@@ -48,6 +61,14 @@ impl ComplianceService {
             return Err(sms_disabled());
         };
         let otp = self.otp;
+        // Số đã nhập sai đủ hạn mức trong 24 giờ: không gửi thêm mã (mã gửi đi cũng không kiểm được).
+        let recent = phone_challenge::Entity::find()
+            .filter(phone_challenge::Column::Phone.eq(phone.as_str()))
+            .filter(phone_challenge::Column::CreatedAt.gt(now() - WRONG_WINDOW))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        self.check_wrong_today(&recent, now())?;
         let mut limits = vec![(
             Throttle::new("compliance", otp.per_phone_per_hour, HOUR)?,
             format!("otp-phone:{}", phone.as_str()),
@@ -142,6 +163,9 @@ impl ComplianceService {
         if row.attempts >= self.otp.max_attempts {
             return Err(otp_attempts_exceeded());
         }
+        // Hạn mức sai mỗi ngày của số (cộng mọi mã của số trong 24 giờ, đã khoá ở trên): xin mã mới
+        // liên tục không mở thêm lượt đoán.
+        self.check_wrong_today(&locked, at)?;
         let digits: String = code.chars().filter(|c| !c.is_whitespace()).collect();
         if !same(&code_hash(&pepper, id, &digits), &row.code_hash) {
             phone_challenge::Entity::update_many()
@@ -171,6 +195,22 @@ impl ComplianceService {
         transaction.commit().await?;
         PhoneNumber::parse(&row.phone, "84")
             .ok_or_else(|| Error::internal("stored phone is not E.164"))
+    }
+
+    /// Báo [`otp_daily_limit`] khi các mã `rows` (của cùng một số) tạo trong 24 giờ trước `at` đã bị
+    /// nhập sai tổng cộng `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần. Tính từ bảng mã (giữ
+    /// [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai database, không thêm bảng đếm.
+    fn check_wrong_today(&self, rows: &[phone_challenge::Model], at: Timestamp) -> Result<(), Error> {
+        let since = at - WRONG_WINDOW;
+        let recent = rows.iter().filter(|row| row.created_at > since && row.attempts > 0);
+        let wrong: i64 = recent.clone().map(|row| i64::from(row.attempts)).sum();
+        if wrong < i64::from(self.otp.wrong_per_phone_per_day) {
+            return Ok(());
+        }
+        // Chờ tới khi mã cũ nhất có lần sai ra khỏi cửa sổ 24 giờ.
+        let oldest = recent.map(|row| row.created_at).min().unwrap_or(at);
+        let wait = (oldest + WRONG_WINDOW - at).as_secs().max(1);
+        Err(otp_daily_limit(u64::try_from(wait).unwrap_or(1)))
     }
 
     /// Ghi `phone` là số đã xác thực của tài khoản `user_id`. Quy tắc của khách không cho thêm tài

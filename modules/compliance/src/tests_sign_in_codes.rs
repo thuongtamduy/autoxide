@@ -25,10 +25,21 @@ impl AuthExtensions for Capture {
 }
 
 async fn app(test: &TestDatabase) -> (TestApp, Arc<dyn PhoneCodes>, Arc<FakeSmsSender>) {
+    app_with(test, &[]).await
+}
+
+async fn app_with(
+    test: &TestDatabase,
+    settings: &[(&str, &str)],
+) -> (TestApp, Arc<dyn PhoneCodes>, Arc<FakeSmsSender>) {
     let sms = Arc::new(FakeSmsSender::new());
     let capture = Arc::new(Capture::default());
     let sender: Arc<dyn SmsSender> = sms.clone();
-    let app = TestApp::builder(test)
+    let mut builder = TestApp::builder(test);
+    for (name, value) in settings {
+        builder = builder.setting(name, value);
+    }
+    let app = builder
         .provide::<dyn SmsSender>(sender)
         .provide::<dyn AuthExtensions>(capture.clone())
         .module(crate::module())
@@ -92,6 +103,61 @@ async fn hai_lan_nhap_ma_cung_luc_chi_mot_ben_duoc() {
             codes.verify(&tenant, sent.id, &code),
         );
         assert_eq!(usize::from(left.is_ok()) + usize::from(right.is_ok()), 1, "{left:?} {right:?}");
+    })
+    .await
+    .unwrap();
+}
+
+/// Hạn mức sai mỗi ngày của một số: cộng mọi mã của số trong 24 giờ — xin mã mới không mở thêm
+/// lượt đoán; đủ hạn mức thì không kiểm, không gửi mã nữa, tới khi lần sai cũ ra khỏi 24 giờ.
+#[tokio::test]
+async fn sai_qua_han_muc_moi_ngay_thi_khoa_so() {
+    TestDatabase::run(async |test| {
+        let settings = [
+            ("AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY", "4"),
+            ("AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR", "100"),
+        ];
+        let (app, codes, sms) = app_with(test, &settings).await;
+        let tenant = app.default_tenant();
+        let wrong_for = |code: &str| if code == "000000" { "111111" } else { "000000" }.to_owned();
+
+        let first = codes.send(&tenant, "0912 000 111", None).await.unwrap();
+        let wrong = wrong_for(&code_in(&sms, "+84912000111"));
+        for _ in 0..3 {
+            let error = codes.verify(&tenant, first.id, &wrong).await.unwrap_err();
+            assert_eq!(error.code(), "compliance.otp_invalid");
+        }
+        // Mã mới: chỉ còn một lượt sai trong ngày.
+        let second = codes.send(&tenant, "0912000111", None).await.unwrap();
+        let code = code_in(&sms, "+84912000111");
+        let error = codes.verify(&tenant, second.id, &wrong_for(&code)).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_invalid");
+        // Đủ 4 lần sai: mã đúng cũng không được kiểm, không gửi thêm mã.
+        let error = codes.verify(&tenant, second.id, &code).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_daily_limit");
+        assert!(error.retry_after().is_some_and(|seconds| seconds > 0));
+        let sent_before = sms.sent.lock().unwrap().len();
+        let error = codes.send(&tenant, "0912000111", None).await.unwrap_err();
+        assert_eq!(error.code(), "compliance.otp_daily_limit");
+        assert_eq!(sms.sent.lock().unwrap().len(), sent_before, "không gửi SMS khi số đang bị khoá");
+        // Số khác không bị ảnh hưởng.
+        codes.send(&tenant, "0912000222", None).await.unwrap();
+
+        // Qua 24 giờ (dời mốc tạo của các mã): gửi và kiểm lại được.
+        {
+            use sea_orm::sea_query::Expr;
+            use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+            let past = autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(25);
+            crate::entity::phone_challenge::Entity::update_many()
+                .col_expr(crate::entity::phone_challenge::Column::CreatedAt, Expr::value(past))
+                .filter(crate::entity::phone_challenge::Column::Phone.eq("+84912000111"))
+                .exec(app.database().write())
+                .await
+                .unwrap();
+        }
+        let third = codes.send(&tenant, "0912000111", None).await.unwrap();
+        let code = code_in(&sms, "+84912000111");
+        codes.verify(&tenant, third.id, &code).await.unwrap();
     })
     .await
     .unwrap();
