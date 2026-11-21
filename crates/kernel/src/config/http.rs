@@ -78,9 +78,19 @@ pub const PUBLIC_CACHE_SECONDS: Setting = Setting::new(
 pub const METRICS: Setting = Setting::new(
     "AUTOXIDE_HTTP_METRICS",
     "Serve Prometheus metrics at `/metrics` (`true` or `false`). The endpoint has no \
-     authentication: enable it only where the port is not reachable from the internet.",
+     authentication: set AUTOXIDE_HTTP_METRICS_ADDRESS to serve it on its own port that only \
+     your metrics collector reaches, or keep the API port off the internet.",
 )
 .with_default("false");
+
+pub const METRICS_ADDRESS: Setting = Setting::new(
+    "AUTOXIDE_HTTP_METRICS_ADDRESS",
+    "With AUTOXIDE_HTTP_METRICS=true: address and port of a second listener that serves only \
+     `/metrics`, which then leaves the API port. Publish this port only to your metrics collector \
+     (for example `0.0.0.0:9090` inside Docker or Kubernetes, without publishing it to the \
+     internet). When unset, `/metrics` is served on AUTOXIDE_HTTP_ADDRESS.",
+)
+.with_example("127.0.0.1:9090");
 
 pub const RATE_LIMIT_PER_MINUTE: Setting = Setting::new(
     "AUTOXIDE_HTTP_RATE_LIMIT_PER_MINUTE",
@@ -372,6 +382,8 @@ pub struct HttpConfig {
     pub drain: Duration,
     pub api_docs: bool,
     pub metrics: bool,
+    /// Port riêng cho `/metrics`; `None`: phục vụ trên port của API.
+    pub metrics_address: Option<SocketAddr>,
     /// Nén response chữ (gzip, brotli) — bước 39, D-20261119-step39-compression.
     pub compression: bool,
     /// `s-maxage` của đọc công khai — bước 39, D-20261119-step39-cdn-cache.
@@ -431,6 +443,11 @@ impl HttpConfig {
         let drain = reader.get_with(&DRAIN_SECONDS, |raw| parse_in_range(raw, 0u64, 600));
         let api_docs = reader.get_with(&API_DOCS, parse_bool);
         let metrics = reader.get_with(&METRICS, parse_bool);
+        let mut metrics_address = reader.optional_with(&METRICS_ADDRESS, |raw| {
+            raw.trim()
+                .parse::<SocketAddr>()
+                .map_err(|_| "must be an IP address and a port, like `127.0.0.1:9090`".to_owned())
+        });
         let compression = reader.get_with(&COMPRESSION, parse_bool);
         let public_cache_seconds =
             reader.get_with(&PUBLIC_CACHE_SECONDS, |raw| parse_in_range(raw, 0u32, 86_400));
@@ -466,6 +483,19 @@ impl HttpConfig {
         let hsts_include_subdomains = reader.get_with(&HSTS_INCLUDE_SUBDOMAINS, parse_bool);
         let request_log_days =
             reader.get_with(&REQUEST_LOG_DAYS, |raw| parse_in_range(raw, 0u16, 365));
+        // Port riêng mà không bật số đo, hay trùng port của API: báo sai thay vì lặng lẽ bỏ qua.
+        if let Ok(Some(own)) = &metrics_address {
+            let own = *own;
+            if matches!(&metrics, Ok(false)) {
+                metrics_address = reader.reject(
+                    &METRICS_ADDRESS,
+                    "needs AUTOXIDE_HTTP_METRICS=true: set both, or neither",
+                );
+            } else if matches!(&address, Ok(api) if api.port() == own.port() && own.port() != 0) {
+                metrics_address = reader
+                    .reject(&METRICS_ADDRESS, "must use another port than AUTOXIDE_HTTP_ADDRESS");
+            }
+        }
         let mut trusted_proxies = reader.optional_with(&TRUSTED_PROXIES, parse_ranges);
         // Dải proxy mà không có header thì không có tác dụng gì: báo sai thay vì lặng lẽ bỏ qua.
         if matches!(&trusted_proxies, Ok(Some(_))) && matches!(&client_ip_header, Ok(None)) {
@@ -484,6 +514,7 @@ impl HttpConfig {
             drain: Duration::from_secs(drain?),
             api_docs: api_docs?,
             metrics: metrics?,
+            metrics_address: metrics_address?,
             compression: compression?,
             public_cache_seconds: public_cache_seconds?,
             rate_limit: RateLimit { per_minute: per_minute?, burst: burst? },
@@ -540,9 +571,33 @@ mod tests {
         let message = read(&[("AUTOXIDE_HTTP_CLIENT_IP_HEADER", "not a header")]).unwrap_err();
         assert!(message.contains("must be an HTTP header name"), "{message}");
         assert!(read(&[("AUTOXIDE_HTTP_METRICS", "true")]).unwrap().metrics);
+        assert_eq!(config.metrics_address, None);
         assert!(read(&[("AUTOXIDE_HTTP_API_DOCS", "true")]).unwrap().api_docs);
         let message = read(&[("AUTOXIDE_HTTP_API_DOCS", "yes")]).unwrap_err();
         assert!(message.contains("must be `true` or `false`"), "{message}");
+    }
+
+    #[test]
+    fn port_rieng_cho_so_do() {
+        let config = read(&[
+            ("AUTOXIDE_HTTP_METRICS", "true"),
+            ("AUTOXIDE_HTTP_METRICS_ADDRESS", "0.0.0.0:9090"),
+        ])
+        .unwrap();
+        assert_eq!(config.metrics_address.unwrap().to_string(), "0.0.0.0:9090");
+        // Không bật số đo thì port riêng là cấu hình sai, không lặng lẽ bỏ qua.
+        let message = read(&[("AUTOXIDE_HTTP_METRICS_ADDRESS", "127.0.0.1:9090")]).unwrap_err();
+        assert!(message.contains("needs AUTOXIDE_HTTP_METRICS=true"), "{message}");
+        let message = read(&[
+            ("AUTOXIDE_HTTP_METRICS", "true"),
+            ("AUTOXIDE_HTTP_METRICS_ADDRESS", "0.0.0.0:8080"),
+        ])
+        .unwrap_err();
+        assert!(message.contains("must use another port"), "{message}");
+        let message =
+            read(&[("AUTOXIDE_HTTP_METRICS", "true"), ("AUTOXIDE_HTTP_METRICS_ADDRESS", "9090")])
+                .unwrap_err();
+        assert!(message.contains("must be an IP address and a port"), "{message}");
     }
 
     #[test]

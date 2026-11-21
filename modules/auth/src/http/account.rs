@@ -26,6 +26,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// Confirms deleting your own account.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct DeleteAccountRequest {
     /// Your current password.
     #[serde(default)]

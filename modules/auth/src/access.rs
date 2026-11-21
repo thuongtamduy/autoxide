@@ -60,14 +60,31 @@ impl Authenticator for RequestAuthenticator {
         let verified = self.sessions.verify_access(token)?;
         let (tenant, user_id) = (verified.tenant, verified.user);
         let tenant = self.tenant(tenant, crate::token::invalid_token).await?;
-        // Dòng người dùng và quyền đọc trong một câu (D-319).
-        let (user, principal) = self
-            .roles
-            .user_principal(&tenant, user_id)
-            .await?
-            .ok_or_else(crate::token::invalid_token)?;
+        // Dòng người dùng, quyền và phiên còn sống đọc trong một câu (D-319,
+        // D-20261121-access-token-revocation). Token cũ không mang phiên (`sid`) thì chỉ kiểm
+        // người dùng, như trước.
+        let (user, principal, live) = match verified.session {
+            Some(session) => self
+                .roles
+                .session_principal(&tenant, user_id, session)
+                .await?
+                .ok_or_else(crate::token::invalid_token)?,
+            None => {
+                let (user, principal) = self
+                    .roles
+                    .user_principal(&tenant, user_id)
+                    .await?
+                    .ok_or_else(crate::token::invalid_token)?;
+                (user, principal, true)
+            }
+        };
+        // Tài khoản bị khoá báo `user_disabled` trước: khoá cũng thu hồi mọi phiên, nhưng lý do
+        // đúng cho client là "bị khoá", không phải "phiên đã kết thúc".
         if !user.is_active() {
             return Err(crate::user::user_disabled());
+        }
+        if !live {
+            return Err(crate::token::session_ended());
         }
         // Người mua: chỉ là tài khoản của khách, không permission nào (D-309).
         if user.realm == autoxide_kernel::access::Realm::Customer {

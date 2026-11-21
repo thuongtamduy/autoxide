@@ -213,9 +213,15 @@ async fn nobody(app: &TestApp) -> String {
         .create(&TenantContext::default_on(app.database().clone()), account)
         .await
         .unwrap();
+    sign_in(app).await
+}
+
+/// Đăng nhập lại tài khoản của [`nobody`]: endpoint đăng xuất mọi phiên kết thúc phiên đang dùng
+/// ngay (D-20261121-access-token-revocation), các endpoint sau cần phiên mới.
+async fn sign_in(app: &TestApp) -> String {
     let login = app
         .post("/api/v1/auth/login")
-        .json(json!({"email": "nobody@example.com", "password": password}))
+        .json(json!({"email": "nobody@example.com", "password": "correct horse battery staple"}))
         .send()
         .await
         .unwrap();
@@ -233,7 +239,7 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
             builder = builder.boxed_module(module);
         }
         let app = builder.build().await.unwrap();
-        let token = nobody(&app).await;
+        let mut token = nobody(&app).await;
         let document = serde_json::to_value(app.openapi()).unwrap();
         let known: Vec<String> =
             app.modules().permissions().iter().map(|permission| permission.name().to_owned()).collect();
@@ -264,7 +270,11 @@ async fn moi_endpoint_khong_cong_khai_tra_401_va_403() {
                 if status != 401 {
                     failures.push(format!("{endpoint}: without a token answered {status}, not 401"));
                 }
-                let (status, body) = send(&app, &probe, Some(&token)).await;
+                let (mut status, mut body) = send(&app, &probe, Some(&token)).await;
+                if body["code"] == "auth.session_ended" {
+                    token = sign_in(&app).await;
+                    (status, body) = send(&app, &probe, Some(&token)).await;
+                }
                 let hides = operation.get("x-hides-existence") == Some(&json!(true));
                 if permissions.is_empty() {
                     if status == 401 || (status == 403 && body["code"] == "permission_denied") {

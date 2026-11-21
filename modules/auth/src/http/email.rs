@@ -37,6 +37,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// A new email address for the signed-in account.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ChangeEmailRequest {
     /// The new address. Case and surrounding spaces do not matter.
     #[schema(example = "ada@example.org")]
@@ -51,6 +52,7 @@ pub(crate) struct ChangeEmailRequest {
 
 /// The token from a verification mail.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct VerificationConfirmation {
     #[validate(length(min = 1, max = 256))]
     token: String,
@@ -58,6 +60,7 @@ pub(crate) struct VerificationConfirmation {
 
 /// The token from the mail sent to the old address after an email change.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct EmailChangeReport {
     #[validate(length(min = 1, max = 256))]
     token: String,

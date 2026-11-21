@@ -1057,7 +1057,11 @@ banner (55, D-236); rà lộ trình lần hai (D-237); module `menus` cho menu c
 Đã đưa lên lộ trình (D-20261119-step69-multiplatform): nền cho ứng dụng đa nền tảng — SDK di động, đồng bộ
 ngoại tuyến, WebSocket, mua trong ứng dụng, hướng dẫn cho người làm app (69).
 
-Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
+Để sau: ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A.
+
+- Rà 139 danh sách `Data<Vec<T>>` trong `xtask/api-shape-allow.txt` (D-20261121-api-shape): danh sách nào không có
+  giới hạn thật (vd nhãn, view, ghi chú, biến thể, hoàn tiền của đơn) thì làm endpoint mới trả `Page<T>` và khai
+  endpoint cũ qua `Module::deprecations` (D-059).
 
 Đã cân nhắc và không làm: API dữ liệu tự
 sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,

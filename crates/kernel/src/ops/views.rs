@@ -261,6 +261,7 @@ pub(crate) struct SavedView {
 
 /// A view to save.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NewView {
     /// The list, as `x-autoxide-list` of its endpoint.
     pub resource: String,
@@ -287,6 +288,7 @@ pub(crate) struct NewView {
 
 /// Changes to a saved view; omitted fields stay as they are.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ViewChanges {
     pub name: Option<String>,
     #[schema(value_type = Option<Object>)]

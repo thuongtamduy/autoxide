@@ -39,6 +39,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// The first password of an account.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct SetPasswordRequest {
     /// 12 to 128 characters.
     password: String,
@@ -137,6 +138,7 @@ pub(crate) async fn describe(
 
 /// A new account.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CreateUserRequest {
     /// Email; also the sign-in name. Case and surrounding spaces do not matter.
     #[schema(example = "ada@example.com")]
@@ -151,6 +153,7 @@ pub(crate) struct CreateUserRequest {
 
 /// A new account created by its owner.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RegisterRequest {
     /// Email; also the sign-in name.
     #[schema(example = "ada@example.com")]
@@ -179,6 +182,7 @@ pub(crate) struct RegistrationResponse {
 
 /// Changes to an account. Omitted fields stay as they are.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct UpdateUserRequest {
     /// New display name, 1 to 200 characters.
     name: Option<String>,

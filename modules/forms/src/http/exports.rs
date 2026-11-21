@@ -25,6 +25,7 @@ use crate::submissions::inbox::SubmissionStatus;
 
 /// What to export. The body may be omitted.
 #[derive(Debug, Default, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CreateExportRequest {
     /// `new`, `read`, `archived` or `spam`; omitted: every status but `spam` (like
     /// `GET /{id}/submissions/export`).
