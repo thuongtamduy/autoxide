@@ -1000,12 +1000,6 @@ ngoại tuyến, WebSocket, mua trong ứng dụng, hướng dẫn cho người 
 
 Để sau: ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A.
 
-- Bật / tắt module theo cấu hình của tiến trình (vd `AUTOXIDE_MODULES=-bookings,-ads`), góp ý của người thử 0.17.0.
-  Hiện tập module cố định lúc build (`crates/app/src/modules.rs`), còn từng khách bật module qua gói (`plans`). Cần:
-  thứ tự phụ thuộc (`require` / `provide`) — tắt bên cung cấp thì tắt luôn bên cần hoặc báo lỗi khi khởi động;
-  migration của module tắt (giữ bảng, không chạy `up`); route, tool MCP, job, event của module tắt không đăng ký;
-  `doctor` và `/api/v1/kernel/modules` nói module nào tắt. Lợi: image nhỏ gọn hơn về bề mặt tấn công, khởi động
-  nhanh hơn. Đáng làm sau giai đoạn B, cần quyết định riêng.
 - Rà 139 danh sách `Data<Vec<T>>` trong `xtask/api-shape-allow.txt` (D-20261121-api-shape): danh sách nào không có
   giới hạn thật (vd nhãn, view, ghi chú, biến thể, hoàn tiền của đơn) thì làm endpoint mới trả `Page<T>` và khai
   endpoint cũ qua `Module::deprecations` (D-059).
