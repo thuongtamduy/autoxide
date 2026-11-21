@@ -201,7 +201,7 @@ impl PromotionsService {
             .with("max", format!("{}%", crate::engine::show_percent(limit.max_bp)))
             .with("legal_basis", &limit.legal_basis),
         );
-        checks.push(self.duration_check(tenant, program, limit).await?);
+        checks.push(self.duration_check(tenant.database().read(), tenant, program, limit).await?);
         checks.extend(self.notice_checks(tenant, program, &legal, start_day).await?);
         if !variants.is_empty() {
             checks.extend(self.floor_checks(tenant, program, currency, &variants).await?);
@@ -225,10 +225,25 @@ impl PromotionsService {
         check("targets", ok, Severity::Error).with("kind", program.kind.as_str())
     }
 
-    /// Số ngày giảm giá: của chương trình và cộng các chương trình giảm giá khác trên cùng mục
-    /// tiêu trong năm (D-225).
-    async fn duration_check(
+    /// Hạn mức luật áp cho `program` (cùng cách tìm như [`Self::activation_checks`]); `None`: không
+    /// có dữ liệu luật. Đọc NGOÀI transaction ghi (dữ liệu luật ở database điều khiển).
+    pub(crate) async fn legal_limit_of(
         &self,
+        program: &Program,
+    ) -> Result<Option<crate::legal::LegalLimit>, Error> {
+        let legal = self.legal().await?;
+        let day = legal_day(program.starts_at.max(crate::service::now()));
+        Ok(legal
+            .limit(&self.config.jurisdiction, legal_kind(program), program.program_kind, day)
+            .cloned())
+    }
+
+    /// Số ngày giảm giá: của chương trình và cộng các chương trình giảm giá khác trên cùng mục
+    /// tiêu trong năm (D-225). `connection`: kết nối đọc khi chỉ kiểm, transaction ghi khi bật
+    /// (kiểm lại sau khi đã khoá — xem `write_activation`).
+    pub(crate) async fn duration_check<C: ConnectionTrait>(
+        &self,
+        connection: &C,
         tenant: &TenantContext,
         program: &Program,
         limit: &crate::legal::LegalLimit,
@@ -246,7 +261,7 @@ impl PromotionsService {
             return Ok(check("duration", true, Severity::Error).with("days", own));
         };
         let year = legal_day(program.starts_at).year();
-        let others = self.overlapping_programs(tenant, program, false).await?;
+        let others = self.overlapping_on(connection, tenant, program, false).await?;
         let mut days = days_in_year(program.starts_at, program.ends_at, year);
         for other in others.iter().filter(|other| legal_kind(other) == "price_reduction") {
             days += days_in_year(other.starts_at, other.ends_at, year);
@@ -394,7 +409,17 @@ impl PromotionsService {
         program: &Program,
         same_time: bool,
     ) -> Result<Vec<Program>, Error> {
-        let read = tenant.database().read();
+        self.overlapping_on(tenant.database().read(), tenant, program, same_time).await
+    }
+
+    /// Như [`Self::overlapping_programs`], đọc qua `read` (kết nối đọc hay transaction ghi).
+    async fn overlapping_on<C: ConnectionTrait>(
+        &self,
+        read: &C,
+        tenant: &TenantContext,
+        program: &Program,
+        same_time: bool,
+    ) -> Result<Vec<Program>, Error> {
         let mut select = promotion::Entity::find()
             .filter(promotion::Column::OrgId.eq(program.org_id))
             .filter(promotion::Column::Id.ne(program.id))

@@ -553,7 +553,7 @@ async fn delete_my_identity(
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, Error> {
     super::require_session(&principal)?;
-    state.oidc.unlink(&tenant, principal.user_id(), id, &state.passkeys).await?;
+    state.oidc.unlink(&tenant, principal.user_id(), id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

@@ -354,9 +354,16 @@ impl PlansService {
     }
 
     /// Đặt lại số đang dùng của mọi hạn mức `count` / `amount` có bộ đếm thật, cho mọi khách có thuê
-    /// bao: `used` = số đếm thật + Σ chỗ `held` còn hạn. Sửa lệch do tiến trình chết giữa lúc giữ chỗ
-    /// và lúc ghi, hay do khách vào gói khi đã có dữ liệu. Trả số dòng đã sửa.
-    pub(crate) async fn reconcile(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    /// bao: `used` = số đếm thật + Σ chỗ `held`. Sửa lệch do module xoá bản ghi mà quên trả chỗ, hay
+    /// do khách vào gói khi đã có dữ liệu. Trả số dòng đã sửa.
+    ///
+    /// Đối soát lạc quan (D-20261121-plans-reconcile-snapshot): số thật đếm ở database của khách,
+    /// ngoài transaction, nên không khoá được cùng sổ. Chụp sổ của khách (lượng dùng, chỗ giữ, số chỗ
+    /// đã xác nhận) TRƯỚC khi đếm, rồi khoá dòng lượng dùng và chụp lại: sổ không đổi thì không có lần
+    /// giữ / xác nhận / trả nào chen giữa lúc đếm, số đếm khớp với sổ — ghi; sổ đổi thì bỏ lượt, thử
+    /// lại (tối đa [`RECONCILE_ATTEMPTS`] lần, còn lại để lượt sau). Trước đây ghi tuyệt đối
+    /// `used = đích` sau khi đếm: lần giữ / trả chen giữa bị ghi đè, khách vượt hạn mức (cả hai DB).
+    pub(crate) async fn reconcile(&self, _at: DateTime<Utc>) -> Result<usize, Error> {
         let catalog = self.entitlements.catalog();
         // (khoá, có chia phần, bộ đếm) của mỗi hạn mức đếm được.
         let limits: Vec<(&'static str, bool, std::sync::Arc<dyn UsageCounter>)> = catalog
@@ -381,29 +388,35 @@ impl PlansService {
             let Ok(context) = self.databases.tenant(tenant).await else {
                 continue;
             };
-            let held: Vec<reservation::Model> = reservation::Entity::find()
-                .filter(reservation::Column::TenantId.eq(row.tenant_id))
-                .filter(reservation::Column::Status.eq("held"))
-                .filter(reservation::Column::ExpiresAt.gt(at))
-                .all(self.databases.control().read())
-                .await?;
             for (key, parts, counter) in &limits {
-                let mut targets = vec![((*key).to_owned(), counter.count(&context).await?)];
-                if *parts {
-                    // Mỗi phần đang có bản ghi, cộng mọi phần đã có dòng lượng dùng (phần không còn
-                    // bản ghi nào thì về 0).
-                    let real = counter.count_parts(&context).await?;
-                    let prefix = format!("{key}.");
-                    let mut keys: BTreeMap<String, i64> =
-                        real.into_iter().map(|(part, n)| (format!("{prefix}{part}"), n)).collect();
-                    for known in self.usage_keys(tenant, &prefix).await? {
-                        keys.entry(known).or_insert(0);
+                for _ in 0..RECONCILE_ATTEMPTS {
+                    let before = marks(self.databases.control().write(), tenant, key).await?;
+                    let mut targets = vec![((*key).to_owned(), counter.count(&context).await?)];
+                    if *parts {
+                        // Mỗi phần đang có bản ghi, cộng mọi phần đã có trong sổ (phần không còn bản
+                        // ghi nào thì về 0).
+                        let real = counter.count_parts(&context).await?;
+                        let prefix = format!("{key}.");
+                        let mut keys: BTreeMap<String, i64> = real
+                            .into_iter()
+                            .map(|(part, n)| (format!("{prefix}{part}"), n))
+                            .collect();
+                        for known in before.keys().filter(|known| known.starts_with(&prefix)) {
+                            keys.entry(known.clone()).or_insert(0);
+                        }
+                        targets.extend(keys);
                     }
-                    targets.extend(keys);
-                }
-                for (limit_key, real) in targets {
-                    if self.reconcile_one(tenant, &held, &limit_key, real).await? {
-                        fixed += 1;
+                    let mut settled = true;
+                    for (limit_key, real) in targets {
+                        let seen = before.get(&limit_key).cloned().unwrap_or_default();
+                        match self.reconcile_one(tenant, &limit_key, real, &seen).await? {
+                            Reconciled::Same => {}
+                            Reconciled::Fixed => fixed += 1,
+                            Reconciled::Busy => settled = false,
+                        }
+                    }
+                    if settled {
+                        break;
                     }
                 }
             }
@@ -411,46 +424,42 @@ impl PlansService {
         Ok(fixed)
     }
 
-    /// Đặt lượng dùng của `key` = `real` + chỗ còn giữ; `true` khi đã sửa.
+    /// Đặt lượng dùng của `key` = `real` + chỗ đang giữ, nếu sổ vẫn như `seen` (chụp trước khi đếm).
     async fn reconcile_one(
         &self,
         tenant: TenantId,
-        held: &[reservation::Model],
         key: &str,
         real: i64,
-    ) -> Result<bool, Error> {
-        let pending: i64 =
-            held.iter().filter(|hold| hold.limit_key == key).map(|hold| hold.amount).sum();
-        let target = real.saturating_add(pending);
-        let current = self.used(tenant, key, NO_PERIOD).await?;
-        if current == target {
-            return Ok(false);
-        }
+        seen: &Mark,
+    ) -> Result<Reconciled, Error> {
         let id = tenant.as_uuid();
-        let write = self.databases.control().write();
-        ensure_usage(write, id, key, NO_PERIOD).await?;
+        let transaction = self.databases.control().begin_write().await?;
+        ensure_usage(&transaction, id, key, NO_PERIOD).await?;
+        // Khoá dòng lượng dùng: lần giữ / trả đang chờ cộng trừ dòng này phải đợi tới khi ghi xong
+        // (chúng cộng trừ tương đối sau đó, nên vẫn đúng); chụp sổ dưới khoá là ảnh nhất quán.
+        rows::lock_one(
+            &transaction,
+            usage::Entity::find().filter(usage_filter(id, key, NO_PERIOD)),
+        )
+        .await?;
+        let now_mark = marks(&transaction, tenant, key).await?.remove(key).unwrap_or_default();
+        if now_mark != *seen {
+            return Ok(Reconciled::Busy);
+        }
+        let target = real.saturating_add(now_mark.held);
+        if now_mark.used == target {
+            return Ok(Reconciled::Same);
+        }
         usage::Entity::update_many()
             .col_expr(usage::Column::Used, sea_orm::sea_query::Expr::value(target))
             .col_expr(usage::Column::UpdatedAt, sea_orm::sea_query::Expr::value(now()))
             .filter(usage_filter(id, key, NO_PERIOD))
-            .exec(write)
+            .exec(&transaction)
             .await?;
+        transaction.commit().await?;
         metrics::counter!("plans_usage_reconciled_total").increment(1);
-        tracing::info!(tenant_id = %tenant, limit = key, from = current, to = target, "usage reconciled");
-        Ok(true)
-    }
-
-    /// Các khoá đã có dòng lượng dùng (không theo kỳ) của khách, bắt đầu bằng `prefix`.
-    async fn usage_keys(&self, tenant: TenantId, prefix: &str) -> Result<Vec<String>, Error> {
-        let keys: Vec<String> = usage::Entity::find()
-            .select_only()
-            .column(usage::Column::LimitKey)
-            .filter(usage::Column::TenantId.eq(tenant.as_uuid()))
-            .filter(usage::Column::PeriodStart.eq(NO_PERIOD))
-            .into_tuple()
-            .all(self.databases.control().read())
-            .await?;
-        Ok(keys.into_iter().filter(|key| key.starts_with(prefix)).collect())
+        tracing::info!(tenant_id = %tenant, limit = key, from = now_mark.used, to = target, "usage reconciled");
+        Ok(Reconciled::Fixed)
     }
 
     /// Khách có thuê bao ở trạng thái `status`.
@@ -531,6 +540,82 @@ impl PlansService {
         }
         Ok(found)
     }
+}
+
+/// Số lần thử đối soát một hạn mức trong một lượt khi sổ cứ đổi trong lúc đếm.
+const RECONCILE_ATTEMPTS: usize = 3;
+
+/// Kết quả đối soát một khoá.
+enum Reconciled {
+    Same,
+    Fixed,
+    /// Sổ đổi trong lúc đếm: không ghi.
+    Busy,
+}
+
+/// Ảnh sổ của một khoá hạn mức: lượng dùng, chỗ đang giữ (tổng và số chỗ), số chỗ đã xác nhận. Mọi
+/// lần giữ / trả đổi `used` hay `held`; mọi lần xác nhận đổi `confirmed` — ảnh không đổi nghĩa là
+/// không có lần nào chen vào.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+struct Mark {
+    used: i64,
+    held: i64,
+    held_count: i64,
+    confirmed: i64,
+}
+
+/// Ảnh sổ của khoá `key` và mọi phần `key.<phần>` của khách `tenant` (lượng dùng không theo kỳ).
+async fn marks<C: ConnectionTrait>(
+    connection: &C,
+    tenant: TenantId,
+    key: &str,
+) -> Result<BTreeMap<String, Mark>, Error> {
+    let id = tenant.as_uuid();
+    let prefix = format!("{key}.");
+    let ours = |found: &str| found == key || found.starts_with(&prefix);
+    let mut found: BTreeMap<String, Mark> = BTreeMap::new();
+    let used: Vec<(String, i64)> = usage::Entity::find()
+        .select_only()
+        .column(usage::Column::LimitKey)
+        .column(usage::Column::Used)
+        .filter(usage::Column::TenantId.eq(id))
+        .filter(usage::Column::PeriodStart.eq(NO_PERIOD))
+        .into_tuple()
+        .all(connection)
+        .await?;
+    for (limit_key, value) in used.into_iter().filter(|(limit_key, _)| ours(limit_key)) {
+        found.entry(limit_key).or_default().used = value;
+    }
+    // Chỗ đang giữ ít (có hạn, job trả khi quá hạn): đọc từng chỗ, cộng ở đây — `SUM` của Postgres
+    // trả kiểu `numeric`, không đọc thẳng thành `i64` được.
+    let held: Vec<(String, i64)> = reservation::Entity::find()
+        .select_only()
+        .column(reservation::Column::LimitKey)
+        .column(reservation::Column::Amount)
+        .filter(reservation::Column::TenantId.eq(id))
+        .filter(reservation::Column::Status.eq("held"))
+        .into_tuple()
+        .all(connection)
+        .await?;
+    for (limit_key, amount) in held.into_iter().filter(|(limit_key, _)| ours(limit_key)) {
+        let mark = found.entry(limit_key).or_default();
+        mark.held = mark.held.saturating_add(amount);
+        mark.held_count += 1;
+    }
+    let confirmed: Vec<(String, i64)> = reservation::Entity::find()
+        .select_only()
+        .column(reservation::Column::LimitKey)
+        .column_as(reservation::Column::Id.count(), "confirmed")
+        .filter(reservation::Column::TenantId.eq(id))
+        .filter(reservation::Column::Status.eq("confirmed"))
+        .group_by(reservation::Column::LimitKey)
+        .into_tuple()
+        .all(connection)
+        .await?;
+    for (limit_key, count) in confirmed.into_iter().filter(|(limit_key, _)| ours(limit_key)) {
+        found.entry(limit_key).or_default().confirmed = count;
+    }
+    Ok(found)
 }
 
 fn usage_filter(tenant: Uuid, key: &str, period: &str) -> sea_orm::Condition {
