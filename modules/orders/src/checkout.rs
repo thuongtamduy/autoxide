@@ -574,6 +574,21 @@ impl OrdersService {
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
                 let now = crate::service::now();
+                // Đóng giỏ TRƯỚC, có điều kiện giỏ còn mở (D-181): hai lần đặt khác
+                // `Idempotency-Key` trên cùng giỏ từng cùng qua bước kiểm (ngoài transaction) và ra
+                // hai đơn (cả hai DB). Bên sau không đổi được dòng giỏ → huỷ cả transaction.
+                let closed = cart::Entity::update_many()
+                    .col_expr(cart::Column::Status, Expr::value(CONVERTED))
+                    .col_expr(cart::Column::ActiveBuyerKey, Expr::value(Option::<String>::None))
+                    .col_expr(cart::Column::UpdatedAt, Expr::value(now))
+                    .filter(cart::Column::Id.eq(draft.cart.id))
+                    .filter(cart::Column::Status.is_not_in([carts::MERGED, CONVERTED]))
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
+                if closed.rows_affected == 0 {
+                    return Err(errors::cart_closed());
+                }
                 let year = now.year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.order:{year}"))
@@ -629,14 +644,6 @@ impl OrdersService {
                     )
                     .col_expr(checkout::Column::UpdatedAt, Expr::value(now))
                     .filter(checkout::Column::Id.eq(draft.order_id))
-                    .scoped(tenant)
-                    .exec(&transaction)
-                    .await?;
-                cart::Entity::update_many()
-                    .col_expr(cart::Column::Status, Expr::value(CONVERTED))
-                    .col_expr(cart::Column::ActiveBuyerKey, Expr::value(Option::<String>::None))
-                    .col_expr(cart::Column::UpdatedAt, Expr::value(now))
-                    .filter(cart::Column::Id.eq(draft.cart.id))
                     .scoped(tenant)
                     .exec(&transaction)
                     .await?;

@@ -67,8 +67,8 @@ rồi xác nhận xanh trên cả hai database.
 | 6 | `modules/promotions/src/participations.rs` `review_participation`, `participate` | Đọc `status` không khoá rồi ghi | Duyệt và từ chối đua nhau: giá flash có hiệu lực nhưng hồ sơ `rejected` | Chưa sửa |
 | 7 | `modules/plans/src/usage.rs` `reconcile_one` | Ghi `used = target` tuyệt đối | `reserve` / `release` chen giữa bị ghi đè, khách vượt hạn mức | Chưa sửa (cả hai DB): `real` và chỗ giữ đọc trước, không có cách vá nhỏ đúng; cần thiết kế lại đối soát |
 | 8 | `modules/plans/src/billing.rs` `invoice_period` ↔ `lifecycle.rs` `void_period` | Kiểm `status != void` ngoài transaction, gán `invoice_id` không điều kiện | Kỳ đã huỷ vẫn có hoá đơn GTGT không bị huỷ | Chưa sửa (cả hai DB) |
-| 9 | `modules/orders/src/checkout.rs` chuyển giỏ sang `converted` | Không điều kiện status | Hai lần đặt hàng khác idempotency key trên cùng giỏ ra hai đơn | Chưa sửa (cả hai DB) |
-| 10 | `modules/orders/src/pos.rs` `close_shift` ↔ `create_pos_order` | Tiền kỳ vọng tính ngoài transaction; lượt bán không kiểm ca còn mở | Lệch số dư két, bán vào ca đã đóng | Chưa sửa (cả hai DB) |
+| 9 | `modules/orders/src/checkout.rs` chuyển giỏ sang `converted` | Không điều kiện status | Hai lần đặt hàng khác idempotency key trên cùng giỏ ra hai đơn | Đã sửa (lượt 2, `orders`): đóng giỏ đầu transaction tạo đơn, có điều kiện giỏ còn mở, không đổi được thì huỷ — đỏ 3/3 trên cả hai DB |
+| 10 | `modules/orders/src/pos.rs` `close_shift` ↔ `create_pos_order` | Tiền kỳ vọng tính ngoài transaction; lượt bán không kiểm ca còn mở | Lệch số dư két, bán vào ca đã đóng | Đã sửa (lượt 2, `orders`): lượt bán giữ khoá chia sẻ dòng ca (chỉ khi ca mở), đóng ca khoá độc quyền rồi mới cộng tiền kỳ vọng — đỏ 3/3 trên cả hai DB |
 
 ### Tồn kho / sức chứa
 
