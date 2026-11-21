@@ -326,10 +326,37 @@ pub fn run(root: &Path, check: bool, workspace_version: &str) -> Result<bool, St
             ok = false;
         }
     }
+    // Lệnh chạy nhanh của README kéo image mặc định của compose.quickstart.yml: ghim đúng bản đang phát hành
+    // (không dùng `latest`, D-20261121-auto-release) nên số đó phải đổi cùng `version` của workspace.
+    if let Ok(compose) = std::fs::read_to_string(root.join(QUICKSTART)) {
+        match quickstart_image_version(&compose) {
+            Some(version) if version == workspace_version => {}
+            other => {
+                eprintln!(
+                    "sdk: {QUICKSTART} pulls image version {} by default but the workspace is {workspace_version}; \
+                     set `${{AUTOXIDE_IMAGE:-ghcr.io/<owner>/autoxide:{workspace_version}}}` (docs/RELEASING.md, step 2)",
+                    other.unwrap_or_else(|| "none".to_owned())
+                );
+                ok = false;
+            }
+        }
+    }
     if ok {
         println!("sdk: {OUTPUT} matches docs/openapi.json");
     }
     Ok(ok)
+}
+
+const QUICKSTART: &str = "compose.quickstart.yml";
+
+/// Phiên bản trong giá trị mặc định `${AUTOXIDE_IMAGE:-<repo>/autoxide:<phiên bản>}` của dòng `image:`.
+fn quickstart_image_version(text: &str) -> Option<String> {
+    let line = text
+        .lines()
+        .find(|line| line.trim_start().starts_with("image:") && line.contains("AUTOXIDE_IMAGE:-"))?;
+    let default = line.split("AUTOXIDE_IMAGE:-").nth(1)?.split('}').next()?;
+    let (_, version) = default.rsplit_once(':')?;
+    Some(version.trim().to_owned())
 }
 
 /// Các khối ```ts của bản EN của `docs/guides/*.md`, ghi ra `<dir>/<hướng dẫn>-<số>.ts`.
@@ -491,6 +518,17 @@ mod tests {
         std::fs::write(root.join(OUTPUT), "// edited\n").unwrap();
         assert!(!run(&root, true, "1.2.3").unwrap(), "edited by hand");
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn doc_phien_ban_image_cua_quickstart() {
+        let text = "services:\n  autoxide:\n    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:1.2.3}\n";
+        assert_eq!(quickstart_image_version(text).as_deref(), Some("1.2.3"));
+        assert_eq!(
+            quickstart_image_version("    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:latest}").as_deref(),
+            Some("latest")
+        );
+        assert_eq!(quickstart_image_version("    image: postgres:18"), None);
     }
 
     #[test]

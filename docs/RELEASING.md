@@ -48,7 +48,7 @@ bước 7.**
    khác có thể đã merge trong lúc mình làm — xem "Khi hai phiên đụng nhau" bên dưới.
 2. Đổi `version` trong `Cargo.toml` gốc; chạy `cargo check` để cập nhật `Cargo.lock`. Đổi
    theo: `"version"` trong `docs/openapi.json`, `"version"` trong `sdk/typescript/package.json` và
-   `sdk/typescript/package-lock.json` — `cargo xtask sdk --check`
+   `sdk/typescript/package-lock.json`, image mặc định trong `compose.quickstart.yml` — `cargo xtask sdk --check`
    của gate kiểm mấy chỗ này; bản phát hành mới
    nhất ở dòng "Trạng thái" của `docs/ROADMAP.md`.
 3. Chạy `cargo xtask changelog`: gộp mọi mảnh trong `changelog.d/` vào `## [Unreleased]` (mỗi mảnh vào
