@@ -14,6 +14,7 @@
 //! Nhận lại event không tạo dòng thứ hai (D-054): tìm uỷ quyền còn hiệu lực cho cùng sandbox, cùng
 //! role trước khi ghi. Không sửa `DelegationService::enter`: uỷ quyền vào sandbox là uỷ quyền thường.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -21,7 +22,6 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::pagination::PageRequest;
 use autoxide_kernel::tenancy::sandbox::SandboxRecipients;
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
@@ -47,8 +47,8 @@ pub(crate) fn subscriptions() -> Vec<Subscription> {
     ]
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn uuid(event: &Delivered, field: &str) -> Option<Uuid> {
@@ -63,7 +63,7 @@ impl EventHandler for SandboxAccess {
         let Some(sandbox) = uuid(event, "sandbox_id") else {
             return Err(Error::internal("a sandbox event without `sandbox_id`"));
         };
-        let expires_at: Option<DateTime<Utc>> =
+        let expires_at: Option<Timestamp> =
             serde_json::from_value(event.payload["expires_at"].clone()).unwrap_or(None);
         let live = || {
             entity::Entity::find()

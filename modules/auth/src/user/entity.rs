@@ -1,6 +1,7 @@
 //! Entity của bảng `auth_user` (SeaORM). Chỉ dùng trong module này; ra ngoài thì
 //! đổi sang [`crate::api::User`], không bao giờ mang theo hash mật khẩu.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 use crate::api::User;
@@ -17,12 +18,12 @@ pub struct Model {
     pub email: String,
     pub name: String,
     pub password_hash: Option<String>,
-    pub disabled_at: Option<DateTimeUtc>,
-    pub email_verified_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub disabled_at: Option<Timestamp>,
+    pub email_verified_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// Lúc mở phiên gần nhất (đăng nhập, đổi mật khẩu); `None`: chưa biết.
-    pub last_sign_in_at: Option<DateTimeUtc>,
+    pub last_sign_in_at: Option<Timestamp>,
     /// Email và tên viết thường, để tìm (`user::service::search_text`).
     pub search_text: String,
     /// Ngôn ngữ ưa thích (mã BCP 47 máy chủ có bản dịch); `None`: theo request.

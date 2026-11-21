@@ -2,6 +2,7 @@
 //! bản nháp, xuất bản, quay lại, xem trước, gửi thử, thương hiệu của mail. Permission được kiểm trong
 //! service TRƯỚC mọi bước tra cứu hay kiểm đầu vào.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -122,7 +122,7 @@ pub(crate) struct DraftResponse {
     body_html: Option<String>,
     short: String,
     zns_template_id: Option<String>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<template_draft::Model> for DraftResponse {
@@ -294,7 +294,7 @@ pub(crate) struct VersionResponse {
     body_html: Option<String>,
     short: String,
     zns_template_id: Option<String>,
-    published_at: DateTime<Utc>,
+    published_at: Timestamp,
 }
 
 pub(crate) fn describe_version(row: template_version::Model, live: Option<i32>) -> VersionResponse {

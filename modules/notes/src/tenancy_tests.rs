@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::event::{Delivered, EventHandler, Outbox};
 use autoxide_kernel::migration::Migrator;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase, leak_check};
 use axum::http::StatusCode;
 use sea_orm::sea_query::{Alias, Query};
@@ -150,7 +151,7 @@ async fn nang_cap_gan_du_lieu_cu_cho_khach_mac_dinh() {
         let database = app.database();
         let backend = database.write().get_database_backend();
         let id = Uuid::now_v7();
-        let at = chrono::Utc::now();
+        let at = Timestamp::now();
         // `sea_query` đổi UUID, thời gian sang dạng lưu của từng database (như SeaORM ghi).
         let insert = Query::insert()
             .into_table(Alias::new("notes_note"))

@@ -1,5 +1,6 @@
 //! `POST /me/reauth`: xác nhận lại danh tính, nhận token ngắn hạn cho một lệnh nhạy cảm (D-308).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -77,7 +77,7 @@ pub(crate) struct ReauthResponse {
     /// `null` with `email_link`: the token is in the mail.
     reauth_token: Option<String>,
     /// When the token stops working (`AUTOXIDE_AUTH_REAUTH_MINUTES`).
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     /// A new access token for this session, confirmed just now: use it to retry an action that
     /// answered 401 `step_up_required`. Sensitive actions then work for
     /// `AUTOXIDE_AUTH_STEP_UP_MINUTES` minutes (refreshing keeps the confirmation). `null` with
@@ -167,6 +167,7 @@ async fn reauthenticate(
 #[cfg(test)]
 mod tests {
     use autoxide_kernel::event::Actor;
+    use autoxide_kernel::time::Timestamp;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -297,7 +298,7 @@ mod tests {
             let body = json!({"current_password": PASSWORD});
             let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&ada), Some(body)).await;
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
-            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let body = json!({"code": code_at(&secret, now)});
             let (status, _, on) =
                 call(&app, "POST", "/me/mfa/totp/confirm", Some(&ada), Some(body)).await;

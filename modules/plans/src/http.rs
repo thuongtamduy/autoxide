@@ -3,6 +3,7 @@
 //! "Vận hành" (gói, thuê bao của mọi khách) cần permission giữ ở khách nền tảng; "khách"
 //! (`billing`) là permission ở khách hiện tại.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -18,7 +19,6 @@ use autoxide_kernel::tenancy::{TenantContext, TenantId, require_platform};
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -101,7 +101,7 @@ pub(crate) struct PriceResponse {
     tax_category: Option<String>,
     /// `false`: no longer sold at this price.
     active: bool,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<price::Model> for PriceResponse {
@@ -168,8 +168,8 @@ pub(crate) struct PlanResponse {
     /// Tenants on the plan now (subscriptions not canceled, as base plan or add-on). Only for
     /// platform staff: `null` in the public catalog.
     subscriber_count: Option<i64>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<PlanRow> for PlanResponse {
@@ -414,13 +414,13 @@ pub(crate) struct SubscriptionResponse {
     /// `canceled` (read-only, data kept until `delete_after`) or `deleted`.
     #[schema(example = "active")]
     status: String,
-    current_period_start: DateTime<Utc>,
-    current_period_end: DateTime<Utc>,
-    trial_ends_at: Option<DateTime<Utc>>,
-    grace_ends_at: Option<DateTime<Utc>>,
-    suspended_at: Option<DateTime<Utc>>,
-    canceled_at: Option<DateTime<Utc>>,
-    delete_after: Option<DateTime<Utc>>,
+    current_period_start: Timestamp,
+    current_period_end: Timestamp,
+    trial_ends_at: Option<Timestamp>,
+    grace_ends_at: Option<Timestamp>,
+    suspended_at: Option<Timestamp>,
+    canceled_at: Option<Timestamp>,
+    delete_after: Option<Timestamp>,
     /// Cancels when the current period ends.
     cancel_at_period_end: bool,
     /// Plan the subscription moves to when the period ends (after a downgrade).
@@ -429,8 +429,8 @@ pub(crate) struct SubscriptionResponse {
     /// The tenant already had its free trial.
     trial_used: bool,
     addons: Vec<AddonItem>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<SubscriptionRow> for SubscriptionResponse {
@@ -516,10 +516,10 @@ pub(crate) struct OverrideResponse {
     max_value: Option<i64>,
     reason: String,
     /// The override no longer applies from this time.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// User who set it.
     created_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<grant::Model> for OverrideResponse {
@@ -554,7 +554,7 @@ pub(crate) struct OverrideRequest {
     /// Why, 1 to 500 characters (kept for the audit trail).
     reason: String,
     /// When the override stops applying.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
 }
 
 impl From<OverrideRequest> for OverrideInput {

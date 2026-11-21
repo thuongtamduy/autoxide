@@ -5,13 +5,14 @@
 //! đầu đã xong). Key thuộc khách của request (bước 33): database là của khách, mọi truy vấn lọc
 //! theo khách (`.scoped`).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::idempotency::{Begin, IdempotencyStore, StoredResponse};
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use uuid::Uuid;
@@ -19,7 +20,7 @@ use uuid::Uuid;
 use crate::entity::{self, Column, Entity};
 
 /// Giữ một key chừng này: gửi lại trong khoảng đó nhận lại kết quả cũ.
-const KEEP: chrono::Duration = chrono::Duration::hours(24);
+const KEEP: SignedDuration = SignedDuration::from_hours(24);
 /// Loại job dọn key hết hạn (cũng là tên lịch).
 pub(crate) const CLEANUP: &str = "idempotency.cleanup";
 
@@ -39,7 +40,7 @@ impl Store {
         scope: &str,
         key: &str,
         fingerprint: &str,
-        locked_until: DateTime<Utc>,
+        locked_until: Timestamp,
     ) -> Result<Option<Uuid>, Error> {
         let now = now();
         let id = Uuid::now_v7();
@@ -76,7 +77,7 @@ impl IdempotencyStore for Store {
         scope: &str,
         key: &str,
         fingerprint: &str,
-        locked_until: DateTime<Utc>,
+        locked_until: Timestamp,
     ) -> Result<Begin, Error> {
         // Vòng lặp chạy lại nhiều nhất một lần: khi dòng cũ đã hết hạn và vừa bị xoá.
         for _ in 0..2 {
@@ -174,8 +175,8 @@ impl JobHandler for Cleanup {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]
@@ -495,7 +496,7 @@ mod tests {
             let (app, _, database) = setup(test).await;
             let store = Store;
             let tenant = app.default_tenant();
-            let soon = now() + chrono::Duration::seconds(60);
+            let soon = now() + SignedDuration::from_secs(60);
 
             let Begin::Started { id } = store.begin(&tenant, "s", "k", "f", soon).await.unwrap()
             else {
@@ -504,7 +505,7 @@ mod tests {
             assert_eq!(store.begin(&tenant, "s", "k", "f", soon).await.unwrap(), Begin::InProgress);
             // Lần đầu chết giữa chừng: quá hạn giữ thì request sau nhận quyền chạy.
             Entity::update_many()
-                .col_expr(Column::LockedUntil, Expr::value(now() - chrono::Duration::seconds(1)))
+                .col_expr(Column::LockedUntil, Expr::value(now() - SignedDuration::from_secs(1)))
                 .exec(database.write())
                 .await
                 .unwrap();
@@ -526,7 +527,7 @@ mod tests {
 
             // Hết hạn giữ key: dọn đi, key dùng lại được như mới.
             Entity::update_many()
-                .col_expr(Column::ExpiresAt, Expr::value(now() - chrono::Duration::seconds(1)))
+                .col_expr(Column::ExpiresAt, Expr::value(now() - SignedDuration::from_secs(1)))
                 .exec(database.write())
                 .await
                 .unwrap();
@@ -554,7 +555,7 @@ mod tests {
                 .build()
                 .await
                 .unwrap();
-            let soon = now() + chrono::Duration::seconds(60);
+            let soon = now() + SignedDuration::from_secs(60);
             let (a, b) = (app.tenant("a").await.unwrap(), app.tenant("b").await.unwrap());
             for tenant in [&a, &b, &app.default_tenant()] {
                 let started = Store.begin(tenant, "s", "k", "f", soon).await.unwrap();

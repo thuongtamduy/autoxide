@@ -6,13 +6,14 @@
 //! Mọi người dùng chung một mật khẩu (`BENCH_PASSWORD`), hash MỘT lần: hash Argon2id cho mỗi người
 //! sẽ tốn hàng phút mà không đo được gì.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::bench_seed::{self, Pseudo, SeedArgs};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::{EntityTrait, PaginatorTrait, Set};
 use uuid::Uuid;
 
@@ -64,14 +65,14 @@ impl TaskRun for Seed {
 }
 
 /// Dòng `auth_user` của `count` người dùng giả, tạo rải trong hai năm trước `now`.
-fn rows(tenant_id: Uuid, count: u64, hash: &str, now: DateTime<Utc>) -> Vec<entity::ActiveModel> {
+fn rows(tenant_id: Uuid, count: u64, hash: &str, now: Timestamp) -> Vec<entity::ActiveModel> {
     let mut random = Pseudo::new(0xA17E);
     (0..count)
         .map(|index| {
             let email = format!("bench-user-{index}@example.com");
             let name = format!("{} {index}", random.sentence(2));
-            let created =
-                now - Duration::minutes(i64::try_from(random.below(1_051_200)).unwrap_or(0));
+            let created = now
+                - SignedDuration::from_mins(i64::try_from(random.below(1_051_200)).unwrap_or(0));
             entity::ActiveModel {
                 id: Set(Uuid::now_v7()),
                 tenant_id: Set(tenant_id),
@@ -93,8 +94,8 @@ fn rows(tenant_id: Uuid, count: u64, hash: &str, now: DateTime<Utc>) -> Vec<enti
         .collect()
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]

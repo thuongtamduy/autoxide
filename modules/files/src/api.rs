@@ -10,7 +10,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::storage::ByteStream;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 /// Thông tin một file đã tải lên.
@@ -25,7 +25,7 @@ pub struct FileInfo {
     pub size: u64,
     /// SHA-256 của nội dung, hex chữ thường.
     pub sha256: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl FileInfo {
@@ -36,7 +36,7 @@ impl FileInfo {
         content_type: impl Into<String>,
         size: u64,
         sha256: impl Into<String>,
-        created_at: DateTime<Utc>,
+        created_at: Timestamp,
     ) -> Self {
         FileInfo {
             id,

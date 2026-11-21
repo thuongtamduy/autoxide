@@ -3,8 +3,8 @@
 //! bảng cũ bị bỏ.
 
 use autoxide_kernel::migration::prelude::*;
+use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::tokens::tokens_migration;
-use chrono::{DateTime, Utc};
 use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
@@ -21,7 +21,7 @@ impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         tokens_migration("m0019_move_tokens", "auth").up(manager).await?;
         let connection = manager.get_connection();
-        let now = Utc::now();
+        let now = Timestamp::now();
         for (table, purpose, email) in [
             ("auth_password_reset", "password_reset", false),
             ("auth_email_verification", "email_verification", true),
@@ -59,8 +59,8 @@ impl MigrationTrait for Migration {
                         row.try_get::<Uuid>("", "user_id")?.to_string().into(),
                         data.into(),
                         row.try_get::<String>("", "token_hash")?.into(),
-                        row.try_get::<DateTime<Utc>>("", "expires_at")?.into(),
-                        row.try_get::<DateTime<Utc>>("", "created_at")?.into(),
+                        row.try_get::<Timestamp>("", "expires_at")?.into(),
+                        row.try_get::<Timestamp>("", "created_at")?.into(),
                     ])
                     .to_owned();
                 connection.execute(&insert).await?;
@@ -87,6 +87,7 @@ mod tests {
     use autoxide_kernel::secret::sha256;
     use autoxide_kernel::tokens::OneTimeTokens;
     use autoxide_testkit::TestDatabase;
+    use jiff::SignedDuration;
 
     use super::*;
 
@@ -107,7 +108,7 @@ mod tests {
                 .await
                 .unwrap();
             let user = Uuid::now_v7();
-            let now = Utc::now();
+            let now = Timestamp::now();
             let insert_user = Query::insert()
                 .into_table(Alias::new("auth_user"))
                 .columns(
@@ -124,7 +125,7 @@ mod tests {
                 ])
                 .to_owned();
             database.write().execute(&insert_user).await.unwrap();
-            let later = now + chrono::Duration::hours(1);
+            let later = now + SignedDuration::from_hours(1);
             let rows: [(&str, Vec<&str>, Vec<sea_orm::Value>); 3] = [
                 (
                     "auth_password_reset",
@@ -134,7 +135,7 @@ mod tests {
                         user.into(),
                         sha256("reset-live").into(),
                         later.into(),
-                        Option::<DateTime<Utc>>::None.into(),
+                        Option::<Timestamp>::None.into(),
                         now.into(),
                     ],
                 ),
@@ -167,7 +168,7 @@ mod tests {
                         "ada@example.com".into(),
                         sha256("verify-live").into(),
                         later.into(),
-                        Option::<DateTime<Utc>>::None.into(),
+                        Option::<Timestamp>::None.into(),
                         now.into(),
                     ],
                 ),

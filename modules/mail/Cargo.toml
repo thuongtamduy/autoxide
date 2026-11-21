@@ -10,7 +10,6 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 autoxide-kernel.workspace = true
-chrono.workspace = true
 lettre.workspace = true
 metrics.workspace = true
 serde.workspace = true

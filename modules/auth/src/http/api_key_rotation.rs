@@ -1,5 +1,6 @@
 //! `POST /api-keys/{id}/rotate`: thay một API key bằng key mới mà máy không mất lúc nào (bước 54).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -36,7 +36,7 @@ pub(crate) struct RotateApiKeyRequest {
     overlap_hours: Option<u32>,
     /// When the new key stops working (RFC 3339), at most `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days
     /// ahead. Omit for that longest lifetime.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// Your current password, as when creating a key. Or `totp_code`, a passkey
     /// (`passkey_ceremony_id` and `passkey_credential`) or a `reauth_token` instead — exactly one.
     #[serde(default)]

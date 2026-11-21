@@ -12,13 +12,13 @@
 //! đổi tên / loại / cấp trên thì đóng (`valid_to` = ngày hiệu lực của bộ mới) và mở dòng mới;
 //! đơn vị giữ nguyên thì giữ dòng cũ.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
-use chrono::{SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::Deserialize;
@@ -160,7 +160,7 @@ pub(crate) fn parse(csv: &str) -> Result<Vec<Row>, Error> {
 
 fn check_manifest(manifest: &Manifest) -> Result<(), Error> {
     let mut problems = Vec::new();
-    let date = |raw: &str| chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d").is_ok();
+    let date = |raw: &str| Date::parse_from_str(raw, "%Y-%m-%d").is_ok();
     if !crate::service::COUNTRIES.contains(&manifest.country.as_str()) {
         problems.push(format!("country `{}` is not supported", manifest.country));
     }
@@ -223,7 +223,7 @@ impl AddressService {
             sha256: Set(sha256.to_owned()),
             province_count: Set(i32::try_from(provinces).map_err(Error::internal)?),
             commune_count: Set(i32::try_from(communes).map_err(Error::internal)?),
-            imported_at: Set(Utc::now().trunc_subsecs(6)),
+            imported_at: Set(Timestamp::now()),
         }
         .insert(&transaction)
         .await?;

@@ -1,6 +1,7 @@
 //! Endpoint REST của module `webhooks`, dưới `/api/v1/webhooks`. Mọi endpoint cần
 //! permission `webhooks.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -61,13 +61,13 @@ pub(crate) struct EndpointResponse {
     #[schema(example = json!(["auth.user_created", "auth.user_deleted"]))]
     events: Vec<String>,
     /// When it was turned off; `null` while it receives events.
-    disabled_at: Option<DateTime<Utc>>,
+    disabled_at: Option<Timestamp>,
     /// The newest delivery to this endpoint; `null` when nothing was sent yet. Only in the list
     /// and when reading one endpoint.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     last_delivery: Option<Option<LastDelivery>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 /// The newest delivery to an endpoint.
@@ -83,8 +83,8 @@ pub(crate) struct LastDelivery {
     /// HTTP status the endpoint answered with, on the last attempt; `null` when it did not answer.
     response_status: Option<i32>,
     /// When it was last tried; `null` while it waits for its first attempt.
-    last_attempt_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    last_attempt_at: Option<Timestamp>,
+    created_at: Timestamp,
 }
 
 impl From<crate::entity::delivery::Model> for LastDelivery {
@@ -197,9 +197,9 @@ pub(crate) struct DeliveryResponse {
     response_status: Option<i32>,
     /// Why the last attempt failed.
     last_error: Option<String>,
-    created_at: DateTime<Utc>,
-    last_attempt_at: Option<DateTime<Utc>>,
-    delivered_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    last_attempt_at: Option<Timestamp>,
+    delivered_at: Option<Timestamp>,
 }
 
 impl From<Delivery> for DeliveryResponse {

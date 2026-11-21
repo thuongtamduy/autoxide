@@ -2,7 +2,7 @@
 //! người dùng (`auth_user_role`). Tạo sẵn role `admin` có mọi permission.
 
 use autoxide_kernel::migration::prelude::*;
-use chrono::{SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 pub(crate) struct Migration;
@@ -91,7 +91,7 @@ impl MigrationTrait for Migration {
             manager.create_index(index.to_owned()).await?;
         }
 
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let mut admin = Query::insert();
         admin
             .into_table("auth_role")

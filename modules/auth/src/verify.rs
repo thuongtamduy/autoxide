@@ -10,6 +10,8 @@
 //!   hiệu lực. Email đổi thì địa chỉ cũ nhận mail báo kèm cách báo "không phải tôi"
 //!   (`email_report.rs`).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -19,7 +21,6 @@ use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
 use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
-use chrono::{DateTime, SubsecRound, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -178,7 +179,7 @@ impl EmailVerifications {
         &self,
         tenant: &TenantContext,
         user: &User,
-    ) -> Result<Option<(String, DateTime<Utc>)>, Error> {
+    ) -> Result<Option<(String, Timestamp)>, Error> {
         let subject = user.id.to_string();
         let live = tokens().live(tenant.database().read(), tenant, PURPOSE, &subject).await?;
         Ok(live.into_iter().find_map(|token| {
@@ -285,7 +286,7 @@ impl EmailVerifications {
     ) -> Result<(), Error> {
         let now = now();
         let subject = user.id.to_string();
-        let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
+        let since = now - SignedDuration::from_secs(COOLDOWN_SECONDS);
         let recent =
             tokens().recent(tenant.database().write(), tenant, PURPOSE, &subject, since).await?;
         if recent.iter().any(|token| token.data.as_deref() == Some(email)) {
@@ -293,7 +294,7 @@ impl EmailVerifications {
         }
 
         let transaction = tenant.database().begin_write().await?;
-        let ttl = chrono::Duration::hours(TOKEN_HOURS);
+        let ttl = SignedDuration::from_hours(TOKEN_HOURS);
         let raw =
             tokens().issue(&transaction, tenant, PURPOSE, &subject, Some(email), ttl).await?.token;
         // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
@@ -341,8 +342,8 @@ fn already_verified() -> Error {
     Error::conflict("auth.email_already_verified", "This email address is already verified.")
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]
@@ -393,8 +394,8 @@ mod tests {
         use sea_orm::sea_query::{Alias, Query};
         let update = Query::update()
             .table(Alias::new("auth_tokens"))
-            .value(Alias::new("created_at"), now() - chrono::Duration::minutes(2))
-            .value(Alias::new("expires_at"), now() + chrono::Duration::hours(24 - hours))
+            .value(Alias::new("created_at"), now() - SignedDuration::from_mins(2))
+            .value(Alias::new("expires_at"), now() + SignedDuration::from_hours(24 - hours))
             .to_owned();
         services.database.write().execute(&update).await.unwrap();
     }

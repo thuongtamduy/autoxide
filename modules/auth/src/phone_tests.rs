@@ -2,6 +2,8 @@
 //! đăng nhập lại cùng tài khoản, hai lần tạo đồng thời một tài khoản, xác nhận lại bằng mã. Bộ mã giả
 //! cắm qua `AuthExtensions` như `compliance` làm. Cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -41,7 +43,7 @@ impl PhoneCodes for FakeCodes {
         })?;
         let id = Uuid::now_v7();
         self.sent.lock().unwrap().insert(id, (phone, false));
-        Ok(PhoneCodeSent { id, expires_at: chrono::Utc::now() + chrono::Duration::minutes(5) })
+        Ok(PhoneCodeSent { id, expires_at: Timestamp::now() + SignedDuration::from_mins(5) })
     }
     async fn verify(&self, _: &TenantContext, id: Uuid, code: &str) -> Result<PhoneNumber, Error> {
         let mut sent = self.sent.lock().unwrap();

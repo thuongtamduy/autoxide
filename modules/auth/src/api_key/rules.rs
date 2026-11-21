@@ -3,7 +3,8 @@
 
 use autoxide_kernel::config::IpRange;
 use autoxide_kernel::error::FieldError;
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 /// Số dải IP tối đa của một key.
 pub(super) const MAX_NETWORKS: usize = 50;
@@ -11,11 +12,11 @@ pub(super) const MAX_NETWORKS: usize = 50;
 /// Hạn của key: `requested`, hay hôm nay + `max_days` khi không nêu. Quá khứ hay xa hơn trần là
 /// lỗi của ô `expires_at`. Mọi key đều hết hạn: key lộ ra không sống mãi.
 pub(super) fn expiry(
-    requested: Option<DateTime<Utc>>,
-    now: DateTime<Utc>,
+    requested: Option<Timestamp>,
+    now: Timestamp,
     max_days: i64,
-) -> Result<DateTime<Utc>, FieldError> {
-    let latest = now + Duration::days(max_days);
+) -> Result<Timestamp, FieldError> {
+    let latest = now + SignedDuration::from_hours(24 * max_days);
     match requested {
         None => Ok(latest),
         Some(at) if at <= now => {
@@ -82,12 +83,12 @@ mod tests {
 
     #[test]
     fn han_mac_dinh_va_tran() {
-        let now = Utc::now();
-        assert_eq!(expiry(None, now, 30).unwrap(), now + Duration::days(30));
-        let soon = now + Duration::days(3);
+        let now = Timestamp::now();
+        assert_eq!(expiry(None, now, 30).unwrap(), now + SignedDuration::from_hours(24 * 30));
+        let soon = now + SignedDuration::from_hours(24 * 3);
         assert_eq!(expiry(Some(soon), now, 30).unwrap(), soon);
         assert_eq!(expiry(Some(now), now, 30).unwrap_err().code, "past");
-        let far = now + Duration::days(31);
+        let far = now + SignedDuration::from_hours(24 * 31);
         assert_eq!(expiry(Some(far), now, 30).unwrap_err().code, "too_far");
     }
 

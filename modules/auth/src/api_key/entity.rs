@@ -1,6 +1,7 @@
 //! Entity của hai bảng API key (SeaORM).
 
 pub(crate) mod api_key {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -15,22 +16,22 @@ pub(crate) mod api_key {
         pub name: String,
         pub prefix: String,
         pub key_hash: String,
-        pub expires_at: Option<DateTimeUtc>,
+        pub expires_at: Option<Timestamp>,
         /// Dải IP được gọi, CIDR cách nhau bằng dấu phẩy (bước 54); NULL: mọi địa chỉ.
         pub allowed_ips: Option<String>,
         /// Key này thay key nào khi xoay vòng (bước 54); NULL: tạo mới.
         pub rotated_from: Option<Uuid>,
         /// Nút của hàng rào (bước 34); nút gốc = không rào. Luôn có giá trị.
         pub org_id: Option<Uuid>,
-        pub last_used_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub last_used_at: Option<Timestamp>,
+        pub created_at: Timestamp,
         /// `human`, `agent` hay `service` (bước 51 P12).
         pub kind: String,
         /// `active` hay `pending` (chờ quản trị duyệt, bước 54).
         pub status: String,
         /// Người duyệt và lúc duyệt; NULL khi key không cần duyệt.
         pub approved_by: Option<Uuid>,
-        pub approved_at: Option<DateTimeUtc>,
+        pub approved_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

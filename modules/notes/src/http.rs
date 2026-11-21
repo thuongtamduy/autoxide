@@ -2,6 +2,7 @@
 //! → kiểm permission → gọi service → trả envelope (`Data`, `Page`; lỗi là `Problem`).
 //! Mọi route đăng ký qua `routes!` để có tài liệu OpenAPI (luật kiến trúc 6).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -44,8 +44,8 @@ pub(crate) struct NoteResponse {
     title: String,
     #[schema(example = "Milk, eggs, bread.")]
     body: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Note> for NoteResponse {

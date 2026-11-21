@@ -6,7 +6,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
@@ -27,7 +27,7 @@ pub(crate) async fn replace<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     user_id: Uuid,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<Vec<String>, Error> {
     remove(connection, tenant, user_id).await?;
     let mut codes = Vec::with_capacity(COUNT);
@@ -55,7 +55,7 @@ pub(crate) async fn redeem<C: ConnectionTrait>(
     tenant: &TenantContext,
     user_id: Uuid,
     code: &str,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<bool, Error> {
     let Some(normalized) = normalize(code) else {
         return Ok(false);

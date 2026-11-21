@@ -20,12 +20,13 @@
 //! của phần thô.
 
 use autoxide_kernel::access::Realm;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Set,
@@ -61,7 +62,7 @@ pub(crate) struct Tokens {
     /// Số giây access token còn sống.
     pub expires_in: u64,
     pub refresh_token: String,
-    pub refresh_token_expires_at: DateTime<Utc>,
+    pub refresh_token_expires_at: Timestamp,
     /// Phiên mà cặp token này thuộc về (họ refresh token): client giữ lại để nhận ra
     /// phiên của chính mình trong danh sách phiên.
     pub session_id: Uuid,
@@ -76,10 +77,10 @@ pub(crate) struct Session {
     pub sign_in_method: Option<String>,
     /// Quốc gia gần đúng, khi biết.
     pub country: Option<String>,
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
     /// Lần cấp token gần nhất (đăng nhập hoặc refresh).
-    pub last_active_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
+    pub last_active_at: Timestamp,
+    pub expires_at: Timestamp,
 }
 
 impl From<entity::Model> for Session {
@@ -102,7 +103,7 @@ const USER_AGENT_MAX_CHARS: usize = 255;
 pub(crate) struct SessionService {
     users: Arc<UserService>,
     access_tokens: AccessTokens,
-    refresh_token_ttl: chrono::Duration,
+    refresh_token_ttl: SignedDuration,
     throttle: LoginThrottle,
     mfa: Arc<MfaService>,
     outbox: Outbox,
@@ -140,7 +141,7 @@ impl SessionService {
         outbox: Outbox,
         databases: DatabaseRegistry,
     ) -> Result<Self, Error> {
-        let refresh_token_ttl = chrono::Duration::from_std(refresh_token_ttl)
+        let refresh_token_ttl = SignedDuration::try_from(refresh_token_ttl)
             .map_err(|error| Error::internal(format!("refresh token lifetime: {error}")))?;
         Ok(SessionService {
             users,
@@ -490,7 +491,7 @@ impl SessionService {
     /// Kiểm access token `token` (không có chữ `Bearer`): khách ghi trong token, người dùng, phiên,
     /// lần xác thực gần nhất. Chữ ký đã kiểm bằng khoá của đúng khách đó; chưa hỏi database nào.
     pub(crate) fn verify_access(&self, token: &str) -> Result<token::Verified, Error> {
-        self.access_tokens.verify(token, Utc::now())
+        self.access_tokens.verify(token, Timestamp::now())
     }
 
     /// Người dùng `user_id` của một access token đã kiểm, tra ở khách `tenant` của token: không
@@ -533,8 +534,8 @@ impl SessionService {
         user_id: Uuid,
         session: Stamp,
         refresh_token: &str,
-        refresh_token_expires_at: DateTime<Utc>,
-        now: DateTime<Utc>,
+        refresh_token_expires_at: Timestamp,
+        now: Timestamp,
     ) -> Result<Tokens, Error> {
         let Stamp { id: session_id, authenticated_at } = session;
         let access_token =
@@ -617,11 +618,7 @@ async fn lock_active_user<C: ConnectionTrait>(
 }
 
 /// Refresh token còn dùng được của người dùng `user_id`: mỗi phiên đúng một dòng.
-fn live_tokens(
-    tenant: &TenantContext,
-    user_id: Uuid,
-    now: DateTime<Utc>,
-) -> sea_orm::Select<Entity> {
+fn live_tokens(tenant: &TenantContext, user_id: Uuid, now: Timestamp) -> sea_orm::Select<Entity> {
     Entity::find()
         .scoped(tenant)
         .filter(Column::UserId.eq(user_id))
@@ -635,13 +632,13 @@ fn live_tokens(
 #[derive(Clone, Copy)]
 struct Stamp {
     id: Uuid,
-    authenticated_at: DateTime<Utc>,
+    authenticated_at: Timestamp,
 }
 
 struct SessionDetails {
-    started_at: DateTime<Utc>,
+    started_at: Timestamp,
     /// Lần xác thực gần nhất (đăng nhập, xác nhận lại).
-    authenticated_at: DateTime<Utc>,
+    authenticated_at: Timestamp,
     user_agent: Option<String>,
     sign_in_method: Option<String>,
     country: Option<String>,
@@ -652,8 +649,8 @@ fn new_refresh_token(
     tenant: &TenantContext,
     user_id: Uuid,
     family_id: Uuid,
-    now: DateTime<Utc>,
-    expires_at: DateTime<Utc>,
+    now: Timestamp,
+    expires_at: Timestamp,
     session: SessionDetails,
 ) -> Result<(String, entity::ActiveModel), Error> {
     let token = token::random_token(REFRESH_TOKEN_BYTES)?;
@@ -690,8 +687,8 @@ pub(crate) fn bearer_token(authorization: Option<&str>) -> Result<&str, Error> {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Khoá của login throttling: email của nhân sự giữ nguyên (bộ đếm cũ còn hiệu lực), của người

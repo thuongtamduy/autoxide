@@ -1,6 +1,8 @@
 //! Test tải thẳng (bước 40 P4): trên nơi lưu giả cấp link (cả hai database), trên ổ đĩa (không
 //! cấp link), và trên S3 thật khi `TEST_S3_ENDPOINT` được đặt (gate luôn đặt, dùng moto).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -212,8 +214,8 @@ async fn luot_het_han_duoc_don() {
         files.complete_upload(&tenant, &ada, kept.upload.id).await.unwrap();
 
         // Chưa quá hạn: không đụng tới.
-        assert_eq!(files.purge_uploads(&registry, &database, Utc::now()).await.unwrap(), 0);
-        let later = Utc::now() + chrono::Duration::hours(3);
+        assert_eq!(files.purge_uploads(&registry, &database, Timestamp::now()).await.unwrap(), 0);
+        let later = Timestamp::now() + SignedDuration::from_hours(3);
         assert_eq!(files.purge_uploads(&registry, &database, later).await.unwrap(), 1);
         assert_eq!(files.purge_uploads(&registry, &database, later).await.unwrap(), 0);
         assert!(storage.bytes(&format!("files/{}", abandoned.upload.id)).is_none());
@@ -221,7 +223,7 @@ async fn luot_het_han_duoc_don() {
         let gone = files.complete_upload(&tenant, &ada, abandoned.upload.id).await.unwrap_err();
         assert_eq!(gone.code(), "files.upload_not_found");
         // Một tuần sau: dòng của lượt đã xác nhận cũng được xoá, file vẫn còn.
-        let week = Utc::now() + chrono::Duration::days(8);
+        let week = Timestamp::now() + SignedDuration::from_hours(24 * 8);
         files.purge_uploads(&registry, &database, week).await.unwrap();
         assert_eq!(count(&database, "SELECT COUNT(*) FROM files_uploads").await, 0);
         assert!(files.get(&tenant, &ada, kept.upload.id).await.is_ok());

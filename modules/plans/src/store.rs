@@ -13,6 +13,8 @@
 //! huỷ khi hết kỳ — không bao giờ thành gói miễn phí. Hoàn tiền / thu hồi: huỷ ngay (chỉ đọc).
 //! Tiền do Apple / Google thu và giữ (D-187).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -20,7 +22,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::rows;
 use autoxide_kernel::store::{AppStore, PurchaseState, StorePurchase, StorePurchases};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantId};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -36,6 +37,7 @@ use crate::service::{
 
 pub(crate) mod entity {
     pub(crate) mod product {
+        use autoxide_kernel::time::Timestamp;
         use sea_orm::entity::prelude::*;
 
         #[sea_orm::model]
@@ -48,14 +50,15 @@ pub(crate) mod entity {
             pub store: String,
             pub product_id: String,
             pub plan_id: Uuid,
-            pub created_at: DateTimeUtc,
-            pub updated_at: DateTimeUtc,
+            pub created_at: Timestamp,
+            pub updated_at: Timestamp,
         }
 
         impl ActiveModelBehavior for ActiveModel {}
     }
 
     pub(crate) mod purchase {
+        use autoxide_kernel::time::Timestamp;
         use sea_orm::entity::prelude::*;
 
         #[sea_orm::model]
@@ -72,16 +75,17 @@ pub(crate) mod entity {
             pub product_id: String,
             /// `active`, `expired`, `refunded` hay `revoked`.
             pub state: String,
-            pub expires_at: Option<DateTimeUtc>,
+            pub expires_at: Option<Timestamp>,
             pub sandbox: bool,
-            pub created_at: DateTimeUtc,
-            pub updated_at: DateTimeUtc,
+            pub created_at: Timestamp,
+            pub updated_at: Timestamp,
         }
 
         impl ActiveModelBehavior for ActiveModel {}
     }
 
     pub(crate) mod notification {
+        use autoxide_kernel::time::Timestamp;
         use sea_orm::entity::prelude::*;
 
         #[sea_orm::model]
@@ -92,7 +96,7 @@ pub(crate) mod entity {
             pub id: Uuid,
             pub store: String,
             pub notification_id: String,
-            pub received_at: DateTimeUtc,
+            pub received_at: Timestamp,
         }
 
         impl ActiveModelBehavior for ActiveModel {}
@@ -392,7 +396,7 @@ impl PlansService {
         tenant: TenantId,
         bought: &StorePurchase,
         plan_id: Option<Uuid>,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         let subject = format!("plans.subscription:{tenant}");
         let current = rows::lock_one(
@@ -402,7 +406,7 @@ impl PlansService {
         )
         .await?;
         let active = bought.state == PurchaseState::Active;
-        let end = bought.expires_at.unwrap_or(at + Duration::days(36500));
+        let end = bought.expires_at.unwrap_or(at + SignedDuration::from_hours(24 * 36500));
         match (current, active) {
             (None, false) => return Ok(()),
             (None, true) => {
@@ -489,7 +493,8 @@ impl PlansService {
                     // Hoàn tiền / thu hồi: thôi quyền dùng ngay (chỉ đọc, giữ dữ liệu).
                     row.status = Set("canceled".to_owned());
                     row.canceled_at = Set(Some(at));
-                    row.delete_after = Set(Some(at + Duration::days(i64::from(retention))));
+                    row.delete_after =
+                        Set(Some(at + SignedDuration::from_hours(24 * (i64::from(retention)))));
                 } else {
                     // Hết hạn, không gia hạn: vòng đời huỷ khi hết kỳ.
                     row.cancel_at_period_end = Set(true);

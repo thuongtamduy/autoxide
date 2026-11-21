@@ -4,12 +4,13 @@
 //! khách tắt bằng cấu hình `auth.step_up` (có audit như mọi cấu hình theo khách). API key không bị
 //! đòi (theo đặc tả 54: việc nhạy cảm của agent đi đường duyệt).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Principal, StepUp};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{TenantContext, TenantSetting, TenantSettings, parsed_setting};
-use chrono::{DateTime, Duration, Utc};
 
 /// Cấu hình theo khách: đòi xác nhận lại cho việc nhạy cảm.
 pub(crate) const STEP_UP: TenantSetting = TenantSetting::new(
@@ -35,7 +36,7 @@ fn parse_flag(raw: &str) -> Result<bool, FieldError> {
 /// Chính sách xác nhận lại của chương trình.
 pub(crate) struct StepUpPolicy {
     /// Cửa sổ sau lần xác thực (`AUTOXIDE_AUTH_STEP_UP_MINUTES`).
-    pub window: Duration,
+    pub window: SignedDuration,
     /// Cấu hình theo khách; `None` (chương trình rút gọn): luôn bật.
     pub settings: Option<Arc<dyn TenantSettings>>,
 }
@@ -46,7 +47,7 @@ impl StepUpPolicy {
         &self,
         tenant: &TenantContext,
         principal: Principal,
-        authenticated_at: Option<DateTime<Utc>>,
+        authenticated_at: Option<Timestamp>,
     ) -> Result<Principal, Error> {
         if let Some(settings) = &self.settings
             && parsed_setting(settings.as_ref(), tenant, &STEP_UP, parse_flag).await? == Some(false)

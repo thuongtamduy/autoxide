@@ -7,6 +7,8 @@
 //! 2. `confirm(token, mật khẩu mới)`: token đúng, chưa dùng, chưa hết hạn thì đặt mật
 //!    khẩu mới; mọi phiên đăng nhập và mọi token đặt lại khác của người đó hết hiệu lực.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -16,7 +18,6 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue
 use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
 use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
-use chrono::{DateTime, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -128,7 +129,7 @@ impl PasswordResets {
         let language = self.users.mail_language(tenant, user.id, language).await?;
         let now = now();
         let subject = user.id.to_string();
-        let since = now - chrono::Duration::seconds(COOLDOWN_SECONDS);
+        let since = now - SignedDuration::from_secs(COOLDOWN_SECONDS);
         if !tokens()
             .recent(tenant.database().write(), tenant, PURPOSE, &subject, since)
             .await?
@@ -138,7 +139,7 @@ impl PasswordResets {
         }
 
         let transaction = tenant.database().begin_write().await?;
-        let ttl = chrono::Duration::minutes(TOKEN_MINUTES);
+        let ttl = SignedDuration::from_mins(TOKEN_MINUTES);
         let raw = tokens().issue(&transaction, tenant, PURPOSE, &subject, None, ttl).await?.token;
         // Token trong mail mang khách: link mở trên tên miền chính vẫn tìm được khách.
         let token = link_token(tenant, &raw);
@@ -206,8 +207,8 @@ fn invalid_token() -> Error {
     )
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]
@@ -258,8 +259,8 @@ mod tests {
         use sea_orm::sea_query::{Alias, Query};
         let update = Query::update()
             .table(Alias::new("auth_tokens"))
-            .value(Alias::new("created_at"), now() - chrono::Duration::minutes(minutes))
-            .value(Alias::new("expires_at"), now() + chrono::Duration::minutes(30 - minutes))
+            .value(Alias::new("created_at"), now() - SignedDuration::from_mins(minutes))
+            .value(Alias::new("expires_at"), now() + SignedDuration::from_mins(30 - minutes))
             .to_owned();
         services.database.write().execute(&update).await.unwrap();
     }

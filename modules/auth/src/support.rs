@@ -11,13 +11,14 @@
 //! Dòng nằm ở database của khách nền tảng (`tenant_id` = khách nền tảng, `target_tenant_id` = khách
 //! được vào): một chỗ tra cho mọi request vào, mọi danh sách.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{AccessPath, Grant, Principal, Realm};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde_json::json;
@@ -26,6 +27,7 @@ use uuid::Uuid;
 use crate::events;
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -48,14 +50,14 @@ pub(crate) mod entity {
         pub reason: String,
         pub legal_reference: Option<String>,
         pub granted_by: Option<Uuid>,
-        pub starts_at: DateTimeUtc,
-        pub expires_at: DateTimeUtc,
-        pub first_used_at: Option<DateTimeUtc>,
-        pub revoked_at: Option<DateTimeUtc>,
+        pub starts_at: Timestamp,
+        pub expires_at: Timestamp,
+        pub first_used_at: Option<Timestamp>,
+        pub revoked_at: Option<Timestamp>,
         pub revoked_by: Option<Uuid>,
         /// Khách tự thu hồi (D-211).
         pub revoked_by_tenant: bool,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -93,8 +95,8 @@ pub(crate) struct SupportService {
     pub catalog: autoxide_kernel::access::PermissionCatalog,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 impl SupportService {
@@ -231,7 +233,7 @@ impl SupportService {
             legal_reference: Set(reference),
             granted_by: Set(Some(principal.user_id())),
             starts_at: Set(now),
-            expires_at: Set(now + chrono::Duration::hours(i64::from(input.hours))),
+            expires_at: Set(now + SignedDuration::from_hours(i64::from(input.hours))),
             first_used_at: Set(None),
             revoked_at: Set(None),
             revoked_by: Set(None),

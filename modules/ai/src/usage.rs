@@ -6,7 +6,8 @@ use autoxide_kernel::ai::Usage;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set, SqlErr};
 use uuid::Uuid;
@@ -15,6 +16,7 @@ use crate::errors;
 
 pub(crate) mod entity {
     //! Bảng `ai_usage`: một dòng mỗi (ngày UTC, việc).
+    use autoxide_kernel::time::Timestamp;
 
     use sea_orm::entity::prelude::*;
 
@@ -33,7 +35,7 @@ pub(crate) mod entity {
         pub input_tokens: i64,
         pub output_tokens: i64,
         pub requests: i64,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -54,7 +56,7 @@ pub(crate) struct UsageBook {
 }
 
 pub(crate) fn today() -> String {
-    Utc::now().format("%Y-%m-%d").to_string()
+    Timestamp::now().format("%Y-%m-%d").to_string()
 }
 
 impl UsageBook {
@@ -111,7 +113,7 @@ impl UsageBook {
                 input_tokens: Set(input),
                 output_tokens: Set(output),
                 requests: Set(1),
-                updated_at: Set(Utc::now()),
+                updated_at: Set(Timestamp::now()),
             };
             match row.insert(tenant.database().write()).await {
                 Ok(_) => return Ok(()),
@@ -135,7 +137,7 @@ impl UsageBook {
             .col_expr(Column::InputTokens, Expr::col(Column::InputTokens).add(input))
             .col_expr(Column::OutputTokens, Expr::col(Column::OutputTokens).add(output))
             .col_expr(Column::Requests, Expr::col(Column::Requests).add(1))
-            .col_expr(Column::UpdatedAt, Expr::value(Utc::now()))
+            .col_expr(Column::UpdatedAt, Expr::value(Timestamp::now()))
             .filter(Column::Day.eq(day))
             .filter(Column::Purpose.eq(purpose))
             .scoped(tenant)
@@ -150,7 +152,9 @@ impl UsageBook {
         database: &autoxide_kernel::database::Database,
         days: u32,
     ) -> Result<u64, Error> {
-        let cutoff = (Utc::now() - Duration::days(i64::from(days))).format("%Y-%m-%d").to_string();
+        let cutoff = (Timestamp::now() - SignedDuration::from_hours(24 * (i64::from(days))))
+            .format("%Y-%m-%d")
+            .to_string();
         let result =
             Entity::delete_many().filter(Column::Day.lt(cutoff)).exec(database.write()).await?;
         Ok(result.rows_affected)

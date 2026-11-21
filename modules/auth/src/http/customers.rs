@@ -1,6 +1,7 @@
 //! Tài khoản người mua của khách (D-309): xem, đổi tên, khoá / mở. Không có role, không permission;
 //! nhân sự quản lý qua `/users`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Principal, Realm};
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -41,11 +41,11 @@ pub(crate) struct CustomerResponse {
     #[schema(example = "Nguyen Van A")]
     name: String,
     /// When the account was disabled; `null` while active.
-    disabled_at: Option<DateTime<Utc>>,
+    disabled_at: Option<Timestamp>,
     /// When the email was confirmed; `null` while not verified.
-    email_verified_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    email_verified_at: Option<Timestamp>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<User> for CustomerResponse {

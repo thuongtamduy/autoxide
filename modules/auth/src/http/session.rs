@@ -1,5 +1,6 @@
 //! Endpoint đăng nhập: `/login`, `/refresh`, `/logout`, `/me`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -112,7 +112,7 @@ pub(crate) struct TokenResponse {
     /// token works once: always keep only the newest one. Store it securely.
     refresh_token: String,
     /// When `refresh_token` expires; after that, sign in again.
-    refresh_token_expires_at: DateTime<Utc>,
+    refresh_token_expires_at: Timestamp,
     /// The session these tokens belong to. It stays the same across refreshes; keep it
     /// to recognize this client in `GET /api/v1/auth/me/sessions`.
     session_id: Uuid,
@@ -143,8 +143,8 @@ pub(crate) struct MeResponse {
     name: String,
     /// When the email was confirmed through a verification mail; `null` while it is
     /// not verified (ask for a new mail with `POST /api/v1/auth/me/email/verification`).
-    email_verified_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    email_verified_at: Option<Timestamp>,
+    created_at: Timestamp,
     /// `true` when a role grants every permission (the `admin` role); `permissions`
     /// is then empty.
     all_permissions: bool,
@@ -186,7 +186,7 @@ pub(crate) struct PendingEmail {
     #[schema(example = "ada@new.example")]
     email: String,
     /// When the confirmation link stops working.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl MeResponse {

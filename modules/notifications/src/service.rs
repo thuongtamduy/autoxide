@@ -2,6 +2,7 @@
 //! thật ở [`crate::delivery`]; hộp thư, tuỳ chọn, đăng ký đẩy ở [`crate::me`]; mẫu ở
 //! [`crate::templates`]; thông báo của nền tảng ở [`crate::platform`].
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -18,7 +19,6 @@ use autoxide_kernel::sms::{PhoneNumber, SmsSender};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantAdmin, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use autoxide_kernel::zns::ZnsSender;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -35,8 +35,8 @@ use crate::registry::Kinds;
 /// Mã nước mặc định khi chuẩn hoá số điện thoại không có `+`.
 pub(crate) const DEFAULT_COUNTRY_CODE: &str = "84";
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Job gửi một tin (payload chỉ ID).

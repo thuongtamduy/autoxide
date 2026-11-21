@@ -5,7 +5,8 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
@@ -20,6 +21,7 @@ const MAX_ATTEMPTS: i32 = 5;
 
 /// Entity của bảng `auth_mfa_challenge` (SeaORM).
 mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -33,8 +35,8 @@ mod entity {
         pub user_id: Uuid,
         pub token_hash: String,
         pub attempts: i32,
-        pub expires_at: DateTimeUtc,
-        pub created_at: DateTimeUtc,
+        pub expires_at: Timestamp,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -51,7 +53,7 @@ pub(crate) async fn open<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     user_id: Uuid,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<String, Error> {
     let mfa_token = token::random_token(32)?;
     entity::ActiveModel {
@@ -60,7 +62,7 @@ pub(crate) async fn open<C: ConnectionTrait>(
         user_id: Set(user_id),
         token_hash: Set(token::sha256(&mfa_token)),
         attempts: Set(0),
-        expires_at: Set(now + chrono::Duration::seconds(CHALLENGE_TTL_SECONDS)),
+        expires_at: Set(now + SignedDuration::from_secs(CHALLENGE_TTL_SECONDS)),
         created_at: Set(now),
     }
     .insert(connection)
@@ -75,7 +77,7 @@ pub(crate) async fn claim_attempt<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     mfa_token: &str,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<(Uuid, Uuid), Error> {
     let row = Entity::find()
         .filter(Column::TokenHash.eq(token::sha256(mfa_token)))

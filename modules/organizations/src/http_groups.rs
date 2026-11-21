@@ -1,6 +1,7 @@
 //! Nhóm nút cho báo cáo (bước 38, D-232), dưới `/api/v1/organizations/groups`. Handler chỉ: lấy dữ
 //! liệu vào → kiểm permission → gọi service → trả envelope.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -45,8 +45,8 @@ pub(crate) struct GroupResponse {
     member_count: u64,
     /// Units of the group outside your scope: only counted, never listed or named.
     excluded_org_count: u64,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<GroupView> for GroupResponse {
@@ -68,7 +68,7 @@ impl From<GroupView> for GroupResponse {
 pub(crate) struct GroupMemberResponse {
     /// Id of the unit (see `GET /api/v1/organizations/units/{id}`).
     org_id: Uuid,
-    added_at: DateTime<Utc>,
+    added_at: Timestamp,
 }
 
 impl From<member::Model> for GroupMemberResponse {

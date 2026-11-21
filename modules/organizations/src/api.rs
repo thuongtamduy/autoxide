@@ -105,12 +105,12 @@ impl EffectiveSetting {
 pub struct OpeningRange {
     /// Ngày trong tuần theo ISO: 1 thứ Hai … 7 Chủ nhật.
     pub day: u8,
-    pub opens: chrono::NaiveTime,
-    pub closes: chrono::NaiveTime,
+    pub opens: jiff::civil::Time,
+    pub closes: jiff::civil::Time,
 }
 
 impl OpeningRange {
-    pub fn new(day: u8, opens: chrono::NaiveTime, closes: chrono::NaiveTime) -> Self {
+    pub fn new(day: u8, opens: jiff::civil::Time, closes: jiff::civil::Time) -> Self {
         OpeningRange { day, opens, closes }
     }
 }

@@ -1,6 +1,7 @@
 //! Entity của bảng mặt điều khiển `address_dataset`, `address_unit` (không có `tenant_id`).
 
 pub(crate) mod dataset {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -19,7 +20,7 @@ pub(crate) mod dataset {
         pub sha256: String,
         pub province_count: i32,
         pub commune_count: i32,
-        pub imported_at: DateTimeUtc,
+        pub imported_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

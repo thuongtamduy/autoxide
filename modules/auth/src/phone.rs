@@ -7,6 +7,7 @@
 //!   và khách cho người mua tự tạo tài khoản → tạo tài khoản chỉ có số (`email = ''`), không mật khẩu.
 //! - Tài khoản được tìm theo `phone_key` (HMAC của số theo khách): database không giữ số rõ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, OnceLock};
 
 use autoxide_kernel::access::Realm;
@@ -172,7 +173,7 @@ impl PhoneSignIn {
     ) -> Result<(Uuid, bool), Error> {
         let name = name.map_or_else(|| phone.masked(), str::to_owned);
         // Lưu tới micro giây như mọi mốc thời gian của module.
-        let at = chrono::SubsecRound::trunc_subsecs(chrono::Utc::now(), 6);
+        let at = Timestamp::now();
         let transaction = tenant.database().begin_write().await?;
         let inserted = entity::ActiveModel {
             id: Set(Uuid::now_v7()),

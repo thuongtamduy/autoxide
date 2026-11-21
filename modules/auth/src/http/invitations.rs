@@ -1,5 +1,6 @@
 //! Lời mời người dùng qua email (D-312).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -49,11 +49,11 @@ pub(crate) struct InvitationResponse {
     /// accepted; resend it.
     #[schema(example = "pending")]
     status: String,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     /// The account that accepted it.
     accepted_user_id: Option<Uuid>,
     invited_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<Invitation> for InvitationResponse {

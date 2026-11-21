@@ -2,6 +2,8 @@
 //! tiếp tục, mail nhắc không gửi trùng, job và lần thu tiền cùng lúc, bộ lọc danh sách khách. Thời
 //! gian "trôi" bằng cách sửa mốc trong database rồi chạy worker (job dùng giờ thật).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::error::Error;
@@ -332,7 +334,7 @@ async fn mail_nhac_khong_gui_trung() {
         ok(&app, Method::POST, "/plans/subscription/change", "owner", Some(body)).await;
         // Kỳ hết sau 12 giờ: job lập kỳ kế và nhắc "còn 1 ngày" đúng một lần.
         sql(&app, "UPDATE plans_subscription SET current_period_end = CURRENT_TIMESTAMP").await;
-        let soon = chrono::Utc::now() + chrono::Duration::hours(12);
+        let soon = Timestamp::now() + SignedDuration::from_hours(12);
         sql(&app, &format!("UPDATE plans_subscription SET current_period_end = '{}'", soon.to_rfc3339())).await;
         tick(&app).await;
         tick(&app).await;

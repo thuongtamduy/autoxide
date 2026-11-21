@@ -1,5 +1,6 @@
 //! Endpoint rào quyền tối đa cho khách con (bước 54).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -41,7 +41,7 @@ pub(crate) struct GuardrailResponse {
     max_permissions: Vec<String>,
     /// Who set it last, and when.
     updated_by: Uuid,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<GuardrailView> for GuardrailResponse {

@@ -2,6 +2,7 @@
 //! (axum trên 127.0.0.1): discovery, JWKS, token endpoint, API kiểu GitHub. `id_token` ký ES256 bằng
 //! khoá sinh lúc chạy — không có khoá riêng nào trong repo. RS256 kiểm bằng ví dụ RFC 7515 ở `jwt`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -266,7 +267,7 @@ fn oidc_body(fake: &Fake, slug: &str, signup: bool) -> Value {
 }
 
 fn claims(fake: &Fake, slug: &str, subject: &str, email: &str, verified: bool) -> Value {
-    let now = chrono::Utc::now().timestamp();
+    let now = Timestamp::now().as_unix_seconds();
     json!({
         "iss": format!("{}/{slug}", fake.base()), "aud": CLIENT_ID, "sub": subject,
         "email": email, "email_verified": verified, "name": "Grace Hopper",
@@ -394,7 +395,7 @@ async fn lien_ket_theo_email_da_xac_minh() {
         let transaction = tenant.database().begin_write().await.unwrap();
         services
             .users
-            .apply_verified_email(&tenant, &transaction, root.id, &root.email, chrono::Utc::now())
+            .apply_verified_email(&tenant, &transaction, root.id, &root.email, Timestamp::now())
             .await
             .unwrap();
         transaction.commit().await.unwrap();
@@ -431,7 +432,7 @@ async fn khong_gop_khi_email_chua_xac_minh() {
         let root =
             services.users.find_by_email(&tenant, "root@example.com").await.unwrap().unwrap();
         let transaction = tenant.database().begin_write().await.unwrap();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         services
             .users
             .apply_verified_email(&tenant, &transaction, root.id, &root.email, now)
@@ -468,7 +469,7 @@ async fn microsoft_khong_tin_claim_email_khi_thieu_xms_edov() {
         let root =
             services.users.find_by_email(&tenant, "root@example.com").await.unwrap().unwrap();
         let transaction = tenant.database().begin_write().await.unwrap();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         services
             .users
             .apply_verified_email(&tenant, &transaction, root.id, &root.email, now)
@@ -516,7 +517,7 @@ async fn state_dung_mot_lan() {
         let root =
             services.users.find_by_email(&tenant, "root@example.com").await.unwrap().unwrap();
         let transaction = tenant.database().begin_write().await.unwrap();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         services
             .users
             .apply_verified_email(&tenant, &transaction, root.id, &root.email, now)
@@ -555,7 +556,7 @@ async fn nonce_aud_iss_exp_alg_sai_bi_tu_choi() {
         let fake = fake_server().await;
         let (app, _, admin) = app(test, true).await;
         provider(&app, &admin, oidc_body(&fake, "idp", true)).await;
-        let now = chrono::Utc::now().timestamp();
+        let now = Timestamp::now().as_unix_seconds();
         let cases = [
             ("nonce", json!("someone-else"), "nonce"),
             ("aud", json!("other-client"), "audience"),
@@ -587,7 +588,7 @@ async fn kid_la_thi_tai_lai_jwks_mot_lan() {
         let root =
             services.users.find_by_email(&tenant, "root@example.com").await.unwrap().unwrap();
         let transaction = tenant.database().begin_write().await.unwrap();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         services
             .users
             .apply_verified_email(&tenant, &transaction, root.id, &root.email, now)
@@ -623,7 +624,7 @@ async fn mfa_van_ap_dung() {
         let root =
             services.users.find_by_email(&tenant, "root@example.com").await.unwrap().unwrap();
         let transaction = tenant.database().begin_write().await.unwrap();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         services
             .users
             .apply_verified_email(&tenant, &transaction, root.id, &root.email, now)
@@ -631,7 +632,7 @@ async fn mfa_van_ap_dung() {
             .unwrap();
         transaction.commit().await.unwrap();
         let setup = services.mfa.start_totp(&tenant, root.id, "root@example.com").await.unwrap();
-        let seconds = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+        let seconds = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
         let code = crate::mfa::service::tests::code_at(&setup.secret, seconds);
         services.mfa.confirm_totp(&tenant, root.id, &code).await.unwrap();
         let (status, body) =

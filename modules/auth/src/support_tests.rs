@@ -1,6 +1,8 @@
 //! Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13, D-190, D-211, D-313), qua REST với module
 //! `auth` thật (khách nền tảng + một khách), cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Actor;
@@ -209,7 +211,7 @@ async fn ho_tro_het_han_thi_mat_quyen() {
                 setup.app.database().write().get_database_backend(),
                 "UPDATE auth_support_grant SET expires_at = $1 WHERE id = $2",
                 [
-                    (chrono::Utc::now() - chrono::Duration::minutes(1)).into(),
+                    (Timestamp::now() - SignedDuration::from_mins(1)).into(),
                     uuid::Uuid::parse_str(&id).unwrap().into(),
                 ],
             ))

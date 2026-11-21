@@ -3,6 +3,7 @@
 //! `navigator.credentials.create()` / `.get()` của trình duyệt) rồi gửi lại câu trả lời
 //! của authenticator kèm `ceremony_id`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -71,9 +71,9 @@ pub(crate) struct PasskeyResponse {
     /// Name the user gave it, e.g. the device.
     #[schema(example = "Ada's phone")]
     name: String,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
     /// When it was last used to sign in; `null` if never.
-    last_used_at: Option<DateTime<Utc>>,
+    last_used_at: Option<Timestamp>,
     /// Kind of authenticator, as it identified itself when registered (its AAGUID); `null` when
     /// it did not say (or registered before this was kept).
     aaguid: Option<Uuid>,

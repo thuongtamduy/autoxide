@@ -23,6 +23,8 @@ mod tests;
 #[cfg(test)]
 mod unlink_tests;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Realm;
@@ -33,7 +35,6 @@ use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
 use autoxide_kernel::tokens::OneTimeTokens;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -165,7 +166,7 @@ impl OidcService {
         let sealer = self.secrets.sealer().await?;
         let row = provider.id.to_string();
         let sealed = sealer.seal(tenant.id(), STATE_PURPOSE, &row, plain.as_bytes())?;
-        let ttl = chrono::Duration::seconds(i64::try_from(STATE_TTL_SECONDS).unwrap_or(600));
+        let ttl = SignedDuration::from_secs(i64::try_from(STATE_TTL_SECONDS).unwrap_or(600));
         let issued = tokens()
             .issue(tenant.database().write(), tenant, PURPOSE, &row, Some(&sealed), ttl)
             .await?;
@@ -424,7 +425,7 @@ impl OidcService {
             alternative_issuer: (provider.kind() == Kind::Google).then_some("accounts.google.com"),
             client_id: &provider.client_id,
             nonce: &data.nonce,
-            now: Utc::now().timestamp(),
+            now: Timestamp::now().as_unix_seconds(),
         };
         let claims = jwt::check_claims(&token.claims, &expected).map_err(reject)?;
         // Entra: claim `email` đổi được và không được xác minh — chỉ tin khi `xms_edov = true`.
@@ -662,7 +663,7 @@ impl OidcService {
         external: &External,
         email: &str,
     ) -> Result<(), Error> {
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let transaction = tenant.database().begin_write().await?;
         // Nhà cung cấp đã xác minh email: tài khoản mới mang email đã xác minh.
         self.users.apply_verified_email(tenant, &transaction, user_id, email, now).await?;

@@ -2,6 +2,7 @@
 //! Google, Microsoft, GitHub hay một issuer OIDC bất kỳ. `client_secret` mã hoá khi lưu bằng lớp
 //! AEAD của kernel (bước 33, D-257) và không bao giờ trả lại.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeSet;
 
 use autoxide_kernel::access::{Principal, Realm};
@@ -9,7 +10,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
     SqlErr,
@@ -21,6 +21,7 @@ use super::client::{OidcClient, UrlProblem};
 use crate::events;
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -50,8 +51,8 @@ pub(crate) mod entity {
         pub default_org_id: Option<Uuid>,
         pub default_role_id: Option<Uuid>,
         pub enabled: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -166,8 +167,8 @@ pub(crate) struct ProviderService {
     pub outbox: Outbox,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 impl ProviderService {

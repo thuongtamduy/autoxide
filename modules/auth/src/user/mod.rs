@@ -15,6 +15,7 @@ pub(crate) use service::{
 pub(crate) mod entity_for_tests {
     //! Thao tác thẳng trên bảng cho test của phần khác trong module (chưa có API
     //! khoá tài khoản ở bước này).
+    use autoxide_kernel::time::Timestamp;
 
     use sea_orm::sea_query::Expr;
     use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
@@ -25,7 +26,7 @@ pub(crate) mod entity_for_tests {
     /// Khoá tài khoản `id`.
     pub async fn disable<C: ConnectionTrait>(connection: &C, id: Uuid) {
         Entity::update_many()
-            .col_expr(Column::DisabledAt, Expr::value(Some(chrono::Utc::now())))
+            .col_expr(Column::DisabledAt, Expr::value(Some(Timestamp::now())))
             .filter(Column::Id.eq(id))
             .exec(connection)
             .await

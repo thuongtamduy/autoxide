@@ -108,8 +108,8 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
 
         // Đồng ý kênh `push`, nhưng khung giờ `push` mở sau 2 giờ nữa: hoãn.
         fx.ledger.allow(ConsentSubject::User(Uuid::from_u128(2)), "push");
-        let from = (Utc::now() + Span::hours(2)).with_minute(0).unwrap();
-        let window = json!({"from": from.format("%H:%M").to_string(), "to": (from + Span::hours(1)).format("%H:%M").to_string()});
+        let from = (Timestamp::now() + SignedDuration::from_hours(2)).truncate(jiff::Unit::Hour);
+        let window = json!({"from": from.format("%H:%M").to_string(), "to": (from + SignedDuration::from_hours(1)).format("%H:%M").to_string()});
         fx.rules.0.lock().unwrap().insert(
             "notifications.send_windows".to_owned(),
             json!({"utc_offset_minutes": 0, "marketing": {"push": window}}),
@@ -131,7 +131,7 @@ async fn tin_quang_cao_khong_gui_khi_chua_dong_y_va_hoan_ngoai_khung_gio() {
             .execute(
                 &Query::update()
                     .table(Alias::new("notifications_jobs"))
-                    .value(Alias::new("run_at"), Utc::now() - Span::minutes(1))
+                    .value(Alias::new("run_at"), Timestamp::now() - SignedDuration::from_mins(1))
                     .and_where(Expr::col(Alias::new("completed_at")).is_null())
                     .to_owned(),
             )

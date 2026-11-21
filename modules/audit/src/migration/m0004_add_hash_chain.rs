@@ -6,7 +6,7 @@
 //! trữ, không bao giờ được sửa (bản mới là `v2` riêng), nên migration không đổi theo code.
 
 use autoxide_kernel::migration::prelude::*;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
@@ -86,8 +86,8 @@ impl MigrationTrait for Migration {
                 let before: Option<String> = row.try_get("", "before")?;
                 let data_after: Option<String> = row.try_get("", "after")?;
                 let details: Option<String> = row.try_get("", "details")?;
-                let occurred_at: DateTime<Utc> = row.try_get("", "occurred_at")?;
-                let recorded_at: DateTime<Utc> = row.try_get("", "recorded_at")?;
+                let occurred_at: Timestamp = row.try_get("", "occurred_at")?;
+                let recorded_at: Timestamp = row.try_get("", "recorded_at")?;
                 let payload_hash = chain::payload_hash(
                     before.as_deref(),
                     data_after.as_deref(),

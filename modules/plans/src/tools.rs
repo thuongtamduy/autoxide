@@ -1,6 +1,7 @@
 //! Tool MCP của module `plans`: cùng service, cùng permission với REST. Không có tool cho thanh
 //! toán hay đăng ký công khai (chỉ danh sách đăng ký cho nhân sự nền tảng, chỉ đọc).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -166,7 +167,7 @@ pub(crate) struct OverrideInput {
     /// Why, 1 to 500 characters.
     reason: String,
     /// When the override stops applying (RFC 3339).
-    expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    expires_at: Option<Timestamp>,
 }
 
 #[derive(Debug, Deserialize, Validate, ToSchema)]

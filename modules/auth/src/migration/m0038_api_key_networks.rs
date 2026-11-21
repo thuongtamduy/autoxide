@@ -3,6 +3,8 @@
 //! nâng cấp (CHANGELOG báo trước), để không key nào sống mãi.
 
 use autoxide_kernel::migration::prelude::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, Query};
 
 pub(crate) struct Migration;
@@ -29,7 +31,7 @@ impl MigrationTrait for Migration {
             .await?;
         // Giá trị tính trong ứng dụng (UTC), không dùng hàm thời gian của database: hai database
         // viết khác nhau.
-        let expires_at = chrono::Utc::now() + chrono::Duration::days(LEGACY_KEY_DAYS);
+        let expires_at = Timestamp::now() + SignedDuration::from_hours(24 * LEGACY_KEY_DAYS);
         let update = Query::update()
             .table("auth_api_key")
             .value("expires_at", expires_at)

@@ -52,6 +52,7 @@ impl AccountRecovery for OperatorRecovery {
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::time::Timestamp;
     use autoxide_testkit::TestDatabase;
 
     use super::*;
@@ -71,7 +72,7 @@ mod tests {
             let ada =
                 Accounts::create(services.users.as_ref(), &services.tenant, account).await.unwrap();
             let setup = services.mfa.start_totp(&tenant, ada.id, "ada@example.com").await.unwrap();
-            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, now);
             services.mfa.confirm_totp(&tenant, ada.id, &code).await.unwrap();
             assert!(services.mfa.status(&tenant, ada.id).await.unwrap().totp_enabled);

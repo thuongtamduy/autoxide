@@ -6,6 +6,8 @@
 //! Token lưu ở bảng `auth_tokens` (kernel, D-117) với mục đích `reauth`, chủ là ID người dùng;
 //! dùng ở người khác hay sau khi hết hạn thì như token lạ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
@@ -13,7 +15,6 @@ use autoxide_kernel::i18n::{Language, Translations};
 use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tokens::OneTimeTokens;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::api_key::Reauth;
@@ -52,7 +53,7 @@ pub(crate) enum Proof {
 /// Token vừa phát; `token` là `None` khi gửi qua mail.
 pub(crate) struct Issued {
     pub token: Option<String>,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 pub(crate) struct Reauthentication {
@@ -63,7 +64,7 @@ pub(crate) struct Reauthentication {
     pub mailer: Arc<dyn Mailer>,
     pub translations: Translations,
     /// Hạn của token (`AUTOXIDE_AUTH_REAUTH_MINUTES`).
-    pub ttl: chrono::Duration,
+    pub ttl: SignedDuration,
 }
 
 impl Reauthentication {
@@ -123,7 +124,7 @@ impl Reauthentication {
         let Some(email) = mail_to else {
             return Ok(Issued { token: Some(issued.token), expires_at: issued.expires_at });
         };
-        let minutes = self.ttl.num_minutes().to_string();
+        let minutes = self.ttl.as_mins().to_string();
         let params = [("minutes", minutes.as_str()), ("token", issued.token.as_str())];
         let mail = REAUTH_MAIL.mail(&email, &self.translations, language, &params);
         self.mailer.send(tenant, mail).await?;

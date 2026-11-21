@@ -2,6 +2,7 @@
 //! gói bật → mời quản trị viên; bước hỏng thì `failed`, chạy lại tiếp từ bước đã ghi; hai lượt cùng
 //! slug không cùng nhận một khách. Cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -40,7 +41,7 @@ impl Invitations for FakeInvitations {
             invitation.email.clone(),
             invitation.roles.clone(),
         ));
-        Ok(InvitationSummary::new(uuid::Uuid::now_v7(), invitation.email, chrono::Utc::now()))
+        Ok(InvitationSummary::new(uuid::Uuid::now_v7(), invitation.email, Timestamp::now()))
     }
 }
 

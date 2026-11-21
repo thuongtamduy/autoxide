@@ -3,6 +3,8 @@
 //! không thấy ghi chú ngoài phạm vi, hai máy cùng sửa một ghi chú — một bên thắng. Chạy trên cả
 //! SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 
@@ -148,7 +150,10 @@ async fn con_tro_qua_cu_hay_sai() {
         // UUIDv7 của 40 ngày trước: cũ hơn 30 ngày giữ mặc định.
         let old = Uuid::new_v7(uuid::Timestamp::from_unix(
             uuid::NoContext,
-            u64::try_from((chrono::Utc::now() - chrono::Duration::days(40)).timestamp()).unwrap(),
+            u64::try_from(
+                (Timestamp::now() - SignedDuration::from_hours(24 * 40)).as_unix_seconds(),
+            )
+            .unwrap(),
             0,
         ));
         let (status, problem) = changes(&app, "ada", &format!("?cursor={old}")).await;
@@ -368,7 +373,7 @@ impl IdempotencyStore for MemoryStore {
         scope: &str,
         key: &str,
         _: &str,
-        _: chrono::DateTime<chrono::Utc>,
+        _: Timestamp,
     ) -> Result<Begin, Error> {
         let mut keys = self.0.lock().unwrap();
         match keys.get(&format!("{scope}|{key}")) {

@@ -1,6 +1,7 @@
 //! Endpoint người dùng: quản trị viên tạo và quản lý tài khoản; người lạ tự đăng ký
 //! khi được bật.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -55,10 +55,10 @@ pub(crate) struct UserResponse {
     name: String,
     /// When the account was disabled; `null` while it is active. A disabled account
     /// cannot sign in or use its tokens.
-    disabled_at: Option<DateTime<Utc>>,
+    disabled_at: Option<Timestamp>,
     /// When the owner confirmed `email` through a verification mail; `null` while it
     /// is not verified.
-    email_verified_at: Option<DateTime<Utc>>,
+    email_verified_at: Option<Timestamp>,
     /// Whether the account has a password. Without one it signs in with a passkey; its owner
     /// sets a first password through `POST /api/v1/auth/password-reset`, an administrator
     /// with `POST /api/v1/auth/users/{id}/password`.
@@ -67,12 +67,12 @@ pub(crate) struct UserResponse {
     mfa_enabled: bool,
     /// When the user last started a session (sign-in, password change); `null` if not since
     /// this field exists.
-    last_sign_in_at: Option<DateTime<Utc>>,
+    last_sign_in_at: Option<Timestamp>,
     /// The user's roles, by name. Only with `include=roles` on the user list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     roles: Option<Vec<UserRole>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 /// A role a user holds.
@@ -841,6 +841,7 @@ mod tests {
 
 #[cfg(test)]
 mod event_tests {
+    use autoxide_kernel::time::Timestamp;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -880,7 +881,7 @@ mod event_tests {
             let (_, _, key) = call(&app, "POST", "/api-keys", Some(&admin), Some(body)).await;
             let (_, _, setup) = call(&app, "POST", "/me/mfa/totp", Some(&admin), Some(json!({"current_password": PASSWORD}))).await;
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
-            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let body = json!({"code": code_at(&secret, now)});
             let (_, _, codes) =
                 call(&app, "POST", "/me/mfa/totp/confirm", Some(&admin), Some(body)).await;

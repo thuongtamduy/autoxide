@@ -6,6 +6,7 @@
 //! / danh sách thành viên luôn là phần GIAO với phạm vi đọc của người gọi — nút ngoài phạm vi chỉ lộ
 //! thành số đếm (`excluded_org_count`), không lộ ID hay tên.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::search::fold;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -37,6 +37,7 @@ const DESCRIPTION_MAX: usize = 1000;
 
 pub(crate) mod entity {
     pub(crate) mod group {
+        use autoxide_kernel::time::Timestamp;
         use sea_orm::entity::prelude::*;
 
         #[sea_orm::model]
@@ -52,8 +53,8 @@ pub(crate) mod entity {
             pub name_folded: String,
             pub description: Option<String>,
             pub created_by: Option<Uuid>,
-            pub created_at: DateTimeUtc,
-            pub updated_at: DateTimeUtc,
+            pub created_at: Timestamp,
+            pub updated_at: Timestamp,
         }
 
         impl ActiveModelBehavior for ActiveModel {}
@@ -66,6 +67,7 @@ pub(crate) mod entity {
     }
 
     pub(crate) mod member {
+        use autoxide_kernel::time::Timestamp;
         use sea_orm::entity::prelude::*;
 
         #[sea_orm::model]
@@ -80,7 +82,7 @@ pub(crate) mod entity {
             #[sea_orm(primary_key, auto_increment = false)]
             pub org_id: Uuid,
             pub added_by: Option<Uuid>,
-            pub added_at: DateTimeUtc,
+            pub added_at: Timestamp,
         }
 
         impl ActiveModelBehavior for ActiveModel {}
@@ -121,8 +123,8 @@ pub(crate) struct Added {
     pub member_count: u64,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn group_not_found(id: Uuid) -> Error {
@@ -320,7 +322,7 @@ impl OrgService {
         principal: &Principal,
         id: Uuid,
         changes: GroupChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<GroupRow, Error> {
         principal.require(&GROUPS_MANAGE)?;
         let checked = check(

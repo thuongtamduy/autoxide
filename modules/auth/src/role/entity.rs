@@ -2,6 +2,7 @@
 //! cố định (`Model`, `Entity`, `Column`) cho mỗi entity.
 
 pub(crate) mod role {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -17,8 +18,8 @@ pub(crate) mod role {
         pub all_permissions: bool,
         /// Quyền của role chỉ có hiệu lực khi tài khoản đã bật MFA (TOTP hay passkey, D-308).
         pub requires_mfa: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -59,6 +60,7 @@ pub(crate) mod role_permission {
 }
 
 pub(crate) mod user_role {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -73,7 +75,7 @@ pub(crate) mod user_role {
         pub role_id: Uuid,
         /// Nút của membership (bước 34); nút gốc = ID của khách. Luôn có giá trị.
         pub org_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

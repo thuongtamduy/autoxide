@@ -1,6 +1,7 @@
 //! Membership theo nút của cây tổ chức (bước 34 mục 2): người làm ở nút nào với role nào.
 //! `PUT /users/{id}/roles` cũ vẫn chạy: nó là membership ở nút gốc.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -73,7 +73,7 @@ pub(crate) struct MembershipRowResponse {
     /// `true` when the membership is on a unit above the one asked for with `org_id`: the user
     /// works there through it.
     inherited: bool,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<MembershipRow> for MembershipRowResponse {

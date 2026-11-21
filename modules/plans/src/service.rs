@@ -3,6 +3,8 @@
 //!
 //! Mọi bảng ở database điều khiển (`databases.control()`); event ghi dưới khách nền tảng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -15,7 +17,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, DatabaseRegistry, TenantId};
-use chrono::{DateTime, Months, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
     SqlErr,
@@ -36,8 +37,8 @@ pub(crate) use errors::*;
 pub(crate) use subscriptions::*;
 
 /// Giờ hiện tại, cắt ở micro giây (độ chính xác của cột thời gian trên cả hai database).
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Dữ liệu để tạo hay thay một gói.
@@ -113,7 +114,7 @@ pub(crate) struct OverrideInput {
     pub enabled: Option<bool>,
     pub max_value: Option<i64>,
     pub reason: String,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 /// Lọc danh sách ghi đè của mọi khách.
@@ -139,7 +140,7 @@ pub(crate) struct PlansService {
     pub entitlements: EntitlementsHandle,
     pub cache: Cache,
     /// Hạn của một chỗ giữ chưa xác nhận.
-    pub hold: chrono::Duration,
+    pub hold: SignedDuration,
     /// Sổ khách của kernel: khoá hẳn khách (`suspend`, xoá sau thời hạn lưu).
     pub tenants: Option<Arc<autoxide_kernel::tenancy::TenantAdmin>>,
     /// Gửi mail nhắc thanh toán (module `mail`); `None` thì không nhắc.
@@ -415,7 +416,7 @@ impl PlansService {
         actor: Actor,
         id: Uuid,
         input: PlanInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<PlanRow, Error> {
         let input = self.check_plan(input)?;
         let transaction = self.control().begin_write().await?;

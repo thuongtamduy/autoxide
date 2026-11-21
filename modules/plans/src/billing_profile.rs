@@ -4,6 +4,7 @@
 //!
 //! Bảng `plans_billing_profile` ở database điều khiển như mọi bảng của `plans`; một dòng mỗi khách.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::{Address, AddressInput};
@@ -14,7 +15,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{EntityTrait, Set};
 use serde::{Deserialize, Serialize};
@@ -31,6 +31,7 @@ use crate::permissions::{BILLING_MANAGE, BILLING_READ, SUBSCRIPTIONS_READ};
 use crate::service::{PlansService, now};
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -50,7 +51,7 @@ pub(crate) mod entity {
         pub address_commune_name: Option<String>,
         pub address_line: Option<String>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -74,7 +75,7 @@ pub(crate) struct BillingProfileResponse {
     address: Option<Address>,
     /// User who last changed it.
     updated_by: Option<Uuid>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<entity::Model> for BillingProfileResponse {

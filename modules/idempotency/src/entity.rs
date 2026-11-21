@@ -1,5 +1,6 @@
 //! Entity của bảng `idempotency_record` (SeaORM).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,9 +17,9 @@ pub struct Model {
     pub status: Option<i32>,
     pub headers: Option<String>,
     pub body: Option<Vec<u8>>,
-    pub locked_until: DateTimeUtc,
-    pub expires_at: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub locked_until: Timestamp,
+    pub expires_at: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

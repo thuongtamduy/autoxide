@@ -7,7 +7,7 @@ use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{OrgId, OrgSetting, OrgTree, ScopeExt, TenantContext, nearest};
-use chrono::{SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -86,9 +86,9 @@ fn text(value: &Value) -> Result<&str, String> {
 
 fn time_zone(value: &Value) -> Result<Value, String> {
     let raw = text(value)?;
-    raw.parse::<chrono_tz::Tz>()
-        .map(|zone| Value::from(zone.name()))
-        .map_err(|_| "must be an IANA time zone name, e.g. `Asia/Ho_Chi_Minh` or `UTC`".to_owned())
+    autoxide_kernel::time::zone(raw).map(|_| Value::from(raw)).ok_or_else(|| {
+        "must be an IANA time zone name, e.g. `Asia/Ho_Chi_Minh` or `UTC`".to_owned()
+    })
 }
 
 fn currency(value: &Value) -> Result<Value, String> {
@@ -200,7 +200,7 @@ impl OrgService {
                     key: Set(key.to_owned()),
                     value: Set(value.to_string()),
                     updated_by: Set(Some(principal.user_id())),
-                    updated_at: Set(Utc::now().trunc_subsecs(6)),
+                    updated_at: Set(Timestamp::now()),
                 };
                 let conflict = OnConflict::columns([
                     setting::Column::TenantId,

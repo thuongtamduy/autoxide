@@ -15,6 +15,8 @@
 //!    thì tài khoản vẫn bị khoá, nhưng không gửi mail đặt lại nào (mail đó sẽ tới tay người
 //!    khác, hay tới kẻ chiếm): chủ tài khoản nhờ quản trị viên.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -25,7 +27,6 @@ use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token};
 use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -74,7 +75,7 @@ pub(crate) struct EmailChangedJob {
     pub user_id: Uuid,
     pub old_email: String,
     pub new_email: String,
-    pub changed_at: DateTime<Utc>,
+    pub changed_at: Timestamp,
     /// Mã ngôn ngữ của mail (`en`, `vi`).
     pub language: String,
 }
@@ -119,7 +120,7 @@ impl EmailVerifications {
     ) -> Result<(), Error> {
         let language = if job.language == Language::Vi.tag() { Language::Vi } else { Language::En };
         let language = self.users.mail_language(tenant, job.user_id, language).await?;
-        let ttl = chrono::Duration::days(REPORT_DAYS);
+        let ttl = SignedDuration::from_hours(24 * REPORT_DAYS);
         let subject = job.user_id.to_string();
         let transaction = tenant.database().begin_write().await?;
         let raw = tokens()
@@ -250,8 +251,8 @@ pub(crate) fn invalid_report_token() -> Error {
     )
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]
@@ -379,7 +380,7 @@ mod tests {
             let admin = autoxide_kernel::access::Principal::with_all_permissions(ada);
             services.api_keys.create(&tenant, &admin, key).await.unwrap();
             let setup = services.mfa.start_totp(&tenant, ada, "ada@example.com").await.unwrap();
-            let unix = u64::try_from(Utc::now().timestamp()).unwrap();
+            let unix = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, unix);
             services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
             let report = change(&services, ada, "thief@evil.example").await;
@@ -475,7 +476,7 @@ mod tests {
             use sea_orm::sea_query::{Alias, Query};
             let expire = Query::update()
                 .table(Alias::new("auth_tokens"))
-                .value(Alias::new("expires_at"), Utc::now() - chrono::Duration::minutes(1))
+                .value(Alias::new("expires_at"), Timestamp::now() - SignedDuration::from_mins(1))
                 .to_owned();
             services.database.write().execute(&expire).await.unwrap();
             let error = services

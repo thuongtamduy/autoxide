@@ -5,6 +5,8 @@
 //! đồng ý và quy tắc là bản giả (test của module không dựng module khác); đi qua module thật ở
 //! `crates/app/src/e2e/notifications.rs`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -23,7 +25,6 @@ use autoxide_testkit::{
     FakeMobilePushSender, FakeSmsSender, FakeWebPushSender, TestApp, TestDatabase,
 };
 use axum::http::{Method, StatusCode};
-use chrono::{DateTime, Duration as Span, Timelike, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
 use serde_json::{Value, json};
@@ -92,7 +93,7 @@ const PUSHED: NotificationKind = NotificationKind::new(
 );
 
 fn user(id: u128, email: &str) -> User {
-    let at = Utc::now();
+    let at = Timestamp::now();
     User {
         id: Uuid::from_u128(id),
         email: email.to_owned(),
@@ -236,13 +237,13 @@ impl ComplianceRules for Rules {
         &self,
         _tenant: TenantId,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Rule>, Error> {
         Ok(self.0.lock().unwrap().get(key).map(|body| Rule {
             jurisdiction: "vn".to_owned(),
             key: key.to_owned(),
             version: 1,
-            effective_from: at - Span::days(1),
+            effective_from: at - SignedDuration::from_hours(24),
             effective_to: None,
             body: body.clone(),
             legal_basis: "Test".to_owned(),
@@ -544,12 +545,12 @@ async fn age(app: &TestApp, key: &str, hours: i64) {
     let database = app.database();
     let jobs = Query::update()
         .table(Alias::new("notifications_jobs"))
-        .value(Alias::new("run_at"), Utc::now() - Span::minutes(1))
+        .value(Alias::new("run_at"), Timestamp::now() - SignedDuration::from_mins(1))
         .to_owned();
     database.write().execute(&jobs).await.unwrap();
     let messages = Query::update()
         .table(Alias::new("notifications_messages"))
-        .value(Alias::new("created_at"), Utc::now() - Span::hours(hours))
+        .value(Alias::new("created_at"), Timestamp::now() - SignedDuration::from_hours(hours))
         .and_where(Expr::col(Alias::new("dedupe_key")).eq(key))
         .to_owned();
     database.write().execute(&messages).await.unwrap();
@@ -560,9 +561,9 @@ async fn ngoai_khung_gio_thi_hoan_qua_24_gio_thi_bo() {
     TestDatabase::run(async |test| {
         let fx = fixture(test).await;
         // Khung SMS quảng cáo mở sau 2 giờ nữa (giờ UTC): bây giờ là ngoài khung.
-        let now = Utc::now();
-        let from = (now + Span::hours(2)).with_minute(0).unwrap();
-        let to = from + Span::hours(1);
+        let now = Timestamp::now();
+        let from = (now + SignedDuration::from_hours(2)).truncate(jiff::Unit::Hour);
+        let to = from + SignedDuration::from_hours(1);
         let window =
             json!({"from": from.format("%H:%M").to_string(), "to": to.format("%H:%M").to_string()});
         fx.rules.0.lock().unwrap().insert(
@@ -584,8 +585,11 @@ async fn ngoai_khung_gio_thi_hoan_qua_24_gio_thi_bo() {
         let (_, page) = call(&fx.app, "GET", "/messages?status=deferred", "admin", None).await;
         let row = &page["data"][0];
         assert_eq!(row["channel"], "sms", "{page}");
-        let not_before: DateTime<Utc> = row["not_before"].as_str().unwrap().parse().unwrap();
-        assert!(not_before > now && not_before <= now + Span::hours(3), "{not_before}");
+        let not_before: Timestamp = row["not_before"].as_str().unwrap().parse().unwrap();
+        assert!(
+            not_before > now && not_before <= now + SignedDuration::from_hours(3),
+            "{not_before}"
+        );
 
         // Tới giờ mở khung nhưng tin đã chờ hơn 24 giờ: bỏ.
         age(&fx.app, "late-1", 30).await;

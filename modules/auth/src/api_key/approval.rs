@@ -7,7 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantSetting, parsed_setting};
-use chrono::{SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
@@ -72,7 +72,7 @@ impl ApiKeyService {
                 "An API key cannot approve API keys. Sign in to approve keys.",
             ));
         }
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let transaction = tenant.database().begin_write().await?;
         let row = api_key::Entity::find_by_id(id)
             .scoped(tenant)

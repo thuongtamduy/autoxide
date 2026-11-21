@@ -2,6 +2,7 @@
 //! nó đẩy sang và luật ánh xạ nhóm → role ở nút.
 //! Cần `auth.scim.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -45,9 +45,9 @@ pub(crate) struct ScimTokenResponse {
     prefix: String,
     /// The user who created it.
     created_by: Uuid,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
     /// Last time the identity provider used it (to within 5 minutes); `null`: never.
-    last_used_at: Option<DateTime<Utc>>,
+    last_used_at: Option<Timestamp>,
 }
 
 impl From<ScimToken> for ScimTokenResponse {
@@ -192,7 +192,7 @@ pub(crate) struct ScimGroupSummaryResponse {
     /// How many mapping rules it has; `0`: its members get no roles from it (also listed in the
     /// work inbox as `auth.scim_unmapped_groups`).
     mappings: u64,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<GroupSummary> for ScimGroupSummaryResponse {
@@ -217,7 +217,7 @@ pub(crate) struct ScimGroupMappingResponse {
     org_id: Uuid,
     role_id: Uuid,
     created_by: Uuid,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<GroupMapping> for ScimGroupMappingResponse {

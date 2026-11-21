@@ -1,5 +1,6 @@
 //! Entity của bảng rào quyền (SeaORM).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     /// Permission tối đa, tên cách nhau bằng dấu cách, theo thứ tự tên.
     pub max_permissions: String,
     pub updated_by: Uuid,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

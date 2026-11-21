@@ -6,7 +6,8 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::secret as token;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext, TenantId, ensure_serving};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, EntityTrait as _, PaginatorTrait as _,
@@ -39,8 +40,8 @@ pub(crate) struct CreatedScimToken {
     pub secret: String,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn token_not_found(id: Uuid) -> Error {
@@ -173,7 +174,10 @@ impl ScimService {
             .ok_or_else(ScimError::unauthorized)?;
         self.entitlements.require_feature(tenant.id(), &SCIM_FEATURE).await?;
         let now = now();
-        if row.last_used_at.is_none_or(|used| used < now - Duration::minutes(TOUCH_EVERY_MINUTES)) {
+        if row
+            .last_used_at
+            .is_none_or(|used| used < now - SignedDuration::from_mins(TOUCH_EVERY_MINUTES))
+        {
             // Ghi lỗi thì chỉ ghi log: dấu "dùng lần cuối" không đáng làm hỏng lần đồng bộ.
             let touched = entity::Entity::update_many()
                 .col_expr(entity::Column::LastUsedAt, Expr::value(Some(now)))

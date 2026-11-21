@@ -1,12 +1,12 @@
 //! Service của role: tạo, sửa, xoá role; gán role cho người dùng; tính permission
 //! của một người dùng.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::access::{Grant, PermissionCatalog, Principal, Scope};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
@@ -57,8 +57,8 @@ pub(crate) struct Role {
     pub grants: Vec<(String, Scope)>,
     /// Permission role cấm (bước 54), theo thứ tự tên: thắng mọi role khác của người dùng.
     pub denies: Vec<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Dữ liệu để tạo hay thay toàn bộ một role.
@@ -103,7 +103,7 @@ pub(crate) struct MembershipRow {
     pub role_name: String,
     /// Membership ở một nút trên nút đang hỏi.
     pub inherited: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Một membership: người làm ở nút `org_id` với các role này.
@@ -333,7 +333,7 @@ impl RoleService {
         actor: Actor,
         id: Uuid,
         input: RoleInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Role, Error> {
         let requires_mfa = input.requires_mfa;
         let (name, description, permissions) = self.check(input)?;
@@ -732,8 +732,8 @@ fn builtin_role() -> Error {
     )
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// ID của role tên `name` của khách `tenant` (lệnh CLI nêu role bằng tên).

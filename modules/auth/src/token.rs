@@ -19,9 +19,9 @@
 //!
 //! Ngoài ra file này sinh và băm refresh token (chuỗi ngẫu nhiên, không phải JWT).
 
+use autoxide_kernel::time::Timestamp;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 // Một cách làm cho cả chương trình: token ngẫu nhiên và băm SHA-256 của kernel.
 pub(crate) use autoxide_kernel::secret::{random_token, sha256};
@@ -72,7 +72,7 @@ pub(crate) struct Verified {
     /// Phiên cấp token; `None` với token cũ.
     pub session: Option<Uuid>,
     /// Lần xác thực gần nhất của phiên; `None` với token cũ.
-    pub authenticated_at: Option<DateTime<Utc>>,
+    pub authenticated_at: Option<Timestamp>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -120,11 +120,11 @@ impl AccessTokens {
         &self,
         tenant: TenantId,
         user: Uuid,
-        now: DateTime<Utc>,
+        now: Timestamp,
         session: Uuid,
-        authenticated_at: DateTime<Utc>,
+        authenticated_at: Timestamp,
     ) -> Result<String, Error> {
-        let iat = now.timestamp();
+        let iat = now.as_unix_seconds();
         let ttl = i64::try_from(self.ttl.as_secs()).map_err(Error::internal)?;
         let claims = Claims {
             iss: ISSUER.to_owned(),
@@ -132,7 +132,7 @@ impl AccessTokens {
             tid: Some(tenant.as_uuid()),
             iat,
             exp: iat + ttl,
-            auth_time: Some(authenticated_at.timestamp()),
+            auth_time: Some(authenticated_at.as_unix_seconds()),
             sid: Some(session),
         };
         let payload = URL_SAFE_NO_PAD.encode(serde_json::to_vec(&claims).map_err(Error::internal)?);
@@ -145,7 +145,7 @@ impl AccessTokens {
     /// Kiểm `token` tại thời điểm `now`; hợp lệ thì trả (khách, ID người dùng). Khách đọc từ
     /// claim `tid` TRƯỚC khi kiểm chữ ký — để chọn khoá — rồi chữ ký phải khớp khoá của đúng khách
     /// đó: `tid` giả không qua được.
-    pub(crate) fn verify(&self, token: &str, now: DateTime<Utc>) -> Result<Verified, Error> {
+    pub(crate) fn verify(&self, token: &str, now: Timestamp) -> Result<Verified, Error> {
         // Đúng ba phần `header.payload.signature`; chữ ký phủ `header.payload`.
         let (signing_input, signature) = token.rsplit_once('.').ok_or_else(invalid_token)?;
         let (header, payload) = signing_input.split_once('.').ok_or_else(invalid_token)?;
@@ -177,7 +177,7 @@ impl AccessTokens {
         if claims.iss != ISSUER {
             return Err(invalid_token());
         }
-        if claims.exp <= now.timestamp() {
+        if claims.exp <= now.as_unix_seconds() {
             return Err(Error::unauthenticated(
                 "auth.token_expired",
                 "Your session has expired. Sign in again.",
@@ -187,9 +187,7 @@ impl AccessTokens {
             tenant,
             user: claims.sub,
             session: claims.sid,
-            authenticated_at: claims
-                .auth_time
-                .and_then(|seconds| DateTime::from_timestamp(seconds, 0)),
+            authenticated_at: claims.auth_time.and_then(Timestamp::from_unix_seconds),
         })
     }
 }
@@ -253,13 +251,14 @@ pub(crate) async fn resolve<'t>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     fn tokens() -> AccessTokens {
         AccessTokens::new(b"0123456789abcdef0123456789abcdef".to_vec(), Duration::from_secs(900))
     }
 
-    fn now() -> DateTime<Utc> {
-        DateTime::from_timestamp(1_800_000_000, 0).unwrap()
+    fn now() -> Timestamp {
+        Timestamp::from_unix_seconds(1_800_000_000).unwrap()
     }
 
     #[test]
@@ -336,8 +335,8 @@ mod tests {
         let token =
             tokens().issue(DEFAULT_TENANT, Uuid::now_v7(), now(), Uuid::nil(), now()).unwrap();
 
-        let still_valid = tokens().verify(&token, now() + chrono::Duration::seconds(899));
-        let expired = tokens().verify(&token, now() + chrono::Duration::seconds(900));
+        let still_valid = tokens().verify(&token, now() + SignedDuration::from_secs(899));
+        let expired = tokens().verify(&token, now() + SignedDuration::from_secs(900));
 
         assert!(still_valid.is_ok());
         assert_eq!(expired.unwrap_err().code(), "auth.token_expired");
