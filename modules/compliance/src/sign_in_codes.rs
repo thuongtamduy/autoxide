@@ -153,7 +153,7 @@ impl ComplianceService {
             phone_challenge::Column::Id,
         )
         .await?;
-        let Some(row) = locked.into_iter().find(|row| row.id == id) else {
+        let Some(row) = locked.iter().find(|row| row.id == id).cloned() else {
             return Err(challenge_not_found());
         };
         let at = now();
@@ -212,8 +212,10 @@ impl ComplianceService {
             return Ok(());
         }
         // Chờ tới khi mã cũ nhất có lần sai ra khỏi cửa sổ 24 giờ.
-        let oldest = recent.map(|row| row.created_at).min().unwrap_or(at);
-        let wait = (oldest + WRONG_WINDOW - at).as_secs().max(1);
+        // `Iterator::min` / `Ord::max` viết rõ: `ExprTrait` (sea-query) dùng trong file cũng có
+        // hàm `min` / `max`.
+        let oldest = Iterator::min(recent.map(|row| row.created_at)).unwrap_or(at);
+        let wait = Ord::max((oldest + WRONG_WINDOW - at).as_secs(), 1);
         Err(otp_daily_limit(u64::try_from(wait).unwrap_or(1)))
     }
 
