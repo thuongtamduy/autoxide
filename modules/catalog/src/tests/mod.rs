@@ -8,6 +8,7 @@ mod collections;
 mod digital;
 mod display_price;
 mod extensions;
+mod from_images;
 mod media_alts;
 mod pricing;
 mod products;

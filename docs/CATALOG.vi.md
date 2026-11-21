@@ -224,6 +224,18 @@ phẩm đã nói. Kết quả là **bản nháp**: sản phẩm không đổi g�
 dung ở ngôn ngữ đó (giữ tên và đường dẫn) và đánh dấu sản phẩm `ai_assisted`; `POST
 /suggestions/{id}/discard` bỏ nó. Tool MCP: `catalog.suggest_copy`.
 
+### Tạo sản phẩm nháp từ ảnh
+
+`POST /products/from-images` `{"media_ids": […], "locale": "vi", "tax_category": "vat.standard",
+"category_id": null, "org_id": null}` (`catalog.products.write`, tính năng gói `catalog.ai`, mô hình AI
+đọc được ảnh) gửi 1 tới 8 ảnh trong thư viện media — bản thu nhỏ máy chủ làm, đã bỏ metadata, không bao
+giờ là ảnh gốc — cho mô hình, chạy nền. Theo `Location` (`GET /products/from-images/{id}`) tới khi
+`status` là `succeeded`: `product_id` là sản phẩm **nháp** mới mang `ai_assisted`, có tên, mô tả, chữ
+SEO, danh mục trong cây của bạn (hay danh mục bạn chọn; danh mục ngoài cây bị bỏ), giá trị thuộc tính của
+danh mục đó mà mô hình chắc chắn, và ảnh công khai làm ảnh sản phẩm. Giá, tồn kho, mã vạch để bạn nhập;
+SKU là mã tạm `AI-…`. Không có gì được mở bán. (Chặn gắn ảnh do AI tạo vào sản phẩm đi cùng bước 67,
+bước đánh dấu chúng.)
+
 ## Hỏi đáp sản phẩm, menu và module khác
 
 Sản phẩm và danh mục nằm trong sổ đối tượng của kernel, nên module khác trỏ tới được mà không đọc

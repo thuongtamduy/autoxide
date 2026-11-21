@@ -1631,6 +1631,43 @@ export type CatalogFacets = {
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
 export type CatalogFloorAction = "warn" | "block";
 
+/** A request to draft a product from photos. */
+export type CatalogImageDraft = {
+  category_id?: string | null;
+  created_at: string;
+  /** Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`. */
+  error_code?: string | null;
+  finished_at?: string | null;
+  id: string;
+  locale: string;
+  media_ids: string[];
+  org_id: string;
+  /**
+   * The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,
+   * SKU and stock, then put it on sale yourself.
+   */
+  product_id?: string | null;
+  /** `queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`). */
+  status: string;
+};
+
+/** Draft a product from photos. */
+export type CatalogImageDraftRequest = {
+  /** Category to use; omitted: the AI picks one of your category tree (or none). */
+  category_id?: string | null;
+  /** Language of the texts, one of `AUTOXIDE_CATALOG_LOCALES`. */
+  locale: string;
+  /**
+   * 1 to 8 images of the media library (JPEG, PNG, GIF or WebP). Public ones become the
+   * product's images.
+   */
+  media_ids: string[];
+  /** Unit owning the new product; leave out when you work in one unit only. */
+  org_id?: string | null;
+  /** Tax category of the new product, e.g. `vat.standard` (the AI never chooses it). */
+  tax_category: string;
+};
+
 /**
  * Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not
  * shipped), `bundle` (takes stock from each component).
@@ -6162,6 +6199,29 @@ export type Data_CatalogFacets = {
     sellers: CatalogFacetValue[];
     /** Products matching every filter. */
     total: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogImageDraft = {
+  /** A request to draft a product from photos. */
+  data: {
+    category_id?: string | null;
+    created_at: string;
+    /** Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    locale: string;
+    media_ids: string[];
+    org_id: string;
+    /**
+     * The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,
+     * SKU and stock, then put it on sale yourself.
+     */
+    product_id?: string | null;
+    /** `queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`). */
+    status: string;
   };
 };
 
@@ -34655,6 +34715,34 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/from-images": {
+    /** Draft a product from photos with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogImageDraftRequest;
+      responses: {
+        201: Data_CatalogImageDraft;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/from-images/{id}": {
+    /** Get a request to draft a product from photos. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogImageDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };

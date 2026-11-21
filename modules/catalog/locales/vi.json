@@ -201,5 +201,10 @@
   "field:must be from 1 to 1000": "phải từ 1 đến 1000",
   "field:must be from 1 to 3650": "phải từ 1 tới 3650",
   "text:Download rights of a digital product were given for a paid order (`after.grants`; never the download token).": "Quyền tải hàng số được phát cho một đơn đã trả tiền (`after.grants`; không bao giờ kèm token tải).",
-  "text:Download rights of an order were revoked (order cancelled or refunded, or by staff).": "Quyền tải của một đơn bị thu hồi (đơn huỷ hay hoàn tiền, hoặc do người quản lý)."
+  "text:Download rights of an order were revoked (order cancelled or refunded, or by staff).": "Quyền tải của một đơn bị thu hồi (đơn huỷ hay hoàn tiền, hoặc do người quản lý).",
+  "catalog.image_draft_not_found": "Không có lần tạo nháp từ ảnh `{id}` nào của bạn.",
+  "catalog.ai_images_unavailable": "Tạo sản phẩm nháp từ ảnh cần mô hình AI đọc được ảnh; mô hình cấu hình trên máy chủ này không đọc được (hoặc chưa cài module `ai`).",
+  "catalog.ai_images_unreadable": "Không đọc được ảnh nào: dùng ảnh JPEG, PNG, GIF hay WebP trong thư viện media.",
+  "field:must have 1 to 8 images": "phải có từ 1 tới 8 ảnh",
+  "field:is not in the media library": "không có trong thư viện media"
 }
