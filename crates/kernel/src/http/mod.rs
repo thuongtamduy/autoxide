@@ -37,6 +37,7 @@ mod disposition;
 mod entitlement;
 mod extract;
 mod health;
+mod home;
 mod idempotency;
 mod language;
 mod llms;
@@ -276,6 +277,7 @@ pub fn build(
     let _ = llms_slot.set(llms_text.clone());
     let module_documents = openapi_modules::ModuleDocuments::default();
     let root = root
+        .merge(home::routes(config.api_docs, extras.authenticator.is_some()))
         .merge(llms::routes(llms_text))
         .merge(openapi_modules::routes(module_documents.clone()));
 

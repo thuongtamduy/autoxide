@@ -10,6 +10,7 @@ mod modules;
 mod observability;
 mod runtime;
 mod settings;
+mod startup;
 
 use std::process::ExitCode;
 
@@ -69,8 +70,9 @@ enum Command {
 
     /// Show, apply or revert the database migrations of the modules.
     ///
-    /// Migrations are never applied automatically: run `autoxide migrate up` once
-    /// per deployment, before starting the server.
+    /// Run `autoxide migrate up` once per deployment, before starting the servers. (For one
+    /// server or a first try, AUTOXIDE_MIGRATE_ON_START=true makes `autoxide serve` apply them
+    /// on start.) Only one process applies migrations at a time: the others wait for it.
     Migrate(commands::migrate::Arguments),
 
     /// Print the OpenAPI document of the whole API as JSON.
@@ -99,8 +101,10 @@ enum Command {
 
     /// Run the HTTP server until it receives Ctrl-C or SIGTERM.
     ///
-    /// Refuses to start while a migration has not been applied: run
-    /// `autoxide migrate up` first. On shutdown, it first keeps handling requests for
+    /// Refuses to start while a migration has not been applied: run `autoxide migrate up`
+    /// first, or set AUTOXIDE_MIGRATE_ON_START=true. On start it can also create the first
+    /// administrator (AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL) and run maintenance tasks
+    /// (AUTOXIDE_STARTUP_TASKS). On shutdown, it first keeps handling requests for
     /// `AUTOXIDE_HTTP_DRAIN_SECONDS` while `/health/ready` answers 503, then stops accepting
     /// connections and gives requests in progress up to `AUTOXIDE_HTTP_SHUTDOWN_SECONDS` to
     /// finish.

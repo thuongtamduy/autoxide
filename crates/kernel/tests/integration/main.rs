@@ -32,6 +32,7 @@ mod mcp;
 mod mcp_resources;
 mod metrics;
 mod migration;
+mod migration_lock;
 mod module;
 mod module_catalog;
 mod money;

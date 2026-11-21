@@ -6,13 +6,14 @@
 use std::process::ExitCode;
 
 use autoxide_kernel::database::Database;
-use autoxide_kernel::migration::{MigrationState, Migrator};
+use autoxide_kernel::migration::{MigrationLock, MigrationState, Migrator};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, PlacementMigrations, Placements, SchemaState, TenancyMode,
 };
 
 use super::{report_failure, report_invalid_configuration, run_with_observability};
 use crate::settings;
+use crate::startup::LOCK_WAIT;
 
 #[derive(Debug, clap::Args)]
 pub struct Arguments {
@@ -54,6 +55,16 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     let config = settings.config.clone();
     let outcome = run_with_observability(&config, async move {
         let migrator = settings.modules.migrator().map_err(|error| error.to_string())?;
+        // `up` lấy khoá migration: máy chủ đang tự migrate lúc khởi động (hay một `migrate up`
+        // khác) thì chờ nó xong, không chạy chồng (D-20261121-migrate-on-start).
+        let lock = match &action {
+            Action::Up { .. } => Some(
+                MigrationLock::acquire(&settings.config.database, LOCK_WAIT)
+                    .await
+                    .map_err(|error| error.to_string())?,
+            ),
+            _ => None,
+        };
         let database = Database::connect(&settings.config.database)
             .await
             .map_err(|error| error.to_string())?;
@@ -76,6 +87,11 @@ pub fn run(arguments: &Arguments) -> ExitCode {
         };
         // Đóng kết nối cả khi lệnh hỏng; lỗi của lệnh quan trọng hơn lỗi lúc đóng.
         let closed = database.close().await.map_err(|error| format!("database: {error}"));
+        if let Some(lock) = lock
+            && let Err(error) = lock.release().await
+        {
+            tracing::warn!(error = %error, "cannot release the migration lock");
+        }
         let report = report?;
         closed?;
         Ok(report)

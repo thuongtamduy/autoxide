@@ -121,7 +121,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-029** SeaORM mặc định, SQL trực tiếp chỉ khi đã đo — 2026-11-11
 - **D-030** Phiên bản database tối thiểu — 2026-11-11
 - **D-035** Chi tiết kết nối database tách đọc / ghi — 2026-11-11
-- **D-036** Migration theo module — 2026-11-11
+- **D-036** Migration theo module — 2026-11-11 · *thay một phần bởi D-20261121-migrate-on-start*
 - **D-037** Kiểm luật sở hữu bảng bằng cách hỏi chính database — 2026-11-11
 - **D-054** Event: transactional outbox — 2026-11-11
 - **D-055** Audit log là một module nhận mọi event — 2026-11-11
@@ -139,6 +139,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
+- **[D-20261121-migrate-on-start](D-20261121-migrate-on-start.md)** Tuỳ chọn tự migrate, tạo quản trị viên đầu tiên và chạy task khi `serve` khởi động — 2026-11-21
 
 ## HTTP, REST, OpenAPI
 

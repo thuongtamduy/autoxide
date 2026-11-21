@@ -281,6 +281,17 @@ async fn open(
     })
 }
 
+/// Một kết nối riêng tới database chính, ngoài hai pool: khoá migration trên Postgres
+/// ([`MigrationLock`](crate::migration::MigrationLock)) giữ transaction của nó suốt lúc migrate,
+/// không chiếm kết nối của pool ghi.
+pub(crate) async fn dedicated_connection(
+    config: &DatabaseConfig,
+) -> Result<DatabaseConnection, DatabaseError> {
+    let mut options = base_options(config, &config.url);
+    options.max_connections(1).min_connections(1);
+    open(options, &config.url).await
+}
+
 /// Phần chung của hai phía.
 fn base_options(config: &DatabaseConfig, url: &DatabaseUrl) -> ConnectOptions {
     let mut options = ConnectOptions::new(url.expose().to_owned());

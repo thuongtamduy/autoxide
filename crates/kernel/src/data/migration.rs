@@ -31,6 +31,9 @@ use crate::error::Error;
 use crate::module::{is_identifier, module_name_problems};
 use crate::secret::{KeyConfig, SecretKey};
 
+mod lock;
+pub use lock::MigrationLock;
+
 /// Một upgrade dữ liệu của module. Xem đầu file.
 //
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.

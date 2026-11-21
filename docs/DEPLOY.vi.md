@@ -311,11 +311,17 @@ backup: thiếu nó thì secret đã mã hoá trong bản backup không đọc �
 chạy đầu nằm ở README, mục [Chạy thử bằng Docker](../README.vi.md#chạy-thử-bằng-docker-không-cần-build).
 Những luật cần nhớ sau đó, với `IMAGE` và `RUN` như định nghĩa ở đó:
 
-- Máy chủ không bao giờ tự áp dụng migration. Chạy `serve` trên database trống hay cũ hơn sẽ dừng
+- Mặc định máy chủ không tự áp dụng migration. Chạy `serve` trên database trống hay cũ hơn sẽ dừng
   ngay với `N migration(s) have not been applied to the database (first: …); run autoxide migrate
   up first` (chỉ nêu số lượng và vài tên đầu; `autoxide migrate status` liệt kê đủ; mã lỗi
   `kernel.migrations_pending`): chạy
   `$RUN $IMAGE migrate up` rồi mới khởi động.
+  Với một máy chủ, có thể đặt `AUTOXIDE_MIGRATE_ON_START=true` thay vào đó: `serve` tự áp dụng
+  migration lúc khởi động, dưới một khoá để hai máy chủ khởi động cùng lúc không cùng migrate. Kèm
+  `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` thì tạo luôn quản trị viên đầu tiên, kèm `AUTOXIDE_STARTUP_TASKS`
+  thì nạp dữ liệu nền — đúng những gì `compose.quickstart.yml` làm. Nhiều máy chủ thì vẫn chạy
+  `migrate up` một lần mỗi lần deploy: thấy rõ cái gì đổi, và migration hỏng thì deploy dừng trước
+  khi bản mới nhận request.
 - Mọi thứ máy chủ ghi ra nằm trong volume `autoxide-data` (`/var/lib/autoxide/data`): database,
   file tải lên, và mail cho tới khi cấu hình SMTP. Container chạy không gắn volume đó chỉ giữ dữ
   liệu cho tới khi bị xoá.

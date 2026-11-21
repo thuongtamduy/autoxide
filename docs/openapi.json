@@ -25045,6 +25045,69 @@
         ],
         "type": "object"
       },
+      "Data_Home": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What this server is and where to go next.",
+            "properties": {
+              "docs": {
+                "description": "Path of the interactive API reference; `null` when it is turned off\n(`AUTOXIDE_HTTP_API_DOCS`).",
+                "example": "/api/docs",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "health": {
+                "description": "Path of the readiness probe.",
+                "example": "/health/ready",
+                "type": "string"
+              },
+              "llms": {
+                "description": "Path of the plain-text overview for AI agents (llmstxt.org).",
+                "example": "/llms.txt",
+                "type": "string"
+              },
+              "mcp": {
+                "description": "Path of the MCP endpoint for AI agents; `null` when no module authenticates callers.",
+                "example": "/mcp",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "name": {
+                "description": "Always `Autoxide`.",
+                "example": "Autoxide",
+                "type": "string"
+              },
+              "openapi": {
+                "description": "Path of the OpenAPI document describing every endpoint.",
+                "example": "/api/v1/openapi.json",
+                "type": "string"
+              },
+              "version": {
+                "description": "Version of the server.",
+                "example": "0.16.0",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version",
+              "openapi",
+              "llms",
+              "health"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_IdentityResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -50884,6 +50947,60 @@
         },
         "required": [
           "reason"
+        ],
+        "type": "object"
+      },
+      "Home": {
+        "description": "What this server is and where to go next.",
+        "properties": {
+          "docs": {
+            "description": "Path of the interactive API reference; `null` when it is turned off\n(`AUTOXIDE_HTTP_API_DOCS`).",
+            "example": "/api/docs",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "health": {
+            "description": "Path of the readiness probe.",
+            "example": "/health/ready",
+            "type": "string"
+          },
+          "llms": {
+            "description": "Path of the plain-text overview for AI agents (llmstxt.org).",
+            "example": "/llms.txt",
+            "type": "string"
+          },
+          "mcp": {
+            "description": "Path of the MCP endpoint for AI agents; `null` when no module authenticates callers.",
+            "example": "/mcp",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Always `Autoxide`.",
+            "example": "Autoxide",
+            "type": "string"
+          },
+          "openapi": {
+            "description": "Path of the OpenAPI document describing every endpoint.",
+            "example": "/api/v1/openapi.json",
+            "type": "string"
+          },
+          "version": {
+            "description": "Version of the server.",
+            "example": "0.16.0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "version",
+          "openapi",
+          "llms",
+          "health"
         ],
         "type": "object"
       },
@@ -97911,6 +98028,53 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/": {
+      "get": {
+        "description": "Open the server's address to see what it is: the OpenAPI document, the interactive API\nreference (when turned on), the MCP endpoint for AI agents, the overview for AI agents and the\nreadiness probe. Needs no sign-in.",
+        "operationId": "home",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Home"
+                }
+              }
+            },
+            "description": "Name, version and links of this server."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Where to start: name, version and links to the API description.",
+        "tags": [
+          "health"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/address/provinces": {
       "get": {
         "description": "No sign-in needed. In code order (the order of the official list). Cached for a day; the\n`ETag` changes when a new list is imported.",

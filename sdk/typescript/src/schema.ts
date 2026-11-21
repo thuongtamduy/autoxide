@@ -8325,6 +8325,30 @@ export type Data_Health = {
 };
 
 /** Envelope of a single result. */
+export type Data_Home = {
+  /** What this server is and where to go next. */
+  data: {
+    /**
+     * Path of the interactive API reference; `null` when it is turned off
+     * (`AUTOXIDE_HTTP_API_DOCS`).
+     */
+    docs?: string | null;
+    /** Path of the readiness probe. */
+    health: string;
+    /** Path of the plain-text overview for AI agents (llmstxt.org). */
+    llms: string;
+    /** Path of the MCP endpoint for AI agents; `null` when no module authenticates callers. */
+    mcp?: string | null;
+    /** Always `Autoxide`. */
+    name: string;
+    /** Path of the OpenAPI document describing every endpoint. */
+    openapi: string;
+    /** Version of the server. */
+    version: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_IdentityResponse = {
   /** A sign-in with an outside provider linked to your account. */
   data: {
@@ -16480,6 +16504,27 @@ export type Health = {
 export type HideSupportMessageRequest = {
   /** Kept in the audit log; 1 to 500 characters. */
   reason: string;
+};
+
+/** What this server is and where to go next. */
+export type Home = {
+  /**
+   * Path of the interactive API reference; `null` when it is turned off
+   * (`AUTOXIDE_HTTP_API_DOCS`).
+   */
+  docs?: string | null;
+  /** Path of the readiness probe. */
+  health: string;
+  /** Path of the plain-text overview for AI agents (llmstxt.org). */
+  llms: string;
+  /** Path of the MCP endpoint for AI agents; `null` when no module authenticates callers. */
+  mcp?: string | null;
+  /** Always `Autoxide`. */
+  name: string;
+  /** Path of the OpenAPI document describing every endpoint. */
+  openapi: string;
+  /** Version of the server. */
+  version: string;
 };
 
 /** A sign-in with an outside provider linked to your account. */
@@ -31580,6 +31625,16 @@ export type WorkView = {
 };
 
 export interface paths {
+  "/": {
+    /** Where to start: name, version and links to the API description. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Home;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/address/provinces": {
     /** List the provinces. */
     get: {

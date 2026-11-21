@@ -11,6 +11,7 @@ use autoxide_kernel::config::{
 use autoxide_kernel::module::{Module, Modules};
 
 use crate::modules;
+use crate::startup::StartupConfig;
 
 /// Tên file cấu hình cục bộ, tìm trong thư mục đang đứng.
 pub const DOTENV_FILE: &str = ".env";
@@ -21,15 +22,21 @@ pub const DOTENV_FILE: &str = ".env";
 pub struct Settings {
     pub config: Config,
     pub modules: Modules,
+    /// Việc `serve` làm lúc khởi động (migrate, quản trị viên đầu tiên, task) — `startup.rs`.
+    pub startup: StartupConfig,
     pub values: Vec<SettingValue>,
 }
 
-/// Đọc cấu hình của kernel rồi của từng module, bằng cùng một `reader`.
-fn read_all(reader: &mut ConfigReader, modules: &mut Modules) -> Result<Config, Invalid> {
+/// Đọc cấu hình của kernel, của từng module, rồi của việc lúc khởi động, bằng cùng một `reader`.
+fn read_all(
+    reader: &mut ConfigReader,
+    modules: &mut Modules,
+) -> Result<(Config, StartupConfig), Invalid> {
     let config = Config::read(reader);
     let configured = modules.configure(reader);
+    let startup = StartupConfig::read(reader);
     configured?;
-    config
+    Ok((config?, startup?))
 }
 
 /// Đăng ký `modules`; tên module sai được báo như một lỗi cấu hình.
@@ -45,9 +52,9 @@ pub fn read_with(
 ) -> Result<Settings, ConfigErrors> {
     let mut modules = register(modules)?;
     let mut reader = ConfigReader::new(source);
-    let config = read_all(&mut reader, &mut modules);
-    let (config, values) = reader.finish(config)?;
-    Ok(Settings { config, modules, values })
+    let read = read_all(&mut reader, &mut modules);
+    let ((config, startup), values) = reader.finish(read)?;
+    Ok(Settings { config, modules, startup, values })
 }
 
 /// Như [`read_with`], với các module đã đăng ký của chương trình.
