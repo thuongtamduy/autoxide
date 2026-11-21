@@ -121,10 +121,10 @@ fn transfer_not_found(id: Uuid) -> Error {
         .with_param("id", id)
 }
 
-fn storage_unavailable() -> Error {
+pub(crate) fn storage_unavailable() -> Error {
     Error::unavailable(
         "catalog.storage_unavailable",
-        "Imports and exports need file storage: install module `files`.",
+        "Imports, exports and digital products need file storage: install module `files`.",
     )
 }
 

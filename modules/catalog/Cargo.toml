@@ -9,6 +9,7 @@ publish.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+autoxide-files.workspace = true
 autoxide-kernel.workspace = true
 autoxide-media.workspace = true
 autoxide-organizations.workspace = true
@@ -18,6 +19,8 @@ base64.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 futures-util.workspace = true
+hmac.workspace = true
+metrics.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

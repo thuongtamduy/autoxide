@@ -138,7 +138,9 @@ impl Module for FilesModule {
         context.usage_counter(&service::STORAGE_LIMIT, Arc::new(service::StorageCounter))?;
         let service = Arc::new(service);
         self.service = Some(service.clone());
-        context.personal_data(service)?;
+        context.personal_data(service.clone())?;
+        // `Arc<FileService>` tự đổi thành `Arc<dyn Files>`: module khác chỉ thấy trait.
+        context.provide::<dyn api::Files>(service)?;
         // Nơi lưu riêng của placement (bước 33) mở bằng cùng cài đặt.
         context.provide::<dyn autoxide_kernel::storage::StorageOpener>(Arc::new(store::Opener))?;
         context.provide::<dyn Storage>(storage)
