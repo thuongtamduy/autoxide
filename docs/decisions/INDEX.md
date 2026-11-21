@@ -20,6 +20,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
+- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-vn-providers*
 
 ## Quy trình, gate, lộ trình
 
@@ -55,7 +56,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-198** Đặc tả từng bước trong `docs/steps/`, luật chung giữa các bước; giữ nguyên lịch sử git — 2026-11-13 · **chủ dự án quyết**
 - **D-205** Phân quyền chuẩn hàng đầu: bước 54 mới, hợp đồng quyền và test độ phủ ở bước 31 — 2026-11-13 · **chủ dự án quyết**
 - **D-221** Đưa tám mảng "để sau" lên lộ trình: bước 59–66 — 2026-11-14 · **chủ dự án quyết**
-- **D-228** Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 · **chủ dự án quyết**
+- **D-228** Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 · **chủ dự án quyết** · *thay một phần bởi D-20261121-community-first*
 - **D-232** Đưa 11 mục "để sau / chờ quyết" vào các bước có sẵn — 2026-11-14 · **chủ dự án quyết**
 - **D-233** Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 · **chủ dự án quyết**
 - **D-237** Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14
@@ -95,6 +96,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-admin-password-path](D-20261121-admin-password-path.md)** Nơi ghi mật khẩu tự sinh là một Setting; gate chặn test ghi file vào cây mã nguồn — 2026-11-21
 - **[D-20261121-auto-release](D-20261121-auto-release.md)** Merge PR phát hành là phát hành: GitHub tự tạo tag và chạy Release khi CI của commit đó xanh — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-mold-shards](D-20261121-ci-mold-shards.md)** CI: mold làm linker cho job build tests; test Postgres chia 6 phần — 2026-11-21 · **chủ dự án quyết**
@@ -561,6 +563,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
 - **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
+- **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
 
 ## Vận hành và hiệu năng
 

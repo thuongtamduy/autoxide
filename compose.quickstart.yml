@@ -6,7 +6,8 @@
 #        "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
 #
 #    Optional lines: AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL (default admin@example.com) and
-#    AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD (without it a password is generated and logged once).
+#    AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD (without it a password is generated and written to
+#    data/initial-admin-password in the data volume, never to the log).
 #
 # 2. docker compose -f compose.quickstart.yml up -d
 #    docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
