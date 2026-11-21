@@ -99,6 +99,19 @@ pub struct TestApp {
     /// Database đã được chép từ database mẫu thay vì migrate từ đầu.
     from_template: bool,
     statements: Arc<StatementLog>,
+    /// Thư mục tạm cho file tải lên và mail file của app; xoá khi `TestApp` bị bỏ.
+    _scratch: Option<ScratchDir>,
+}
+
+/// Thư mục tạm tự xoá khi bị bỏ (`Drop`). Rust gọi `drop` khi giá trị ra khỏi phạm vi — tương tự
+/// `finally` — nên test dù đỏ hay xanh cũng không để file lại.
+struct ScratchDir(std::path::PathBuf);
+
+impl Drop for ScratchDir {
+    fn drop(&mut self) {
+        // Lỗi xoá (thư mục chưa từng được tạo, đã mất) không đáng làm test hỏng.
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 /// Cấu hình của [`TestApp`] trước khi dựng.
@@ -450,6 +463,30 @@ impl<'a> TestAppBuilder<'a> {
     pub async fn build(self) -> Result<TestApp, TestAppError> {
         let mut pairs = vec![("DATABASE_URL".to_owned(), self.test.url().to_owned())];
         pairs.extend(self.settings);
+        // Mặc định của `files` và `mail` là thư mục tương đối `data/files`, `data/mail` — tức ngay trong
+        // thư mục chạy test (`crates/app`), và test upload để rác ở đó mãi. Bài test chưa chọn thư mục
+        // (hay S3) thì cho một thư mục tạm riêng, xoá khi `TestApp` bị bỏ.
+        let has = |pairs: &[(String, String)], name: &str| pairs.iter().any(|(n, _)| n == name);
+        let mut scratch = None;
+        let needs_files =
+            !has(&pairs, "AUTOXIDE_FILES_DIR") && !has(&pairs, "AUTOXIDE_FILES_S3_BUCKET");
+        let needs_mail = !has(&pairs, "AUTOXIDE_MAIL_FILE_DIR");
+        if needs_files || needs_mail {
+            let dir = std::env::temp_dir().join(format!("autoxide-testapp-{}", Uuid::now_v7()));
+            if needs_files {
+                pairs.push((
+                    "AUTOXIDE_FILES_DIR".to_owned(),
+                    dir.join("files").display().to_string(),
+                ));
+            }
+            if needs_mail {
+                pairs.push((
+                    "AUTOXIDE_MAIL_FILE_DIR".to_owned(),
+                    dir.join("mail").display().to_string(),
+                ));
+            }
+            scratch = Some(ScratchDir(dir));
+        }
         let source = ConfigSource::from_pairs(pairs);
         let mut reader = ConfigReader::new(&source);
         let config = Config::read(&mut reader);
@@ -593,6 +630,7 @@ impl<'a> TestAppBuilder<'a> {
             dns,
             from_template,
             statements,
+            _scratch: scratch,
         })
     }
 }
