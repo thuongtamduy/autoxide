@@ -4,7 +4,7 @@
 
 use autoxide_kernel::config::ConfigSource;
 use autoxide_kernel::database::Database;
-use autoxide_kernel::module::{Module, Stability};
+use autoxide_kernel::module::Stability;
 use autoxide_testkit::{TestDatabase, schema_snapshot};
 use serde_json::json;
 

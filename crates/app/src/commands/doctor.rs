@@ -366,8 +366,11 @@ mod tests {
                     ("secret_key", "skipped")
                 ]
             );
-            assert_eq!(lines[2].hint.as_deref(), Some("Run `autoxide migrate up`."));
-            assert!(lines[2].message.contains(" more"), "{}", lines[2].message);
+            // Module đang chạy và đang tắt (bước 70 P1); test đọc cấu hình với mọi module.
+            assert!(lines[1].message.contains("modules run: mail, ai,"), "{}", lines[1].message);
+            assert!(lines[1].message.ends_with("No module is turned off."), "{}", lines[1].message);
+            assert_eq!(lines[3].hint.as_deref(), Some("Run `autoxide migrate up`."));
+            assert!(lines[3].message.contains(" more"), "{}", lines[3].message);
 
             let setup = settings(test.url(), &dir);
             autoxide_testkit::prepare_from_template(

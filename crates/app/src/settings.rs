@@ -41,18 +41,22 @@ enum Choice {
     Everything,
 }
 
-/// Đọc và kiểm toàn bộ cấu hình từ `source`, đăng ký những module của `modules` mà `choice` bật.
+/// Kết quả một lượt đọc: thứ đã đọc được, hoặc `Invalid` khi lỗi đã ghi vào reader.
+type Read = Result<(Config, StartupConfig, Modules), Invalid>;
+
+/// Đọc toàn bộ cấu hình từ `reader`, đăng ký những module của `modules` mà `choice` bật.
 ///
 /// Thứ tự đọc cũng là thứ tự trong `.env.example`: kernel, việc lúc khởi động, `AUTOXIDE_MODULES`,
-/// rồi từng module đang bật.
+/// rồi từng module đang bật. `Err(ConfigErrors)`: module khai sai (tên, phụ thuộc) — lỗi của
+/// người viết module, không đọc tiếp được.
 fn read_selected(
+    reader: &mut ConfigReader<'_>,
     source: &ConfigSource,
     modules: Vec<Box<dyn Module>>,
     choice: Choice,
-) -> (ConfigReader<'_>, Result<(Config, StartupConfig, Modules), Invalid>, Option<ConfigErrors>) {
-    let mut reader = ConfigReader::new(source);
-    let config = Config::read(&mut reader);
-    let startup = StartupConfig::read(&mut reader);
+) -> Result<Read, ConfigErrors> {
+    let config = Config::read(reader);
+    let startup = StartupConfig::read(reader);
     // Luôn đọc qua `reader` để biến hiện ở `autoxide config` và `.env.example`.
     let configured = reader.get_with(&MODULES, Selection::parse);
     let unset = source.get(MODULES.name).is_none();
@@ -67,39 +71,30 @@ fn read_selected(
         Ok(Ok(modules)) => Ok(modules),
         // Người cài viết sai biến: báo cùng lượt với mọi lỗi cấu hình khác.
         Ok(Err(SelectionError::Setting(problem))) => reader.reject(&MODULES, problem),
-        // Module khai sai (tên, phụ thuộc): lỗi của người viết module, không đọc tiếp được.
         Ok(Err(SelectionError::Modules(error))) => {
-            let errors = ConfigErrors::from(ConfigError::new("modules", error.message()));
-            return (reader, Err(Invalid), Some(errors));
+            return Err(ConfigErrors::from(ConfigError::new("modules", error.message())));
         }
         Err(Invalid) => Err(Invalid),
     };
-    let read = match registered {
-        Ok(mut modules) => {
-            let configured = modules.configure(&mut reader);
-            // Đọc hết rồi mới `?`: lỗi của kernel và của mọi module hiện cùng lúc.
-            (|| {
-                configured?;
-                Ok((config?, startup?, modules))
-            })()
-        }
-        Err(Invalid) => Err(Invalid),
+    let Ok(mut modules) = registered else {
+        return Ok(Err(Invalid));
     };
-    (reader, read, None)
+    // Đọc hết rồi mới `?`: lỗi của kernel và của mọi module hiện cùng lúc.
+    let configured = modules.configure(reader);
+    Ok((|| {
+        configured?;
+        Ok((config?, startup?, modules))
+    })())
 }
 
-fn finish(
-    (reader, read, fatal): (
-        ConfigReader<'_>,
-        Result<(Config, StartupConfig, Modules), Invalid>,
-        Option<ConfigErrors>,
-    ),
+fn settings(
+    source: &ConfigSource,
+    modules: Vec<Box<dyn Module>>,
+    choice: Choice,
 ) -> Result<Settings, ConfigErrors> {
-    if let Some(errors) = fatal {
-        return Err(errors);
-    }
-    let ((config, modules, startup), values) =
-        reader.finish(read.map(|(config, startup, modules)| (config, modules, startup)))?;
+    let mut reader = ConfigReader::new(source);
+    let read = read_selected(&mut reader, source, modules, choice)?;
+    let ((config, startup, modules), values) = reader.finish(read)?;
     Ok(Settings { config, modules, startup, values })
 }
 
@@ -109,14 +104,14 @@ pub fn read_with(
     source: &ConfigSource,
     modules: Vec<Box<dyn Module>>,
 ) -> Result<Settings, ConfigErrors> {
-    finish(read_selected(source, modules, Choice::Configured))
+    settings(source, modules, Choice::Configured)
 }
 
 /// Như [`read_with`] với các module của chương trình, cho test: không đặt `AUTOXIDE_MODULES` thì
 /// MỌI module chạy (kể cả thử nghiệm), để bài test không phải nêu biến.
 #[cfg(test)]
 pub fn read(source: &ConfigSource) -> Result<Settings, ConfigErrors> {
-    finish(read_selected(source, modules::all(), Choice::AllUnlessConfigured))
+    settings(source, modules::all(), Choice::AllUnlessConfigured)
 }
 
 /// Đọc cấu hình từ môi trường của tiến trình và file `.env` trong thư mục hiện tại.
@@ -128,7 +123,7 @@ pub fn load() -> Result<Settings, ConfigErrors> {
 /// (`autoxide openapi`, `autoxide mcp-manifest`).
 pub fn load_everything() -> Result<Settings, ConfigErrors> {
     let source = ConfigSource::load(Path::new(DOTENV_FILE))?;
-    finish(read_selected(&source, modules::all(), Choice::Everything))
+    settings(&source, modules::all(), Choice::Everything)
 }
 
 /// Danh sách mọi biến chương trình đọc (kernel và mọi module), với giá trị mặc định
@@ -136,8 +131,9 @@ pub fn load_everything() -> Result<Settings, ConfigErrors> {
 /// `.env.example`.
 pub fn describe() -> Vec<SettingValue> {
     let source = ConfigSource::default();
+    let mut reader = ConfigReader::new(&source);
     // Bỏ qua kết quả: biến bắt buộc đương nhiên "thiếu" ở đây; chỉ cần danh sách.
-    let (reader, _, _) = read_selected(&source, modules::all(), Choice::Everything);
+    let _ = read_selected(&mut reader, &source, modules::all(), Choice::Everything);
     reader.values().to_vec()
 }
 

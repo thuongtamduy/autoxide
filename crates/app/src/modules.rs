@@ -180,16 +180,16 @@ pub fn dormant_notice(modules: &Modules, dormant: &[DormantModule]) -> (String, 
 /// Ghi vào log lúc `serve` khởi động: module nào chạy, module nào tắt, và — điều người nâng cấp
 /// không được bỏ lỡ — module tắt mà database còn dữ liệu của nó, kèm đúng dòng cấu hình cần thêm.
 pub async fn log_at_start(modules: &Modules, database: &Database) {
-    tracing::info!("{}", summary(modules));
+    tracing::info!(summary = %summary(modules), "modules");
     match dormant_with_data(modules, database).await {
         Ok(dormant) if dormant.is_empty() => {}
         Ok(dormant) => {
             let (message, hint) = dormant_notice(modules, &dormant);
             // Người cài tự viết `AUTOXIDE_MODULES` thì đã chọn; mặc định thì có thể họ chưa biết.
             if modules.selection_is_explicit() {
-                tracing::info!("{message} {hint}");
+                tracing::info!(hint, "{message}");
             } else {
-                tracing::warn!("{message} {hint}");
+                tracing::warn!(hint, "{message}");
             }
         }
         // Không đọc được catalog (vd quyền): không chặn khởi động vì một câu nhắc.

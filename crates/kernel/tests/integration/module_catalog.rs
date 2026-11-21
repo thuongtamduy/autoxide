@@ -309,6 +309,7 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 ],
                 "always_enabled": false,
                 "requires": [],
+                "stability": "official",
             })
         );
     })
