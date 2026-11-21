@@ -27,14 +27,14 @@ pub struct Settings {
     pub values: Vec<SettingValue>,
 }
 
-/// Đọc cấu hình của kernel, của từng module, rồi của việc lúc khởi động, bằng cùng một `reader`.
+/// Đọc cấu hình của kernel, của việc lúc khởi động, rồi của từng module, bằng cùng một `reader`.
 fn read_all(
     reader: &mut ConfigReader,
     modules: &mut Modules,
 ) -> Result<(Config, StartupConfig), Invalid> {
     let config = Config::read(reader);
-    let configured = modules.configure(reader);
     let startup = StartupConfig::read(reader);
+    let configured = modules.configure(reader);
     configured?;
     Ok((config?, startup?))
 }
