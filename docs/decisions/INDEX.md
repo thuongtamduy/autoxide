@@ -246,6 +246,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21
 
 ## Đa khách, tổ chức, gói
 

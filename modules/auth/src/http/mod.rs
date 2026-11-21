@@ -18,6 +18,8 @@ mod phone;
 mod reauth;
 mod reset;
 pub(crate) mod roles;
+mod scim;
+mod scim_admin;
 pub(crate) mod session;
 mod sessions;
 mod support;
@@ -40,6 +42,8 @@ use crate::verify::EmailVerifications;
 pub(crate) struct HttpState {
     /// Đăng nhập qua nhà cung cấp danh tính (bước 40 P3).
     pub oidc: Arc<crate::oidc::OidcService>,
+    /// Đồng bộ nhân viên qua SCIM 2.0 (bước 66).
+    pub scim: Arc<crate::scim::ScimService>,
     pub sessions: Arc<SessionService>,
     pub users: Arc<UserService>,
     pub roles: Arc<RoleService>,
@@ -97,6 +101,8 @@ pub(crate) fn routes(state: HttpState) -> OpenApiRouter {
         .merge(oidc::routes())
         .merge(invitations::routes())
         .merge(support::routes())
+        .merge(scim::routes())
+        .merge(scim_admin::routes())
         .with_state(Arc::new(state))
         // Response của `auth` hay chứa secret chỉ trả một lần (token, API key mới, secret TOTP,
         // mã khôi phục): không ai được lưu lại — proxy, trình duyệt, lớp idempotency (RFC 6749

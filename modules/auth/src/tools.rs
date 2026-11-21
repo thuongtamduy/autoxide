@@ -496,6 +496,14 @@ mod tests {
                 entitlements: Default::default(),
                 self_registration: false,
             }),
+            scim: Arc::new(crate::scim::ScimService {
+                databases: autoxide_kernel::tenancy::DatabaseRegistry::single(
+                    services.database.clone(),
+                ),
+                outbox: autoxide_kernel::event::Outbox::standalone("auth"),
+                entitlements: Default::default(),
+                users: services.users.clone(),
+            }),
             sessions: services.sessions.clone(),
             users: services.users.clone(),
             roles: services.roles.clone(),

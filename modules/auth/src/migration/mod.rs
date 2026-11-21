@@ -39,6 +39,7 @@ mod m0040_api_key_approval;
 mod m0041_tenant_guardrails;
 mod m0042_session_authenticated_at;
 mod m0043_phone_accounts;
+mod m0044_scim;
 pub(crate) mod u0001_seal_totp;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
@@ -126,6 +127,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0042_session_authenticated_at::Migration),
         // Tài khoản người mua chỉ có số điện thoại (bước 47).
         Box::new(m0043_phone_accounts::Migration),
+        // Đồng bộ nhân viên qua SCIM 2.0: token SCIM, liên kết tài khoản (bước 66).
+        Box::new(m0044_scim::Migration),
     ]
 }
 

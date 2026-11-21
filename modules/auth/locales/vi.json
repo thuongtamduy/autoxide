@@ -239,5 +239,10 @@
   "auth.phone_sign_in_unavailable": "Máy chủ này không gửi được mã đăng nhập qua SMS.",
   "field:this account has no email yet; add one first": "tài khoản này chưa có email; hãy thêm email trước",
   "field:this account has no email; use `phone_code`": "tài khoản này không có email; hãy dùng `phone_code`",
-  "field:was not sent to the number this account signs in with": "không được gửi tới số mà tài khoản này dùng để đăng nhập"
+  "field:was not sent to the number this account signs in with": "không được gửi tới số mà tài khoản này dùng để đăng nhập",
+  "auth.scim_token_not_found": "Không có token SCIM `{id}`.",
+  "auth.scim_token_limit": "Khách đã có {limit} token SCIM. Hãy thu hồi token không còn dùng trước.",
+  "text:Create and revoke the SCIM tokens the company's identity provider (Entra ID, Okta, Google Workspace) uses to create, change and disable staff accounts, and map its groups to roles. Whoever holds this lets an outside system manage who works here.": "Tạo và thu hồi token SCIM mà hệ thống danh tính của doanh nghiệp (Entra ID, Okta, Google Workspace) dùng để tạo, sửa, khoá tài khoản nhân viên, và ánh xạ nhóm của nó sang role. Ai giữ quyền này cho một hệ thống bên ngoài quyết định ai làm việc ở đây.",
+  "text:A SCIM token was created for the tenant's identity provider (`after`: id, name, prefix; never the token).": "Khách tạo một token SCIM cho hệ thống danh tính (`after`: id, tên, phần đầu; không bao giờ có token).",
+  "text:A SCIM token was revoked; the identity provider using it is refused from now on.": "Một token SCIM bị thu hồi; hệ thống danh tính dùng nó bị từ chối từ nay."
 }

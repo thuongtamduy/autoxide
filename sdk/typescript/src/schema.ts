@@ -4972,6 +4972,12 @@ export type CreateRuleRequest = {
   trigger: Record<string, unknown>;
 };
 
+/** A new SCIM token. */
+export type CreateScimTokenRequest = {
+  /** 1–100 characters, e.g. the identity provider it is for. */
+  name: string;
+};
+
 /** A new menu. */
 export type CreateSiteMenuRequest = {
   items?: SiteMenuItemInput[];
@@ -5099,6 +5105,20 @@ export type CreatedEndpointResponse = EndpointResponse & {
    * Webhooks). Store it now: it cannot be shown again, only replaced.
    */
   secret: string;
+};
+
+/** A SCIM token just created: the only time its secret is shown. */
+export type CreatedScimTokenResponse = ScimTokenResponse & {
+  /**
+   * Path of the SCIM endpoint on this server; put the server's public address in front of it
+   * for the identity provider's "tenant URL" / "base URL".
+   */
+  scim_base_path: string;
+  /**
+   * The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /
+   * API token; it is not shown again.
+   */
+  token_secret: string;
 };
 
 /** ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted. */
@@ -7669,6 +7689,23 @@ export type Data_CreatedEndpointResponse = {
      * Webhooks). Store it now: it cannot be shown again, only replaced.
      */
     secret: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CreatedScimTokenResponse = {
+  /** A SCIM token just created: the only time its secret is shown. */
+  data: ScimTokenResponse & {
+    /**
+     * Path of the SCIM endpoint on this server; put the server's public address in front of it
+     * for the identity provider's "tenant URL" / "base URL".
+     */
+    scim_base_path: string;
+    /**
+     * The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /
+     * API token; it is not shown again.
+     */
+    token_secret: string;
   };
 };
 
@@ -15142,6 +15179,22 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ScimTokenResponse = {
+  data: {
+    created_at: string;
+    /** The user who created it. */
+    created_by: string;
+    id: string;
+    /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
+    last_used_at?: string | null;
+    /** Name to recognise the token, e.g. the identity provider it is set up in. */
+    name: string;
+    /** Start and end of the token, to recognise it; never the whole token. */
+    prefix: string;
   }[];
 };
 
@@ -28384,6 +28437,83 @@ export type ScheduleResponse = {
   updated_at: string;
 };
 
+/** A SCIM error (`urn:ietf:params:scim:api:messages:2.0:Error`, RFC 7644 §3.12). */
+export type ScimErrorBody = {
+  /** What went wrong, for people. */
+  detail: string;
+  schemas: string[];
+  /**
+   * `invalidFilter`, `uniqueness`, `mutability`, `invalidSyntax`, `invalidPath`, `noTarget`
+   * or `invalidValue`, when one applies.
+   */
+  scimType?: string | null;
+  /** The HTTP status, as a string. */
+  status: string;
+};
+
+/** A SCIM list (`urn:ietf:params:scim:api:messages:2.0:ListResponse`, RFC 7644 §3.4.2). */
+export type ScimListResponse = {
+  /** The resources of this page. */
+  Resources: unknown[];
+  /** How many resources this page holds. */
+  itemsPerPage: number;
+  schemas: string[];
+  /** 1-based index of the first resource of this page. */
+  startIndex: number;
+  /** How many resources match the filter, on every page. */
+  totalResults: number;
+};
+
+/** A SCIM PATCH request (`urn:ietf:params:scim:api:messages:2.0:PatchOp`, RFC 7644 §3.5.2). */
+export type ScimPatch = {
+  /**
+   * `op` (`add`, `replace`, `remove`, any case), `path` (`attr`, `attr.sub`,
+   * `attr[filter]`, `attr[filter].sub`) and `value`. Without `path`, `value` is an object of
+   * attributes.
+   */
+  Operations: unknown[];
+  schemas: string[];
+};
+
+/** A SCIM token of the tenant, without its secret. */
+export type ScimTokenResponse = {
+  created_at: string;
+  /** The user who created it. */
+  created_by: string;
+  id: string;
+  /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
+  last_used_at?: string | null;
+  /** Name to recognise the token, e.g. the identity provider it is set up in. */
+  name: string;
+  /** Start and end of the token, to recognise it; never the whole token. */
+  prefix: string;
+};
+
+/** A SCIM User (RFC 7643 §4.1), as Autoxide stores it: the staff account of the tenant. */
+export type ScimUser = {
+  /**
+   * `false` disables the account at once: its sessions, refresh tokens and API keys are
+   * revoked in the same transaction. `"True"` / `"False"` strings are accepted.
+   */
+  active?: boolean | null;
+  /** Name shown in Autoxide; else `name.formatted`, else given and family name, else `userName`. */
+  displayName?: string | null;
+  /** Work email: the `primary` one, else the first; when absent, `userName` must be an email. */
+  emails?: unknown[] | null;
+  /** Id of the person at the identity provider; unique in the tenant, compared with case. */
+  externalId?: string | null;
+  /** Groups the user is in (read-only; change them through `/Groups`). */
+  groups?: unknown[] | null;
+  /** Id given by Autoxide (the account id); read-only. */
+  id?: string | null;
+  /** `givenName`, `familyName`, `formatted`. */
+  name?: unknown;
+  /** `urn:ietf:params:scim:schemas:core:2.0:User`. */
+  schemas?: string[] | null;
+  /** Unique sign-in name at the identity provider, compared without case. Required. */
+  userName: string;
+};
+
 /** A search result. */
 export type SearchHit = {
   entry_id: string;
@@ -32934,6 +33064,153 @@ export interface paths {
         403: Problem;
         404: Problem;
         409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/tokens": {
+    /** List the SCIM tokens of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ScimTokenResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM token for the tenant's identity provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateScimTokenRequest;
+      responses: {
+        201: Data_CreatedScimTokenResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/tokens/{id}": {
+    /** Revoke a SCIM token. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/ResourceTypes": {
+    /** List the SCIM resource types (`User`, `Group`). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: ScimListResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Schemas": {
+    /** List the SCIM schemas, with the attributes Autoxide keeps. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: ScimListResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/ServiceProviderConfig": {
+    /** Describe what this SCIM server supports. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Users": {
+    /** List or find SCIM Users. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimListResponse;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM User (provision a staff account). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ScimUser;
+      responses: {
+        201: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Users/{id}": {
+    /** Get a SCIM User. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: ScimUser;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Replace a SCIM User. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimUser;
+      responses: {
+        200: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Change a SCIM User with PATCH operations. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimPatch;
+      responses: {
+        200: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Delete a SCIM User. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
         default: Problem;
       };
     };
