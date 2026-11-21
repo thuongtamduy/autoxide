@@ -344,10 +344,19 @@ impl PasskeyService {
             .col_expr(passkey::Column::LastUsedAt, Expr::value(Some(now())))
             .filter(passkey::Column::Id.eq(stored.id))
             .scoped(tenant);
+        let counted = dynamic.is_some();
         if let Some(dynamic) = dynamic {
-            update = update.col_expr(passkey::Column::DynamicState, Expr::value(dynamic));
+            // Ghi có điều kiện (so-và-đổi): chỉ khi bộ đếm vẫn là bản vừa kiểm. Hai lần đăng nhập
+            // cùng lúc bằng cùng một chữ ký (hay một bản sao của authenticator) không cùng thắng.
+            update = update
+                .col_expr(passkey::Column::DynamicState, Expr::value(dynamic))
+                .filter(passkey::Column::DynamicState.eq(stored.dynamic_state.clone()));
         }
-        update.exec(tenant.database().write()).await?;
+        let written = update.exec(tenant.database().write()).await?;
+        if counted && written.rows_affected == 0 {
+            tracing::info!(passkey_id = %stored.id, "passkey sign-in lost a race on its counter");
+            return Err(sign_in_failed());
+        }
         Ok(stored)
     }
 

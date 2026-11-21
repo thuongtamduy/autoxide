@@ -131,7 +131,7 @@ async fn resend_user_verification(
 /// cannot do this). A verification mail goes to the NEW address; the email changes
 /// only when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,
 /// within 24 hours. Until then the old address stays in use. Wrong passwords count
-/// towards the sign-in lock of the email. Once the change is confirmed, the OLD address gets
+/// towards the sign-in lock of the account. Once the change is confirmed, the OLD address gets
 /// a mail saying so, with a token to report the change if the owner did not make it
 /// (`POST /api/v1/auth/email-change/report`, valid 7 days).
 #[utoipa::path(

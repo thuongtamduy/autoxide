@@ -545,7 +545,7 @@ chứng chỉ mới. Xác minh, gỡ tên miền hay tạm khoá khách có hi�
 Mỗi khách có hai loại tài khoản. **Nhân sự** (`realm: staff`, mặc định) làm việc bằng role và
 permission. **Người mua** (`realm: customer`) là tài khoản của cửa hàng: đăng nhập được, không có
 permission nào, tách khỏi nhân sự dù trùng email. Người mua đăng ký bằng
-`POST /api/v1/auth/register` và đăng nhập bằng `POST /api/v1/auth/login`, cùng với
+`POST /api/v1/auth/registrations` và đăng nhập bằng `POST /api/v1/auth/login`, cùng với
 `"realm": "customer"`; khách đóng đăng ký người mua bằng cài đặt theo cây tổ chức
 `auth.customer_registration` (`false`). Nhân sự quản lý người mua bằng `GET /api/v1/auth/customers`
 và `PATCH /api/v1/auth/customers/{id}` (permission `auth.customers.read`, `auth.customers.manage`).

@@ -108,8 +108,10 @@ async fn doan_ma_sai_bi_gioi_han() {
         let used_up =
             sessions.complete_mfa(Some(&tenant), &mfa_token, "000000", None).await.unwrap_err();
         assert_eq!(used_up.code(), "auth.invalid_mfa_token");
-        // …và các lần sai đã khoá đăng nhập của email, kể cả đúng mật khẩu.
-        let locked = sessions.login(&tenant, "ada@example.com", PASSWORD, None).await.unwrap_err();
+        // …và các lần sai được đếm theo tài khoản: lượt mới (đúng mật khẩu) cũng bị chặn nhập mã.
+        let fresh = challenge(&sessions, &tenant).await;
+        let locked =
+            sessions.complete_mfa(Some(&tenant), &fresh, "000000", None).await.unwrap_err();
         assert_eq!(locked.code(), "auth.login_throttled");
     })
     .await
