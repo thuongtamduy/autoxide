@@ -1,4 +1,4 @@
-//! Phần giao thức của MCP mà kernel tự viết theo đặc tả công khai (thay `rmcp`, D-20261121-time-library):
+//! Phần giao thức của MCP mà kernel tự viết theo đặc tả công khai (thay `rmcp`, D-20261121-mcp-server):
 //! tin nhắn JSON-RPC 2.0, phiên bản giao thức và lỗi.
 //!
 //! Hai "thế hệ" giao thức cùng phục vụ trên một endpoint (đặc tả 2026-07-28, mục "Versioning"):

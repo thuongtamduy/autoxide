@@ -1,4 +1,4 @@
-//! Client MCP cho test (thay client của `rmcp`, D-20261121-time-library): gửi request JSON-RPC thẳng vào
+//! Client MCP cho test (thay client của `rmcp`, D-20261121-mcp-server): gửi request JSON-RPC thẳng vào
 //! router của app (không mở cổng TCP), theo đặc tả MCP mới (`2026-07-28`, mặc định) hay bản cũ
 //! (`initialize`, [`McpClient::legacy`]).
 //!

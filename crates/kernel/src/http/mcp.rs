@@ -1,5 +1,5 @@
 //! Endpoint MCP (Streamable HTTP) ở `/mcp` (D-068). Giao thức do kernel tự cài theo đặc tả công khai
-//! (`mcp/protocol.rs`, `mcp/transport.rs`; thay thư viện `rmcp` — D-20261121-time-library), phục vụ cả bản
+//! (`mcp/protocol.rs`, `mcp/transport.rs`; thay thư viện `rmcp` — D-20261121-mcp-server), phục vụ cả bản
 //! mới (`2026-07-28`: không bắt tay, `_meta` theo request, `server/discover`) lẫn các bản cũ còn `initialize`.
 //!
 //! - Không giữ phiên (stateless) và trả JSON: mỗi request độc lập, chạy được trên nhiều
