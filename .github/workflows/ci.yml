@@ -94,7 +94,9 @@ jobs:
     runs-on: ubuntu-24.04
     # Swift: ở PR chỉ kiểm manifest và phụ thuộc (nhẹ); biên dịch đầy đủ (dựng cả swift-syntax của plugin
     # sinh mã) chỉ khi push vào main, có cache — không chặn hàng đợi merge.
-    timeout-minutes: ${{ (matrix.sdk == 'swift' && github.event_name != 'pull_request') && 30 || 15 }}
+    # Swift build đầy đủ trên main: hợp đồng API lớn dần (SCIM, tạo nháp từ ảnh…) làm mã sinh ra biên dịch
+    # lâu hơn 30 phút (lượt sau #309 bị huỷ vì hết giờ). Job không chặn merge nên cho 60 phút.
+    timeout-minutes: ${{ (matrix.sdk == 'swift' && github.event_name != 'pull_request') && 60 || 15 }}
     strategy:
       fail-fast: false
       matrix:
