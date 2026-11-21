@@ -165757,7 +165757,7 @@
     },
     "/api/v1/customers/me/gift-cards/attach": {
       "post": {
-        "description": "Any signed-in buyer, when gift cards are on. The card still works only in this shop.",
+        "description": "Any signed-in buyer, when gift cards are on. The card still works only in this shop, and from\nthen on only for your account; a card attached to another account answers like a wrong code.",
         "operationId": "customers_attach_my_gift_card",
         "parameters": [
           {
