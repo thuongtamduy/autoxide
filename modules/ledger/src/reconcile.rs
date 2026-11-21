@@ -39,11 +39,75 @@ pub(crate) fn exception_not_found() -> Error {
 /// Cách xử lý một mục chờ.
 #[derive(Debug, Clone)]
 pub(crate) enum Resolution {
-    /// Ghi như đã thu cho thanh toán `payment_id` (số tiền đối tác thực thu).
+    /// Ghi như đã thu cho thanh toán `payment_id`: chỉ khi số tiền thực thu đúng bằng số phải thu.
     Match(Uuid),
+    /// Xác nhận riêng: ghi thanh toán `payment_id` đã thu đúng số tiền thực thu, kể cả khi lệch số
+    /// phải thu (thiếu hay thừa) — event mang số thực thu.
+    AcceptReceived(Uuid),
     Ignore,
     /// Đã hoàn ngoài hệ thống.
     RefundedOutside,
+}
+
+/// Loại mục chờ ghi được thành "đã thu" cho một thanh toán.
+const MATCHABLE: [&str; 4] =
+    ["amount_mismatch", "unmatched_credit", "unknown_in_statement", "missing_in_statement"];
+
+fn amount_differs(received: Money, expected: Money) -> Error {
+    Error::conflict(
+        "ledger.amount_differs",
+        "The partner collected {received} but the payment is for {expected}; resolve with \
+         `accept_received` to record the amount collected.",
+    )
+    .with_param("received", received.minor().to_string())
+    .with_param("expected", expected.minor().to_string())
+}
+
+/// Số tiền đối tác thực thu của mục chờ `item`, khi ghi nó cho thanh toán `payment` được: loại mục
+/// ghi được, mục nói về đúng thanh toán đó (nếu có nêu), thanh toán chưa thu, cùng tiền tệ.
+fn matchable(
+    item: &exception::Model,
+    details: &Value,
+    payment: &payment::Model,
+) -> Result<Money, Error> {
+    if !MATCHABLE.contains(&item.kind.as_str()) {
+        return Err(Error::validation(vec![FieldError::new(
+            "payment_id",
+            "mismatch",
+            "this kind of item cannot be matched to a payment",
+        )]));
+    }
+    if let Some(named) = details["payment_id"].as_str()
+        && named != payment.id.to_string()
+    {
+        return Err(Error::validation(vec![FieldError::new(
+            "payment_id",
+            "mismatch",
+            "must be the payment named in the item",
+        )]));
+    }
+    if !matches!(payment.status.as_str(), "pending" | "expired" | "needs_review") {
+        return Err(crate::payments::payment_state(&payment.status));
+    }
+    // Số thực thu: `received_minor` (+ tiền tệ của `received` / `amount`), hay `amount` / `received`
+    // dạng tiền; mục "thiếu trong sao kê" không có số → số phải thu.
+    let stated = ["received", "amount"]
+        .iter()
+        .find_map(|field| serde_json::from_value::<Money>(details[field].clone()).ok());
+    let received = match (details["received_minor"].as_i64(), stated) {
+        (Some(minor), Some(money)) => Money::new(minor, money.currency()),
+        (Some(minor), None) => Money::from_columns(minor, &payment.amount_currency)?,
+        (None, Some(money)) => money,
+        (None, None) => Money::from_columns(payment.amount_minor, &payment.amount_currency)?,
+    };
+    if received.currency().code() != payment.amount_currency {
+        return Err(Error::validation(vec![FieldError::new(
+            "payment_id",
+            "mismatch",
+            "must be a payment in the currency of the money collected",
+        )]));
+    }
+    Ok(received)
 }
 
 impl LedgerService {
@@ -163,15 +227,21 @@ impl LedgerService {
             return Ok(current);
         }
         let (label, status) = match &resolution {
-            Resolution::Match(payment_id) => {
+            Resolution::Match(payment_id) | Resolution::AcceptReceived(payment_id) => {
+                let accept = matches!(resolution, Resolution::AcceptReceived(_));
                 let found = Self::find_payment(database.read(), tenant, *payment_id)
                     .await?
                     .ok_or_else(crate::payments::payment_not_found)?;
                 let details: Value = serde_json::from_str(&current.details).unwrap_or_default();
-                let received = details["received_minor"].as_i64().unwrap_or(found.amount_minor);
-                let amount = Money::from_columns(received, &found.amount_currency)?;
-                self.capture(tenant, found.id, amount, "manual").await?;
-                ("match", "resolved")
+                let received = matchable(&current, &details, &found)?;
+                let expected = Money::from_columns(found.amount_minor, &found.amount_currency)?;
+                if received != expected && !accept {
+                    // Lệch số: thanh toán giữ `needs_review` tới khi có xác nhận riêng.
+                    return Err(amount_differs(received, expected));
+                }
+                let via = if accept { crate::payments::VIA_ACCEPTED } else { "manual" };
+                self.capture(tenant, found.id, received, via).await?;
+                (if accept { "accept_received" } else { "match" }, "resolved")
             }
             Resolution::Ignore => ("ignore", "ignored"),
             Resolution::RefundedOutside => ("refunded_outside", "resolved"),

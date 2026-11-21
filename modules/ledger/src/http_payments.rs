@@ -422,9 +422,12 @@ async fn list_exceptions(
 #[serde(deny_unknown_fields)]
 #[schema(as = LedgerResolveRequest)]
 pub(crate) struct ResolveRequest {
-    /// `match` (record the money for `payment_id`), `ignore`, or `refunded_outside`.
+    /// `match` (record the money for `payment_id` when the partner collected exactly the amount
+    /// due), `accept_received` (record the amount the partner collected for `payment_id`, even
+    /// when it differs from the amount due), `ignore`, or `refunded_outside`.
     action: String,
-    /// With `match`.
+    /// With `match` and `accept_received`: the payment the item is about (the one it names, if
+    /// any), still waiting for its money and in the same currency.
     payment_id: Option<Uuid>,
     /// Up to 500 characters.
     note: Option<String>,
@@ -433,7 +436,9 @@ pub(crate) struct ResolveRequest {
 /// Resolve a difference.
 ///
 /// Requires `ledger.reconcile`. `match` records the money the partner collected for the payment
-/// (same path as a partner notification). Resolving a resolved item returns it unchanged.
+/// (same path as a partner notification) and is refused when that amount differs from the amount
+/// due; `accept_received` records the amount collected anyway, after a person checked it.
+/// Resolving a resolved item returns it unchanged.
 #[utoipa::path(
     post,
     path = "/exceptions/{id}/resolve",
@@ -447,6 +452,7 @@ pub(crate) struct ResolveRequest {
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
         (status = 403, description = "Missing `ledger.reconcile`; code `permission_denied`.", body = Problem),
         (status = 404, description = "No such item (`ledger.exception_not_found`) or payment (`ledger.payment_not_found`).", body = Problem),
+        (status = 409, description = "The amount collected differs from the amount due and the action is `match` (`ledger.amount_differs`), or the payment is no longer waiting for its money (`ledger.payment_state`).", body = Problem),
         (status = 422, description = "A value is invalid; every problem in `errors`.", body = Problem),
     )
 )]
@@ -460,20 +466,21 @@ async fn resolve_exception(
     principal.require(&crate::permissions::RECONCILE)?;
     let resolution = match (input.action.as_str(), input.payment_id) {
         ("match", Some(payment)) => Resolution::Match(payment),
+        ("accept_received", Some(payment)) => Resolution::AcceptReceived(payment),
         ("ignore", _) => Resolution::Ignore,
         ("refunded_outside", _) => Resolution::RefundedOutside,
-        ("match", None) => {
+        ("match" | "accept_received", None) => {
             return Err(Error::validation(vec![FieldError::new(
                 "payment_id",
                 "required",
-                "is required with `match`",
+                "is required with `match` and `accept_received`",
             )]));
         }
         _ => {
             return Err(Error::validation(vec![FieldError::new(
                 "action",
                 "invalid",
-                "must be `match`, `ignore` or `refunded_outside`",
+                "must be `match`, `accept_received`, `ignore` or `refunded_outside`",
             )]));
         }
     };

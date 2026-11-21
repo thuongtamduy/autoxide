@@ -57,11 +57,14 @@ pub(crate) fn gateway_not_configured(provider: &str) -> Error {
     .with_param("provider", provider)
 }
 
+/// `via` của [`LedgerService::capture`] khi người đối soát xác nhận riêng số tiền thực thu.
+pub(crate) const VIA_ACCEPTED: &str = "accepted";
+
 pub(crate) fn payment_not_found() -> Error {
     Error::not_found("ledger.payment_not_found", "There is no such payment.")
 }
 
-fn payment_state(status: &str) -> Error {
+pub(crate) fn payment_state(status: &str) -> Error {
     Error::conflict("ledger.payment_state", "The payment is `{status}`; this cannot be done now.")
         .with_param("status", status)
 }
@@ -633,9 +636,11 @@ impl LedgerService {
         }
     }
 
-    /// Đối tác đã thu `received` cho thanh toán `id` (`via`: `webhook`, `reconcile`, `manual`).
-    /// Đúng số tiền → ghi bút toán (theo `reference` ổn định, gọi lại không ghi trùng), chuyển
-    /// `succeeded`, phát `ledger.payment_succeeded`. Sai số → `needs_review` + hàng chờ.
+    /// Đối tác đã thu `received` cho thanh toán `id` (`via`: `webhook`, `reconcile`, `bank_feed`,
+    /// `manual`, [`VIA_ACCEPTED`]). Đúng số tiền → ghi bút toán (theo `reference` ổn định, gọi lại
+    /// không ghi trùng), chuyển `succeeded`, phát `ledger.payment_succeeded` mang số thực thu. Sai
+    /// số → `needs_review` + hàng chờ; chỉ người đối soát xác nhận riêng ([`VIA_ACCEPTED`]) mới ghi
+    /// được số lệch.
     pub(crate) async fn capture(
         &self,
         tenant: &TenantContext,
@@ -651,7 +656,7 @@ impl LedgerService {
             return Ok(());
         }
         let expected = money(current.amount_minor, &current.amount_currency)?;
-        if received != expected && via != "manual" {
+        if received != expected && via != VIA_ACCEPTED {
             self.mark_needs_review(tenant, &current, received).await?;
             return Ok(());
         }
@@ -699,7 +704,10 @@ impl LedgerService {
                 active.captured_at = Set(Some(at));
                 active.updated_at = Set(at);
                 let saved = payment::Entity::update(active).exec(&transaction).await?;
-                let event = events::PaymentSucceeded(payment_payload(&saved)?);
+                // Số thực thu, không phải số phải thu: bên nghe cộng đúng tiền đã vào.
+                let mut payload = payment_payload(&saved)?;
+                payload["amount"] = json!(received);
+                let event = events::PaymentSucceeded(payload);
                 outbox
                     .record(&transaction, tenant, Actor::system(), payment_subject(id), &event)
                     .await?;
