@@ -73,7 +73,17 @@ curl -sS -X PATCH "$API/api/v1/auth/scim/v2/Users/$USER" -H "Authorization: Bear
 
 Mọi thay đổi có trong nhật ký audit với loại người làm `scim`.
 
-## 4. Hỗ trợ những gì
+## 4. Nhóm và role
+
+Hệ thống danh tính cũng đẩy được nhóm của nó (`/Groups`; Okta: *Push Groups*, Entra ID: gán nhóm cho ứng dụng). Nhóm tự nó không cho gì: khách quyết định ý nghĩa của nó bằng **luật ánh xạ** — "thành viên nhóm X giữ role R ở nút N".
+
+1. Để hệ thống danh tính đẩy nhóm sang, rồi tìm id của nó bằng `GET /api/v1/auth/scim/groups` (số thành viên, số luật). Nhóm chưa có luật cũng hiện trong hộp việc (`auth.scim_unmapped_groups`).
+2. Thêm luật bằng `POST /api/v1/auth/scim/group-mappings` với `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` là id của khách cho nút gốc). Bạn phải tự gán được role đó ở nút đó. Thành viên hiện có nhận role ngay.
+3. Từ đó, người được thêm vào hay bỏ khỏi nhóm có hay mất role ngay. Role ai đó được gán tay không bao giờ bị SCIM gỡ, và role hai nhóm cùng cấp vẫn còn khi người đó còn ở một trong hai nhóm.
+
+Gỡ luật bằng `DELETE /api/v1/auth/scim/group-mappings/{id}`; xoá nhóm ở hệ thống danh tính thì luật của nó và role nó đã cấp cũng bị gỡ.
+
+## 5. Hỗ trợ những gì
 
 - Bộ lọc: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, nối bằng `and` / `or` và ngoặc. User theo `userName`, `externalId`, `emails`, `active`, `id`. Thứ khác trả `400` với `scimType` `invalidFilter`.
 - `PATCH` (RFC 7644 §3.5.2): `add`, `replace`, `remove`, với đường dẫn như `active`, `name.givenName`, `emails[type eq "work"].value`, hay không đường dẫn. Thuộc tính Autoxide không lưu (phần mở rộng enterprise, số điện thoại, chức danh…) bị bỏ qua.

@@ -6,6 +6,8 @@
 //! chung không nhận nó (không phải API key, không phải access token), và API key / access token
 //! không dùng được ở đây.
 //!
+//! - `Group` ↔ nhóm của hệ thống danh tính; luật ánh xạ của khách (nhóm X → role R ở nút N) biến
+//!   thành viên thành membership ([`groups`], [`mappings`]).
 //! - `User` ↔ tài khoản nhân sự (`realm = staff`) của khách; liên kết ở `auth_scim_users`
 //!   (`userName`, `externalId`, tên riêng / họ). Email và tên hiển thị nằm ở `auth_user`.
 //! - `active = false` → trong CÙNG transaction: khoá tài khoản, thu hồi mọi phiên / refresh
@@ -19,6 +21,10 @@ pub(crate) mod discovery;
 pub(crate) mod entity;
 pub(crate) mod error;
 pub(crate) mod filter;
+mod groups;
+#[cfg(test)]
+mod groups_tests;
+mod mappings;
 pub(crate) mod patch;
 #[cfg(test)]
 mod tests;
@@ -34,6 +40,7 @@ use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt as _, TenantContext};
 use sea_orm::{ColumnTrait as _, ConnectionTrait, EntityTrait as _, QueryFilter as _};
 use uuid::Uuid;
 
+pub(crate) use self::mappings::{GroupMapping, GroupSummary, UnmappedGroups};
 pub(crate) use self::token::{CreatedScimToken, ScimToken};
 use crate::user::UserService;
 
@@ -57,6 +64,8 @@ pub(crate) struct ScimService {
     pub outbox: Outbox,
     pub entitlements: EntitlementsHandle,
     pub users: Arc<UserService>,
+    /// Đồng bộ membership do nhóm SCIM cấp.
+    pub roles: Arc<crate::role::RoleService>,
 }
 
 /// Bên gọi endpoint SCIM đã xác thực: khách của token.
@@ -73,8 +82,8 @@ impl ScimCaller {
     }
 }
 
-/// Xoá liên kết SCIM của tài khoản `user_id` trong transaction xoá tài khoản (không có foreign
-/// key, như `auth_identity`).
+/// Xoá liên kết SCIM, thành viên nhóm và dấu "do SCIM cấp" của tài khoản `user_id` trong
+/// transaction xoá tài khoản (không có foreign key, như `auth_identity`).
 pub(crate) async fn forget_user<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
@@ -85,7 +94,12 @@ pub(crate) async fn forget_user<C: ConnectionTrait>(
         .scoped(tenant)
         .exec(connection)
         .await?;
-    Ok(())
+    entity::member::Entity::delete_many()
+        .filter(entity::member::Column::UserId.eq(user_id))
+        .scoped(tenant)
+        .exec(connection)
+        .await?;
+    crate::role::forget_scim_grants(connection, tenant, user_id).await
 }
 
 /// Liên kết SCIM của tài khoản `user_id` (bản xuất dữ liệu cá nhân); `None`: không có.
@@ -96,16 +110,4 @@ pub(crate) async fn link_of(
     Ok(entity::scim_user::Entity::find_by_id((tenant.id().as_uuid(), user_id))
         .one(tenant.database().read())
         .await?)
-}
-
-impl ScimService {
-    /// Nhóm của các người `ids` (thuộc tính `groups` của `User`). Chưa có tài nguyên `Group`:
-    /// rỗng.
-    pub(crate) async fn groups_of(
-        &self,
-        _tenant: &TenantContext,
-        _ids: &[Uuid],
-    ) -> Result<std::collections::HashMap<Uuid, Vec<serde_json::Value>>, error::ScimError> {
-        Ok(std::collections::HashMap::new())
-    }
 }

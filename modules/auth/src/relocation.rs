@@ -22,7 +22,14 @@ pub(crate) fn relocation() -> Relocation {
         // Uỷ quyền cấp cho khách con là của khách nguồn.
         .stay(&["auth_delegation"])
         // Kết nối SCIM (token, liên kết tài khoản) là của khách nguồn: token mang ID khách đó.
-        .stay(&["auth_scim_tokens", "auth_scim_users"])
+        .stay(&[
+            "auth_scim_tokens",
+            "auth_scim_users",
+            "auth_scim_groups",
+            "auth_scim_group_members",
+            "auth_scim_group_mappings",
+            "auth_scim_grants",
+        ])
         .ephemeral(&[
             "auth_throttle",
             "auth_tokens",

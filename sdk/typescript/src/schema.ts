@@ -4972,6 +4972,16 @@ export type CreateRuleRequest = {
   trigger: Record<string, unknown>;
 };
 
+/** A new mapping rule. */
+export type CreateScimGroupMappingRequest = {
+  /** A SCIM group of the tenant (`GET /api/v1/auth/scim/groups`). */
+  group_id: string;
+  /** The unit where members get the role; the tenant's id for the root unit. */
+  org_id: string;
+  /** The role members get there. */
+  role_id: string;
+};
+
 /** A new SCIM token. */
 export type CreateScimTokenRequest = {
   /** 1–100 characters, e.g. the identity provider it is for. */
@@ -11801,6 +11811,20 @@ export type Data_ScheduleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ScimGroupMappingResponse = {
+  /** A mapping rule: members of the group hold the role at the unit. */
+  data: {
+    created_at: string;
+    created_by: string;
+    group_id: string;
+    id: string;
+    /** Organization unit; the tenant's id is the root unit. */
+    org_id: string;
+    role_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SecretResponse = {
   /** A new signing secret, shown only once. */
   data: {
@@ -15179,6 +15203,19 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ScimGroupMappingResponse = {
+  data: {
+    created_at: string;
+    created_by: string;
+    group_id: string;
+    id: string;
+    /** Organization unit; the tenant's id is the root unit. */
+    org_id: string;
+    role_id: string;
   }[];
 };
 
@@ -24343,6 +24380,25 @@ export type Page_ScheduleResponse = {
 };
 
 /** One page of a list. */
+export type Page_ScimGroupSummaryResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    display_name: string;
+    external_id?: string | null;
+    id: string;
+    /**
+     * How many mapping rules it has; `0`: its members get no roles from it (also listed in the
+     * work inbox as `auth.scim_unmapped_groups`).
+     */
+    mappings: number;
+    /** How many people are in it. */
+    members: number;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_SearchHit = {
   /** The items of this page, in the requested order. */
   data: {
@@ -28449,6 +28505,48 @@ export type ScimErrorBody = {
   scimType?: string | null;
   /** The HTTP status, as a string. */
   status: string;
+};
+
+/**
+ * A SCIM Group (RFC 7643 §4.2): a group of the identity provider. Mapping rules of the tenant
+ * (`/api/v1/auth/scim/group-mappings`) turn its members into holders of roles at units.
+ */
+export type ScimGroup = {
+  /** Name of the group, unique in the tenant (compared without case). Required. */
+  displayName: string;
+  /** Id of the group at the identity provider; unique in the tenant. */
+  externalId?: string | null;
+  /** Id given by Autoxide; read-only. */
+  id?: string | null;
+  /** Members: `value` is the id of a SCIM User of the tenant. */
+  members?: unknown[] | null;
+  schemas?: string[] | null;
+};
+
+/** A mapping rule: members of the group hold the role at the unit. */
+export type ScimGroupMappingResponse = {
+  created_at: string;
+  created_by: string;
+  group_id: string;
+  id: string;
+  /** Organization unit; the tenant's id is the root unit. */
+  org_id: string;
+  role_id: string;
+};
+
+/** A group pushed by the identity provider, for administrators. */
+export type ScimGroupSummaryResponse = {
+  display_name: string;
+  external_id?: string | null;
+  id: string;
+  /**
+   * How many mapping rules it has; `0`: its members get no roles from it (also listed in the
+   * work inbox as `auth.scim_unmapped_groups`).
+   */
+  mappings: number;
+  /** How many people are in it. */
+  members: number;
+  updated_at: string;
 };
 
 /** A SCIM list (`urn:ietf:params:scim:api:messages:2.0:ListResponse`, RFC 7644 §3.4.2). */
@@ -33068,6 +33166,59 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/scim/group-mappings": {
+    /** List the mapping rules from SCIM groups to roles. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ScimGroupMappingResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Map a SCIM group to a role at a unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateScimGroupMappingRequest;
+      responses: {
+        201: Data_ScimGroupMappingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/group-mappings/{id}": {
+    /** Remove a mapping rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/groups": {
+    /** List the groups the identity provider pushed. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ScimGroupSummaryResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/scim/tokens": {
     /** List the SCIM tokens of the tenant. */
     get: {
@@ -33102,6 +33253,85 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Groups": {
+    /** List or find SCIM Groups. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimListResponse;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM Group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ScimGroup;
+      responses: {
+        201: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Groups/{id}": {
+    /** Get a SCIM Group. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimGroup;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Replace a SCIM Group. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimGroup;
+      responses: {
+        200: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Change a SCIM Group with PATCH operations. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimPatch;
+      responses: {
+        200: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Delete a SCIM Group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
         default: Problem;
       };
     };

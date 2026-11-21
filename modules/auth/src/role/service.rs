@@ -25,9 +25,11 @@ use serde_json::json;
 mod admins;
 mod members;
 mod principal;
+mod scim_grants;
 pub(crate) use admins::*;
 pub(crate) use members::*;
 pub(crate) use principal::*;
+pub(crate) use scim_grants::forget_scim_grants;
 
 /// Role đã kiểm: tên, mô tả, permission cấp (kèm độ sâu) và permission cấm.
 type CheckedRole = (String, String, RoleRules);
@@ -413,6 +415,9 @@ impl RoleService {
         }
         let before = role_snapshot(&transaction, tenant, &current).await?;
         role::Entity::delete_by_id(id).scoped(tenant).exec(&transaction).await?;
+        // Luật ánh xạ nhóm SCIM trỏ tới role này và dấu "do SCIM cấp" của nó (bước 66): không có
+        // foreign key, xoá cùng transaction (membership xoá theo foreign key của `auth_user_role`).
+        scim_grants::forget_role(&transaction, tenant, id).await?;
         let event = events::RoleDeleted { before: Some(before), after: None };
         self.outbox.record(&transaction, tenant, actor, role_subject(id), &event).await?;
         transaction.commit().await?;

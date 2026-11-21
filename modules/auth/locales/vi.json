@@ -244,5 +244,14 @@
   "auth.scim_token_limit": "Khách đã có {limit} token SCIM. Hãy thu hồi token không còn dùng trước.",
   "text:Create and revoke the SCIM tokens the company's identity provider (Entra ID, Okta, Google Workspace) uses to create, change and disable staff accounts, and map its groups to roles. Whoever holds this lets an outside system manage who works here.": "Tạo và thu hồi token SCIM mà hệ thống danh tính của doanh nghiệp (Entra ID, Okta, Google Workspace) dùng để tạo, sửa, khoá tài khoản nhân viên, và ánh xạ nhóm của nó sang role. Ai giữ quyền này cho một hệ thống bên ngoài quyết định ai làm việc ở đây.",
   "text:A SCIM token was created for the tenant's identity provider (`after`: id, name, prefix; never the token).": "Khách tạo một token SCIM cho hệ thống danh tính (`after`: id, tên, phần đầu; không bao giờ có token).",
-  "text:A SCIM token was revoked; the identity provider using it is refused from now on.": "Một token SCIM bị thu hồi; hệ thống danh tính dùng nó bị từ chối từ nay."
+  "text:A SCIM token was revoked; the identity provider using it is refused from now on.": "Một token SCIM bị thu hồi; hệ thống danh tính dùng nó bị từ chối từ nay.",
+  "auth.scim_group_not_found": "Không có nhóm SCIM `{id}`.",
+  "auth.scim_mapping_not_found": "Không có luật ánh xạ nhóm SCIM `{id}`.",
+  "auth.scim_mapping_taken": "Nhóm này đã cấp role này ở nút này rồi.",
+  "text:The identity provider created a SCIM group (`after`: id, name, member ids).": "Hệ thống danh tính tạo một nhóm SCIM (`after`: id, tên, id thành viên).",
+  "text:The identity provider renamed a SCIM group or changed its members (`after`: name, `added`, `removed` user ids).": "Hệ thống danh tính đổi tên hay đổi thành viên một nhóm SCIM (`after`: tên, id người `added`, `removed`).",
+  "text:The identity provider deleted a SCIM group; its mapping rules went with it.": "Hệ thống danh tính xoá một nhóm SCIM; các luật ánh xạ của nó bị xoá theo.",
+  "text:A rule now gives the members of a SCIM group a role at a unit (`after`: rule id, group, unit, role).": "Một luật cho thành viên của nhóm SCIM giữ một role ở một nút (`after`: id luật, nhóm, nút, role).",
+  "text:A rule from a SCIM group to a role at a unit was removed (`before`: rule id, group, unit, role).": "Một luật từ nhóm SCIM sang role ở nút bị gỡ (`before`: id luật, nhóm, nút, role).",
+  "text:Map the SCIM group {group} to roles; its members get no roles from it yet": "Hãy ánh xạ nhóm SCIM {group} sang role; thành viên của nó chưa nhận role nào từ nhóm"
 }
