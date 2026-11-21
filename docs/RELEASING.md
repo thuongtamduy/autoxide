@@ -36,7 +36,7 @@ không còn xung đột ở `CHANGELOG.md`; xem `changelog.d/README.md`.
 ## Các bước phát hành
 
 Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`.github/workflows/release.yml`,
-D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-20261120-release-gate-sharded), build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
+D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-20261120-release-gate-sharded) — **trừ khi** workflow CI trên `main` của đúng SHA của tag đã `success` (gate SQLite + Postgres 16 và 18, upgrade-test, quét secret): khi đó job `ci-result` cho bỏ qua gate (D-20261121-ci-batch-release-faster); chưa có lần chạy, đang chạy hay đỏ thì gate chạy như cũ —, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
 repo công khai; `./gate.sh` trên máy vẫn là gate bắt buộc trước khi đẩy tag. **Repo đang riêng

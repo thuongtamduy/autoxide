@@ -20,9 +20,9 @@ permissions:
 # không lưu được cache (bước Post của rust-cache không chạy), và trước đây mỗi lần merge huỷ lần
 # chạy main trước nên main không bao giờ có cache, mọi PR build từ đầu (D-20261119-ci-faster).
 # Không huỷ thì lần chạy main mới chờ lần đang chạy xong; GitHub chỉ giữ một lần chờ (lần mới nhất).
-# PR ghép lô của phiên điều phối (tiêu đề bắt đầu bằng "Lô:", D-20261119-merge-batches): đã kiểm trên máy
-# và merge ngay, lần chạy trên main mới là lưới kiểm — các job nặng bỏ qua để không chiếm máy của lần
-# chạy main; job `gate` vẫn báo xong. PR của phiên làm việc chạy đủ như cũ.
+# PR ghép lô của phiên điều phối (tiêu đề bắt đầu bằng "Lô:") chạy CI đầy đủ như mọi PR: phiên điều phối
+# ghép, sinh lại file tự động, chạy `cargo xtask check` + `cargo xtask sdk --check`, push PR lô rồi chờ CI
+# xanh mới merge (D-20261121-ci-batch-release-faster, thay phần "kiểm trên máy" của D-20261119-merge-batches).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -36,7 +36,7 @@ jobs:
   # check vẫn tên "gate / lint", "gate / build tests", "gate / sqlite 1/4"… như khi còn nằm ở đây.
   parts:
     name: gate
-    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
+    if: ${{ !github.event.repository.private }}
     uses: ./.github/workflows/gate.yml
     with:
       # Pull request chỉ chạy PostgreSQL thấp nhất (có kết quả sớm); push main và chạy tay chạy cả hai.
@@ -55,18 +55,13 @@ jobs:
       - name: Every part of the gate passed
         env:
           GATE: ${{ needs.parts.result }}
-          BATCH: ${{ github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:') }}
         run: |
           echo "gate: $GATE"
-          if [ "$BATCH" = true ]; then
-            echo "Batch PR (title starts with 'Lô:'): checked on the coordinator's machine and merged at once; main's run is the check."
-            exit 0
-          fi
           [ "$GATE" = success ]
 
   sdk:
     name: TypeScript SDK and guide examples (tsc)
-    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -88,7 +83,7 @@ jobs:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.
     name: upgrade from the last release (${{ matrix.database }})
-    if: ${{ !github.event.repository.private && !(github.event_name == 'pull_request' && startsWith(github.event.pull_request.title, 'Lô:')) }}
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -115,18 +110,43 @@ jobs:
     steps:
       - uses: actions/checkout@v7
         with:
-          # Cả lịch sử và tag: chọn tag phát hành trước HEAD.
+          # Cả lịch sử và tag: chọn tag phát hành trước HEAD; và để so với nhánh gốc của PR.
           fetch-depth: 0
+      # D-20261121-ci-batch-release-faster: ở pull request, test nâng cấp chỉ chạy khi PR đụng thứ có thể
+      # đổi dạng dữ liệu đã lưu (migration, entity, kernel/data, Cargo.lock, chính test nâng cấp, workflow,
+      # Dockerfile). Push vào `main` và chạy tay luôn chạy. Kiểm trong một bước (không dùng `paths:` ở trigger)
+      # để job vẫn báo xong khi nó là check bắt buộc.
+      - name: changed
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          pattern='(^|/)migrations?(/|\.rs$)|(^|/)entity(/|\.rs$)|^crates/kernel/src/data/|^Cargo\.lock$|^xtask/src/upgrade\.rs$|^crates/app/tests/.*upgrade|^\.github/workflows/|(^|/)Dockerfile'
+          if git diff --name-only "$BASE_SHA" HEAD | grep -E -q "$pattern"; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "This pull request does not touch migrations, entities or the stored format: upgrade test skipped."
+          fi
       - run: rustup toolchain install
+        if: steps.changed.outputs.run == 'true'
       - uses: Swatinem/rust-cache@v2
+        if: steps.changed.outputs.run == 'true'
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: docker/login-action@v4
+        if: steps.changed.outputs.run == 'true'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo xtask upgrade-test --database ${{ matrix.database }}
+        if: steps.changed.outputs.run == 'true'
 
   secrets:
     name: secret scan (gitleaks)
