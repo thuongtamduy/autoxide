@@ -20,11 +20,11 @@
 
 use std::sync::Arc;
 
+use crate::migration::prelude::*;
+use crate::migration::schema;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Order, Query};
 use sea_orm::{ConnectionTrait, QueryResult};
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::schema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;

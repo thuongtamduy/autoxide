@@ -17,13 +17,13 @@
 
 use std::time::Duration;
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, OnConflict, Query};
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 
 use crate::database::Database;
 use crate::error::Error;

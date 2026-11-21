@@ -17,14 +17,14 @@
 
 use std::sync::Arc;
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query, SelectStatement};
 use sea_orm::{ConnectionTrait, QueryResult};
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 use sha2::{Digest as _, Sha256};
 use uuid::Uuid;
 

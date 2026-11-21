@@ -12,13 +12,13 @@
 //!   [`OneTimeTokens::recent`] trước khi phát token mới.
 //! - Theo khách (bước 33): token mang khách; dùng token ở khách khác thì như token lạ.
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 use uuid::Uuid;
 
 use crate::error::Error;

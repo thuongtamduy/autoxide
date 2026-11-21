@@ -25,7 +25,6 @@ use axum::http::{Request, StatusCode, header};
 use axum::{Json, Router};
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, QueryOrder, Set, SqlErr};
-use sea_orm_migration::MigratorTrait;
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
 use tower_http::cors::CorsLayer;
@@ -40,8 +39,10 @@ use validator::Validate;
 
 /// Migration tạo bảng `stack_probe`.
 mod migration {
-    use sea_orm_migration::prelude::*;
-    use sea_orm_migration::schema::{big_integer, pk_uuid, string, timestamp_with_time_zone};
+    use autoxide_kernel::migration::prelude::*;
+    use autoxide_kernel::migration::schema::{
+        big_integer, pk_uuid, string, timestamp_with_time_zone,
+    };
 
     pub struct CreateProbe;
 
@@ -84,12 +85,23 @@ mod migration {
         }
     }
 
+    /// Chạy `up` / `down` của migration thử thẳng trên kết nối (không qua bảng lịch sử: file này chỉ kiểm thư
+    /// viện nền; bộ chạy migration có test riêng ở `migration.rs`).
     pub struct Migrator;
 
-    #[async_trait::async_trait]
-    impl MigratorTrait for Migrator {
-        fn migrations() -> Vec<Box<dyn MigrationTrait>> {
-            vec![Box::new(CreateProbe)]
+    impl Migrator {
+        pub async fn up(
+            db: &sea_orm::DatabaseConnection,
+            _steps: Option<u32>,
+        ) -> Result<(), DbErr> {
+            CreateProbe.up(&SchemaManager::new(db)).await
+        }
+
+        pub async fn down(
+            db: &sea_orm::DatabaseConnection,
+            _steps: Option<u32>,
+        ) -> Result<(), DbErr> {
+            CreateProbe.down(&SchemaManager::new(db)).await
         }
     }
 }

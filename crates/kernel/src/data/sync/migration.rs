@@ -1,7 +1,7 @@
 //! Migration tạo bảng luồng thay đổi `<module>_changes` của một module.
 
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::schema;
+use crate::migration::prelude::*;
+use crate::migration::schema;
 
 /// Migration tạo bảng `<module>_changes` (bước 69 P2). Module khai `sync_resources` thêm nó vào
 /// CUỐI danh sách migration của mình:

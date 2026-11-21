@@ -15,6 +15,10 @@
 
 use std::sync::Arc;
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
@@ -24,10 +28,6 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
