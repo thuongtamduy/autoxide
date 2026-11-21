@@ -6,24 +6,7 @@ Autoxide is an API only: a phone app, a desktop app or a point-of-sale terminal 
 
 ## 1. Pick an SDK
 
-Three SDKs are generated from the API contract (`docs/openapi.json`), so they always match the server of the same version:
-
-| Platform | Package | Built with |
-| --- | --- | --- |
-| iOS, iPadOS, macOS (Swift) | [`sdk/swift`](../../sdk/swift/README.md), Swift Package `Autoxide` | Apple's `swift-openapi-generator`, at build time |
-| Android, desktop JVM (Kotlin) | `sdk/kotlin` | `openapi-generator`, generator `kotlin` (`jvm-okhttp4`, Moshi) |
-| Flutter (Dart) | `sdk/dart` | `openapi-generator`, generator `dart-dio` (`built_value`) |
-| Web, React Native, Node (TypeScript) | [`sdk/typescript`](../../sdk/typescript/) | `openapi-typescript` |
-
-The Kotlin and Dart sources are not kept in the repository; generate them with the pinned generator version and settings of [`sdk/openapitools.json`](../../sdk/openapitools.json):
-
-```bash
-cd sdk
-npx @openapitools/openapi-generator-cli generate --generator-key kotlin   # → sdk/kotlin/generated
-npx @openapitools/openapi-generator-cli generate --generator-key dart     # → sdk/dart/generated
-```
-
-The packages are not published to Swift Package Index, Maven Central or pub.dev yet: add them from the repository at the tag of your server's version. Whatever the SDK, three rules hold for every call:
+The TypeScript SDK ([`sdk/typescript`](../../sdk/typescript/)) is generated from the API contract (`docs/openapi.json`), so it always matches the server of the same version. Use it for web, React Native and Node. There are no official Swift, Kotlin or Dart SDKs (decision D-20261121-drop-mobile-sdk): for a native or Flutter app, generate a client from `docs/openapi.json` (also served at `/api/v1/openapi.json`) with the OpenAPI generator of your platform, or call the REST endpoints directly. Whatever the client, three rules hold for every call:
 
 - Send the access token in `Authorization: Bearer …`.
 - Send an `Idempotency-Key` header (a new random UUID per action, kept across retries) on writes: phones retry on bad networks — see [Retrying safely](retries.md).

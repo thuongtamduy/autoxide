@@ -6,24 +6,7 @@ Autoxide chỉ có API: app điện thoại, app máy tính hay máy bán hàng 
 
 ## 1. Chọn SDK
 
-Ba SDK sinh từ hợp đồng API (`docs/openapi.json`), nên luôn khớp với máy chủ cùng phiên bản:
-
-| Nền tảng | Gói | Sinh bằng |
-| --- | --- | --- |
-| iOS, iPadOS, macOS (Swift) | [`sdk/swift`](../../sdk/swift/README.vi.md), Swift Package `Autoxide` | `swift-openapi-generator` của Apple, lúc build |
-| Android, JVM trên máy tính (Kotlin) | `sdk/kotlin` | `openapi-generator`, generator `kotlin` (`jvm-okhttp4`, Moshi) |
-| Flutter (Dart) | `sdk/dart` | `openapi-generator`, generator `dart-dio` (`built_value`) |
-| Web, React Native, Node (TypeScript) | [`sdk/typescript`](../../sdk/typescript/) | `openapi-typescript` |
-
-Mã Kotlin và Dart không lưu trong repo; sinh bằng đúng phiên bản generator và cấu hình đã ghim ở [`sdk/openapitools.json`](../../sdk/openapitools.json):
-
-```bash
-cd sdk
-npx @openapitools/openapi-generator-cli generate --generator-key kotlin   # → sdk/kotlin/generated
-npx @openapitools/openapi-generator-cli generate --generator-key dart     # → sdk/dart/generated
-```
-
-Các gói chưa đăng lên Swift Package Index, Maven Central hay pub.dev: thêm từ repo theo tag của phiên bản máy chủ. SDK nào cũng theo ba luật cho mọi lệnh gọi:
+SDK TypeScript ([`sdk/typescript`](../../sdk/typescript/)) sinh từ hợp đồng API (`docs/openapi.json`), nên luôn khớp với máy chủ cùng phiên bản. Dùng cho web, React Native và Node. Không có SDK Swift, Kotlin hay Dart chính thức (quyết định D-20261121-drop-mobile-sdk): app native hoặc Flutter thì tự sinh client từ `docs/openapi.json` (cũng phục vụ ở `/api/v1/openapi.json`) bằng công cụ sinh OpenAPI của nền tảng đó, hoặc gọi thẳng các endpoint REST. Client nào cũng theo ba luật cho mọi lệnh gọi:
 
 - Gửi access token trong `Authorization: Bearer …`.
 - Lệnh ghi gửi header `Idempotency-Key` (một UUID ngẫu nhiên mới cho mỗi hành động, giữ nguyên khi gửi lại): mạng điện thoại chập chờn nên app hay gửi lại — xem [Gửi lại an toàn](retries.vi.md).
