@@ -5,6 +5,9 @@ and TypeScript examples with the SDK in [`sdk/typescript`](../../sdk/typescript/
 
 Vietnamese: [`README.vi.md`](README.vi.md).
 
+The `curl` examples send JSON with `--json '…'`, which needs curl 7.82 or newer (`curl --version`). With an
+older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
+
 - [Showing posts and pictures on a website](website.md): public endpoints, `srcset` and WebP, ETag and 304
 - [Building a shop's home page from the API](storefront.md): placements and banners, collections, brand and contact details, cache
 - [Signing in and staying signed in](authentication.md): access and refresh tokens, signing out

@@ -13,8 +13,8 @@ core không chứa khái niệm nghiệp vụ — những thứ đó thuộc v�
 ## Chạy nhanh
 
 Một lệnh, không phải biên dịch gì: SQLite trong một Docker volume, bảng được tạo, có quản trị viên
-đầu tiên, dữ liệu tham chiếu đã nạp và trang xem API đã bật. Bạn cần
-[Docker](https://docs.docker.com/get-docker/) (kèm Compose) và `openssl`.
+đầu tiên và dữ liệu tham chiếu đã nạp. Bạn cần [Docker](https://docs.docker.com/get-docker/) (kèm
+Compose) và `openssl`.
 
 ```bash
 mkdir autoxide && cd autoxide
@@ -24,25 +24,77 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
 
 docker compose -f compose.quickstart.yml up -d
-# Quản trị viên admin@example.com có mật khẩu tự sinh, ghi một lần vào một file trong volume dữ liệu
-# mà chỉ người dùng của máy chủ đọc được (không bao giờ vào log)
+# Mật khẩu tự sinh của quản trị viên (xem bên dưới)
 docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 ```
 
-Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn) và đăng nhập (đổi mật khẩu xong thì
-xoá file đó). Trang xem API (`/api/docs`, nạp script từ CDN) tắt trong bản chạy nhanh: thêm
-`AUTOXIDE_HTTP_API_DOCS=true` vào `.env` để bật.
+**Mật khẩu của quản trị viên đầu tiên.** Lần chạy đầu, máy chủ tạo quản trị viên `admin@example.com`
+với một mật khẩu tự sinh. Mật khẩu không bao giờ vào log (log hay được gom về hệ thống khác): nó được
+ghi một lần vào file `data/initial-admin-password`, chỉ người dùng của máy chủ đọc được. Trong container
+đó là `/var/lib/autoxide/data/initial-admin-password`, nằm trong Docker volume `data` (Compose đặt tên
+`<thư mục>_data`), nên còn nguyên qua các lần khởi động lại. Lệnh trên in hai dòng của nó: email, rồi
+mật khẩu. Log chỉ nói file ở đâu (`docker compose -f compose.quickstart.yml logs autoxide | grep "first
+administrator"`). Nếu `cat` báo "No such file" thì quản trị viên đã có từ trước (volume đã dùng rồi),
+hoặc bạn đã tự đặt `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD`. Đăng nhập và đổi mật khẩu xong thì xoá file:
+`docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password`.
+
+Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn) và đăng nhập. Trang xem API
+(`/api/docs`, nạp script từ CDN) tắt trong bản chạy nhanh: thêm `AUTOXIDE_HTTP_API_DOCS=true` vào `.env`
+rồi chạy lại `docker compose -f compose.quickstart.yml up -d` để bật.
 
 ```bash
-curl -sS http://127.0.0.1:8080/api/v1/auth/login \
-  --json '{"email":"admin@example.com","password":"<mật khẩu trong file>"}'
+curl -sS http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"<mật khẩu trong file>"}'
 ```
+
+Các hướng dẫn trong [`docs/guides/`](docs/guides/README.vi.md) viết request này gọn hơn bằng
+`--json '…'`, cần curl 7.82 trở lên (`curl --version`); curl cũ hơn thì viết
+`-H 'Content-Type: application/json' -d '…'` thay vào.
 
 Muốn tự chọn thì thêm `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` và `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…`
 vào `.env` trước lần chạy đầu. Tiếp theo: nối một AI agent qua MCP
 ([`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md#6-từ-chạy-nhanh-tới-một-agent-làm-việc-thật)). Chạy nhanh
 cần bản phát hành sau 0.16.0; với PostgreSQL, nhiều máy chủ và HTTPS, xem
 [`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
+
+### Bản chạy nhanh có những gì
+
+Image phát hành đăng ký mọi module của binary `autoxide` (mọi thư mục trong `modules/` trừ module mẫu
+`notes`); `GET /api/v1/kernel/modules` liệt kê chúng trên máy chủ của bạn. Mỗi module trả lời dưới
+`/api/v1/<module>`.
+
+| Mảng | Module |
+| --- | --- |
+| Tài khoản và quyền | `auth` (đăng nhập, role, API key, xác thực hai bước, passkey), `organizations` (khách, đơn vị, cửa hàng), `audit`, `idempotency` |
+| Nền tảng | `files`, `mail`, `notifications`, `webhooks`, `ai` (tắt tới khi bạn cấu hình nhà cung cấp), `address` (đơn vị hành chính Việt Nam), `compliance`, `plans` (gói và thuê bao), `reporting`, `automations` |
+| Website | `content` (bài viết, trang), `media`, `menus`, `forms`, `newsletter`, `comments`, `analytics` |
+| Thương mại | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers`, `tax`, `ledger` (tiền), `invoices` |
+| Dịch vụ | `bookings`, `support`, `conversations` |
+
+Không phải bật gì để thử, và module bạn không ghi dữ liệu thì không tốn gì. Module nói chuyện với dịch
+vụ bên ngoài (nhà cung cấp AI, đối tác thanh toán hay vận chuyển, SMTP) không gửi gì ra ngoài cho tới
+khi bạn cấu hình. Mỗi khách được dùng module nào do gói của khách quyết
+([`docs/PLANS.vi.md`](docs/PLANS.vi.md)); tập module máy chủ chạy cố định lúc build binary
+([`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md)), và xem danh sách cần permission
+`kernel.modules.read` (quản trị viên có sẵn).
+
+### Sửa một bản ghi: `If-Match`
+
+Đọc một bản ghi trả phiên bản của nó trong header `ETag`. Gửi lại giá trị đó trong `If-Match` khi sửa
+bản ghi, để hai người không ghi đè lên nhau: phiên bản cũ nhận `412`, và endpoint bắt buộc header này
+trả `428` khi thiếu.
+
+```bash
+# Đọc bài viết và giữ header ETag (một số trong ngoặc kép, như "1763700000000000")
+curl -sS -i http://127.0.0.1:8080/api/v1/content/entries/<id> -H 'Authorization: Bearer <access token>'
+# Sửa bài viết kèm ETag đó
+curl -sS -X PATCH http://127.0.0.1:8080/api/v1/content/entries/<id> \
+  -H 'Authorization: Bearer <access token>' -H 'If-Match: <the ETag>' \
+  -H 'Content-Type: application/json' -d '{"title":"A new title"}'
+```
+
+[`docs/guides/errors.vi.md`](docs/guides/errors.vi.md) cho thấy từng câu trả lời (`428`, `412`)
+bằng ví dụ chạy thật.
 
 ## Trạng thái
 
@@ -168,6 +220,26 @@ Chỉ cần khi build từ mã nguồn (muốn chạy image đã phát hành th�
 - Để chạy gate chất lượng đầy đủ: [Docker](https://docs.docker.com/get-docker/) và
   [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny)
   (`cargo install cargo-deny --locked`)
+
+**Build mất khá lâu.** Lần build đầu (`cargo build --release`, hay `docker build`) biên dịch vài trăm
+crate: tính khoảng 20 phút tới hơn một giờ, tuỳ số nhân CPU và bộ nhớ (RAM ít nhất 4 GB, 8 GB thì
+thoải mái; build bị dừng giữa chừng trên Docker Desktop thì nâng giới hạn bộ nhớ của nó). Các lần sau
+dùng lại phần đã biên dịch. Muốn chạy Autoxide chứ không sửa nó thì dùng image đã phát hành ở trên:
+không phải biên dịch gì.
+
+**Sau proxy của công ty.** `cargo` và `rustup` đọc `HTTPS_PROXY` (và `HTTP_PROXY`, `NO_PROXY`) từ biến
+môi trường. `docker build` không chuyển biến của shell vào bước build: truyền chúng thành build
+argument — Docker biết sẵn các tên này và không giữ chúng trong image —
+
+```bash
+docker build --build-arg HTTPS_PROXY=http://proxy.example.com:3128 \
+  --build-arg HTTP_PROXY=http://proxy.example.com:3128 --build-arg NO_PROXY=localhost,127.0.0.1 \
+  -t autoxide .
+```
+
+— hoặc đặt một lần trong mục `proxies` của `~/.docker/config.json`, Docker sẽ truyền cho mọi lần build,
+kể cả `docker compose build`. Proxy soi HTTPS bằng chứng chỉ riêng làm việc tải thư viện trong lúc build
+lỗi chứng chỉ; khi đó hãy dùng image đã phát hành.
 
 ## Bắt đầu
 

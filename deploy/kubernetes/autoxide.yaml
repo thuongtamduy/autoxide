@@ -1,0 +1,182 @@
+# Autoxide on Kubernetes: a minimal example (docs/DEPLOY.md, "Kubernetes").
+#
+# PostgreSQL 16 or newer runs outside this file (a managed database or your own operator), files go to
+# S3 and mail to SMTP: the pods keep nothing on disk, so any of them can be replaced at any time.
+#
+# Before applying, create the secret (never commit it):
+#
+#   kubectl create namespace autoxide
+#   kubectl -n autoxide create secret generic autoxide \
+#     --from-literal=DATABASE_URL='postgres://autoxide:<password>@<host>:5432/autoxide' \
+#     --from-literal=AUTOXIDE_AUTH_TOKEN_SECRET="$(openssl rand -base64 48 | tr -d '\n')" \
+#     --from-literal=AUTOXIDE_SECRET_KEY="$(openssl rand -base64 48 | tr -d '\n')" \
+#     --from-literal=AWS_ACCESS_KEY_ID='<key id>' --from-literal=AWS_SECRET_ACCESS_KEY='<secret>' \
+#     --from-literal=AUTOXIDE_MAIL_SMTP_URL='smtps://<user>:<password>@<smtp host>:465'
+#
+# Then replace every `<…>` below: `<version>` is a release such as `0.17.0` (in the Job name write
+# it with dashes, `0-17-0`), the bucket, the domain. Then:
+#
+#   kubectl -n autoxide apply -f deploy/kubernetes/autoxide.yaml
+#   kubectl -n autoxide wait --for=condition=complete job/autoxide-migrate-<version> --timeout=10m
+#   kubectl -n autoxide rollout status deployment/autoxide
+#
+# On each update, change `<version>` in its three places (the Job's name too: a Job cannot be changed
+# once created) and apply again: the new Job migrates, then wait for it as above, then the Deployment
+# rolls over without dropping requests (readinessProbe, drain, terminationGracePeriodSeconds). Apply
+# the Job first and the Deployment after it completes when a release notes a migration the old
+# version cannot run with (CHANGELOG.md).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: autoxide
+data:
+  AUTOXIDE_HTTP_ADDRESS: "0.0.0.0:8080"
+  AUTOXIDE_LOG_FORMAT: json
+  # Several pods share one database: count the per-key limit there, not per pod.
+  AUTOXIDE_HTTP_RATE_LIMIT_STORE: database
+  # The ingress controller is one proxy in front of the pods; it passes the client's address here.
+  AUTOXIDE_HTTP_CLIENT_IP_HEADER: X-Forwarded-For
+  AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT: "1"
+  # Drain longer than the readinessProbe needs to take a pod out (5 s × 2 failures).
+  AUTOXIDE_HTTP_DRAIN_SECONDS: "15"
+  AUTOXIDE_HTTP_SHUTDOWN_SECONDS: "30"
+  AUTOXIDE_FILES_S3_BUCKET: "<bucket>"
+  AWS_REGION: "<region>"
+  # AWS_ENDPOINT_URL: "https://<account>.r2.cloudflarestorage.com"   # for an S3-compatible service
+  AUTOXIDE_MAIL_FROM: "Autoxide <no-reply@example.com>"
+---
+# Migrations run once per release, before the new pods start (the server refuses to start while one is
+# pending). A new release needs a new Job name.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: autoxide-migrate-<version>
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: ghcr.io/thuongtamduy/autoxide:<version>
+          args: ["migrate", "up"]
+          envFrom:
+            - configMapRef:
+                name: autoxide
+            - secretRef:
+                name: autoxide
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: autoxide
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: autoxide
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: autoxide
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      # Drain (15 s) + requests in progress (30 s), with some margin.
+      terminationGracePeriodSeconds: 50
+      containers:
+        - name: autoxide
+          image: ghcr.io/thuongtamduy/autoxide:<version>
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: autoxide
+            - secretRef:
+                name: autoxide
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /health/live
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: autoxide
+spec:
+  selector:
+    app: autoxide
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+# HTTPS at the ingress controller (here ingress-nginx with cert-manager; adapt to yours).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: autoxide
+  annotations:
+    cert-manager.io/cluster-issuer: "<issuer>"
+    nginx.ingress.kubernetes.io/proxy-body-size: "30m"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: ["api.example.com"]
+      secretName: autoxide-tls
+  rules:
+    - host: api.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: autoxide
+                port:
+                  name: http
