@@ -170,7 +170,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-020** "Phù hợp với AI agent" nghĩa là gì — 2026-11-11
 - **D-022** MCP endpoint nằm trong core — 2026-11-11 · **chủ dự án quyết**
 - **D-050** API key cho máy và AI agent — 2026-11-11
-- **D-068** MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11
+- **D-068** MCP endpoint: `rmcp` ở kernel, tool khai qua hợp đồng module — 2026-11-11 · *thay một phần bởi D-20261121-mcp-server*
 - **D-083** Bước 14: kiểm đầu vào ở service và báo mọi lỗi một lần; `Created`; header chung trong OpenAPI; MCP cùng envelope với REST — 2026-11-12
 - **D-109** Tính năng AI: tầng kết nối trung lập, hai adapter, quyền cho agent, mặc định tắt — 2026-11-12 · **chủ dự án quyết**
 - **D-110** Bước 18 (AI): những chỗ đề bài chưa nói hoặc làm khác — 2026-11-12
@@ -190,6 +190,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step58-automations](D-20261118-step58-automations.md)** Tự động hoá quy trình: luật, bộ chạy, duyệt, cảnh báo số liệu — 2026-11-18
 - **[D-20261119-step53-ai-mail](D-20261119-step53-ai-mail.md)** `support`: bản nháp AI lưu riêng, khoá trả lời email là HMAC theo phiếu, tool MCP dùng trường phẳng — 2026-11-19
 - **[D-20261119-step53-auto-reply](D-20261119-step53-auto-reply.md)** `support`: trả lời tự động — mô hình chỉ phân loại, luật quyết trong Rust, duyệt bằng chính lệnh bật — 2026-11-19
+- **[D-20261121-mcp-server](D-20261121-mcp-server.md)** MCP server tự viết trong kernel thay `rmcp`, phục vụ cả bản `2026-07-28` lẫn bản cũ — 2026-11-21
 
 ## Xác thực, phân quyền, bảo mật
 

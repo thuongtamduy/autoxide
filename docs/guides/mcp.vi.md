@@ -412,3 +412,70 @@ Dưới mỗi module, `/llms.txt` có link tới tài liệu OpenAPI và endpoin
 ```bash
 curl -sS "$API/api/v1/openapi/content.json"
 ```
+
+## 6. Từ chạy nhanh tới một agent làm việc thật
+
+Làm trọn trên máy của bạn, từ một thư mục trống tới một trợ lý trả lời được câu hỏi về tồn kho và doanh số. Bắt đầu từ mục [Chạy nhanh](../../README.vi.md#chạy-nhanh) (`compose.quickstart.yml`), nên máy chủ ở `http://127.0.0.1:8080`.
+
+**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
+
+```bash
+API=http://127.0.0.1:8080
+TOKEN=$(curl -sS "$API/api/v1/auth/login" \
+  --json '{"email":"admin@example.com","password":"<password from the log>"}' | jq -r .data.access_token)
+curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
+  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<password from the log>"}' \
+  | jq -r .data.key
+```
+
+Key (`axk1_…`) chỉ hiện một lần: cất vào trình quản lý mật khẩu. Xem key được làm gì bằng `curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer axk1_…"`.
+
+**2. Nối client.**
+
+*Claude Desktop* nhận máy chủ cục bộ (stdio) trong file cấu hình (Settings → Developer → Edit Config, `claude_desktop_config.json`). Cầu nối [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) (cần Node.js) nối nó tới máy chủ HTTP kèm header:
+
+```json
+{
+  "mcpServers": {
+    "autoxide": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://127.0.0.1:8080/mcp", "--header", "Authorization:${AUTOXIDE_AUTH}"],
+      "env": { "AUTOXIDE_AUTH": "Bearer axk1_…" }
+    }
+  }
+}
+```
+
+Khởi động lại Claude Desktop; các tool hiện dưới biểu tượng công cụ của cuộc trò chuyện mới. (`mcp-remote` chỉ dùng HTTP thường với `localhost`; máy chủ ở nơi khác cần HTTPS.)
+
+*Cursor* tự nói Streamable HTTP. Trong `~/.cursor/mcp.json` (mọi dự án) hay `.cursor/mcp.json` (một dự án — đừng commit key):
+
+```json
+{
+  "mcpServers": {
+    "autoxide": {
+      "url": "http://127.0.0.1:8080/mcp",
+      "headers": { "Authorization": "Bearer ${env:AUTOXIDE_AGENT_KEY}" }
+    }
+  }
+}
+```
+
+Chạy Cursor với `AUTOXIDE_AGENT_KEY=axk1_…` trong môi trường, rồi xem Settings → MCP: `autoxide` phải liệt kê các tool. Muốn trợ lý hẹp hơn thì nối vào đúng một module, vd `http://127.0.0.1:8080/mcp/inventory`.
+
+**3. Giao việc thật.** Bản cài mới chưa có sản phẩm hay tồn kho: thêm trước (qua trang xem API `/api/docs`, hay giao diện của bạn). Rồi hỏi bằng lời thường; mô hình tự chọn tool, client hiện từng lần gọi trước hoặc sau khi chạy.
+
+| Bạn hỏi | Tool agent gọi | Kết quả |
+|---|---|---|
+| "Sản phẩm nào sắp hết hàng? Gom theo kho." | `inventory.list_low_stock`, rồi `catalog.get_product` để lấy tên | Danh sách biến thể dưới ngưỡng đặt hàng lại, kèm số đang có |
+| "Mã TS-RED-M còn bao nhiêu, ở đâu?" | `catalog.list_products` (tìm), `inventory.get_levels` | Tồn theo từng nơi: đang có, đã giữ, còn bán được |
+| "Soạn hoá đơn cho Công ty ABC: 10 × TS-RED-M theo giá niêm yết." | `catalog.resolve_price`, `invoices.create_draft` | Một hoá đơn **nháp**; người duyệt và phát hành — key không có quyền phát hành |
+| "Doanh số tuần trước so với tuần trước nữa thế nào?" | `reporting.summary`, `reporting.facts` | Tổng và mức thay đổi, từ dữ liệu của module báo cáo |
+| "Trang nào kéo nhiều khách nhất tháng này?" | `analytics.overview`, `analytics.top_pages` | Lượt xem và các trang đứng đầu của website |
+
+Điều giữ an toàn:
+
+- Key quyết định: `tools/list` chỉ hiện tool mà permission của key cho phép, và tool không bao giờ làm được hơn REST với cùng permission. Trợ lý ở trên đọc và soạn nháp được; không đổi tồn kho, không hoàn tiền, không phát hành hoá đơn được.
+- Đơn hàng đến từ checkout, không từ tool: không có tool nào đặt hàng thay khách. Agent soạn bản nháp (hoá đơn, nội dung, trả lời) để người xác nhận.
+- Lệnh ghi gọi lại an toàn (idempotency) và mọi lệnh ghi nằm trong audit log dưới tên key (`/api/v1/audit`).
+- Xong việc thì xoá key: `DELETE /api/v1/auth/api-keys/{id}`.

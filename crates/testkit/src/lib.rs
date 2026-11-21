@@ -40,6 +40,7 @@ mod dns;
 mod einvoice;
 mod identity;
 mod leak;
+pub mod mcp;
 mod ownership;
 mod payment;
 mod postgres;

@@ -1,4 +1,4 @@
-//! Resource và prompt MCP (bước 40 P2), gọi bằng client MCP thật (`rmcp`): lọc theo permission,
+//! Resource và prompt MCP (bước 40 P2), gọi bằng client MCP của testkit (`autoxide_testkit::mcp`, nói đặc tả 2026-07-28): lọc theo permission,
 //! không lộ sự tồn tại, đối số trong ranh giới, khai báo sai bị từ chối lúc khởi động; và trang
 //! `/llms.txt`.
 
@@ -16,13 +16,11 @@ use autoxide_kernel::mcp::{McpResource, NoInput, Prompt, PromptArgument, PromptM
 use autoxide_kernel::module::{Module, Modules};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
 use autoxide_testkit::TestDatabase;
+use autoxide_testkit::mcp::{
+    GetPromptRequestParams, McpClient, ReadResourceRequestParams, ResourceContents,
+};
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use rmcp::ServiceExt as _;
-use rmcp::model::{GetPromptRequestParams, ReadResourceRequestParams, ResourceContents};
-use rmcp::service::{RoleClient, RunningService};
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use serde::Serialize;
 use serde_json::{Value, json};
 use tower::ServiceExt as _;
@@ -160,18 +158,20 @@ async fn router(test: &TestDatabase, settings: &[(&str, &str)]) -> axum::Router 
     http::build(&config, axum::Router::new().into(), Vec::new(), extras).router
 }
 
-async fn serve(test: &TestDatabase) -> String {
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-    let address = listener.local_addr().unwrap();
-    let app = router(test, &[]).await;
-    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
-    format!("http://{address}{MCP_PATH}")
+/// Router của app và đường dẫn MCP. Client của testkit gửi request thẳng vào router, không cần mở
+/// cổng TCP.
+#[derive(Clone)]
+struct Endpoint {
+    router: axum::Router,
+    path: String,
 }
 
-async fn client(url: &str, token: &str) -> RunningService<RoleClient, ()> {
-    autoxide_kernel::tls::install_crypto_provider();
-    let config = StreamableHttpClientTransportConfig::with_uri(url.to_owned()).auth_header(token);
-    ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap()
+async fn serve(test: &TestDatabase) -> Endpoint {
+    Endpoint { router: router(test, &[]).await, path: MCP_PATH.to_owned() }
+}
+
+async fn client(endpoint: &Endpoint, token: &str) -> McpClient {
+    McpClient::new(endpoint.router.clone(), &endpoint.path, Some(token))
 }
 
 fn text(contents: &[ResourceContents]) -> &str {
@@ -185,7 +185,7 @@ fn text(contents: &[ResourceContents]) -> &str {
 async fn resources_list_loc_theo_permission() {
     TestDatabase::run(async |test| {
         let url = serve(test).await;
-        let uris = |resources: Vec<rmcp::model::Resource>| -> Vec<String> {
+        let uris = |resources: Vec<autoxide_testkit::mcp::Resource>| -> Vec<String> {
             resources.into_iter().map(|resource| resource.uri).collect()
         };
         let writer = client(&url, "writer").await;
@@ -298,7 +298,7 @@ async fn schema_resource_nhung_kieu_con() {
 async fn prompt_an_khi_thieu_permission_cua_tool() {
     TestDatabase::run(async |test| {
         let url = serve(test).await;
-        let names = |prompts: Vec<rmcp::model::Prompt>| -> Vec<String> {
+        let names = |prompts: Vec<autoxide_testkit::mcp::Prompt>| -> Vec<String> {
             prompts.into_iter().map(|prompt| prompt.name).collect()
         };
         let writer = client(&url, "writer").await;

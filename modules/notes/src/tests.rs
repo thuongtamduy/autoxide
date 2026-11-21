@@ -8,9 +8,9 @@ use autoxide_kernel::access::{Grant, Principal, Scope};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 
+use autoxide_testkit::mcp::McpClient;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use rmcp::service::{RoleClient, RunningService};
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -63,7 +63,7 @@ async fn rest(
     (answer.status(), answer.json())
 }
 
-async fn mcp(app: &TestApp, who: &str) -> RunningService<RoleClient, ()> {
+async fn mcp(app: &TestApp, who: &str) -> McpClient {
     app.mcp(who).await.unwrap()
 }
 
