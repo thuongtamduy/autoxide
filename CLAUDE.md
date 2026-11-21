@@ -255,7 +255,8 @@ sẵn lệnh.
    `principal.require(&NOTES_WRITE)?`; tài liệu của handler nêu permission cần có.
    Module nghiệp vụ không phụ thuộc module `auth` (D-046).
 8. **REST và MCP dùng chung service.** Tool MCP không có logic riêng và không được
-   phép làm điều mà REST với cùng permission không làm được.
+   phép làm điều mà REST với cùng permission không làm được: permission mà REST giới hạn theo phạm vi
+   thì tool phải truyền `principal` vào service (gate `mcp-principal`, D-20261121-security-lints).
 9. **Core chỉ có API.** Không có giao diện web hay trang quản trị trong repo này;
    giao diện là dự án riêng dùng API. (Trang xem tài liệu API sinh tự động thì được.)
 
@@ -267,7 +268,8 @@ sẵn lệnh.
   thập phân của database.
 - **Thời gian:** lưu UTC.
 - **Đa khách (D-185, từ bước 33):** bảng cấp khách hàng có `tenant_id` (kể cả khi khách có
-  database riêng); mọi truy vấn lọc theo khách qua công cụ của kernel; dữ liệu nghiệp vụ theo tổ
+  database riêng); mọi truy vấn lọc theo khách qua công cụ của kernel (`.scoped(&tenant)`; gate
+  `tenant-scope` chặn chỗ quên, cố ý quét mọi khách thì ghi `// tenant-scope: <lý do>`, D-20261121-security-lints); dữ liệu nghiệp vụ theo tổ
   chức có `org_id`. Không bao giờ trả dữ liệu của khách hay nhánh mà người gọi không có quyền.
 - **Hai database:** xem "Luật số một".
 - **Đọc và ghi tách kết nối.** Đọc qua `Database::read()`, ghi qua
