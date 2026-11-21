@@ -17,13 +17,24 @@ const EMAIL: &str = "first-admin@example.com";
 const PASSWORD: &str = "correct horse battery staple";
 
 fn settings(url: &str, extra: &[(&str, &str)]) -> Settings {
-    // Mặc định của `files` và `mail` là thư mục tương đối trong thư mục chạy test: dùng thư mục tạm.
-    let scratch = std::env::temp_dir().join(format!("autoxide-startup-{}", uuid::Uuid::now_v7()));
+    settings_in(&scratch(), url, extra)
+}
+
+/// Thư mục tạm riêng cho một lần khởi động.
+fn scratch() -> std::path::PathBuf {
+    std::env::temp_dir().join(format!("autoxide-startup-{}", uuid::Uuid::now_v7()))
+}
+
+/// Mặc định của `files`, `mail` và file mật khẩu tự sinh là đường dẫn tương đối trong thư mục chạy
+/// test (thư mục của crate, trong cây mã nguồn): mọi thứ đặt vào `scratch`.
+fn settings_in(scratch: &std::path::Path, url: &str, extra: &[(&str, &str)]) -> Settings {
     let files = scratch.join("files").display().to_string();
     let mail = scratch.join("mail").display().to_string();
+    let password_out = scratch.join("initial-admin-password").display().to_string();
     let mut pairs = vec![
         ("AUTOXIDE_FILES_DIR", files.as_str()),
         ("AUTOXIDE_MAIL_FILE_DIR", mail.as_str()),
+        ("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT", password_out.as_str()),
         ("DATABASE_URL", url),
         ("AUTOXIDE_HTTP_ADDRESS", "127.0.0.1:0"),
         ("AUTOXIDE_HTTP_DRAIN_SECONDS", "0"),
@@ -81,8 +92,15 @@ async fn hai_ban_khoi_dong_cung_luc_tren_database_trong() {
 #[tokio::test]
 async fn da_co_quan_tri_vien_thi_khong_tao_them() {
     TestDatabase::run(async |test| {
-        // Lần đầu: không có mật khẩu, máy chủ tự sinh (ghi log một lần).
-        start_and_stop(settings(test.url(), &[])).await.unwrap();
+        // Lần đầu: không có mật khẩu, máy chủ tự sinh và ghi vào file đã cấu hình (không vào log,
+        // không vào cây mã nguồn — D-20261121-admin-password-file).
+        let first = scratch();
+        start_and_stop(settings_in(&first, test.url(), &[])).await.unwrap();
+        let written = std::fs::read_to_string(first.join("initial-admin-password")).unwrap();
+        assert!(written.starts_with(&format!("{EMAIL}\n")), "{written}");
+        let in_tree = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("data");
+        assert!(!in_tree.join("initial-admin-password").exists(), "written into the source tree");
+        let _ = std::fs::remove_dir_all(&first);
         // Lần sau, email khác: đã có quản trị viên nên không tạo ai.
         let other = [("AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL", "someone-else@example.com")];
         start_and_stop(settings(test.url(), &other)).await.unwrap();

@@ -182,6 +182,20 @@ fi
 
 export CARGO_INCREMENTAL=0
 
+# --- test không được ghi file vào cây mã nguồn ---------------------------------------------------------
+# Test chạy trong thư mục của crate: đường dẫn tương đối mặc định (thư mục dữ liệu, file mật khẩu tự
+# sinh…) rơi vào cây mã nguồn rồi bị commit nhầm. Chụp danh sách file chưa theo dõi (không tính file
+# trong .gitignore) trước khi chạy test; trước khi báo xanh, file mới xuất hiện thì đỏ
+# (D-20261121-admin-password-path).
+untracked() { git ls-files --others --exclude-standard 2>/dev/null | sort; }
+UNTRACKED_BEFORE="$(untracked)"
+tree_unchanged() {
+  local added
+  added="$(comm -13 <(printf '%s\n' "$UNTRACKED_BEFORE") <(untracked) | sed '/^$/d')"
+  [ -z "$added" ] || fail "the run left new files in the source tree (a test wrote to a relative path; give it a temporary directory):
+$added"
+}
+
 # --- dọn target/ khi quá trần (D-20261118-build-size) ---------------------------------------------
 # Cargo không bao giờ tự xoá bản build cũ: mỗi nhánh, mỗi Cargo.lock khác nhau để lại một bộ file.
 target_gb() { du -s --block-size=1G target 2>/dev/null | cut -f1 || echo 0; }
@@ -212,6 +226,7 @@ if runs avif && avif_needed; then
   env -u TEST_DATABASE_URL cargo test -p autoxide-media --locked --features avif --lib -- avif
 fi
 if [ "$ONLY" = avif ]; then
+  tree_unchanged
   printf '\n\033[32mgate --only avif: green — AVIF feature of media\033[0m\n'
   exit 0
 fi
@@ -266,6 +281,7 @@ gitleaks_run git . "${leaks[@]}" --pre-commit
 fi
 
 if [ "$ONLY" = lint ]; then
+  tree_unchanged
   printf '\n\033[32mgate%s --only lint: green — fmt, clippy, boundaries, api contract, dependencies, secrets\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
   exit 0
 fi
@@ -297,6 +313,7 @@ if [ "$ONLY" = build ]; then
     env -u TEST_DATABASE_URL cargo test --workspace --locked ${PROFILE_ARGS[@]+"${PROFILE_ARGS[@]}"} --doc
   fi
   printf 'filter: %s\n' "$(cat "$ARCHIVE_DIR/filter")"
+  tree_unchanged
   printf '\n\033[32mgate%s --only build: green — test archive built%s\033[0m\n' \
     "$([ "$PR" = 1 ] && echo ' --pr')" "$([ "$PR" = 1 ] || echo ', doc tests')"
   exit 0
@@ -325,6 +342,7 @@ run_archive() {
 if [ "$QUICK" = 1 ]; then
   step "tests on SQLite, changed crates only (cargo xtask test-affected)"
   cargo xtask test-affected
+  tree_unchanged
   printf '\n\033[32mgate --quick: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of changed crates on SQLite\033[0m\n'
   printf 'Not checked: PostgreSQL, S3, crates you did not touch. Run ./gate.sh before merging into main.\n'
   exit 0
@@ -381,6 +399,7 @@ else
 fi
 
 if [ "$ONLY" = sqlite ]; then
+  tree_unchanged
   printf '\n\033[32mgate%s --only sqlite: green — tests on SQLite\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
   exit 0
 fi
@@ -432,23 +451,28 @@ fi
 if [ -n "$ARCHIVE" ]; then
   # 16: như POSTGRES_CONCURRENT_TESTS của `cargo xtask test-all` — dưới trần 300 kết nối.
   run_archive 16 TEST_DATABASE_URL="$POSTGRES_URL"
+  tree_unchanged
   printf '\n\033[32mgate%s --only postgres --archive: green — tests on Postgres\033[0m\n' "$([ "$PR" = 1 ] && echo ' --pr')"
   exit 0
 fi
 if [ "$PR" = 1 ]; then
   TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-affected --base "$BASE" --keep-env "${SHARD[@]}"
   if [ "$ONLY" = postgres ]; then
+    tree_unchanged
     printf '\n\033[32mgate --pr --only postgres: green — tests of crates changed since %s on Postgres\033[0m\n' "$BASE"
     exit 0
   fi
+  tree_unchanged
   printf '\n\033[32mgate --pr: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests of crates changed since %s on SQLite and Postgres\033[0m\n' "$BASE"
   printf 'Not checked: doc tests, crates the change does not reach. The push to main runs the full gate.\n'
   exit 0
 fi
 TEST_DATABASE_URL="$POSTGRES_URL" cargo xtask test-all "${SHARD[@]}"
 if [ "$ONLY" = postgres ]; then
+  tree_unchanged
   printf '\n\033[32mgate --only postgres: green — tests on Postgres (files also on S3)\033[0m\n'
   exit 0
 fi
 
+tree_unchanged
 printf '\n\033[32mgate: green — fmt, clippy, boundaries, api contract, dependencies, secrets, tests on SQLite and Postgres (files also on S3)\033[0m\n'
