@@ -423,6 +423,7 @@ impl OrdersService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
+        // tenant-scope: job hết hạn bảo hành của mọi khách trên database.
         let result = warranty::Entity::update_many()
             .col_expr(warranty::Column::Status, Expr::value(EXPIRED))
             .filter(warranty::Column::Status.eq(ACTIVE))

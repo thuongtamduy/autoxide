@@ -304,6 +304,7 @@ pub(crate) fn all(service: &Arc<CatalogService>) -> Vec<Tool> {
             },
         )
         .requires(PRODUCTS_WRITE),
+        // mcp-principal: danh mục chung của khách, không gắn nút tổ chức; REST `GET /categories` cũng trả cả khách.
         Tool::new(
             "list_categories",
             "List every category of the tenant, by depth then display order.",

@@ -383,6 +383,7 @@ pub(crate) struct Cleanup;
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let before = now() - SignedDuration::from_hours(24 * KEEP_DELIVERIES_DAYS);
+        // tenant-scope: job xoá lần gửi cũ của mọi khách trên database.
         let deleted = delivery::Entity::delete_many()
             .filter(delivery::Column::CreatedAt.lt(before))
             .filter(delivery::Column::Status.ne(STATUS_PENDING))
