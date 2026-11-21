@@ -10,6 +10,38 @@ to be used by AI agents as well as by people.
 It is a foundation for new products. It is not tied to any company or industry:
 the core contains no business concepts — those belong to modules.
 
+## Quickstart
+
+One command, nothing to compile: SQLite in a Docker volume, the tables created, a first
+administrator, the reference data loaded and the API reference turned on. You need
+[Docker](https://docs.docker.com/get-docker/) (with Compose) and `openssl`.
+
+```bash
+mkdir autoxide && cd autoxide
+curl -fsSLO https://raw.githubusercontent.com/thuongtamduy/autoxide/main/compose.quickstart.yml
+# Two secrets, kept in .env next to it (never commit it)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
+
+docker compose -f compose.quickstart.yml up -d
+# The administrator admin@example.com gets a generated password, written to the log once
+docker compose -f compose.quickstart.yml logs autoxide | grep -i password
+```
+
+Then open <http://127.0.0.1:8080/> (name, version and links), <http://127.0.0.1:8080/api/docs>
+(the API reference) and sign in:
+
+```bash
+curl -sS http://127.0.0.1:8080/api/v1/auth/login \
+  --json '{"email":"admin@example.com","password":"<the password from the log>"}'
+```
+
+To choose them yourself, add `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` and
+`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…` to `.env` before the first start. Next: connect an AI agent
+over MCP ([`docs/guides/mcp.md`](docs/guides/mcp.md#6-from-the-quickstart-to-a-working-agent)). The
+quickstart needs a release made after 0.16.0; for PostgreSQL, several servers and HTTPS, see
+[`docs/DEPLOY.md`](docs/DEPLOY.md).
+
 ## Status
 
 The core is complete: **every step of the roadmap is done** — project skeleton,
@@ -91,8 +123,8 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 ## Try it with Docker (no build)
 
-The quickest way to run Autoxide is a released image: nothing to compile, SQLite inside a
-Docker volume. You need [Docker](https://docs.docker.com/get-docker/) and `openssl`. The
+The same as the [Quickstart](#quickstart), step by step with plain `docker run` (works with every
+release): nothing to compile, SQLite inside a Docker volume. You need [Docker](https://docs.docker.com/get-docker/) and `openssl`. The
 image is about 630 MB on disk and the server is ready about a second after it starts.
 
 ```bash

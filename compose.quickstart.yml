@@ -1,0 +1,49 @@
+# Autoxide quickstart: one server, SQLite in a Docker volume, ready in one command.
+#
+# 1. In an empty directory, next to this file, create `.env` (never commit it):
+#
+#      printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+#        "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
+#
+#    Optional lines: AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL (default admin@example.com) and
+#    AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD (without it a password is generated and logged once).
+#
+# 2. docker compose -f compose.quickstart.yml up -d
+#    docker compose -f compose.quickstart.yml logs autoxide | grep -i password
+#
+# 3. Open http://127.0.0.1:8080/ (links), http://127.0.0.1:8080/api/docs (API reference).
+#
+# On start the server applies the migrations, creates the first administrator while there is none,
+# and loads the reference data shipped with it (addresses, taxes, promotion limits); each start
+# after the first changes nothing. For PostgreSQL, several servers, HTTPS and updates, see
+# compose.yml and docs/DEPLOY.md.
+
+services:
+  autoxide:
+    # Needs a release made after 0.16.0 (the start-up settings below). Pin a version for anything
+    # you keep: AUTOXIDE_IMAGE=ghcr.io/thuongtamduy/autoxide:<version> in `.env`.
+    image: ${AUTOXIDE_IMAGE:-ghcr.io/thuongtamduy/autoxide:latest}
+    command: ["serve"]
+    environment:
+      AUTOXIDE_AUTH_TOKEN_SECRET: ${AUTOXIDE_AUTH_TOKEN_SECRET:?create .env next to compose.quickstart.yml with AUTOXIDE_AUTH_TOKEN_SECRET (openssl rand -base64 48), see the top of compose.quickstart.yml}
+      # Optional (empty = unset): without it the root key is kept in the database and the server warns.
+      AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:-}
+      AUTOXIDE_MIGRATE_ON_START: "true"
+      AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL: ${AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
+      AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD: ${AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD:-}
+      AUTOXIDE_STARTUP_TASKS: address.import,tax.import_pack,promotions.load_legal_data
+      # The interactive API reference at /api/docs (off by default in the image).
+      AUTOXIDE_HTTP_API_DOCS: "true"
+      # Readable logs in a terminal; the image defaults to JSON for log collectors.
+      AUTOXIDE_LOG_FORMAT: text
+    volumes:
+      # The database, uploaded files and mail (until SMTP is set) live here.
+      - data:/var/lib/autoxide/data
+    ports:
+      # This machine only; put a reverse proxy with HTTPS in front before going on the internet.
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
+    stop_grace_period: 40s
+
+volumes:
+  data:
