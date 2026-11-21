@@ -21,6 +21,7 @@ use std::sync::Arc;
 use autoxide_kernel::ai::{EmbedKind, vector};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -214,6 +215,12 @@ impl CatalogService {
 
     /// Tính lại danh sách tương tự của `products` ở `locale`, và thêm mỗi sản phẩm vào danh sách
     /// của hàng giống nó.
+    ///
+    /// Đọc vector và ghi danh sách trong CÙNG một transaction ghi, sau khi khoá mọi dòng embedding
+    /// cùng khách + ngôn ngữ + mô hình. Hai job lập index chạy song song (worker nhiều slot) vì thế
+    /// đi lần lượt: job sau chờ job trước commit rồi mới đọc, nên thấy cả vector lẫn dòng đối xứng
+    /// job trước vừa ghi. Đọc qua kết nối đọc rồi mới mở transaction (như trước) thì job sau có thể
+    /// xoá mất dòng "A giống B" mà job của B vừa ghi.
     async fn recompute_similar(
         &self,
         tenant: &TenantContext,
@@ -221,12 +228,21 @@ impl CatalogService {
         locale: &str,
         products: &[Uuid],
     ) -> Result<(), Error> {
-        let read = tenant.database().read();
-        let all: Vec<(Uuid, Vec<f32>)> = embedding::Entity::find()
-            .filter(embedding::Column::Locale.eq(locale))
-            .filter(embedding::Column::Model.eq(model))
-            .scoped(tenant)
-            .all(read)
+        let select = || {
+            embedding::Entity::find()
+                .filter(embedding::Column::Locale.eq(locale))
+                .filter(embedding::Column::Model.eq(model))
+                .scoped(tenant)
+        };
+        let write = tenant.database().begin_write().await?;
+        // Khoá theo ID tăng dần (không deadlock giữa các job). Postgres: `FOR UPDATE`; SQLite:
+        // `BEGIN IMMEDIATE` đã giữ quyền ghi cả database. Hai job luôn cùng khoá ít nhất một dòng:
+        // job chạy sau thấy vector của job chạy trước (đã commit trước khi nó khoá).
+        rows::lock(&write, select(), embedding::Column::Id).await?;
+        // Đọc lại SAU khi có khoá: ở READ COMMITTED của Postgres, câu khoá ở trên giữ bức ảnh từ
+        // lúc nó bắt đầu (có thể trước khi job kia commit); câu mới thấy mọi thứ đã commit.
+        let all: Vec<(Uuid, Vec<f32>)> = select()
+            .all(&write)
             .await?
             .into_iter()
             .filter_map(|row| Some((row.product_id, vector::decode(&row.vector)?)))
@@ -243,7 +259,6 @@ impl CatalogService {
                 .collect();
             ranked.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
             ranked.truncate(TOP);
-            let write = tenant.database().begin_write().await?;
             similar_product::Entity::delete_many()
                 .filter(similar_product::Column::ProductId.eq(*product))
                 .filter(similar_product::Column::Locale.eq(locale))
@@ -256,8 +271,8 @@ impl CatalogService {
                 self.put_similar(&write, tenant, locale, (*other, *product, *value), at).await?;
                 self.trim_similar(&write, tenant, *other, locale).await?;
             }
-            write.commit().await?;
         }
+        write.commit().await?;
         Ok(())
     }
 
