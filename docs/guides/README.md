@@ -21,3 +21,4 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Automating work with rules](automations.md): triggers, conditions, MCP tools as actions, approvals, alerts on unusual figures
 - [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases
 - [Writing a provider adapter](provider-adapters.md): per-tenant accounts, secrets, webhooks, testing without the network (for developers)
+- [Confirming bank transfers with SePay](sepay.md): your own SePay account per tenant, the webhook address, VietQR payments confirmed by themselves (experimental)

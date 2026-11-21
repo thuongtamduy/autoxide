@@ -112,7 +112,7 @@ thật (P7).
       viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
   - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
-  - [ ] Thanh toán: SePay
+  - [x] Thanh toán: SePay
   - [ ] Thanh toán: MoMo
   - [ ] Vận chuyển: Giao Hàng Nhanh
   - [ ] SMS: eSMS

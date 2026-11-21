@@ -33,6 +33,7 @@ pub(crate) mod restore_drill;
 pub(crate) mod sandbox;
 pub(crate) mod sandbox_copy;
 pub(crate) mod sandbox_isolation;
+pub(crate) mod sepay;
 pub(crate) mod signup;
 pub(crate) mod startup;
 pub(crate) mod support;

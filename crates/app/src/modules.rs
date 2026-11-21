@@ -33,6 +33,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_webhooks::module()),
         // Thuế (bước 36): sổ cái và chứng từ (sau) cần `dyn TaxEngine`, nên đứng trước chúng.
         Box::new(autoxide_tax::module()),
+        // Bộ nối SePay (bước 70 P7, thử nghiệm): góp `dyn BankFeed` cho `ledger`, nên đứng trước nó.
+        Box::new(autoxide_sepay::module()),
         // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
         // toán và module thương mại (sau) ghi sổ qua `dyn Ledger`.
         Box::new(autoxide_ledger::module()),

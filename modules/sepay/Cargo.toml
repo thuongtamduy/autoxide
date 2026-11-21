@@ -1,0 +1,25 @@
+[package]
+name = "autoxide-sepay"
+description = "Autoxide adapter for SePay bank transaction notifications (VietQR bank transfers): signed webhooks and the transaction API, with one SePay account per tenant. Experimental: written from the provider's public documentation; not yet verified against the live service."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+jiff.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true
