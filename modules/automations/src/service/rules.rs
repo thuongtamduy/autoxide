@@ -90,6 +90,7 @@ impl Automations {
         principal
             .require_write_at(&transaction, &AUTOMATIONS_MANAGE, OrgTarget::new(org, None))
             .await?;
+        let (key, limit) = super::credential(principal)?;
         let rule = rule::ActiveModel {
             id: Set(id),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -105,6 +106,8 @@ impl Automations {
             status_reason: Set(None),
             timezone: Set(zone_name(&zone)),
             run_as: Set(principal.user_id()),
+            run_as_api_key: Set(key),
+            run_as_limit: Set(limit),
             created_by: Set(principal.user_id()),
             created_by_kind: Set(principal.actor_kind().as_str().to_owned()),
             updated_by: Set(principal.user_id()),
@@ -208,6 +211,9 @@ impl Automations {
             row.conditions = Set(raw.conditions.to_string());
             row.actions = Set(raw.actions.to_string());
             row.run_as = Set(principal.user_id());
+            let (key, limit) = super::credential(principal)?;
+            row.run_as_api_key = Set(key);
+            row.run_as_limit = Set(limit);
             if agent {
                 status = PENDING_APPROVAL.to_owned();
                 row.status = Set(status.clone());
@@ -301,6 +307,9 @@ impl Automations {
         row.status_reason = Set(None);
         if let Some((body, zone, _)) = body {
             row.run_as = Set(principal.user_id());
+            let (key, limit) = super::credential(principal)?;
+            row.run_as_api_key = Set(key);
+            row.run_as_limit = Set(limit);
             row.timezone = Set(zone_name(&zone));
             row.next_run_at = Set(next_run(body, status, &zone, now));
         } else {

@@ -591,6 +591,10 @@ async fn trang_xem_tai_lieu_chi_co_khi_duoc_bat() {
     let bytes = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let html = String::from_utf8(bytes.to_vec()).unwrap();
     assert!(html.contains("/api/v1/notes"), "docs page does not embed the OpenAPI document");
+    // Script từ CDN ghim phiên bản và có Subresource Integrity.
+    assert!(html.contains("@scalar/api-reference@1."), "{html}");
+    assert!(html.contains("integrity=\"sha384-"), "{html}");
+    assert!(html.contains("crossorigin=\"anonymous\""), "{html}");
 }
 
 // Handler không có doc comment và không khai response thành công.

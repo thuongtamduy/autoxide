@@ -50,6 +50,62 @@ pub(crate) struct Automations {
     pub config: AutomationsConfig,
 }
 
+impl Automations {
+    /// Quyền luật `rule` chạy với: quyền HIỆN TẠI của `run_as`, giới hạn bởi quyền của API key đã
+    /// tạo / sửa / bật luật nếu có (D-20261121-automation-credential) — chỉ permission key có, trong
+    /// hàng rào nút của key, cùng loại bên làm và ID key (audit thấy key). `None`: không còn người
+    /// dùng đó (hay không có module xác thực).
+    pub(crate) async fn rule_principal(
+        &self,
+        tenant: &autoxide_kernel::tenancy::TenantContext,
+        rule: &crate::entity::rule::Model,
+    ) -> Result<Option<autoxide_kernel::access::Principal>, Error> {
+        let Some(authenticator) = &self.authenticator else { return Ok(None) };
+        let Some(owner) = authenticator.principal_of(tenant, rule.run_as).await? else {
+            return Ok(None);
+        };
+        bounded(owner, rule).map(Some)
+    }
+}
+
+/// `owner` giới hạn bởi bản chụp quyền của API key trong `rule` (không có thì giữ nguyên).
+pub(crate) fn bounded(
+    owner: autoxide_kernel::access::Principal,
+    rule: &crate::entity::rule::Model,
+) -> Result<autoxide_kernel::access::Principal, Error> {
+    let Some(raw) = &rule.run_as_limit else { return Ok(owner) };
+    let limit: autoxide_kernel::access::PrincipalSnapshot =
+        serde_json::from_str(raw).map_err(Error::internal)?;
+    let limit = limit.restore();
+    let mut bounded = if limit.has_all_permissions() {
+        owner
+    } else {
+        let names = limit.permissions();
+        owner.only(names.iter().map(String::as_str))
+    };
+    if let Some(fence) = limit.fence() {
+        bounded = bounded.with_fence(fence);
+    }
+    if let Some(key) = rule.run_as_api_key {
+        bounded = bounded.via_api_key(key);
+    }
+    Ok(bounded.with_actor_kind(limit.actor_kind()))
+}
+
+/// Cột `run_as_api_key`, `run_as_limit` cho người đang lưu / bật luật: API key thì chụp quyền của
+/// key, người dùng đăng nhập thì cả hai `None`.
+pub(crate) fn credential(
+    principal: &autoxide_kernel::access::Principal,
+) -> Result<(Option<Uuid>, Option<String>), Error> {
+    match principal.api_key_id() {
+        None => Ok((None, None)),
+        Some(key) => {
+            let limit = serde_json::to_string(&principal.snapshot()).map_err(Error::internal)?;
+            Ok((Some(key), Some(limit)))
+        }
+    }
+}
+
 /// Bây giờ, cắt tới micro giây (hai database lưu cùng một giá trị — dùng làm phiên bản).
 pub(crate) fn now() -> Timestamp {
     Timestamp::now()

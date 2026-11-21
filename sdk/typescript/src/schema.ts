@@ -11866,7 +11866,10 @@ export type Data_RuleResponse = {
      * `paused` (stopped by itself; see `status_reason`).
      */
     status: string;
-    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    /**
+     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
+     * `credential_revoked` (the API key that created or enabled it was revoked).
+     */
     status_reason?: string | null;
     /** IANA time zone of the schedule. */
     timezone: string;
@@ -24538,7 +24541,10 @@ export type Page_RuleResponse = {
      * `paused` (stopped by itself; see `status_reason`).
      */
     status: string;
-    /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+    /**
+     * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
+     * `credential_revoked` (the API key that created or enabled it was revoked).
+     */
     status_reason?: string | null;
     /** IANA time zone of the schedule. */
     timezone: string;
@@ -28588,7 +28594,10 @@ export type RuleResponse = {
    * `paused` (stopped by itself; see `status_reason`).
    */
   status: string;
-  /** Why the rule paused: `rate_limit`, `permission_lost` or `owner_unavailable`. */
+  /**
+   * Why the rule paused: `rate_limit`, `permission_lost`, `owner_unavailable`, or
+   * `credential_revoked` (the API key that created or enabled it was revoked).
+   */
   status_reason?: string | null;
   /** IANA time zone of the schedule. */
   timezone: string;

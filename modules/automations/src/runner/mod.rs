@@ -216,6 +216,25 @@ impl Automations {
     }
 
     /// Tạm dừng luật (trong `connection`, thường là transaction đang mở) và ghi event.
+    /// API key `key` bị thu hồi: tạm dừng mọi luật đang bật mang quyền của nó (lý do
+    /// `credential_revoked`). Nhận lại cùng event thì không còn luật nào đang bật: không làm gì.
+    pub(crate) async fn credential_revoked(
+        &self,
+        tenant: &TenantContext,
+        key: Uuid,
+    ) -> Result<(), Error> {
+        let rules = rule::Entity::find()
+            .filter(rule::Column::RunAsApiKey.eq(key))
+            .filter(rule::Column::Status.eq(ACTIVE))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        for rule in &rules {
+            self.pause(tenant.database().write(), tenant, rule, "credential_revoked").await?;
+        }
+        Ok(())
+    }
+
     pub(crate) async fn pause<C: sea_orm::ConnectionTrait>(
         &self,
         connection: &C,
@@ -340,10 +359,7 @@ impl Automations {
         rule: &Rule,
         actions: &[Action],
     ) -> Result<Result<Principal, Error>, Error> {
-        let principal = match &self.authenticator {
-            Some(authenticator) => authenticator.principal_of(tenant, rule.run_as).await?,
-            None => None,
-        };
+        let principal = self.rule_principal(tenant, rule).await?;
         let Some(principal) = principal else {
             self.pause(tenant.database().write(), tenant, rule, "owner_unavailable").await?;
             return Ok(Err(owner_unavailable()));

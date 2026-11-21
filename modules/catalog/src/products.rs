@@ -245,11 +245,9 @@ pub(crate) async fn free_slug<C: ConnectionTrait>(
     let taken: Vec<String> = translation::Entity::find()
         .filter(translation::Column::Locale.eq(locale))
         .filter(translation::Column::ProductId.ne(product_id))
-        .filter(
-            Condition::any()
-                .add(translation::Column::Slug.eq(base))
-                .add(translation::Column::Slug.starts_with(format!("{base}-"))),
-        )
+        .filter(Condition::any().add(translation::Column::Slug.eq(base)).add(
+            autoxide_kernel::search::starts_with(translation::Column::Slug, &format!("{base}-")),
+        ))
         .scoped(tenant)
         .all(connection)
         .await?

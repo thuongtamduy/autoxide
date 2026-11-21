@@ -289,7 +289,8 @@ async fn list_endpoints(
 
 /// Create a webhook endpoint.
 ///
-/// Requires `webhooks.manage`. From now on, every event it subscribes to is sent to
+/// Requires `webhooks.manage`, and for each subscribed event its `stream_permission` (`*`: all of
+/// them), as for the event stream. From now on, every event it subscribes to is sent to
 /// `url` as a signed `POST` (Standard Webhooks headers `webhook-id`,
 /// `webhook-timestamp`, `webhook-signature`); answer with any 2xx within 10 seconds
 /// (`AUTOXIDE_WEBHOOKS_TIMEOUT_SECONDS`).
@@ -305,7 +306,7 @@ async fn list_endpoints(
     responses(
         (status = 201, description = "Created; store `secret` now.", body = Data<CreatedEndpointResponse>),
         (status = 401, description = "Not signed in.", body = Problem),
-        (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `webhooks.manage`, or the `stream_permission` of a subscribed event (see `GET /api/v1/kernel/modules`); code `permission_denied`.", body = Problem),
         (status = 422, description = "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.", body = Problem),
     )
 )]
@@ -316,6 +317,7 @@ async fn create_endpoint(
     ValidJson(input): ValidJson<CreateEndpointRequest>,
 ) -> Result<(NoStore, Created<CreatedEndpointResponse>), Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
+    service.require_event_permissions(&principal, &input.events)?;
     let input =
         NewEndpoint { url: input.url, description: input.description, events: input.events };
     let created = service.create(&tenant, Actor::from(&principal), input).await?;
@@ -372,7 +374,7 @@ async fn get_endpoint(
     responses(
         (status = 200, description = "The changed endpoint.", body = Data<EndpointResponse>, headers(("ETag" = String, description = "Version of the record: send it back in `If-Match` when changing it."))),
         (status = 401, description = "Not signed in.", body = Problem),
-        (status = 403, description = "Missing permission `webhooks.manage`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `webhooks.manage`, or the `stream_permission` of a subscribed event (see `GET /api/v1/kernel/modules`); code `permission_denied`.", body = Problem),
         (status = 404, description = "No endpoint has this id; code `webhooks.endpoint_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid — e.g. the address is not `https://` or an event name is unknown; `errors` lists every problem.", body = Problem),
         (status = 412, description = "`If-Match` does not match: the record changed since you read it. Get it again and retry; code `precondition_failed`.", body = Problem),
@@ -387,6 +389,9 @@ async fn update_endpoint(
     ValidJson(input): ValidJson<UpdateEndpointRequest>,
 ) -> Result<Tagged<EndpointResponse>, Error> {
     principal.require(&WEBHOOKS_MANAGE)?;
+    if let Some(events) = &input.events {
+        service.require_event_permissions(&principal, events)?;
+    }
     let changes = EndpointChanges {
         url: input.url,
         description: input.description,

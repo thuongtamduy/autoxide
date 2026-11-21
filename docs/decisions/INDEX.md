@@ -147,7 +147,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
-- **[D-20261121-migrate-on-start](D-20261121-migrate-on-start.md)** Tuỳ chọn tự migrate, tạo quản trị viên đầu tiên và chạy task khi `serve` khởi động — 2026-11-21
+- **[D-20261121-migrate-on-start](D-20261121-migrate-on-start.md)** Tuỳ chọn tự migrate, tạo quản trị viên đầu tiên và chạy task khi `serve` khởi động — 2026-11-21 · *thay một phần bởi D-20261121-admin-password-file*
 - **[D-20261121-own-migrations](D-20261121-own-migrations.md)** Kernel tự chạy migration, bỏ `sea-orm-migration` — 2026-11-21
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 - **[D-20261121-raw-statement](D-20261121-raw-statement.md)** Câu SQL viết tay dựng bằng `autoxide_kernel::database::statement` — 2026-11-21
@@ -260,6 +260,9 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-admin-password-file](D-20261121-admin-password-file.md)** Mật khẩu tự sinh của quản trị viên đầu tiên ghi ra file, không vào log — 2026-11-21
+- **[D-20261121-automation-credential](D-20261121-automation-credential.md)** Luật tự động hoá mang quyền của credential đã tạo / bật nó — 2026-11-21
+- **[D-20261121-hardening-batch](D-20261121-hardening-batch.md)** Cứng hoá kernel và hạ tầng: step-up cho tool, quyền event của webhook, mẫu, SVG, ảnh, trang tài liệu — 2026-11-21
 - **[D-20261121-scim-groups](D-20261121-scim-groups.md)** Bước 66: nhóm SCIM → role ở nút qua luật ánh xạ; chỉ membership do SCIM tạo bị SCIM gỡ; đồng bộ từng người sau khi ghi nhóm — 2026-11-21
 - **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21
 

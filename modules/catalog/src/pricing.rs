@@ -655,7 +655,7 @@ impl CatalogService {
                 let prefix = format!("{}#", reference.as_str());
                 let rows = price::Entity::find()
                     .filter(price::Column::PriceListId.eq(id))
-                    .filter(price::Column::Reference.starts_with(prefix))
+                    .filter(autoxide_kernel::search::starts_with(price::Column::Reference, &prefix))
                     .scoped(tenant)
                     .order_by_asc(price::Column::Id)
                     .all(&transaction)

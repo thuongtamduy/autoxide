@@ -150,6 +150,27 @@ impl WebhookService {
         self.translations.describe(english, language)
     }
 
+    /// Người đăng ký phải được tự xem từng event qua luồng event (SSE / WebSocket): event có
+    /// `stream_permission` đòi đúng permission đó; `*` đòi mọi permission như vậy. Không thì
+    /// webhook thành đường vòng đọc event mà luồng event chặn. Lỗi: 403 `permission_denied` nêu
+    /// permission thiếu.
+    pub(crate) fn require_event_permissions(
+        &self,
+        principal: &autoxide_kernel::access::Principal,
+        events: &[String],
+    ) -> Result<(), Error> {
+        let all = events.iter().any(|event| event.trim() == ALL_EVENTS);
+        for info in self.catalog.iter() {
+            if !all && !events.iter().any(|event| event.trim() == info.name()) {
+                continue;
+            }
+            if let Some(permission) = info.stream_permission() {
+                principal.require(&permission)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Mọi loại event có thể đăng ký, theo tên.
     pub(crate) fn event_catalog(&self) -> &EventCatalog {
         &self.catalog

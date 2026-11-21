@@ -32,8 +32,9 @@ services:
       AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL: ${AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD: ${AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTOXIDE_STARTUP_TASKS: address.import,tax.import_pack,promotions.load_legal_data
-      # The interactive API reference at /api/docs (off by default in the image).
-      AUTOXIDE_HTTP_API_DOCS: "true"
+      # The interactive API reference at /api/docs loads its script from a CDN: off unless you set
+      # AUTOXIDE_HTTP_API_DOCS=true in .env.
+      AUTOXIDE_HTTP_API_DOCS: ${AUTOXIDE_HTTP_API_DOCS:-false}
       # Readable logs in a terminal; the image defaults to JSON for log collectors.
       AUTOXIDE_LOG_FORMAT: text
     volumes:
