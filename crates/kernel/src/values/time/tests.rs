@@ -358,7 +358,12 @@ fn rfc3339_theo_gio_dia_phuong_nhu_chrono() {
         let ours = Timestamp::from_unix_micros(micros).unwrap();
         let theirs = DateTime::<Utc>::from_timestamp_micros(micros).unwrap();
         let offset = |hours: i32| chrono::FixedOffset::east_opt(hours * 3600).unwrap();
-        assert_eq!(ours.to_rfc3339_in(&vietnam), theirs.with_timezone(&offset(7)).to_rfc3339());
+        // Độ lệch lấy từ dữ liệu múi giờ (Việt Nam năm 1970 là UTC+8): test so cách VIẾT, không so dữ liệu.
+        let vietnam_hours = vietnam.to_offset(ours.to_jiff()).seconds() / 3600;
+        assert_eq!(
+            ours.to_rfc3339_in(&vietnam),
+            theirs.with_timezone(&offset(vietnam_hours)).to_rfc3339()
+        );
         assert_eq!(ours.to_rfc3339_in(&jiff::tz::TimeZone::UTC), theirs.to_rfc3339());
         let new_york_hours =
             if new_york.to_offset(ours.to_jiff()).seconds() == -4 * 3600 { -4 } else { -5 };
