@@ -175,7 +175,10 @@ smaller copy, in a separate background job after the smaller copies are saved �
 uploading. At the same visual quality an AVIF copy is about a third lighter than the WebP one
 (28–44% on the test images, `docs/BENCHMARKS.md`), but making it takes seconds of CPU per image
 (up to about 8 s for the four default widths of a 4000 × 2250 photo), so turn it on only when the
-server has CPU to spare. Each entry of `variants` then gives `avif_url` (`url` plus
+server has CPU to spare. The AVIF encoder is not in the default build (it pulls in an unmaintained
+build-time library): build the server with `cargo build --release --features avif` first; a
+default build refuses to start with `AUTOXIDE_MEDIA_AVIF=true` and says so. Each entry of
+`variants` then gives `avif_url` (`url` plus
 `&format=avif`) and `avif_size`; put it first:
 
 ```html

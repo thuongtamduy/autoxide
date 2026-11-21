@@ -7,7 +7,10 @@
 
 mod alt;
 mod alts;
+// Bản AVIF chỉ có khi build với feature `avif`; gate chạy riêng các test này với feature đó.
+#[cfg(feature = "avif")]
 mod avif;
+#[cfg(feature = "avif")]
 mod avif_http;
 mod direct;
 mod folders;

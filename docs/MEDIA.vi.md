@@ -168,7 +168,10 @@ phần tư giây cho mỗi ảnh chụp với các cỡ mặc định); request 
 nhỏ, bằng một job nền riêng sau khi ảnh thu nhỏ đã lưu — không bao giờ trong lúc tải lên. Cùng
 chất lượng nhìn, bản AVIF nhẹ hơn bản WebP khoảng một phần ba (28–44% trên bộ ảnh thử,
 `docs/BENCHMARKS.md`), nhưng làm nó tốn vài giây CPU mỗi ảnh (tới khoảng 8 giây cho bốn cỡ mặc
-định của một ảnh chụp 4000 × 2250), nên chỉ bật khi máy chủ dư CPU. Khi đó mỗi mục của `variants`
+định của một ảnh chụp 4000 × 2250), nên chỉ bật khi máy chủ dư CPU. Bộ mã hoá AVIF không có trong bản
+build mặc định (nó kéo một thư viện lúc biên dịch đã ngừng bảo trì): trước hết build máy chủ bằng
+`cargo build --release --features avif`; bản build mặc định từ chối khởi động khi
+`AUTOXIDE_MEDIA_AVIF=true` và nói rõ lý do. Khi đó mỗi mục của `variants`
 có `avif_url` (`url` thêm `&format=avif`) và `avif_size`; đặt nó lên đầu:
 
 ```html

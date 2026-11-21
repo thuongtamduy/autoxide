@@ -41,7 +41,8 @@
 #
 # Theo thứ tự (dừng ở bước đỏ đầu tiên):
 #   1. định dạng            cargo fmt --check
-#   2. lint                 cargo clippy, cảnh báo tính là lỗi
+#   2. lint                 cargo clippy, cảnh báo tính là lỗi; cùng clippy + test AVIF của `media` với
+#                           `--features avif` (feature không bật mặc định, D-20261121-avif-feature)
 #   3. ranh giới workspace  cargo xtask check
 #   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
 #                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
@@ -202,6 +203,12 @@ cargo fmt --all --check
 
 step "lint (cargo clippy)"
 cargo clippy --workspace --all-targets --locked -- -D warnings
+
+# Feature `avif` của `media` không bật mặc định (D-20261121-avif-feature) nên bước trên và bước test không
+# biên dịch phần AVIF: lint và chạy riêng test của `media` với feature đó (SQLite), để nó không mục.
+step "AVIF feature of media (cargo clippy + cargo test --features avif)"
+cargo clippy -p autoxide-media --all-targets --locked --features avif -- -D warnings
+env -u TEST_DATABASE_URL cargo test -p autoxide-media --locked --features avif --lib -- avif
 
 step "workspace boundaries (cargo xtask check)"
 cargo xtask check

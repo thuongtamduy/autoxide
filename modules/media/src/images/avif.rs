@@ -31,8 +31,10 @@ use crate::service::{Item, MediaService, now};
 pub(crate) const MAKE_AVIF: &str = "media.make_avif";
 
 /// Chất lượng AVIF (0–100 của `ravif`): ở 75, cỡ nhỏ hơn WebP 80 cùng điểm DSSIM (đo ở bước 39).
+#[cfg(feature = "avif")]
 const AVIF_QUALITY: f32 = 75.0;
 /// Tốc độ mã hoá (1 chậm, nén tốt — 10 nhanh); 6 là mức đo trong `docs/BENCHMARKS.md`.
+#[cfg(feature = "avif")]
 const AVIF_SPEED: u8 = 6;
 
 /// Job: làm bản AVIF cho phiên bản `version_id` của item `item_id`.
@@ -206,6 +208,7 @@ fn render_avif(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String>
 }
 
 /// Mã hoá AVIF; ảnh có kênh trong suốt giữ kênh đó.
+#[cfg(feature = "avif")]
 fn encode_avif(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, String> {
     let encoder = ravif::Encoder::new()
         .with_quality(AVIF_QUALITY)
@@ -224,4 +227,11 @@ fn encode_avif(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, Strin
         encoder.encode_rgb(ravif::Img::new(&pixels[..], width, height))
     };
     encoded.map(|done| done.avif_file).map_err(|error| format!("avif: {error}"))
+}
+
+/// Bản build không có feature `avif`: cấu hình đã chặn `AUTOXIDE_MEDIA_AVIF=true` lúc khởi động, nên không job
+/// nào tới đây; vẫn trả lỗi rõ thay vì dừng chương trình nếu lỡ tới.
+#[cfg(not(feature = "avif"))]
+fn encode_avif(_image: &DynamicImage, _transparent: bool) -> Result<Vec<u8>, String> {
+    Err("this server was built without the `avif` feature".to_owned())
 }
