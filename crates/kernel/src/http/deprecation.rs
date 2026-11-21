@@ -190,6 +190,39 @@ fn header(text: &str) -> HeaderValue {
     HeaderValue::from_str(text).unwrap_or_else(|_| HeaderValue::from_static(""))
 }
 
+/// Câu gắn vào mô tả của mọi operation và tool MCP thuộc module thử nghiệm.
+pub(crate) const EXPERIMENTAL_NOTE: &str = "**Experimental**: this belongs to an experimental \
+     module; it may change between releases, breaking changes included (see the changelog).";
+
+/// Đánh dấu mọi operation của các module thử nghiệm `modules` (bước 70 P3): extension
+/// `x-stability: experimental` cho máy, một câu trong mô tả cho người. Operation không có
+/// `x-stability` thuộc module chính thức.
+pub(super) fn mark_experimental(openapi: &mut OpenApi, modules: &[&'static str]) {
+    for (path, item) in &mut openapi.paths.paths {
+        let owner = path
+            .strip_prefix(super::API_PREFIX)
+            .and_then(|rest| rest.strip_prefix('/'))
+            .and_then(|rest| rest.split('/').next());
+        if !owner.is_some_and(|owner| modules.contains(&owner)) {
+            continue;
+        }
+        let operations =
+            [&mut item.get, &mut item.post, &mut item.put, &mut item.patch, &mut item.delete];
+        for operation in operations.into_iter().flatten() {
+            operation
+                .extensions
+                .get_or_insert_with(Default::default)
+                .insert("x-stability".to_owned(), serde_json::Value::String("experimental".into()));
+            let description = operation.description.take().unwrap_or_default();
+            operation.description = Some(if description.is_empty() {
+                EXPERIMENTAL_NOTE.to_owned()
+            } else {
+                format!("{description}\n\n{EXPERIMENTAL_NOTE}")
+            });
+        }
+    }
+}
+
 fn operation_mut<'a>(
     openapi: &'a mut OpenApi,
     path: &str,

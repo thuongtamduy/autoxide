@@ -39,6 +39,7 @@ mod registry;
 mod selection;
 
 pub use registry::{ModuleError, Modules};
+pub(crate) use selection::inactive_with_tenant_data;
 pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
 
 /// Những gì một module khai với core.
