@@ -254,9 +254,38 @@ viết cứng cho ngành nào. Giá trị chữ có thể kèm bản dịch: `{"
 "texts": {"en": "Hand wash"}}`. Trang sản phẩm công khai liệt kê chúng dưới từng biến thể
 (`variants[].attributes`) ở ngôn ngữ hỏi.
 
+## Hàng số
+
+Sản phẩm loại `digital` giao bằng link tải thay vì giao hàng (tính năng gói `catalog.digital`).
+
+1. Tải file lên bằng `POST /api/v1/files` (hay tải thẳng, `/api/v1/files/uploads`).
+2. Gắn vào biến thể: `POST /variants/{id}/digital-assets` `{"file_id": …, "download_limit": 5,
+   "grant_days": 30}` (`catalog.products.write`). Nội dung được chép lại, nên xoá file đã tải lên sau
+   đó không ảnh hưởng người mua. Hàng số chưa có file thì không mở bán được
+   (`catalog.digital_asset_missing`).
+3. Khi module `orders` xác nhận một đơn **đã trả tiền** (`orders.order_confirmed` với `payment_status`
+   `paid`), mỗi dòng đơn của biến thể hàng số được một quyền tải cho mỗi file: `download_limit` lượt,
+   hiệu lực `grant_days` ngày. Nhận lại event không phát thêm. Huỷ đơn, hay hoàn tiền không gắn trả
+   hàng, thu hồi quyền ngay.
+4. Người mua có tài khoản xem quyền của mình bằng `GET /downloads` và dùng một lượt bằng
+   `POST /downloads/{id}`. Người quản lý có `catalog.downloads.manage` xem quyền của đơn
+   (`GET /orders/{id}/downloads`), thu hồi (`POST /orders/{id}/downloads/revoke`) hay cấp token mới để
+   gửi cho người mua không có tài khoản (`POST /orders/{id}/downloads/reissue`, lần duy nhất
+   `token_path` hiện ra).
+5. Dùng một lượt (`POST /public/downloads/{token}`, không cần đăng nhập) trả địa chỉ file đã ký, sống
+   `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS`; địa chỉ nhận `Range` để tải tiếp và không trừ thêm lượt.
+   Địa chỉ ký bằng khoá riêng của khách: địa chỉ của khách này không dùng được trên tên miền của khách
+   khác.
+
+Dịch vụ (`service`) không giao hàng, không tồn kho; combo (`bundle`) trừ kho từng thành phần
+(`PUT /variants/{id}/components`); hàng đặt trước dùng `sale_mode` của biến thể.
+
 ## Cấu hình
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
 | `AUTOXIDE_CATALOG_LOCALES` | `en,vi` | Ngôn ngữ được viết nội dung sản phẩm và danh mục |
 | `AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX` | `products` | Đoạn đầu của đường dẫn công khai của sản phẩm |
+| `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS` | `300` | Số giây địa chỉ file đã ký của hàng số còn dùng được |
+| `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT` | `5` | Số lượt tải mỗi file khi file không tự đặt |
+| `AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS` | `30` | Số ngày người mua tải được khi file không tự đặt |

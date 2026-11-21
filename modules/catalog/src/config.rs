@@ -18,10 +18,34 @@ pub(crate) const PRODUCT_PATH_PREFIX: Setting = Setting::new(
 )
 .with_default("products");
 
+pub(crate) const DOWNLOAD_LINK_SECONDS: Setting = Setting::new(
+    "AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS",
+    "Seconds a signed file address of a digital product stays valid after the buyer spends one \
+     download (1 to 86400). Short: the address cannot be passed around for long.",
+)
+.with_default("300");
+
+pub(crate) const DEFAULT_DOWNLOAD_LIMIT: Setting = Setting::new(
+    "AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT",
+    "Downloads a buyer gets for each file of a digital product, when the file does not set its \
+     own (1 to 1000).",
+)
+.with_default("5");
+
+pub(crate) const DEFAULT_GRANT_DAYS: Setting = Setting::new(
+    "AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS",
+    "Days a buyer can download a digital product after paying, when the file does not set its \
+     own (1 to 3650).",
+)
+.with_default("30");
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct CatalogConfig {
     pub locales: Vec<String>,
     pub product_path_prefix: String,
+    pub download_link_seconds: i64,
+    pub default_download_limit: i64,
+    pub default_grant_days: i64,
 }
 
 impl Default for CatalogConfig {
@@ -29,7 +53,18 @@ impl Default for CatalogConfig {
         CatalogConfig {
             locales: vec!["en".to_owned(), "vi".to_owned()],
             product_path_prefix: "products".to_owned(),
+            download_link_seconds: 300,
+            default_download_limit: 5,
+            default_grant_days: 30,
         }
+    }
+}
+
+/// Số nguyên trong `[min, max]`.
+fn bounded(raw: &str, min: i64, max: i64) -> Result<i64, String> {
+    match raw.trim().parse::<i64>() {
+        Ok(value) if (min..=max).contains(&value) => Ok(value),
+        _ => Err(format!("must be a whole number from {min} to {max}")),
     }
 }
 
@@ -59,7 +94,18 @@ impl CatalogConfig {
                 Err("must be lower-case letters, digits and `-`, like `products`".to_owned())
             }
         });
-        Ok(CatalogConfig { locales: locales?, product_path_prefix: product_path_prefix? })
+        let download_link_seconds =
+            reader.get_with(&DOWNLOAD_LINK_SECONDS, |raw| bounded(raw, 1, 86_400));
+        let default_download_limit =
+            reader.get_with(&DEFAULT_DOWNLOAD_LIMIT, |raw| bounded(raw, 1, 1_000));
+        let default_grant_days = reader.get_with(&DEFAULT_GRANT_DAYS, |raw| bounded(raw, 1, 3_650));
+        Ok(CatalogConfig {
+            locales: locales?,
+            product_path_prefix: product_path_prefix?,
+            download_link_seconds: download_link_seconds?,
+            default_download_limit: default_download_limit?,
+            default_grant_days: default_grant_days?,
+        })
     }
 
     /// `locale` đã chuẩn hoá nếu nằm trong ngôn ngữ cấu hình.

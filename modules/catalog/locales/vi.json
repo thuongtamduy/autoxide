@@ -173,7 +173,7 @@
   "field:must be between 1 and 12": "phải từ 1 đến 12",
   "text:Test event.": "Event dùng trong test.",
   "catalog.transfer_not_found": "Không có lần nhập hay xuất `{id}` nào của bạn.",
-  "catalog.storage_unavailable": "Nhập và xuất cần nơi lưu file: hãy cài module `files`.",
+  "catalog.storage_unavailable": "Nhập, xuất và hàng số cần nơi lưu file: hãy cài module `files`.",
   "field:must be at most {max} bytes": "tối đa {max} byte",
   "field:must be a whole number of grams": "phải là số gam nguyên",
   "field:must be physical, digital, service or bundle": "phải là physical, digital, service hay bundle",
@@ -189,5 +189,17 @@
   "field:must not be empty": "không được để trống",
   "catalog.product_media_not_found": "Ảnh `{media_id}` không phải ảnh của sản phẩm này.",
   "field:is not a configured language": "không phải ngôn ngữ đã cấu hình",
-  "field:only text attributes have translations": "chỉ thuộc tính kiểu chữ mới có bản dịch"
+  "field:only text attributes have translations": "chỉ thuộc tính kiểu chữ mới có bản dịch",
+  "catalog.not_digital": "Chỉ gắn được file vào biến thể của sản phẩm loại `digital` (hàng số).",
+  "catalog.digital_asset_missing": "Hàng số phải có ít nhất một file trước khi mở bán: gắn file bằng `POST /api/v1/catalog/variants/{id}/digital-assets`.",
+  "catalog.digital_asset_not_found": "Không có file hàng số `{id}`.",
+  "catalog.digital_asset_in_use": "Người mua vẫn còn tải được file này. Thu hồi quyền tải hoặc chờ hết hạn rồi mới gỡ.",
+  "catalog.download_not_found": "Link tải không còn hiệu lực: đã hết hạn, bị thu hồi hoặc sai. Hãy xin cửa hàng link mới.",
+  "catalog.download_limit_reached": "Đã dùng hết lượt tải của link này. Hãy xin cửa hàng thêm lượt tải.",
+  "catalog.files_unavailable": "Hàng số cần module `files` để nhận file đã tải lên.",
+  "catalog.range_not_satisfiable": "Đoạn byte xin đọc nằm ngoài file ({size} byte).",
+  "field:must be from 1 to 1000": "phải từ 1 đến 1000",
+  "field:must be from 1 to 3650": "phải từ 1 tới 3650",
+  "text:Download rights of a digital product were given for a paid order (`after.grants`; never the download token).": "Quyền tải hàng số được phát cho một đơn đã trả tiền (`after.grants`; không bao giờ kèm token tải).",
+  "text:Download rights of an order were revoked (order cancelled or refunded, or by staff).": "Quyền tải của một đơn bị thu hồi (đơn huỷ hay hoàn tiền, hoặc do người quản lý)."
 }
