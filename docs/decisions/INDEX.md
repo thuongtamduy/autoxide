@@ -101,6 +101,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-ci-sccache-build](D-20261121-ci-sccache-build.md)** sccache cho job build tests của CI, không cho lint — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
+- **[D-20261121-pin-ci-deps](D-20261121-pin-ci-deps.md)** Ghim action, công cụ CI và image nền theo SHA / digest, Dependabot nâng — 2026-11-21
 - **[D-20261121-security-lints](D-20261121-security-lints.md)** Hai luật gate chặn lỗi phân quyền tái phát: `tenant-scope` và `mcp-principal`, kèm danh sách chỗ cũ chờ sửa — 2026-11-21
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
