@@ -409,7 +409,26 @@ impl CustomersService {
         refund_id: Uuid,
         amount: i64,
     ) -> Result<(), Error> {
-        let source = format!("orders:{}:earn", fact.order_id);
+        self.take_back(
+            connection,
+            tenant,
+            &format!("orders:{}:earn", fact.order_id),
+            |lot| mul_div(lot.earned, amount, Ord::max(fact.net_minor, 1)),
+            &format!("orders:refund:{refund_id}"),
+        )
+        .await
+    }
+
+    /// Thu hồi điểm của lô mang `source` (`wanted` tính số điểm muốn thu từ lô) — tối đa phần còn
+    /// chưa dùng; `entry_ref`: tham chiếu của dòng sổ điểm "reverse".
+    pub(crate) async fn take_back<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        source: &str,
+        wanted: impl FnOnce(&points_lot::Model) -> i64,
+        entry_ref: &str,
+    ) -> Result<(), Error> {
         let Some(lot) = rows::lock_one(
             connection,
             points_lot::Entity::find()
@@ -420,7 +439,7 @@ impl CustomersService {
         else {
             return Ok(());
         };
-        let wanted = mul_div(lot.earned, amount, Ord::max(fact.net_minor, 1));
+        let wanted = wanted(&lot);
         let free = Ord::max(lot.remaining - lot.held, 0);
         let take = Ord::min(wanted, free);
         if take <= 0 {
@@ -458,7 +477,7 @@ impl CustomersService {
                 -take,
                 -value,
                 &lot.currency,
-                &format!("orders:refund:{refund_id}"),
+                entry_ref,
                 None,
                 Actor::system(),
             )

@@ -389,6 +389,10 @@ impl CustomersService {
     ) -> Result<gift_card::Model, Error> {
         let row = self.lookup_gift_card(tenant, user, code).await?;
         let profile = self.me(tenant, user).await?;
+        // Thẻ đã là của người khác: như mã sai (không lộ số dư cho người biết mã).
+        if row.owner_profile_id.is_some_and(|owner| owner != profile.id) {
+            return Err(card_not_found());
+        }
         gift_card::Entity::update_many()
             .col_expr(gift_card::Column::OwnerProfileId, Expr::value(profile.id))
             .filter(gift_card::Column::Id.eq(row.id))

@@ -239,7 +239,10 @@ impl PromotionsService {
         }
         if let Some(q) = filter.q.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
             let ids: Vec<Uuid> = translation::Entity::find()
-                .filter(translation::Column::Title.contains(q))
+                .filter(
+                    translation::Column::Title
+                        .like(sea_orm::sea_query::LikeExpr::new(contains_pattern(q)).escape('\\')),
+                )
                 .scoped(tenant)
                 .all(read)
                 .await?
@@ -550,4 +553,19 @@ async fn record_change<C: ConnectionTrait>(
             }),
         )
         .await
+}
+
+/// Mẫu `LIKE … ESCAPE '\'` "chứa `text`": `%`, `_`, `\` người dùng gõ là chữ thường, không phải ký tự
+/// đại diện.
+fn contains_pattern(text: &str) -> String {
+    let mut pattern = String::with_capacity(text.len() + 2);
+    pattern.push('%');
+    for character in text.chars() {
+        if matches!(character, '\\' | '%' | '_') {
+            pattern.push('\\');
+        }
+        pattern.push(character);
+    }
+    pattern.push('%');
+    pattern
 }

@@ -281,3 +281,27 @@ async fn unaccepted_order_is_cancelled_after_acceptance_hours() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn cod_khong_ung_lan_giao_nao_gui_lai_khong_cong_hai_lan() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let id = cod_order(&shop).await;
+        // Hãng thu thiếu (100.000 / 230.000) cho vận đơn không ứng với lần giao nào, rồi event tới
+        // lại (mỗi lần một event mới): chỉ cộng một lần.
+        for _ in 0..2 {
+            emit_from(
+                &shop,
+                &shop.shipping_outbox,
+                &CodCollected(keyed_shipment_event(id, "unknown-key", "delivered", Some(100_000))),
+            )
+            .await;
+        }
+        drain(&shop).await;
+        let (_, found) = Call::as_user(&shop, "boss").send("GET", &format!("/{id}"), None).await;
+        assert_eq!(super::minor(&found["data"]["totals"]["paid"]), 100_000);
+        assert_eq!(found["data"]["payment_status"], "partially_paid");
+    })
+    .await
+    .unwrap();
+}

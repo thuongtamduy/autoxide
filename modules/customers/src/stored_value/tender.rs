@@ -12,7 +12,9 @@ use uuid::Uuid;
 
 use crate::service::{CustomersService, now};
 
-use super::{CREDIT, GIFT_CARD, STORE_CREDIT, card_inactive, insufficient, need_account};
+use super::{
+    CREDIT, GIFT_CARD, STORE_CREDIT, card_inactive, card_not_found, insufficient, need_account,
+};
 
 /// `Tender` loại `gift_card`: `input = {"code": "…"}`.
 pub(crate) struct GiftCardTender(pub Arc<CustomersService>);
@@ -37,6 +39,12 @@ impl Tender for GiftCardTender {
         let who = buyer.ok_or_else(need_account)?;
         let code = input["code"].as_str().unwrap_or_default();
         let card = self.0.lookup_gift_card(tenant, who, code).await?;
+        // Thẻ đã gắn chủ: chỉ chủ dùng được; người khác biết mã cũng nhận cùng lỗi như mã sai.
+        if let Some(owner) = card.owner_profile_id
+            && self.0.me(tenant, who).await?.id != owner
+        {
+            return Err(card_not_found());
+        }
         let expired = card.expires_at.is_some_and(|at| at <= now());
         if card.status != "active" || expired {
             return Err(card_inactive());

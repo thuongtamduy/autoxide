@@ -471,3 +471,28 @@ async fn xem_truoc_vietqr_khong_tao_thanh_toan() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn hai_lan_chuyen_cung_ma_khop_dong_thoi_khong_mat_khoan_thua() {
+    TestDatabase::run(async |test| {
+        let (app, _feed, account) = setup(test).await;
+        let created = pay(&app, 150_000, "P-1").await;
+        let id = created["id"].as_str().unwrap().to_owned();
+        let code = created["transfer_code"].as_str().unwrap().to_owned();
+        // Hai lần chuyển cho cùng mã tới cùng lúc, hai worker khớp song song.
+        let first = FakeBankFeed::credit("T-1", ACCOUNT, vnd(150_000), &code);
+        let second = FakeBankFeed::credit("T-2", ACCOUNT, vnd(150_000), &code);
+        let (answer, stored) = push(&app, &[first, second]).await;
+        assert_eq!(answer, StatusCode::OK, "{stored}");
+        tokio::join!(drain(&app), drain(&app));
+        drain(&app).await;
+        // Một lần ghi đã thu; lần kia vào hàng chờ (không mất, không cộng hai lần).
+        assert_eq!(status(&app, &id).await, "succeeded");
+        assert_eq!(bank_balance(&app, &account).await, 150_000);
+        let open = exceptions(&app).await;
+        let kinds: Vec<&str> = open.iter().map(|item| item["kind"].as_str().unwrap()).collect();
+        assert_eq!(kinds, ["duplicate_payment"], "{open:?}");
+    })
+    .await
+    .unwrap();
+}

@@ -18,6 +18,7 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::payment::{BankAccountRef, BankDirection, BankFeed, BankTransaction};
 use autoxide_kernel::reference::{self, Reference, Submitted};
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
@@ -697,29 +698,32 @@ impl LedgerService {
                     .await?;
                     ("exception", None)
                 }
-                Some(paid) if paid.status == "succeeded" => {
-                    // Tiền lần hai cho thanh toán đã xong: người quyết hoàn hay giữ.
-                    self.open_exception(
-                        tenant,
-                        "duplicate_payment",
-                        &format!("ledger.payment:{}", paid.id),
-                        json!({"payment_id": paid.id, "bank_transaction_id": id, "amount": amount,
-                               "received_minor": amount.minor()}),
-                        &format!("duplicate_payment:bank:{id}"),
-                    )
-                    .await?;
-                    ("exception", Some(paid.id))
-                }
-                Some(paid) => {
-                    let was = paid.status.clone();
-                    self.capture(tenant, paid.id, amount, "bank_feed").await?;
-                    let after = Self::find_payment(database.write(), tenant, paid.id).await?;
-                    let clean = was == "pending"
-                        && after.is_some_and(|row| {
-                            row.status == "succeeded" && row.amount_minor == amount.minor()
-                        });
-                    (if clean { "matched" } else { "exception" }, Some(paid.id))
-                }
+                Some(paid) => match self.claim_payment(tenant, id, paid.id).await? {
+                    // Thanh toán đã xong, hay một biến động khác đã nhận nó trước (hai lần chuyển
+                    // tiền cho một mã, kể cả khi tới cùng lúc): tiền lần này vào hàng chờ để người
+                    // quyết hoàn hay giữ — không mất, không cộng hai lần.
+                    Claim::Taken => {
+                        self.open_exception(
+                            tenant,
+                            "duplicate_payment",
+                            &format!("ledger.payment:{}", paid.id),
+                            json!({"payment_id": paid.id, "bank_transaction_id": id,
+                                   "amount": amount, "received_minor": amount.minor()}),
+                            &format!("duplicate_payment:bank:{id}"),
+                        )
+                        .await?;
+                        ("exception", Some(paid.id))
+                    }
+                    Claim::Ours { was } => {
+                        self.capture(tenant, paid.id, amount, "bank_feed").await?;
+                        let after = Self::find_payment(database.write(), tenant, paid.id).await?;
+                        let clean = was != "expired"
+                            && after.is_some_and(|row| {
+                                row.status == "succeeded" && row.amount_minor == amount.minor()
+                            });
+                        (if clean { "matched" } else { "exception" }, Some(paid.id))
+                    }
+                },
             }
         };
         bank_transaction::Entity::update_many()
@@ -729,6 +733,71 @@ impl LedgerService {
             .exec(database.write())
             .await?;
         Ok(())
+    }
+}
+
+/// Kết quả nhận một thanh toán cho một biến động số dư.
+enum Claim {
+    /// Biến động này giữ thanh toán (vừa nhận, hay đã nhận ở lần chạy trước); `was`: trạng thái của
+    /// thanh toán lúc nhận.
+    Ours { was: String },
+    /// Thanh toán đã xong, hay một biến động khác đã nhận nó.
+    Taken,
+}
+
+impl LedgerService {
+    /// Biến động `txn` nhận thanh toán `payment_id` (ghi `payment_id` lên biến động) nếu chưa biến
+    /// động nào khác nhận và thanh toán chưa xong. Khoá dòng thanh toán trong transaction ghi: hai
+    /// biến động cùng mã chạy song song thì chỉ một bên nhận được (Postgres `FOR UPDATE`; SQLite một
+    /// bên ghi mỗi lúc). Chạy lại cho cùng biến động → vẫn là của nó.
+    async fn claim_payment(
+        &self,
+        tenant: &TenantContext,
+        txn: Uuid,
+        payment_id: Uuid,
+    ) -> Result<Claim, Error> {
+        let database = tenant.database();
+        database
+            .write_with_retry(move || async move {
+                let transaction = database.begin_write().await?;
+                let Some(paid) = rows::lock_one(
+                    &transaction,
+                    payment::Entity::find_by_id(payment_id).scoped(tenant),
+                )
+                .await?
+                else {
+                    return Ok(Claim::Taken);
+                };
+                let mine = bank_transaction::Entity::find_by_id(txn)
+                    .scoped(tenant)
+                    .one(&transaction)
+                    .await?
+                    .is_some_and(|row| row.payment_id == Some(payment_id));
+                if mine {
+                    return Ok(Claim::Ours { was: paid.status });
+                }
+                let other = bank_transaction::Entity::find()
+                    .select_only()
+                    .column(bank_transaction::Column::Id)
+                    .filter(bank_transaction::Column::PaymentId.eq(payment_id))
+                    .filter(bank_transaction::Column::Id.ne(txn))
+                    .scoped(tenant)
+                    .into_tuple::<Uuid>()
+                    .one(&transaction)
+                    .await?;
+                if paid.status == "succeeded" || other.is_some() {
+                    return Ok(Claim::Taken);
+                }
+                bank_transaction::Entity::update_many()
+                    .col_expr(bank_transaction::Column::PaymentId, Some(payment_id).into())
+                    .filter(bank_transaction::Column::Id.eq(txn))
+                    .scoped(tenant)
+                    .exec(&transaction)
+                    .await?;
+                transaction.commit().await?;
+                Ok(Claim::Ours { was: paid.status })
+            })
+            .await
     }
 }
 
