@@ -31,8 +31,10 @@ use crate::service::{Item, MediaService, now};
 pub(crate) const MAKE_AVIF: &str = "media.make_avif";
 
 /// Chất lượng AVIF (0–100 của `ravif`): ở 75, cỡ nhỏ hơn WebP 80 cùng điểm DSSIM (đo ở bước 39).
+#[cfg(feature = "avif")]
 const AVIF_QUALITY: f32 = 75.0;
 /// Tốc độ mã hoá (1 chậm, nén tốt — 10 nhanh); 6 là mức đo trong `docs/BENCHMARKS.md`.
+#[cfg(feature = "avif")]
 const AVIF_SPEED: u8 = 6;
 
 /// Job: làm bản AVIF cho phiên bản `version_id` của item `item_id`.
