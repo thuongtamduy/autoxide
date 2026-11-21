@@ -22,7 +22,8 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, EntityTrait, ExprTrait, QueryFilter, QueryOrder, QuerySelect,
+    Set,
 };
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -398,6 +399,40 @@ impl PromotionsService {
             .iter()
             .map(present)
             .collect())
+    }
+
+    /// Ví voucher của tài khoản `user_id` cho nhân viên (tool MCP): chỉ voucher của chương trình
+    /// thuộc nút trong phạm vi `promotions.read` của `principal` — như REST, không thấy dữ liệu
+    /// của nhánh khác.
+    pub(crate) async fn vouchers_of_in_scope(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        user_id: Uuid,
+        status: Option<VoucherStatus>,
+    ) -> Result<Vec<Voucher>, Error> {
+        principal.require(&crate::permissions::READ)?;
+        let vouchers = self.vouchers_of(tenant, user_id, status).await?;
+        let mut ids: Vec<Uuid> = vouchers.iter().map(|voucher| voucher.promotion_id).collect();
+        ids.sort();
+        ids.dedup();
+        if ids.is_empty() {
+            return Ok(vouchers);
+        }
+        let visible: Vec<Uuid> = promotion::Entity::find()
+            .select_only()
+            .column(promotion::Column::Id)
+            .filter(promotion::Column::Id.is_in(ids))
+            .filter(principal.scope_condition(
+                &crate::permissions::READ,
+                promotion::Column::OrgId,
+                None,
+            )?)
+            .scoped(tenant)
+            .into_tuple()
+            .all(tenant.database().read())
+            .await?;
+        Ok(vouchers.into_iter().filter(|voucher| visible.contains(&voucher.promotion_id)).collect())
     }
 
     /// Một trang ví voucher (hết hạn gần nhất trước).

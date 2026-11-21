@@ -21,6 +21,7 @@ impl UserService {
     /// Như [`check_credentials`](Self::check_credentials), kèm hash mật khẩu đang lưu lúc
     /// kiểm (hash mới nếu vừa hash lại). Bên cấp phiên / API key đưa hash này vào
     /// [`SessionService::lock_grant`]: mật khẩu đổi giữa lúc kiểm và lúc cấp thì không cấp.
+    #[cfg(test)]
     pub(crate) async fn verify_credentials(
         &self,
         tenant: &TenantContext,
@@ -181,9 +182,11 @@ impl UserService {
         SessionService::drop_mfa_challenges(&transaction, tenant, id).await?;
         crate::passkey::drop_ceremonies_in(&transaction, tenant, id).await?;
         let subject = id.to_string();
-        OneTimeTokens::new("auth")
-            .revoke(&transaction, tenant, "email_verification", &subject)
-            .await?;
+        // Link đăng nhập và token xác nhận lại đang chờ: phát trước khi đổi mật khẩu, không còn
+        // hiệu lực sau đó.
+        for purpose in ["email_verification", "login_link", "reauth"] {
+            OneTimeTokens::new("auth").revoke(&transaction, tenant, purpose, &subject).await?;
+        }
         if mode == PasswordWrite::Recovery {
             crate::passkey::remove_all_in(&transaction, tenant, &self.outbox, actor, id, false)
                 .await?;
@@ -191,11 +194,44 @@ impl UserService {
             OneTimeTokens::new("auth")
                 .revoke(&transaction, tenant, "password_reset", &subject)
                 .await?;
+            // Liên kết đăng nhập bằng nhà cung cấp ngoài cũng là một cửa: gỡ hết, chủ tài khoản
+            // liên kết lại sau khi đã lấy lại tài khoản.
+            self.forget_identities(&transaction, tenant, actor, id).await?;
         }
         let event = events::PasswordChanged::default();
         self.outbox.record(&transaction, tenant, actor, events::user_subject(id), &event).await?;
         transaction.commit().await?;
         tracing::info!(user_id = %id, "password changed");
+        Ok(())
+    }
+}
+
+impl UserService {
+    /// Gỡ mọi liên kết OIDC của tài khoản `id` trong `transaction`, mỗi liên kết một event
+    /// `auth.identity_unlinked`.
+    async fn forget_identities(
+        &self,
+        transaction: &sea_orm::DatabaseTransaction,
+        tenant: &TenantContext,
+        actor: Actor,
+        id: Uuid,
+    ) -> Result<(), Error> {
+        let linked = crate::oidc::identity::for_user_in(transaction, tenant, id).await?;
+        if linked.is_empty() {
+            return Ok(());
+        }
+        crate::oidc::identity::delete_for_user(transaction, tenant, id).await?;
+        for identity in linked {
+            let event = events::IdentityUnlinked {
+                before: Some(serde_json::json!({
+                    "identity_id": identity.id,
+                    "provider_id": identity.provider_id,
+                })),
+                after: None,
+            };
+            let subject = events::user_subject(id);
+            self.outbox.record(transaction, tenant, actor, subject, &event).await?;
+        }
         Ok(())
     }
 }

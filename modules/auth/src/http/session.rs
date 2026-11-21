@@ -252,12 +252,13 @@ impl MeResponse {
         (status = 401, description = "Wrong email or password; code `auth.invalid_credentials`.", body = Problem),
         (status = 403, description = "The account is disabled; code `auth.user_disabled`.", body = Problem),
         (status = 422, description = "The body is missing a field or a value is invalid.", body = Problem),
-        (status = 429, description = "Too many failed sign-ins for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
+        (status = 429, description = "Too many failed sign-ins for this email from this address, or for this email overall; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header.", body = Problem),
     )
 )]
 async fn login(
     State(state): State<Arc<HttpState>>,
     tenant: TenantContext,
+    client: autoxide_kernel::http::ClientInfo,
     headers: HeaderMap,
     ValidJson(input): ValidJson<LoginRequest>,
 ) -> Result<Response, Error> {
@@ -266,7 +267,7 @@ async fn login(
     Ok(
         match state
             .sessions
-            .login_in(&tenant, input.realm, &input.email, &input.password, user_agent)
+            .login_in(&tenant, input.realm, &input.email, &input.password, client.ip, user_agent)
             .await?
         {
             LoginOutcome::Tokens(tokens) => {
@@ -292,7 +293,7 @@ const METHODS: [&str; 2] = ["totp", "recovery_code"];
 ///
 /// Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`
 /// seconds. Each `mfa_token` allows five wrong codes; wrong codes also count
-/// towards the sign-in lock of the email. Needs no tenant header: the `mfa_token`
+/// towards the sign-in lock of the account. Needs no tenant header: the `mfa_token`
 /// names its tenant.
 #[utoipa::path(
     post,
@@ -468,7 +469,7 @@ async fn update_me(
 /// Needs the current password and a session signed in with a password (an API key
 /// cannot do this). Every session of the account ends, including this one; the
 /// response carries the tokens of a new session, so this client stays signed in.
-/// Wrong current passwords count towards the sign-in lock of the email.
+/// Wrong current passwords count towards the sign-in lock of the account.
 #[utoipa::path(
     post,
     path = "/me/password",

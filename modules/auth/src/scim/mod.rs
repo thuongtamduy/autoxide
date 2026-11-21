@@ -71,6 +71,9 @@ pub(crate) struct ScimService {
 /// Bên gọi endpoint SCIM đã xác thực: khách của token.
 pub(crate) struct ScimCaller {
     pub tenant: TenantContext,
+    /// Người tạo token: SCIM chỉ nhận về, khoá hay đổi email tài khoản mà người này bao trùm quyền
+    /// (như D-079 với quản trị viên).
+    pub created_by: Uuid,
 }
 
 impl ScimCaller {

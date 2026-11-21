@@ -169,30 +169,32 @@ impl SessionService {
         password: &str,
         user_agent: Option<&str>,
     ) -> Result<LoginOutcome, Error> {
-        self.login_in(tenant, Realm::Staff, email, password, user_agent).await
+        self.login_in(tenant, Realm::Staff, email, password, None, user_agent).await
     }
 
     /// Như [`login`](Self::login), cho tài khoản `realm` (D-309). Bộ đếm lần sai của người mua
     /// tách khỏi của nhân sự cùng email.
+    /// `ip`: địa chỉ client — lần sai đếm theo cặp email + địa chỉ (D-20261121-login-throttle-pair).
     pub(crate) async fn login_in(
         &self,
         tenant: &TenantContext,
         realm: Realm,
         email: &str,
         password: &str,
+        ip: Option<std::net::IpAddr>,
         user_agent: Option<&str>,
     ) -> Result<LoginOutcome, Error> {
         let throttled = throttle_key(realm, email);
         let email_for_check = email;
         let email = throttled.as_str();
         // Lượt thử được đếm TRƯỚC khi kiểm mật khẩu; đúng thì xoá bộ đếm bên dưới.
-        self.throttle.reserve(tenant, email).await?;
+        self.throttle.reserve_login(tenant, email, ip).await?;
         let (user, hash) =
             self.users.verify_credentials_in(tenant, realm, email_for_check, password).await?;
         if self.mfa.status(tenant, user.id).await?.totp_enabled {
             // Mật khẩu đúng: trả lại lượt vừa xin, nhưng chưa xoá các lần sai trước — đúng
             // mật khẩu mới là nửa đường.
-            self.throttle.refund(tenant, email).await?;
+            self.throttle.refund_login(tenant, email, ip).await?;
             let write = tenant.database().write();
             let raw = challenge::open(write, tenant, user.id, now()).await?;
             return Ok(LoginOutcome::MfaRequired {
@@ -200,7 +202,7 @@ impl SessionService {
                 expires_in: challenge::CHALLENGE_TTL_SECONDS.unsigned_abs(),
             });
         }
-        self.throttle.clear(tenant, email).await?;
+        self.throttle.clear_login(tenant, email, ip).await?;
         let proof = Proof::Password(hash);
         let tokens = self.start_session(tenant, user.id, "password", user_agent, proof).await?;
         Ok(LoginOutcome::Tokens(tokens))
@@ -228,7 +230,7 @@ impl SessionService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let (user, _) = self.check_password(tenant, user_id, current).await?;
+        self.check_password(tenant, user_id, current).await?;
         self.users
             .write_password(
                 tenant,
@@ -239,7 +241,6 @@ impl SessionService {
                 crate::user::PasswordWrite::Change,
             )
             .await?;
-        self.throttle.clear(tenant, &user.email).await?;
         self.start_session(tenant, user_id, "password_change", user_agent, Proof::Active).await
     }
 
@@ -333,10 +334,13 @@ impl SessionService {
             .get(tenant, user_id)
             .await?
             .ok_or_else(|| crate::user::user_not_found(user_id))?;
-        self.throttle.reserve(tenant, &user.email).await?;
-        match self.users.verify_credentials(tenant, &user.email, current).await {
+        // Đếm theo tài khoản (không theo email: người mua chỉ có số điện thoại có email rỗng), và
+        // kiểm mật khẩu trong đúng loại tài khoản của người dùng.
+        let key = account_key(user.id);
+        self.throttle.reserve(tenant, &key).await?;
+        match self.users.verify_credentials_in(tenant, user.realm, &user.email, current).await {
             Ok(verified) => {
-                self.throttle.clear(tenant, &verified.0.email).await?;
+                self.throttle.clear(tenant, &key).await?;
                 Ok(verified)
             }
             Err(error) if error.code() == INVALID_CREDENTIALS => Err(Error::bad_request(
@@ -402,7 +406,8 @@ impl SessionService {
             challenge::claim_attempt(write, tenant, mfa_token, now()).await?;
         let user =
             self.users.get(tenant, user_id).await?.ok_or_else(challenge::invalid_mfa_token)?;
-        self.throttle.reserve(tenant, &user.email).await?;
+        let key = account_key(user.id);
+        self.throttle.reserve(tenant, &key).await?;
         if !self.mfa.verify_second_factor(tenant, user.id, code).await? {
             return Err(Error::unauthenticated(
                 "auth.invalid_mfa_code",
@@ -414,7 +419,7 @@ impl SessionService {
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }
-        self.throttle.clear(tenant, &user.email).await?;
+        self.throttle.clear(tenant, &key).await?;
         let proof = Proof::Challenge(challenge_id);
         self.start_session(tenant, user.id, "password_and_mfa", user_agent, proof).await
     }
@@ -693,6 +698,13 @@ fn now() -> Timestamp {
 
 /// Khoá của login throttling: email của nhân sự giữ nguyên (bộ đếm cũ còn hiệu lực), của người
 /// mua có tiền tố — sai mật khẩu ở cửa hàng không khoá đăng nhập của nhân sự cùng email.
+/// Khoá đếm lần sai của một tài khoản đã biết (mật khẩu hiện tại, mã MFA): theo ID, không theo
+/// email — không ghi email thô làm khoá, và người mua chỉ có số điện thoại (email rỗng) không dùng
+/// chung một bộ đếm.
+fn account_key(user_id: Uuid) -> String {
+    format!("account:{user_id}")
+}
+
 fn throttle_key(realm: Realm, email: &str) -> String {
     match realm {
         Realm::Staff => email.to_owned(),

@@ -11,7 +11,7 @@ use jiff::SignedDuration;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
-use autoxide_kernel::access::{OrgTarget, Principal};
+use autoxide_kernel::access::{Decision, OrgTarget, Principal, Realm};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::i18n::{Language, Translations};
@@ -152,6 +152,8 @@ pub(crate) struct Accepted {
 
 pub(crate) struct Invitations {
     pub users: Arc<UserService>,
+    /// Quyền hiện tại của người mời, kiểm lại lúc chấp nhận.
+    pub roles: Arc<crate::role::RoleService>,
     pub sessions: Arc<SessionService>,
     pub jobs: JobQueue,
     pub mailer: Arc<dyn Mailer>,
@@ -484,6 +486,7 @@ impl Invitations {
                 Some(NewUser { email: invitation.email.clone(), name, password })
             }
         };
+        self.inviter_still_covers(&tenant, &invitation).await?;
         // Chỉ một request thắng (16 request cùng token: một thành công).
         let consumed = tokens().consume(tenant.database().write(), &tenant, PURPOSE, raw).await?;
         if consumed.is_none() {
@@ -520,6 +523,38 @@ impl Invitations {
             }
         }
         accepted
+    }
+
+    /// Người mời VẪN được cấp các role của lời mời ở nút của nó (kiểm lại lúc chấp nhận, như lúc
+    /// mời): từ lúc mời tới lúc nhận, người mời có thể đã mất quyền, bị khoá, hay role đã được sửa
+    /// rộng hơn. Lời mời do lệnh CLI của người vận hành tạo (`invited_by` rỗng) không kiểm.
+    async fn inviter_still_covers(
+        &self,
+        tenant: &TenantContext,
+        invitation: &Invitation,
+    ) -> Result<(), Error> {
+        let Some(inviter) = invitation.invited_by else { return Ok(()) };
+        let refused = || invalid().with_reason("inviter_not_allowed");
+        let Some((user, actor)) = self.roles.user_principal(tenant, inviter).await? else {
+            return Err(refused());
+        };
+        if user.disabled_at.is_some() || user.realm != Realm::Staff {
+            return Err(refused());
+        }
+        let read = tenant.database().read();
+        let target = OrgTarget::new(OrgId::from_uuid(invitation.org_id), None);
+        if actor.check(read, &INVITATIONS_MANAGE, target).await? != Decision::Allow {
+            return Err(refused());
+        }
+        let roles: BTreeSet<Uuid> = invitation.roles().into_iter().collect();
+        let problems =
+            crate::role::grant_problems(read, tenant, &actor, "", invitation.org_id, &roles)
+                .await?;
+        if !problems.is_empty() {
+            tracing::info!(invitation_id = %invitation.id, "invitation refused: inviter lost rights");
+            return Err(refused());
+        }
+        Ok(())
     }
 
     /// Gán role của lời mời `invitation` cho `user_id` trong một transaction (đã tiêu token).
@@ -674,6 +709,7 @@ mod tests {
         Invitations {
             links: Default::default(),
             users: services.users.clone(),
+            roles: services.roles.clone(),
             sessions: services.sessions.clone(),
             jobs: autoxide_kernel::job::JobQueue::new("auth"),
             mailer: services.mails.clone(),
@@ -700,8 +736,17 @@ mod tests {
         services.roles.create(&services.tenant, Actor::system(), input).await.unwrap().id
     }
 
-    fn admin(services: &Services) -> Principal {
-        Principal::with_all_permissions(uuid::Uuid::now_v7()).in_tenant(services.tenant.id())
+    /// Quản trị viên thật (lúc nhận lời mời, quyền của người mời được đọc lại từ database).
+    async fn admin(services: &Services) -> Principal {
+        let input = NewUser {
+            email: format!("boss-{}@example.com", uuid::Uuid::now_v7()),
+            name: "Boss".to_owned(),
+            password: None,
+        };
+        let tenant = &services.tenant;
+        let boss = services.users.create(tenant, Actor::system(), input).await.unwrap();
+        crate::role::grant_admin(services.database.write(), tenant, boss.id).await.unwrap();
+        services.roles.principal(tenant, boss.id).await.unwrap()
     }
 
     fn invite(email: &str, role: uuid::Uuid) -> NewInvitation {
@@ -729,7 +774,7 @@ mod tests {
             let services = services(test).await;
             let role = role(&services, &["auth.users.read"]).await;
             let invitations = Arc::new(invitations(&services));
-            let boss = admin(&services);
+            let boss = admin(&services).await;
             invitations
                 .create(
                     &services.tenant,
@@ -773,7 +818,7 @@ mod tests {
             let tenant = &services.tenant;
             let role = role(&services, &["auth.users.read"]).await;
             let invitations = invitations(&services);
-            let boss = admin(&services);
+            let boss = admin(&services).await;
             for (index, _) in (0..3).enumerate() {
                 let email = format!("race{index}@example.com");
                 let row = invitations
@@ -808,7 +853,7 @@ mod tests {
             let tenant = &services.tenant;
             let role = role(&services, &[]).await;
             let invitations = invitations(&services);
-            let boss = admin(&services);
+            let boss = admin(&services).await;
             let row = invitations
                 .create(tenant, Some(&boss), invite("a@example.com", role), Language::En)
                 .await
@@ -877,7 +922,7 @@ mod tests {
                 password: None,
             };
             let dan = services.users.create(tenant, Actor::system(), input).await.unwrap();
-            let boss = admin(&services);
+            let boss = admin(&services).await;
             let existing = invite("dan@example.com", powerful);
             invitations.create(tenant, Some(&boss), existing, Language::En).await.unwrap();
             let token = deliver(&services, &invitations).await;
@@ -895,6 +940,138 @@ mod tests {
             assert!(accepted.tokens.is_none(), "tài khoản có sẵn: không mở phiên mới");
             assert!(
                 services.roles.principal(tenant, dan.id).await.unwrap().allows("auth.users.manage")
+            );
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Người mời chỉ có quyền ở một nhánh không mời được ai (kể cả email của chính mình) với role
+    /// phủ cả khách; role cùng phạm vi nhánh thì mời và nhận bình thường.
+    #[tokio::test]
+    async fn nguoi_moi_o_nhanh_khong_cap_duoc_role_ca_khach() {
+        use autoxide_kernel::access::Scope;
+        use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree};
+        TestDatabase::run(async |test| {
+            let services = services(test).await;
+            let tenant = &services.tenant;
+            let write = services.database.begin_write().await.unwrap();
+            let root = OrgTree::insert_root(&write, DEFAULT_TENANT).await.unwrap();
+            let branch = OrgId::from_uuid(uuid::Uuid::now_v7());
+            OrgTree::insert(&write, DEFAULT_TENANT, branch, root, 8).await.unwrap();
+            write.commit().await.unwrap();
+            let scoped = |name: &str, grants: &[(&str, Scope)]| RoleInput {
+                denies: Vec::new(),
+                requires_mfa: false,
+                name: name.to_owned(),
+                description: String::new(),
+                permissions: Vec::new(),
+                grants: grants.iter().map(|(p, s)| ((*p).to_owned(), *s)).collect(),
+            };
+            let lead_role = scoped(
+                "branch-lead",
+                &[("auth.invitations.manage", Scope::Subtree), ("notes.read", Scope::Subtree)],
+            );
+            let lead_role =
+                services.roles.create(tenant, Actor::system(), lead_role).await.unwrap();
+            let everywhere = role(&services, &["notes.read"]).await;
+            let in_branch = scoped("branch-reader", &[("notes.read", Scope::Subtree)]);
+            let in_branch =
+                services.roles.create(tenant, Actor::system(), in_branch).await.unwrap();
+            let input = NewUser {
+                email: "lead@example.com".to_owned(),
+                name: "Lead".to_owned(),
+                password: None,
+            };
+            let lead = services.users.create(tenant, Actor::system(), input).await.unwrap();
+            let boss = admin(&services).await;
+            services
+                .roles
+                .set_memberships(
+                    tenant,
+                    &boss,
+                    lead.id,
+                    vec![(branch.as_uuid(), vec![lead_role.id])],
+                )
+                .await
+                .unwrap();
+            let actor = services.roles.principal(tenant, lead.id).await.unwrap();
+            let invitations = invitations(&services);
+            let at_branch = |email: &str, role: uuid::Uuid| NewInvitation {
+                org_id: Some(branch.as_uuid()),
+                ..invite(email, role)
+            };
+            for email in ["lead@example.com", "other@example.com"] {
+                let refused = invitations
+                    .create(tenant, Some(&actor), at_branch(email, everywhere), Language::En)
+                    .await
+                    .unwrap_err();
+                assert_eq!(refused.fields()[0].code, "more_than_you_have", "{email}");
+            }
+            invitations
+                .create(
+                    tenant,
+                    Some(&actor),
+                    at_branch("new@example.com", in_branch.id),
+                    Language::En,
+                )
+                .await
+                .unwrap();
+            let token = deliver(&services, &invitations).await;
+            let accepted =
+                invitations.accept(Some(tenant), &token, None, None, None, None).await.unwrap();
+            let joined = services.roles.principal(tenant, accepted.user_id).await.unwrap();
+            assert!(joined.allows("notes.read"));
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Người mời mất quyền (bị gỡ role) trước khi lời mời được nhận: lời mời không còn hiệu lực.
+    #[tokio::test]
+    async fn nhan_loi_moi_kiem_lai_quyen_nguoi_moi() {
+        TestDatabase::run(async |test| {
+            let services = services(test).await;
+            let tenant = &services.tenant;
+            let reader = role(&services, &["auth.users.read"]).await;
+            let input = RoleInput {
+                denies: Vec::new(),
+                requires_mfa: false,
+                name: "inviter".to_owned(),
+                description: String::new(),
+                permissions: vec![
+                    "auth.invitations.manage".to_owned(),
+                    "auth.users.read".to_owned(),
+                ],
+                grants: Vec::new(),
+            };
+            let inviter_role = services.roles.create(tenant, Actor::system(), input).await.unwrap();
+            let input = NewUser {
+                email: "hr@example.com".to_owned(),
+                name: "HR".to_owned(),
+                password: None,
+            };
+            let hr = services.users.create(tenant, Actor::system(), input).await.unwrap();
+            let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
+            let boss = admin(&services).await;
+            services
+                .roles
+                .set_memberships(tenant, &boss, hr.id, vec![(root, vec![inviter_role.id])])
+                .await
+                .unwrap();
+            let actor = services.roles.principal(tenant, hr.id).await.unwrap();
+            let invitations = invitations(&services);
+            invitations
+                .create(tenant, Some(&actor), invite("late@example.com", reader), Language::En)
+                .await
+                .unwrap();
+            let token = deliver(&services, &invitations).await;
+            services.roles.set_memberships(tenant, &boss, hr.id, Vec::new()).await.unwrap();
+            let refused = invitations.accept(Some(tenant), &token, None, None, None, None).await;
+            assert_eq!(refused.err().unwrap().code(), "auth.invitation_invalid");
+            assert!(
+                services.users.find_by_email(tenant, "late@example.com").await.unwrap().is_none(),
+                "không tạo tài khoản"
             );
         })
         .await

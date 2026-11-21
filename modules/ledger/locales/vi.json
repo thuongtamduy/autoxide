@@ -7,7 +7,7 @@
   "field:is required for a purpose outside the basic set; open the account first": "là bắt buộc với mục đích ngoài bộ cơ bản; hãy mở tài khoản trước",
   "field:is required in this mode": "là bắt buộc ở chế độ này",
   "field:is required when the partner splits the payment": "là bắt buộc khi đối tác chia tiền tại cổng",
-  "field:is required with `match`": "là bắt buộc khi chọn `match`",
+  "field:is required with `match` and `accept_received`": "bắt buộc khi dùng `match` hay `accept_received`",
   "field:is required: this server has several payment partners": "là bắt buộc: máy chủ này có nhiều đối tác thanh toán",
   "field:is required: this unit has several bank accounts": "là bắt buộc: nút này có nhiều tài khoản ngân hàng",
   "field:must be 0 to 365": "phải từ 0 đến 365",
@@ -25,8 +25,8 @@
   "field:must be `active` or `disabled`": "phải là `active` hoặc `disabled`",
   "field:must be `debit` or `credit`": "phải là `debit` hay `credit`",
   "field:must be `goods`, `services`, `production_transport` or `other`": "phải là `goods`, `services`, `production_transport` hay `other`",
-  "field:must be `match` (with `payment_id`), `ignore` or `refunded_outside`": "phải là `match` (kèm `payment_id`), `ignore` hay `refunded_outside`",
-  "field:must be `match`, `ignore` or `refunded_outside`": "phải là `match`, `ignore` hay `refunded_outside`",
+  "field:must be `match` or `accept_received` (with `payment_id`), `ignore` or `refunded_outside`": "phải là `match` hay `accept_received` (kèm `payment_id`), `ignore` hay `refunded_outside`",
+  "field:must be `match`, `accept_received`, `ignore` or `refunded_outside`": "phải là `match`, `accept_received`, `ignore` hay `refunded_outside`",
   "field:must be `partner_collection` or `seller_direct`": "phải là `partner_collection` hay `seller_direct`",
   "field:must be `self_collect`, `partner_collect` or `split_at_gateway`": "phải là `self_collect`, `partner_collect` hay `split_at_gateway`",
   "field:must be a module name": "phải là tên một module",
@@ -66,6 +66,7 @@
   "ledger.book_not_found": "Nút này chưa có sổ, hoặc nằm ngoài phạm vi của bạn. Mở sổ bằng `POST /api/v1/ledger/books`.",
   "ledger.currency_mixed": "Mọi dòng của một bút toán, và tài khoản của dòng, phải cùng một loại tiền.",
   "ledger.entry_not_found": "Không tìm thấy bút toán này.",
+  "ledger.amount_differs": "Đối tác đã thu {received} nhưng thanh toán là {expected}; xử lý bằng `accept_received` để ghi số tiền đã thu.",
   "ledger.exception_not_found": "Không tìm thấy mục chờ xử lý này.",
   "ledger.exchange_rate_exists": "Cặp tiền này đã có một tỉ giá khác cho ngày và nguồn này; tỉ giá đã ghi không sửa. Ghi tỉ giá mới từ một ngày khác.",
   "ledger.exchange_rate_missing": "Chưa có tỉ giá {base}/{quote} cho ngày {date}. Ghi bằng tiền hạch toán của sổ, hoặc nhập tỉ giá trước.",
@@ -110,5 +111,8 @@
   "text:Set the money-flow mode, hold days and partners, and register bank accounts, for the units in your scope.": "Đặt chế độ dòng tiền, số ngày tạm giữ, đối tác, và đăng ký tài khoản ngân hàng cho các nút trong phạm vi của bạn.",
   "text:The partner collected a payment (`payment_id`, `org_id`, `provider`, `provider_ref`, `amount`, `source_module`, `source_id`, `reference`).": "Đối tác đã thu một thanh toán (`payment_id`, `org_id`, `provider`, `provider_ref`, `amount`, `source_module`, `source_id`, `reference`).",
   "text:The payout partner paid a seller (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`).": "Đối tác chi hộ đã trả tiền cho người bán (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`).",
-  "text:The payout partner refused a payout; the amount is back on the seller's available balance (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).": "Đối tác chi hộ từ chối một lượt chi; số tiền đã trở lại số dư khả dụng của người bán (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`)."
+  "text:The payout partner refused a payout; the amount is back on the seller's available balance (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).": "Đối tác chi hộ từ chối một lượt chi; số tiền đã trở lại số dư khả dụng của người bán (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).",
+  "field:this kind of item cannot be matched to a payment": "loại mục chờ này không ghi được cho một thanh toán",
+  "field:must be the payment named in the item": "phải là thanh toán mà mục chờ nêu",
+  "field:must be a payment in the currency of the money collected": "phải là thanh toán cùng tiền tệ với số tiền đã thu"
 }

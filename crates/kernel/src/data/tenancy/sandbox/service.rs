@@ -241,7 +241,16 @@ impl TenantSandboxes {
         if tenant.is_sandbox() {
             return Err(sandbox_nested());
         }
-        let source = self.source(tenant, principal, source_id).await?;
+        // Sandbox sao dữ liệu của khách (cấu hình, sản phẩm): chỉ tạo được từ BÊN TRONG khách đó —
+        // nhân sự nền tảng phải vào khách bằng lần cấp quyền vào hỗ trợ trước, như xuất dữ liệu
+        // (D-313, D-20261121-export-entry); xem danh sách, gia hạn, xoá vẫn làm từ khách nền tảng.
+        if tenant.id().as_uuid() != source_id {
+            if require_platform(principal).is_ok() && principal.has(&TENANTS_MANAGE) {
+                return Err(super::sandbox_needs_tenant_access(source_id));
+            }
+            return Err(errors::tenant_not_found(&source_id.to_string()));
+        }
+        let source = tenant.clone();
         if source.is_sandbox() {
             return Err(sandbox_nested());
         }

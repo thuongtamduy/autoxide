@@ -985,6 +985,8 @@ export type CallbackHoursRange = {
 
 /** What the provider sent back to `redirect_uri`. */
 export type CallbackRequest = {
+  /** The `browser_secret` from the start call, when it asked to bind the browser. */
+  browser_secret?: string | null;
   /** The `code` query parameter. */
   code: string;
   /** The `state` query parameter, unchanged. */
@@ -11675,6 +11677,21 @@ export type Data_ReferralRule = {
 };
 
 /** Envelope of a single result. */
+export type Data_RegistrationResponse = {
+  /**
+   * What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an
+   * account or not.
+   */
+  data: {
+    /**
+     * The email, normalized. A mail went to it: either a link to confirm the new account, or,
+     * when it already had one, a notice to sign in or reset the password.
+     */
+    email: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RelocationPlan = {
   /** What a split or merge would do (dry run). Nothing is changed. */
   data: {
@@ -12353,6 +12370,8 @@ export type Data_StartResponse = {
      * and `state` in the query.
      */
     authorization_url: string;
+    /** Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback. */
+    browser_secret?: string | null;
     /** Seconds left to finish; after that, start again. */
     expires_in: number;
   };
@@ -18564,11 +18583,18 @@ export type LedgerRefundRequest = {
 
 /** How to resolve an item. */
 export type LedgerResolveRequest = {
-  /** `match` (record the money for `payment_id`), `ignore`, or `refunded_outside`. */
+  /**
+   * `match` (record the money for `payment_id` when the partner collected exactly the amount
+   * due), `accept_received` (record the amount the partner collected for `payment_id`, even
+   * when it differs from the amount due), `ignore`, or `refunded_outside`.
+   */
   action: string;
   /** Up to 500 characters. */
   note?: string | null;
-  /** With `match`. */
+  /**
+   * With `match` and `accept_received`: the payment the item is about (the one it names, if
+   * any), still waiting for its money and in the same currency.
+   */
   payment_id?: string | null;
 };
 
@@ -18718,6 +18744,8 @@ export type LinkProductRequest = {
 
 /** Start linking a provider to your account; proves it is you first. */
 export type LinkStartRequest = {
+  /** `true`: the link can only be finished together with the `browser_secret` returned here. */
+  bind_browser?: boolean;
   /** Your current password. */
   current_password?: string;
   /**
@@ -28072,6 +28100,18 @@ export type RegisterRequest = {
   realm?: Realm;
 };
 
+/**
+ * What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an
+ * account or not.
+ */
+export type RegistrationResponse = {
+  /**
+   * The email, normalized. A mail went to it: either a link to confirm the new account, or,
+   * when it already had one, a notice to sign in or reset the password.
+   */
+  email: string;
+};
+
 /** Why a request is rejected. */
 export type RejectRequest = {
   /** 1 to 500 characters, shown to the agent. */
@@ -29982,6 +30022,12 @@ export type StartPasskeyRegistrationRequest = {
 
 /** Where the interface wants the provider to send the browser back. */
 export type StartRequest = {
+  /**
+   * `true`: the sign-in can only be finished together with the `browser_secret` returned
+   * here, so a leaked `code` and `state` cannot be used from another browser. Keep the secret
+   * in the browser (for example in session storage) and send it to the callback. Recommended.
+   */
+  bind_browser?: boolean;
   /** A page of the interface, exactly as listed in the provider's `redirect_uris`. */
   redirect_uri: string;
 };
@@ -29993,6 +30039,8 @@ export type StartResponse = {
    * and `state` in the query.
    */
   authorization_url: string;
+  /** Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback. */
+  browser_secret?: string | null;
   /** Seconds left to finish; after that, start again. */
   expires_in: number;
 };
@@ -33388,7 +33436,7 @@ export interface paths {
     };
   };
   "/api/v1/auth/register": {
-    /** Create your own account. */
+    /** Create your own account (deprecated: use `POST /api/v1/auth/registrations`). */
     post: {
       parameters: { header: { "Accept-Language"?: string }; };
       requestBody: RegisterRequest;
@@ -33396,6 +33444,19 @@ export interface paths {
         201: Data_UserResponse;
         403: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/registrations": {
+    /** Create your own account, without telling whether the email already has one. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: RegisterRequest;
+      responses: {
+        202: Data_RegistrationResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -42912,6 +42973,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };

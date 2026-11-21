@@ -804,7 +804,7 @@ async fn logged(level: LogLevel, request: Request<Body>) -> Vec<serde_json::Valu
 #[tokio::test]
 async fn moi_request_mot_dong_log_kem_request_id() {
     let request = Request::builder()
-        .uri("/api/v1/notes/7?token=s3cr3t")
+        .uri("/api/v1/notes/987654321?token=s3cr3t")
         .header("x-request-id", "trace-1")
         .body(Body::empty())
         .unwrap();
@@ -819,10 +819,14 @@ async fn moi_request_mot_dong_log_kem_request_id() {
     assert_eq!(line["route"], "/api/v1/notes/{id}");
     assert_eq!(line["span"]["request_id"], "trace-1");
     assert_eq!(line["span"]["method"], "GET");
-    assert_eq!(line["span"]["path"], "/api/v1/notes/7");
+    // Span ghi mẫu route, không ghi đường dẫn thô: đoạn đường dẫn có thể là token (link tải file
+    // số, trạng thái thanh toán, webhook của đối tác).
+    assert_eq!(line["span"]["http.route"], "/api/v1/notes/{id}");
+    assert!(line["span"].get("path").is_none(), "{line}");
     assert!(line["elapsed_ms"].is_u64(), "{line}");
-    // Query string không bao giờ vào log.
+    // Đường dẫn thô và query string không bao giờ vào log.
     assert!(!line.to_string().contains("s3cr3t"), "{line}");
+    assert!(!line.to_string().contains("987654321"), "{line}");
 }
 
 #[tokio::test]
@@ -839,14 +843,15 @@ async fn loi_5xx_duoc_ghi_kem_nguyen_nhan_goc() {
 
 #[tokio::test]
 async fn request_khong_khop_route_va_health_check_duoc_ghi_dung_muc() {
-    let lines = logged(LogLevel::Info, get("/nowhere")).await;
+    let lines = logged(LogLevel::Info, get("/nowhere/s3cr3t")).await;
     assert_eq!(lines[0]["route"], "unmatched");
+    assert!(!lines[0].to_string().contains("s3cr3t"), "{}", lines[0]);
     assert_eq!(lines[0]["status"], 404);
 
     // Health check ghi ở mức debug: ở mức info thì không có dòng nào.
     assert!(logged(LogLevel::Info, get("/health/live")).await.is_empty());
     let lines = logged(LogLevel::Debug, get("/health/live")).await;
-    assert!(lines.iter().any(|line| line["span"]["path"] == "/health/live"), "{lines:?}");
+    assert!(lines.iter().any(|line| line["level"] == "DEBUG"), "{lines:?}");
 }
 
 /// Request GET `path` đến từ địa chỉ `client` (như khi đi qua socket thật).

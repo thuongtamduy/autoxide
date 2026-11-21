@@ -22,6 +22,7 @@ fn service(services: &Services) -> OidcService {
         providers: ProviderService { secrets: secrets.clone(), outbox: Outbox::standalone("auth") },
         client: OidcClient::new(false).unwrap(),
         users: services.users.clone(),
+        roles: services.roles.clone(),
         sessions: services.sessions.clone(),
         outbox: Outbox::standalone("auth"),
         secrets,

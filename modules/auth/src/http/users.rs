@@ -33,6 +33,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
         .routes(routes!(list_users, create_user))
         .routes(routes!(get_user, update_user, delete_user))
         .routes(routes!(register))
+        .routes(routes!(request_registration))
         .routes(routes!(set_user_password))
 }
 
@@ -164,6 +165,16 @@ pub(crate) struct RegisterRequest {
     /// the setting `auth.customer_registration`).
     #[serde(default)]
     realm: autoxide_kernel::access::Realm,
+}
+
+/// What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an
+/// account or not.
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub(crate) struct RegistrationResponse {
+    /// The email, normalized. A mail went to it: either a link to confirm the new account, or,
+    /// when it already had one, a notice to sign in or reset the password.
+    #[schema(example = "ada@example.com")]
+    email: String,
 }
 
 /// Changes to an account. Omitted fields stay as they are.
@@ -391,7 +402,7 @@ async fn delete_user(
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Create your own account.
+/// Create your own account (deprecated: use `POST /api/v1/auth/registrations`).
 ///
 /// Open only when the server enables self-registration; otherwise answers 403. The
 /// new account has no role. A mail asking to confirm the address goes to the email,
@@ -415,12 +426,82 @@ async fn register(
     language: Language,
     ValidJson(input): ValidJson<RegisterRequest>,
 ) -> Result<Created<UserResponse>, Error> {
+    let customer = registration_open(&state, &tenant, input.realm).await?;
+    let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
+    // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
+    let user = if customer {
+        state.users.create_customer(&tenant, Actor::system(), input).await?
+    } else {
+        state.users.create(&tenant, Actor::system(), input).await?
+    };
+    state.verifications.after_signup(&tenant, Actor::system(), &user, language).await;
+    let path = format!("/auth/users/{}", user.id);
+    Ok(Created::new(path, describe(&state.users, &tenant, user).await?))
+}
+
+/// Create your own account, without telling whether the email already has one.
+///
+/// Open only when the server enables self-registration (or, for `customer`, when the tenant
+/// lets customers create accounts); otherwise answers 403. Always answers 202 with the same
+/// body for a valid request: a new account (without any role) gets a mail to confirm the
+/// address; an email that already has an account gets a notice instead, and nothing changes.
+/// Then sign in with `POST /api/v1/auth/login`. Replaces `POST /api/v1/auth/register`, which
+/// tells with 409 that an email is taken.
+#[utoipa::path(
+    post,
+    path = "/registrations",
+    extensions(("x-public" = json!(true))),
+    operation_id = "request_registration",
+    request_body = RegisterRequest,
+    responses(
+        (status = 202, description = "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one).", body = Data<RegistrationResponse>),
+        (status = 403, description = "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`).", body = Problem),
+        (status = 422, description = "A value is invalid, e.g. a password shorter than 12 characters; see `errors`.", body = Problem),
+    )
+)]
+async fn request_registration(
+    State(state): State<Arc<HttpState>>,
+    tenant: TenantContext,
+    language: Language,
+    ValidJson(input): ValidJson<RegisterRequest>,
+) -> Result<(StatusCode, Data<RegistrationResponse>), Error> {
+    let customer = registration_open(&state, &tenant, input.realm).await?;
     let realm = input.realm;
+    let email = autoxide_kernel::email::normalize(&input.email);
+    let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
+    // Kiểm đầu vào và hash mật khẩu xảy ra ở cả hai nhánh (trong `create`): thời gian trả lời
+    // không cho biết email đã có tài khoản hay chưa.
+    let created = if customer {
+        state.users.create_customer(&tenant, Actor::system(), input).await
+    } else {
+        state.users.create(&tenant, Actor::system(), input).await
+    };
+    match created {
+        Ok(user) => {
+            state.verifications.after_signup(&tenant, Actor::system(), &user, language).await;
+        }
+        Err(error) if error.code() == "auth.email_taken" => {
+            if let Some(user) = state.users.find_by_email_in(&tenant, realm, &email).await? {
+                state.verifications.notify_existing_registration(&tenant, &user, language).await;
+            }
+        }
+        Err(error) => return Err(error),
+    }
+    Ok((StatusCode::ACCEPTED, Data { data: RegistrationResponse { email } }))
+}
+
+/// `Ok(true)` cho người mua, `Ok(false)` cho nhân sự, khi khách / máy chủ cho tự đăng ký loại
+/// tài khoản `realm`; không thì 403.
+async fn registration_open(
+    state: &HttpState,
+    tenant: &TenantContext,
+    realm: autoxide_kernel::access::Realm,
+) -> Result<bool, Error> {
     let customer = realm == autoxide_kernel::access::Realm::Customer;
     if customer {
         let open = crate::settings::enabled(
             state.orgs.as_ref(),
-            &tenant,
+            tenant,
             &crate::settings::CUSTOMER_REGISTRATION,
         )
         .await?;
@@ -437,16 +518,7 @@ async fn register(
              to create one for you.",
         ));
     }
-    let input = NewUser { email: input.email, name: input.name, password: Some(input.password) };
-    // Chưa đăng nhập, chưa có tài khoản: "hệ thống" tạo thay người đăng ký.
-    let user = if customer {
-        state.users.create_customer(&tenant, Actor::system(), input).await?
-    } else {
-        state.users.create(&tenant, Actor::system(), input).await?
-    };
-    state.verifications.after_signup(&tenant, Actor::system(), &user, language).await;
-    let path = format!("/auth/users/{}", user.id);
-    Ok(Created::new(path, describe(&state.users, &tenant, user).await?))
+    Ok(customer)
 }
 
 /// Set the password of an account created without one.

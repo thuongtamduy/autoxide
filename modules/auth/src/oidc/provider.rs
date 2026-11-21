@@ -53,6 +53,8 @@ pub(crate) mod entity {
         pub enabled: bool,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
+        /// Người tạo hay sửa gần nhất (D-20261121-oidc-link-covers); `None`: dòng có từ trước.
+        pub configured_by: Option<Uuid>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -277,6 +279,7 @@ impl ProviderService {
             enabled: input.enabled,
             created_at: now,
             updated_at: now,
+            configured_by: Some(principal.user_id()),
         };
         if kind == Kind::Google && row.issuer.is_none() {
             row.issuer = Some(GOOGLE_ISSUER.to_owned());
@@ -402,6 +405,7 @@ impl ProviderService {
         active.default_role_id = Set(row.default_role_id);
         active.enabled = Set(row.enabled);
         active.updated_at = Set(row.updated_at);
+        active.configured_by = Set(Some(principal.user_id()));
         let row = active.update(&transaction).await?;
         let mut after = describe(&row);
         after["secret_changed"] = json!(secret_changed);
@@ -477,6 +481,15 @@ impl ProviderService {
     }
 }
 
+/// Issuer của Entra cho mọi tổ chức (`…/organizations/v2.0`, `…/common/v2.0`), không gắn một
+/// directory.
+fn is_multi_tenant_entra(issuer: &str) -> bool {
+    let path = issuer.trim_end_matches('/');
+    ["/organizations/v2.0", "/common/v2.0", "/organizations", "/common"]
+        .iter()
+        .any(|tail| path.ends_with(tail))
+}
+
 /// Lỗi của các trường không cần database.
 fn check(
     row: &Provider,
@@ -547,6 +560,21 @@ fn check(
                  for localhost), at most 500 characters",
             ));
         }
+    }
+    // Entra nhiều tổ chức (`organizations`, `common`): bất kỳ công ty nào dùng Microsoft cũng đăng
+    // nhập được — cho tự tạo tài khoản thì phải nêu tên miền email được phép.
+    if row.kind() == Kind::Microsoft
+        && row.allow_signup
+        && row.issuer.as_deref().is_some_and(is_multi_tenant_entra)
+        && domains.is_none_or(<[String]>::is_empty)
+    {
+        problems.push(FieldError::new(
+            "allowed_email_domains",
+            "required",
+            "is required when `allow_signup` is on with a multi-organization Microsoft issuer \
+             (`organizations` or `common`); list your company's email domains, or use your \
+             directory's own issuer",
+        ));
     }
     if let Some(list) = domains {
         let bad = list.len() > MAX_DOMAINS
@@ -659,4 +687,56 @@ pub(crate) fn not_found_slug(slug: &str) -> Error {
 fn slug_taken(slug: &str) -> Error {
     Error::conflict("auth.oidc_slug_taken", "There is already a sign-in provider named `{slug}`.")
         .with_param("slug", slug)
+}
+
+#[cfg(test)]
+mod check_tests {
+    use super::*;
+
+    fn entra(issuer: &str, allow_signup: bool) -> Provider {
+        let now = Timestamp::now();
+        Provider {
+            tenant_id: Uuid::now_v7(),
+            id: Uuid::now_v7(),
+            slug: "entra".to_owned(),
+            kind: Kind::Microsoft.as_str().to_owned(),
+            name: "Entra".to_owned(),
+            issuer: Some(issuer.to_owned()),
+            client_id: "client".to_owned(),
+            client_secret: String::new(),
+            scopes: DEFAULT_SCOPES.to_owned(),
+            redirect_uris: "[]".to_owned(),
+            allowed_email_domains: None,
+            allow_signup,
+            realm: "staff".to_owned(),
+            default_org_id: None,
+            default_role_id: None,
+            enabled: true,
+            created_at: now,
+            updated_at: now,
+            configured_by: None,
+        }
+    }
+
+    /// Entra nhiều tổ chức cho tự tạo tài khoản thì phải nêu tên miền email.
+    #[test]
+    fn entra_nhieu_to_chuc_cho_dang_ky_phai_neu_ten_mien() {
+        let client = OidcClient::new(false).unwrap();
+        let uris = vec!["https://app.example.com/callback".to_owned()];
+        let codes = |row: &Provider, domains: Option<&[String]>| {
+            check(row, &client, &uris, domains)
+                .into_iter()
+                .filter(|problem| problem.field == "allowed_email_domains")
+                .map(|problem| problem.code)
+                .collect::<Vec<_>>()
+        };
+        let common = "https://login.microsoftonline.com/common/v2.0";
+        assert_eq!(codes(&entra(MICROSOFT_ISSUER, true), None), ["required"]);
+        assert_eq!(codes(&entra(common, true), Some(&[])), ["required"]);
+        let listed = ["example.com".to_owned()];
+        assert!(codes(&entra(MICROSOFT_ISSUER, true), Some(&listed)).is_empty());
+        assert!(codes(&entra(MICROSOFT_ISSUER, false), None).is_empty(), "không cho đăng ký");
+        let own = "https://login.microsoftonline.com/0d4c7a9e-0000-4000-8000-000000000000/v2.0";
+        assert!(codes(&entra(own, true), None).is_empty(), "directory riêng");
+    }
 }

@@ -59,6 +59,11 @@ pub(crate) struct StartRequest {
     #[validate(length(min = 1, max = 500))]
     #[schema(example = "https://app.example.com/sign-in/callback")]
     redirect_uri: String,
+    /// `true`: the sign-in can only be finished together with the `browser_secret` returned
+    /// here, so a leaked `code` and `state` cannot be used from another browser. Keep the secret
+    /// in the browser (for example in session storage) and send it to the callback. Recommended.
+    #[serde(default)]
+    bind_browser: bool,
 }
 
 /// Where to send the browser.
@@ -69,6 +74,9 @@ pub(crate) struct StartResponse {
     authorization_url: String,
     /// Seconds left to finish; after that, start again.
     expires_in: u64,
+    /// Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    browser_secret: Option<String>,
 }
 
 impl From<Started> for StartResponse {
@@ -76,6 +84,7 @@ impl From<Started> for StartResponse {
         StartResponse {
             authorization_url: started.authorization_url,
             expires_in: started.expires_in,
+            browser_secret: started.browser_secret,
         }
     }
 }
@@ -90,6 +99,9 @@ pub(crate) struct CallbackRequest {
     /// The `state` query parameter, unchanged.
     #[validate(length(min = 1, max = 512))]
     state: String,
+    /// The `browser_secret` from the start call, when it asked to bind the browser.
+    #[validate(length(max = 128))]
+    browser_secret: Option<String>,
 }
 
 /// Start linking a provider to your account; proves it is you first.
@@ -99,6 +111,9 @@ pub(crate) struct LinkStartRequest {
     /// A page of the interface, exactly as listed in the provider's `redirect_uris`.
     #[validate(length(min = 1, max = 500))]
     redirect_uri: String,
+    /// `true`: the link can only be finished together with the `browser_secret` returned here.
+    #[serde(default)]
+    bind_browser: bool,
     /// Your current password.
     #[serde(default)]
     current_password: String,
@@ -378,7 +393,8 @@ async fn start_oidc(
     Path(slug): Path<String>,
     ValidJson(input): ValidJson<StartRequest>,
 ) -> Result<Data<StartResponse>, Error> {
-    let started = state.oidc.start(&tenant, &slug, &input.redirect_uri, None).await?;
+    let started =
+        state.oidc.start(&tenant, &slug, &input.redirect_uri, None, input.bind_browser).await?;
     Ok(Data { data: started.into() })
 }
 
@@ -397,7 +413,7 @@ async fn start_oidc(
     responses(
         (status = 200, description = "Signed in.", body = Data<TokenResponse>),
         (status = 202, description = "A code is needed; continue with `POST /api/v1/auth/login/mfa`.", body = Data<MfaChallengeResponse>),
-        (status = 400, description = "The `state` is unknown, used or expired; code `auth.oidc_state_invalid`. Start again.", body = Problem),
+        (status = 400, description = "The `state` is unknown, used or expired, or `browser_secret` does not match (`reason` `browser`); code `auth.oidc_state_invalid`. Start again.", body = Problem),
         (status = 401, description = "The provider's answer is not valid (signature, issuer, audience, expiry, nonce); code `auth.oidc_token_invalid`, `reason` says which.", body = Problem),
         (status = 403, description = "The provider has not verified the email (code `auth.oidc_email_unverified`), its domain is not allowed (code `auth.oidc_email_domain_not_allowed`), nobody may create an account this way (code `auth.oidc_signup_closed`), or the account is disabled (code `auth.user_disabled`).", body = Problem),
         (status = 404, description = "Outside sign-in is off (code `auth.oidc_disabled`), or no enabled provider has this slug (code `auth.oidc_provider_not_found`).", body = Problem),
@@ -414,8 +430,11 @@ async fn finish_oidc(
     ValidJson(input): ValidJson<CallbackRequest>,
 ) -> Result<Response, Error> {
     let user_agent = super::user_agent(&headers);
-    let (tenant, outcome) =
-        state.oidc.callback(tenant.as_ref(), &slug, &input.code, &input.state, user_agent).await?;
+    let secret = input.browser_secret.as_deref();
+    let (tenant, outcome) = state
+        .oidc
+        .callback(tenant.as_ref(), &slug, &input.code, &input.state, secret, user_agent)
+        .await?;
     Ok(match outcome {
         LoginOutcome::Tokens(tokens) => {
             super::note_country(&state, &tenant, &headers, tokens.session_id).await;
@@ -486,7 +505,8 @@ async fn start_identity_link(
     let confirm = super::confirm(&input.current_password, input.reauth_token.as_deref())?;
     confirm.check(&state.sessions, &tenant, principal.user_id()).await?;
     let user = Some(principal.user_id());
-    let started = state.oidc.start(&tenant, &slug, &input.redirect_uri, user).await?;
+    let started =
+        state.oidc.start(&tenant, &slug, &input.redirect_uri, user, input.bind_browser).await?;
     Ok(Data { data: started.into() })
 }
 
@@ -522,7 +542,14 @@ async fn finish_identity_link(
     super::require_session(&principal)?;
     let linked = state
         .oidc
-        .link_callback(&tenant, principal.user_id(), &slug, &input.code, &input.state)
+        .link_callback(
+            &tenant,
+            principal.user_id(),
+            &slug,
+            &input.code,
+            &input.state,
+            input.browser_secret.as_deref(),
+        )
         .await?;
     Ok(Created::new("/auth/me/identities", IdentityResponse::from(linked)))
 }

@@ -198,6 +198,17 @@ pub fn sandbox_nested() -> Error {
     )
 }
 
+/// `tenancy.sandbox_needs_tenant_access` (403): nhân sự nền tảng tạo sandbox (sao cấu hình, sản
+/// phẩm) của khách khác mà chưa vào khách đó bằng lần cấp quyền vào hỗ trợ (D-20261121-export-entry).
+pub fn sandbox_needs_tenant_access(tenant: uuid::Uuid) -> Error {
+    Error::forbidden(
+        "tenancy.sandbox_needs_tenant_access",
+        "Making a sandbox copies data of the tenant: get a support access grant in force for it, \
+         then call with the header `Autoxide-Tenant: {tenant}`.",
+    )
+    .with_param("tenant", tenant)
+}
+
 /// `tenancy.sandbox_forbidden` (403): việc chỉ làm được ở khách thật.
 pub fn sandbox_forbidden(action: &str) -> Error {
     Error::forbidden(

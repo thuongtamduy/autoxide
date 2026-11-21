@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use autoxide_kernel::reference::Submitted;
-use autoxide_testkit::TestDatabase;
+use autoxide_testkit::{TestDatabase, tool};
 use axum::http::StatusCode;
 use serde_json::json;
 use uuid::Uuid;
@@ -143,6 +143,35 @@ async fn xoa_tai_khoan_thu_hoi_voucher_va_co_trong_xuat_du_lieu() {
             .await
             .unwrap();
         assert_eq!(wallet.len(), 1);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn tool_vi_voucher_cua_nguoi_dung_chi_tra_voucher_trong_pham_vi() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let user = Uuid::from_u128(4242);
+        for org in [setup.tree.a, setup.tree.b] {
+            let id = running(&setup, body(org, json!({"trigger": "voucher"}))).await;
+            let request = GrantVoucher::new(id, user, VoucherSource::Referral, format!("r-{id}"));
+            setup.promotions().grant_voucher(&setup.tenant(), &request).await.unwrap();
+        }
+        let count = async |who: &str| {
+            let client = setup.app.mcp(who).await.unwrap();
+            let answer = client
+                .call_tool(tool("promotions.list_vouchers_of_user", json!({"user_id": user})))
+                .await
+                .unwrap();
+            let found = answer.structured_content.unwrap();
+            client.cancel().await.unwrap();
+            found["data"]["vouchers"].as_array().map_or(0, Vec::len)
+        };
+        // Cả khách thấy hai; cửa hàng A chỉ thấy voucher của chương trình của mình.
+        assert_eq!(count("boss").await, 2);
+        assert_eq!(count("store_a").await, 1);
+        assert_eq!(count("store_b").await, 1);
     })
     .await
     .unwrap();

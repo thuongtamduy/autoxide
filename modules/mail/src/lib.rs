@@ -117,10 +117,17 @@ impl Module for MailModule {
                  sent; set it for production"
             );
         }
+        service::allow_private_networks(config.allow_private_networks);
         let transport = Arc::new(Transport::new(config.smtp_url.as_deref(), config.file_dir)?);
         self.probe = Some(Arc::new(doctor::SmtpProbe { transport: transport.clone() }));
         let settings = context.require::<dyn autoxide_kernel::tenancy::TenantSettings>()?;
-        let sender = Arc::new(Sender::new(transport, config.from, context.outbox()?, settings));
+        let sender = Arc::new(Sender::new(
+            transport,
+            config.from,
+            context.outbox()?,
+            settings,
+            config.allow_private_networks,
+        ));
         // Thử kết nối SMTP từ trang cài đặt (`POST /kernel/settings/{name}/test`).
         context.connection_probe(sender.clone())?;
         self.sender = Some(sender);

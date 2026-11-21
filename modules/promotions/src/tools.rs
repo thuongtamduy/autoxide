@@ -302,12 +302,14 @@ pub(crate) fn all(service: &Arc<PromotionsService>) -> Vec<Tool> {
         .requires(VOUCHERS_GRANT),
         Tool::new(
             "list_vouchers_of_user",
-            "List the vouchers in a user's wallet, soonest to expire first (for support staff).",
-            move |tenant: TenantContext, _principal: Principal, input: VouchersOfUserInput| {
+            "List the vouchers in a user's wallet, soonest to expire first (for support staff); only \
+             vouchers of promotions in units you can read.",
+            move |tenant: TenantContext, principal: Principal, input: VouchersOfUserInput| {
                 let service = wallet.clone();
                 async move {
-                    let vouchers =
-                        service.vouchers_of(&tenant, input.user_id, input.status).await?;
+                    let vouchers = service
+                        .vouchers_of_in_scope(&tenant, &principal, input.user_id, input.status)
+                        .await?;
                     Ok::<_, Error>(Wallet { vouchers })
                 }
             },

@@ -1,24 +1,72 @@
 //! Login throttling: chặn đoán mật khẩu bằng cách thử liên tục.
 //!
+//! Đăng nhập bằng email (D-20261121-login-throttle-pair): đếm theo CẶP email + địa chỉ IP với
+//! `max_failures`, cộng một trần rộng hơn (`ACCOUNT_FACTOR` lần) cho cả email. Người khác chỉ
+//! khoá được cặp của chính họ; muốn khoá cả email phải thử sai từ nhiều địa chỉ, và trần đó vẫn
+//! chặn đoán mật khẩu phân tán. Không biết IP thì cặp là "email + không rõ" (như trước).
+//!
 //! Đếm lần đăng nhập sai theo email (kể cả email không tồn tại — để không lộ email
 //! nào có thật). Quá `max_failures` lần trong một `period` thì khoá đăng nhập của email
 //! đó trong `period`, kể cả khi mật khẩu đúng. Đếm trong database (bảng `auth_throttle`,
 //! bằng `Throttle` của kernel, D-116) nên mọi máy chủ dùng chung một con số, và nhiều lần thử
 //! cùng lúc không vượt được số lần cho phép (D-079).
 
+use std::net::IpAddr;
 use std::time::Duration;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::{Outcome, Throttle};
 
+/// Trần lần sai của cả một email so với trần của một cặp email + IP.
+const ACCOUNT_FACTOR: u32 = 10;
+
 pub(crate) struct LoginThrottle {
     inner: Throttle,
+    /// Trần của cả email khi đăng nhập (mọi địa chỉ cộng lại).
+    account: Throttle,
 }
 
 impl LoginThrottle {
     pub(crate) fn new(max_failures: u32, period: Duration) -> Result<Self, Error> {
-        Ok(LoginThrottle { inner: Throttle::new("auth", max_failures, period)? })
+        Ok(LoginThrottle {
+            inner: Throttle::new("auth", max_failures, period)?,
+            account: Throttle::new("auth", max_failures.saturating_mul(ACCOUNT_FACTOR), period)?,
+        })
+    }
+
+    /// Xin một lượt đăng nhập cho `email` từ địa chỉ `ip` (đếm trước khi kiểm, như
+    /// [`reserve`](Self::reserve)): cặp email + IP rồi cả email.
+    pub(crate) async fn reserve_login(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<(), Error> {
+        refuse(self.inner.hit(tenant, &pair_key(email, ip)).await?)?;
+        refuse(self.account.hit(tenant, &key(email)).await?)
+    }
+
+    /// Trả lại lượt vừa xin bằng [`reserve_login`](Self::reserve_login).
+    pub(crate) async fn refund_login(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<(), Error> {
+        self.inner.refund(tenant, &pair_key(email, ip)).await?;
+        self.account.refund(tenant, &key(email)).await
+    }
+
+    /// Đăng nhập đúng: quên các lần sai của cặp và của email.
+    pub(crate) async fn clear_login(
+        &self,
+        tenant: &TenantContext,
+        email: &str,
+        ip: Option<IpAddr>,
+    ) -> Result<(), Error> {
+        self.inner.clear(tenant, &pair_key(email, ip)).await?;
+        self.account.clear(tenant, &key(email)).await
     }
 
     /// Lỗi 429 `auth.login_throttled` nếu đăng nhập của `email` đang bị khoá (không đếm).
@@ -33,12 +81,6 @@ impl LoginThrottle {
     /// [`clear`](Self::clear).
     pub(crate) async fn reserve(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
         refuse(self.inner.hit(tenant, &key(email)).await?)
-    }
-
-    /// Trả lại lượt vừa xin bằng [`reserve`](Self::reserve) khi lần thử đó không sai (vd
-    /// mật khẩu đúng, còn chờ mã MFA): người dùng thật không bị tính oan.
-    pub(crate) async fn refund(&self, tenant: &TenantContext, email: &str) -> Result<(), Error> {
-        self.inner.refund(tenant, &key(email)).await
     }
 
     /// Đăng nhập đúng: quên các lần sai trước đó.
@@ -63,6 +105,12 @@ fn refuse(outcome: Outcome) -> Result<(), Error> {
 /// Khoá đếm của một email (đã chuẩn hoá); kernel băm trước khi lưu.
 fn key(email: &str) -> String {
     format!("login:{}", email.trim().to_lowercase())
+}
+
+/// Khoá đếm của cặp email + địa chỉ (`-`: không biết địa chỉ).
+fn pair_key(email: &str, ip: Option<IpAddr>) -> String {
+    let ip = ip.map_or_else(|| "-".to_owned(), |ip| ip.to_string());
+    format!("login-ip:{}|{ip}", email.trim().to_lowercase())
 }
 
 #[cfg(test)]

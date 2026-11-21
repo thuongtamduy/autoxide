@@ -9943,13 +9943,13 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "Resolve a difference: `match` records the money the partner collected for a payment, `ignore` closes it, `refunded_outside` notes it was refunded outside Autoxide.",
+      "description": "Resolve a difference: `match` records the money the partner collected for a payment when it is exactly the amount due, `accept_received` records the amount collected even when it differs, `ignore` closes it, `refunded_outside` notes it was refunded outside Autoxide.",
       "input_schema": {
         "additionalProperties": false,
         "description": "How to resolve an item.",
         "properties": {
           "action": {
-            "description": "`match` (record the money for `payment_id`), `ignore` or `refunded_outside`.",
+            "description": "`match` (record the money for `payment_id` when it is exactly the amount due),\n`accept_received` (record the amount collected even when it differs), `ignore` or\n`refunded_outside`.",
             "type": "string"
           },
           "exception_id": {
@@ -9965,7 +9965,7 @@
             ]
           },
           "payment_id": {
-            "description": "With `match`.",
+            "description": "With `match` and `accept_received`.",
             "format": "uuid",
             "type": [
               "string",
@@ -13588,7 +13588,7 @@
         "returns_secret": false
       },
       "deprecation": null,
-      "description": "List the vouchers in a user's wallet, soonest to expire first (for support staff).",
+      "description": "List the vouchers in a user's wallet, soonest to expire first (for support staff); only vouchers of promotions in units you can read.",
       "input_schema": {
         "additionalProperties": false,
         "description": "Whose wallet to read.",

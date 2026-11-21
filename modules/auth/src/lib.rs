@@ -26,6 +26,8 @@ mod find;
 mod guardrail;
 #[cfg(test)]
 mod guardrail_tests;
+#[cfg(test)]
+mod hardening_tests;
 mod http;
 mod invitation;
 mod login_link;
@@ -391,6 +393,7 @@ impl Module for AuthModule {
             },
             client: oidc::OidcClient::new(config.oidc_allow_private_networks)?,
             users: users.clone(),
+            roles: roles.clone(),
             sessions: sessions.clone(),
             outbox: outbox.clone(),
             secrets: secrets.as_ref().clone(),
@@ -401,6 +404,7 @@ impl Module for AuthModule {
         });
         let invitations = Arc::new(invitation::Invitations {
             users: users.clone(),
+            roles: roles.clone(),
             sessions: sessions.clone(),
             jobs: context.jobs(),
             mailer: mailer.clone(),
@@ -454,6 +458,20 @@ impl Module for AuthModule {
 
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
+    }
+
+    fn deprecations(&self) -> Vec<autoxide_kernel::http::Deprecation> {
+        // `/register` báo 409 khi email đã có tài khoản; `/registrations` trả lời như nhau
+        // (D-20261121-registration-uniform). Hành vi cũ giữ tới ngày sunset.
+        vec![
+            autoxide_kernel::http::Deprecation::new(
+                axum::http::Method::POST,
+                "/register",
+                "2026-11-21",
+            )
+            .sunset("2027-05-21")
+            .successor("/api/v1/auth/registrations"),
+        ]
     }
 
     fn permissions(&self) -> Vec<Permission> {
