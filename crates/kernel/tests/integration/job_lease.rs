@@ -113,7 +113,13 @@ async fn job_mat_quyen_giu_thi_dung() {
         let (database, modules, sleeper) = setup(test).await;
         let worker = modules.worker(1).unwrap().lease(Duration::from_millis(1500));
         let running = tokio::spawn(async move { worker.run_once().await.unwrap() });
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        // Chờ tới khi job thật sự bắt đầu (máy CI bận có thể mất hơn vài trăm mili giây để worker lấy job),
+        // thay vì ngủ một khoảng cố định rồi mới kiểm.
+        let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+        while sleeper.started.load(Ordering::SeqCst) == 0 && tokio::time::Instant::now() < deadline
+        {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
         assert_eq!(sleeper.started.load(Ordering::SeqCst), 1);
         // Ai đó (lệnh vận hành, worker khác sau khi hết hạn) lấy job đi.
         let backend = database.write().get_database_backend();
