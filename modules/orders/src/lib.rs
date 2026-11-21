@@ -12,6 +12,7 @@ mod advance;
 mod advance_cancel;
 mod advance_flow;
 pub mod api;
+mod buyer_identity;
 mod carts;
 mod checkout;
 mod config;

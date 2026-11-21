@@ -62,6 +62,7 @@
   "promotions.claim_requires_verified_phone": "Cần xác thực số điện thoại để nhận voucher này.",
   "promotions.code_invalid": "Mã `{code}` không tồn tại.",
   "promotions.code_taken": "Mã `{code}` đã có.",
+  "promotions.buyer_unidentified": "Chương trình `{title}` giới hạn lượt mỗi người mua; hãy đăng nhập hoặc nhập số điện thoại để dùng.",
   "promotions.customer_limit_reached": "Bạn đã dùng hết lượt của chương trình `{title}`.",
   "promotions.daily_limit_reached": "Chương trình `{title}` đã hết lượt trong hôm nay.",
   "promotions.exceeds_duration_limit": "Số ngày giảm giá vượt giới hạn {max} ngày theo {legal_basis} đang hiệu lực.",
