@@ -10,7 +10,7 @@ use autoxide_kernel::config::{
 };
 use autoxide_kernel::module::{Module, Modules};
 
-use crate::modules;
+use crate::registry;
 use crate::startup::StartupConfig;
 
 /// Tên file cấu hình cục bộ, tìm trong thư mục đang đứng.
@@ -59,7 +59,7 @@ pub fn read_with(
 
 /// Như [`read_with`], với các module đã đăng ký của chương trình.
 pub fn read(source: &ConfigSource) -> Result<Settings, ConfigErrors> {
-    read_with(source, modules::all())
+    read_with(source, registry::all())
 }
 
 /// Đọc cấu hình từ môi trường của tiến trình và file `.env` trong thư mục hiện tại.
@@ -74,7 +74,7 @@ pub fn describe() -> Vec<SettingValue> {
     let source = ConfigSource::default();
     let mut reader = ConfigReader::new(&source);
     // Bỏ qua kết quả: biến bắt buộc đương nhiên "thiếu" ở đây; chỉ cần danh sách.
-    if let Ok(mut modules) = register(modules::all()) {
+    if let Ok(mut modules) = register(registry::all()) {
         let _ = read_all(&mut reader, &mut modules);
     }
     reader.values().to_vec()

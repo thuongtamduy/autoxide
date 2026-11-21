@@ -1,0 +1,29 @@
+[package]
+name = "acme-bookmarks"
+description = "Example Autoxide module kept outside the Autoxide repository: bookmarks of a user."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+axum.workspace = true
+jiff.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+validator.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,69 @@
+# A module that lives OUTSIDE the Autoxide repository, and a server that runs it next to the
+# official modules. This folder is its own Cargo workspace: nothing here is part of the workspace
+# at the root of the repository. The guide that walks through it: docs/guides/writing-a-module.md.
+[workspace]
+resolver = "3"
+members = ["bookmarks", "server"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+# The Rust version of the Autoxide release you build on (its `rust-toolchain.toml`), or newer.
+rust-version = "1.99"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Here the core is a path inside the repository, so that CI tests this example against the
+# current code. In a repository of your own, depend on a release tag instead:
+#
+#   autoxide = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+#   autoxide-kernel = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+#   autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
+autoxide = { path = "../../crates/app" }
+autoxide-kernel = { path = "../../crates/kernel" }
+autoxide-testkit = { path = "../../crates/testkit" }
+
+# Libraries whose types appear in the module contract: keep the same major version as the core
+# (table "Stability of the module contract" in docs/MODULE_GUIDE.md), or the compiler reports two
+# copies of the same type. The core turns on the features it needs (database drivers, runtime…);
+# a module only adds what its own code uses.
+async-trait = "0.1"
+axum = "0.8"
+jiff = { version = "1", default-features = false, features = ["std"] }
+sea-orm = { version = "2.0", default-features = false, features = ["macros"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing = "0.1"
+utoipa = "6.0"
+utoipa-axum = "0.3"
+uuid = { version = "1", features = ["v7"] }
+validator = { version = "0.21", features = ["derive"] }
+
+# The lints of the core: no `unsafe`, and outside tests errors are returned, never `unwrap`ped.
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+
+# Smaller debug information: a test program links the whole core.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 1
+debug = false
+
+# Password hashing is slow on purpose; unoptimized it makes every sign-in in a test take seconds.
+[profile.dev.package.argon2]
+opt-level = 3
+
+[profile.dev.package.blake2]
+opt-level = 3

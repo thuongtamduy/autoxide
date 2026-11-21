@@ -20,3 +20,7 @@ Tiếng Anh: [`README.md`](README.md).
 - [Thử thay đổi trong sandbox](sandbox.vi.md): bản thử của khách, đối tác giả lập, đem bản nháp về
 - [Tự động hoá công việc bằng luật](automations.vi.md): kích hoạt, điều kiện, tool MCP làm hành động, duyệt, cảnh báo số liệu bất thường
 - [Làm app điện thoại hay app máy tính](mobile.vi.md): SDK, token và PKCE, thông báo đẩy, đồng bộ khi mất mạng, WebSocket, mua trong ứng dụng
+
+Cho lập trình viên mở rộng core:
+
+- [Viết module ở repo riêng của bạn](writing-a-module.vi.md): module và máy chủ của bạn bên cạnh các module chính thức, test trên cả hai database, không cần fork

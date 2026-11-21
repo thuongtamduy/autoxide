@@ -14,7 +14,7 @@ use crate::error::{Error, FieldError};
 use crate::response::{Data, Problem};
 
 /// CHANGELOG của workspace, nhúng lúc biên dịch.
-const CHANGELOG: &str = include_str!("../../../../CHANGELOG.md");
+const CHANGELOG: &str = include_str!("../../CHANGELOG.md");
 
 /// Tối đa số phiên bản trả về khi không nêu `since`.
 const DEFAULT_RELEASES: usize = 5;

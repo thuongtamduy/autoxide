@@ -41,8 +41,8 @@ every case: crate name, `Module::name`, tables, permissions, events, error codes
 file names). The result passes the gate as it is; then rewrite the tables, the service,
 the descriptions and `locales/vi.json` for your feature. To register it:
 
-1. add `autoxide-<name> = { path = "modules/<name>" }` under `[workspace.dependencies]`
-   in the root `Cargo.toml`;
+1. add `autoxide-<name> = { path = "modules/<name>", version = "=<workspace version>" }` under
+   `[workspace.dependencies]` in the root `Cargo.toml`;
 2. add `autoxide-<name>.workspace = true` to `crates/app/Cargo.toml`;
 3. add one line to `all()` in `crates/app/src/modules.rs`:
    `Box::new(autoxide_<name>::module())`. A module that uses another module's trait
@@ -767,32 +767,40 @@ names, single-use tokens, counters) needs a concurrency test.
 
 ## A module in its own repository
 
-A module does not have to live in this repository. Keep it in its own crate and
-depend on the core by a release tag:
+A module does not have to live in this repository, and running it does not need a fork. Keep
+the module in a crate of your own, write a small binary that adds it to the official modules
+(`autoxide::Autoxide::new().module(your_crate::module).run()`), and depend on the core by a
+release tag:
 
 ```toml
 [dependencies]
-autoxide-kernel = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+autoxide-kernel = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
 
 [dev-dependencies]
-autoxide-testkit = { git = "https://github.com/<owner>/autoxide", tag = "vX.Y.Z" }
+autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX.Y.Z" }
 ```
+
+[`docs/guides/writing-a-module.md`](guides/writing-a-module.md) goes from an empty repository to
+a running, tested module step by step; [`examples/external-module`](../examples/external-module)
+is that module and its server, built and tested by CI on both databases.
 
 Use the Rust version of that release (`rust-toolchain.toml`) or newer, and the same
 major versions of the public dependencies (table below), or the compiler reports two
-copies of the same type. To run it, add the crate to a checkout
-of Autoxide (`crates/app/Cargo.toml` and `crates/app/src/modules.rs`, step 1).
+copies of the same type.
 
-`cargo xtask check` only runs inside this repository, so a module kept elsewhere follows
-its rules by hand: the two public items, the table prefix, no foreign key to another
-module, every route through `routes!`, translated error codes. Keep the table-ownership
-test (`autoxide_testkit::schema_ownership_violations`) and `TestApp` tests on both
-databases.
+`cargo xtask check-module <dir>` (run from a checkout of this repository) applies the rules of
+`cargo xtask check` that read a module's source to a crate anywhere: the two public items, every
+route through `routes!`, no database access in handlers and tools, translated error codes,
+`tenant_id` on entities, queries filtered by tenant. What lives in the database — the table
+prefix, no foreign key to another module, `tenant_id` first in every index — is checked by tests
+of the test kit (`schema_ownership_violations`, `schema_tenancy_violations`, `leak_check`): keep
+them, and run your tests on both databases.
 
 ## Stability of the module contract
 
 What a module builds on is the **module contract**: the public items of
-`autoxide-kernel` and `autoxide-testkit`, and the libraries whose types appear in them.
+`autoxide-kernel` and `autoxide-testkit`, the entry point `autoxide::Autoxide`, the `api` of the
+official modules (`autoxide_<name>::api`), and the libraries whose types appear in them.
 
 | Library | Version | Seen in |
 | --- | --- | --- |
@@ -803,7 +811,7 @@ What a module builds on is the **module contract**: the public items of
 | `tokio` | 1 | async runtime |
 | `serde`, `serde_json` | 1 | bodies, events, tool arguments |
 | `uuid` | 1 (v7) | ids |
-| `chrono` | 0.4 | times |
+| `jiff` | 1 | durations and time zones (times themselves are `autoxide_kernel::time::Timestamp`) |
 | `async-trait` | 0.1 | traits called through `dyn` |
 | `validator` | 0.21 | `ValidJson<T>` |
 
@@ -811,7 +819,11 @@ Rules the core follows:
 
 - While the version is `0.x`, a breaking change to the contract comes only in a minor
   release (`0.7` → `0.8`) and is listed under **Changed** or **Removed** in
-  `CHANGELOG.md`. A new major version of a library in the table is such a change.
+  `CHANGELOG.md`, with the Rust items under `### Breaking (Rust)`. A patch release (`0.8.0` →
+  `0.8.1`) never breaks the contract. A new major version of a library in the table, or a newer
+  minimum Rust version, is such a change.
+- From `1.0` the contract follows Semantic Versioning: a breaking change comes only in a major
+  release, and `cargo semver-checks` stops a release that breaks it by accident.
 - `Module` only grows by functions with a default body: a module written for an older
   release keeps compiling.
 - Public types that will grow are `#[non_exhaustive]`: build them with their

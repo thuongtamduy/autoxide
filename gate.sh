@@ -19,6 +19,11 @@
 #                         sqlite    bước 7 (kèm doc-test ở gate đầy đủ);
 #                         postgres  bước 8.
 #                       Không có `--only` thì chạy cả ba, như cũ.
+#   --only example      module ở repo riêng (D-20261121-external-modules): `examples/external-module/check.sh` — workspace
+#                       Cargo riêng gồm một module và binary ghép nó với module chính thức; fmt, clippy, test trên
+#                       SQLite và (khi có GATE_POSTGRES_URL) Postgres — cộng `cargo xtask check-module` trên module
+#                       đó. CI chạy job riêng song song. Gate đầy đủ không có `--only` cũng chạy phần này; gate
+#                       nhanh chỉ chạy khi `examples/` đổi so với origin/main (nó build lại cả core ở workspace riêng).
 #   --only build        đi kèm gate đầy đủ hoặc `--pr`: build mọi chương trình test MỘT lần thành archive
 #                       của nextest ở GATE_ARCHIVE_DIR (D-20261120-ci-nextest-archive), kèm file `filter`
 #                       (filterset chọn test: `all()` ở gate đầy đủ, crate bị ảnh hưởng ở `--pr`). Gate đầy
@@ -98,7 +103,7 @@ ONLY=""
 SHARD=()
 ARCHIVE=""
 usage() {
-  echo "usage: ./gate.sh [--quick | --pr] [--only lint|avif|build|sqlite|postgres] [--archive DIR] [--shard k/n]" >&2
+  echo "usage: ./gate.sh [--quick | --pr] [--only lint|avif|example|build|sqlite|postgres] [--archive DIR] [--shard k/n]" >&2
   exit 2
 }
 while [ $# -gt 0 ]; do
@@ -127,7 +132,7 @@ while [ $# -gt 0 ]; do
 done
 [ "$QUICK" = 1 ] && [ "$PR" = 1 ] && usage
 case "$ONLY" in
-  "" | lint | avif | build | sqlite | postgres) ;;
+  "" | lint | avif | example | build | sqlite | postgres) ;;
   *) usage ;;
 esac
 # Archive chỉ để chạy test của một database; `build` thì không chia phần.
@@ -228,6 +233,26 @@ fi
 if [ "$ONLY" = avif ]; then
   tree_unchanged
   printf '\n\033[32mgate --only avif: green — AVIF feature of media\033[0m\n'
+  exit 0
+fi
+
+# --- Module ở repo riêng: phần riêng (`--only example`) -----------------------------------------------
+# `examples/external-module` là workspace Cargo riêng (D-20261121-external-modules): build lại cả core với bộ
+# feature của người ngoài, nên không nằm trong lint hay test của workspace gốc. Thư mục build riêng
+# (`examples/external-module/target`) trừ khi CARGO_TARGET_DIR đã đặt.
+example_needed() {
+  [ "$QUICK" = 1 ] || return 0
+  git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
+  git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- examples | grep -q .
+}
+if runs example && example_needed; then
+  step "module outside the repository: rules (cargo xtask check-module)"
+  cargo xtask check-module examples/external-module/bookmarks
+  step "module outside the repository: examples/external-module/check.sh"
+  POSTGRES_URL="${GATE_POSTGRES_URL:-}" ./examples/external-module/check.sh
+fi
+if [ "$ONLY" = example ]; then
+  printf '\n\033[32mgate --only example: green — module outside the repository\033[0m\n'
   exit 0
 fi
 

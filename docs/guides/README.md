@@ -20,3 +20,7 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Trying changes in a sandbox](sandbox.md): a test copy of your tenant, simulated partners, bringing drafts back
 - [Automating work with rules](automations.md): triggers, conditions, MCP tools as actions, approvals, alerts on unusual figures
 - [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases
+
+For developers who extend the core:
+
+- [Writing a module in your own repository](writing-a-module.md): your module and your server next to the official modules, tests on both databases, no fork

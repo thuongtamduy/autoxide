@@ -1,0 +1,10 @@
+{
+  "bookmarks.bookmark_not_found": "Bạn không có bookmark `{id}`.",
+  "bookmarks.url_taken": "Bạn đã lưu liên kết `{url}` rồi.",
+  "field:must be 1 to {title_max_length} characters, not only spaces": "phải dài 1 đến {title_max_length} ký tự, không chỉ có khoảng trắng",
+  "field:must be an http:// or https:// address of at most {url_max_length} characters": "phải là địa chỉ http:// hoặc https:// dài tối đa {url_max_length} ký tự",
+  "text:A bookmark was created.": "Một bookmark được tạo.",
+  "text:A bookmark was deleted.": "Một bookmark bị xoá.",
+  "text:Create and delete your own bookmarks.": "Tạo và xoá bookmark của chính bạn.",
+  "text:See your own bookmarks.": "Xem bookmark của chính bạn."
+}
