@@ -403,7 +403,9 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
         let (app, tree) = app(test).await;
         let list = price_list(&app, tree.chain).await;
         let (_, variant) = on_sale(&app, &list, tree.chain, "H-1", "Bình hoa", 200_000).await;
-        let ends = chrono::Utc::now() + chrono::Duration::seconds(2);
+        // Đủ rộng để lượt đọc đầu (sau khi dựng lại storefront) chắc chắn còn trong hạn kể cả khi máy CI
+        // chậm — 2 giây từng hết hạn trước lượt đọc đầu trên Postgres 18.
+        let ends = chrono::Utc::now() + chrono::Duration::seconds(8);
         let body = json!({"reference": "sale", "prices": [{"variant_id": variant, "amount": vnd(150_000), "valid_to": ends}]});
         let (status, added) =
             call(&app, "POST", &format!("/price-lists/{list}/prices"), "boss", Some(body)).await;
@@ -413,7 +415,9 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
         let (_, listed, _) = public(&app, &uri, None).await;
         assert_eq!(listed["data"][0]["price_from"], vnd(150_000));
 
-        tokio::time::sleep(std::time::Duration::from_millis(2_500)).await;
+        // Ngủ tới khi giá tạm thật sự hết hạn (cộng một chút), không ngủ một khoảng cố định.
+        let left = (ends - chrono::Utc::now()).to_std().unwrap_or_default();
+        tokio::time::sleep(left + std::time::Duration::from_millis(500)).await;
         let queue = autoxide_kernel::job::JobQueue::new("catalog");
         queue
             .enqueue_database(app.database().write(), &Tick, Default::default())

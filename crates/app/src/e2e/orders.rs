@@ -70,6 +70,20 @@ async fn gio_vang_lai_dat_hang_tra_qua_cong_thi_don_xac_nhan() {
         let uri = format!("/catalog/price-lists/{}/prices", list["data"]["id"].as_str().unwrap());
         let (status, added) = call(&app, "POST", &uri, &boss, Some(prices)).await;
         assert_eq!(status, StatusCode::OK, "{added}");
+        // Hàng số cần một file trước khi mở bán: tải lên qua `files`, gắn vào biến thể.
+        let uploaded = app
+            .post("/api/v1/files?name=course.pdf")
+            .header("authorization", "Bearer boss")
+            .header("content-type", "application/pdf")
+            .bytes(b"%PDF-1.4 course".to_vec())
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(uploaded.status(), StatusCode::CREATED, "{}", uploaded.text());
+        let file = json!({"file_id": uploaded.json()["data"]["id"]});
+        let uri = format!("/catalog/variants/{variant}/digital-assets");
+        let (status, attached) = call(&app, "POST", &uri, &boss, Some(file)).await;
+        assert_eq!(status, StatusCode::CREATED, "{attached}");
         let uri = format!("/catalog/products/{product_id}/status");
         let (status, active) = call(&app, "POST", &uri, &[boss[0], ("if-match", "*")], Some(json!({"status": "active"}))).await;
         assert_eq!(status, StatusCode::OK, "{active}");

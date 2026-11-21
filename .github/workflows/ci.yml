@@ -156,13 +156,31 @@ jobs:
           java-version: "21"
       # Phiên bản openapi-generator và tham số của từng SDK ở sdk/openapitools.json; tải jar thẳng từ
       # Maven Central (bản bọc npm dùng API tìm kiếm của Maven, hay bị giới hạn lượt gọi).
+      # Jar của generator giữ trong cache theo phiên bản: Maven Central thỉnh thoảng trả 429 (quá lượt gọi)
+      # khi nhiều job tải cùng lúc — tải một lần, các lượt sau lấy từ cache.
+      - name: generator version
+        id: generator
+        if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
+        run: echo "version=$(jq -r '."generator-cli".version' sdk/openapitools.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v6
+        if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
+        with:
+          path: ~/.cache/openapi-generator
+          key: openapi-generator-${{ steps.generator.outputs.version }}
       - name: generate
         if: steps.changed.outputs.run == 'true' && matrix.sdk != 'swift'
         run: |
           config=sdk/openapitools.json
-          version=$(jq -r '."generator-cli".version' "$config")
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/openapi-generator.jar" \
-            "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/$version/openapi-generator-cli-$version.jar"
+          version=${{ steps.generator.outputs.version }}
+          jar="$HOME/.cache/openapi-generator/openapi-generator-cli-$version.jar"
+          if [ ! -s "$jar" ]; then
+            mkdir -p "$(dirname "$jar")"
+            # 429 là lỗi tạm: thử lại có giãn cách (curl coi 429 là lỗi thử lại được với --retry).
+            curl -fsSL --retry 6 --retry-delay 10 --retry-max-time 180 -o "$jar.part" \
+              "https://repo1.maven.org/maven2/org/openapitools/openapi-generator-cli/$version/openapi-generator-cli-$version.jar"
+            mv "$jar.part" "$jar"
+          fi
+          cp "$jar" "$RUNNER_TEMP/openapi-generator.jar"
           generator=".\"generator-cli\".generators.${{ matrix.sdk }}"
           java -jar "$RUNNER_TEMP/openapi-generator.jar" generate \
             -g "$(jq -r "$generator.generatorName" "$config")" \

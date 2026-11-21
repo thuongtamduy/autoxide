@@ -8,6 +8,7 @@ use autoxide_kernel::migration::prelude::*;
 
 mod collection_ai;
 mod collections;
+mod digital;
 mod media_alts;
 mod net_content;
 mod recommend;
@@ -51,6 +52,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(media_alts::CreateMediaAlts),
         // Thuộc tính theo biến thể cho trang sản phẩm.
         Box::new(variant_attributes::CreateVariantAttributes),
+        // Hàng số: file của biến thể, quyền tải theo dòng đơn.
+        Box::new(digital::CreateDigital),
     ]
 }
 

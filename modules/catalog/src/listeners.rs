@@ -8,6 +8,9 @@
 //!   "currency": "VND"}}}` — xem `api::events::INVENTORY_COST_CHANGED`.
 //! - `orders.order_completed`, `orders.review_published` / `review_moderated` (module `orders`,
 //!   đăng ký sau `catalog`) → số bán, mua cùng, điểm đánh giá (`recommend.rs`).
+//! - `orders.order_confirmed` (đã trả tiền) → phát quyền tải hàng số; `orders.order_cancelled`,
+//!   `orders.refund_completed` không gắn trả hàng → thu hồi (`digital.rs`). Phát theo khoá
+//!   (dòng đơn, file) và thu hồi chỉ đặt `revoked_at` khi chưa có: nhận lại không đổi gì thêm.
 
 use std::sync::Arc;
 
@@ -21,10 +24,11 @@ use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
 use crate::api::events::{
-    INVENTORY_COST_CHANGED, ORDERS_ORDER_COMPLETED, ORDERS_REVIEW_MODERATED,
-    ORDERS_REVIEW_PUBLISHED,
+    INVENTORY_COST_CHANGED, ORDERS_ORDER_CANCELLED, ORDERS_ORDER_COMPLETED, ORDERS_ORDER_CONFIRMED,
+    ORDERS_REFUND_COMPLETED, ORDERS_REVIEW_MODERATED, ORDERS_REVIEW_PUBLISHED,
 };
-use crate::entity::{price, price_list, product};
+use crate::digital::PaidLine;
+use crate::entity::{download_grant, price, price_list, product};
 use crate::service::CatalogService;
 
 /// Nút tổ chức đổi chỗ hay đổi trạng thái (module `organizations`): website nào thấy sản phẩm nào
@@ -45,6 +49,9 @@ pub(crate) fn subscriptions(service: &Arc<CatalogService>) -> Vec<Subscription> 
         Subscription::optional(ORDERS_ORDER_COMPLETED, service.clone()),
         Subscription::optional(ORDERS_REVIEW_PUBLISHED, service.clone()),
         Subscription::optional(ORDERS_REVIEW_MODERATED, service.clone()),
+        Subscription::optional(ORDERS_ORDER_CONFIRMED, service.clone()),
+        Subscription::optional(ORDERS_ORDER_CANCELLED, service.clone()),
+        Subscription::optional(ORDERS_REFUND_COMPLETED, service.clone()),
     ]
 }
 
@@ -98,6 +105,36 @@ impl EventHandler for CatalogService {
             };
             return self.record_rating(&event.tenant, product, count, sum).await;
         }
+        if event.name == ORDERS_ORDER_CONFIRMED {
+            let after = &event.payload["after"];
+            if after["payment_status"].as_str() != Some("paid") {
+                // Thu khi giao (COD) hay chưa trả: chưa phát quyền tải.
+                return Ok(());
+            }
+            let Some((order, buyer, lines)) = paid_order(after) else {
+                tracing::warn!(event_id = %event.id, "orders.order_confirmed without order_id or lines; ignored");
+                return Ok(());
+            };
+            return self.issue_downloads(&event.tenant, order, buyer, &lines).await.map(|_| ());
+        }
+        if event.name == ORDERS_ORDER_CANCELLED || event.name == ORDERS_REFUND_COMPLETED {
+            let after = &event.payload["after"];
+            // Hoàn tiền của một lần trả hàng chỉ có hàng vật lý (hàng số không trả được).
+            if event.name == ORDERS_REFUND_COMPLETED && !after["return_id"].is_null() {
+                return Ok(());
+            }
+            let Some(order) = after["order_id"].as_str().and_then(|id| id.parse().ok()) else {
+                tracing::warn!(event_id = %event.id, event = %event.name, "order event without order_id; ignored");
+                return Ok(());
+            };
+            let reason =
+                if event.name == ORDERS_ORDER_CANCELLED { "cancelled" } else { "refunded" };
+            let actor = autoxide_kernel::event::Actor::system();
+            return self
+                .revoke_downloads(&event.tenant, actor, order, None, reason)
+                .await
+                .map(|_| ());
+        }
         if event.name == UNIT_MOVED || event.name == UNIT_STATUS_CHANGED {
             // Job tính lại từ đầu: nhận lại event chỉ dựng lại thêm một lần.
             let write = event.tenant.database().write();
@@ -129,7 +166,31 @@ impl CatalogService {
             .scoped(tenant)
             .exec(write)
             .await?;
+        // Quyền tải vẫn dùng được bằng token đã gửi; chỉ bỏ liên kết với tài khoản đã xoá.
+        download_grant::Entity::update_many()
+            .col_expr(download_grant::Column::BuyerId, Expr::value(None::<Uuid>))
+            .filter(download_grant::Column::BuyerId.eq(user_id))
+            .scoped(tenant)
+            .exec(write)
+            .await?;
         tracing::info!(user_id = %user_id, "catalog records of a deleted user anonymised");
         Ok(())
     }
+}
+
+/// Đọc `order_id`, `buyer_user_id` và `lines[].{line_id, variant_id}` của đơn đã trả tiền.
+fn paid_order(after: &serde_json::Value) -> Option<(Uuid, Option<Uuid>, Vec<PaidLine>)> {
+    let order: Uuid = after.get("order_id")?.as_str()?.parse().ok()?;
+    let buyer = after.get("buyer_user_id").and_then(|id| id.as_str()?.parse().ok());
+    let lines = after
+        .get("lines")?
+        .as_array()?
+        .iter()
+        .filter_map(|line| {
+            let line_id = line.get("line_id")?.as_str()?.parse().ok()?;
+            let variant_id = line.get("variant_id")?.as_str()?.parse().ok()?;
+            Some(PaidLine { line_id, variant_id })
+        })
+        .collect();
+    Some((order, buyer, lines))
 }

@@ -168,6 +168,36 @@ async fn concurrent_checkouts_same_key_create_one_order() {
 }
 
 #[tokio::test]
+async fn concurrent_checkouts_other_keys_same_cart_create_one_order() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        let shirt = shop.catalog.add(shop.tree.a, 100_000);
+        shop.inventory.stock(shop.tree.a, shirt, 100);
+        let buyer = Call::as_user(&shop, "buyer1");
+        let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 1).await;
+        // Mỗi lần một `Idempotency-Key` khác trên cùng giỏ. Bước kiểm giỏ còn mở chạy ngoài
+        // transaction: nhiều lần từng cùng qua và ra nhiều đơn từ một giỏ (cả hai DB).
+        let keys: Vec<String> = (0..8).map(|index| format!("other-{index}")).collect();
+        let attempts =
+            keys.iter().map(|key| checkout(&buyer, Some(key), body(&cart, &quote, "cod")));
+        let outcomes = join_all(attempts).await;
+        let created = outcomes.iter().filter(|(status, _)| *status == StatusCode::CREATED).count();
+        assert_eq!(created, 1, "{outcomes:?}");
+        for (status, answer) in &outcomes {
+            assert!(
+                *status == StatusCode::CREATED || answer["code"] == "orders.cart_closed",
+                "{status} {answer}"
+            );
+        }
+        assert_eq!(orders_count(&shop).await, 1);
+        // Lượt thua đã trả chỗ giữ: chỉ một cái bị giữ.
+        assert_eq!(shop.inventory.available(shop.tree.a, shirt), 99);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn last_unit_concurrent_checkouts() {
     TestDatabase::run(async |test| {
         let shop = shop(test).await;

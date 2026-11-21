@@ -769,3 +769,7 @@ pub(crate) use recommend::{co_purchase, embedding, product_stat, similar_product
 // Nhập / xuất CSV (m0014).
 mod transfer_entity;
 pub(crate) use transfer_entity::{media_alt, suggestion, transfer, variant_attribute};
+
+// Hàng số (m0019).
+mod digital;
+pub(crate) use digital::{digital_asset, download_grant};

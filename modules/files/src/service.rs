@@ -301,6 +301,40 @@ impl FileService {
     }
 }
 
+fn info(file: &FileRecord) -> crate::api::FileInfo {
+    crate::api::FileInfo::new(
+        file.id,
+        file.name.clone(),
+        file.content_type.clone(),
+        u64::try_from(file.size).unwrap_or_default(),
+        file.sha256.clone(),
+        file.created_at,
+    )
+}
+
+#[async_trait::async_trait]
+impl crate::api::Files for FileService {
+    async fn find(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<crate::api::FileInfo, Error> {
+        Ok(info(&self.get(tenant, principal, id).await?))
+    }
+
+    async fn open(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        id: Uuid,
+    ) -> Result<crate::api::OpenedFile, Error> {
+        let download = self.download(tenant, principal, id, |_| false).await?;
+        let Download { file, content } = download.ok_or_else(|| file_not_found(id))?;
+        Ok(crate::api::OpenedFile::new(info(&file), content))
+    }
+}
+
 /// Người gọi xem được file nếu là chủ (và còn `files.upload`) hoặc có `files.manage`.
 /// Không được xem thì báo "không có" — không để lộ file của người khác có tồn tại.
 fn visible(principal: &Principal, file: Option<FileRecord>, id: Uuid) -> Result<FileRecord, Error> {

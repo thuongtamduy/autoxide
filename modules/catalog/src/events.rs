@@ -47,9 +47,20 @@ event!(CollectionChanged, "catalog.collection_changed");
 event!(ImportCompleted, "catalog.import_completed");
 event!(DisplayPriceChanged, names::DISPLAY_PRICE_CHANGED);
 event!(ExportCompleted, "catalog.export_completed");
+event!(DownloadsIssued, "catalog.downloads_issued");
+event!(DownloadsRevoked, "catalog.downloads_revoked");
 
 pub(crate) fn all() -> Vec<EventInfo> {
     vec![
+        EventInfo::new(
+            "catalog.downloads_issued",
+            "Download rights of a digital product were given for a paid order (`after.grants`; \
+             never the download token).",
+        ),
+        EventInfo::new(
+            "catalog.downloads_revoked",
+            "Download rights of an order were revoked (order cancelled or refunded, or by staff).",
+        ),
         EventInfo::new(names::PRODUCT_CREATED, "A product was created."),
         EventInfo::new(names::PRODUCT_UPDATED, "A product's details, texts or images changed."),
         EventInfo::new(

@@ -75,6 +75,19 @@ pub mod events {
     /// Như [`ORDERS_REVIEW_PUBLISHED`], khi đánh giá bị ẩn hay mở lại.
     pub const ORDERS_REVIEW_MODERATED: &str = "orders.review_moderated";
 
+    /// Event của module `orders` (bước 45): đơn được xác nhận. `catalog` phát quyền tải hàng số khi
+    /// `after.payment_status = "paid"`, đọc `after.order_id`, `after.buyer_user_id` (có thể `null`) và
+    /// `after.lines[].{line_id, variant_id}`. Nhận lại cùng đơn không phát thêm (khoá theo
+    /// `line_id` và file).
+    pub const ORDERS_ORDER_CONFIRMED: &str = "orders.order_confirmed";
+    /// Event của module `orders`: đơn bị huỷ — `catalog` thu hồi mọi quyền tải của `after.order_id`.
+    pub const ORDERS_ORDER_CANCELLED: &str = "orders.order_cancelled";
+    /// Event của module `orders`: một lần hoàn tiền xong. Hoàn tiền không gắn trả hàng
+    /// (`after.return_id = null`) là hoàn cả đơn hay một phần do người bán quyết — `catalog` thu hồi
+    /// quyền tải của `after.order_id`. Hoàn tiền của một lần trả hàng chỉ là hàng vật lý (hàng số
+    /// không trả được) nên không đụng tới quyền tải.
+    pub const ORDERS_REFUND_COMPLETED: &str = "orders.refund_completed";
+
     // Hai bộ đọc dưới đây là hợp đồng payload: `catalog` đọc event của `orders` bằng đúng chúng,
     // và test của `orders` dùng chúng để kiểm event mình phát khớp hợp đồng.
 

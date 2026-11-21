@@ -1129,6 +1129,22 @@ export type CatalogAddedPrices = {
   warnings: CatalogPriceWarning[];
 };
 
+/** Attach a file to a digital variant. */
+export type CatalogAttachDigitalAsset = {
+  /** Downloads each buyer gets, 1 to 1000; omitted: `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT`. */
+  download_limit?: number | null;
+  /**
+   * A file you uploaded with `POST /api/v1/files` (or `/api/v1/files/uploads`). Its content is
+   * copied: deleting the uploaded file later does not affect buyers.
+   */
+  file_id: string;
+  /**
+   * Days a buyer can download after paying, 1 to 3650; omitted:
+   * `AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS`.
+   */
+  grant_days?: number | null;
+};
+
 /** An attribute products can have (origin, material, size of the box…). */
 export type CatalogAttribute = {
   code: string;
@@ -1528,6 +1544,64 @@ export type CatalogCreateRoundingRule = {
   name: string;
   /** Step in minor units, above 0, e.g. `10000`. */
   step_minor: number;
+};
+
+/** A file of a digital product variant. */
+export type CatalogDigitalAsset = {
+  content_type: string;
+  created_at: string;
+  /** Downloads each buyer gets for each order line. */
+  download_limit: number;
+  /** Name the buyer's download is saved as. */
+  file_name: string;
+  /** Days a buyer can download after paying. */
+  grant_days: number;
+  id: string;
+  product_id: string;
+  /** SHA-256 of the content, lower-case hex. */
+  sha256: string;
+  /** Size in bytes. */
+  size: number;
+  variant_id: string;
+};
+
+/** The right of a buyer to download one file of one order line. */
+export type CatalogDownloadGrant = {
+  asset_id: string;
+  created_at: string;
+  expires_at: string;
+  file_name: string;
+  id: string;
+  order_id: string;
+  order_line_id: string;
+  /** Downloads left. */
+  remaining: number;
+  /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+  revoked_at?: string | null;
+  /**
+   * Only right after the token was issued: the path to `POST` to spend one download, without
+   * signing in. It cannot be read again later; send it to the buyer.
+   */
+  token_path?: string | null;
+  variant_id: string;
+};
+
+/** A short-lived address of the file, after one download was spent. */
+export type CatalogDownloadLink = {
+  expires_at: string;
+  file_name: string;
+  /** Downloads left after this one. */
+  remaining: number;
+  /**
+   * Path (under the same host) to `GET` the file; works without signing in until `expires_at`,
+   * accepts `Range`, and does not spend more downloads.
+   */
+  url: string;
+};
+
+/** How many rights were revoked. */
+export type CatalogDownloadsRevoked = {
+  revoked: number;
 };
 
 /** What to export. */
@@ -6029,6 +6103,52 @@ export type Data_CatalogCollectionItems = {
   data: {
     /** Product ids, first shown first; at most 500. */
     product_ids: string[];
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogDigitalAsset = {
+  /** A file of a digital product variant. */
+  data: {
+    content_type: string;
+    created_at: string;
+    /** Downloads each buyer gets for each order line. */
+    download_limit: number;
+    /** Name the buyer's download is saved as. */
+    file_name: string;
+    /** Days a buyer can download after paying. */
+    grant_days: number;
+    id: string;
+    product_id: string;
+    /** SHA-256 of the content, lower-case hex. */
+    sha256: string;
+    /** Size in bytes. */
+    size: number;
+    variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogDownloadLink = {
+  /** A short-lived address of the file, after one download was spent. */
+  data: {
+    expires_at: string;
+    file_name: string;
+    /** Downloads left after this one. */
+    remaining: number;
+    /**
+     * Path (under the same host) to `GET` the file; works without signing in until `expires_at`,
+     * accepts `Range`, and does not spend more downloads.
+     */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogDownloadsRevoked = {
+  /** How many rights were revoked. */
+  data: {
+    revoked: number;
   };
 };
 
@@ -13368,6 +13488,50 @@ export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogDigitalAsset = {
+  data: {
+    content_type: string;
+    created_at: string;
+    /** Downloads each buyer gets for each order line. */
+    download_limit: number;
+    /** Name the buyer's download is saved as. */
+    file_name: string;
+    /** Days a buyer can download after paying. */
+    grant_days: number;
+    id: string;
+    product_id: string;
+    /** SHA-256 of the content, lower-case hex. */
+    sha256: string;
+    /** Size in bytes. */
+    size: number;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogDownloadGrant = {
+  data: {
+    asset_id: string;
+    created_at: string;
+    expires_at: string;
+    file_name: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    /** Downloads left. */
+    remaining: number;
+    /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+    revoked_at?: string | null;
+    /**
+     * Only right after the token was issued: the path to `POST` to spend one download, without
+     * signing in. It cannot be read again later; send it to the buyer.
+     */
+    token_path?: string | null;
     variant_id: string;
   }[];
 };
@@ -21388,6 +21552,31 @@ export type Page_CatalogCollection = {
       [key: string]: CatalogCollectionText;
     };
     updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_CatalogDownloadGrant = {
+  /** The items of this page, in the requested order. */
+  data: {
+    asset_id: string;
+    created_at: string;
+    expires_at: string;
+    file_name: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    /** Downloads left. */
+    remaining: number;
+    /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+    revoked_at?: string | null;
+    /**
+     * Only right after the token was issued: the path to `POST` to spend one download, without
+     * signing in. It cannot be read again later; send it to the buyer.
+     */
+    token_path?: string | null;
+    variant_id: string;
   }[];
   pagination: Pagination;
 };
@@ -34115,6 +34304,47 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/digital-assets/{id}": {
+    /** Remove a file from a digital variant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/downloads": {
+    /** List your download rights. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/downloads/{id}": {
+    /** Spend one download of one of your rights. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogDownloadLink;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/exports": {
     /** Export products to a CSV file. */
     post: {
@@ -34178,6 +34408,45 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads": {
+    /** List the download rights of an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads/reissue": {
+    /** Give new download tokens for an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads/revoke": {
+    /** Revoke the download rights of an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogDownloadsRevoked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -34684,6 +34953,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/downloads/{id}/file": {
+    /** Download the file of a signed address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { exp: number; sig: string }; };
+      responses: {
+        200: Blob;
+        206: Blob;
+        403: Problem;
+        404: Problem;
+        416: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/downloads/{token}": {
+    /** Spend one download with a token (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { token: string }; };
+      responses: {
+        200: Data_CatalogDownloadLink;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/public/products": {
     /** List products on sale (public). */
     get: {
@@ -34955,6 +35251,33 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}/digital-assets": {
+    /** List the files of a digital variant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDigitalAsset;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Attach a file to a variant of a digital product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAttachDigitalAsset;
+      responses: {
+        201: Data_CatalogDigitalAsset;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };
