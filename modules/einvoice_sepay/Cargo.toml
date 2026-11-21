@@ -1,0 +1,25 @@
+[package]
+name = "autoxide-einvoice-sepay"
+description = "Autoxide adapter for SePay eInvoice (Vietnamese e-invoices sent to the tax authority through SePay), with one SePay eInvoice account per tenant. Experimental: written from the provider's public documentation; not yet verified against the live service."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+autoxide-kernel.workspace = true
+base64.workspace = true
+bytes.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+autoxide-testkit.workspace = true
+axum.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[lints]
+workspace = true

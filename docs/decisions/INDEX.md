@@ -495,6 +495,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-363** Vụ việc: báo vi phạm sở hữu trí tuệ / hàng giả, ẩn đích qua hợp đồng kernel, cung cấp thông tin cho cơ quan (bước 37) — 2026-11-17
 - **D-364** Bảo vệ người tiêu dùng: lý do được ẩn đánh giá, kênh khiếu nại, điều kiện giao dịch chung (bước 37) — 2026-11-17
 - **[D-20261118-step43-legal-data](D-20261118-step43-legal-data.md)** Khuyến mại: hạn mức pháp luật là dữ liệu, chặn khi chưa thông báo — 2026-11-18
+- **[D-20261121-sepay-einvoice](D-20261121-sepay-einvoice.md)** Bộ nối SePay eInvoice sau `EInvoiceProvider`: gửi và phát hành ngay, hỏi trạng thái theo mã tracking — 2026-11-21
 
 ## Thương mại
 

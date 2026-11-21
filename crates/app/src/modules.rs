@@ -38,6 +38,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
         // toán và module thương mại (sau) ghi sổ qua `dyn Ledger`.
         Box::new(autoxide_ledger::module()),
+        // Bộ nối SePay eInvoice (bước 70 P7, thử nghiệm): góp `dyn EInvoiceProvider` cho `invoices`,
+        // nên đứng trước nó.
+        Box::new(autoxide_einvoice_sepay::module()),
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),

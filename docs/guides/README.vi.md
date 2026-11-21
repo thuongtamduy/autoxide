@@ -22,3 +22,4 @@ Tiếng Anh: [`README.md`](README.md).
 - [Làm app điện thoại hay app máy tính](mobile.vi.md): SDK, token và PKCE, thông báo đẩy, đồng bộ khi mất mạng, WebSocket, mua trong ứng dụng
 - [Viết một bộ nối nhà cung cấp](provider-adapters.vi.md): tài khoản theo khách, secret, webhook, test không ra mạng (cho người phát triển)
 - [Xác nhận chuyển khoản bằng SePay](sepay.vi.md): tài khoản SePay riêng của từng khách, địa chỉ webhook, thanh toán VietQR tự được xác nhận (thử nghiệm)
+- [Xuất hoá đơn điện tử qua SePay eInvoice](sepay-einvoice.vi.md): tài khoản SePay eInvoice riêng của từng khách, gửi gì và không gửi gì tới cơ quan thuế (thử nghiệm)

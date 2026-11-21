@@ -22,3 +22,4 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Building a mobile or desktop app](mobile.md): SDKs, tokens and PKCE, push, offline sync, WebSocket, in-app purchases
 - [Writing a provider adapter](provider-adapters.md): per-tenant accounts, secrets, webhooks, testing without the network (for developers)
 - [Confirming bank transfers with SePay](sepay.md): your own SePay account per tenant, the webhook address, VietQR payments confirmed by themselves (experimental)
+- [Issuing e-invoices through SePay eInvoice](sepay-einvoice.md): your own SePay eInvoice account per tenant, what is sent to the tax authority and what is not (experimental)

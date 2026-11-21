@@ -116,7 +116,7 @@ thật (P7).
   - [ ] Thanh toán: MoMo
   - [ ] Vận chuyển: Giao Hàng Nhanh
   - [ ] SMS: eSMS
-  - [ ] Hoá đơn điện tử: SePay eInvoice
+  - [x] Hoá đơn điện tử: SePay eInvoice
 - [ ] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →
       thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm

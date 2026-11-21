@@ -59,6 +59,7 @@ autoxide-plans = { path = "modules/plans" }
 autoxide-tax = { path = "modules/tax" }
 autoxide-ledger = { path = "modules/ledger" }
 autoxide-sepay = { path = "modules/sepay" }
+autoxide-einvoice-sepay = { path = "modules/einvoice_sepay" }
 autoxide-invoices = { path = "modules/invoices" }
 autoxide-compliance = { path = "modules/compliance" }
 autoxide-notifications = { path = "modules/notifications" }
