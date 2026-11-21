@@ -53,6 +53,8 @@ pub(crate) mod entity {
         pub enabled: bool,
         pub created_at: Timestamp,
         pub updated_at: Timestamp,
+        /// Người tạo hay sửa gần nhất (D-20261121-oidc-link-covers); `None`: dòng có từ trước.
+        pub configured_by: Option<Uuid>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -277,6 +279,7 @@ impl ProviderService {
             enabled: input.enabled,
             created_at: now,
             updated_at: now,
+            configured_by: Some(principal.user_id()),
         };
         if kind == Kind::Google && row.issuer.is_none() {
             row.issuer = Some(GOOGLE_ISSUER.to_owned());
@@ -402,6 +405,7 @@ impl ProviderService {
         active.default_role_id = Set(row.default_role_id);
         active.enabled = Set(row.enabled);
         active.updated_at = Set(row.updated_at);
+        active.configured_by = Set(Some(principal.user_id()));
         let row = active.update(&transaction).await?;
         let mut after = describe(&row);
         after["secret_changed"] = json!(secret_changed);
