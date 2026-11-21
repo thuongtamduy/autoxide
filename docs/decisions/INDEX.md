@@ -96,6 +96,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
 - **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-ci-sccache-build](D-20261121-ci-sccache-build.md)** sccache cho job build tests của CI, không cho lint — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
