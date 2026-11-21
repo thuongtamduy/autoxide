@@ -525,6 +525,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step47-stored-value](D-20261120-step47-stored-value.md)** Thẻ quà tặng và số dư cửa hàng của `customers` (bước 47 mục 4): tắt hai lớp, khép kín trong khách phát hành, không đường rút tiền, chỉ đếm mã sai — 2026-11-20
 - **[D-20261120-step47-wishlist-alerts](D-20261120-step47-wishlist-alerts.md)** Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (bước 47, D-233): tự bật kèm đồng ý riêng, chỉ giảm thật so với mốc, gom lô theo khung giờ — 2026-11-20
 - **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
+- **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
 
 ## Vận hành và hiệu năng
 
