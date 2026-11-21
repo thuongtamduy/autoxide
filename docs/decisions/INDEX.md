@@ -97,6 +97,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
 - **[D-20261121-auto-release](D-20261121-auto-release.md)** Merge PR phát hành là phát hành: GitHub tự tạo tag và chạy Release khi CI của commit đó xanh — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-ci-mold-shards](D-20261121-ci-mold-shards.md)** CI: mold làm linker cho job build tests; test Postgres chia 6 phần — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-sccache-build](D-20261121-ci-sccache-build.md)** sccache cho job build tests của CI, không cho lint — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
