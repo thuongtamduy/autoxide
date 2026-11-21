@@ -88,6 +88,7 @@ api-unpaged-list GET /api/v1/inventory/public/availability # có trước luật
 api-unpaged-list GET /api/v1/inventory/reports/valuation # có trước luật
 api-unpaged-list GET /api/v1/invoices/export-profiles # có trước luật
 api-unpaged-list GET /api/v1/kernel/approvals # có trước luật
+api-unpaged-list GET /api/v1/kernel/connections/webhooks # một dòng cho mỗi loại kết nối mà bộ nối đang bật đăng ký (D-20261121-provider-accounts): tập nhỏ, cố định theo binary
 api-unpaged-list GET /api/v1/kernel/custom-fields # có trước luật
 api-unpaged-list GET /api/v1/kernel/devtools/events # có trước luật
 api-unpaged-list GET /api/v1/kernel/jobs # có trước luật

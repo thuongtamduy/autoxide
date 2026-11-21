@@ -222,6 +222,7 @@
         "type": "object"
       },
       "AddPasskeyRequest": {
+        "additionalProperties": false,
         "description": "The authenticator's answer to an add-passkey ceremony.",
         "properties": {
           "ceremony_id": {
@@ -384,6 +385,7 @@
         "type": "object"
       },
       "AddressInput": {
+        "additionalProperties": false,
         "description": "An address to check: codes only; names are filled in.",
         "properties": {
           "commune_code": {
@@ -2695,6 +2697,7 @@
         "type": "object"
       },
       "BulkRequest": {
+        "additionalProperties": false,
         "description": "Records to act on: either `ids`, or `filter` with `expected_count`.",
         "properties": {
           "dry_run": {
@@ -3038,6 +3041,7 @@
         "type": "object"
       },
       "CanRequest": {
+        "additionalProperties": false,
         "description": "The questions.",
         "properties": {
           "checks": {
@@ -3167,6 +3171,7 @@
         "type": "object"
       },
       "CatalogAttachDigitalAsset": {
+        "additionalProperties": false,
         "description": "Attach a file to a digital variant.",
         "properties": {
           "download_limit": {
@@ -4529,6 +4534,7 @@
         "type": "object"
       },
       "CatalogExportRequest": {
+        "additionalProperties": false,
         "description": "What to export.",
         "properties": {
           "org_id": {
@@ -4674,6 +4680,7 @@
         "type": "object"
       },
       "CatalogImageDraftRequest": {
+        "additionalProperties": false,
         "description": "Draft a product from photos.",
         "properties": {
           "category_id": {
@@ -4748,6 +4755,7 @@
         "type": "object"
       },
       "CatalogMediaAltRequest": {
+        "additionalProperties": false,
         "description": "The alternative text of an image in one language.",
         "properties": {
           "alt": {
@@ -6691,6 +6699,7 @@
         "type": "object"
       },
       "CatalogSuggestionRequest": {
+        "additionalProperties": false,
         "description": "Which language to draft.",
         "properties": {
           "locale": {
@@ -7696,6 +7705,7 @@
         "type": "object"
       },
       "ChangeEmailRequest": {
+        "additionalProperties": false,
         "description": "A new email address for the signed-in account.",
         "properties": {
           "current_password": {
@@ -7721,6 +7731,7 @@
         "type": "object"
       },
       "ChangePasswordRequest": {
+        "additionalProperties": false,
         "description": "The current password and the new one.",
         "properties": {
           "current_password": {
@@ -8099,6 +8110,7 @@
         "type": "object"
       },
       "CodeRequest": {
+        "additionalProperties": false,
         "description": "A code from the authenticator app, or (where stated) a recovery code.",
         "properties": {
           "code": {
@@ -13845,6 +13857,7 @@
         "type": "object"
       },
       "CreateApiKeyRequest": {
+        "additionalProperties": false,
         "description": "A key to create.",
         "properties": {
           "allowed_ips": {
@@ -14557,6 +14570,7 @@
         "description": "A new post or page, created as a draft."
       },
       "CreateExportRequest": {
+        "additionalProperties": false,
         "description": "What to export. The body may be omitted.",
         "properties": {
           "status": {
@@ -15071,6 +15085,7 @@
         "type": "object"
       },
       "CreateScimGroupMappingRequest": {
+        "additionalProperties": false,
         "description": "A new mapping rule.",
         "properties": {
           "group_id": {
@@ -15097,6 +15112,7 @@
         "type": "object"
       },
       "CreateScimTokenRequest": {
+        "additionalProperties": false,
         "description": "A new SCIM token.",
         "properties": {
           "name": {
@@ -15365,6 +15381,7 @@
         "type": "object"
       },
       "CreateUserRequest": {
+        "additionalProperties": false,
         "description": "A new account.",
         "properties": {
           "email": {
@@ -49847,6 +49864,7 @@
         "type": "object"
       },
       "DeleteAccountRequest": {
+        "additionalProperties": false,
         "description": "Confirms deleting your own account.",
         "properties": {
           "current_password": {
@@ -50204,6 +50222,7 @@
         "description": "A comment just changed, for its author."
       },
       "EmailChangeReport": {
+        "additionalProperties": false,
         "description": "The token from the mail sent to the old address after an email change.",
         "properties": {
           "token": {
@@ -51180,6 +51199,7 @@
         "type": "object"
       },
       "FieldSettings": {
+        "additionalProperties": false,
         "description": "The changeable settings of a field; omitted fields stay (or take their default).",
         "properties": {
           "active": {
@@ -51889,6 +51909,7 @@
         "type": "object"
       },
       "GuardrailRequest": {
+        "additionalProperties": false,
         "description": "A guardrail to set.",
         "properties": {
           "max_permissions": {
@@ -58305,6 +58326,7 @@
         "type": "object"
       },
       "LoginMfaRequest": {
+        "additionalProperties": false,
         "description": "The second step of signing in.",
         "properties": {
           "code": {
@@ -58324,6 +58346,7 @@
         "type": "object"
       },
       "LoginRequest": {
+        "additionalProperties": false,
         "description": "Email and password of an account.",
         "properties": {
           "email": {
@@ -59164,6 +59187,7 @@
         "type": "object"
       },
       "MergeTag": {
+        "additionalProperties": false,
         "description": "The tag to merge into.",
         "properties": {
           "into": {
@@ -60416,6 +60440,7 @@
         "description": "A field to define."
       },
       "NewExport": {
+        "additionalProperties": false,
         "description": "A list to export.",
         "properties": {
           "columns": {
@@ -60456,6 +60481,7 @@
         "type": "string"
       },
       "NewRecordNote": {
+        "additionalProperties": false,
         "description": "A note to write.",
         "properties": {
           "body": {
@@ -60704,6 +60730,7 @@
         "type": "object"
       },
       "NewTag": {
+        "additionalProperties": false,
         "description": "A tag to create.",
         "properties": {
           "color": {
@@ -60781,6 +60808,7 @@
         "type": "object"
       },
       "NewView": {
+        "additionalProperties": false,
         "description": "A view to save.",
         "properties": {
           "columns": {
@@ -79653,6 +79681,7 @@
         "type": "object"
       },
       "PasskeyLoginRequest": {
+        "additionalProperties": false,
         "description": "The authenticator's answer to a sign-in ceremony.",
         "properties": {
           "ceremony_id": {
@@ -81732,6 +81761,7 @@
         "type": "object"
       },
       "PromotionsCart": {
+        "additionalProperties": false,
         "description": "A cart to compute promotions for.",
         "properties": {
           "at": {
@@ -86986,6 +87016,7 @@
         "type": "string"
       },
       "ReasonChange": {
+        "additionalProperties": false,
         "description": "Changes to a reason; omitted fields stay. A code the list does not have yet is added.",
         "properties": {
           "active": {
@@ -87287,6 +87318,7 @@
         "type": "object"
       },
       "RecordTagsInput": {
+        "additionalProperties": false,
         "description": "The tags of a record.",
         "properties": {
           "new_tags": {
@@ -87595,6 +87627,7 @@
         "type": "object"
       },
       "RefreshRequest": {
+        "additionalProperties": false,
         "description": "A refresh token, as returned by sign-in or by the previous refresh.",
         "properties": {
           "refresh_token": {
@@ -87663,6 +87696,7 @@
         "type": "object"
       },
       "RegisterRequest": {
+        "additionalProperties": false,
         "description": "A new account created by its owner.",
         "properties": {
           "email": {
@@ -87706,6 +87740,7 @@
         "type": "object"
       },
       "RejectRequest": {
+        "additionalProperties": false,
         "description": "Why a request is rejected.",
         "properties": {
           "reason": {
@@ -88339,6 +88374,7 @@
         "type": "object"
       },
       "ResetConfirmation": {
+        "additionalProperties": false,
         "description": "A new password, with the token from the reset mail.",
         "properties": {
           "password": {
@@ -88357,6 +88393,7 @@
         "type": "object"
       },
       "ResetRequest": {
+        "additionalProperties": false,
         "description": "The account whose password to reset.",
         "properties": {
           "email": {
@@ -88706,6 +88743,7 @@
         "type": "object"
       },
       "RoleRequest": {
+        "additionalProperties": false,
         "description": "The full content of a role.",
         "properties": {
           "denies": {
@@ -88844,6 +88882,7 @@
         "type": "object"
       },
       "RotateApiKeyRequest": {
+        "additionalProperties": false,
         "description": "How to replace a key.",
         "properties": {
           "current_password": {
@@ -90322,6 +90361,7 @@
         "type": "object"
       },
       "SetPasswordRequest": {
+        "additionalProperties": false,
         "description": "The first password of an account.",
         "properties": {
           "password": {
@@ -93226,6 +93266,7 @@
         "type": "object"
       },
       "StartPasskeyRegistrationRequest": {
+        "additionalProperties": false,
         "description": "Proof that you are the account owner.",
         "properties": {
           "current_password": {
@@ -93289,6 +93330,7 @@
         "type": "object"
       },
       "StartTotpRequest": {
+        "additionalProperties": false,
         "description": "Confirms starting two-step sign-in.",
         "properties": {
           "current_password": {
@@ -95434,6 +95476,7 @@
         "type": "object"
       },
       "TagChanges": {
+        "additionalProperties": false,
         "description": "Changes to a tag; omitted fields stay.",
         "properties": {
           "color": {
@@ -97356,6 +97399,7 @@
         "type": "object"
       },
       "TextInput": {
+        "additionalProperties": false,
         "description": "The tenant's wording.",
         "properties": {
           "text": {
@@ -98847,6 +98891,7 @@
         "type": "object"
       },
       "UpdateUserRequest": {
+        "additionalProperties": false,
         "description": "Changes to an account. Omitted fields stay as they are.",
         "properties": {
           "disabled": {
@@ -99073,6 +99118,7 @@
         "type": "object"
       },
       "UserRolesRequest": {
+        "additionalProperties": false,
         "description": "The complete list of roles a user should have.",
         "properties": {
           "role_ids": {
@@ -99201,6 +99247,7 @@
         "type": "object"
       },
       "VerificationConfirmation": {
+        "additionalProperties": false,
         "description": "The token from a verification mail.",
         "properties": {
           "token": {
@@ -99246,6 +99293,7 @@
         "type": "object"
       },
       "ViewChanges": {
+        "additionalProperties": false,
         "description": "Changes to a saved view; omitted fields stay as they are.",
         "properties": {
           "columns": {
@@ -99446,6 +99494,7 @@
         "type": "object"
       },
       "WorkAssignRequest": {
+        "additionalProperties": false,
         "description": "Who should do the work.",
         "properties": {
           "user_id": {
@@ -99544,6 +99593,7 @@
         "type": "object"
       },
       "WorkSnoozeRequest": {
+        "additionalProperties": false,
         "description": "When to show the work again.",
         "properties": {
           "until": {
@@ -105674,7 +105724,7 @@
                 }
               }
             },
-            "description": "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`."
+            "description": "The access token is missing (code `auth.missing_token`), invalid (`auth.invalid_token`) or expired (`auth.token_expired`; get a new one with `POST /api/v1/auth/refresh`), or its session was signed out or revoked (`auth.session_ended`). Without a usable refresh token, sign in with `POST /api/v1/auth/login`."
           },
           "403": {
             "content": {
