@@ -11,7 +11,7 @@ Quyết định:
 - **Một PR cho một cụm việc.** Mỗi phiên gom các mục của bước mình vào một PR, push một lần khi xong cụm, thay vì một
   PR cho mỗi mục nhỏ: ít lượt ghép hơn.
 - **File sinh tự động không gộp tay.** `docs/openapi.json`, `docs/mcp-tools.json`, `sdk/typescript/src/schema.ts`,
-  `sdk/swift/Sources/Autoxide/openapi.json`, `docs/decisions/INDEX.md`, `.env.example` khai `merge=generated` trong
+  `docs/decisions/INDEX.md`, `.env.example` khai `merge=generated` trong
   `.gitattributes`; máy ghép lô bật `git config merge.generated.driver true` rồi sinh lại (`autoxide openapi`,
   `mcp-manifest`, `config --env-example`, `cargo xtask sdk`, `cargo xtask decisions`). PR chỉ xung đột ở các file này
   thì phiên làm việc không phải gộp `main` lại: phiên điều phối lo khi ghép lô.

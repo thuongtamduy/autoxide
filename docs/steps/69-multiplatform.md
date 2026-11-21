@@ -10,7 +10,7 @@ Core chỉ có API (luật kiến trúc 9), nên mọi loại giao diện đều
 bốn chỗ còn thiếu để app điện thoại, app máy tính và máy bán hàng tại quầy (POS) dùng Autoxide trọn vẹn như web,
 kèm một hướng dẫn cho người làm app:
 
-1. SDK có sẵn cho Swift (iOS), Kotlin (Android) và Dart (Flutter), sinh từ `docs/openapi.json`.
+1. ~~SDK Swift, Kotlin, Dart~~ — đã bỏ (D-20261121-drop-mobile-sdk); app native tự sinh client từ `docs/openapi.json`.
 2. Đồng bộ khi mất mạng: app ghi tạm trên máy, có mạng lại thì gửi lên; máy chủ báo xung đột rõ ràng.
 3. Kênh thời gian thực hai chiều (WebSocket) bên cạnh SSE của bước 40.
 4. Mua trong ứng dụng qua App Store và Google Play, nối vào gói và thuê bao của bước 35.
@@ -30,7 +30,9 @@ của core; GraphQL (bảng "Chưa làm, đã cân nhắc" của `STACK.md`).
 
 ## Thiết kế
 
-### P1 — SDK Swift, Kotlin, Dart
+### P1 — SDK Swift, Kotlin, Dart (ĐÃ BỎ, D-20261121-drop-mobile-sdk)
+
+> Phần dưới là lịch sử thiết kế; mã và job CI tương ứng đã gỡ. Chỉ còn SDK TypeScript.
 
 - Sinh từ `docs/openapi.json` bằng công cụ chuẩn, ghim phiên bản: Swift dùng `swift-openapi-generator` (của Apple),
   Kotlin và Dart dùng `openapi-generator` (generator `kotlin` và `dart-dio`). Tra đúng phiên bản bằng skill
@@ -88,7 +90,7 @@ khi mất mạng, mua trong ứng dụng, dùng SDK. Ví dụ code chạy đư�
 
 ## Test bắt buộc
 
-- P1: `cargo xtask sdk --check` báo khi SDK lệch OpenAPI; job CI biên dịch ba SDK.
+- P1: `cargo xtask sdk --check` báo khi SDK lệch OpenAPI; (phần biên dịch ba SDK di động đã bỏ cùng P1).
 - P2: luồng thay đổi đúng thứ tự và đủ dấu xoá; con trỏ cũ trả `reset`; ghi với `If-Match` cũ trả `412` kèm bản
   hiện tại; lô ghi gửi lại hai lần không ghi trùng; không thấy bản ghi của khách hay nhánh khác; hai máy cùng ghi một
   bản ghi đồng thời — một bên thắng, bên kia nhận `412`. Cả SQLite và Postgres.
