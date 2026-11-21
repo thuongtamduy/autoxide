@@ -26,7 +26,12 @@ fn unused<T>() -> Result<T, Error> {
 
 #[async_trait::async_trait]
 impl Ledger for FakeLedger {
-    async fn post(&self, _: &TenantContext, _: Actor, _: NewEntry) -> Result<Submitted<Entry>, Error> {
+    async fn post(
+        &self,
+        _: &TenantContext,
+        _: Actor,
+        _: NewEntry,
+    ) -> Result<Submitted<Entry>, Error> {
         unused()
     }
     async fn reverse(

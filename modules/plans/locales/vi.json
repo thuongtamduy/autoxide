@@ -113,5 +113,6 @@
   "plans.store_purchase_inactive": "Cửa hàng báo giao dịch này không còn hiệu lực (hết hạn, đã hoàn tiền hay bị thu hồi).",
   "plans.store_billed": "Thuê bao này trả tiền qua cửa hàng ứng dụng: đổi, huỷ hay tiếp tục trong cửa hàng.",
   "field:must be 1 to 200 characters": "phải dài 1 đến 200 ký tự",
-  "plans.billing_period_underpaid": "Khoản thu {received} {received_currency} không đủ {due} {due_currency} phải trả; kỳ thanh toán vẫn mở."
+  "plans.billing_period_underpaid": "Khoản thu {received} {received_currency} không đủ {due} {due_currency} phải trả; kỳ thanh toán vẫn mở.",
+  "text:A payment was collected.": "Đã thu một khoản thanh toán."
 }

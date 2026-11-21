@@ -144,8 +144,7 @@ impl BookingsService {
             tracing::error!(booking_id = %id, "deposit payment in another currency; left for review");
             return Ok(());
         }
-        let covered =
-            received.is_none_or(|money| money.compare(deposit).is_ok_and(|o| o.is_ge()));
+        let covered = received.is_none_or(|money| money.compare(deposit).is_ok_and(|o| o.is_ge()));
         let mut after = before.clone();
         after.payment_id = Some(payment_id);
         after.updated_at = now();
