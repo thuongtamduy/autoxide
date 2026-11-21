@@ -92,13 +92,20 @@ thật (P7).
 - [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
       ngoài; `cargo-semver-checks` trong bước phát hành; dòng hỗ trợ dài hạn (vá bảo mật bao lâu) ghi ở
       `docs/RELEASING.md` và `SECURITY.md`
-- [ ] P5 — Đăng gói: SDK TypeScript lên npm, kernel và testkit lên crates.io, tự động lúc phát hành (**chờ chủ dự án**
-      cấp tài khoản npm và crates.io)
-- [ ] P6 — Kiểm toán bảo mật độc lập trước 1.0 (**chờ chủ dự án** chọn bên làm); kết quả và cách đã sửa công bố ở
-      `SECURITY.md`
-- [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam: thanh toán, vận chuyển, SMS, hoá đơn điện tử — mỗi bộ nối một module
-      nhỏ sau trait của core, có hướng dẫn để người ngoài viết bộ nối khác (**chờ chủ dự án** chọn đối tác và cấp tài
-      khoản thử)
+- [ ] P5 — Đăng gói: SDK TypeScript lên npm, kernel và testkit lên crates.io, tự động lúc phát hành — **ghi nợ, làm
+      sau** (D-20261121-vn-providers); cần tài khoản npm và crates.io của chủ dự án
+- [ ] P6 — Rà soát bảo mật toàn bộ trước 1.0 bằng một phiên AI độc lập (chưa thuê bên ngoài, D-20261121-vn-providers);
+      làm sau khi P1–P4 đã vào `main`; `SECURITY.md` ghi đúng đây là rà soát nội bộ có AI hỗ trợ, không phải kiểm toán
+      của bên thứ ba
+- [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam (D-20261121-vn-providers), mỗi bộ nối một module nhỏ sau trait của core,
+      viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
+  - [ ] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
+        webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
+  - [ ] Thanh toán: SePay
+  - [ ] Thanh toán: MoMo
+  - [ ] Vận chuyển: Giao Hàng Nhanh
+  - [ ] SMS: eSMS
+  - [ ] Hoá đơn điện tử: SePay eInvoice
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

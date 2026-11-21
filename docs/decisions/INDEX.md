@@ -20,7 +20,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
-- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết**
+- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-vn-providers*
 
 ## Quy trình, gate, lộ trình
 
@@ -562,6 +562,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
 - **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
+- **[D-20261121-vn-providers](D-20261121-vn-providers.md)** Bộ nối nhà cung cấp đầu tiên: SePay, MoMo, Giao Hàng Nhanh, eSMS, SePay eInvoice; tài khoản do từng khách tự cấu hình — 2026-11-21 · **chủ dự án quyết**
 
 ## Vận hành và hiệu năng
 
