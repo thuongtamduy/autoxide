@@ -10,6 +10,38 @@ PostgreSQL**, có REST API mô tả bằng OpenAPI, và được thiết kế đ
 Autoxide là nền cho sản phẩm mới. Nó không gắn với một công ty hay một ngành nào:
 core không chứa khái niệm nghiệp vụ — những thứ đó thuộc về module.
 
+## Chạy nhanh
+
+Một lệnh, không phải biên dịch gì: SQLite trong một Docker volume, bảng được tạo, có quản trị viên
+đầu tiên, dữ liệu tham chiếu đã nạp và trang xem API đã bật. Bạn cần
+[Docker](https://docs.docker.com/get-docker/) (kèm Compose) và `openssl`.
+
+```bash
+mkdir autoxide && cd autoxide
+curl -fsSLO https://raw.githubusercontent.com/thuongtamduy/autoxide/main/compose.quickstart.yml
+# Hai secret, giữ trong .env cạnh file đó (không commit)
+printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
+  "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
+
+docker compose -f compose.quickstart.yml up -d
+# Quản trị viên admin@example.com có mật khẩu tự sinh, ghi vào log một lần
+docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
+```
+
+Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn), <http://127.0.0.1:8080/api/docs>
+(trang xem API) và đăng nhập:
+
+```bash
+curl -sS http://127.0.0.1:8080/api/v1/auth/login \
+  --json '{"email":"admin@example.com","password":"<mật khẩu trong log>"}'
+```
+
+Muốn tự chọn thì thêm `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` và `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…`
+vào `.env` trước lần chạy đầu. Tiếp theo: nối một AI agent qua MCP
+([`docs/guides/mcp.vi.md`](docs/guides/mcp.vi.md#6-từ-chạy-nhanh-tới-một-agent-làm-việc-thật)). Chạy nhanh
+cần bản phát hành sau 0.16.0; với PostgreSQL, nhiều máy chủ và HTTPS, xem
+[`docs/DEPLOY.vi.md`](docs/DEPLOY.vi.md).
+
 ## Trạng thái
 
 Core đã hoàn chỉnh: **mọi bước của lộ trình đã xong** — khung dự án, nền, đăng nhập
@@ -87,8 +119,8 @@ Core gồm những gì, theo thứ tự dựng (xem [`docs/ROADMAP.md`](docs/ROA
 
 ## Chạy thử bằng Docker (không cần build)
 
-Cách nhanh nhất để chạy Autoxide là dùng image đã phát hành: không phải biên dịch gì, SQLite
-nằm trong một Docker volume. Bạn cần [Docker](https://docs.docker.com/get-docker/) và `openssl`.
+Như mục [Chạy nhanh](#chạy-nhanh), làm từng bước bằng `docker run` (dùng được với mọi bản phát
+hành): không phải biên dịch gì, SQLite nằm trong một Docker volume. Bạn cần [Docker](https://docs.docker.com/get-docker/) và `openssl`.
 Image nặng khoảng 630 MB trên đĩa, máy chủ sẵn sàng khoảng một giây sau khi khởi động.
 
 ```bash

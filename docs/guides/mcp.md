@@ -412,3 +412,70 @@ Under each module, `/llms.txt` links its own OpenAPI document and MCP endpoint a
 ```bash
 curl -sS "$API/api/v1/openapi/content.json"
 ```
+
+## 6. From the quickstart to a working agent
+
+A walk-through on your own machine, from an empty directory to an assistant that answers questions about stock and sales. It starts from the [Quickstart](../../README.md#quickstart) (`compose.quickstart.yml`), so the server is at `http://127.0.0.1:8080`.
+
+**1. Sign in and make a key for the assistant.** Use the administrator's password from the log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
+
+```bash
+API=http://127.0.0.1:8080
+TOKEN=$(curl -sS "$API/api/v1/auth/login" \
+  --json '{"email":"admin@example.com","password":"<password from the log>"}' | jq -r .data.access_token)
+curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
+  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<password from the log>"}' \
+  | jq -r .data.key
+```
+
+The key (`axk1_…`) is shown once: keep it in your password manager. Check what it may do with `curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer axk1_…"`.
+
+**2. Connect the client.**
+
+*Claude Desktop* takes local (stdio) servers in its configuration file (Settings → Developer → Edit Config, `claude_desktop_config.json`). The [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) bridge (needs Node.js) connects it to an HTTP server with a header:
+
+```json
+{
+  "mcpServers": {
+    "autoxide": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "http://127.0.0.1:8080/mcp", "--header", "Authorization:${AUTOXIDE_AUTH}"],
+      "env": { "AUTOXIDE_AUTH": "Bearer axk1_…" }
+    }
+  }
+}
+```
+
+Restart Claude Desktop; the tools appear under the tools icon of a new chat. (`mcp-remote` speaks plain HTTP only to `localhost`; a server elsewhere needs HTTPS.)
+
+*Cursor* talks Streamable HTTP itself. In `~/.cursor/mcp.json` (every project) or `.cursor/mcp.json` (one project — do not commit the key):
+
+```json
+{
+  "mcpServers": {
+    "autoxide": {
+      "url": "http://127.0.0.1:8080/mcp",
+      "headers": { "Authorization": "Bearer ${env:AUTOXIDE_AGENT_KEY}" }
+    }
+  }
+}
+```
+
+Start Cursor with `AUTOXIDE_AGENT_KEY=axk1_…` in its environment, then check Settings → MCP: `autoxide` should list its tools. For a narrower assistant, connect to one module only, e.g. `http://127.0.0.1:8080/mcp/inventory`.
+
+**3. Ask for real work.** A fresh installation has no products or stock yet: add some first (the API reference at `/api/docs`, or your own front end). Then ask in plain words; the model picks the tools, and the client shows each call before or after it runs.
+
+| You ask | Tools the agent calls | What you get |
+|---|---|---|
+| "Which products are running low? Group them by warehouse." | `inventory.list_low_stock`, then `catalog.get_product` for names | A list of variants under their reorder point, with the quantity on hand |
+| "How many units of SKU TS-RED-M do we have, and where?" | `catalog.list_products` (search), `inventory.get_levels` | Stock per location: on hand, reserved, available |
+| "Draft an invoice for Công ty ABC: 10 × TS-RED-M at the list price." | `catalog.resolve_price`, `invoices.create_draft` | A **draft** invoice; a person reviews and issues it — the key has no permission to issue |
+| "How did sales go last week compared with the week before?" | `reporting.summary`, `reporting.facts` | Totals and the change, from the reporting module's facts |
+| "Which pages brought the most visitors this month?" | `analytics.overview`, `analytics.top_pages` | Visits and top pages of the website |
+
+What keeps this safe:
+
+- The key decides: `tools/list` shows only the tools its permissions allow, and a tool can never do more than REST with the same permission. The assistant above can read and draft; it cannot change stock, refund an order or issue an invoice.
+- Orders come from checkout, not from tools: there is no tool that places an order for a customer. An agent prepares drafts (invoices, content, replies) that people confirm.
+- Writes are safe to retry (idempotency) and every write is in the audit log under the key's name (`/api/v1/audit`).
+- Remove the key when you are done: `DELETE /api/v1/auth/api-keys/{id}`.
