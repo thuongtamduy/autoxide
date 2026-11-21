@@ -75,6 +75,8 @@ events! {
     IDENTITY_UNLINKED, IdentityUnlinked, "auth.identity_unlinked", "A sign-in with an outside provider was removed from an account (`before`: provider id, identity id).";
     OIDC_PROVIDER_CREATED, OidcProviderCreated, "auth.oidc_provider_created", "A sign-in provider was added to the tenant (`after`: slug, kind, name, issuer; never the client secret).";
     OIDC_PROVIDER_UPDATED, OidcProviderUpdated, "auth.oidc_provider_updated", "A sign-in provider of the tenant was changed (`before` / `after` without the client secret; `after.secret_changed`).";
+    SCIM_TOKEN_CREATED, ScimTokenCreated, "auth.scim_token_created", "A SCIM token was created for the tenant's identity provider (`after`: id, name, prefix; never the token).";
+    SCIM_TOKEN_REVOKED, ScimTokenRevoked, "auth.scim_token_revoked", "A SCIM token was revoked; the identity provider using it is refused from now on.";
     OIDC_PROVIDER_DELETED, OidcProviderDeleted, "auth.oidc_provider_deleted", "A sign-in provider was removed from the tenant, with every account link to it.";
 }
 

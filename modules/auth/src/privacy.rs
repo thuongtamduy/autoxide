@@ -50,6 +50,7 @@ impl PersonalData for AuthPersonalData {
         .await?;
         let mfa = self.mfa.status(tenant, user_id).await?;
         let identities = crate::oidc::identity::for_user(tenant, user_id).await?;
+        let scim = crate::scim::link_of(tenant, user_id).await?;
         Ok(json!({
             "profile": {
                 "id": user.id,
@@ -93,6 +94,15 @@ impl PersonalData for AuthPersonalData {
                 "created_at": identity.created_at,
                 "last_login_at": identity.last_login_at,
             })).collect::<Vec<_>>(),
+            // Liên kết với hệ thống danh tính của khách (SCIM, bước 66); `null`: không có.
+            "scim": scim.map(|link| json!({
+                "user_name": link.user_name,
+                "external_id": link.external_id,
+                "given_name": link.given_name,
+                "family_name": link.family_name,
+                "created_at": link.created_at,
+                "updated_at": link.updated_at,
+            })),
             "two_step_sign_in": {
                 "totp_enabled": mfa.totp_enabled,
                 "recovery_codes_remaining": mfa.recovery_codes_remaining,

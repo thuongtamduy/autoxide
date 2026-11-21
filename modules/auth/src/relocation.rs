@@ -21,6 +21,8 @@ pub(crate) fn relocation() -> Relocation {
         .follow("auth_identity", "user_id", "auth_user")
         // Uỷ quyền cấp cho khách con là của khách nguồn.
         .stay(&["auth_delegation"])
+        // Kết nối SCIM (token, liên kết tài khoản) là của khách nguồn: token mang ID khách đó.
+        .stay(&["auth_scim_tokens", "auth_scim_users"])
         .ephemeral(&[
             "auth_throttle",
             "auth_tokens",
