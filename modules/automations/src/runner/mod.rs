@@ -149,6 +149,13 @@ impl Automations {
             return Ok(None);
         }
         // Giới hạn số lần chạy mỗi giờ của một luật (đếm trên index `(tenant, rule, created_at)`).
+        // Khoá dòng luật trước khi đếm (D-181): nhiều kích hoạt cùng lúc từng cùng đếm thiếu trên
+        // Postgres và vượt `max_runs_per_hour`.
+        autoxide_kernel::rows::lock_one(
+            &transaction,
+            rule::Entity::find_by_id(rule.id).scoped(tenant),
+        )
+        .await?;
         let recent = run::Entity::find()
             .filter(run::Column::RuleId.eq(rule.id))
             .filter(run::Column::CreatedAt.gt(now - Duration::hours(1)))

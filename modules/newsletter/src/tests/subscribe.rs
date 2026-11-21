@@ -441,3 +441,51 @@ async fn request_chi_xep_job_nhu_nhau_moi_dia_chi() {
     .await
     .unwrap();
 }
+
+/// Xác nhận và huỷ đăng ký cùng lúc: người đã huỷ không bao giờ bị ghi lại thành đã xác nhận
+/// (đồng ý nhận thư, D-367). Trước đây xác nhận đọc `unconfirmed` không khoá rồi ghi đè.
+#[tokio::test]
+async fn xac_nhan_va_huy_cung_luc_van_la_da_huy() {
+    TestDatabase::run(async |test| {
+        let config = NewsletterConfig { per_ip_per_hour: 100, per_email_per_hour: 100, ..config() };
+        let h = service(test, config).await;
+        let weekly = list(&h, "weekly", true).await;
+        for (index, email) in ["a@example.com", "b@example.com", "c@example.com"].iter().enumerate()
+        {
+            subscribe(&h, email, &["weekly"], &format!("203.0.113.{}", 20 + index)).await.unwrap();
+            store_subscriptions(&h).await;
+            let token = token_in(&h.mailer.to(email)[0].text);
+            let row = subscriptions(&h.database)
+                .await
+                .into_iter()
+                .find(|row| row.status == "unconfirmed")
+                .unwrap();
+            let confirm = h.service.confirm(Some(&h.tenant), &token);
+            let unsubscribe = async {
+                let transaction = h.database.begin_write().await.unwrap();
+                h.service
+                    .unsubscribe_in(
+                        &transaction,
+                        &h.tenant,
+                        Actor::system(),
+                        row.subscriber_id,
+                        &weekly,
+                        chrono::Utc::now(),
+                    )
+                    .await
+                    .unwrap();
+                transaction.commit().await.unwrap();
+            };
+            let (confirmed, ()) = tokio::join!(confirm, unsubscribe);
+            confirmed.unwrap();
+            let after = subscriptions(&h.database)
+                .await
+                .into_iter()
+                .find(|found| found.subscriber_id == row.subscriber_id)
+                .unwrap();
+            assert_eq!(after.status, "unsubscribed", "{email}");
+        }
+    })
+    .await
+    .unwrap();
+}

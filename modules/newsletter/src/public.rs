@@ -456,11 +456,14 @@ impl NewsletterService {
         let mut confirmed = Vec::new();
         for id in &list_ids {
             let Some(list) = lists.get(id) else { continue };
-            let Some(existing) =
+            // Khoá dòng đăng ký (D-181): huỷ đăng ký cùng lúc từng bị ghi đè thành `confirmed`
+            // trên Postgres — người vừa từ chối nhận thư lại thành đã đồng ý (D-367).
+            let Some(existing) = autoxide_kernel::rows::lock_one(
+                &transaction,
                 subscription::Entity::find_by_id((tenant.id().as_uuid(), subscriber_id, *id))
-                    .scoped(tenant)
-                    .one(&transaction)
-                    .await?
+                    .scoped(tenant),
+            )
+            .await?
             else {
                 continue;
             };
