@@ -246,40 +246,23 @@ impl Job for MoveTenant {
 #[derive(Clone, Default)]
 pub(crate) struct MoveSetup(Arc<OnceLock<Setup>>);
 
-struct Setup {
-    modules: Vec<&'static str>,
-    control_plane: Vec<&'static str>,
-    migrator: Migrator,
+pub(crate) struct Setup {
+    pub(crate) modules: Vec<&'static str>,
+    pub(crate) control_plane: Vec<&'static str>,
+    pub(crate) migrator: Migrator,
     /// Quản lý placement (migrate placement bằng API, D-334).
-    placements: super::Placements,
+    pub(crate) placements: super::Placements,
     /// Bảng giữ lại khi xoá hẳn khách (`Module::retained_tables`, D-337).
-    retained: Vec<&'static str>,
+    pub(crate) retained: Vec<&'static str>,
     /// Chính sách tách / gộp của mọi module (`Module::relocation`, bước 38).
-    policies: super::relocate::Policies,
+    pub(crate) policies: super::relocate::Policies,
     /// Module có trong binary nhưng đang tắt (`AUTOXIDE_MODULES`): lượt dời không chép bảng của chúng.
-    inactive: Vec<&'static str>,
+    pub(crate) inactive: Vec<&'static str>,
 }
 
 impl MoveSetup {
-    pub(crate) fn fill(
-        &self,
-        modules: Vec<&'static str>,
-        control_plane: Vec<&'static str>,
-        migrator: Migrator,
-        placements: super::Placements,
-        retained: Vec<&'static str>,
-        policies: super::relocate::Policies,
-        inactive: Vec<&'static str>,
-    ) {
-        let _ = self.0.set(Setup {
-            modules,
-            control_plane,
-            migrator,
-            placements,
-            retained,
-            policies,
-            inactive,
-        });
+    pub(crate) fn fill(&self, setup: Setup) {
+        let _ = self.0.set(setup);
     }
 
     /// Module đang tắt còn dữ liệu của khách `tenant` ở `database` (bước 70 P1): dời, tách hay gộp
