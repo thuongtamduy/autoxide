@@ -24,8 +24,7 @@ async fn chi_mot_ben_giu_khoa_ben_kia_cho_toi_khi_nha() {
 
         // Bên thứ hai chờ: đang có người giữ thì không lấy được trong 600 ms.
         let started = Instant::now();
-        let error =
-            MigrationLock::acquire(&config, Duration::from_millis(600)).await.unwrap_err();
+        let error = MigrationLock::acquire(&config, Duration::from_millis(600)).await.unwrap_err();
         assert!(started.elapsed() >= Duration::from_millis(600), "phải chờ đủ hạn");
         assert!(error.to_string().contains("another process has been applying migrations"));
 
