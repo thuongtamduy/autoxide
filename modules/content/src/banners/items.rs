@@ -198,6 +198,7 @@ impl ContentService {
         row.updated_at = at;
         let transaction = tenant.database().begin_write().await?;
         principal.require_write_at(&transaction, &CONTENT_BANNERS, target(&row)).await?;
+        lock_placement(&transaction, tenant, placement.id).await?;
         if row.status != "archived" {
             ensure_room(&transaction, tenant, &placement, &row, None).await?;
         }
@@ -241,6 +242,7 @@ impl ContentService {
         row.created_at = found.created_at;
         row.updated_at = at;
         let transaction = tenant.database().begin_write().await?;
+        lock_placement(&transaction, tenant, placement.id).await?;
         principal.require_write_at(&transaction, &CONTENT_BANNERS, target(&found)).await?;
         if row.status != "archived" && (found.status == "archived" || row.locale != found.locale) {
             ensure_room(&transaction, tenant, &placement, &row, Some(found.id)).await?;
@@ -496,6 +498,22 @@ async fn ensure_room<C: ConnectionTrait>(
         )
         .with_param("max", placement.max_items));
     }
+    Ok(())
+}
+
+/// Khoá dòng vị trí banner tới hết `transaction` ghi (D-181): đếm số banner (`max_items`) và lấy
+/// `position` kế tiếp rồi mới ghi — hai lần tạo cùng lúc từng cùng đếm thiếu trên Postgres, vượt
+/// `max_items` và trùng `position`.
+async fn lock_placement(
+    transaction: &sea_orm::DatabaseTransaction,
+    tenant: &TenantContext,
+    placement_id: Uuid,
+) -> Result<(), Error> {
+    autoxide_kernel::rows::lock_one(
+        transaction,
+        placement::Entity::find_by_id(placement_id).scoped(tenant),
+    )
+    .await?;
     Ok(())
 }
 

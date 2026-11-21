@@ -426,13 +426,25 @@ impl BookingsService {
                 Origin::Customer => CONFIRMED,
             };
             let hold = (status == HELD).then(|| now() + Duration::minutes(policy.hold_minutes));
-            match self
+            let mut attempt = self
                 .insert(
                     tenant, principal, origin, &service, candidate, &input, status, total, deposit,
                     hold, actor,
                 )
-                .await
+                .await;
+            if service.row.capacity > 1
+                && attempt.as_ref().is_err_and(|error| error.code() == "bookings.slot_taken")
             {
+                // Lớp học: người khác vừa mở cùng buổi (vướng unique khi mở) — lần này thấy buổi đã
+                // có và lấy chỗ trong đó, thay vì báo `slot_taken` khi lớp còn chỗ.
+                attempt = self
+                    .insert(
+                        tenant, principal, origin, &service, candidate, &input, status, total,
+                        deposit, hold, actor,
+                    )
+                    .await;
+            }
+            match attempt {
                 Ok(row) => return self.collect_deposit(tenant, actor, &service, row, &input).await,
                 Err(error) if error.code() == "bookings.slot_taken" => last = error,
                 Err(error) => return Err(error),

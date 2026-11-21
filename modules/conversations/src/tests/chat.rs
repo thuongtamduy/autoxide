@@ -382,3 +382,40 @@ async fn tool_mcp_dung_chung_service() {
     .await
     .unwrap();
 }
+
+/// Hai thiết bị đánh dấu đã đọc cùng lúc (một tới tin cũ, một tới tin mới nhất): con trỏ không lùi.
+/// Trước đây đọc con trỏ rồi ghi tuyệt đối, bên ghi sau thắng.
+#[tokio::test]
+async fn danh_dau_da_doc_cung_luc_con_tro_khong_lui() {
+    TestDatabase::run(async |test| {
+        let h = harness(test).await;
+        let id = start(&h.app, "buyer", "Chào shop").await;
+        for round in 0..4 {
+            let uri = format!("/me/threads/{id}/messages");
+            let body = json!({"body": format!("Tin {round}"), "client_id": format!("r-{round}")});
+            let (status, _) = call(&h.app, "POST", &uri, "buyer", Some(body)).await;
+            assert_eq!(status, StatusCode::CREATED);
+            let all = messages(&h.app, &id).await;
+            let id_of =
+                |row: &serde_json::Value| row["id"].as_str().unwrap().parse::<Uuid>().unwrap();
+            let oldest = id_of(all.first().unwrap());
+            let newest = id_of(all.last().unwrap());
+            let read = format!("/threads/{id}/read");
+            let (old, new) = tokio::join!(
+                call(&h.app, "POST", &read, "agent", Some(json!({"message_id": oldest}))),
+                call(&h.app, "POST", &read, "agent", Some(json!({"message_id": newest}))),
+            );
+            assert_eq!((old.0, new.0), (StatusCode::OK, StatusCode::OK));
+            let cursor = crate::entity::read::Entity::find()
+                .filter(crate::entity::read::Column::ThreadId.eq(id.parse::<Uuid>().unwrap()))
+                .filter(crate::entity::read::Column::UserId.eq(Uuid::from_u128(AGENT)))
+                .one(h.app.database().read())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(cursor.last_read_message_id, newest, "round {round}");
+        }
+    })
+    .await
+    .unwrap();
+}

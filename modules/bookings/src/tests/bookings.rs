@@ -237,6 +237,27 @@ async fn lop_hoc_khong_vuot_suc_chua() {
 }
 
 #[tokio::test]
+async fn lop_con_cho_nguoi_dat_dau_cung_luc_deu_duoc() {
+    TestDatabase::run(async |test| {
+        let (shop, _) = shop(test).await;
+        let coach = staff(&shop, "Coach").await;
+        let yoga = service(&shop, 60, 0, json!({"capacity": 5}), &[&coach]).await;
+        let start = at(next_monday(), 9, 0);
+        // Năm người cùng là người đầu tiên của buổi. Trước đây bên vướng unique khi mở buổi nhận
+        // `bookings.slot_taken` dù lớp còn chỗ.
+        let attempts = CUSTOMERS.map(|(who, _)| book(&shop, who, &yoga, start, json!({})));
+        let [a, b, c, d, e] = attempts;
+        let results = tokio::join!(a, b, c, d, e);
+        let results = [results.0, results.1, results.2, results.3, results.4];
+        for (status, body) in &results {
+            assert_eq!(*status, StatusCode::CREATED, "{body}");
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn giu_tam_het_han_tra_cho() {
     TestDatabase::run(async |test| {
         let (shop, ledger) = shop(test).await;
