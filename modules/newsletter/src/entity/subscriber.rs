@@ -1,5 +1,6 @@
 //! Bảng `newsletter_subscribers`: một dòng cho mỗi địa chỉ email, dùng chung cho mọi danh sách.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -22,8 +23,8 @@ pub struct Model {
     pub attributes: String,
     /// Số lần soft bounce từ lần bị chặn gần nhất.
     pub soft_bounces: i32,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,8 +1,9 @@
 //! Người bán tham gia flash sale của sàn: đăng ký, duyệt, thành suất, người bán trả phần giảm.
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 
 use super::{activate, body, call, create, setup};
@@ -14,7 +15,7 @@ async fn nguoi_ban_dang_ky_san_duyet_nguoi_ban_tra_phan_giam() {
         let setup = setup(test, true).await;
         let mine = setup.catalog.add(setup.tree.a, 200_000, &[]);
         // Flash sale của chuỗi (sàn), chưa bắt đầu.
-        let starts = Utc::now() + Duration::hours(2);
+        let starts = Timestamp::now() + SignedDuration::from_hours(2);
         let id = create(
             &setup,
             body(
@@ -60,7 +61,7 @@ async fn nguoi_ban_dang_ky_san_duyet_nguoi_ban_tra_phan_giam() {
             crate::entity::promotion::Entity::update_many()
                 .col_expr(
                     crate::entity::promotion::Column::StartsAt,
-                    Expr::value(Utc::now() - Duration::hours(1)),
+                    Expr::value(Timestamp::now() - SignedDuration::from_hours(1)),
                 )
                 .filter(crate::entity::promotion::Column::Id.eq(id.parse::<uuid::Uuid>().unwrap()))
                 .exec(setup.app.database().write())
@@ -86,7 +87,7 @@ async fn dang_ky_dong_thoi_chi_mot_dong() {
     TestDatabase::run(async |test| {
         let setup = std::sync::Arc::new(setup(test, true).await);
         let mine = setup.catalog.add(setup.tree.a, 200_000, &[]);
-        let starts = Utc::now() + Duration::hours(2);
+        let starts = Timestamp::now() + SignedDuration::from_hours(2);
         let id = create(
             &setup,
             body(
@@ -122,7 +123,7 @@ async fn duyet_va_tu_choi_cung_luc_khong_lech_suat() {
         let setup = setup(test, true).await;
         for _ in 0..4 {
             let mine = setup.catalog.add(setup.tree.a, 200_000, &[]);
-            let starts = Utc::now() + Duration::hours(2);
+            let starts = Timestamp::now() + SignedDuration::from_hours(2);
             let id = create(
                 &setup,
                 body(

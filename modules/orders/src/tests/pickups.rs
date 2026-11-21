@@ -2,9 +2,10 @@
 //! trước hạn một lần, hết hạn thì huỷ (mặc định) hay chờ tiếp theo chính sách.
 
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -41,7 +42,7 @@ async fn boss(shop: &Shop, uri: &str, body: Option<Value>) -> (StatusCode, Value
     Call::as_user(shop, "boss").send("POST", uri, body).await
 }
 
-async fn age(shop: &Shop, id: Uuid, until: chrono::DateTime<Utc>) {
+async fn age(shop: &Shop, id: Uuid, until: Timestamp) {
     pickup::Entity::update_many()
         .col_expr(pickup::Column::HoldUntil, Expr::value(until))
         .filter(pickup::Column::OrderId.eq(id))
@@ -124,12 +125,12 @@ async fn pickup_reminds_once_then_expires_per_policy() {
         let id = store_order(&shop).await;
         boss(&shop, &format!("/{id}/pickup/ready"), None).await;
         // Còn dưới 24 giờ: nhắc đúng một lần.
-        age(&shop, id, Utc::now() + Duration::hours(5)).await;
+        age(&shop, id, Timestamp::now() + SignedDuration::from_hours(5)).await;
         run_job(&shop, crate::jobs::EXPIRE_PICKUPS).await;
         run_job(&shop, crate::jobs::EXPIRE_PICKUPS).await;
         assert_eq!(count_events(&shop, "orders.pickup_reminder").await, 1);
         // Quá hạn, mặc định `cancel_refund`: huỷ.
-        age(&shop, id, Utc::now() - Duration::hours(1)).await;
+        age(&shop, id, Timestamp::now() - SignedDuration::from_hours(1)).await;
         run_job(&shop, crate::jobs::EXPIRE_PICKUPS).await;
         assert_eq!(status_of(&shop, id).await, "cancelled");
         assert_eq!(count_events(&shop, "orders.pickup_expired").await, 1);
@@ -138,7 +139,7 @@ async fn pickup_reminds_once_then_expires_per_policy() {
         shop.orgs.set(shop.tree.a, "orders.pickup_expired_action", json!("keep_waiting"));
         let second = store_order(&shop).await;
         boss(&shop, &format!("/{second}/pickup/ready"), None).await;
-        age(&shop, second, Utc::now() - Duration::hours(1)).await;
+        age(&shop, second, Timestamp::now() - SignedDuration::from_hours(1)).await;
         run_job(&shop, crate::jobs::EXPIRE_PICKUPS).await;
         assert_eq!(status_of(&shop, second).await, "preparing");
         let (_, mine) =

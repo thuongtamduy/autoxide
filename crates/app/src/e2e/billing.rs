@@ -2,13 +2,13 @@
 //! (`invoices`, số không nhảy, ghi sổ) → khách trả qua cổng thanh toán của khách vận hành (`ledger`)
 //! → đối tác báo đã thu → kỳ đã trả, thuê bao đang dùng lại. Chạy trên cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::payment::PaymentGateway;
 use autoxide_testkit::{FakePaymentGateway, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Datelike, Utc};
 use serde_json::{Value, json};
 
 const OPS: [&str; 8] = [
@@ -112,7 +112,7 @@ async fn ky_thanh_toan_thanh_hoa_don_tra_qua_cong_thi_da_tra() {
         // Khách vận hành: gói thuế, ký hiệu hoá đơn.
         let pack: Value = serde_json::from_str(include_str!("../../../../modules/tax/packs/vn.json")).unwrap();
         ok(&app, Method::POST, "/tax/packs", "ops", Some(json!({"pack": pack}))).await;
-        let year = Utc::now().year();
+        let year = Timestamp::now().date_utc().year();
         ok(&app, Method::POST, "/invoices/series", "ops", Some(json!({"kind": "vat_invoice", "symbol": "1C26SAS", "year": year}))).await;
         // Gói 199.000 đ / tháng, khách `acme` đang dùng; hết kỳ → kỳ gia hạn mở.
         let plan = ok(

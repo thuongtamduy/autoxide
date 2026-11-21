@@ -12,8 +12,11 @@
 //! kiểm được và giải thích được bằng một câu.
 
 use autoxide_kernel::error::FieldError;
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Utc, Weekday};
-use chrono_tz::Tz;
+use autoxide_kernel::time::{self, Timestamp};
+use jiff::SignedDuration;
+use jiff::Span;
+use jiff::civil::{self, Weekday};
+use jiff::tz::TimeZone;
 use serde_json::Value;
 
 /// Nhịp của lịch.
@@ -104,7 +107,7 @@ impl Trigger {
     }
 
     /// Lần chạy theo lịch kế tiếp sau `after` (luật theo lịch hay số liệu); `None` với luật khác.
-    pub(crate) fn next_run(&self, after: DateTime<Utc>, zone: Tz) -> Option<DateTime<Utc>> {
+    pub(crate) fn next_run(&self, after: Timestamp, zone: &TimeZone) -> Option<Timestamp> {
         match self {
             Trigger::Schedule(recurrence) => Some(recurrence.next_after(after, zone)),
             Trigger::Metric(metric) => Some(
@@ -112,7 +115,7 @@ impl Trigger {
                     every: Every::Day,
                     hour: metric.hour,
                     minute: metric.minute,
-                    weekday: Weekday::Mon,
+                    weekday: Weekday::Monday,
                 }
                 .next_after(after, zone),
             ),
@@ -125,7 +128,7 @@ impl Trigger {
         value: &Value,
         field: &str,
         errors: &mut Vec<FieldError>,
-    ) -> Option<(Trigger, Option<Tz>)> {
+    ) -> Option<(Trigger, Option<TimeZone>)> {
         let Some(object) = value.as_object() else {
             errors.push(FieldError::new(field, "invalid", "must be an object with `type`"));
             return None;
@@ -133,7 +136,7 @@ impl Trigger {
         let before = errors.len();
         let zone = match object.get("timezone") {
             None | Some(Value::Null) => None,
-            Some(raw) => match raw.as_str().and_then(|text| text.parse::<Tz>().ok()) {
+            Some(raw) => match raw.as_str().and_then(time::zone) {
                 Some(zone) => Some(zone),
                 None => {
                     errors.push(FieldError::new(
@@ -195,7 +198,7 @@ impl Trigger {
                     }
                 };
                 let weekday = match object.get("weekday") {
-                    None | Some(Value::Null) if every != Every::Week => Weekday::Mon,
+                    None | Some(Value::Null) if every != Every::Week => Weekday::Monday,
                     raw => match raw.and_then(Value::as_str).and_then(weekday) {
                         Some(day) => day,
                         None => {
@@ -204,7 +207,7 @@ impl Trigger {
                                 "invalid",
                                 "must be a day name such as `monday` (required when `every` is `week`)",
                             ));
-                            Weekday::Mon
+                            Weekday::Monday
                         }
                     },
                 };
@@ -310,13 +313,13 @@ fn number(
 
 fn weekday(name: &str) -> Option<Weekday> {
     Some(match name {
-        "monday" => Weekday::Mon,
-        "tuesday" => Weekday::Tue,
-        "wednesday" => Weekday::Wed,
-        "thursday" => Weekday::Thu,
-        "friday" => Weekday::Fri,
-        "saturday" => Weekday::Sat,
-        "sunday" => Weekday::Sun,
+        "monday" => Weekday::Monday,
+        "tuesday" => Weekday::Tuesday,
+        "wednesday" => Weekday::Wednesday,
+        "thursday" => Weekday::Thursday,
+        "friday" => Weekday::Friday,
+        "saturday" => Weekday::Saturday,
+        "sunday" => Weekday::Sunday,
         _ => return None,
     })
 }
@@ -324,51 +327,37 @@ fn weekday(name: &str) -> Option<Weekday> {
 impl Recurrence {
     /// Mốc đầu tiên SAU `after` theo giờ địa phương của `zone`. Giờ không có ở địa phương (chuyển giờ
     /// mùa hè) thì bỏ qua mốc đó.
-    pub(crate) fn next_after(&self, after: DateTime<Utc>, zone: Tz) -> DateTime<Utc> {
-        let local = after.with_timezone(&zone);
-        let today = local.date_naive();
+    pub(crate) fn next_after(&self, after: Timestamp, zone: &TimeZone) -> Timestamp {
+        let local = after.in_zone(zone);
+        let today = local.date();
+        let minute = i8::try_from(self.minute).unwrap_or(0);
         match self.every {
             Every::Hour => {
                 // Mốc ở giờ hiện tại hoặc các giờ sau (tối đa hai ngày để qua mọi chỗ chuyển giờ).
-                let start = local.naive_local().date().and_hms_opt(local.hour_of_day(), 0, 0);
-                let Some(start) = start else { return after + Duration::hours(1) };
+                let start = today.at(local.hour(), 0, 0, 0);
                 (0..48)
                     .filter_map(|offset| {
                         let naive = start
-                            + Duration::hours(offset)
-                            + Duration::minutes(i64::from(self.minute));
-                        zone.from_local_datetime(&naive).earliest()
+                            .checked_add(SignedDuration::from_hours(offset))
+                            .ok()?
+                            .checked_add(SignedDuration::from_mins(i64::from(minute)))
+                            .ok()?;
+                        time::from_local(zone, naive)
                     })
-                    .map(|at| at.with_timezone(&Utc))
                     .find(|at| *at > after)
-                    .unwrap_or(after + Duration::hours(1))
+                    .unwrap_or(after + SignedDuration::from_hours(1))
             }
             Every::Day | Every::Week => {
-                let time =
-                    NaiveTime::from_hms_opt(self.hour, self.minute, 0).unwrap_or(NaiveTime::MIN);
+                let hour = i8::try_from(self.hour).unwrap_or(0);
+                let clock = civil::Time::new(hour, minute, 0, 0).unwrap_or(civil::Time::MIN);
                 (0..16)
-                    .filter_map(|offset| today.checked_add_signed(Duration::days(offset)))
-                    .filter(|day: &NaiveDate| {
-                        self.every == Every::Day || day.weekday() == self.weekday
-                    })
-                    .filter_map(|day| zone.from_local_datetime(&day.and_time(time)).earliest())
-                    .map(|at| at.with_timezone(&Utc))
+                    .filter_map(|offset| today.checked_add(Span::new().days(offset)).ok())
+                    .filter(|day| self.every == Every::Day || day.weekday() == self.weekday)
+                    .filter_map(|day| time::from_local(zone, day.to_datetime(clock)))
                     .find(|at| *at > after)
-                    .unwrap_or(after + Duration::days(1))
+                    .unwrap_or(after + SignedDuration::from_hours(24))
             }
         }
-    }
-}
-
-/// Giờ trong ngày của một thời điểm địa phương (chrono không có hàm ngắn cho việc này).
-trait HourOfDay {
-    fn hour_of_day(&self) -> u32;
-}
-
-impl<Z: TimeZone> HourOfDay for DateTime<Z> {
-    fn hour_of_day(&self) -> u32 {
-        use chrono::Timelike;
-        self.naive_local().hour()
     }
 }
 
@@ -378,8 +367,8 @@ mod tests {
 
     use super::*;
 
-    fn at(text: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(text).unwrap().to_utc()
+    fn at(text: &str) -> Timestamp {
+        Timestamp::parse_rfc3339(text).unwrap()
     }
 
     fn parse(value: Value) -> Result<Trigger, Vec<FieldError>> {
@@ -389,9 +378,10 @@ mod tests {
 
     #[test]
     fn lich_theo_gio_dia_phuong() {
-        let vietnam = chrono_tz::Asia::Ho_Chi_Minh;
+        let vietnam = &time::zone("Asia/Ho_Chi_Minh").unwrap();
         // 2026-11-16 là thứ Hai. 08:00 giờ Việt Nam = 01:00 UTC.
-        let weekly = Recurrence { every: Every::Week, hour: 8, minute: 0, weekday: Weekday::Mon };
+        let weekly =
+            Recurrence { every: Every::Week, hour: 8, minute: 0, weekday: Weekday::Monday };
         assert_eq!(
             weekly.next_after(at("2026-11-16T00:30:00Z"), vietnam),
             at("2026-11-16T01:00:00Z")
@@ -426,7 +416,7 @@ mod tests {
                 every: Every::Week,
                 hour: 17,
                 minute: 0,
-                weekday: Weekday::Fri
+                weekday: Weekday::Friday
             })
         );
         let errors =

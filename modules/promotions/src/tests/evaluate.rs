@@ -2,9 +2,10 @@
 //! do theo ngôn ngữ, dấu vân tay, REST / MCP / `dyn Promotions`.
 
 use autoxide_catalog::api::FloorAction;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, tool};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -46,7 +47,7 @@ async fn cat_ve_tran_khi_tinh_va_san_gia() {
         assert!(result.lines[0].capped_by_floor);
         // Sản phẩm mới chưa có giá trước khuyến mại: giữ lại khoản giảm, có lý do.
         let fresh = setup.catalog.add(setup.tree.a, 100_000, &[category]);
-        setup.catalog.prices.lock().unwrap().insert(fresh, vec![(Utc::now() - Duration::minutes(5), money(100_000))]);
+        setup.catalog.prices.lock().unwrap().insert(fresh, vec![(Timestamp::now() - SignedDuration::from_mins(5), money(100_000))]);
         let result = promotions.evaluate(&tenant, &setup.cart(&[(fresh, 1)])).await.unwrap();
         assert!(result.lines.is_empty());
         assert_eq!(result.withheld[0].reason.code, "promotions.reason.no_reference_price");
@@ -161,7 +162,7 @@ async fn catalog_lay_gia_giam_tu_dong_qua_nguon_da_cam() {
             .sale_prices(
                 &setup.tenant(),
                 setup.tree.a,
-                chrono::Utc::now(),
+                Timestamp::now(),
                 &[(variant, super::money(100_000))],
             )
             .await
@@ -174,7 +175,7 @@ async fn catalog_lay_gia_giam_tu_dong_qua_nguon_da_cam() {
             .automatic_prices(
                 &setup.tenant(),
                 setup.tree.a,
-                chrono::Utc::now(),
+                Timestamp::now(),
                 &[(variant, super::money(100_000))],
             )
             .await

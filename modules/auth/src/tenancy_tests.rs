@@ -2,6 +2,7 @@
 //! khách mới, secret TOTP lưu mã hoá (upgrade `u0001_seal_totp`), không rò rỉ giữa khách qua REST
 //! và MCP.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::{MAIN_PLACEMENT, TenantContext, TenantId, TenantSeed, TenantStatus};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{SubsecRound, Utc};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set, Statement};
 use serde_json::json;
 use uuid::Uuid;
@@ -107,7 +107,7 @@ async fn totp_luu_ma_hoa_va_ma_cu_doc_duoc() {
         let ada = ada.await.unwrap();
         // Như bản trước bước 33: secret base32 lưu nguyên văn, đã xác nhận.
         let plain = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         crate::mfa::entity::totp::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -141,7 +141,7 @@ async fn totp_luu_ma_hoa_va_ma_cu_doc_duoc() {
         // Mã của secret cũ vẫn đúng (mở secret đã mã hoá lúc kiểm).
         let code = crate::mfa::service::tests::code_at(
             plain,
-            u64::try_from(Utc::now().timestamp()).unwrap(),
+            u64::try_from(Timestamp::now().as_unix_seconds()).unwrap(),
         );
         assert!(services.mfa.verify_totp(&tenant, ada.id, &code).await.unwrap());
 
@@ -442,7 +442,7 @@ async fn api_key_dinh_tuyen_dung_database() {
         let legacy = format!("axk_{}", crate::token::random_token(32).unwrap());
         let database = default.database().write();
         let backend = database.get_database_backend();
-        let update = Statement::from_sql_and_values(
+        let update = autoxide_kernel::database::statement(
             backend,
             match backend {
                 sea_orm::DatabaseBackend::Postgres => {

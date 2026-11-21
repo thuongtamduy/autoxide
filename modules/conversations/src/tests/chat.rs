@@ -1,6 +1,8 @@
 //! Cuộc trò chuyện và tin nhắn: gửi lại không trùng, phạm vi theo nhánh, thu hồi, đã đọc, phân công,
 //! đóng, chặn, thông báo gom lô, chuyển phiếu qua `support` thật, tool MCP.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::tenancy::ScopeExt;
@@ -144,7 +146,7 @@ async fn thu_hoi_qua_hai_phut_bi_tu_choi() {
         message::Entity::update_many()
             .col_expr(
                 message::Column::CreatedAt,
-                Expr::value(chrono::Utc::now() - chrono::Duration::seconds(121)),
+                Expr::value(Timestamp::now() - SignedDuration::from_secs(121)),
             )
             .filter(message::Column::Id.eq(old_id))
             .scoped(&tenant)

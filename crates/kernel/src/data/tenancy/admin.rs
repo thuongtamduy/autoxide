@@ -11,11 +11,11 @@
 //!   đang "vào" khách khác bằng header làm việc này từ trong khách đó.
 //! - Chế độ `single`: chỉ có khách mặc định; tạo khách là lỗi `tenant_single_mode`.
 
+use crate::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock};
 
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -99,6 +99,7 @@ pub fn require_platform(principal: &Principal) -> Result<(), Error> {
 
 pub(super) mod tenant {
     //! Bảng `kernel_tenants` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -112,8 +113,8 @@ pub(super) mod tenant {
         pub status: String,
         pub parent_id: Option<Uuid>,
         pub placement_id: Uuid,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// Chỉ đọc: đọc được, mọi lệnh ghi bị chặn (`tenant_read_only`); độc lập với `status`.
         pub read_only: bool,
         /// Nước khách buộc lưu dữ liệu (ISO 3166-1 alpha-2), `None` khi không buộc (D-360).
@@ -125,6 +126,7 @@ pub(super) mod tenant {
 
 pub(super) mod placement {
     //! Bảng `kernel_placements` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -140,9 +142,9 @@ pub(super) mod placement {
         pub read_url_sealed: Option<String>,
         pub storage_sealed: Option<String>,
         pub schema_state: String,
-        pub schema_checked_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub schema_checked_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// Nước đặt máy chủ (ISO 3166-1 alpha-2), `None` khi chưa ghi (D-360).
         pub country_code: Option<String>,
     }
@@ -173,8 +175,8 @@ pub struct Tenant {
     /// Name of the placement (database) that keeps its data.
     #[schema(example = "main")]
     pub placement: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// Related records asked for with `expand` in `GET /api/v1/kernel/tenants`; absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expanded: Option<TenantExpanded>,
@@ -219,7 +221,7 @@ pub struct Placement {
     /// country; `null` when unknown. Set with `autoxide placement country`.
     #[serde(default)]
     pub country_code: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Where a placement keeps its tenants' files. Access keys are never shown.
@@ -359,8 +361,8 @@ impl std::fmt::Debug for TenantAdmin {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(super) fn is_slug(slug: &str) -> bool {
@@ -722,7 +724,7 @@ impl TenantAdmin {
         actor: Actor,
         id: Uuid,
         changes: TenantChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Tenant, Error> {
         let row = self.find(id).await?;
         if row.status == TenantStatus::Deleted.as_str() {

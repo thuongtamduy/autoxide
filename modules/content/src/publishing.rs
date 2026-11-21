@@ -12,7 +12,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -39,8 +39,8 @@ pub(crate) type Published = published::Model;
 /// Ai đăng, lúc nào, với ngày hiển thị nào, và ai xác nhận đã duyệt nội dung do AI tạo.
 pub(crate) struct PublishStamp {
     /// Ngày hiển thị; `None`: giữ ngày cũ, hay `now` khi đăng lần đầu.
-    pub published_at: Option<DateTime<Utc>>,
-    pub now: DateTime<Utc>,
+    pub published_at: Option<Timestamp>,
+    pub now: Timestamp,
     pub by: Option<Uuid>,
     pub ai_reviewed_by: Option<Uuid>,
 }
@@ -60,8 +60,8 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
-        published_at: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
+        published_at: Option<Timestamp>,
         ai_reviewed: bool,
     ) -> Result<Entry, Error> {
         permissions::require_some_publish(principal)?;
@@ -161,7 +161,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         self.take_down(tenant, principal, id, expected, Status::Draft).await
     }
@@ -172,7 +172,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         self.take_down(tenant, principal, id, expected, Status::Archived).await
     }
@@ -184,7 +184,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         principal.require(&CONTENT_PUBLISH)?;
         let entry = self.load_checked(tenant, id, None).await?;
@@ -230,7 +230,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         to: Status,
     ) -> Result<Entry, Error> {
         // Gỡ: `content.publish`, hay `content.publish_own` trên mục của mình. Lưu trữ (410, gỡ
@@ -304,7 +304,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(), Error> {
         principal.require(&CONTENT_DELETE)?;
         let entry = self.load_checked(tenant, id, expected).await?;
@@ -392,7 +392,7 @@ impl ContentService {
         principal: &Principal,
         id: Uuid,
         parent: Option<Uuid>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
         let entry = self.load_checked(tenant, id, None).await?;
@@ -608,7 +608,7 @@ impl ContentService {
         entry: &Entry,
         gone: bool,
         by: Option<Uuid>,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Option<String>, Error> {
         let Some(old) = published::Entity::find()
             .scoped(tenant)
@@ -675,7 +675,7 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         let entry = entry::Entity::find_by_id(id)
             .scoped(tenant)
@@ -694,7 +694,7 @@ impl ContentService {
         tenant: &TenantContext,
         transaction: &C,
         id: Uuid,
-        version: DateTime<Utc>,
+        version: Timestamp,
     ) -> Result<Entry, Error> {
         let entry = entry::Entity::find_by_id(id)
             .scoped(tenant)
@@ -775,7 +775,7 @@ pub(crate) fn published_payload(entry: &Entry, path: Option<&str>, moved: &[Move
 }
 
 /// `expected` (`If-Match`) khác phiên bản của `entry`: 412.
-pub(crate) fn check_version(entry: &Entry, expected: Option<DateTime<Utc>>) -> Result<(), Error> {
+pub(crate) fn check_version(entry: &Entry, expected: Option<Timestamp>) -> Result<(), Error> {
     if expected.is_some_and(|expected| expected != entry.updated_at) {
         return Err(autoxide_kernel::version::changed());
     }

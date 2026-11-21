@@ -1,5 +1,7 @@
 //! Bảng `customers_profiles`.
 
+use autoxide_kernel::time::Date;
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -23,12 +25,12 @@ pub struct Model {
     pub currency: Option<String>,
     pub total_spent_minor: i64,
     pub orders_count: i64,
-    pub first_order_at: Option<DateTimeUtc>,
-    pub last_order_at: Option<DateTimeUtc>,
+    pub first_order_at: Option<Timestamp>,
+    pub last_order_at: Option<Timestamp>,
     pub custom_fields: String,
     pub birthday_md: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

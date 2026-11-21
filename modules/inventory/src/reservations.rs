@@ -10,6 +10,8 @@
 //! Mọi chuyển trạng thái khoá dòng chỗ giữ trước (`rows::lock_one`): xác nhận, trả, xuất, hết hạn
 //! của cùng một đơn nối đuôi nhau; chỉ bên đổi được trạng thái mới cộng / trừ tồn.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_catalog::api::{ProductKind, SaleMode, VariantSnapshot};
@@ -18,7 +20,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::Duration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
@@ -204,10 +205,7 @@ async fn set_status(
         .col_expr(reservation::Column::Status, Expr::value(to.as_str()))
         .col_expr(reservation::Column::UpdatedAt, Expr::value(now()));
     if to != ReservationStatus::Held {
-        update = update.col_expr(
-            reservation::Column::ExpiresAt,
-            Expr::value(None::<chrono::DateTime<chrono::Utc>>),
-        );
+        update = update.col_expr(reservation::Column::ExpiresAt, Expr::value(None::<Timestamp>));
     }
     if let Some(reason) = reason {
         update = update.col_expr(reservation::Column::ReleaseReason, Expr::value(reason.as_str()));
@@ -388,7 +386,7 @@ impl InventoryService {
             problems.push(FieldError::new("expires_at", "range", "must be in the future"));
         }
         fail_if_any(problems)?;
-        if request.expires_at > now() + Duration::hours(self.config.max_hold_hours) {
+        if request.expires_at > now() + SignedDuration::from_hours(self.config.max_hold_hours) {
             return Err(Error::new(
                 ErrorKind::Validation,
                 "inventory.hold_too_long",

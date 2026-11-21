@@ -9,6 +9,8 @@
 //! - Bản nháp thông báo gửi cơ quan và gửi người bị ảnh hưởng dựng từ mẫu cố định + dữ liệu sự cố — chỉ
 //!   là bản nháp, con người duyệt và gửi.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -19,7 +21,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::{Value, json};
@@ -78,7 +79,7 @@ pub(crate) struct NewIncident {
     pub title: String,
     pub description: String,
     pub severity: String,
-    pub detected_at: Option<DateTime<Utc>>,
+    pub detected_at: Option<Timestamp>,
     pub data_categories: Vec<String>,
     pub affected_count: Option<i64>,
 }
@@ -92,9 +93,9 @@ pub(crate) struct IncidentChange {
     pub status: Option<String>,
     pub data_categories: Option<Vec<String>>,
     pub affected_count: Option<i64>,
-    pub authority_notified_at: Option<DateTime<Utc>>,
+    pub authority_notified_at: Option<Timestamp>,
     pub authority_reference: Option<String>,
-    pub subjects_notified_at: Option<DateTime<Utc>>,
+    pub subjects_notified_at: Option<Timestamp>,
 }
 
 fn check_text(
@@ -165,7 +166,7 @@ pub(crate) fn incident_payload(row: &incident::Model) -> Value {
 
 impl ComplianceService {
     async fn incident_rule(&self, tenant: &TenantContext) -> Result<(i64, Vec<i64>), Error> {
-        let rule = self.rule_for(tenant, "privacy.incident", Utc::now()).await?;
+        let rule = self.rule_for(tenant, "privacy.incident", Timestamp::now()).await?;
         let body = rule.and_then(|row| serde_json::from_str::<Value>(&row.body).ok());
         Ok(deadline_rule(body.as_ref()))
     }
@@ -188,7 +189,7 @@ impl ComplianceService {
         );
         let at = now();
         let detected_at = input.detected_at.unwrap_or(at);
-        if detected_at > at + Duration::minutes(5) {
+        if detected_at > at + SignedDuration::from_mins(5) {
             problems.push(FieldError::new("detected_at", "range", "must not be in the future"));
         }
         if !problems.is_empty() {
@@ -203,7 +204,7 @@ impl ComplianceService {
             severity: input.severity,
             status: "open".to_owned(),
             detected_at,
-            report_due_at: detected_at + Duration::hours(hours),
+            report_due_at: detected_at + SignedDuration::from_hours(hours),
             reminded_hours: 0,
             authority_notified_at: None,
             authority_reference: None,
@@ -268,7 +269,7 @@ impl ComplianceService {
             select = select
                 .filter(incident::Column::Status.is_in(["open", "contained"]))
                 .filter(incident::Column::AuthorityNotifiedAt.is_null())
-                .filter(incident::Column::ReportDueAt.lt(Utc::now()));
+                .filter(incident::Column::ReportDueAt.lt(Timestamp::now()));
         }
         fetch_page(select, incident::Column::Id, |row| row.id, page, tenant.database().read()).await
     }
@@ -278,7 +279,7 @@ impl ComplianceService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         change: IncidentChange,
     ) -> Result<incident::Model, Error> {
         principal.require(&INCIDENTS_MANAGE)?;
@@ -481,7 +482,7 @@ impl ComplianceService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
-        let at = Utc::now();
+        let at = Timestamp::now();
         let due: Vec<(Uuid, Uuid)> = incident::Entity::find()
             .select_only()
             .column(incident::Column::TenantId)
@@ -490,8 +491,8 @@ impl ComplianceService {
             .filter(incident::Column::AuthorityNotifiedAt.is_null())
             // Mốc nhắc sớm nhất: không trước 1 giờ sau phát hiện; quá hạn 7 ngày thì thôi nhắc
             // (doctor vẫn báo).
-            .filter(incident::Column::DetectedAt.lt(at - Duration::hours(1)))
-            .filter(incident::Column::ReportDueAt.gt(at - Duration::days(7)))
+            .filter(incident::Column::DetectedAt.lt(at - SignedDuration::from_hours(1)))
+            .filter(incident::Column::ReportDueAt.gt(at - SignedDuration::from_hours(24 * 7)))
             .order_by_asc(incident::Column::Id)
             .limit(500)
             .into_tuple()
@@ -510,7 +511,7 @@ impl ComplianceService {
                 continue;
             };
             let (_, marks) = self.incident_rule(&tenant).await?;
-            let elapsed = (at - row.detected_at).num_hours();
+            let elapsed = (at - row.detected_at).as_hours();
             let Some(mark) = due_mark(&marks, elapsed, i64::from(row.reminded_hours)) else {
                 continue;
             };

@@ -16,7 +16,8 @@ use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use uuid::Uuid;
@@ -31,7 +32,7 @@ use crate::tenancy::TenantContext;
 pub struct Issued {
     pub id: Uuid,
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Token vừa được dùng.
@@ -48,7 +49,7 @@ pub struct Consumed {
 #[non_exhaustive]
 pub struct Live {
     pub data: Option<String>,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Vì sao một token bị từ chối.
@@ -75,7 +76,7 @@ impl TokenRejection {
 #[non_exhaustive]
 pub struct Recent {
     pub data: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Token dùng một lần trên bảng `<module>_tokens`. Mọi hàm nhận kết nối (`database.write()`
@@ -98,7 +99,7 @@ impl OneTimeTokens {
         purpose: &str,
         subject: &str,
         data: Option<&str>,
-        ttl: chrono::Duration,
+        ttl: SignedDuration,
     ) -> Result<Issued, Error> {
         let token = random_token(32)?;
         let id = Uuid::now_v7();
@@ -141,7 +142,7 @@ impl OneTimeTokens {
         tenant: &TenantContext,
         purpose: &str,
         subject: &str,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> Result<Vec<Recent>, Error> {
         let select = Query::select()
             .columns([Alias::new("data"), Alias::new("created_at")])
@@ -157,7 +158,7 @@ impl OneTimeTokens {
             .map(|row| {
                 Ok(Recent {
                     data: row.try_get::<Option<String>>("", "data")?,
-                    created_at: row.try_get::<DateTime<Utc>>("", "created_at")?,
+                    created_at: row.try_get::<Timestamp>("", "created_at")?,
                 })
             })
             .collect()
@@ -187,7 +188,7 @@ impl OneTimeTokens {
             .map(|row| {
                 Ok(Live {
                     data: row.try_get::<Option<String>>("", "data")?,
-                    expires_at: row.try_get::<DateTime<Utc>>("", "expires_at")?,
+                    expires_at: row.try_get::<Timestamp>("", "expires_at")?,
                 })
             })
             .collect()
@@ -282,10 +283,10 @@ impl OneTimeTokens {
         let Some(row) = connection.query_one(&select).await? else {
             return Ok(TokenRejection::Unknown);
         };
-        if row.try_get::<Option<DateTime<Utc>>>("", "used_at")?.is_some() {
+        if row.try_get::<Option<Timestamp>>("", "used_at")?.is_some() {
             return Ok(TokenRejection::Used);
         }
-        if row.try_get::<DateTime<Utc>>("", "expires_at")? <= now() {
+        if row.try_get::<Timestamp>("", "expires_at")? <= now() {
             return Ok(TokenRejection::Expired);
         }
         // Còn hạn, chưa dùng: vừa có bên khác dùng xong giữa hai câu, hay sai mục đích.
@@ -334,7 +335,7 @@ impl OneTimeTokens {
     pub async fn purge<C: ConnectionTrait>(
         &self,
         connection: &C,
-        before: DateTime<Utc>,
+        before: Timestamp,
     ) -> Result<u64, Error> {
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
@@ -344,8 +345,8 @@ impl OneTimeTokens {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn table_name(module: &str) -> String {

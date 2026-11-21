@@ -1,5 +1,6 @@
 //! Bảng `orders_cod_blocks`: người mua không được trả khi nhận hàng, có lý do và hạn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,11 +13,11 @@ pub struct Model {
     pub buyer_key: String,
     pub reason_code: String,
     pub note: Option<String>,
-    pub expires_at: DateTimeUtc,
+    pub expires_at: Timestamp,
     pub created_by: Uuid,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
     pub lifted_by: Option<Uuid>,
-    pub lifted_at: Option<DateTimeUtc>,
+    pub lifted_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,6 +1,8 @@
 //! Ảnh thu nhỏ theo phiên bản nội dung.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 /// Ảnh thu nhỏ: tải lên đưa job vào hàng đợi; job làm đúng các cỡ nhỏ hơn ảnh; thay nội dung
 /// thì bản cũ bị xoá và job cũ không làm gì; xoá hẳn thì hết; job dọn mồ côi giữ bản hiện tại.
@@ -83,7 +85,7 @@ async fn anh_thu_nho_theo_phien_ban() {
             media
                 .clean_orphans(
                     &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
-                    Utc::now() + chrono::Duration::days(2),
+                    Timestamp::now() + SignedDuration::from_hours(24 * 2),
                 )
                 .await
                 .unwrap(),

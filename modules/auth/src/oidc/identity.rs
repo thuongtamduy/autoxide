@@ -4,7 +4,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -13,6 +13,7 @@ use sea_orm::{
 use uuid::Uuid;
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -28,8 +29,8 @@ pub(crate) mod entity {
         pub subject: String,
         pub email: Option<String>,
         pub email_verified: bool,
-        pub created_at: DateTimeUtc,
-        pub last_login_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_login_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -43,8 +44,8 @@ pub(crate) mod entity {
 
 pub(crate) type Identity = entity::Model;
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Danh tính `subject` ở nhà cung cấp `provider_id`.

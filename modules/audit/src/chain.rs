@@ -26,7 +26,7 @@ use autoxide_kernel::doctor::{Finding, Probe};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::privacy::USER_DELETED;
 use autoxide_kernel::rows;
-use chrono::{DateTime, SecondsFormat, Utc};
+use autoxide_kernel::time::{Precision, Timestamp};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter, QueryOrder,
     QuerySelect, Set,
@@ -49,8 +49,8 @@ pub(crate) struct Link<'a> {
     pub actor_api_key_id: Option<Uuid>,
     pub actor_kind: Option<&'a str>,
     pub subject: Option<&'a str>,
-    pub occurred_at: DateTime<Utc>,
-    pub recorded_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
+    pub recorded_at: Timestamp,
     pub payload_hash: &'a str,
 }
 
@@ -96,8 +96,8 @@ pub(crate) fn chain_hash(previous: &str, link: &Link<'_>) -> String {
     );
     // Thời gian băm ở độ chính xác micro giây: đúng độ chính xác cả hai database lưu, nên đọc
     // lại từ database nào cũng cho cùng một chuỗi.
-    let occurred = link.occurred_at.to_rfc3339_opts(SecondsFormat::Micros, true);
-    let recorded = link.recorded_at.to_rfc3339_opts(SecondsFormat::Micros, true);
+    let occurred = link.occurred_at.to_rfc3339_opts(Precision::Micros, true);
+    let recorded = link.recorded_at.to_rfc3339_opts(Precision::Micros, true);
     for part in [
         Some(previous),
         Some(sequence.as_str()),
@@ -363,7 +363,6 @@ mod tests {
     use autoxide_kernel::event::{Actor, Delivered, EventHandler};
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_testkit::TestDatabase;
-    use chrono::SubsecRound;
     use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
     use serde_json::json;
     use std::sync::Arc;
@@ -403,7 +402,7 @@ mod tests {
         )
         .actor(Actor::user(Uuid::now_v7()))
         .subject(Some(subject.to_owned()))
-        .occurred_at(Utc::now().trunc_subsecs(6))
+        .occurred_at(Timestamp::now())
     }
 
     /// Ghi `count` event; trả ID theo thứ tự ghi.
@@ -438,7 +437,7 @@ mod tests {
 
     #[test]
     fn bam_doi_khi_doi_bat_ky_phan_nao() {
-        let at = Utc::now();
+        let at = Timestamp::now();
         let link = |module| Link {
             sequence: 1,
             id: Uuid::nil(),
@@ -635,8 +634,8 @@ mod tests {
                         "notes.note_created".into(),
                         format!("notes.note:{index}").into(),
                         (index != 3).then(|| r#"{"title":"x"}"#.to_owned()).into(),
-                        Utc::now().into(),
-                        Utc::now().into(),
+                        Timestamp::now().into(),
+                        Timestamp::now().into(),
                     ])
                     .unwrap()
                     .to_owned();

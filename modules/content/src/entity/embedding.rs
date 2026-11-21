@@ -1,5 +1,6 @@
 //! Bảng `content_embeddings`: vector của từng đoạn của mục, cho tìm theo ý nghĩa (D-109).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -21,7 +22,7 @@ pub struct Model {
     pub dimensions: i32,
     /// `f32` little-endian nối nhau (`autoxide_kernel::ai::vector::encode`), đã chuẩn hoá.
     pub vector: Vec<u8>,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

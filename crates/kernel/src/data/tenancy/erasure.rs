@@ -17,12 +17,11 @@
 //!
 //! Chạy lại được: hỏng giữa chừng (file, mạng) thì khách vẫn `suspended`, gọi lại xoá tiếp.
 
-use std::sync::Arc;
-
-use chrono::{SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
 use sea_orm::{ActiveModelTrait, ConnectionTrait, EntityTrait, IntoActiveModel, Set};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -77,8 +76,8 @@ impl Event for TenantDeleted<'_> {
     const NAME: &'static str = "kernel.tenant_deleted";
 }
 
-fn now() -> chrono::DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn tenant_not_suspended() -> Error {

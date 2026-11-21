@@ -10,6 +10,7 @@
 //! - Bản công khai đã được đăng SAU lúc đặt lịch thì lịch thất bại với
 //!   `content.schedule_outdated`, không ghi đè.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -17,7 +18,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -62,7 +62,7 @@ impl Action {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SchedulePlan {
     pub action: Action,
-    pub run_at: DateTime<Utc>,
+    pub run_at: Timestamp,
     pub ai_reviewed: bool,
 }
 
@@ -102,8 +102,8 @@ impl ContentService {
         principal: &Principal,
         entry_id: Uuid,
         action: Action,
-        run_at: DateTime<Utc>,
-        expected: Option<DateTime<Utc>>,
+        run_at: Timestamp,
+        expected: Option<Timestamp>,
     ) -> Result<Schedule, Error> {
         let plan = SchedulePlan { action, run_at, ai_reviewed: false };
         self.create_schedule_reviewed(tenant, principal, entry_id, plan, expected).await
@@ -118,7 +118,7 @@ impl ContentService {
         principal: &Principal,
         entry_id: Uuid,
         plan: SchedulePlan,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Schedule, Error> {
         let SchedulePlan { action, run_at, ai_reviewed } = plan;
         principal.require(&CONTENT_PUBLISH)?;
@@ -333,7 +333,7 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         id: Uuid,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<(), Error> {
         let Some(row) =
             schedule::Entity::find_by_id(id).scoped(tenant).one(tenant.database().write()).await?
@@ -384,7 +384,7 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         row: &Schedule,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<(), Error> {
         let entry = entry::Entity::find_by_id(row.entry_id)
             .scoped(tenant)

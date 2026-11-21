@@ -9,7 +9,8 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
@@ -42,7 +43,7 @@ impl OrdersService {
         id: Uuid,
         to: OrderStatus,
         reason: Option<String>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<order::Model, Error> {
         principal.require(&MANAGE)?;
         let row = self.order(tenant, id).await?;
@@ -151,7 +152,7 @@ impl OrdersService {
 
     /// Một lô đơn `delivered` quá hạn đổi trả của nút, không có hoãn → `completed`.
     pub(crate) async fn complete_delivered(&self, database: &Database) -> Result<u64, Error> {
-        let due: Vec<(Uuid, Uuid, Uuid, Option<DateTime<Utc>>)> = order::Entity::find()
+        let due: Vec<(Uuid, Uuid, Uuid, Option<Timestamp>)> = order::Entity::find()
             .select_only()
             .column(order::Column::TenantId)
             .column(order::Column::Id)
@@ -167,7 +168,8 @@ impl OrdersService {
         for (tenant_id, id, org, delivered_at) in due {
             let tenant = self.databases.tenant(TenantId::from_uuid(tenant_id)).await?;
             let policy = self.policy(&tenant, OrgId::from_uuid(org)).await?;
-            let ends = delivered_at.map(|at| at + Duration::days(policy.return_window_days));
+            let ends = delivered_at
+                .map(|at| at + SignedDuration::from_hours(24 * policy.return_window_days));
             if ends.is_none_or(|ends| ends > crate::service::now()) {
                 continue;
             }
@@ -196,7 +198,7 @@ impl OrdersService {
     /// Một lô đơn `confirmed` quá `orders.acceptance_hours` của nút mà cửa hàng chưa nhận →
     /// huỷ (`seller_not_accepted`), hoàn tiền tự động (D-209).
     pub(crate) async fn expire_unaccepted(&self, database: &Database) -> Result<u64, Error> {
-        let due: Vec<(Uuid, Uuid, Uuid, Option<DateTime<Utc>>)> = order::Entity::find()
+        let due: Vec<(Uuid, Uuid, Uuid, Option<Timestamp>)> = order::Entity::find()
             .select_only()
             .column(order::Column::TenantId)
             .column(order::Column::Id)
@@ -216,7 +218,8 @@ impl OrdersService {
             if policy.acceptance_hours == 0 {
                 continue;
             }
-            let ends = confirmed_at.map(|at| at + Duration::hours(policy.acceptance_hours));
+            let ends =
+                confirmed_at.map(|at| at + SignedDuration::from_hours(policy.acceptance_hours));
             if ends.is_none_or(|ends| ends > crate::service::now()) {
                 continue;
             }

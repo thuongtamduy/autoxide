@@ -1,5 +1,6 @@
 //! Bảng `conversations_voice_lines`: đường dây thoại của một nút.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,7 +18,7 @@ pub struct Model {
     pub callback_hours: String,
     pub utc_offset_minutes: i32,
     pub active: bool,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

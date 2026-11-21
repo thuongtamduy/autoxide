@@ -6,6 +6,7 @@
 //! 33). Sản phẩm và bảng giá thuộc một nút của cây tổ chức (bước 34): đọc kiểm `require_at`, ghi
 //! kiểm `require_write_at` TRONG transaction ghi; ngoài phạm vi báo như không có (404).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal, Scope};
@@ -13,7 +14,6 @@ use autoxide_kernel::entitlement::{EntitlementsHandle, Feature, Limit};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ConnectionTrait, DbErr, SqlErr};
 
 use crate::config::CatalogConfig;
@@ -106,13 +106,13 @@ impl CatalogService {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai
 /// database trả về cùng một giá trị và so bằng nhau được.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Cắt một thời điểm client gửi tới micro giây (như [`now`]).
-pub(crate) fn micros(at: DateTime<Utc>) -> DateTime<Utc> {
-    at.trunc_subsecs(6)
+pub(crate) fn micros(at: Timestamp) -> Timestamp {
+    at.truncate(jiff::Unit::Microsecond)
 }
 
 /// Nút của bản ghi mới khi người tạo không nêu: gốc nếu họ có `permission` cho cả khách; nút

@@ -2,6 +2,7 @@
 //! `OrderExtensions::add_tender`: phần còn lại thu qua đối tác, trả đủ thì đơn xác nhận ngay, tender
 //! lạ hay tender lỗi thì mọi chỗ giữ được trả.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -9,7 +10,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ impl Tender for FakeTender {
         buyer: Option<Uuid>,
         input: &Value,
         max: Money,
-        _expires_at: DateTime<Utc>,
+        _expires_at: Timestamp,
     ) -> Result<Money, Error> {
         assert!(buyer.is_some());
         if input["fail"] == true {

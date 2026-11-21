@@ -1,5 +1,6 @@
 //! Bảng `orders_advance_plans`: kế hoạch trả trước một phần của một đơn có hàng đặt trước (D-232).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -19,10 +20,10 @@ pub struct Model {
     pub terms_sha256: String,
     pub status: String,
     pub balance_attempt: i32,
-    pub balance_requested_at: Option<DateTimeUtc>,
-    pub balance_due_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub balance_requested_at: Option<Timestamp>,
+    pub balance_due_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

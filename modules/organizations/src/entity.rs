@@ -2,6 +2,7 @@
 //! sâu, tổ tiên) nằm ở kernel (`OrgTree`); bảng ở đây giữ phần nghĩa của nút.
 
 pub(crate) mod unit {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -24,8 +25,8 @@ pub(crate) mod unit {
         pub status: String,
         pub status_reason: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -38,6 +39,7 @@ pub(crate) mod unit {
 }
 
 pub(crate) mod unit_type {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -50,8 +52,8 @@ pub(crate) mod unit_type {
         pub code: String,
         pub name: String,
         pub description: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -64,6 +66,7 @@ pub(crate) mod unit_type {
 }
 
 pub(crate) mod setting {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -79,7 +82,7 @@ pub(crate) mod setting {
         /// JSON đã kiểm.
         pub value: String,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

@@ -12,6 +12,7 @@ macro_rules! tenant_scoped {
 
 /// Nhật ký gửi: mỗi (thông báo, kênh) một dòng.
 pub(crate) mod message {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -37,15 +38,15 @@ pub(crate) mod message {
         /// `queued`, `deferred`, `sent`, `failed`, `skipped` hay `canceled`.
         pub status: String,
         pub skip_reason: String,
-        pub not_before: Option<DateTimeUtc>,
+        pub not_before: Option<Timestamp>,
         pub attempts: i32,
         pub provider_reference: Option<String>,
         pub error_code: Option<String>,
         /// SHA-256 của phần thô token huỷ nhận (email quảng cáo).
         pub unsubscribe_token_hash: Option<String>,
         pub dedupe_key: String,
-        pub created_at: DateTimeUtc,
-        pub sent_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub sent_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -54,6 +55,7 @@ pub(crate) mod message {
 
 /// Hộp thư trong ứng dụng.
 pub(crate) mod inbox {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -70,8 +72,8 @@ pub(crate) mod inbox {
         pub title: String,
         pub body: String,
         pub link: Option<String>,
-        pub read_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub read_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -80,6 +82,7 @@ pub(crate) mod inbox {
 
 /// Tuỳ chọn nhận của người dùng; không có dòng là bật.
 pub(crate) mod preference {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -96,7 +99,7 @@ pub(crate) mod preference {
         #[sea_orm(primary_key, auto_increment = false)]
         pub channel: String,
         pub enabled: bool,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -105,6 +108,7 @@ pub(crate) mod preference {
 
 /// Câu chữ thay mẫu mặc định của khách.
 pub(crate) mod template {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -125,7 +129,7 @@ pub(crate) mod template {
         /// Mã mẫu ZNS đã được Zalo duyệt (kênh `zns`).
         pub zns_template_id: Option<String>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -134,6 +138,7 @@ pub(crate) mod template {
 
 /// Đăng ký web push của trình duyệt.
 pub(crate) mod push_subscription {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -152,8 +157,8 @@ pub(crate) mod push_subscription {
         pub auth_secret: String,
         pub user_agent: Option<String>,
         pub failures: i32,
-        pub created_at: DateTimeUtc,
-        pub last_used_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_used_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -162,6 +167,7 @@ pub(crate) mod push_subscription {
 
 /// Token thiết bị di động (D-220).
 pub(crate) mod device_token {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -181,8 +187,8 @@ pub(crate) mod device_token {
         pub app_id: String,
         pub locale: Option<String>,
         pub failures: i32,
-        pub created_at: DateTimeUtc,
-        pub last_used_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_used_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -191,6 +197,7 @@ pub(crate) mod device_token {
 
 /// Tin mời đăng ký nhận quảng cáo đã gửi: mỗi (kênh, địa chỉ) một lần.
 pub(crate) mod invitation {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -204,7 +211,7 @@ pub(crate) mod invitation {
         /// SHA-256 của địa chỉ (hay ID người dùng).
         #[sea_orm(primary_key, auto_increment = false)]
         pub subject_key: String,
-        pub sent_at: DateTimeUtc,
+        pub sent_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -213,6 +220,7 @@ pub(crate) mod invitation {
 
 /// Bản nháp mẫu khách tự soạn (D-206): mỗi (loại, kênh, ngôn ngữ) một bản.
 pub(crate) mod template_draft {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -233,7 +241,7 @@ pub(crate) mod template_draft {
         pub short: String,
         pub zns_template_id: Option<String>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -242,6 +250,7 @@ pub(crate) mod template_draft {
 
 /// Bản đã xuất bản của mẫu khách tự soạn: ghi một lần, không sửa (giữ 20 bản gần nhất).
 pub(crate) mod template_version {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -261,7 +270,7 @@ pub(crate) mod template_version {
         pub short: String,
         pub zns_template_id: Option<String>,
         pub published_by: Option<Uuid>,
-        pub published_at: DateTimeUtc,
+        pub published_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -270,6 +279,7 @@ pub(crate) mod template_version {
 
 /// Bản đang dùng của mẫu khách tự soạn: số phiên bản trong `notifications_template_versions`.
 pub(crate) mod template_live {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -286,7 +296,7 @@ pub(crate) mod template_live {
         pub locale: String,
         pub version: i32,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -295,6 +305,7 @@ pub(crate) mod template_live {
 
 /// Thương hiệu của mail HTML của khách (logo, màu, chân thư).
 pub(crate) mod branding {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -311,7 +322,7 @@ pub(crate) mod branding {
         pub background_color: String,
         pub footer_text: Option<String>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

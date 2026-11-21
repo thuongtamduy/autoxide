@@ -2,6 +2,7 @@
 //! lại đồng thời chỉ xử lý một lần, đối tác không trả lời rồi gửi lại cùng `reference`, hoàn tiền
 //! đồng thời không vượt số đã thu, đối soát báo thiếu và lệch, xử lý tay một mục chờ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Actor;
@@ -10,7 +11,6 @@ use autoxide_kernel::payment::{PaymentGateway, StatementKind, StatementLine};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 use autoxide_testkit::{FakePaymentGateway, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::Utc;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -104,7 +104,7 @@ async fn webhook_sai_chu_ky_tra_401_va_khong_luu() {
         let stale = FakePaymentGateway::signed(
             &json!({"event_id": "evt-2", "kind": "payment_succeeded", "provider_ref": payment.provider_ref,
                     "amount": 100_000, "currency": "VND"}),
-            Utc::now().timestamp() - 3600,
+            Timestamp::now().as_unix_seconds() - 3600,
         );
         assert_eq!(webhook(&app, stale).await, StatusCode::UNAUTHORIZED);
         drain(&app).await;
@@ -227,7 +227,7 @@ async fn hoan_tien_dong_thoi_khong_vuot_so_da_thu() {
 async fn doi_soat_bao_thieu_va_lech_roi_xu_ly_tay() {
     TestDatabase::run(async |test| {
         let (app, gateway) = app(test).await;
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         // A: đã thu qua webhook, có trong sao kê (kèm phí). B: webhook lạc, sao kê có → ghi như đã thu.
         // C: đã thu nhưng sao kê không có. D: sao kê báo số khác. E: sao kê có giao dịch lạ.
         let a = pay(&app, 100_000, "A").await;

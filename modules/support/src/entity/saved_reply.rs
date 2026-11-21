@@ -1,5 +1,6 @@
 //! Bảng `support_macros`: câu trả lời mẫu của một nút.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,11 +16,11 @@ pub struct Model {
     pub auto_reply: bool,
     pub questions: String,
     pub approved_by: Option<Uuid>,
-    pub approved_at: Option<DateTimeUtc>,
+    pub approved_at: Option<Timestamp>,
     pub review_due_on: Option<String>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,5 +1,6 @@
 //! Bảng `media_tag`: nhãn gắn cho item (D-094).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,8 +16,8 @@ pub struct Model {
     pub name_key: String,
     /// `search::fold(name)` (bỏ dấu): để tìm (D-104).
     pub search_key: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

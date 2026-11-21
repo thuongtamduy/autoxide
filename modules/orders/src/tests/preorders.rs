@@ -4,9 +4,10 @@
 
 use autoxide_catalog::api::SaleMode;
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -24,7 +25,8 @@ use crate::entity::line;
 pub(super) fn preorder_item(shop: &Shop, price: i64) -> Uuid {
     let id = shop.catalog.add_with(shop.tree.a, price, |variant| {
         variant.sale_mode = SaleMode::Preorder;
-        variant.preorder_available_on = Some((Utc::now() + Duration::days(10)).date_naive());
+        variant.preorder_available_on =
+            Some((Timestamp::now() + SignedDuration::from_hours(24 * 10)).date_utc());
     });
     shop.inventory.stock(shop.tree.a, id, 10);
     id
@@ -167,7 +169,7 @@ async fn doi_ngay_dat_truoc_bao_nguoi_mua_va_cho_huy_mien_phi() {
             buyer.send("POST", &format!("/me/orders/{id}/cancel"), Some(json!({}))).await;
         assert_eq!(status, StatusCode::CONFLICT);
         // …nhưng ngày giao dời muộn hơn ngày đã hứa: báo người mua, huỷ miễn phí.
-        let later = (Utc::now() + Duration::days(40)).date_naive();
+        let later = (Timestamp::now() + SignedDuration::from_hours(24 * 40)).date_utc();
         let moved = json!({"before": {"id": phone, "sale_mode": "preorder"},
             "after": {"id": phone, "sale_mode": "preorder", "preorder_available_on": later}});
         emit_from(&shop, &shop.catalog_outbox, &PreorderDateChanged(moved.clone())).await;

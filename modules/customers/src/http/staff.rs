@@ -1,6 +1,7 @@
 //! Endpoint của nhân viên về hồ sơ khách: danh sách, đăng ký tại quầy, một hồ sơ, sửa, liên hệ đầy
 //! đủ (có audit), lịch sử mua.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::NaiveDate;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 use utoipa::{IntoParams, ToSchema};
@@ -110,7 +110,7 @@ pub(crate) struct RegisterRequest {
     /// Up to 200 characters.
     full_name: Option<String>,
     email: Option<String>,
-    birthday: Option<NaiveDate>,
+    birthday: Option<Date>,
     /// `female`, `male` or `other`.
     gender: Option<String>,
     /// Values of the shop's custom fields for customers.
@@ -197,7 +197,7 @@ pub(crate) async fn get_customer(
 pub(crate) struct UpdateRequest {
     full_name: Option<String>,
     email: Option<String>,
-    birthday: Option<NaiveDate>,
+    birthday: Option<Date>,
     /// `female`, `male`, `other` or an empty string.
     gender: Option<String>,
     /// Custom field values to set; `null` clears a field.

@@ -1,5 +1,7 @@
 //! Sản phẩm, biến thể, combo, đặt trước, rò rỉ giữa khách và giữa hai cửa hàng anh em.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::tenancy::DEFAULT_TENANT;
@@ -275,7 +277,7 @@ async fn dat_truoc_phai_co_ngay_sau_hom_nay() {
         assert!(codes.contains(&"catalog.preorder_date_invalid"), "{codes:?}");
         assert!(codes.contains(&"catalog.preorder_limit_invalid"), "{codes:?}");
 
-        let later = (chrono::Utc::now() + chrono::Duration::days(30)).date_naive();
+        let later = (Timestamp::now() + SignedDuration::from_hours(24 * 30)).date_utc();
         body["variant"]["preorder_available_on"] = json!(later);
         body["variant"]["preorder_limit"] = json!(100);
         let (status, made) = call(&app, "POST", "/products", "boss", Some(body)).await;
@@ -420,7 +422,7 @@ async fn doi_ngay_dat_truoc_dong_thoi_chi_phat_mot_event() {
     TestDatabase::run(async |test| {
         let (app, tree) = app(test).await;
         let mut body = product_body(tree.a, "PRE-R", "Hàng đặt trước");
-        let later = (chrono::Utc::now() + chrono::Duration::days(30)).date_naive();
+        let later = (Timestamp::now() + SignedDuration::from_hours(24 * 30)).date_utc();
         body["variant"]["sale_mode"] = json!("preorder");
         body["variant"]["preorder_available_on"] = json!(later);
         body["variant"]["preorder_limit"] = json!(100);
@@ -428,7 +430,7 @@ async fn doi_ngay_dat_truoc_dong_thoi_chi_phat_mot_event() {
         assert_eq!(status, StatusCode::CREATED, "{made}");
         let variant = made["data"]["variants"][0]["id"].as_str().unwrap().to_owned();
         let uri = format!("/variants/{variant}");
-        let moved = json!({"preorder_available_on": later + chrono::Duration::days(7)});
+        let moved = json!({"preorder_available_on": later.checked_add_days(7).unwrap()});
         let (first, second) = tokio::join!(
             call(&app, "PATCH", &uri, "boss", Some(moved.clone())),
             call(&app, "PATCH", &uri, "boss", Some(moved.clone())),

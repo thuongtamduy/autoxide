@@ -8,6 +8,7 @@
 //!   NOTHING` rồi đọc lại; trước khi gắn thì "chạm" dòng nhãn (khoá tới hết transaction),
 //!   lệnh xoá nhãn xoá dòng trước rồi mới gỡ khỏi item — không còn liên kết tới nhãn đã xoá.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -16,7 +17,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
@@ -314,7 +314,7 @@ impl MediaService {
         principal: &Principal,
         id: Uuid,
         name: &str,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<TagWithCount, Error> {
         principal.require(&MEDIA_WRITE)?;
         let mut problems = Vec::new();

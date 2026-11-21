@@ -7,8 +7,7 @@
 //!
 //! Số điện thoại đầy đủ chỉ đi tới nhà cung cấp; bên gọi không ghi nó vào log, event hay lỗi (dùng
 //! [`PhoneNumber::masked`](crate::sms::PhoneNumber::masked)).
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
@@ -57,7 +56,7 @@ pub struct BrowserSessionRequest {
 pub struct BrowserSession {
     /// Token ngắn hạn đưa cho SDK; không lưu.
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Một cuộc gọi ra: nối máy nhân viên với số người mua.
@@ -148,7 +147,7 @@ pub struct VoiceNotification {
     pub call_id: Option<Uuid>,
     pub status: CallStatus,
     pub agent_identity: Option<String>,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     pub duration_seconds: Option<u32>,
     pub provider_recording_id: Option<String>,
 }

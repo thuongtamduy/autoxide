@@ -7,7 +7,8 @@ use autoxide_kernel::access::{OrgTarget, Permission, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::find::{FinderSource, Found, SearchFilter, SearchOp, SearchQuery};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Condition, SimpleExpr};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 
@@ -100,7 +101,7 @@ fn condition(filter: &SearchFilter) -> Option<Condition> {
                 return Some(
                     Condition::all()
                         .add(column.gte(from))
-                        .add(column.lt(from + chrono::Duration::days(1))),
+                        .add(column.lt(from + SignedDuration::from_hours(24))),
                 );
             }
             SearchOp::Gt(value) => column.gt(at(value)?),
@@ -131,13 +132,10 @@ fn condition(filter: &SearchFilter) -> Option<Condition> {
 }
 
 /// `YYYY-MM-DD` (đầu ngày, UTC) hay RFC 3339.
-fn instant(value: &str) -> Option<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(value).map(|at| at.with_timezone(&Utc)).ok().or_else(|| {
-        NaiveDate::parse_from_str(value, "%Y-%m-%d")
-            .ok()
-            .and_then(|date| date.and_hms_opt(0, 0, 0))
-            .map(|at| at.and_utc())
-    })
+fn instant(value: &str) -> Option<Timestamp> {
+    Timestamp::parse_rfc3339(value)
+        .ok()
+        .or_else(|| Date::parse_from_str(value, "%Y-%m-%d").ok().map(Date::start_of_day_utc))
 }
 
 /// Mở bài viết / trang theo đường dẫn (bước 51 P9): mã là slug hay đường dẫn công khai

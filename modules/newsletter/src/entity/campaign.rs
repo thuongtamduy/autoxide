@@ -1,5 +1,6 @@
 //! Bảng `newsletter_campaigns`: một lần gửi bản tin tới một danh sách.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -21,19 +22,19 @@ pub struct Model {
     pub advertising: bool,
     /// `draft`, `scheduled`, `sending`, `paused`, `sent` hoặc `cancelled`.
     pub status: String,
-    pub scheduled_at: Option<DateTimeUtc>,
-    pub started_at: Option<DateTimeUtc>,
-    pub finished_at: Option<DateTimeUtc>,
+    pub scheduled_at: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// Đã chụp xong danh sách người nhận vào `newsletter_deliveries`.
-    pub prepared_at: Option<DateTimeUtc>,
+    pub prepared_at: Option<Timestamp>,
     /// Lượt chạy: tăng mỗi lần gửi / hẹn giờ / tiếp tục. Job của lượt cũ thấy khác số thì thôi.
     pub run: i32,
     /// Nguồn tự động (vd `content.entry`) và khoá trong nguồn — unique: một bài một chiến dịch.
     pub source: Option<String>,
     pub source_ref: Option<String>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// `static` (gửi đúng như viết) hay `template` (mẫu dựng riêng cho từng người nhận, D-367).
     pub format: String,
 }

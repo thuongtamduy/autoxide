@@ -1,5 +1,6 @@
 //! Endpoint tính giỏ, lượt giữ, dữ liệu luật, ví voucher của người mua, dưới `/api/v1/promotions`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -77,7 +77,7 @@ async fn evaluate(
 #[derive(Debug, Deserialize, IntoParams)]
 pub(crate) struct AtQuery {
     /// Day `YYYY-MM-DD`; defaults to today.
-    pub at: Option<chrono::NaiveDate>,
+    pub at: Option<Date>,
 }
 
 /// List the legal promotion limits in force on a day.
@@ -153,8 +153,8 @@ pub(crate) struct RedemptionItem {
     pub status: String,
     pub total_discount_minor: i64,
     pub currency: String,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub expires_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 /// List the promotion usage held for orders.

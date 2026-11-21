@@ -1,6 +1,7 @@
 //! Route REST của chính người dùng (dưới `/api/v1/notifications`): loại thông báo, hộp thư, tuỳ chọn
 //! nhận, đăng ký đẩy; và hai route công khai (khoá web push, rút đồng ý bằng link).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -13,7 +14,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -110,8 +110,8 @@ pub(crate) struct InboxItem {
     body: String,
     link: Option<String>,
     /// When you read it; `null`: unread.
-    read_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    read_at: Option<Timestamp>,
+    created_at: Timestamp,
 }
 
 impl From<inbox::Model> for InboxItem {
@@ -414,8 +414,8 @@ pub(crate) struct PushSubscriptionResponse {
     id: Uuid,
     endpoint: String,
     user_agent: Option<String>,
-    created_at: DateTime<Utc>,
-    last_used_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    last_used_at: Option<Timestamp>,
 }
 
 impl From<push_subscription::Model> for PushSubscriptionResponse {
@@ -525,8 +525,8 @@ pub(crate) struct DeviceTokenResponse {
     platform: String,
     app_id: String,
     locale: Option<String>,
-    created_at: DateTime<Utc>,
-    last_used_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    last_used_at: Option<Timestamp>,
 }
 
 impl From<device_token::Model> for DeviceTokenResponse {

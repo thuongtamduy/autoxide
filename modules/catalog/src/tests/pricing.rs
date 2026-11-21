@@ -1,13 +1,14 @@
 //! Bảng giá (D-222): kế thừa theo cây, nhóm khách, giá hẹn giờ và tạm thời, giá ngay trước một
 //! thời điểm, `reference` chống trùng, sàn giá, giá vốn từ `inventory.cost_changed`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::OrgId;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -54,7 +55,7 @@ async fn gia_cua_hang_ghi_de_gia_chuoi_va_nhom_khach_thang_gia_chung() {
         let _ = add(&app, &store, "s1", json!([{"variant_id": id, "amount": vnd(90_000)}])).await;
         let _ = add(&app, &members, "m1", json!([{"variant_id": id, "amount": vnd(80_000)}])).await;
 
-        let now = Utc::now() + Duration::seconds(1);
+        let now = Timestamp::now() + SignedDuration::from_secs(1);
         let ask = |org: OrgId| PriceQuery::new(org, Currency::VND, now, vec![id]);
         assert_eq!(price_at(&app, ask(tree.a)).await, Some(90_000), "store overrides chain");
         assert_eq!(price_at(&app, ask(tree.b)).await, Some(100_000), "store B inherits chain");
@@ -99,9 +100,9 @@ async fn gia_hen_gio_tam_thoi_va_gia_ngay_truoc_thoi_diem() {
         let (_, variant) = create_product(&app, "boss", tree.a, "P-2", "Hàng").await;
         let id: Uuid = variant.parse().unwrap();
         let list = price_list(&app, "boss", tree.a, json!({})).await;
-        let start = Utc::now() - Duration::days(10);
-        let sale = Utc::now() + Duration::days(1);
-        let sale_end = sale + Duration::days(2);
+        let start = Timestamp::now() - SignedDuration::from_hours(24 * 10);
+        let sale = Timestamp::now() + SignedDuration::from_hours(24);
+        let sale_end = sale + SignedDuration::from_hours(24 * 2);
         let (status, added) = add(
             &app,
             &list,
@@ -114,16 +115,16 @@ async fn gia_hen_gio_tam_thoi_va_gia_ngay_truoc_thoi_diem() {
         .await;
         assert_eq!(status, StatusCode::OK, "{added}");
         let ask = |at| PriceQuery::new(tree.a, Currency::VND, at, vec![id]);
-        assert_eq!(price_at(&app, ask(Utc::now())).await, Some(200_000));
+        assert_eq!(price_at(&app, ask(Timestamp::now())).await, Some(200_000));
         assert_eq!(price_at(&app, ask(sale)).await, Some(150_000), "scheduled price starts at valid_from");
-        assert_eq!(price_at(&app, ask(sale_end - Duration::seconds(1))).await, Some(150_000));
+        assert_eq!(price_at(&app, ask(sale_end - SignedDuration::from_secs(1))).await, Some(150_000));
         assert_eq!(price_at(&app, ask(sale_end)).await, Some(200_000), "temporary price ended");
 
         let catalog = app.api::<dyn Catalog>().unwrap();
         let tenant = app.default_tenant();
         let before = catalog.reference_prices(&tenant, &ask(sale)).await.unwrap();
         assert_eq!(before[0].amount.minor(), 200_000, "the row starting exactly at `at` is not before it");
-        let during = catalog.reference_prices(&tenant, &ask(sale + Duration::hours(1))).await.unwrap();
+        let during = catalog.reference_prices(&tenant, &ask(sale + SignedDuration::from_hours(1))).await.unwrap();
         assert_eq!(during[0].amount.minor(), 150_000);
         let snapshot = catalog.prices(&tenant, &ask(sale)).await.unwrap();
         assert_eq!(snapshot[0].compare_at, Some(Money::new(200_000, Currency::VND)));
@@ -237,7 +238,7 @@ async fn cost(app: &TestApp, org: OrgId, variant: Uuid, minor: i64) {
         variant_id: Set(variant),
         unit_cost_minor: Set(minor),
         currency: Set("VND".to_owned()),
-        updated_at: Set(Utc::now()),
+        updated_at: Set(Timestamp::now()),
     }
     .insert(app.database().write())
     .await

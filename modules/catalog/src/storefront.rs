@@ -11,6 +11,8 @@
 //! `catalog.rebuild_storefront` dựng lại cả khách; lịch mỗi phút dựng lại sản phẩm có giá hẹn giờ
 //! vừa bắt đầu hay hết hạn.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -21,7 +23,6 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId, root_of};
-use chrono::{Duration, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
     QueryOrder, QuerySelect, Set,
@@ -365,7 +366,7 @@ impl CatalogService {
         &self,
         tenant: &TenantContext,
         site: OrgId,
-        at: chrono::DateTime<Utc>,
+        at: Timestamp,
         prices: &[crate::api::PriceSnapshot],
     ) -> Result<Option<HashMap<Uuid, crate::api::SalePrice>>, Error> {
         let Some(source) = self.sale_prices.get() else { return Ok(None) };
@@ -595,8 +596,8 @@ pub(crate) struct ScheduledPrices(pub(crate) Arc<CatalogService>);
 #[async_trait::async_trait]
 impl JobHandler for ScheduledPrices {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let to = Utc::now();
-        let from = to - Duration::minutes(2);
+        let to = Timestamp::now();
+        let from = to - SignedDuration::from_mins(2);
         let rows: Vec<(Uuid, Uuid)> = price::Entity::find()
             .select_only()
             .column(price::Column::TenantId)

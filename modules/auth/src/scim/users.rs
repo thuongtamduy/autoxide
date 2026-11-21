@@ -5,12 +5,12 @@
 //! thì khoá tài khoản, thu hồi phiên, refresh token, API key và ghi event — không có lúc nào tài
 //! khoản đã khoá mà phiên còn sống.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Realm;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, LikeExpr, Query};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, DatabaseTransaction, EntityTrait as _,
@@ -32,8 +32,8 @@ const ID_MAX_LENGTH: usize = 255;
 /// Độ dài tối đa của tên (như `auth_user.name`).
 const NAME_MAX_LENGTH: usize = 200;
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Thân `User` đã đọc và kiểm.
@@ -466,7 +466,7 @@ impl ScimService {
         update = match (was_active, input.active) {
             (true, false) => update.col_expr(user::Column::DisabledAt, Expr::value(Some(now))),
             (false, true) => {
-                update.col_expr(user::Column::DisabledAt, Expr::value(None::<DateTime<Utc>>))
+                update.col_expr(user::Column::DisabledAt, Expr::value(None::<Timestamp>))
             }
             _ => update,
         };

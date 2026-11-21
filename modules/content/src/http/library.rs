@@ -1,6 +1,7 @@
 //! Endpoint quản lý danh mục / thẻ (`/terms`) và tác giả (`/authors`). Đọc cần
 //! `content.read`; ghi cần `content.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -47,8 +47,8 @@ pub(crate) struct TermResponse {
     /// How many entries (in any status) have this term. Only in the list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     entry_count: Option<u64>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<TermWithTexts> for TermResponse {
@@ -309,8 +309,8 @@ pub(crate) struct AuthorResponse {
     /// How many entries (in any status) list this author. Only in the list.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     entry_count: Option<u64>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Author> for AuthorResponse {

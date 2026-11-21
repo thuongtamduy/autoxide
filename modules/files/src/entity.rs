@@ -1,5 +1,6 @@
 //! Entity của bảng `files_file` (SeaORM).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     pub content_type: String,
     pub size: i64,
     pub sha256: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

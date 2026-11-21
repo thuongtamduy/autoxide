@@ -1,5 +1,6 @@
 //! Cấu hình của module `plans`.
 
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::config::{ConfigReader, Invalid, Setting, parse_in_range};
@@ -71,7 +72,7 @@ pub(crate) struct SignupConfig {
 pub(crate) struct PlansConfig {
     pub tax_category: String,
     pub cache: Duration,
-    pub hold: chrono::Duration,
+    pub hold: SignedDuration,
     pub reminder_days: Vec<u32>,
     pub signup: SignupConfig,
 }
@@ -104,7 +105,7 @@ impl PlansConfig {
         Ok(PlansConfig {
             tax_category: tax_category?,
             cache: Duration::from_secs(cache?),
-            hold: chrono::Duration::minutes(hold?),
+            hold: SignedDuration::from_mins(hold?),
             reminder_days: reminder_days?,
             signup: SignupConfig { enabled: enabled?, url: url?, return_url: return_url? },
         })

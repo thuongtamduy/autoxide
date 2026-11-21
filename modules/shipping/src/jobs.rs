@@ -1,5 +1,6 @@
 //! Job và lịch của `shipping`. Mọi job chạy lại được (job chạy ít nhất một lần).
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -156,7 +157,7 @@ impl JobHandler for Webhook {
 async fn due(
     job: &JobContext,
     statuses: &[ShipmentStatus],
-    older_than: chrono::Duration,
+    older_than: SignedDuration,
 ) -> Result<Vec<(Uuid, Uuid)>, Error> {
     Ok(shipment::Entity::find()
         .select_only()
@@ -177,7 +178,7 @@ struct Reconcile(Arc<ShippingService>);
 impl JobHandler for Reconcile {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         for (tenant, id) in
-            due(job, &[ShipmentStatus::Booking], chrono::Duration::minutes(10)).await?
+            due(job, &[ShipmentStatus::Booking], SignedDuration::from_mins(10)).await?
         {
             let tenant = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
             if let Err(error) = self.0.reconcile_booking(&tenant, id).await {
@@ -201,7 +202,7 @@ impl JobHandler for Poll {
             ShipmentStatus::DeliveryFailed,
             ShipmentStatus::Returning,
         ];
-        for (tenant, id) in due(job, &moving, chrono::Duration::minutes(30)).await? {
+        for (tenant, id) in due(job, &moving, SignedDuration::from_mins(30)).await? {
             let tenant = self.0.databases.tenant(TenantId::from_uuid(tenant)).await?;
             // Chỉ hãng không gửi webhook mới cần hỏi.
             if !self.0.polls(&tenant, id).await.unwrap_or(false) {

@@ -1,5 +1,6 @@
 //! Bản nháp AI cho mô tả và SEO của sản phẩm (D-109): tạo, áp, bỏ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -53,8 +53,8 @@ pub(crate) struct SuggestionResponse {
     pub meta_description: String,
     /// Model that wrote the draft.
     pub model: String,
-    pub created_at: DateTime<Utc>,
-    pub decided_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub decided_at: Option<Timestamp>,
 }
 
 impl From<suggestion::Model> for SuggestionResponse {

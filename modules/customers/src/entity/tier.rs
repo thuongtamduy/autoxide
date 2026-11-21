@@ -1,5 +1,6 @@
 //! Bảng `customers_tiers`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,8 +16,8 @@ pub struct Model {
     pub currency: String,
     pub earn_multiplier_bp: i32,
     pub rank: i32,
-    pub effective_from: DateTimeUtc,
-    pub created_at: DateTimeUtc,
+    pub effective_from: Timestamp,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

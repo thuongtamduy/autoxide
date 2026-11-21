@@ -1,6 +1,7 @@
 //! Sản phẩm: tạo (kèm biến thể đầu tiên), đọc, sửa, xoá / lưu trữ, chuyển trạng thái, nội dung
 //! theo ngôn ngữ, danh mục và ảnh của sản phẩm.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::search;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel,
     PaginatorTrait, QueryFilter, QueryOrder, Set,
@@ -635,7 +635,7 @@ impl CatalogService {
         tenant: &TenantContext,
         actor: Actor,
         before: &product::Model,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<product::Model, Error> {
         let mut row = before.clone().into_active_model();
         row.updated_at = Set(now());
@@ -649,7 +649,7 @@ impl CatalogService {
         actor: Actor,
         before: &product::Model,
         mut row: product::ActiveModel,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<product::Model, Error> {
         row.updated_at = Set(now());
         let mut update = product::Entity::update(row).validate()?.scoped(tenant);
@@ -679,7 +679,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         changes: ProductChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
         let mut problems = Vec::new();
         if let Some(code) = &changes.tax_category {
@@ -798,7 +798,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         to: ProductStatus,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
         let actor = Actor::from(principal);
         if to == ProductStatus::Active {
@@ -907,7 +907,7 @@ impl CatalogService {
         );
         let request = TaxQuoteRequest::new(
             profile.jurisdiction,
-            chrono::Utc::now().date_naive(),
+            Timestamp::now().date_utc(),
             org,
             PriceMode::Inclusive,
             currency,

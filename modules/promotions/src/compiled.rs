@@ -5,6 +5,7 @@
 //! Khoá theo `promotions_revisions` (tăng trong cùng transaction với mọi lần đổi chương trình):
 //! máy chủ này xoá ngay khi tự đổi; máy chủ khác kiểm số phiên bản sau `COMPILED_TTL_SECONDS`.
 
+use jiff::SignedDuration;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
@@ -131,7 +132,7 @@ impl CompiledCache {
             self.store(tenant.id(), compiled.clone());
             return Ok(compiled);
         }
-        let horizon = crate::service::now() + chrono::Duration::hours(24);
+        let horizon = crate::service::now() + SignedDuration::from_hours(24);
         let rows = promotion::Entity::find()
             .filter(promotion::Column::Status.is_in(["active", "scheduled"]))
             .filter(promotion::Column::EndsAt.gt(crate::service::now()))

@@ -1,5 +1,6 @@
 //! Endpoint chống bom hàng COD (D-194) và báo cáo bán hàng (D-213).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,7 +32,7 @@ pub(crate) struct BuyerRiskResponse {
     /// `(failed + refused) / all`, in basis points (10000 = 100%).
     fail_ratio_bp: i64,
     /// Until when cash on delivery is blocked, if it is.
-    blocked_until: Option<DateTime<Utc>>,
+    blocked_until: Option<Timestamp>,
     block_reason: Option<String>,
 }
 
@@ -91,8 +91,8 @@ pub(crate) struct RuleResponse {
     max_order_value: Option<Money>,
     /// `require_prepayment`.
     action: String,
-    effective_from: DateTime<Utc>,
-    effective_to: Option<DateTime<Utc>>,
+    effective_from: Timestamp,
+    effective_to: Option<Timestamp>,
 }
 
 impl RuleResponse {
@@ -151,8 +151,8 @@ pub(crate) struct RuleRequest {
     /// Orders above this total must be paid in advance, whoever the buyer.
     max_order_value: Option<Money>,
     /// Default: now.
-    effective_from: Option<DateTime<Utc>>,
-    effective_to: Option<DateTime<Utc>>,
+    effective_from: Option<Timestamp>,
+    effective_to: Option<Timestamp>,
 }
 
 /// Add a cash-on-delivery rule.
@@ -226,10 +226,10 @@ pub(crate) struct BlockResponse {
     /// Code of the list `orders.cod_block`.
     reason_code: String,
     note: Option<String>,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     created_by: Uuid,
-    created_at: DateTime<Utc>,
-    lifted_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    lifted_at: Option<Timestamp>,
 }
 
 impl From<cod_block::Model> for BlockResponse {
@@ -285,7 +285,7 @@ pub(crate) struct BlockRequest {
     #[validate(length(min = 1, max = 1000))]
     note: Option<String>,
     /// Required; at most 365 days from now (no block is permanent).
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 /// Block a buyer from paying on delivery.
@@ -358,9 +358,9 @@ pub(crate) struct SalesQuery {
     /// `org`, `channel`, `product`, `day` or `month` (days and months in UTC).
     group_by: String,
     /// From (included).
-    from: DateTime<Utc>,
+    from: Timestamp,
     /// To (excluded); at most 366 days after `from`.
-    to: DateTime<Utc>,
+    to: Timestamp,
     /// Currency of the orders counted; default `VND`.
     currency: Option<String>,
 }

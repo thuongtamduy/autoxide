@@ -1,6 +1,7 @@
 //! Route REST của dòng tiền (dưới `/api/v1/ledger`): cài đặt dòng tiền, khoản tạm giữ, chi trả, tài
 //! khoản ngân hàng, thanh toán VietQR, webhook biến động số dư, trạng thái niêm phong của sổ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +16,6 @@ use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -370,8 +370,8 @@ pub(crate) struct BankAccountResponse {
     feed_provider: Option<String>,
     /// `active` or `disabled`.
     status: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<bank_account::Model> for BankAccountResponse {
@@ -697,7 +697,7 @@ pub(crate) struct SealStatusResponse {
     total: u64,
     sealed: u64,
     /// When the oldest entry not yet sealed was posted; entries are sealed within seconds.
-    oldest_unsealed_at: Option<DateTime<Utc>>,
+    oldest_unsealed_at: Option<Timestamp>,
 }
 
 /// The result of checking a book's hash chain.
@@ -711,7 +711,7 @@ pub(crate) struct ChainCheckResponse {
     checked: u64,
     /// Where the chain first breaks, when it is not intact.
     broken: Option<ChainBreak>,
-    checked_at: DateTime<Utc>,
+    checked_at: Timestamp,
 }
 
 /// The first place a hash chain breaks.
@@ -761,7 +761,13 @@ async fn verify_book(
         }
     };
     Ok(Data {
-        data: ChainCheckResponse { book_id: id, intact, checked, broken, checked_at: Utc::now() },
+        data: ChainCheckResponse {
+            book_id: id,
+            intact,
+            checked,
+            broken,
+            checked_at: Timestamp::now(),
+        },
     })
 }
 

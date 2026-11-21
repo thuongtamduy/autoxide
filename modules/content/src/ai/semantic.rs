@@ -15,6 +15,7 @@
 //!   thấy vector, câu tìm hay hạn mức của khách kia. Job lập index bù chạy một lần mỗi database,
 //!   xếp job lập index cho từng khách có mục trên database đó.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -216,7 +217,7 @@ impl ContentService {
         tenant: &TenantContext,
         entry_id: Uuid,
         scope: Scope,
-        source: Option<(String, Vec<String>, chrono::DateTime<chrono::Utc>)>,
+        source: Option<(String, Vec<String>, Timestamp)>,
     ) -> Result<(), Error> {
         let model = self.embedder.model_id().to_owned();
         let read_stamp = source.as_ref().map(|(_, _, stamp)| *stamp);
@@ -364,7 +365,7 @@ impl ContentService {
         let transaction = tenant.database().begin_write().await?;
         // Mỗi mục tối đa một job lập bù mỗi ngày: nhà cung cấp hỏng hay hết hạn mức thì không
         // xếp chồng job mỗi giờ.
-        let day = chrono::Utc::now().format("%Y-%m-%d");
+        let day = Timestamp::now().format("%Y-%m-%d");
         for entry_id in &missing {
             let options =
                 EnqueueOptions::default().unique_key(format!("content.index:{entry_id}:{day}"));
@@ -915,7 +916,7 @@ async fn stamp<C: ConnectionTrait>(
     tenant: &TenantContext,
     entry_id: Uuid,
     scope: Scope,
-) -> Result<Option<chrono::DateTime<chrono::Utc>>, Error> {
+) -> Result<Option<Timestamp>, Error> {
     Ok(match scope {
         Scope::Draft => entry::Entity::find_by_id(entry_id)
             .scoped(tenant)

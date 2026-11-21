@@ -2,6 +2,7 @@
 //! `customers.stored_value_disabled` khi người vận hành chưa bật hay khách chưa có tính năng. Không có
 //! endpoint rút tiền, chuyển số dư hay đổi ra tiền mặt (luật cứng, cần đối chiếu NĐ 52/2024).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -35,8 +35,8 @@ pub(crate) struct GiftCard {
     pub balance: Money,
     /// `active`, `void` or `expired`.
     pub status: String,
-    pub expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub expires_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl GiftCard {
@@ -78,7 +78,7 @@ pub(crate) struct GiftCardCodeRequest {
 #[derive(Debug, Serialize, ToSchema)]
 pub(crate) struct StoreCredit {
     pub balance: Money,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl StoreCredit {

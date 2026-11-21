@@ -6,6 +6,7 @@
 //! như đã thu; lệch số / không biết giao dịch / thiếu trong sao kê → `ledger_exceptions`. Phí trong
 //! sao kê → bút toán Nợ `expense.gateway_fee` / Có `clearing.gateway`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -18,7 +19,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::payment::StatementKind;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::{Days, NaiveDate, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::{Value, json};
@@ -232,7 +232,7 @@ impl LedgerService {
         tenant: &TenantContext,
         principal: &Principal,
         provider: Option<String>,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<reconciliation::Model, Error> {
         principal.require(&RECONCILE)?;
         let gateway = self.gateway(provider.as_deref())?;
@@ -244,7 +244,7 @@ impl LedgerService {
         &self,
         tenant: &TenantContext,
         provider: &str,
-        on: NaiveDate,
+        on: Date,
         by: Option<Uuid>,
     ) -> Result<reconciliation::Model, Error> {
         let gateway = self.gateway(Some(provider))?;
@@ -312,11 +312,8 @@ impl LedgerService {
                 .await?;
         }
         // Đã thu trong ngày theo sổ mà sao kê không có.
-        let start = on.and_hms_opt(0, 0, 0).map(|at| at.and_utc());
-        let end = on
-            .checked_add_days(Days::new(1))
-            .and_then(|day| day.and_hms_opt(0, 0, 0))
-            .map(|at| at.and_utc());
+        let start = Some(on.start_of_day_utc());
+        let end = on.succ().map(Date::start_of_day_utc);
         if let (Some(start), Some(end)) = (start, end) {
             let captured = payment::Entity::find()
                 .scoped(tenant)
@@ -467,7 +464,7 @@ impl LedgerService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
-        let Some(yesterday) = Utc::now().date_naive().pred_opt() else {
+        let Some(yesterday) = Timestamp::now().date_utc().pred() else {
             return Ok(0);
         };
         let pairs: Vec<(Uuid, String)> = payment::Entity::find()

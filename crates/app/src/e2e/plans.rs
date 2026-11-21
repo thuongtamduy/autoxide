@@ -369,7 +369,7 @@ async fn rows_of(app: &TestApp, table: &str, tenant: uuid::Uuid) -> i64 {
     let database = app.database().write();
     let backend = database.get_database_backend();
     let row = database
-        .query_one_raw(sea_orm::Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             backend,
             format!("SELECT COUNT(*) AS n FROM {table} WHERE tenant_id = $1"),
             [tenant.into()],

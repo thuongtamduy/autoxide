@@ -16,6 +16,8 @@
 //! - Slug chỉ thật sự được giữ khi lượt cấp phát được ghi (unique): hai người chờ cùng slug thì người
 //!   đến bước cấp phát sau bị từ chối (`tenant_slug_taken`) — không lộ email nào đang chờ slug nào.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -32,7 +34,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -48,6 +49,7 @@ use crate::provisioning::{self, is_slug};
 use crate::service::{PlansService, now};
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -73,10 +75,10 @@ pub(crate) mod entity {
         pub provisioning_id: Option<Uuid>,
         pub tenant_id: Option<Uuid>,
         pub reason: Option<String>,
-        pub confirmed_at: Option<DateTimeUtc>,
-        pub expires_at: DateTimeUtc,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub confirmed_at: Option<Timestamp>,
+        pub expires_at: Timestamp,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -235,7 +237,7 @@ pub(crate) struct StartedKyc {
     pub kind: String,
     pub url: Option<String>,
     pub token: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 impl PlansService {
@@ -431,7 +433,7 @@ impl PlansService {
         };
         let token = random_token(32)?;
         let at = now();
-        let expires_at = at + chrono::Duration::hours(CONFIRM_HOURS);
+        let expires_at = at + SignedDuration::from_hours(CONFIRM_HOURS);
         let transaction = self.databases.control().begin_write().await?;
         let existing = entity::Entity::find()
             .filter(entity::Column::Email.eq(job.email.as_str()))
@@ -561,7 +563,7 @@ impl PlansService {
                         .col_expr(entity::Column::Terms, Expr::value(terms))
                         .col_expr(
                             entity::Column::ExpiresAt,
-                            Expr::value(at + chrono::Duration::days(KYC_DAYS)),
+                            Expr::value(at + SignedDuration::from_hours(24 * KYC_DAYS)),
                         )
                         .col_expr(entity::Column::UpdatedAt, Expr::value(at))
                         .filter(entity::Column::Id.eq(row.id))
@@ -653,7 +655,7 @@ impl PlansService {
         &self,
         row: entity::Model,
         terms: Option<String>,
-        confirmed_at: Option<DateTime<Utc>>,
+        confirmed_at: Option<Timestamp>,
     ) -> Result<entity::Model, Error> {
         let mut request = ProvisionRequest::new(
             row.slug.clone(),
@@ -770,7 +772,7 @@ impl PlansService {
 
     /// Lịch [`EXPIRE_SIGNUPS`]: đăng ký chờ quá hạn → `expired`; dòng đã kết thúc quá `KEEP_DAYS`
     /// ngày bị xoá; dọn bộ đếm và nonce của chống spam. Trả số đăng ký vừa hết hạn.
-    pub(crate) async fn expire_signups(&self, at: DateTime<Utc>) -> Result<u64, Error> {
+    pub(crate) async fn expire_signups(&self, at: Timestamp) -> Result<u64, Error> {
         let control = self.databases.control();
         let expired = entity::Entity::update_many()
             .col_expr(entity::Column::Status, Expr::value("expired"))
@@ -780,14 +782,16 @@ impl PlansService {
             .exec(control.write())
             .await?
             .rows_affected;
-        let before = at - chrono::Duration::days(KEEP_DAYS);
+        let before = at - SignedDuration::from_hours(24 * KEEP_DAYS);
         entity::Entity::delete_many()
             .filter(entity::Column::Status.is_in(["expired", "rejected"]))
             .filter(entity::Column::UpdatedAt.lt(before))
             .exec(control.write())
             .await?;
         self.guard.purge_nonces(control.write(), MODULE).await?;
-        Throttle::new(MODULE, 1, HOUR)?.purge(control, at - chrono::Duration::days(2)).await?;
+        Throttle::new(MODULE, 1, HOUR)?
+            .purge(control, at - SignedDuration::from_hours(24 * 2))
+            .await?;
         if expired > 0 {
             tracing::info!(expired, "tenant sign-ups expired");
         }
@@ -799,7 +803,7 @@ impl PlansService {
 pub(crate) struct SignupLink {
     pub id: Uuid,
     pub terms: Option<String>,
-    pub confirmed_at: Option<DateTime<Utc>>,
+    pub confirmed_at: Option<Timestamp>,
 }
 
 /// Trong transaction ghi lượt cấp phát `provisioning_id`: chuyển đăng ký đang chờ sang

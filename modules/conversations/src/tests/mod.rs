@@ -7,6 +7,8 @@ mod privacy;
 mod stream;
 mod voice;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::{Principal, Scope};
@@ -17,6 +19,7 @@ use autoxide_support::api::{AutoResponder, InboundQuestion, ReplyDecision};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
 use sea_orm::ConnectionTrait;
+use sea_orm::sea_query::ExprTrait as _;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -181,18 +184,15 @@ pub(crate) async fn run_jobs(app: &TestApp) {
 
 /// Đưa mọi job đang hẹn giờ của module về tới hạn ngay (thay cho chờ thật).
 pub(crate) async fn due_now(app: &TestApp) {
-    let past = chrono::Utc::now() - chrono::Duration::minutes(1);
-    let statement = sea_orm::Statement::from_sql_and_values(
-        app.database().write().get_database_backend(),
-        match app.database().write().get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => {
-                "UPDATE conversations_jobs SET run_at = $1 WHERE completed_at IS NULL"
-            }
-            _ => "UPDATE conversations_jobs SET run_at = ? WHERE completed_at IS NULL",
-        },
-        [past.into()],
-    );
-    app.database().write().execute_raw(statement).await.unwrap();
+    let past = Timestamp::now() - SignedDuration::from_mins(1);
+    let statement = sea_orm::sea_query::Query::update()
+        .table(sea_orm::sea_query::Alias::new("conversations_jobs"))
+        .value(sea_orm::sea_query::Alias::new("run_at"), sea_orm::Value::from(past))
+        .and_where(
+            sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("completed_at")).is_null(),
+        )
+        .to_owned();
+    app.database().write().execute(&statement).await.unwrap();
 }
 
 /// Tin của cuộc `id` mà người mua thấy, cũ trước.

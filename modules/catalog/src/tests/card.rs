@@ -1,8 +1,9 @@
 //! Thẻ sản phẩm và dữ liệu cho JSON-LD (D-201): tóm tắt biến thể, thương hiệu, đơn giá theo đơn
 //! vị cơ sở, URL từng biến thể, giá ngay trước giá giảm tạm thời.
 
+use autoxide_kernel::time::Timestamp;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 
 use super::public::{drain, on_sale, price_list, public};
@@ -84,7 +85,7 @@ async fn gia_truoc_giam_tam_thoi_cho_json_ld() {
         let list = price_list(&app, tree.chain).await;
         let (_, variant) = on_sale(&app, &list, tree.chain, "B-1", "Bình nước", 200_000).await;
         // Giá giảm bắt đầu ngay (sau dòng giá gốc), hết sau ba ngày.
-        let end = Utc::now() + Duration::days(3);
+        let end = Timestamp::now() + SignedDuration::from_hours(24 * 3);
         let body = json!({"reference": "sale", "prices": [
             {"variant_id": variant, "amount": vnd(150_000), "valid_to": end}]});
         let (status, _) =

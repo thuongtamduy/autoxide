@@ -1,6 +1,7 @@
 //! Chuẩn hoá giá trị theo kiểu dữ liệu của trường và tách giá trị để đánh chỉ mục.
 
 use super::*;
+use crate::time::{Date, Timestamp};
 
 /// Giá trị đã kiểm theo kiểu của `field`.
 pub(super) fn normalize(field: &CustomFieldView, value: &Value) -> Result<Value, FieldError> {
@@ -78,14 +79,14 @@ pub(super) fn normalize(field: &CustomFieldView, value: &Value) -> Result<Value,
             .ok_or_else(|| FieldError::new("", "invalid", "must be `true` or `false`")),
         "date" => {
             let text = text()?;
-            NaiveDate::parse_from_str(text, "%Y-%m-%d")
+            Date::parse_from_str(text, "%Y-%m-%d")
                 .map_err(|_| FieldError::new("", "invalid", "must be a date `YYYY-MM-DD`"))?;
             Ok(Value::String(text.to_owned()))
         }
         "datetime" => {
-            let at = DateTime::parse_from_rfc3339(text()?)
+            let at = Timestamp::parse_rfc3339(text()?)
                 .map_err(|_| FieldError::new("", "invalid", "must be an RFC 3339 time"))?;
-            Ok(Value::String(at.with_timezone(&Utc).to_rfc3339()))
+            Ok(Value::String(at.to_rfc3339()))
         }
         "option" => {
             let text = text()?;
@@ -176,16 +177,15 @@ pub(super) fn index_values(
             None,
             value
                 .as_str()
-                .and_then(|text| NaiveDate::parse_from_str(text, "%Y-%m-%d").ok())
-                .and_then(|date| date.and_hms_opt(0, 0, 0))
-                .map(|at| at.and_utc().timestamp()),
+                .and_then(|text| Date::parse_from_str(text, "%Y-%m-%d").ok())
+                .map(|date| date.start_of_day_utc().as_unix_seconds()),
         )],
         "datetime" => vec![(
             None,
             value
                 .as_str()
-                .and_then(|text| DateTime::parse_from_rfc3339(text).ok())
-                .map(|at| at.timestamp()),
+                .and_then(|text| Timestamp::parse_rfc3339(text).ok())
+                .map(|at| at.as_unix_seconds()),
         )],
         "options" => value
             .as_array()

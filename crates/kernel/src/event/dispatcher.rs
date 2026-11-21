@@ -10,15 +10,15 @@
 //! lọc theo `AUTOXIDE_WORKER_PLACEMENTS`); event mang khách (`tenant_id`) và bên nhận nhận ngữ cảnh
 //! khách đó trong [`Delivered::tenant`].
 
+use crate::time::Timestamp;
+use futures_util::FutureExt as _;
+use jiff::SignedDuration;
+use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Order, Query};
+use sea_orm::{ConnectionTrait, QueryResult};
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::sync::Arc;
 use std::time::Duration;
-
-use chrono::{DateTime, SubsecRound, Utc};
-use futures_util::FutureExt as _;
-use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Order, Query};
-use sea_orm::{ConnectionTrait, QueryResult};
 use tokio::sync::Notify;
 use uuid::Uuid;
 
@@ -43,7 +43,7 @@ const IDLE_POLL: Duration = Duration::from_secs(1);
 /// Độ dài tối đa của lỗi lưu lại.
 const MAX_ERROR_LENGTH: usize = 2000;
 /// Giữ event đã giao chừng này rồi xoá (audit log đã có bản của nó).
-const KEEP_DELIVERED: chrono::Duration = chrono::Duration::days(7);
+const KEEP_DELIVERED: SignedDuration = SignedDuration::from_hours(24 * 7);
 /// Dọn event đã giao mỗi chừng này.
 const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
 
@@ -337,12 +337,12 @@ async fn claim(
     database: &Database,
     table: &Alias,
     id: Uuid,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<bool, Error> {
     let mut update = Query::update();
     update
         .table(table.clone())
-        .value(Alias::new("claimed_until"), now + chrono::Duration::seconds(CLAIM_SECONDS))
+        .value(Alias::new("claimed_until"), now + SignedDuration::from_secs(CLAIM_SECONDS))
         .cond_where(Condition::all().add(Expr::col(Alias::new("id")).eq(id)).add(pending(now)));
     Ok(database.write().execute(&update).await?.rows_affected() == 1)
 }
@@ -353,7 +353,7 @@ async fn postpone(database: &Database, table: &Alias, id: Uuid) -> Result<(), Er
     let mut update = Query::update();
     update
         .table(table.clone())
-        .value(Alias::new("next_attempt_at"), now + chrono::Duration::seconds(30))
+        .value(Alias::new("next_attempt_at"), now + SignedDuration::from_secs(30))
         .cond_where(Condition::all().add(Expr::col(Alias::new("id")).eq(id)).add(pending(now)));
     database.write().execute(&update).await?;
     Ok(())
@@ -384,7 +384,7 @@ async fn mark_delivered(database: &Database, table: &Alias, id: Uuid) -> Result<
     update
         .table(table.clone())
         .value(Alias::new("delivered_at"), now())
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("id")).eq(id));
     database.write().execute(&update).await?;
     metrics::counter!("events_delivered_total").increment(1);
@@ -406,7 +406,7 @@ async fn mark_failed(
         .table(table.clone())
         .value(Alias::new("attempts"), attempts)
         .value(Alias::new("next_attempt_at"), now + backoff(attempts))
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .value(Alias::new("last_error"), message.clone())
         .and_where(Expr::col(Alias::new("id")).eq(event.id));
     // Xoá dữ liệu của tài khoản đã xoá là nghĩa vụ, không phải việc phụ: không bỏ cuộc,
@@ -445,7 +445,7 @@ async fn mark_failed(
 }
 
 /// Điều kiện "đang chờ giao": chưa giao, chưa hỏng hẳn, tới giờ thử, không ai đang giữ.
-fn pending(now: DateTime<Utc>) -> Condition {
+fn pending(now: Timestamp) -> Condition {
     Condition::all()
         .add(Expr::col(Alias::new("delivered_at")).is_null())
         .add(Expr::col(Alias::new("failed_at")).is_null())
@@ -458,9 +458,9 @@ fn pending(now: DateTime<Utc>) -> Condition {
 }
 
 /// Chờ trước lần giao thứ `attempts + 1`: 2, 4, 8… giây, tối đa một giờ.
-fn backoff(attempts: i32) -> chrono::Duration {
+fn backoff(attempts: i32) -> SignedDuration {
     let exponent = u32::try_from(attempts.clamp(1, 12)).unwrap_or(12);
-    chrono::Duration::seconds(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
+    SignedDuration::from_secs(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
 }
 
 /// Lỗi kèm nguyên nhân gốc (lỗi nội bộ chỉ có câu chung; nguyên nhân mới có ích để sửa).
@@ -471,8 +471,8 @@ fn describe(error: &Error) -> String {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]
@@ -481,8 +481,8 @@ mod tests {
 
     #[test]
     fn backoff_tang_dan_va_co_tran() {
-        assert_eq!(backoff(1), chrono::Duration::seconds(2));
-        assert_eq!(backoff(3), chrono::Duration::seconds(8));
-        assert_eq!(backoff(30), chrono::Duration::seconds(3600));
+        assert_eq!(backoff(1), SignedDuration::from_secs(2));
+        assert_eq!(backoff(3), SignedDuration::from_secs(8));
+        assert_eq!(backoff(30), SignedDuration::from_secs(3600));
     }
 }

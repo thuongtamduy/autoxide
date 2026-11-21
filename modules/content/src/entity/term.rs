@@ -1,5 +1,6 @@
 //! Bảng `content_terms`: danh mục (cây) và thẻ (phẳng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,8 +14,8 @@ pub struct Model {
     /// `category` hoặc `tag`.
     pub taxonomy: String,
     pub parent_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

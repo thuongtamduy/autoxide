@@ -2,6 +2,7 @@
 //! quản lý người dùng. Mỗi tool gọi đúng service mà endpoint REST tương ứng gọi, với
 //! cùng permission — tool không làm được gì hơn REST.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -61,7 +62,7 @@ pub(crate) struct RotateApiKeyInput {
     /// Hours the old key keeps working, 0 to 72 (24 by default); 0 stops it at once.
     overlap_hours: Option<u32>,
     /// When the new key stops working (RFC 3339); omit for the longest lifetime allowed.
-    expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    expires_at: Option<Timestamp>,
     /// Your current password, or give `totp_code` or `reauth_token` instead.
     #[serde(default)]
     current_password: String,

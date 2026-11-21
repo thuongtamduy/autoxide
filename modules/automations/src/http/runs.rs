@@ -1,5 +1,6 @@
 //! Endpoint REST của lần chạy, dưới `/api/v1/automations`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -55,10 +55,10 @@ pub(crate) struct RunResponse {
     error_code: Option<String>,
     error_message: Option<String>,
     /// When a `wait` step ends.
-    resume_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    finished_at: Option<DateTime<Utc>>,
+    resume_at: Option<Timestamp>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
+    finished_at: Option<Timestamp>,
 }
 
 impl From<Run> for RunResponse {

@@ -5,6 +5,7 @@
 //! (`sniff::HEAD_BYTES`) để nhận loại thật và đọc kích thước ảnh. Loại khai sai thì dừng
 //! ngay khi đủ byte để nhận ra, không chờ hết file (D-089).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -12,7 +13,6 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::storage::{ByteStream, Storage as _};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use sha2::{Digest, Sha256};
@@ -139,7 +139,7 @@ impl MediaService {
         id: Uuid,
         content_type: Option<&str>,
         content: ByteStream,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
         let current = Entity::find_by_id(id)
@@ -284,7 +284,7 @@ impl MediaService {
         id: Uuid,
         version_id: Uuid,
         received: Received,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(Item, Item, Vec<crate::images::variants::Variant>), Error> {
         let transaction = tenant.database().begin_write().await?;
         let before = Entity::find_by_id(id)

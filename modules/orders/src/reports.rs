@@ -12,6 +12,8 @@
 //! - Kho báo cáo gộp (bước 38) dùng event `orders.order_*` (payload có `tenant_id`, `org_id`,
 //!   `channel`, tiền, dòng).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -21,7 +23,6 @@ use autoxide_kernel::list_exports::{ExportInfo, ExportPage, ExportQuery, ExportS
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::pagination::{PageQuery, PageRequest};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Alias, Expr, Func, Query};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QuerySelect};
 use serde::{Deserialize, Serialize};
@@ -89,12 +90,12 @@ impl OrdersService {
         tenant: &TenantContext,
         principal: &Principal,
         group_by: GroupBy,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
         currency: Currency,
     ) -> Result<Vec<SalesRow>, Error> {
         principal.require(&REPORTS_READ)?;
-        if to <= from || to - from > Duration::days(366) {
+        if to <= from || to - from > SignedDuration::from_hours(24 * 366) {
             return Err(Error::validation(vec![FieldError::new(
                 "to",
                 "range",
@@ -199,7 +200,7 @@ impl OrdersService {
                     .collect()
             }
             GroupBy::Day | GroupBy::Month => {
-                let found: Vec<(DateTime<Utc>, i64, i64, i64, i64)> = order::Entity::find()
+                let found: Vec<(Timestamp, i64, i64, i64, i64)> = order::Entity::find()
                     .select_only()
                     .column(order::Column::PlacedAt)
                     .column(order::Column::TotalMinor)
@@ -273,7 +274,7 @@ struct ExportRow {
     tax: i64,
     total: i64,
     refunded: i64,
-    placed_at: DateTime<Utc>,
+    placed_at: Timestamp,
 }
 
 /// Bộ lọc của xuất đơn: như `GET /api/v1/orders`.

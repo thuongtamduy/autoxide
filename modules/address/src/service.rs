@@ -1,5 +1,6 @@
 //! Tra và kiểm đơn vị hành chính. Đọc ở database điều khiển (bảng mặt điều khiển, D-253).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 
 use autoxide_kernel::database::Database;
@@ -298,8 +299,8 @@ pub(crate) fn live(as_of: &str) -> Condition {
 /// một ngày; danh mục đổi theo ngày, lệch vài giờ quanh nửa đêm chấp nhận được).
 pub(crate) fn as_of_date(raw: Option<&str>) -> Result<String, Error> {
     match raw.map(str::trim).filter(|raw| !raw.is_empty()) {
-        None => Ok(chrono::Utc::now().date_naive().format("%Y-%m-%d").to_string()),
-        Some(raw) => chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        None => Ok(Timestamp::now().date_utc().format("%Y-%m-%d").to_string()),
+        Some(raw) => Date::parse_from_str(raw, "%Y-%m-%d")
             .map(|date| date.format("%Y-%m-%d").to_string())
             .map_err(|_| {
                 Error::validation(vec![FieldError::new(

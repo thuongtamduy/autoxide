@@ -25,7 +25,6 @@ use autoxide_kernel::pagination::{Order, PageQuery, PageRequest};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::storage::Storage;
 use autoxide_testkit::TestDatabase;
-use chrono::Utc;
 use futures_util::TryStreamExt as _;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::json;

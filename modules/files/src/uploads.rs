@@ -11,6 +11,8 @@
 //! - Loại nội dung: như tải qua máy chủ, `files` lưu loại đã khai (S3 nhận đúng loại đó vì đã ký) và
 //!   trả file với `nosniff` + CSP `sandbox`; nhận loại thật bằng magic bytes là việc của `media`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -20,7 +22,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::storage::{PresignedUpload, Storage as _, UploadConstraints};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext};
 use autoxide_kernel::upload::{DirectUpload, NewDirectUpload, UploadStatus, inspect, parse_sha256};
-use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, EntityTrait, Set};
 use uuid::Uuid;
 
@@ -36,9 +37,9 @@ use crate::service::{
 /// Job dọn lượt tải lên không được xác nhận (mỗi giờ, trên mọi database).
 pub(crate) const PURGE_UPLOADS: &str = "files.purge_expired_uploads";
 /// Lượt quá hạn chừng này mới bị dọn: client có thể vừa PUT xong lúc hết hạn.
-const PURGE_AFTER: chrono::Duration = chrono::Duration::hours(1);
+const PURGE_AFTER: SignedDuration = SignedDuration::from_hours(1);
 /// Dòng của lượt đã xác nhận được giữ chừng này (xác nhận gọi lại trả cùng bản ghi).
-const KEEP_COMPLETED: chrono::Duration = chrono::Duration::days(7);
+const KEEP_COMPLETED: SignedDuration = SignedDuration::from_hours(24 * 7);
 /// Số lượt dọn mỗi lần chạy.
 const PURGE_BATCH: u64 = 200;
 
@@ -179,7 +180,7 @@ impl FileService {
         if upload.status == UploadStatus::Completed {
             return self.existing(tenant, principal, id).await.map(Completed::Existing);
         }
-        if Utc::now() > upload.expires_at {
+        if Timestamp::now() > upload.expires_at {
             return Err(upload_expired(id));
         }
         let store = self.store(tenant);
@@ -264,7 +265,7 @@ impl FileService {
         &self,
         databases: &DatabaseRegistry,
         database: &autoxide_kernel::database::Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
         let mut removed = 0;
         let expired =
@@ -296,7 +297,10 @@ pub(crate) struct PurgeUploads {
 #[async_trait::async_trait]
 impl JobHandler for PurgeUploads {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        self.service.purge_uploads(&self.databases, &job.database, Utc::now()).await.map(|_| ())
+        self.service
+            .purge_uploads(&self.databases, &job.database, Timestamp::now())
+            .await
+            .map(|_| ())
     }
 }
 

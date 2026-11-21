@@ -4,6 +4,7 @@
 //! bị từ chối gửi lại cùng số, lập thay cần uỷ nhiệm, hoá đơn máy tính tiền, ghi sổ và huỷ đảo sổ,
 //! điều chỉnh / thay thế.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::einvoice::EInvoiceProvider;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, ro
 use autoxide_ledger::api::{AccountKey, Ledger};
 use autoxide_testkit::{FakeEInvoiceProvider, TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use chrono::{Datelike, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -80,7 +80,7 @@ async fn call(app: &TestApp, method: &str, uri: &str, body: Option<Value>) -> (S
 }
 
 fn year() -> i32 {
-    Utc::now().year()
+    i32::from(Timestamp::now().date_utc().year())
 }
 
 async fn series(app: &TestApp, kind: &str, symbol: &str, provider: Option<&str>) -> String {
@@ -440,7 +440,7 @@ async fn hoi_lai_nha_cung_cap_hoa_don_ngay() {
         let write = app.database().write();
         let backend = write.get_database_backend();
         write
-            .execute_raw(sea_orm::Statement::from_sql_and_values(
+            .execute_raw(autoxide_kernel::database::statement(
                 backend,
                 "UPDATE invoices_documents SET status = 'submitting', authority_code = NULL \
                  WHERE id = $1",
@@ -499,8 +499,8 @@ async fn tong_hop_gtgt_dau_ra_theo_ky() {
         let adjusted = invoices(&app).issue(&tenant, Actor::system(), adjustment_id).await.unwrap();
         drain(&app).await;
 
-        let today = Utc::now().date_naive();
-        let uri = format!("/vat-summary?from={}&to={today}", today.with_day(1).unwrap());
+        let today = Timestamp::now().date_utc();
+        let uri = format!("/vat-summary?from={}&to={today}", today.first_of_month());
         let (status, summary) = call(&app, "GET", &uri, None).await;
         assert_eq!(status, StatusCode::OK, "{summary}");
         let rows = summary["data"]["rows"].as_array().unwrap();

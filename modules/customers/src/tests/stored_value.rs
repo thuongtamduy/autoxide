@@ -2,9 +2,10 @@
 //! bị giới hạn, trả đồng thời không vượt số dư, giữ / xác nhận / trả theo đơn.
 
 use autoxide_kernel::money::{Currency, Money};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -180,7 +181,7 @@ async fn gift_card_issue_lookup_attach_void() {
                 Some(Uuid::from_u128(BUYER)),
                 &json!({"code": code}),
                 vnd(100_000),
-                Utc::now() + Duration::minutes(30),
+                Timestamp::now() + SignedDuration::from_mins(30),
             )
             .await
             .unwrap_err();
@@ -246,7 +247,7 @@ async fn concurrent_gift_card_redemptions_never_overdraw() {
                         Some(Uuid::from_u128(500 + buyer)),
                         &json!({"code": code}),
                         vnd(30_000),
-                        Utc::now() + Duration::minutes(30),
+                        Timestamp::now() + SignedDuration::from_mins(30),
                     )
                     .await
             });
@@ -281,7 +282,7 @@ async fn gift_card_hold_confirmed_or_released_with_order() {
         let tenant = shop.default_tenant();
         let tender = shop.tender("gift_card").unwrap();
         let buyer = Some(Uuid::from_u128(BUYER));
-        let until = Utc::now() + Duration::minutes(30);
+        let until = Timestamp::now() + SignedDuration::from_mins(30);
 
         // Khách vãng lai không trả được bằng thẻ.
         let error = tender
@@ -361,7 +362,7 @@ async fn store_credit_adjusted_by_staff_and_spent_once() {
         // Trả đơn 30.000 rồi đơn 30.000: lần hai chỉ còn 20.000.
         let tender = shop.tender("store_credit").unwrap();
         let tenant = shop.default_tenant();
-        let until = Utc::now() + Duration::minutes(30);
+        let until = Timestamp::now() + SignedDuration::from_mins(30);
         let buyer = Some(Uuid::from_u128(BUYER));
         let first = tender.hold(&tenant, "orders:a", buyer, &json!({}), vnd(30_000), until).await.unwrap();
         let second = tender.hold(&tenant, "orders:b", buyer, &json!({}), vnd(30_000), until).await.unwrap();

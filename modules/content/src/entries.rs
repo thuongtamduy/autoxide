@@ -5,6 +5,7 @@ pub(crate) mod body;
 pub(crate) mod review;
 pub(crate) mod revisions;
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeSet;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -238,7 +238,7 @@ pub(crate) fn blank(
     locale: &str,
     parent: Option<Uuid>,
     by: Uuid,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Entry {
     Entry {
         id,

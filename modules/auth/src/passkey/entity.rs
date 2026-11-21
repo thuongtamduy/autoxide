@@ -1,6 +1,7 @@
 //! Entity của hai bảng passkey (SeaORM).
 
 pub(crate) mod passkey {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -17,8 +18,8 @@ pub(crate) mod passkey {
         pub static_state: Vec<u8>,
         pub dynamic_state: Vec<u8>,
         pub name: String,
-        pub created_at: DateTimeUtc,
-        pub last_used_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_used_at: Option<Timestamp>,
         /// Loại authenticator nó tự khai lúc đăng ký (D-272); `None` khi không biết.
         pub aaguid: Option<Uuid>,
     }
@@ -33,6 +34,7 @@ pub(crate) mod passkey {
 }
 
 pub(crate) mod ceremony {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -45,7 +47,7 @@ pub(crate) mod ceremony {
         pub tenant_id: Uuid,
         pub user_id: Option<Uuid>,
         pub state: Vec<u8>,
-        pub expires_at: DateTimeUtc,
+        pub expires_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

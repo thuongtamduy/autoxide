@@ -18,7 +18,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::search::fold;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_immutable, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, QueryOrder, Set, SqlErr,
@@ -371,7 +371,7 @@ impl OrgService {
         principal: &Principal,
         id: Uuid,
         changes: UnitChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<UnitRow, Error> {
         let (name, code) =
             check_unit(changes.name.as_deref(), changes.code.as_ref().map(|code| code.as_deref()))?;
@@ -943,8 +943,8 @@ fn type_snapshot(row: &UnitTypeRow) -> Value {
 }
 
 /// Bây giờ, cắt tới micro giây: hai database trả cùng một giá trị.
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Hạn mức số nút tổ chức (bước 35): mọi nút trừ gốc, trừ nút đã lưu trữ.

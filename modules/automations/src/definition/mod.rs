@@ -8,7 +8,7 @@ pub(crate) mod schema;
 pub(crate) mod trigger;
 
 use autoxide_kernel::error::FieldError;
-use chrono_tz::Tz;
+use jiff::tz::TimeZone;
 use serde_json::Value;
 
 pub(crate) use action::Action;
@@ -20,7 +20,7 @@ pub(crate) use trigger::{MetricOperator, MetricTrigger, Trigger};
 pub(crate) struct RuleBody {
     pub trigger: Trigger,
     /// Múi giờ khai trong kích hoạt, nếu có (không thì múi giờ của nút).
-    pub timezone: Option<Tz>,
+    pub timezone: Option<TimeZone>,
     pub conditions: Option<Condition>,
     pub actions: Vec<Action>,
 }

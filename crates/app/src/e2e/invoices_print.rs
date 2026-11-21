@@ -3,6 +3,7 @@
 //! CSV / XLSX cân nợ có, bản lưu trữ có băm khớp, dọn chứng từ hết hạn lưu (giữ chứng từ còn hạn, kể cả
 //! sau khi xoá hẳn khách).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::einvoice::EInvoiceProvider;
@@ -14,9 +15,8 @@ use autoxide_kernel::tenancy::{
 };
 use autoxide_testkit::{FakeEInvoiceProvider, TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use chrono::{Datelike, Utc};
 use futures_util::TryStreamExt as _;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -90,7 +90,8 @@ async fn call(
 }
 
 async fn series(app: &TestApp, who: &str, kind: &str) {
-    let body = json!({"kind": kind, "symbol": "1C26TAA", "year": Utc::now().year()});
+    let body =
+        json!({"kind": kind, "symbol": "1C26TAA", "year": Timestamp::now().date_utc().year()});
     let (status, created) = call(app, who, "POST", "/api/v1/invoices/series", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
 }
@@ -153,8 +154,8 @@ async fn chung_tu_ngoai_te_chup_ti_gia_khi_phat_hanh() {
             .into_inner();
         let error = invoices.issue(&tenant, Actor::system(), draft.id).await.unwrap_err();
         assert_eq!(error.code(), "invoices.rate_missing");
-        let today = Utc::now().date_naive();
-        let rate = json!({"base": "USD", "quote": "VND", "rate": "25000", "effective_date": today.pred_opt().unwrap()});
+        let today = Timestamp::now().date_utc();
+        let rate = json!({"base": "USD", "quote": "VND", "rate": "25000", "effective_date": today.pred().unwrap()});
         let (status, answer) = call(&app, "clerk", "POST", "/api/v1/ledger/exchange-rates", Some(rate)).await;
         assert_eq!(status, StatusCode::CREATED, "{answer}");
         let document = issued(&app, &tenant, sale(&tenant, Currency::USD, 10_000, business, "U-1")).await;
@@ -319,8 +320,9 @@ fn read_csv(bytes: &[u8]) -> Vec<Vec<String>> {
 }
 
 async fn export(app: &TestApp, profile: &str, format: &str) -> Vec<u8> {
-    let today = Utc::now().date_naive();
-    let body = json!({"profile": profile, "format": format, "from": today.with_day(1).unwrap(), "to": today});
+    let today = Timestamp::now().date_utc();
+    let body =
+        json!({"profile": profile, "format": format, "from": today.first_of_month(), "to": today});
     let (status, created) =
         call(app, "clerk", "POST", "/api/v1/invoices/exports", Some(body)).await;
     assert_eq!(status, StatusCode::CREATED, "{created}");
@@ -418,12 +420,12 @@ async fn file(storage: &Arc<dyn Storage>, key: &str) -> Vec<u8> {
     chunks.concat()
 }
 
-async fn set_retention(tenant: &TenantContext, id: uuid::Uuid, until: chrono::NaiveDate) {
+async fn set_retention(tenant: &TenantContext, id: uuid::Uuid, until: Date) {
     let write = tenant.database().begin_write().await.unwrap();
     let backend = write.get_database_backend();
     let sql = "UPDATE invoices_documents SET retention_until = $1 WHERE id = $2";
     write
-        .execute_raw(Statement::from_sql_and_values(backend, sql, [until.into(), id.into()]))
+        .execute_raw(autoxide_kernel::database::statement(backend, sql, [until.into(), id.into()]))
         .await
         .unwrap();
     write.commit().await.unwrap();
@@ -434,7 +436,7 @@ async fn rows_of(tenant: &TenantContext, table: &str) -> i64 {
     let read = tenant.database().read();
     let backend = read.get_database_backend();
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             backend,
             format!("SELECT COUNT(*) AS n FROM {table} WHERE tenant_id = $1"),
             [tenant.id().as_uuid().into()],
@@ -496,7 +498,7 @@ async fn luu_tru_va_don_chung_tu_het_han() {
             )
             .await
             .unwrap();
-        let yesterday = Utc::now().date_naive().pred_opt().unwrap();
+        let yesterday = Timestamp::now().date_utc().pred().unwrap();
         set_retention(&tenant, old.id, yesterday).await;
         set_retention(&acme, acme_old.id, yesterday).await;
         let admin = app.api::<TenantAdmin>().unwrap();
@@ -536,9 +538,9 @@ fn hex(bytes: &[u8]) -> String {
 async fn lap_lai_ban_xuat_bi_loi() {
     TestDatabase::run(async |test| {
         let app = app(test).await;
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         let body = json!({"profile": "generic_journal", "format": "csv",
-                          "from": today.with_day(1).unwrap(), "to": today});
+                          "from": today.first_of_month(), "to": today});
         let (status, created) =
             call(&app, "clerk", "POST", "/api/v1/invoices/exports", Some(body)).await;
         assert_eq!(status, StatusCode::CREATED, "{created}");
@@ -564,7 +566,7 @@ async fn lap_lai_ban_xuat_bi_loi() {
                    WHERE id = $1";
         let uuid: uuid::Uuid = id.parse().unwrap();
         write
-            .execute_raw(Statement::from_sql_and_values(backend, sql, [uuid.into()]))
+            .execute_raw(autoxide_kernel::database::statement(backend, sql, [uuid.into()]))
             .await
             .unwrap();
         write.commit().await.unwrap();

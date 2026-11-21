@@ -1,6 +1,7 @@
 //! Định nghĩa form: vòng đời và phiên bản, kiểm từng kiểu trường, đổi nơi nhận mail báo.
 
 use super::*;
+use jiff::SignedDuration;
 
 #[tokio::test]
 async fn vong_doi_form_phien_ban_va_bai_cu_doc_dung_nhan_cu() {
@@ -53,7 +54,7 @@ async fn vong_doi_form_phien_ban_va_bai_cu_doc_dung_nhan_cu() {
         changed[0].label = Localized { en: Some("Full name".to_owned()), vi: None };
         changed.remove(2);
         let input = FormInput { fields: Some(changed), ..FormInput::default() };
-        let stale = Some(form.row.updated_at - chrono::Duration::seconds(1));
+        let stale = Some(form.row.updated_at - SignedDuration::from_secs(1));
         assert_eq!(
             service
                 .update_form(&tenant, &admin, form.row.id, input.clone(), stale)

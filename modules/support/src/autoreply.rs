@@ -7,6 +7,7 @@
 //! hoàn tiền / trả hàng / huỷ đơn, thanh toán lỗi, dữ liệu cá nhân, pháp lý, lời lẽ bức xúc, người mua
 //! đòi gặp người.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 
 use autoxide_kernel::ai::{Part, Prompt};
@@ -15,7 +16,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
 use autoxide_kernel::search::fold;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
-use chrono::{NaiveDate, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
     QueryOrder, Set, SqlErr,
@@ -146,13 +146,13 @@ fn contains_word(haystack: &str, needle: &str) -> bool {
 }
 
 /// Câu trả lời mẫu dùng được cho trả lời tự động hôm nay: đã duyệt, chưa quá hạn rà lại.
-pub(crate) fn usable(reply: &SavedReply, today: NaiveDate) -> bool {
+pub(crate) fn usable(reply: &SavedReply, today: Date) -> bool {
     reply.auto_reply
         && reply.approved_at.is_some()
         && reply
             .review_due_on
             .as_deref()
-            .and_then(|day| day.parse::<NaiveDate>().ok())
+            .and_then(|day| day.parse::<Date>().ok())
             .is_some_and(|due| due >= today)
 }
 
@@ -184,7 +184,7 @@ impl SupportService {
         if lineage.is_empty() {
             lineage.push(node);
         }
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         Ok(saved_reply::Entity::find()
             .filter(saved_reply::Column::OrgId.is_in(lineage.iter().map(OrgId::as_uuid)))
             .filter(saved_reply::Column::AutoReply.eq(true))

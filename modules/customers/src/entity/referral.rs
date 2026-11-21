@@ -1,5 +1,6 @@
 //! Bảng `customers_referrals`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,8 +15,8 @@ pub struct Model {
     pub status: String,
     pub reason: Option<String>,
     pub qualifying_order_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

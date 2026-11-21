@@ -3,6 +3,8 @@
 //! định và phải xác nhận, số người mua không lộ, bản ghi lưu về rồi xoá ở nhà cung cấp, hết hạn, xoá
 //! tài khoản. Bộ giả không có HTTP client: cả luồng chạy không mở kết nối mạng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_compliance::api::{AccountVerification, VerificationLevel};
@@ -16,7 +18,6 @@ use autoxide_kernel::voice::{CallStatus, VoiceProvider};
 use autoxide_kernel::work::WorkSource;
 use autoxide_testkit::{FAKE_RECORDING, FakeVoiceProvider, MemoryStorage, TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Timelike, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -85,8 +86,9 @@ async fn voice(test: &TestDatabase, notice: bool, recording: bool) -> Voice {
 
 /// Khung gọi lại ngày mai 10:00–11:00 UTC.
 fn window() -> (String, String) {
-    let tomorrow = (Utc::now() + Duration::days(1)).with_hour(10).unwrap().with_minute(0).unwrap();
-    (tomorrow.to_rfc3339(), (tomorrow + Duration::hours(1)).to_rfc3339())
+    let tomorrow = Timestamp::now().date_utc().succ().unwrap().start_of_day_utc()
+        + SignedDuration::from_hours(10);
+    (tomorrow.to_rfc3339(), (tomorrow + SignedDuration::from_hours(1)).to_rfc3339())
 }
 
 async fn request(
@@ -396,7 +398,7 @@ async fn so_chua_xac_thuc_khong_yeu_cau_goi_lai() {
         assert_eq!(body["code"], "conversations.phone_unverified");
         // Ngoài giờ nhận gọi lại hay quá số ngày: 422.
         let id = start(&v.h.app, "buyer", "Gọi mình").await;
-        let late = (Utc::now() + Duration::days(30)).to_rfc3339();
+        let late = (Timestamp::now() + SignedDuration::from_hours(24 * 30)).to_rfc3339();
         let body = json!({"client_id": "x", "window_start": late, "window_end": late, "phone_source": "account"});
         let (status, body) = call(&v.h.app, "POST", &format!("/me/threads/{id}/callbacks"), "buyer", Some(body)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
@@ -463,18 +465,18 @@ async fn ban_ghi_het_han_thi_xoa() {
         let tenant = v.h.app.default_tenant();
         // Chưa hết hạn: không xoá.
         let storage_service = with_storage(&v);
-        assert_eq!(storage_service.purge_recordings(&tenant, Utc::now()).await.unwrap(), 0);
+        assert_eq!(storage_service.purge_recordings(&tenant, Timestamp::now()).await.unwrap(), 0);
         call_entity::Entity::update_many()
             .col_expr(
                 call_entity::Column::RecordingExpiresAt,
-                Expr::value(Some(Utc::now() - Duration::days(1))),
+                Expr::value(Some(Timestamp::now() - SignedDuration::from_hours(24))),
             )
             .filter(call_entity::Column::Id.eq(call_id))
             .scoped(&tenant)
             .exec(tenant.database().write())
             .await
             .unwrap();
-        assert_eq!(storage_service.purge_recordings(&tenant, Utc::now()).await.unwrap(), 1);
+        assert_eq!(storage_service.purge_recordings(&tenant, Timestamp::now()).await.unwrap(), 1);
         assert!(recordings(&v).await.is_empty());
     })
     .await

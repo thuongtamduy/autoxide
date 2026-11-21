@@ -1,5 +1,6 @@
 //! Bảng `orders_cod_rules`: quy tắc buộc trả trước khi rủi ro cao, có ngày hiệu lực.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,10 +16,10 @@ pub struct Model {
     pub max_order_value_minor: Option<i64>,
     pub currency: Option<String>,
     pub action: String,
-    pub effective_from: DateTimeUtc,
-    pub effective_to: Option<DateTimeUtc>,
+    pub effective_from: Timestamp,
+    pub effective_to: Option<Timestamp>,
     pub created_by: Uuid,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

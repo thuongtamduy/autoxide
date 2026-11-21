@@ -1,5 +1,6 @@
 //! Nhập / xuất sản phẩm bằng CSV (chạy bằng job): `/imports`, `/exports`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -66,8 +66,8 @@ pub(crate) struct TransferResponse {
     pub ok_rows: i64,
     /// Problems by row, at most 1 000.
     pub errors: Vec<TransferErrorResponse>,
-    pub created_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
     /// For a finished export: where to download the file (`GET`, same sign-in).
     pub content_path: Option<String>,
 }

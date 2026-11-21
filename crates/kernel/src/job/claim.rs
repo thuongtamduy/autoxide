@@ -9,8 +9,7 @@
 //!   `UPDATE … WHERE id IN (SELECT … LIMIT n) RETURNING` đã là nguyên tử.
 //!
 //! Gate chạy test claim đồng thời trên cả hai database, nên cả hai nhánh đều được test.
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{
     Alias, Condition, Expr, ExprTrait as _, LockBehavior, LockType, Order, Query, SelectStatement,
     UpdateStatement,
@@ -43,8 +42,8 @@ pub struct ClaimRequest<'a> {
     pub table: &'a str,
     pub tenant: Option<TenantId>,
     pub worker: &'a str,
-    pub now: DateTime<Utc>,
-    pub until: DateTime<Utc>,
+    pub now: Timestamp,
+    pub until: Timestamp,
     pub limit: u64,
 }
 
@@ -53,8 +52,8 @@ impl<'a> ClaimRequest<'a> {
     pub fn new(
         table: &'a str,
         worker: &'a str,
-        now: DateTime<Utc>,
-        until: DateTime<Utc>,
+        now: Timestamp,
+        until: Timestamp,
         limit: u64,
     ) -> Self {
         ClaimRequest { table, tenant: None, worker, now, until, limit }
@@ -117,7 +116,7 @@ impl Claim for SqliteClaim {
 }
 
 /// Điều kiện "đang chờ chạy": chưa xong, chưa hỏng hẳn, tới giờ, không ai đang giữ.
-pub(crate) fn pending(now: DateTime<Utc>) -> Condition {
+pub(crate) fn pending(now: Timestamp) -> Condition {
     Condition::all()
         .add(Expr::col(Alias::new("completed_at")).is_null())
         .add(Expr::col(Alias::new("failed_at")).is_null())

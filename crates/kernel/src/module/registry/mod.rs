@@ -4,6 +4,7 @@
 
 mod sandbox;
 
+use jiff::SignedDuration;
 use std::fmt;
 use std::sync::Arc;
 
@@ -93,7 +94,7 @@ pub struct Modules {
     /// Sổ sao / đẩy sandbox (bước 38, D-232).
     sandbox: crate::tenancy::sandbox::SandboxCatalog,
     /// Thời hạn giữ luồng thay đổi đồng bộ (`AUTOXIDE_SYNC_RETENTION_DAYS`, bước 69 P2).
-    sync_keep: chrono::Duration,
+    sync_keep: SignedDuration,
 }
 
 impl Modules {
@@ -280,7 +281,7 @@ impl Modules {
                 analytics,
                 automations,
                 sandbox: Default::default(),
-                sync_keep: chrono::Duration::days(30),
+                sync_keep: SignedDuration::from_hours(24 * 30),
             })
         } else {
             Err(ModuleError(problems.join("; ")))

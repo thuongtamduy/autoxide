@@ -1,5 +1,6 @@
 //! Bảng `content_menus`: menu theo (`key`, `locale`).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,8 +13,8 @@ pub struct Model {
     pub tenant_id: Uuid,
     pub key: String,
     pub locale: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,5 +1,6 @@
 //! Entity của bảng `audit_entry` và `audit_chain` (SeaORM).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -19,8 +20,8 @@ pub struct Model {
     pub before: Option<String>,
     pub after: Option<String>,
     pub details: Option<String>,
-    pub occurred_at: DateTimeUtc,
-    pub recorded_at: DateTimeUtc,
+    pub occurred_at: Timestamp,
+    pub recorded_at: Timestamp,
     /// Vị trí trong chuỗi băm (D-183). Có ở mọi dòng sau migration `m0004`.
     pub sequence: Option<i64>,
     pub payload_hash: Option<String>,

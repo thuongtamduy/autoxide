@@ -15,8 +15,7 @@
 //!
 //! Giá phải trả: các bên cấp số trong cùng một dãy nối đuôi nhau tới khi commit — giữ transaction
 //! ngắn, cấp số ở cuối, ngay trước khi ghi bản ghi.
-
-use chrono::Utc;
+use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
 
@@ -39,7 +38,7 @@ pub async fn next<C: ConnectionTrait>(
 ) -> Result<i64, Error> {
     check_scope(scope)?;
     let table = Alias::new(TABLE);
-    let now = Utc::now();
+    let now = Timestamp::now();
     let upsert = Query::insert()
         .into_table(table.clone())
         .columns(["tenant_id", "scope", "last_value", "updated_at"].map(Alias::new))

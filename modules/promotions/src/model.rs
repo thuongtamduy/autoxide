@@ -2,9 +2,8 @@
 //! database) và [`Program`] — chương trình đã biên dịch (điều kiện thành struct, mục tiêu thành
 //! tập) mà bộ tính dùng. Không chạm database.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
-
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::api::{GiftReturnPolicy, PayerKind, PromotionClass};
@@ -301,8 +300,8 @@ pub(crate) struct Program {
     pub max_add_on_quantity: Option<i32>,
     pub gift_quantity: Option<i32>,
     pub first_order_only: bool,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub priority: i32,
     pub exclusivity: Exclusivity,
     pub combines_with: BTreeSet<PromotionClass>,

@@ -1,6 +1,5 @@
 //! Khách của người gọi (`GET /api/v1/kernel/tenant`, tool `kernel.current_tenant`).
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -34,7 +33,7 @@ pub struct CurrentTenant {
     pub sandbox_of: Option<Uuid>,
     /// Sandbox only: when it is deleted unless extended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub sandbox_expires_at: Option<DateTime<Utc>>,
+    pub sandbox_expires_at: Option<Timestamp>,
 }
 
 fn production() -> String {

@@ -1,5 +1,6 @@
 //! Trả lời tự động (D-230): duyệt câu trả lời mẫu, xem thử, nhật ký, phản hồi và "gặp nhân viên".
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -10,7 +11,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -36,7 +36,7 @@ pub(crate) struct ApproveRequest {
     questions: BTreeMap<String, Vec<String>>,
     /// Automatic use stops after this day unless approved again (today to one year ahead).
     #[schema(value_type = Option<String>, example = "2027-05-01")]
-    review_due_on: Option<NaiveDate>,
+    review_due_on: Option<Date>,
 }
 
 /// Approve a saved reply for automatic answers, or stop using it.
@@ -180,7 +180,7 @@ pub(crate) struct AutoReplyResponse {
     reply_message_id: Option<Uuid>,
     /// `helpful`, `wrong`, or empty.
     feedback: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<AutoReply> for AutoReplyResponse {

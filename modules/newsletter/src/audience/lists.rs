@@ -1,5 +1,6 @@
 //! Danh sách bản tin: tạo, đọc, liệt kê (kèm số người theo trạng thái), sửa, xoá.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -7,7 +8,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -295,7 +295,7 @@ impl NewsletterService {
         principal: &Principal,
         id: Uuid,
         input: ListInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<List, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let before = self.find_list(tenant, id).await?;
@@ -361,7 +361,7 @@ impl NewsletterService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let before = self.find_list(tenant, id).await?;

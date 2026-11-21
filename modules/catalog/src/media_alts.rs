@@ -7,13 +7,13 @@
 //! `alt` của sản phẩm khi `locale` là ngôn ngữ mặc định → `alt` của `media` theo ngôn ngữ
 //! (`Media::find_many_in`: bản dịch hay mặc định của media) → `alt` của sản phẩm.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
 
@@ -41,7 +41,7 @@ impl CatalogService {
         media_id: Uuid,
         locale: &str,
         alt: &str,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
         let locale = self.locale(locale)?;
         let alt = alt.trim();
@@ -59,7 +59,7 @@ impl CatalogService {
         id: Uuid,
         media_id: Uuid,
         locale: &str,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
         let locale = self.locale(locale)?;
         self.change_media_alt(tenant, principal, id, media_id, &locale, None, expected).await
@@ -74,7 +74,7 @@ impl CatalogService {
         media_id: Uuid,
         locale: &str,
         alt: Option<&str>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<ProductDetail, Error> {
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;

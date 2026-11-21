@@ -1,5 +1,6 @@
 //! Bảng `orders_warranty_claims`: phiếu tiếp nhận bảo hành và trạng thái xử lý.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,10 +16,10 @@ pub struct Model {
     pub status: String,
     pub issue: String,
     pub resolution: Option<String>,
-    pub due_at: DateTimeUtc,
+    pub due_at: Timestamp,
     pub created_by: Uuid,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

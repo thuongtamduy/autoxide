@@ -2,6 +2,7 @@
 //! cửa hàng). Kiểm ảnh (thư viện `media`), link và trang được chọn (sổ đối tượng) chạy TRƯỚC
 //! transaction ghi: transaction phải ngắn, không gọi module khác.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{HashMap, HashSet};
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -9,7 +10,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -65,8 +65,8 @@ pub(crate) struct BannerFields {
     pub page_kinds: Vec<String>,
     pub page_targets: Vec<PageTarget>,
     pub link: Link,
-    pub starts_at: Option<DateTime<Utc>>,
-    pub ends_at: Option<DateTime<Utc>>,
+    pub starts_at: Option<Timestamp>,
+    pub ends_at: Option<Timestamp>,
     /// Không gửi: `draft`.
     pub status: Option<String>,
     pub ai_assisted: bool,
@@ -96,8 +96,8 @@ pub(crate) struct BannerPatch {
     pub page_kinds: Option<Vec<String>>,
     pub page_targets: Option<Vec<PageTarget>>,
     pub link: Option<Link>,
-    pub starts_at: Option<Option<DateTime<Utc>>>,
-    pub ends_at: Option<Option<DateTime<Utc>>>,
+    pub starts_at: Option<Option<Timestamp>>,
+    pub ends_at: Option<Option<Timestamp>>,
     pub status: Option<String>,
     pub ai_assisted: Option<bool>,
 }
@@ -217,7 +217,7 @@ impl ContentService {
         principal: &Principal,
         id: Uuid,
         patch: BannerPatch,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         via: Via,
     ) -> Result<(Banner, Placement), Error> {
         let (found, placement) = self.get_banner(tenant, principal, id).await?;
@@ -296,7 +296,7 @@ impl ContentService {
         principal: &Principal,
         key: &str,
         ids: Vec<Uuid>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Placement, Error> {
         principal.require(&CONTENT_BANNERS)?;
         let found = self.placement_by_key(tenant, key).await?;

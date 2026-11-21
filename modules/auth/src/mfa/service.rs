@@ -6,7 +6,7 @@
 //! trộm một mã không dùng lại được nó (RFC 6238 mục 5.2).
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
@@ -440,11 +440,11 @@ pub(crate) async fn remove_in(
 }
 
 fn unix_now() -> u64 {
-    u64::try_from(Utc::now().timestamp()).unwrap_or(0)
+    u64::try_from(Timestamp::now().as_unix_seconds()).unwrap_or(0)
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Mã sai, hết hạn hay đã dùng: một lỗi chung (không cho biết mã gần đúng tới đâu).

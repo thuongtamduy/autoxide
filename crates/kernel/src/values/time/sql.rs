@@ -65,6 +65,33 @@ fn text_of(value: &Value, type_name: &str) -> Option<String> {
     }
 }
 
+/// Chuỗi trong `Value::Enum` mang đúng tên kiểu `type_name` (không nhận `Value::String`): để code chung (chép dữ
+/// liệu giữa hai database) phân biệt cột thời gian với cột chữ.
+fn enum_text<'v>(value: &'v Value, type_name: &str) -> Option<&'v str> {
+    match value {
+        Value::Enum(OptionEnum::Some(inner)) if &*inner.type_name == type_name => {
+            Some(&inner.value)
+        }
+        _ => None,
+    }
+}
+
+impl Timestamp {
+    /// Thời điểm trong một `Value` do [`Timestamp`] tạo (`None`: NULL hay không phải thời điểm).
+    pub fn from_sql_value(value: &Value) -> Option<Timestamp> {
+        enum_text(value, TIMESTAMPTZ)
+            .and_then(format::parse_lenient_timestamp)
+            .map(Timestamp::exact)
+    }
+}
+
+impl Date {
+    /// Ngày trong một `Value` do [`Date`] tạo (`None`: NULL hay không phải ngày).
+    pub fn from_sql_value(value: &Value) -> Option<Date> {
+        enum_text(value, DATE).and_then(format::parse_date).map(Date::from)
+    }
+}
+
 // --- Timestamp -----------------------------------------------------------------------------------------
 
 impl From<Timestamp> for Value {
@@ -314,4 +341,18 @@ fn unsupported_row() -> TryGetError {
     TryGetError::DbErr(DbErr::Type(
         "time values are only read from SQLite or Postgres rows".to_owned(),
     ))
+}
+
+// SeaORM đòi kiểu của cột khoá chính cài `TryFromU64` (để đọc ID tự tăng sau INSERT). Ngày / thời điểm
+// không bao giờ là ID tự tăng: luôn báo lỗi, như cài đặt sẵn của SeaORM cho kiểu `chrono`.
+impl sea_orm::TryFromU64 for Timestamp {
+    fn try_from_u64(_: u64) -> Result<Self, DbErr> {
+        Err(DbErr::ConvertFromU64("Timestamp"))
+    }
+}
+
+impl sea_orm::TryFromU64 for Date {
+    fn try_from_u64(_: u64) -> Result<Self, DbErr> {
+        Err(DbErr::ConvertFromU64("Date"))
+    }
 }

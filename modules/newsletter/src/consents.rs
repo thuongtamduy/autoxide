@@ -95,7 +95,7 @@ impl NewsletterService {
             let subject = ConsentSubject::Email(email.to_owned());
             let key = consent_key(row.list_id);
             let state = if row.status == SubscriptionStatus::Confirmed.as_str() {
-                let at = row.confirmed_at.map_or(0, |at| at.timestamp_micros());
+                let at = row.confirmed_at.map_or(0, |at| at.as_unix_micros());
                 let source_ref =
                     format!("newsletter.subscription:{}:{}:{at}", row.subscriber_id, row.list_id);
                 ledger
@@ -103,7 +103,7 @@ impl NewsletterService {
                     .await?;
                 GRANTED
             } else {
-                let at = row.unsubscribed_at.map_or(0, |at| at.timestamp_micros());
+                let at = row.unsubscribed_at.map_or(0, |at| at.as_unix_micros());
                 let source_ref =
                     format!("newsletter.unsubscribe:{}:{}:{at}", row.subscriber_id, row.list_id);
                 ledger.withdraw(tenant, subject, key, "newsletter", &source_ref).await?;

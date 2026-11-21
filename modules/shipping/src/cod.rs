@@ -22,8 +22,9 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::Date;
 use autoxide_ledger::api::Side;
-use chrono::{Duration, NaiveDate};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -267,8 +268,8 @@ impl ShippingService {
         tenant: &TenantContext,
         principal: &Principal,
         account_id: Uuid,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
     ) -> Result<(cod_statement::Model, bool), Error> {
         let (_, account, carrier) = self.account(tenant, account_id).await?;
         let statement =
@@ -452,7 +453,7 @@ impl ShippingService {
 
     /// Lịch hằng ngày: vận đơn giao xong có COD chưa đối soát quá `COD_SETTLEMENT_DAYS`.
     pub(crate) async fn cod_aging(&self, tenant: &TenantContext) -> Result<u64, Error> {
-        let limit = now() - Duration::days(self.config.cod_settlement_days);
+        let limit = now() - SignedDuration::from_hours(24 * self.config.cod_settlement_days);
         let rows = shipment::Entity::find()
             .filter(shipment::Column::CodStatus.eq("collected"))
             .filter(shipment::Column::DeliveredAt.lte(limit))

@@ -1,6 +1,7 @@
 //! Endpoint quản trị sản phẩm và biến thể, dưới `/api/v1/catalog`. Handler chỉ: lấy dữ liệu vào
 //! → kiểm permission → gọi service → trả envelope.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use utoipa::{IntoParams, ToSchema};
@@ -596,14 +596,14 @@ pub(crate) struct UpdateVariantRequest {
     #[schema(inline)]
     pub sale_mode: Option<SaleModeDto>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<NaiveDate>, nullable)]
-    pub preorder_available_on: Option<Option<NaiveDate>>,
+    #[schema(value_type = Option<Date>, nullable)]
+    pub preorder_available_on: Option<Option<Date>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<i64>, nullable)]
     pub preorder_limit: Option<Option<i64>>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>, nullable)]
-    pub preorder_ends_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>, nullable)]
+    pub preorder_ends_at: Option<Option<Timestamp>>,
     pub preorder_messages: Option<BTreeMap<String, String>>,
     #[serde(default, deserialize_with = "present")]
     #[schema(value_type = Option<i64>, nullable)]

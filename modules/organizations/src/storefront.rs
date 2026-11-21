@@ -10,7 +10,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgSetting, Site, TenantContext};
-use chrono::{DateTime, Datelike, NaiveTime, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -175,7 +175,7 @@ impl OrgService {
         &self,
         tenant: &TenantContext,
         site: &Site,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Storefront, Error> {
         let profile = self.site_profile(tenant, site).await?;
         let settings = self.resolve_settings(tenant, site.org(), None).await?;
@@ -203,14 +203,14 @@ pub(crate) fn open_at(
     hours: &[OpeningHours],
     special: &[SpecialDay],
     timezone: &str,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Option<bool> {
-    let zone = timezone.parse::<chrono_tz::Tz>().unwrap_or(chrono_tz::UTC);
-    let local = now.with_timezone(&zone);
-    let date = local.date_naive().format("%Y-%m-%d").to_string();
+    let zone = autoxide_kernel::time::zone(timezone).unwrap_or(jiff::tz::TimeZone::UTC);
+    let local = now.in_zone(&zone);
+    let date = Date::from(local.date()).to_string();
     let time = local.time();
-    let parse = |raw: &str| NaiveTime::parse_from_str(raw, "%H:%M").ok();
-    let within = |opens: Option<NaiveTime>, closes: Option<NaiveTime>| matches!((opens, closes), (Some(opens), Some(closes)) if opens <= time && time < closes);
+    let parse = autoxide_kernel::time::parse_clock;
+    let within = |opens: Option<jiff::civil::Time>, closes: Option<jiff::civil::Time>| matches!((opens, closes), (Some(opens), Some(closes)) if opens <= time && time < closes);
     if let Some(day) = special.iter().find(|day| day.date == date) {
         return Some(
             !day.closed
@@ -223,7 +223,7 @@ pub(crate) fn open_at(
     if hours.is_empty() {
         return None;
     }
-    let weekday = u8::try_from(local.weekday().number_from_monday()).unwrap_or(0);
+    let weekday = u8::try_from(local.weekday().to_monday_one_offset()).unwrap_or(0);
     Some(
         hours
             .iter()
@@ -235,7 +235,7 @@ pub(crate) fn open_at(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use jiff::SignedDuration;
 
     fn range(day: u8, opens: &str, closes: &str) -> OpeningHours {
         OpeningHours { day, opens: opens.into(), closes: closes.into() }
@@ -244,18 +244,18 @@ mod tests {
     #[test]
     fn dang_mo_cua_theo_mui_gio_cua_nut_ke_ca_qua_nua_dem() {
         // Thứ Hai 2026-11-16 18:30 UTC = thứ Ba 01:30 ở Việt Nam.
-        let now = Utc.with_ymd_and_hms(2026, 11, 16, 18, 30, 0).unwrap();
+        let now = Timestamp::from_utc(2026, 11, 16, 18, 30, 0).unwrap();
         let hours = [range(1, "08:00", "18:00"), range(2, "00:00", "02:00")];
         assert_eq!(open_at(&hours, &[], "Asia/Ho_Chi_Minh", now), Some(true));
         assert_eq!(open_at(&hours, &[], "UTC", now), Some(false), "18:30 thứ Hai: đã đóng");
-        let later = now + chrono::Duration::hours(1);
+        let later = now + SignedDuration::from_hours(1);
         assert_eq!(open_at(&hours, &[], "Asia/Ho_Chi_Minh", later), Some(false));
         assert_eq!(open_at(&[], &[], "UTC", now), None, "chưa khai giờ: không biết");
     }
 
     #[test]
     fn ngay_dac_biet_thang_gio_thuong() {
-        let now = Utc.with_ymd_and_hms(2026, 11, 17, 3, 0, 0).unwrap(); // 10:00 thứ Ba ở Việt Nam
+        let now = Timestamp::from_utc(2026, 11, 17, 3, 0, 0).unwrap(); // 10:00 thứ Ba ở Việt Nam
         let hours = [range(2, "08:00", "22:00")];
         let closed = SpecialDay {
             date: "2026-11-17".into(),

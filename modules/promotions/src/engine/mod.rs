@@ -20,7 +20,6 @@ mod tests;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::money::Money;
-use chrono::{Datelike, NaiveDateTime, Timelike};
 use uuid::Uuid;
 
 use crate::api::{Cart, GiftChoice, PromotionClass};
@@ -69,7 +68,7 @@ pub(crate) struct Input<'a> {
     /// Chuỗi nút của cửa hàng, gồm chính nó.
     pub ancestors: &'a [Uuid],
     /// `cart.at` theo giờ địa phương của cửa hàng (khung giờ).
-    pub local: NaiveDateTime,
+    pub local: jiff::civil::DateTime,
     pub best_for_buyer: bool,
     pub max_vouchers_per_class: usize,
     /// promotion_id → mã / voucher đã kiểm hợp lệ.
@@ -396,12 +395,12 @@ fn best_for_buyer<'p>(
 }
 
 /// Khung giờ: không có dòng nào = cả ngày.
-pub(crate) fn in_windows(program: &Program, local: NaiveDateTime) -> bool {
+pub(crate) fn in_windows(program: &Program, local: jiff::civil::DateTime) -> bool {
     if program.windows.is_empty() {
         return true;
     }
-    let day_bit = 1 << local.weekday().num_days_from_monday();
-    let minute = i32::try_from(local.hour() * 60 + local.minute()).unwrap_or(0);
+    let day_bit = 1 << local.weekday().to_monday_zero_offset();
+    let minute = i32::from(local.hour()) * 60 + i32::from(local.minute());
     program.windows.iter().any(|window| {
         window.weekdays & day_bit != 0
             && minute >= window.start_minute

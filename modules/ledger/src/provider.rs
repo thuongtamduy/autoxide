@@ -1,5 +1,6 @@
 //! `dyn Ledger` module `ledger` công bố.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -7,7 +8,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::EntityTrait;
 use uuid::Uuid;
 
@@ -69,7 +69,7 @@ impl Ledger for Provider {
         &self,
         tenant: &TenantContext,
         key: AccountKey,
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Money, Error> {
         self.0.balance_of_key(tenant, &key, as_of).await
     }
@@ -111,7 +111,7 @@ impl Ledger for Provider {
         &self,
         tenant: &TenantContext,
         keys: &[AccountKey],
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         self.0.balances_of_keys(tenant, keys, as_of).await
     }
@@ -165,7 +165,7 @@ impl Ledger for Provider {
         tenant: &TenantContext,
         base: autoxide_kernel::money::Currency,
         quote: autoxide_kernel::money::Currency,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         self.0
             .exchange_rate(tenant, base, quote, on)

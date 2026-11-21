@@ -1,6 +1,7 @@
 //! Endpoint quản trị chương trình, dưới `/api/v1/promotions`. Handler chỉ: lấy dữ liệu vào →
 //! kiểm permission → gọi service → trả envelope.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -719,7 +719,7 @@ pub(crate) struct NoticeRequest {
     pub status: String,
     /// Receipt number of the authority, up to 100 characters.
     pub reference: Option<String>,
-    pub submitted_at: Option<DateTime<Utc>>,
+    pub submitted_at: Option<Timestamp>,
 }
 
 /// A notice of a promotion to one authority.
@@ -729,7 +729,7 @@ pub(crate) struct NoticeResponse {
     pub authority_code: String,
     pub status: String,
     pub reference: Option<String>,
-    pub submitted_at: Option<DateTime<Utc>>,
+    pub submitted_at: Option<Timestamp>,
     pub submitted_by: Option<Uuid>,
 }
 

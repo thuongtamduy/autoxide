@@ -1,6 +1,7 @@
 //! Bảng `kernel_relocations` (mặt điều khiển): mỗi lượt tách / gộp — hay yêu cầu của khách — một
 //! dòng, đi qua các trạng thái của [`super::run`].
 
+use crate::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -23,6 +24,7 @@ pub(crate) const UNFINISHED: [&str; 6] = [PLANNED, FROZEN, COPIED, VERIFIED, SWI
 
 pub(crate) mod entity {
     //! Bảng `kernel_relocations` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -49,13 +51,13 @@ pub(crate) mod entity {
         pub tables: String,
         pub error: Option<String>,
         pub runner: Option<String>,
-        pub runner_until: Option<DateTimeUtc>,
+        pub runner_until: Option<Timestamp>,
         /// Người của khách gửi yêu cầu (`requested`).
         pub requested_by: Option<Uuid>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -90,7 +92,7 @@ pub(crate) struct Options {
     pub(crate) to_root: Option<Uuid>,
     /// Lúc khách bắt đầu bảo trì (chờ hàng đợi rỗng tính từ đây).
     #[serde(default)]
-    pub(crate) frozen_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub(crate) frozen_at: Option<Timestamp>,
 }
 
 impl Options {

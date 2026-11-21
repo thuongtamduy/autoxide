@@ -1,5 +1,6 @@
 //! Bảng `conversations_blocks`: người dùng bị một nút chặn nhắn tin.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,7 +14,7 @@ pub struct Model {
     pub user_id: Uuid,
     pub reason: String,
     pub blocked_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

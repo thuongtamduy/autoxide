@@ -1,5 +1,6 @@
 //! Bảng `customers_wishlist_alert_settings`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,7 +14,7 @@ pub struct Model {
     pub user_id: Uuid,
     pub back_in_stock: bool,
     pub price_drop: bool,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

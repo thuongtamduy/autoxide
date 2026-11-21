@@ -5,7 +5,9 @@
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::{AccountKey, Counterparty, Ledger};
+use jiff::SignedDuration;
 
 use super::fake_ledger::FakeLedger;
 use sea_orm::sea_query::Expr;
@@ -285,7 +287,7 @@ async fn cod_qua_han_chua_doi_soat() {
         crate::entity::shipment::Entity::update_many()
             .col_expr(
                 crate::entity::shipment::Column::DeliveredAt,
-                Expr::value(Some(chrono::Utc::now() - chrono::Duration::days(20))),
+                Expr::value(Some(Timestamp::now() - SignedDuration::from_hours(24 * 20))),
             )
             .filter(crate::entity::shipment::Column::Id.eq(Uuid::parse_str(&id).unwrap()))
             .exec(tenant.database().write())

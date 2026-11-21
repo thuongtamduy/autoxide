@@ -1,5 +1,6 @@
 //! Bảng `customers_wishlist_alert_batches`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,8 +15,8 @@ pub struct Model {
     pub local_day: String,
     pub items: String,
     pub status: String,
-    pub created_at: DateTimeUtc,
-    pub sent_at: Option<DateTimeUtc>,
+    pub created_at: Timestamp,
+    pub sent_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

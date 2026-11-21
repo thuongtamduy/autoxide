@@ -1,5 +1,6 @@
 //! Uỷ quyền theo cây khách hàng (D-310) và danh sách khách người gọi vào được (`/me/tenants`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -43,10 +43,10 @@ pub(crate) struct DelegationResponse {
     org_id: Uuid,
     reason: String,
     /// When it stops working by itself; `null`: until revoked.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// When it was revoked; `null` while in force.
-    revoked_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    revoked_at: Option<Timestamp>,
+    created_at: Timestamp,
 }
 
 impl From<Delegation> for DelegationResponse {
@@ -97,7 +97,7 @@ pub(crate) struct DelegationRequest {
     /// The unit of the child tenant the permissions apply at; omit for its root unit.
     org_id: Option<Uuid>,
     /// When it stops working by itself; omit for "until revoked".
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// Why, 1 to 500 characters; kept in both audit logs.
     reason: String,
 }

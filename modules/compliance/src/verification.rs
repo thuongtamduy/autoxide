@@ -6,6 +6,8 @@
 //! Mã một lần không bao giờ nằm trong job hay log: gửi SMS đồng bộ NGOÀI transaction (bảng job đọc
 //! được qua API quản trị và dead-letter queue), database chỉ giữ bản băm có pepper riêng của khách.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -17,7 +19,6 @@ use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -45,8 +46,8 @@ pub(crate) struct Verification {
     pub level: VerificationLevel,
     /// Số đã xác thực (E.164).
     pub phone: Option<PhoneNumber>,
-    pub phone_verified_at: Option<DateTime<Utc>>,
-    pub identity_verified_at: Option<DateTime<Utc>>,
+    pub phone_verified_at: Option<Timestamp>,
+    pub identity_verified_at: Option<Timestamp>,
 }
 
 pub(crate) fn verification_required(level: VerificationLevel) -> Error {
@@ -269,7 +270,7 @@ impl ComplianceService {
             )]));
         };
         let rule = self
-            .rule_for(tenant, "posting.phone_countries", Utc::now())
+            .rule_for(tenant, "posting.phone_countries", Timestamp::now())
             .await?
             .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
             .unwrap_or_else(|| json!({"countries": [DEFAULT_COUNTRY]}));
@@ -331,7 +332,7 @@ impl ComplianceService {
             phone: Set(phone.as_str().to_owned()),
             code_hash: Set(code_hash(&pepper, id, &code)),
             attempts: Set(0),
-            expires_at: Set(at + chrono::Duration::seconds(otp.ttl_seconds)),
+            expires_at: Set(at + SignedDuration::from_secs(otp.ttl_seconds)),
             consumed_at: Set(None),
             created_at: Set(at),
         };
@@ -498,7 +499,7 @@ impl ComplianceService {
             .col_expr(account_verification::Column::PhoneKey, Expr::value(""))
             .col_expr(
                 account_verification::Column::PhoneVerifiedAt,
-                Expr::value(Option::<DateTime<Utc>>::None),
+                Expr::value(Option::<Timestamp>::None),
             )
             .col_expr(account_verification::Column::UpdatedAt, Expr::value(now()))
             .filter(account_verification::Column::TenantId.eq(tenant.id().as_uuid()))
@@ -527,7 +528,7 @@ impl ComplianceService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
-        let before = Utc::now() - chrono::Duration::hours(CHALLENGE_KEEP_HOURS);
+        let before = Timestamp::now() - SignedDuration::from_hours(CHALLENGE_KEEP_HOURS);
         Ok(phone_challenge::Entity::delete_many()
             .filter(phone_challenge::Column::CreatedAt.lt(before))
             .exec(database.write())

@@ -2,6 +2,7 @@
 //! (từng thiết bị hoặc mọi thiết bị khác); quản trị viên kết thúc mọi phiên của một
 //! người.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -51,11 +51,11 @@ pub(crate) struct SessionResponse {
     #[schema(example = "VN")]
     country: Option<String>,
     /// When the session was signed in.
-    started_at: DateTime<Utc>,
+    started_at: Timestamp,
     /// Last time the session got tokens (sign-in or refresh).
-    last_active_at: DateTime<Utc>,
+    last_active_at: Timestamp,
     /// When the session ends unless refreshed before.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl From<Session> for SessionResponse {

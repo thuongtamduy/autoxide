@@ -1,6 +1,7 @@
 //! REST của khách tự đăng ký (D-349): ba endpoint công khai cho người đăng ký, một danh sách cho nhân
 //! sự nền tảng. Handler chỉ lấy dữ liệu vào → gọi service (`signup.rs`) → trả envelope.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -61,12 +61,12 @@ pub(crate) struct SignupResponse {
     /// Identity checks to do now: only in the answer of `POST /signups/confirm` while
     /// `awaiting_kyc`.
     kyc: Option<SignupKyc>,
-    confirmed_at: Option<DateTime<Utc>>,
+    confirmed_at: Option<Timestamp>,
     /// Until when it waits for the mail link (`pending_email`) or the identity checks
     /// (`awaiting_kyc`).
-    expires_at: DateTime<Utc>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    expires_at: Timestamp,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 /// Where the applicant goes for the identity checks.
@@ -77,7 +77,7 @@ pub(crate) struct SignupKyc {
     kind: String,
     url: Option<String>,
     token: Option<String>,
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
 }
 
 impl SignupResponse {

@@ -10,6 +10,7 @@
 //! - Dữ liệu cá nhân module giữ về một người dùng: xuất (`PersonalData`) và xoá khi tài khoản bị xoá
 //!   (`auth.user_deleted`) — số điện thoại đã xác thực và mã một lần (phần còn lại từ D-356).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -19,7 +20,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::privacy::{DataCategory, Keep, PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId, require_platform};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::{Deserialize, Serialize};
@@ -302,7 +302,7 @@ pub(crate) struct ProcessingRegister {
     pub purposes: Vec<Purpose>,
     pub retention: Vec<RetentionItem>,
     pub residency: ResidencyView,
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
     /// Reminder that a legal professional should review it.
     pub disclaimer: String,
 }
@@ -347,7 +347,7 @@ impl ComplianceService {
 
     /// Mục đích hiệu lực của khách: mặc định của quy tắc, phần khách thêm / ghi đè thắng theo `key`.
     pub(crate) async fn purposes(&self, tenant: &TenantContext) -> Result<Vec<Purpose>, Error> {
-        let rule = self.rule_for(tenant, "privacy.default_purposes", Utc::now()).await?;
+        let rule = self.rule_for(tenant, "privacy.default_purposes", Timestamp::now()).await?;
         let body: Value =
             rule.and_then(|row| serde_json::from_str(&row.body).ok()).unwrap_or_default();
         let defaults: Vec<DefaultPurpose> = body
@@ -596,7 +596,7 @@ impl ComplianceService {
         &self,
         jurisdiction: &str,
     ) -> Result<Vec<RetentionItem>, Error> {
-        let at = Utc::now();
+        let at = Timestamp::now();
         let limits: Value = self
             .effective_rule(jurisdiction, "privacy.retention_limits", at)
             .await?
@@ -633,7 +633,7 @@ impl ComplianceService {
     /// Số ngày giữ bằng chứng đồng ý (quy tắc `privacy.consent_proof_days`, mặc định 1825).
     pub(crate) async fn consent_proof_days_in(&self, jurisdiction: &str) -> Result<u32, Error> {
         Ok(self
-            .effective_rule(jurisdiction, "privacy.consent_proof_days", Utc::now())
+            .effective_rule(jurisdiction, "privacy.consent_proof_days", Timestamp::now())
             .await?
             .and_then(|row| serde_json::from_str::<Value>(&row.body).ok())
             .and_then(|body| body.get("days").and_then(Value::as_u64))
@@ -971,7 +971,7 @@ impl Probe for DeadlinesProbe {
             Ok(databases) => databases,
             Err(error) => return Finding::failed(format!("cannot list the databases: {error}")),
         };
-        let at = Utc::now();
+        let at = Timestamp::now();
         let (mut incidents, mut requests) = (0usize, 0usize);
         for (_, name, database) in databases {
             let late = crate::entity::incident::Entity::find()

@@ -2,9 +2,10 @@
 
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::OrgId;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -68,7 +69,7 @@ async fn bang_suy_ra_ghi_dong_gia_that_va_khong_nhan_doi() {
         assert_eq!(rows[0]["amount"]["amount"], "119000");
         assert_eq!(rows[0]["source"], "derived");
         // Chạy lại job (thêm giá mới ở bảng gốc xếp job lần nữa): dòng cũ không nhân đôi.
-        let body = json!({"reference": "base-2", "prices": [{"variant_id": variant, "amount": vnd(200_000), "valid_from": Utc::now() + Duration::days(1)}]});
+        let body = json!({"reference": "base-2", "prices": [{"variant_id": variant, "amount": vnd(200_000), "valid_from": Timestamp::now() + SignedDuration::from_hours(24)}]});
         let (status, _) = call(&app, "POST", &format!("/price-lists/{base}/prices"), "boss", Some(body)).await;
         assert_eq!(status, StatusCode::OK);
         run_jobs(&app).await;
@@ -79,7 +80,7 @@ async fn bang_suy_ra_ghi_dong_gia_that_va_khong_nhan_doi() {
         // Đọc giá qua `dyn Catalog`: nhóm `vip` lấy bảng suy ra.
         let catalog = app.api::<dyn Catalog>().unwrap();
         let id: Uuid = variant.parse().unwrap();
-        let query = PriceQuery::new(tree.a, Currency::VND, Utc::now() + Duration::seconds(1), vec![id])
+        let query = PriceQuery::new(tree.a, Currency::VND, Timestamp::now() + SignedDuration::from_secs(1), vec![id])
             .for_customer_group("vip");
         let found = catalog.prices(&app.default_tenant(), &query).await.unwrap();
         assert_eq!(found[0].amount.minor(), 119_000);
@@ -96,7 +97,7 @@ async fn dong_tay_ghim_gia_trong_bang_suy_ra() {
         let (_, variant) = create_product(&app, "boss", tree.a, "PIN-1", "Hàng").await;
         let base = list(&app, tree.chain, json!({})).await;
         let derived = list(&app, tree.chain, json!({"customer_group": "vip", "derived_from": base, "adjust_bp": -2000})).await;
-        let pin = json!({"reference": "pin", "prices": [{"variant_id": variant, "amount": vnd(55_000), "valid_from": Utc::now() - Duration::days(1)}]});
+        let pin = json!({"reference": "pin", "prices": [{"variant_id": variant, "amount": vnd(55_000), "valid_from": Timestamp::now() - SignedDuration::from_hours(24)}]});
         let (status, _) = call(&app, "POST", &format!("/price-lists/{derived}/prices"), "boss", Some(pin)).await;
         assert_eq!(status, StatusCode::OK);
         let body = json!({"reference": "base", "prices": [{"variant_id": variant, "amount": vnd(100_000)}]});
@@ -121,13 +122,13 @@ async fn doi_gia_hang_loat_xem_truoc_khong_ghi_va_gia_tam_thoi() {
         let (_, two) = create_product(&app, "boss", tree.a, "B-2", "Hai").await;
         let retail = list(&app, tree.a, json!({})).await;
         let body = json!({"reference": "open", "prices": [
-            {"variant_id": one, "amount": vnd(100_000), "valid_from": Utc::now() - Duration::days(2)},
-            {"variant_id": two, "amount": vnd(50_000), "valid_from": Utc::now() - Duration::days(2)},
+            {"variant_id": one, "amount": vnd(100_000), "valid_from": Timestamp::now() - SignedDuration::from_hours(24 * 2)},
+            {"variant_id": two, "amount": vnd(50_000), "valid_from": Timestamp::now() - SignedDuration::from_hours(24 * 2)},
         ]});
         let (status, _) = call(&app, "POST", &format!("/price-lists/{retail}/prices"), "boss", Some(body)).await;
         assert_eq!(status, StatusCode::OK);
-        let start = Utc::now() + Duration::hours(1);
-        let end = start + Duration::days(3);
+        let start = Timestamp::now() + SignedDuration::from_hours(1);
+        let end = start + SignedDuration::from_hours(24 * 3);
         let body = json!({"operation": "percent", "value": -2000, "valid_from": start, "valid_to": end});
         let (status, change) = call(&app, "POST", &format!("/price-lists/{retail}/changes"), "boss", Some(body)).await;
         assert_eq!(status, StatusCode::CREATED, "{change}");
@@ -154,9 +155,9 @@ async fn doi_gia_hang_loat_xem_truoc_khong_ghi_va_gia_tam_thoi() {
         let at = |t| PriceQuery::new(tree.a, Currency::VND, t, vec![id]);
         let price = |found: Vec<crate::api::PriceSnapshot>| found[0].amount.minor();
         let tenant = app.default_tenant();
-        assert_eq!(price(catalog.prices(&tenant, &at(Utc::now())).await.unwrap()), 100_000);
-        assert_eq!(price(catalog.prices(&tenant, &at(start + Duration::minutes(1))).await.unwrap()), 80_000);
-        assert_eq!(price(catalog.prices(&tenant, &at(end + Duration::minutes(1))).await.unwrap()), 100_000, "the temporary price ended");
+        assert_eq!(price(catalog.prices(&tenant, &at(Timestamp::now())).await.unwrap()), 100_000);
+        assert_eq!(price(catalog.prices(&tenant, &at(start + SignedDuration::from_mins(1))).await.unwrap()), 80_000);
+        assert_eq!(price(catalog.prices(&tenant, &at(end + SignedDuration::from_mins(1))).await.unwrap()), 100_000, "the temporary price ended");
     })
     .await
     .unwrap();
@@ -204,8 +205,8 @@ async fn chon_bang_gia_theo_thu_tu_cu_the() {
                 priority: Set(priority),
                 active: Set(true),
                 created_by: Set(None),
-                created_at: Set(Utc::now()),
-                updated_at: Set(Utc::now()),
+                created_at: Set(Timestamp::now()),
+                updated_at: Set(Timestamp::now()),
             }
             .insert(app.database().write())
             .await
@@ -218,13 +219,13 @@ async fn chon_bang_gia_theo_thu_tu_cu_the() {
                 amount_minor: Set(amount),
                 amount_currency: Set("VND".to_owned()),
                 compare_at_minor: Set(None),
-                valid_from: Set(Utc::now() - Duration::days(1)),
+                valid_from: Set(Timestamp::now() - SignedDuration::from_hours(24)),
                 valid_to: Set(None),
                 source: Set("manual".to_owned()),
                 reference: Set(None),
                 reference_fingerprint: Set(None),
                 created_by: Set(None),
-                created_at: Set(Utc::now()),
+                created_at: Set(Timestamp::now()),
             }
             .insert(app.database().write())
             .await
@@ -235,7 +236,7 @@ async fn chon_bang_gia_theo_thu_tu_cu_the() {
             let (catalog, tenant) = (catalog.clone(), tenant.clone());
             async move { catalog.prices(&tenant, &query).await.unwrap()[0].amount.minor() }
         };
-        let base = |org| PriceQuery::new(org, Currency::VND, Utc::now(), vec![id]);
+        let base = |org| PriceQuery::new(org, Currency::VND, Timestamp::now(), vec![id]);
         // Cửa hàng A có bảng riêng: thắng mọi bảng của chuỗi dù khớp bao nhiêu chiều.
         assert_eq!(ask(base(tree.a).for_company(company).for_customer_group("vip")).await, 106);
         // Cửa hàng B: theo chiều khớp, công ty trước nhất.

@@ -1,6 +1,7 @@
 //! Xuất CSV lớn bằng job (đặc tả 32 B3): file giống từng byte bản đồng bộ, link ký, yêu cầu đồng
 //! thời, nơi lưu lỗi, xoá theo email / xoá form / dọn theo hạn xoá cả file.
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::storage::StoredFile;
@@ -87,7 +88,7 @@ async fn xuat_qua_job_giong_tung_byte_ban_dong_bo() {
         // Sai chữ ký, sửa hạn, chữ ký không phải hex, hạn đã qua: cùng một lỗi.
         let mut wrong = signature.clone();
         wrong.replace_range(0..2, if signature.starts_with("00") { "11" } else { "00" });
-        let past = now().timestamp() - 1;
+        let past = now().as_unix_seconds() - 1;
         let past_signature = service.signature(&tenant, view.row.id, past).await.unwrap();
         for (expires, signature) in [
             (expires, wrong.as_str()),
@@ -261,7 +262,7 @@ async fn xoa_theo_email_xoa_form_va_don_dep_xoa_file_xuat() {
             .cleanup(
                 &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
                 &database,
-                now() + chrono::Duration::hours(23),
+                now() + SignedDuration::from_hours(23),
             )
             .await
             .unwrap();
@@ -270,7 +271,7 @@ async fn xoa_theo_email_xoa_form_va_don_dep_xoa_file_xuat() {
             .cleanup(
                 &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
                 &database,
-                now() + chrono::Duration::hours(25),
+                now() + SignedDuration::from_hours(25),
             )
             .await
             .unwrap();

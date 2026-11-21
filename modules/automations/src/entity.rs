@@ -12,6 +12,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod rule {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -46,9 +47,9 @@ pub(crate) mod rule {
         pub updated_by: Uuid,
         pub version: i32,
         /// Lần chạy theo lịch / kiểm số liệu kế tiếp.
-        pub next_run_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub next_run_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -56,6 +57,7 @@ pub(crate) mod rule {
 }
 
 pub(crate) mod run {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -92,10 +94,10 @@ pub(crate) mod run {
         /// Người gọi chạy tay / chạy lại.
         pub triggered_by: Option<Uuid>,
         /// Lúc chạy tiếp sau `wait`.
-        pub resume_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub resume_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -103,6 +105,7 @@ pub(crate) mod run {
 }
 
 pub(crate) mod run_key {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -116,7 +119,7 @@ pub(crate) mod run_key {
         #[sea_orm(primary_key, auto_increment = false)]
         pub trigger_key: String,
         pub run_id: Uuid,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -124,6 +127,7 @@ pub(crate) mod run_key {
 }
 
 pub(crate) mod metric_hour {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -137,7 +141,7 @@ pub(crate) mod metric_hour {
         pub source: String,
         /// Đầu giờ UTC.
         #[sea_orm(primary_key, auto_increment = false)]
-        pub hour: DateTimeUtc,
+        pub hour: Timestamp,
         /// Mã tiền; rỗng khi không phải tiền.
         #[sea_orm(primary_key, auto_increment = false)]
         pub currency: String,
@@ -151,6 +155,7 @@ pub(crate) mod metric_hour {
 }
 
 pub(crate) mod metric_seen {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -161,7 +166,7 @@ pub(crate) mod metric_seen {
         pub tenant_id: Uuid,
         #[sea_orm(primary_key, auto_increment = false)]
         pub event_id: Uuid,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

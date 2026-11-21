@@ -7,6 +7,8 @@
 //! ngày hiệu lực của `compliance` (`notifications.send_windows`, `notifications.marketing_labels`),
 //! không viết cứng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -18,7 +20,6 @@ use autoxide_kernel::push::{DeviceToken, PushContent, PushDelivery, WebPushSubsc
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::zns::ZnsMessage;
-use chrono::{DateTime, Duration, Timelike, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::{Value, json};
@@ -83,15 +84,11 @@ fn rule_channel(channel: Channel) -> Option<&'static str> {
 
 /// Lúc khung giờ mở lại, nếu `at` đang ngoài khung `window` (`{"from": "07:00", "to": "22:00"}`)
 /// theo giờ địa phương lệch `offset` phút. `None`: đang trong khung, hay không có khung.
-pub(crate) fn next_opening(
-    window: &Value,
-    offset: i64,
-    at: DateTime<Utc>,
-) -> Option<DateTime<Utc>> {
+pub(crate) fn next_opening(window: &Value, offset: i64, at: Timestamp) -> Option<Timestamp> {
     let from = minutes(window.get("from")?.as_str()?)?;
     let to = minutes(window.get("to")?.as_str()?)?;
-    let local = at + Duration::minutes(offset);
-    let now_minutes = i64::from(local.hour()) * 60 + i64::from(local.minute());
+    let local = at + SignedDuration::from_mins(offset);
+    let now_minutes = local.as_unix_seconds().rem_euclid(86_400) / 60;
     let inside = if from <= to {
         (from..to).contains(&now_minutes)
     } else {
@@ -101,12 +98,12 @@ pub(crate) fn next_opening(
     if inside {
         return None;
     }
-    let midnight = local.date_naive().and_hms_opt(0, 0, 0)?.and_utc();
-    let mut opening = midnight + Duration::minutes(from);
+    let midnight = local.date_utc().start_of_day_utc();
+    let mut opening = midnight + SignedDuration::from_mins(from);
     if opening <= local {
-        opening += Duration::days(1);
+        opening = opening + SignedDuration::from_hours(24);
     }
-    Some(opening - Duration::minutes(offset))
+    Some(opening - SignedDuration::from_mins(offset))
 }
 
 impl NotificationsService {
@@ -115,7 +112,7 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Value>, Error> {
         let Some(rules) = &self.rules else {
             return Ok(None);
@@ -128,8 +125,8 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         channel: Channel,
-        at: DateTime<Utc>,
-    ) -> Result<Option<DateTime<Utc>>, Error> {
+        at: Timestamp,
+    ) -> Result<Option<Timestamp>, Error> {
         let (Some(key), Some(body)) =
             (rule_channel(channel), self.rule(tenant, SEND_WINDOWS, at).await?)
         else {
@@ -148,7 +145,7 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         channel: Channel,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<String, Error> {
         let Some(key) = rule_channel(channel) else {
             return Ok(String::new());
@@ -198,7 +195,7 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         id: Uuid,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         let Some(row) =
             message::Entity::find_by_id(id).scoped(tenant).one(tenant.database().write()).await?
@@ -261,9 +258,9 @@ impl NotificationsService {
         &self,
         tenant: &TenantContext,
         row: &message::Model,
-        opening: DateTime<Utc>,
+        opening: Timestamp,
     ) -> Result<(), Error> {
-        if opening - row.created_at > Duration::hours(QUIET_HOURS_LIMIT_HOURS) {
+        if opening - row.created_at > SignedDuration::from_hours(QUIET_HOURS_LIMIT_HOURS) {
             return self.finish(tenant, row, Sent::Skipped(SkipReason::QuietHoursExpired)).await;
         }
         let transaction = tenant.database().begin_write().await?;
@@ -283,7 +280,7 @@ impl NotificationsService {
                 EnqueueOptions::default().run_at(opening).unique_key(format!(
                     "deliver:{}:{}",
                     row.id,
-                    opening.timestamp()
+                    opening.as_unix_seconds()
                 )),
             )
             .await?;
@@ -297,7 +294,7 @@ impl NotificationsService {
         kind: &NotificationKind,
         row: &message::Model,
         rendered: &Rendered,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Sent, Error> {
         let Some(mailer) = &self.mailer else {
             return Ok(Sent::Skipped(SkipReason::ChannelDisabled));
@@ -362,7 +359,7 @@ impl NotificationsService {
         kind: &NotificationKind,
         row: &message::Model,
         rendered: &Rendered,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Sent, Error> {
         let Some(sender) = &self.sms else {
             return Ok(Sent::Skipped(SkipReason::ChannelDisabled));
@@ -429,7 +426,7 @@ impl NotificationsService {
         channel: Channel,
         row: &message::Model,
         rendered: &Rendered,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<PushContent, Error> {
         let label = if kind.category == Category::Marketing {
             self.marketing_label(tenant, channel, at).await?
@@ -450,7 +447,7 @@ impl NotificationsService {
         kind: &NotificationKind,
         row: &message::Model,
         rendered: &Rendered,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Sent, Error> {
         let (Some(sender), Some(secret)) = (&self.web_push, &self.secret) else {
             return Ok(Sent::Skipped(SkipReason::ChannelDisabled));
@@ -510,7 +507,7 @@ impl NotificationsService {
         kind: &NotificationKind,
         row: &message::Model,
         rendered: &Rendered,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Sent, Error> {
         let (Some(sender), Some(secret)) = (&self.mobile_push, &self.secret) else {
             return Ok(Sent::Skipped(SkipReason::ChannelDisabled));
@@ -691,21 +688,25 @@ impl NotificationsService {
     pub(crate) async fn purge(
         &self,
         database: &autoxide_kernel::database::Database,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<(u64, u64), Error> {
         let write = database.write();
         let blanked = message::Entity::update_many()
             .col_expr(message::Column::Address, Expr::value(Option::<String>::None))
             .col_expr(message::Column::Params, Expr::value("{}"))
             .col_expr(message::Column::Link, Expr::value(Option::<String>::None))
-            .filter(message::Column::CreatedAt.lt(at - Duration::days(self.config.retention_days)))
+            .filter(
+                message::Column::CreatedAt
+                    .lt(at - SignedDuration::from_hours(24 * self.config.retention_days)),
+            )
             .filter(message::Column::Address.is_not_null())
             .exec(write)
             .await?
             .rows_affected;
         let deleted = inbox::Entity::delete_many()
             .filter(
-                inbox::Column::CreatedAt.lt(at - Duration::days(self.config.inbox_retention_days)),
+                inbox::Column::CreatedAt
+                    .lt(at - SignedDuration::from_hours(24 * self.config.inbox_retention_days)),
             )
             .exec(write)
             .await?
@@ -763,7 +764,6 @@ impl EventHandler for ConsentWithdrawnListener {
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
 
     use super::*;
 
@@ -771,24 +771,24 @@ mod tests {
     fn khung_gio_theo_gio_viet_nam() {
         let window = json!({"from": "07:00", "to": "22:00"});
         // 23:30 giờ Việt Nam (16:30 UTC) → mở lại 07:00 hôm sau (00:00 UTC).
-        let late = Utc.with_ymd_and_hms(2026, 11, 17, 16, 30, 0).unwrap();
+        let late = Timestamp::from_utc(2026, 11, 17, 16, 30, 0).unwrap();
         assert_eq!(
             next_opening(&window, 420, late),
-            Some(Utc.with_ymd_and_hms(2026, 11, 18, 0, 0, 0).unwrap())
+            Some(Timestamp::from_utc(2026, 11, 18, 0, 0, 0).unwrap())
         );
         // 06:00 giờ Việt Nam (23:00 UTC hôm trước) → 07:00 cùng ngày.
-        let early = Utc.with_ymd_and_hms(2026, 11, 16, 23, 0, 0).unwrap();
+        let early = Timestamp::from_utc(2026, 11, 16, 23, 0, 0).unwrap();
         assert_eq!(
             next_opening(&window, 420, early),
-            Some(Utc.with_ymd_and_hms(2026, 11, 17, 0, 0, 0).unwrap())
+            Some(Timestamp::from_utc(2026, 11, 17, 0, 0, 0).unwrap())
         );
         // 10:00 giờ Việt Nam: trong khung.
-        let inside = Utc.with_ymd_and_hms(2026, 11, 17, 3, 0, 0).unwrap();
+        let inside = Timestamp::from_utc(2026, 11, 17, 3, 0, 0).unwrap();
         assert_eq!(next_opening(&window, 420, inside), None);
         // Khung qua nửa đêm.
         let night = json!({"from": "20:00", "to": "06:00"});
         assert_eq!(
-            next_opening(&night, 0, Utc.with_ymd_and_hms(2026, 1, 1, 21, 0, 0).unwrap()),
+            next_opening(&night, 0, Timestamp::from_utc(2026, 1, 1, 21, 0, 0).unwrap()),
             None
         );
         assert!(next_opening(&json!({"from": "x"}), 0, inside).is_none());

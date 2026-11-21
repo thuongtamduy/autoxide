@@ -8,7 +8,7 @@ use autoxide_kernel::numbering;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Condition;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -464,7 +464,7 @@ impl SupportService {
         principal: &autoxide_kernel::access::Principal,
         id: Uuid,
         changes: TicketChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Ticket, Error> {
         let actor = Actor::from(principal);
         let before = self.get(tenant, Viewer::Staff(principal), id).await?;
@@ -578,7 +578,7 @@ impl SupportService {
         tenant: &TenantContext,
         ticket_id: Uuid,
         line: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         message::ActiveModel {
             id: Set(Uuid::now_v7()),
@@ -609,7 +609,7 @@ pub(crate) fn apply_status(
     before: &Ticket,
     to: Status,
     resolution: Option<Resolution>,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) {
     row.status = Set(to.as_str().to_owned());
     match to {

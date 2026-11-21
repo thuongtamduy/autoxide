@@ -8,7 +8,7 @@ use chrono::{DateTime, NaiveDate, Utc};
 use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection,
-    EntityTrait, QueryFilter, QueryOrder, Set, Statement,
+    EntityTrait, QueryFilter, QueryOrder, Set,
 };
 use uuid::Uuid;
 
@@ -122,7 +122,7 @@ async fn stored_text(db: &DatabaseConnection, id: Uuid) -> String {
         _ => "SELECT at FROM time_probe WHERE id = ?",
     };
     let row = db
-        .query_one_raw(Statement::from_sql_and_values(backend, sql, [id.into()]))
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, [id.into()]))
         .await
         .unwrap()
         .unwrap();
@@ -290,7 +290,9 @@ async fn doc_gia_tri_database_tu_ghi() {
             }
             _ => "UPDATE time_probe SET at = CURRENT_TIMESTAMP, day = CURRENT_DATE WHERE id = ?",
         };
-        db.execute_raw(Statement::from_sql_and_values(backend, sql, [id.into()])).await.unwrap();
+        db.execute_raw(autoxide_kernel::database::statement(backend, sql, [id.into()]))
+            .await
+            .unwrap();
 
         let row = probe::Entity::find_by_id(id).one(&db).await.unwrap().unwrap();
         let drift = (Timestamp::now() - row.at).abs();
@@ -302,6 +304,60 @@ async fn doc_gia_tri_database_tu_ghi() {
                     .unwrap()
                     .date_in(&jiff::tz::TimeZone::UTC)
         );
+    })
+    .await
+    .unwrap();
+}
+
+/// Câu SQL viết tay qua `autoxide_kernel::database::statement` ghi / lọc được cột thời gian trên cả hai database,
+/// và lưu đúng chuỗi như builder (Postgres từ chối nếu tham số thiếu tên kiểu).
+#[tokio::test]
+async fn cau_viet_tay_ghi_va_loc_duoc_cot_thoi_gian() {
+    use autoxide_kernel::database::statement;
+    TestDatabase::run(async |database| {
+        let db = database.connect().await.unwrap();
+        create_table(&db).await;
+        let backend = db.get_database_backend();
+        let id = Uuid::now_v7();
+        let at = ts("2026-11-21T10:00:00.123456Z");
+        // `$n` chạy được trên cả hai: SQLite hiểu `$1` là tham số theo vị trí.
+        db.execute_raw(statement(
+            backend,
+            "INSERT INTO time_probe (id, at, maybe_at, day, maybe_day) VALUES ($1, $2, $3, $4, $5)",
+            [
+                id.into(),
+                at.into(),
+                None::<Timestamp>.into(),
+                day("2026-11-21").into(),
+                None::<Date>.into(),
+            ],
+        ))
+        .await
+        .unwrap();
+        let reference = insert(&db, at, None, day("2026-11-21")).await;
+        assert_eq!(stored_text(&db, id).await, stored_text(&db, reference).await);
+        db.execute_raw(statement(
+            backend,
+            "UPDATE time_probe SET maybe_at = $1, maybe_day = $2 WHERE id = $3",
+            [at.into(), day("2026-11-22").into(), id.into()],
+        ))
+        .await
+        .unwrap();
+        let row = probe::Entity::find_by_id(id).one(&db).await.unwrap().unwrap();
+        assert_eq!(
+            (row.at, row.maybe_at, row.day, row.maybe_day),
+            (at, Some(at), day("2026-11-21"), Some(day("2026-11-22")))
+        );
+        let found = db
+            .query_one_raw(statement(
+                backend,
+                "SELECT COUNT(*) AS n FROM time_probe WHERE at >= $1 AND day = $2",
+                [at.into(), day("2026-11-21").into()],
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(found.try_get::<i64>("", "n").unwrap(), 2);
     })
     .await
     .unwrap();

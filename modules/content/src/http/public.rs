@@ -2,6 +2,7 @@
 //! đăng, không bao giờ trả bản nháp. Có `ETag` (→ 304) và `Cache-Control: public, no-cache`:
 //! cache được nhưng hỏi lại máy chủ — website làm mới ngay nhờ webhook (D-102).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Data, Problem};
 use axum::extract::{Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -149,10 +149,10 @@ pub(crate) struct PublicEntryResponse {
     body_media: Vec<PublicMedia>,
     seo: PublicSeo,
     /// The date shown as the publication date.
-    published_at: DateTime<Utc>,
-    first_published_at: DateTime<Utc>,
+    published_at: Timestamp,
+    first_published_at: Timestamp,
     /// Last change of the published content (sitemap `lastmod`, feed `updated`).
-    content_modified_at: DateTime<Utc>,
+    content_modified_at: Timestamp,
     /// Other published languages of this entry, for `hreflang`.
     translations: Vec<PublicTranslation>,
     /// Categories and tags; the first category is the main one.
@@ -318,7 +318,7 @@ pub(crate) async fn resolution(
     site: &Site,
     locale: &str,
     path: &str,
-) -> Result<(Resolution, Option<DateTime<Utc>>), Error> {
+) -> Result<(Resolution, Option<Timestamp>), Error> {
     Ok(match service.resolve(tenant, site, locale, path).await? {
         Resolved::Entry(row) => {
             let version = row.updated_at;
@@ -744,7 +744,7 @@ pub(crate) struct SitemapItem {
     locale: String,
     path: String,
     /// For `lastmod`.
-    content_modified_at: DateTime<Utc>,
+    content_modified_at: Timestamp,
     /// Leave it out of the sitemap when `true`.
     noindex: bool,
     /// The other languages of the same entry, for `hreflang` alternates.
@@ -914,7 +914,7 @@ pub(crate) struct PreviewEntryResponse {
     /// The content was written or edited from AI suggestions.
     ai_assisted: bool,
     /// Last change of the draft.
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
     /// Categories and tags, in order (the first category is the main one).
     term_ids: Vec<Uuid>,
     /// Authors, in order (the first is the main one).
@@ -1025,7 +1025,7 @@ pub(crate) async fn preview(
 pub(crate) struct PreviewToken {
     /// Give it to `GET /api/v1/content/public/preview?token=…`.
     token: String,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 /// Make a preview link for the draft of an entry.

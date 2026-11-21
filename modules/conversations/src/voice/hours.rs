@@ -1,7 +1,7 @@
 //! Giờ nhận gọi lại của một đường dây: danh sách khung theo thứ trong tuần, giờ địa phương của nút
 //! (lệch UTC cố định theo phút). Mặc định 08:00–20:00 mỗi ngày, giờ Việt Nam (D-232).
-
-use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -27,8 +27,8 @@ pub(crate) fn default_hours() -> Vec<Range> {
     (1..=7).map(|day| Range { day, from: "08:00".to_owned(), to: "20:00".to_owned() }).collect()
 }
 
-fn time(raw: &str) -> Option<NaiveTime> {
-    NaiveTime::parse_from_str(raw, "%H:%M").ok()
+fn time(raw: &str) -> Option<jiff::civil::Time> {
+    autoxide_kernel::time::parse_clock(raw)
 }
 
 /// Khung hợp lệ: thứ 1–7, giờ `HH:MM`, kết thúc sau bắt đầu, tối đa 50 khung.
@@ -43,15 +43,16 @@ pub(crate) fn valid(ranges: &[Range]) -> bool {
 pub(crate) fn covers(
     ranges: &[Range],
     offset_minutes: i32,
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
+    start: Timestamp,
+    end: Timestamp,
 ) -> bool {
-    let shift = Duration::minutes(i64::from(offset_minutes));
-    let (local_start, local_end) = ((start + shift).naive_utc(), (end + shift).naive_utc());
+    let shift = SignedDuration::from_mins(i64::from(offset_minutes));
+    let utc = |at: Timestamp| jiff::tz::Offset::UTC.to_datetime(at.to_jiff());
+    let (local_start, local_end) = (utc(start + shift), utc(end + shift));
     if local_start.date() != local_end.date() {
         return false;
     }
-    let day = u8::try_from(local_start.weekday().number_from_monday()).unwrap_or(0);
+    let day = local_start.weekday().to_monday_one_offset().unsigned_abs();
     ranges.iter().any(|range| {
         range.day == day
             && matches!((time(&range.from), time(&range.to)), (Some(from), Some(to))
@@ -67,11 +68,21 @@ mod tests {
     fn khung_gio_theo_gio_dia_phuong() {
         let hours = default_hours();
         // 2026-11-19 là thứ Năm. 02:00 UTC = 09:00 giờ Việt Nam.
-        let start = DateTime::parse_from_rfc3339("2026-11-19T02:00:00Z").unwrap().to_utc();
-        assert!(covers(&hours, DEFAULT_OFFSET_MINUTES, start, start + Duration::hours(1)));
+        let start = Timestamp::parse_rfc3339("2026-11-19T02:00:00Z").unwrap();
+        assert!(covers(
+            &hours,
+            DEFAULT_OFFSET_MINUTES,
+            start,
+            start + SignedDuration::from_hours(1)
+        ));
         // 13:30 UTC = 20:30: ngoài giờ.
-        let late = DateTime::parse_from_rfc3339("2026-11-19T13:30:00Z").unwrap().to_utc();
-        assert!(!covers(&hours, DEFAULT_OFFSET_MINUTES, late, late + Duration::minutes(10)));
+        let late = Timestamp::parse_rfc3339("2026-11-19T13:30:00Z").unwrap();
+        assert!(!covers(
+            &hours,
+            DEFAULT_OFFSET_MINUTES,
+            late,
+            late + SignedDuration::from_mins(10)
+        ));
         assert!(!valid(&[Range { day: 8, from: "08:00".into(), to: "09:00".into() }]));
         assert!(!valid(&[Range { day: 1, from: "10:00".into(), to: "09:00".into() }]));
     }

@@ -2,6 +2,7 @@
 //! (tồn theo nút, giữ / xác nhận / trả chỗ theo `order_id`, mã giảm phần trăm), có thể tiêm lỗi.
 //! Kiểu của các module đó là `#[non_exhaustive]` nên dựng qua JSON.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -18,7 +19,6 @@ use autoxide_promotions::api::{
     AutomaticPrice, Cart, Eligibility, Evaluation, GrantVoucher, Promotions, Redemption,
     ReserveRequest as PromotionHold, Voucher, VoucherStatus,
 };
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -338,7 +338,7 @@ impl Promotions for FakePromotions {
         let empty: Evaluation = self.compute(&Cart::new(
             OrgId::from_uuid(Uuid::nil()),
             autoxide_kernel::money::Currency::parse("VND")?,
-            Utc::now(),
+            Timestamp::now(),
         ));
         Ok(Self::redemption(order_id, status, empty))
     }
@@ -354,7 +354,7 @@ impl Promotions for FakePromotions {
         let empty = self.compute(&Cart::new(
             OrgId::from_uuid(Uuid::nil()),
             autoxide_kernel::money::Currency::parse("VND")?,
-            Utc::now(),
+            Timestamp::now(),
         ));
         Ok(Some(Self::redemption(order_id, "released", empty)))
     }
@@ -388,7 +388,7 @@ impl Promotions for FakePromotions {
         &self,
         _tenant: &TenantContext,
         _org_id: OrgId,
-        _at: DateTime<Utc>,
+        _at: Timestamp,
         _prices: &[(Uuid, Money)],
     ) -> Result<Vec<AutomaticPrice>, Error> {
         Ok(Vec::new())

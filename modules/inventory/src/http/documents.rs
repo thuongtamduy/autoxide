@@ -1,5 +1,6 @@
 //! Endpoint phiếu chuyển kho và phiếu kiểm kê, dưới `/api/v1/inventory`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -61,11 +61,11 @@ pub(crate) struct TransferResponse {
     pub to_org_id: Uuid,
     /// `draft`, `in_transit`, `partially_received`, `received`, `closed` or `cancelled`.
     pub status: String,
-    pub shipped_at: Option<DateTime<Utc>>,
+    pub shipped_at: Option<Timestamp>,
     pub reference: Option<String>,
     pub note: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     pub lines: Vec<TransferLineResponse>,
 }
 
@@ -397,7 +397,7 @@ pub(crate) struct CountLineResponse {
     pub counted: i64,
     /// On hand when this line was counted; the difference applied is `counted − expected_at_count`.
     pub expected_at_count: i64,
-    pub counted_at: DateTime<Utc>,
+    pub counted_at: Timestamp,
     pub reason_code: Option<String>,
 }
 
@@ -412,8 +412,8 @@ pub(crate) struct CountResponse {
     /// `open`, `applied` or `cancelled`.
     pub status: String,
     pub note: String,
-    pub applied_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub applied_at: Option<Timestamp>,
+    pub created_at: Timestamp,
     pub lines: Vec<CountLineResponse>,
 }
 

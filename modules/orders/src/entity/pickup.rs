@@ -1,5 +1,6 @@
 //! Bảng `orders_pickups`: đơn nhận tại cửa hàng đã sẵn sàng.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,13 +14,13 @@ pub struct Model {
     pub pickup_org_id: Uuid,
     pub status: String,
     pub code: String,
-    pub ready_at: DateTimeUtc,
-    pub hold_until: DateTimeUtc,
-    pub reminded_at: Option<DateTimeUtc>,
-    pub handed_over_at: Option<DateTimeUtc>,
+    pub ready_at: Timestamp,
+    pub hold_until: Timestamp,
+    pub reminded_at: Option<Timestamp>,
+    pub handed_over_at: Option<Timestamp>,
     pub handed_over_to: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

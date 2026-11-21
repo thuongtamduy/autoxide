@@ -9,6 +9,7 @@
 //! Mọi endpoint dùng đúng ba hình dạng này: client (người hay AI agent) học một
 //! endpoint là đọc được mọi endpoint.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use axum::Json;
@@ -49,7 +50,7 @@ pub struct Created<T> {
     pub data: T,
     /// Phiên bản của bản ghi vừa tạo: có thì response mang `ETag` như `GET` (client sửa tiếp
     /// với `If-Match` mà không phải đọc lại).
-    pub version: Option<chrono::DateTime<chrono::Utc>>,
+    pub version: Option<Timestamp>,
 }
 
 impl<T> Created<T> {
@@ -59,7 +60,7 @@ impl<T> Created<T> {
 
     /// Kèm `ETag` của phiên bản `version` (cột `updated_at` của bản ghi).
     #[must_use]
-    pub fn tagged(mut self, version: chrono::DateTime<chrono::Utc>) -> Self {
+    pub fn tagged(mut self, version: Timestamp) -> Self {
         self.version = Some(version);
         self
     }

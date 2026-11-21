@@ -1,5 +1,6 @@
 //! Entity của bảng `notes_note` (SeaORM). Chỉ dùng trong module này.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,8 +17,8 @@ pub struct Model {
     pub owner_id: Uuid,
     pub title: String,
     pub body: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -6,6 +6,8 @@
 //! token cũ. Chấp nhận: email chưa có tài khoản nhân sự → tạo (email coi là đã xác minh, đặt mật
 //! khẩu nếu gửi) và đăng nhập luôn; đã có → phải đang đăng nhập đúng tài khoản đó, chỉ thêm role.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 
@@ -20,7 +22,6 @@ use autoxide_kernel::tenancy::{
     DatabaseRegistry, OrgId, ScopeExt, TenantContext, link_token, root_of,
 };
 use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -41,6 +42,7 @@ fn tokens() -> OneTimeTokens {
 }
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -60,10 +62,10 @@ pub(crate) mod entity {
         pub invited_by: Option<Uuid>,
         /// `pending`, `accepted`, `revoked`.
         pub status: String,
-        pub expires_at: DateTimeUtc,
+        pub expires_at: Timestamp,
         pub accepted_user_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -83,7 +85,7 @@ impl entity::Model {
     }
 
     /// Còn chấp nhận được lúc `at`.
-    fn open(&self, at: DateTime<Utc>) -> bool {
+    fn open(&self, at: Timestamp) -> bool {
         self.status == "pending" && self.expires_at > at
     }
 }
@@ -166,8 +168,8 @@ pub(crate) struct Invitations {
     pub entitlements: autoxide_kernel::entitlement::EntitlementsHandle,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 impl Invitations {
@@ -225,7 +227,7 @@ impl Invitations {
             reference: Set(input.reference),
             invited_by: Set(principal.map(Principal::user_id)),
             status: Set("pending".to_owned()),
-            expires_at: Set(now + chrono::Duration::days(self.days)),
+            expires_at: Set(now + SignedDuration::from_hours(24 * self.days)),
             accepted_user_id: Set(None),
             created_at: Set(now),
             updated_at: Set(now),
@@ -344,7 +346,7 @@ impl Invitations {
         entity::Entity::update_many()
             .col_expr(
                 entity::Column::ExpiresAt,
-                Expr::value(now + chrono::Duration::days(self.days)),
+                Expr::value(now + SignedDuration::from_hours(24 * self.days)),
             )
             .col_expr(entity::Column::UpdatedAt, Expr::value(now))
             .filter(entity::Column::Id.eq(id))
@@ -652,6 +654,8 @@ impl crate::api::Invitations for Invitations {
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::time::Timestamp;
+    use jiff::SignedDuration;
     use std::sync::Arc;
 
     use autoxide_kernel::access::Principal;
@@ -836,7 +840,7 @@ mod tests {
                 .col_expr(
                     super::entity::Column::ExpiresAt,
                     sea_orm::sea_query::Expr::value(
-                        chrono::Utc::now() - chrono::Duration::minutes(1),
+                        Timestamp::now() - SignedDuration::from_mins(1),
                     ),
                 )
                 .filter(super::entity::Column::Id.eq(other.id))

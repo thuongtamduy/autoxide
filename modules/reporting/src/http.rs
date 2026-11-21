@@ -1,6 +1,7 @@
 //! Endpoint REST của module `reporting`, dưới `/api/v1/reporting`. Handler chỉ: lấy dữ liệu vào →
 //! kiểm permission → gọi service → trả envelope.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -130,9 +130,9 @@ fn ids(field: &str, raw: Option<&str>, problems: &mut Vec<FieldError>) -> Vec<Uu
     found
 }
 
-fn day(field: &str, raw: Option<&str>, problems: &mut Vec<FieldError>) -> Option<NaiveDate> {
+fn day(field: &str, raw: Option<&str>, problems: &mut Vec<FieldError>) -> Option<Date> {
     let raw = raw?;
-    match NaiveDate::parse_from_str(raw.trim(), "%Y-%m-%d") {
+    match Date::parse_from_str(raw.trim(), "%Y-%m-%d") {
         Ok(day) => Some(day),
         Err(_) => {
             problems.push(FieldError::new(field, "invalid", "must be a date `YYYY-MM-DD`"));
@@ -257,7 +257,7 @@ impl From<SummaryGroup> for SummaryGroupResponse {
 pub(crate) struct MissingRateResponse {
     #[schema(example = "USD")]
     currency: String,
-    day: NaiveDate,
+    day: Date,
 }
 
 impl From<MissingRate> for MissingRateResponse {
@@ -270,8 +270,8 @@ impl From<MissingRate> for MissingRateResponse {
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub(crate) struct SummaryResponse {
     kind: String,
-    from: NaiveDate,
-    to: NaiveDate,
+    from: Date,
+    to: Date,
     group_by: String,
     groups: Vec<SummaryGroupResponse>,
     totals: SummaryGroupResponse,
@@ -302,9 +302,9 @@ pub(crate) struct FactResponse {
     /// The organization unit of that tenant; the root unit has the id of the tenant.
     org_id: Uuid,
     kind: String,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
     /// The day in the time zone of the unit, when the fact was taken.
-    local_day: NaiveDate,
+    local_day: Date,
     /// For figures of money.
     amount: Option<Money>,
     /// For figures that count things.
@@ -348,9 +348,9 @@ pub(crate) struct LagResponse {
     /// Facts not yet pushed to the store.
     pending: u64,
     /// When the oldest fact not yet pushed was taken.
-    oldest_pending_at: Option<DateTime<Utc>>,
+    oldest_pending_at: Option<Timestamp>,
     /// When the store last received a fact of this tenant.
-    last_received_at: Option<DateTime<Utc>>,
+    last_received_at: Option<Timestamp>,
 }
 
 impl From<Lag> for LagResponse {

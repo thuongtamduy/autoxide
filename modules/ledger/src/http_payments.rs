@@ -1,5 +1,6 @@
 //! Route REST của thanh toán, webhook đối tác, đối soát và hàng chờ (dưới `/api/v1/ledger`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::HeaderMap;
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -358,8 +358,8 @@ pub(crate) struct ExceptionResponse {
     resolution: Option<String>,
     note: Option<String>,
     resolved_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<exception::Model> for ExceptionResponse {
@@ -488,7 +488,7 @@ pub(crate) struct ReconciliationResponse {
     id: Uuid,
     provider: String,
     /// The day reconciled.
-    date: NaiveDate,
+    date: Date,
     /// `completed` or `failed`.
     status: String,
     /// Statement lines read.
@@ -498,7 +498,7 @@ pub(crate) struct ReconciliationResponse {
     /// Differences sent to the exceptions.
     exceptions: i64,
     created_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<reconciliation::Model> for ReconciliationResponse {
@@ -525,7 +525,7 @@ pub(crate) struct ReconciliationRequest {
     /// Partner; may be left out when the server has only one.
     provider: Option<String>,
     /// Day to reconcile, `YYYY-MM-DD`.
-    date: NaiveDate,
+    date: Date,
 }
 
 /// List reconciliation runs.

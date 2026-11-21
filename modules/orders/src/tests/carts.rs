@@ -1,9 +1,10 @@
 //! Giỏ hàng: giá tính lại ở máy chủ, vãng lai và gộp giỏ, tồn, mã giảm giá, phí giao, giỏ bỏ dở.
 
 use autoxide_kernel::tenancy::{OrgId, ScopeExt};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
@@ -283,7 +284,10 @@ async fn gio_bo_do_phat_event_mot_lan_va_nhan_vien_xem_theo_pham_vi() {
             .await;
         let tenant = shop.default_tenant();
         cart::Entity::update_many()
-            .col_expr(cart::Column::UpdatedAt, Expr::value(Utc::now() - Duration::hours(3)))
+            .col_expr(
+                cart::Column::UpdatedAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(3)),
+            )
             .filter(cart::Column::Status.eq("active"))
             .scoped(&tenant)
             .exec(shop.database().write())

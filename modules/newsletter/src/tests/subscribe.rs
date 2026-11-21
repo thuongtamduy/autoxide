@@ -1,5 +1,6 @@
 //! Đăng ký công khai và xác nhận.
 
+use autoxide_kernel::time::Timestamp;
 use std::time::Duration;
 
 use autoxide_kernel::antispam::AntispamConfig;
@@ -328,7 +329,7 @@ async fn dang_ky_lai_sau_khi_huy_phai_xac_nhan() {
                 Actor::system(),
                 row.subscriber_id,
                 &deals,
-                chrono::Utc::now(),
+                Timestamp::now(),
             )
             .await
             .unwrap();
@@ -363,7 +364,7 @@ async fn dang_ky_lai_sau_khi_huy_phai_xac_nhan() {
                 Actor::system(),
                 row.subscriber_id,
                 &promo,
-                chrono::Utc::now(),
+                Timestamp::now(),
             )
             .await
             .unwrap();
@@ -470,7 +471,7 @@ async fn xac_nhan_va_huy_cung_luc_van_la_da_huy() {
                         Actor::system(),
                         row.subscriber_id,
                         &weekly,
-                        chrono::Utc::now(),
+                        Timestamp::now(),
                     )
                     .await
                     .unwrap();

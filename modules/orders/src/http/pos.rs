@@ -1,6 +1,7 @@
 //! Endpoint bán tại quầy (POS) cho chuỗi (D-227, D-340): ca, bán, tạm tính, tra mã vạch. Handler
 //! chỉ lấy dữ liệu vào → gọi service → trả envelope.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -34,10 +34,10 @@ pub(crate) struct ShiftResponse {
     /// `open`, `pending_approval` (cash difference above the threshold) or `closed`.
     status: String,
     opened_by: Uuid,
-    opened_at: DateTime<Utc>,
+    opened_at: Timestamp,
     opening_cash: Money,
     closed_by: Option<Uuid>,
-    closed_at: Option<DateTime<Utc>>,
+    closed_at: Option<Timestamp>,
     /// Opening cash plus cash taken by sales of the shift.
     expected_cash: Option<Money>,
     counted_cash: Option<Money>,
@@ -47,7 +47,7 @@ pub(crate) struct ShiftResponse {
     variance_reason: Option<String>,
     variance_note: Option<String>,
     approved_by: Option<Uuid>,
-    approved_at: Option<DateTime<Utc>>,
+    approved_at: Option<Timestamp>,
 }
 
 impl ShiftResponse {

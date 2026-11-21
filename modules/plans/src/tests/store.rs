@@ -2,13 +2,14 @@
 //! thông báo không cấp trùng; hoàn tiền thu hồi quyền; chữ ký sai bị từ chối; hết hạn thì vòng đời
 //! huỷ khi hết kỳ; khách không tự "tiếp tục" thành gói miễn phí. Chạy trên cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::entitlement::TenantAccess;
 use autoxide_kernel::store::{AppStore, PurchaseState, StorePurchase, StorePurchases};
 use autoxide_testkit::{FakeStorePurchases, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 
 use super::lifecycle::{call, tick};
@@ -44,7 +45,7 @@ fn bought(state: PurchaseState, days: i64, transaction: &str) -> StorePurchase {
         "orig-1",
         transaction,
         state,
-        Some(Utc::now() + Duration::days(days)),
+        Some(Timestamp::now() + SignedDuration::from_hours(24 * days)),
     )
 }
 
@@ -146,7 +147,7 @@ async fn giao_dich_hop_le_cap_quyen_dung_va_goi_lai_khong_cap_trung() {
             "orig-3",
             "t8",
             PurchaseState::Active,
-            Some(Utc::now() + Duration::days(9)),
+            Some(Timestamp::now() + SignedDuration::from_hours(24 * 9)),
         );
         let (status, body) = claim(&app, "other", &store().proof(&other)).await;
         assert_eq!(
@@ -177,11 +178,9 @@ async fn thong_bao_gia_han_gui_lai_khong_cap_trung_het_han_thi_huy() {
         assert_eq!(notify(&app, "app_store", renewed).await, StatusCode::NO_CONTENT);
         assert_eq!(events(&app, "plans.subscription_plan_changed").await, 1);
         let sub = ok(&app, Method::GET, "/plans/subscription", "owner", None).await;
-        let end = chrono::DateTime::parse_from_rfc3339(
-            sub["data"]["current_period_end"].as_str().unwrap(),
-        )
-        .unwrap();
-        assert!(end > Utc::now() + Duration::days(59));
+        let end =
+            Timestamp::parse_rfc3339(sub["data"]["current_period_end"].as_str().unwrap()).unwrap();
+        assert!(end > Timestamp::now() + SignedDuration::from_hours(24 * 59));
 
         // Khách không tự "tiếp tục" / đổi ở đây: phải làm trong cửa hàng.
         let (status, body) =
@@ -198,7 +197,7 @@ async fn thong_bao_gia_han_gui_lai_khong_cap_trung_het_han_thi_huy() {
             "orig-1",
             "t2",
             PurchaseState::Expired,
-            Some(Utc::now() - Duration::days(1)),
+            Some(Timestamp::now() - SignedDuration::from_hours(24)),
         );
         assert_eq!(
             notify(&app, "app_store", store().notification_body("n-2", &gone)).await,
@@ -253,7 +252,7 @@ async fn hoan_tien_thu_hoi_quyen_va_chu_ky_sai_bi_tu_choi() {
             "orig-9",
             "t1",
             PurchaseState::Active,
-            Some(Utc::now() + Duration::days(3)),
+            Some(Timestamp::now() + SignedDuration::from_hours(24 * 3)),
         );
         assert_eq!(
             notify(&app, "app_store", store().notification_body("n-4", &stray)).await,

@@ -13,6 +13,7 @@ use autoxide_kernel::tenancy::{
     DEFAULT_TENANT, DatabaseRegistry, MAIN_PLACEMENT, TenancyConfig, TenancyMode, TenantId,
     TenantStatus, ensure_serving,
 };
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use sea_orm::ConnectionTrait as _;
 use sea_orm::sea_query::{Alias, ExprTrait as _, Query};
@@ -44,7 +45,7 @@ async fn insert(database: &Database, table: &str, columns: &[&str], values: Vec<
 async fn placement(database: &Database, name: &str, dir: &std::path::Path) -> Uuid {
     let id = Uuid::now_v7();
     let url = format!("sqlite://{}", dir.join(format!("{name}.db")).display());
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     insert(
         database,
         "kernel_placements",
@@ -75,7 +76,7 @@ async fn placement(database: &Database, name: &str, dir: &std::path::Path) -> Uu
 
 async fn tenant(database: &Database, slug: &str, status: &str, placement: Uuid) -> TenantId {
     let id = Uuid::now_v7();
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     insert(
         database,
         "kernel_tenants",
@@ -95,7 +96,7 @@ async fn tenant(database: &Database, slug: &str, status: &str, placement: Uuid) 
 }
 
 async fn domain(database: &Database, tenant: TenantId, name: &str, status: &str) {
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     insert(
         database,
         "kernel_tenant_domains",

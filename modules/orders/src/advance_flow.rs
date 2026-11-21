@@ -8,7 +8,8 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -34,7 +35,7 @@ pub(crate) struct Planned {
     pub terms: Terms,
     pub split: Split,
     /// Mốc chốt của từng dòng của báo giá (cùng thứ tự).
-    pub commit_at: Vec<Option<DateTime<Utc>>>,
+    pub commit_at: Vec<Option<Timestamp>>,
 }
 
 fn split_lines(quote: &Quote) -> Vec<SplitLine> {
@@ -144,7 +145,7 @@ impl OrdersService {
                     let transaction = database.begin_write().await?;
                     let current = crate::lifecycle::lock(&transaction, tenant, order_id).await?;
                     let at = now();
-                    let due = at + Duration::hours(terms.balance_due_hours);
+                    let due = at + SignedDuration::from_hours(terms.balance_due_hours);
                     let moved = advance_plan::Entity::update_many()
                         .col_expr(advance_plan::Column::Status, Expr::value(BALANCE_REQUESTED))
                         .col_expr(advance_plan::Column::BalanceAttempt, Expr::value(1))

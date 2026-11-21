@@ -7,7 +7,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::deleted_user;
-use chrono::{SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::Value;
@@ -39,8 +39,8 @@ impl EventHandler for Recorder {
             before,
             after,
             details,
-            occurred_at: event.occurred_at.trunc_subsecs(6),
-            recorded_at: Utc::now().trunc_subsecs(6),
+            occurred_at: event.occurred_at.truncate(jiff::Unit::Microsecond),
+            recorded_at: Timestamp::now(),
             sequence: None,
             payload_hash: Some(payload_hash),
             chain_hash: None,
@@ -239,7 +239,7 @@ mod database_tests {
             )
             .actor(Actor::user(user))
             .subject(Some("notes.note:1".to_owned()))
-            .occurred_at(Utc::now().trunc_subsecs(6));
+            .occurred_at(Timestamp::now());
 
             recorder.handle(&event).await.unwrap();
             recorder.handle(&event).await.unwrap();
@@ -278,7 +278,7 @@ mod database_tests {
                 )
                 .actor(Actor::user(user))
                 .subject(subject)
-                .occurred_at(Utc::now().trunc_subsecs(6))
+                .occurred_at(Timestamp::now())
             };
             let created = happened(
                 "auth.user_created",

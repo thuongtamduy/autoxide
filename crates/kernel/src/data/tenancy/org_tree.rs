@@ -20,8 +20,7 @@
 //! Mọi hàm đổi cây gọi [`OrgTree::lock`] (khoá dòng gốc của khách) TRƯỚC mọi dòng khác: dời nút và
 //! đổi trạng thái của cùng khách nối đuôi nhau, không deadlock, không tạo vòng khi hai lệnh dời
 //! chéo nhau chạy cùng lúc.
-
-use chrono::Utc;
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, JoinType, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -35,6 +34,7 @@ use crate::rows;
 
 pub(crate) mod unit {
     //! Bảng `kernel_org_units`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -51,7 +51,7 @@ pub(crate) mod unit {
         pub depth: i32,
         /// `false` khi nút không hoạt động: nút và cả nhánh dưới nó không ghi được.
         pub writable: bool,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -246,7 +246,7 @@ impl OrgTree {
 
         // 3. Độ sâu của cả nhánh đổi cùng một lượng; cha của `id` đổi.
         let delta = new_depth - node.depth;
-        let now = Utc::now();
+        let now = Timestamp::now();
         unit::Entity::update_many()
             .col_expr(unit::Column::Depth, Expr::col(unit::Column::Depth).add(delta))
             .col_expr(unit::Column::UpdatedAt, Expr::val(now))
@@ -273,7 +273,7 @@ impl OrgTree {
         Self::lock(transaction, tenant).await?;
         let mut row: unit::ActiveModel = find_unit(transaction, tenant, id).await?.into();
         row.writable = Set(writable);
-        row.updated_at = Set(Utc::now());
+        row.updated_at = Set(Timestamp::now());
         row.update(transaction).await?;
         Ok(())
     }
@@ -484,7 +484,7 @@ async fn insert_unit<C: ConnectionTrait>(
         parent_id: Set(parent.map(|parent| parent.as_uuid())),
         depth: Set(depth),
         writable: Set(true),
-        updated_at: Set(Utc::now()),
+        updated_at: Set(Timestamp::now()),
     }
     .insert(connection)
     .await?;

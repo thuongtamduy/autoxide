@@ -15,6 +15,8 @@
 //! từng khách có bình luận trên database đó; xoá dấu vết IP, khoá người báo, nonce, bộ đếm, token
 //! quét cả database.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -24,7 +26,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::json;
@@ -83,10 +84,10 @@ impl CommentsService {
         &self,
         databases: &DatabaseRegistry,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
-        let before = now - chrono::Duration::days(i64::from(self.config.retention_days));
+        let before = now - SignedDuration::from_hours(24 * (i64::from(self.config.retention_days)));
         // Khách có bình luận trên database này: mọi bình luận có dòng đích (`ensure_target`), nên
         // đọc bảng đích — nhỏ, khoá chính có `tenant_id` đứng đầu.
         let tenants: Vec<Uuid> = target::Entity::find()
@@ -105,7 +106,8 @@ impl CommentsService {
                 }
             }
         }
-        let ip_before = now - chrono::Duration::days(i64::from(self.config.ip_retention_days));
+        let ip_before =
+            now - SignedDuration::from_hours(24 * (i64::from(self.config.ip_retention_days)));
         let write = database.write();
         cleaned.fingerprints = comment::Entity::update_many()
             .col_expr(comment::Column::IpFingerprint, Expr::value(Option::<String>::None))
@@ -143,7 +145,7 @@ impl CommentsService {
         self.guard.purge_nonces(write, MODULE).await?;
         self.tokens.purge(write, now).await?;
         Throttle::new(MODULE, 1, Duration::from_secs(3600))?
-            .purge(database, now - chrono::Duration::days(1))
+            .purge(database, now - SignedDuration::from_hours(24))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -161,7 +163,7 @@ impl CommentsService {
     async fn expire_tenant(
         &self,
         tenant: &TenantContext,
-        before: DateTime<Utc>,
+        before: Timestamp,
         cleaned: &mut Cleaned,
     ) -> Result<(), Error> {
         let mut after = Uuid::nil();

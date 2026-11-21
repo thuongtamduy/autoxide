@@ -12,12 +12,13 @@
 //! sau khi dời khách không phải việc của job này — `autoxide tenant purge-copy`). Chạy một lần mỗi
 //! ngày trên database điều khiển.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashSet;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
@@ -41,7 +42,7 @@ pub(crate) struct CleanOrphans {
 #[async_trait::async_trait]
 impl JobHandler for CleanOrphans {
     async fn run(&self, _job: &JobContext) -> Result<(), Error> {
-        self.service.clean_orphans(&self.databases, Utc::now()).await.map(|_| ())
+        self.service.clean_orphans(&self.databases, Timestamp::now()).await.map(|_| ())
     }
 }
 
@@ -61,7 +62,7 @@ impl FileService {
     pub(crate) async fn clean_orphans(
         &self,
         databases: &DatabaseRegistry,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
         let mut removed = 0;
         for store in databases.file_stores(self.storage().clone()).await? {
@@ -78,10 +79,10 @@ impl FileService {
         &self,
         databases: &DatabaseRegistry,
         store: &FileStore,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
         let storage = &store.storage;
-        let cutoff = now - chrono::Duration::hours(GRACE_HOURS);
+        let cutoff = now - SignedDuration::from_hours(GRACE_HOURS);
         let mut keys = storage.keys_with_prefix(PREFIX).await?;
         keys.extend(
             storage
@@ -138,17 +139,19 @@ impl FileService {
 }
 
 /// Thời điểm tạo ghi trong UUIDv7 (ID của file cũng là tên nội dung của nó).
-fn created_at(id: Uuid) -> Option<DateTime<Utc>> {
+fn created_at(id: Uuid) -> Option<Timestamp> {
     let (seconds, nanos) = id.get_timestamp()?.to_unix();
-    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+    Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
 #[cfg(test)]
 mod tests {
     use autoxide_kernel::access::Principal;
+    use autoxide_kernel::time::Timestamp;
     use autoxide_testkit::TestDatabase;
     use bytes::Bytes;
     use futures_util::StreamExt as _;
+    use jiff::SignedDuration;
 
     use crate::testing::{no_limits, service};
 
@@ -177,13 +180,13 @@ mod tests {
                 files
                     .clean_orphans(
                         &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
-                        chrono::Utc::now()
+                        Timestamp::now()
                     )
                     .await
                     .unwrap(),
                 0
             );
-            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            let later = Timestamp::now() + SignedDuration::from_hours(25);
             assert_eq!(
                 files
                     .clean_orphans(

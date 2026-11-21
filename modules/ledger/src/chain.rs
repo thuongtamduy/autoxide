@@ -11,6 +11,8 @@
 //! / gộp khách (bước 38) đổi `tenant_id` mà không làm gãy chuỗi. Cách băm là định dạng lưu trữ —
 //! đổi nó làm mọi chuỗi thành "bị sửa"; cần đổi thì thêm `ledger-v2`, không sửa `ledger-v1`.
 
+use autoxide_kernel::time::{Precision, Timestamp};
+use jiff::SignedDuration;
 use std::collections::HashMap;
 
 use autoxide_kernel::database::Database;
@@ -18,7 +20,6 @@ use autoxide_kernel::doctor::{Finding, Probe};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::DatabaseRegistry;
-use chrono::{DateTime, SecondsFormat, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -34,7 +35,7 @@ const BATCH: u64 = 500;
 /// Số sổ xét mỗi lần chạy job.
 const BOOKS_PER_RUN: u64 = 200;
 /// Bút toán chưa niêm phong lâu hơn ngần này thì doctor cảnh báo.
-const UNSEALED_WARNING: chrono::Duration = chrono::Duration::minutes(10);
+const UNSEALED_WARNING: SignedDuration = SignedDuration::from_mins(10);
 /// Thời gian tối đa cho bước kiểm chuỗi của doctor: đọc lại cả sổ cái.
 pub(crate) const VERIFY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
@@ -51,9 +52,9 @@ fn push(text: &mut String, part: Option<&str>) {
     }
 }
 
-fn instant(at: DateTime<Utc>) -> String {
+fn instant(at: Timestamp) -> String {
     // Độ chính xác micro giây: đúng độ chính xác cả hai database lưu.
-    at.to_rfc3339_opts(SecondsFormat::Micros, true)
+    at.to_rfc3339_opts(Precision::Micros, true)
 }
 
 /// Mã băm của bút toán `row` và các dòng `lines` (đã sắp theo `line_no`).
@@ -345,7 +346,7 @@ pub(crate) async fn check_database(
     }
     let stale = entry::Entity::find()
         .filter(entry::Column::Id.not_in_subquery(sealed_ids()))
-        .filter(entry::Column::PostedAt.lt(Utc::now() - UNSEALED_WARNING))
+        .filter(entry::Column::PostedAt.lt(Timestamp::now() - UNSEALED_WARNING))
         .count(&snapshot)
         .await?;
     Ok((total, None, stale))

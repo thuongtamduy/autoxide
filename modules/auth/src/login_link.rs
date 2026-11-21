@@ -7,6 +7,8 @@
 //! - `confirm`: dùng token (một lần); có gắn thiết bị thì `device_secret` phải khớp; tài khoản bật
 //!   MFA thì vẫn hỏi mã như `/login`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Realm;
@@ -18,7 +20,6 @@ use autoxide_kernel::mail::{MailTemplate, Mailer};
 use autoxide_kernel::secret::{random_token, sha256};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, link_token};
 use autoxide_kernel::tokens::{OneTimeTokens, TokenRejection};
-use chrono::{DateTime, SubsecRound, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -153,13 +154,13 @@ impl LoginLinks {
         }
         let language = self.users.mail_language(tenant, user.id, fallback).await?;
         let subject = user.id.to_string();
-        let since = now() - chrono::Duration::seconds(COOLDOWN_SECONDS);
+        let since = now() - SignedDuration::from_secs(COOLDOWN_SECONDS);
         let recent =
             tokens().recent(tenant.database().write(), tenant, PURPOSE, &subject, since).await?;
         if !recent.is_empty() {
             return Ok(());
         }
-        let ttl = chrono::Duration::minutes(self.minutes);
+        let ttl = SignedDuration::from_mins(self.minutes);
         let transaction = tenant.database().begin_write().await?;
         let raw = tokens()
             .issue(&transaction, tenant, PURPOSE, &subject, job.device.as_deref(), ttl)
@@ -232,8 +233,8 @@ impl LoginLinks {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn invalid() -> Error {
@@ -245,6 +246,7 @@ fn invalid() -> Error {
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::time::Timestamp;
     use std::sync::Arc;
 
     use autoxide_kernel::access::Realm;
@@ -345,7 +347,7 @@ mod tests {
             let user = ada(&services).await;
             let setup =
                 services.mfa.start_totp(&services.tenant, user, "ada@example.com").await.unwrap();
-            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
             let code = crate::mfa::service::tests::code_at(&setup.secret, now);
             services.mfa.confirm_totp(&services.tenant, user, &code).await.unwrap();
             let links = links(&services, true);

@@ -17,13 +17,13 @@
 //! Mã đơn là `Uuid` (UUIDv7), như `order_id` trong hợp đồng của `inventory`, `promotions`,
 //! `shipping`. Mã tham chiếu giữ chỗ chung: [`hold_reference`] (`orders:<order_id>`).
 
+use autoxide_kernel::time::Timestamp;
 use std::fmt;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, TenantContext, TenantId};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use uuid::Uuid;
@@ -244,7 +244,7 @@ pub struct OrderSummary {
     pub status: OrderStatus,
     pub funds_flow: FundsFlow,
     pub total: Money,
-    pub placed_at: DateTime<Utc>,
+    pub placed_at: Timestamp,
     pub lines: Vec<OrderLineSummary>,
     pub attribution: Option<Attribution>,
 }
@@ -312,7 +312,7 @@ pub struct ImportedOrder {
     pub funds_flow: FundsFlow,
     /// `channel`, `cod`…
     pub payment_method: String,
-    pub placed_at: DateTime<Utc>,
+    pub placed_at: Timestamp,
 }
 
 impl ImportedOrder {
@@ -325,7 +325,7 @@ impl ImportedOrder {
         contact_name: impl Into<String>,
         lines: Vec<ImportedLine>,
         payment_method: impl Into<String>,
-        placed_at: DateTime<Utc>,
+        placed_at: Timestamp,
     ) -> Self {
         ImportedOrder {
             org_id,
@@ -501,7 +501,7 @@ pub trait Tender: Send + Sync {
         buyer: Option<Uuid>,
         input: &Value,
         max: Money,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<Money, Error>;
 
     /// Trả chỗ giữ của `reference` (không có thì không làm gì).

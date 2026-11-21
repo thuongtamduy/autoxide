@@ -3,7 +3,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::Serialize;
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
@@ -27,7 +27,7 @@ pub(crate) struct CustomerResponse {
     pub phone_masked: Option<String>,
     /// Masked email, e.g. `n•••@gmail.com`.
     pub email_masked: Option<String>,
-    pub birthday: Option<NaiveDate>,
+    pub birthday: Option<Date>,
     /// `female`, `male` or `other`.
     pub gender: Option<String>,
     /// Membership tier code.
@@ -37,13 +37,13 @@ pub(crate) struct CustomerResponse {
     pub total_spent: Option<Money>,
     /// Orders placed and not cancelled.
     pub orders_count: i64,
-    pub first_order_at: Option<DateTime<Utc>>,
-    pub last_order_at: Option<DateTime<Utc>>,
+    pub first_order_at: Option<Timestamp>,
+    pub last_order_at: Option<Timestamp>,
     /// Values of the shop's custom fields for customers.
     #[schema(value_type = Object)]
     pub custom_fields: Map<String, Value>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 fn spent(row: &profile::Model) -> Result<Option<Money>, Error> {
@@ -85,12 +85,12 @@ pub(crate) struct MyCustomerProfile {
     /// The verified phone of the account, in E.164 form.
     pub phone: Option<String>,
     pub email: Option<String>,
-    pub birthday: Option<NaiveDate>,
+    pub birthday: Option<Date>,
     pub gender: Option<String>,
     pub tier: Option<String>,
     pub total_spent: Option<Money>,
     pub orders_count: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl MyCustomerProfile {
@@ -132,8 +132,8 @@ pub(crate) struct CustomerOrder {
     /// Paid for goods: after discounts, with tax, without shipping.
     pub net: Money,
     pub refunded: Money,
-    pub placed_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub placed_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
 }
 
 impl CustomerOrder {
@@ -168,8 +168,8 @@ pub(crate) struct CustomerGroupResponse {
     /// Number of members (only when reading one group).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub members: Option<u64>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<group::Model> for CustomerGroupResponse {

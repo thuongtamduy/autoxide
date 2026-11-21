@@ -1,6 +1,7 @@
 //! Entity của các bảng SCIM (SeaORM). Mỗi bảng một module con vì SeaORM đặt tên cố định.
 
 pub(crate) mod token {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -15,8 +16,8 @@ pub(crate) mod token {
         pub prefix: String,
         pub token_hash: String,
         pub created_by: Uuid,
-        pub created_at: DateTimeUtc,
-        pub last_used_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_used_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -29,6 +30,7 @@ pub(crate) mod token {
 }
 
 pub(crate) mod scim_user {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -46,8 +48,8 @@ pub(crate) mod scim_user {
         pub external_key: Option<String>,
         pub given_name: Option<String>,
         pub family_name: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -60,6 +62,7 @@ pub(crate) mod scim_user {
 }
 
 pub(crate) mod group {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -74,8 +77,8 @@ pub(crate) mod group {
         pub display_name_key: String,
         pub external_id: Option<String>,
         pub external_key: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -88,6 +91,7 @@ pub(crate) mod group {
 }
 
 pub(crate) mod member {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -100,7 +104,7 @@ pub(crate) mod member {
         pub id: Uuid,
         pub group_id: Uuid,
         pub user_id: Uuid,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -113,6 +117,7 @@ pub(crate) mod member {
 }
 
 pub(crate) mod mapping {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -127,7 +132,7 @@ pub(crate) mod mapping {
         pub org_id: Uuid,
         pub role_id: Uuid,
         pub created_by: Uuid,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -140,6 +145,7 @@ pub(crate) mod mapping {
 }
 
 pub(crate) mod grant {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -154,7 +160,7 @@ pub(crate) mod grant {
         pub user_id: Uuid,
         pub org_id: Uuid,
         pub role_id: Uuid,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

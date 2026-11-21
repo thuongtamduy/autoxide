@@ -10,10 +10,10 @@ use autoxide_kernel::access::{OrgTarget, Permission, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::module::{Module, StartContext};
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Date;
 use autoxide_kernel::work::{Severity, WorkItem, WorkSource};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{TimeZone, Utc};
 
 const DEMO_REVIEW: Permission = Permission::new("demo.review", "Review demo things.");
 const DEMO_SLOW: Permission = Permission::new("demo.slow", "See the slow source.");
@@ -41,7 +41,7 @@ impl WorkSource for Waiting {
         _: OrgTarget,
         _: u16,
     ) -> Result<Vec<WorkItem>, Error> {
-        let due = |day| Some(Utc.with_ymd_and_hms(2026, 1, day, 0, 0, 0).unwrap());
+        let due = |day: i8| Some(Date::new(2026, 1, day).unwrap().start_of_day_utc());
         Ok(vec![
             WorkItem::new("later", Severity::Attention, "Check {name}", "demo.list")
                 .param("name", "B")

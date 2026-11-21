@@ -4,6 +4,7 @@ use crate::taxonomy::authors::AuthorInput;
 use crate::taxonomy::menus::ItemInput;
 use crate::taxonomy::terms::{Taxonomy, TermInput};
 use autoxide_kernel::tenancy::TenantContext;
+use jiff::SignedDuration;
 
 fn name(locale: &str, name: &str) -> TermInput {
     TermInput { locale: Some(locale.into()), name: Some(name.into()), ..Default::default() }
@@ -309,7 +310,7 @@ async fn menu() {
                 "main",
                 None,
                 tree.clone(),
-                Some(menu.created_at - chrono::Duration::seconds(1)),
+                Some(menu.created_at - SignedDuration::from_secs(1)),
             )
             .await;
         assert_eq!(stale.unwrap_err().kind(), ErrorKind::PreconditionFailed);

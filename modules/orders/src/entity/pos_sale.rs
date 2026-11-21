@@ -1,5 +1,6 @@
 //! Bảng `orders_pos_sales`: lượt bán tại quầy theo `reference` của máy quầy (chống trùng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     pub fingerprint: String,
     pub order_id: Uuid,
     pub cash_minor: i64,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

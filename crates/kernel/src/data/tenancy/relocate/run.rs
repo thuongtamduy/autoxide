@@ -1,13 +1,13 @@
 //! Service tách / gộp khách ([`TenantRelocations`]): kế hoạch, bắt đầu, chạy từng bước, yêu cầu
 //! của khách. Các bước (`planned` → … → `done`) ở `steps.rs`.
 
-use std::sync::Arc;
-use std::time::Duration;
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Condition, Expr};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::Duration;
 use uuid::Uuid;
 
 use super::prepare::{Prepared, Spec};
@@ -28,8 +28,8 @@ use crate::tenancy::{DatabaseRegistry, TenantContext};
 /// Một bên giữ lượt tối đa chừng này mà không gia hạn; đang chạy thì gia hạn mỗi một phần ba.
 pub(super) const LEASE: Duration = Duration::from_secs(120);
 
-pub(super) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(super) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Tách hay gộp những gì (CLI, REST).
@@ -365,7 +365,7 @@ impl TenantRelocations {
         if state == store::DONE || state == store::FAILED {
             query = query
                 .col_expr(Column::FinishedAt, Expr::value(at))
-                .col_expr(Column::RunnerUntil, Expr::value(Option::<DateTime<Utc>>::None));
+                .col_expr(Column::RunnerUntil, Expr::value(Option::<Timestamp>::None));
         }
         query = update(query)?;
         if query.exec(connection).await?.rows_affected != 1 {
@@ -377,7 +377,7 @@ impl TenantRelocations {
     /// Nhận lease của lượt `id`. `None`: lượt đã kết thúc. Bên khác đang giữ: `in_progress`.
     async fn acquire(&self, id: Uuid, runner: &str) -> Result<Option<Model>, Error> {
         let at = now();
-        let until = at + chrono::Duration::from_std(LEASE).map_err(Error::internal)?;
+        let until = at + SignedDuration::try_from(LEASE).map_err(Error::internal)?;
         let taken = Entity::update_many()
             .col_expr(Column::Runner, Expr::value(runner))
             .col_expr(Column::RunnerUntil, Expr::value(until))
@@ -403,7 +403,7 @@ impl TenantRelocations {
 
     async fn release(&self, id: Uuid, runner: &str) -> Result<(), Error> {
         Entity::update_many()
-            .col_expr(Column::RunnerUntil, Expr::value(Option::<DateTime<Utc>>::None))
+            .col_expr(Column::RunnerUntil, Expr::value(Option::<Timestamp>::None))
             .filter(Column::Id.eq(id))
             .filter(Column::Runner.eq(runner))
             .exec(self.control().write())
@@ -451,7 +451,7 @@ impl TenantRelocations {
             ticker.tick().await;
             loop {
                 ticker.tick().await;
-                let until = now() + chrono::Duration::seconds(120);
+                let until = now() + SignedDuration::from_secs(120);
                 let renewed = Entity::update_many()
                     .col_expr(Column::RunnerUntil, Expr::value(until))
                     .filter(Column::Id.eq(id))

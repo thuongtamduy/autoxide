@@ -4,7 +4,8 @@
 //! từ chối, webhook (chữ ký sai, trùng, sai thứ tự, token của khách khác). Cả SQLite và Postgres.
 
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
-use chrono::Utc;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 use super::rates::{Tree, shop, zone};
 use super::*;
@@ -363,10 +364,10 @@ async fn webhook_chu_ky_trung_va_sai_thu_tu() {
             .unwrap()
             .to_owned();
         let tracking = book(&app, &id).await["tracking_number"].as_str().unwrap().to_owned();
-        let at = Utc::now();
+        let at = Timestamp::now();
         let line = |event: &str, status: &str, minutes: i64| {
             json!({"event_id": event, "tracking_number": tracking, "status": status,
-                   "occurred_at": at + chrono::Duration::minutes(minutes)})
+                   "occurred_at": at + SignedDuration::from_mins(minutes)})
         };
         // Chữ ký sai: 401, không lưu.
         let lines = json!([line("e1", "picked_up", 1)]);

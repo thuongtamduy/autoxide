@@ -4,6 +4,8 @@
 //! key. Chủ key mất một quyền (đổi role) thì key mất theo ngay; chủ key bị khoá thì
 //! key không dùng được.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -11,7 +13,6 @@ use autoxide_kernel::access::ActorKind;
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait,
@@ -67,7 +68,7 @@ pub(crate) struct ApiKey {
     /// Nút của hàng rào (bước 34): key chỉ có quyền trong nhánh này; nút gốc = không rào.
     pub org_id: Uuid,
     /// Mọi key mới đều có hạn (bước 54); `None` chỉ còn ở dữ liệu không qua nâng cấp.
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Dải IP được gọi, dạng CIDR (bước 54); rỗng: mọi địa chỉ.
     pub allowed_ips: Vec<String>,
     /// Key này thay key nào khi xoay vòng (bước 54).
@@ -75,9 +76,9 @@ pub(crate) struct ApiKey {
     /// `active` hay `pending` (chờ quản trị duyệt).
     pub status: String,
     pub approved_by: Option<Uuid>,
-    pub approved_at: Option<DateTime<Utc>>,
-    pub last_used_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub approved_at: Option<Timestamp>,
+    pub last_used_at: Option<Timestamp>,
+    pub created_at: Timestamp,
     /// `Human`, `Agent` hay `Service` (bước 51 P12).
     pub kind: ActorKind,
 }
@@ -98,7 +99,7 @@ pub(crate) struct NewApiKey {
     /// Nút của hàng rào; `None`: nút gốc (không rào). Phải là nút người tạo làm việc ở đó.
     pub org_id: Option<Uuid>,
     /// `None`: hạn dài nhất cho phép (`AUTOXIDE_AUTH_API_KEY_MAX_DAYS`).
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Dải IP được gọi (`203.0.113.0/24`, một địa chỉ); rỗng: mọi địa chỉ.
     pub allowed_ips: Vec<String>,
     /// Mật khẩu hiện tại của người tạo: access token bị lộ không đủ để tạo key sống lâu
@@ -241,7 +242,8 @@ impl ApiKeyService {
             (Err(error), _) => return Err(error),
         };
         // `check` đã báo lỗi nếu hạn sai, nên tới đây luôn có hạn.
-        let expires_at = expires_at.unwrap_or_else(|| now + chrono::Duration::days(self.max_days));
+        let expires_at =
+            expires_at.unwrap_or_else(|| now + SignedDuration::from_hours(24 * self.max_days));
         let allowed_ips = super::rules::stored(&networks);
         // Key xoay vòng giữ trạng thái của key nó thay; key mới theo cấu hình duyệt của khách.
         let status = match &replacing {
@@ -523,8 +525,8 @@ impl ApiKeyService {
 
     /// Ghi lần dùng gần nhất, nhiều nhất một lần mỗi phút. Hỏng thì chỉ ghi log: không
     /// từ chối một request hợp lệ vì một dòng thống kê.
-    async fn touch(&self, tenant: &TenantContext, row: &api_key::Model, now: DateTime<Utc>) {
-        let stale = now - chrono::Duration::seconds(LAST_USED_RESOLUTION_SECONDS);
+    async fn touch(&self, tenant: &TenantContext, row: &api_key::Model, now: Timestamp) {
+        let stale = now - SignedDuration::from_secs(LAST_USED_RESOLUTION_SECONDS);
         if row.last_used_at.is_some_and(|last| last > stale) {
             return;
         }
@@ -707,8 +709,8 @@ pub(crate) fn invalid_api_key() -> Error {
     )
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Thu hồi mọi API key của người dùng `user_id` trong `connection` (transaction của bên gọi, vd
@@ -918,7 +920,7 @@ mod tests {
         TestDatabase::run(async |test| {
             let (services, ada) = setup(test).await;
             let tenant = services.tenant.clone();
-            let past = Utc::now() - chrono::Duration::hours(1);
+            let past = Timestamp::now() - SignedDuration::from_hours(1);
             let input = NewApiKey {
                 allowed_ips: Vec::new(),
                 kind: autoxide_kernel::access::ActorKind::Human,
@@ -1035,11 +1037,11 @@ mod tests {
             let before = now();
             let plain = keys.create(&tenant, &ada, new_key(&["auth.users.read"])).await.unwrap();
             let expires = plain.key.expires_at.unwrap();
-            assert!(expires >= before + chrono::Duration::days(DEFAULT_MAX_DAYS));
+            assert!(expires >= before + SignedDuration::from_hours(24 * DEFAULT_MAX_DAYS));
             assert!(plain.key.allowed_ips.is_empty());
 
             let mut far = new_key(&["auth.users.read"]);
-            far.expires_at = Some(now() + chrono::Duration::days(DEFAULT_MAX_DAYS + 1));
+            far.expires_at = Some(now() + SignedDuration::from_hours(24 * (DEFAULT_MAX_DAYS + 1)));
             far.allowed_ips = vec!["not an address".to_owned()];
             let error = keys.create(&tenant, &ada, far).await.unwrap_err();
             let fields: Vec<(&str, &str)> = error

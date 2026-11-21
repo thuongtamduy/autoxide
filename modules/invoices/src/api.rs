@@ -12,7 +12,7 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -164,7 +164,7 @@ pub struct NewDocument {
     /// Ký hiệu; bỏ trống thì dùng ký hiệu đang dùng duy nhất của nút cho loại này và năm phát hành.
     pub series: Option<Uuid>,
     /// Ngày lập dự kiến; bỏ trống thì là ngày phát hành.
-    pub issue_date: Option<NaiveDate>,
+    pub issue_date: Option<Date>,
     /// Giá trên dòng đã gồm thuế (`true`) hay chưa (`false`).
     pub prices_include_tax: bool,
     pub currency: Currency,
@@ -280,7 +280,7 @@ pub struct Document {
     pub number: Option<i64>,
     /// `draft`, `issued`, `submitting`, `accepted`, `rejected`, `cancelled`, `replaced` or `adjusted`.
     pub status: String,
-    pub issue_date: Option<NaiveDate>,
+    pub issue_date: Option<Date>,
     pub prices_include_tax: bool,
     pub currency: String,
     pub subtotal: Money,
@@ -299,7 +299,7 @@ pub struct Document {
     pub lookup_code: Option<String>,
     pub rejection_reason: Option<String>,
     /// Kept at least until this day (Accounting Law 88/2015, Article 41).
-    pub retention_until: Option<NaiveDate>,
+    pub retention_until: Option<Date>,
     /// For a document in a foreign currency: the rate used at issue (1 `currency` = `exchange_rate`
     /// of the book currency), kept as issued; `null` in the book currency or while a draft.
     pub exchange_rate: Option<String>,
@@ -310,9 +310,9 @@ pub struct Document {
     pub source_module: String,
     pub source_id: Option<String>,
     pub reference: String,
-    pub issued_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub issued_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Định dạng bản in.

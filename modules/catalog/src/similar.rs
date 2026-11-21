@@ -14,6 +14,7 @@
 //!
 //! Vector giữ theo khách (bước 33): không câu nào đọc vector của khách khác.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -267,7 +268,7 @@ impl CatalogService {
         tenant: &TenantContext,
         locale: &str,
         (product, other, value): (Uuid, Uuid, i32),
-        at: chrono::DateTime<chrono::Utc>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         similar_product::Entity::delete_many()
             .filter(similar_product::Column::ProductId.eq(product))

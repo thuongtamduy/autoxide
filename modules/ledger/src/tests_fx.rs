@@ -3,6 +3,7 @@
 //! ghi, quyền kiểm trước khi đọc đầu vào, lấy từ nguồn giả, bút toán ngoại tệ cân ở cả tiền sổ và giữ
 //! ảnh chụp tỉ giá, đảo bằng đúng tỉ giá gốc, sổ nhật ký chung có số hiệu tài khoản.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Actor;
@@ -11,13 +12,12 @@ use autoxide_kernel::payment::ExchangeRateSource;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgTree, root_of};
 use autoxide_testkit::{FakeExchangeRateSource, TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
-use chrono::NaiveDate;
 use serde_json::{Value, json};
 
 use crate::api::{AccountKey, JournalQuery, Ledger, LineAccount, NewEntry, NewLine, NewReversal};
 
-fn day(text: &str) -> NaiveDate {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").unwrap()
+fn day(text: &str) -> Date {
+    Date::parse_from_str(text, "%Y-%m-%d").unwrap()
 }
 
 async fn app(test: &TestDatabase, source: Arc<FakeExchangeRateSource>) -> TestApp {

@@ -1,6 +1,8 @@
 //! Nhà cung cấp thoại giả cho test (bước 61, D-232): giữ mọi lệnh trong bộ nhớ, không có HTTP client
 //! (không bao giờ gọi mạng), ký webhook bằng một khoá cố định, bản ghi âm là vài byte cố định.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -14,7 +16,6 @@ use autoxide_kernel::voice::{
 };
 use axum::http::HeaderMap;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -125,7 +126,7 @@ impl FakeVoiceProvider {
             "duration_seconds": duration_seconds,
             "recording_id": recording_id,
         }]});
-        Self::signed(&body, Utc::now().timestamp())
+        Self::signed(&body, Timestamp::now().as_unix_seconds())
     }
 
     /// Thân `body` ký với mốc thời gian `timestamp` (thử chống phát lại, gửi lại cùng event).
@@ -171,7 +172,7 @@ impl VoiceProvider for FakeVoiceProvider {
         lock(&self.sessions).push(request.clone());
         Ok(BrowserSession {
             token: format!("fake-webrtc-{}", Uuid::now_v7()),
-            expires_at: Utc::now() + chrono::Duration::minutes(10),
+            expires_at: Timestamp::now() + SignedDuration::from_mins(10),
         })
     }
 
@@ -199,14 +200,14 @@ impl VoiceProvider for FakeVoiceProvider {
             return Err(signature_invalid());
         };
         let timestamp: i64 = timestamp.parse().map_err(|_| signature_invalid())?;
-        if (Utc::now().timestamp() - timestamp).abs() > WINDOW {
+        if (Timestamp::now().as_unix_seconds() - timestamp).abs() > WINDOW {
             return Err(signature_invalid());
         }
         if Self::sign(timestamp, body) != signature {
             return Err(signature_invalid());
         }
         let body: Value = serde_json::from_slice(body).map_err(|_| signature_invalid())?;
-        let at = DateTime::<Utc>::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now);
+        let at = Timestamp::from_unix_seconds(timestamp).unwrap_or_else(Timestamp::now);
         let items = body["events"].as_array().ok_or_else(signature_invalid)?;
         items
             .iter()

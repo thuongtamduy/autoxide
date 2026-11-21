@@ -9,12 +9,12 @@
 //!   giữ trong bộ nhớ [`COUNT_CACHE`] với khoá gồm khách, người gọi, nút.
 //! - Khác hộp thư của `notifications` (tin đã gửi cho một người).
 
+use crate::time::Timestamp;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Arc, Mutex, PoisonError, RwLock};
 use std::time::{Duration, Instant};
 
 use axum::extract::{Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -65,7 +65,7 @@ pub struct WorkItem {
     pub title: &'static str,
     /// Giá trị điền vào `{tên}` của `title` (dữ liệu, không dịch).
     pub params: Vec<(&'static str, String)>,
-    pub due_at: Option<DateTime<Utc>>,
+    pub due_at: Option<Timestamp>,
     /// Màn của sổ điều hướng mở việc này (`NavItem::id`).
     pub screen: &'static str,
 }
@@ -92,7 +92,7 @@ impl WorkItem {
         self
     }
 
-    pub fn due_at(mut self, due_at: Option<DateTime<Utc>>) -> Self {
+    pub fn due_at(mut self, due_at: Option<Timestamp>) -> Self {
         self.due_at = due_at;
         self
     }
@@ -180,13 +180,13 @@ pub(crate) struct WorkItemView {
     pub severity: Severity,
     /// What to do, in the language of `Accept-Language`.
     pub title: String,
-    pub due_at: Option<DateTime<Utc>>,
+    pub due_at: Option<Timestamp>,
     /// Where to do it: the screen of `GET /api/v1/kernel/navigation` and the record.
     pub target: WorkTarget,
     /// Who it is assigned to (`POST /api/v1/me/work/{key}/assign`).
     pub assignee_id: Option<Uuid>,
     /// Hidden from your inbox until then (only with `include_snoozed=true`).
-    pub snoozed_until: Option<DateTime<Utc>>,
+    pub snoozed_until: Option<Timestamp>,
 }
 
 /// Where a piece of work is done.
@@ -321,7 +321,7 @@ impl WorkState {
         // Hoãn / giao (P10): đọc một lần cho cả danh sách.
         let keys: Vec<String> = items.iter().map(|item| item.key.clone()).collect();
         let states = crate::ops::work_states::states(tenant, principal.user_id(), &keys).await?;
-        let now = Utc::now();
+        let now = Timestamp::now();
         items.retain_mut(|item| {
             let state = states.get(&item.key).cloned().unwrap_or_default();
             item.assignee_id = state.assignee_id;

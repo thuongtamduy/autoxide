@@ -1,5 +1,6 @@
 //! Bảng `media_item`: một item của thư viện (ảnh, video, âm thanh, tài liệu).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -33,9 +34,9 @@ pub struct Model {
     pub uploaded_by: Option<Uuid>,
     /// Nút sở hữu item (bước 34); gốc = ID của khách. Luôn có giá trị.
     pub org_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
-    pub trashed_at: Option<DateTimeUtc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub trashed_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

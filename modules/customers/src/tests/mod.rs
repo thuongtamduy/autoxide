@@ -12,6 +12,8 @@ mod profiles;
 mod stored_value;
 mod wishlist_alerts;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -383,7 +385,7 @@ impl Order {
             "number": format!("DH{}", &self.id.simple().to_string()[24..]), "status": status,
             "buyer_user_id": self.buyer, "buyer_key": self.buyer_key,
             "hold_reference": format!("orders:{}", self.id),
-            "placed_at": chrono::Utc::now(), "total": money(self.goods + 30_000),
+            "placed_at": Timestamp::now(), "total": money(self.goods + 30_000),
             "goods_paid": money(self.goods), "lines": [],
         }})
     }
@@ -445,9 +447,9 @@ pub(crate) async fn call(
 
 /// Số event `name` trong outbox của `customers`.
 pub(crate) async fn events_named(app: &TestApp, name: &str) -> Vec<Value> {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
     let read = app.database().read();
-    let statement = Statement::from_sql_and_values(
+    let statement = autoxide_kernel::database::statement(
         read.get_database_backend(),
         match read.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {
@@ -543,8 +545,8 @@ impl autoxide_promotions::api::Promotions for FakePromotions {
         let voucher: autoxide_promotions::api::Voucher = serde_json::from_value(json!({
             "id": Uuid::now_v7(), "promotion_id": request.promotion_id, "holder_user_id": request.user_id,
             "status": "available", "source": request.source, "source_ref": request.source_ref,
-            "valid_from": chrono::Utc::now(), "expires_at": chrono::Utc::now() + chrono::Duration::days(30),
-            "issued_at": chrono::Utc::now(), "used_order_id": null,
+            "valid_from": Timestamp::now(), "expires_at": Timestamp::now() + SignedDuration::from_hours(24 * 30),
+            "issued_at": Timestamp::now(), "used_order_id": null,
         }))
         .unwrap();
         Ok(if replay {
@@ -565,7 +567,7 @@ impl autoxide_promotions::api::Promotions for FakePromotions {
         &self,
         _: &autoxide_kernel::tenancy::TenantContext,
         _: OrgId,
-        _: chrono::DateTime<chrono::Utc>,
+        _: Timestamp,
         _: &[(Uuid, autoxide_kernel::money::Money)],
     ) -> Result<Vec<autoxide_promotions::api::AutomaticPrice>, Error> {
         Ok(Vec::new())
@@ -574,22 +576,15 @@ impl autoxide_promotions::api::Promotions for FakePromotions {
 
 /// Đẩy mốc hết hạn của mọi lô điểm và chỗ giữ về quá khứ (giả lập thời gian trôi).
 pub(crate) async fn age_points(app: &TestApp) {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
     let write = app.database().write();
-    let past = chrono::Utc::now() - chrono::Duration::days(1);
+    let past = Timestamp::now() - SignedDuration::from_hours(24);
     for table in ["customers_points_lots", "customers_point_holds"] {
-        let sql = match write.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => format!("UPDATE {table} SET expires_at = $1"),
-            _ => format!("UPDATE {table} SET expires_at = ?"),
-        };
-        write
-            .execute_raw(Statement::from_sql_and_values(
-                write.get_database_backend(),
-                sql,
-                [past.into()],
-            ))
-            .await
-            .unwrap();
+        let statement = sea_orm::sea_query::Query::update()
+            .table(sea_orm::sea_query::Alias::new(table))
+            .value(sea_orm::sea_query::Alias::new("expires_at"), sea_orm::Value::from(past))
+            .to_owned();
+        write.execute(&statement).await.unwrap();
     }
 }
 
@@ -631,13 +626,14 @@ impl autoxide_compliance::api::ComplianceRules for FakeRules {
         &self,
         _: TenantId,
         key: &str,
-        at: chrono::DateTime<chrono::Utc>,
+        at: Timestamp,
     ) -> Result<Option<autoxide_compliance::api::Rule>, Error> {
         if key != "notifications.send_windows" {
             return Ok(None);
         }
         // Giờ UTC (lệch 0): khung mở = 2 giờ trước tới 2 giờ sau; khung đóng = 3 tới 5 giờ sau.
-        let hhmm = |hours: i64| (at + chrono::Duration::hours(hours)).format("%H:%M").to_string();
+        let hhmm =
+            |hours: i64| (at + SignedDuration::from_hours(hours)).format("%H:%M").to_string();
         let window = if *self.0.lock().unwrap() {
             json!({"from": hhmm(-2), "to": hhmm(2)})
         } else {
@@ -689,7 +685,7 @@ fn consent_of(
         scope: key.scope.clone(),
         channel: key.channel.clone(),
         state: state.to_owned(),
-        granted_at: Some(chrono::Utc::now()),
+        granted_at: Some(Timestamp::now()),
         withdrawn_at: None,
         subject_value: None,
     }
@@ -759,21 +755,16 @@ impl autoxide_compliance::api::ConsentLedger for FakeConsents {
 
 /// Cho mọi job đang chờ của `customers` tới hạn ngay (giả lập thời gian trôi).
 pub(crate) async fn jobs_due_now(app: &TestApp) {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
+    use sea_orm::sea_query::ExprTrait as _;
     let write = app.database().write();
-    let past = chrono::Utc::now() - chrono::Duration::minutes(1);
-    let sql = match write.get_database_backend() {
-        sea_orm::DatabaseBackend::Postgres => {
-            "UPDATE customers_jobs SET run_at = $1 WHERE completed_at IS NULL"
-        }
-        _ => "UPDATE customers_jobs SET run_at = ? WHERE completed_at IS NULL",
-    };
-    write
-        .execute_raw(Statement::from_sql_and_values(
-            write.get_database_backend(),
-            sql,
-            [past.into()],
-        ))
-        .await
-        .unwrap();
+    let past = Timestamp::now() - SignedDuration::from_mins(1);
+    let statement = sea_orm::sea_query::Query::update()
+        .table(sea_orm::sea_query::Alias::new("customers_jobs"))
+        .value(sea_orm::sea_query::Alias::new("run_at"), sea_orm::Value::from(past))
+        .and_where(
+            sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("completed_at")).is_null(),
+        )
+        .to_owned();
+    write.execute(&statement).await.unwrap();
 }

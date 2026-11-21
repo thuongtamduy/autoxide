@@ -9,12 +9,12 @@
 //!
 //! Bảng `kernel_connection_status` (cấp khách hàng): một dòng mỗi (khách, kết nối).
 
+use crate::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, PoisonError, RwLock};
 use std::time::Duration;
 
 use axum::extract::{Path, State};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, OnConflict, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -96,7 +96,7 @@ pub(crate) fn connection_of(setting: &str) -> Option<&str> {
 /// Lần dùng / lỗi cuối của một kết nối.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct Status {
-    pub last_used_at: Option<DateTime<Utc>>,
+    pub last_used_at: Option<Timestamp>,
     pub last_error: Option<String>,
 }
 
@@ -115,7 +115,7 @@ impl ConnectionStatus {
 }
 
 async fn write(tenant: &TenantContext, connection: &str, error: Option<&str>) -> Result<(), Error> {
-    let now = Utc::now().trunc_subsecs(6);
+    let now = Timestamp::now();
     let error: Option<String> = error.map(|error| error.chars().take(ERROR_MAX).collect());
     let insert = SqlQuery::insert()
         .into_table(Alias::new(TABLE))
@@ -171,7 +171,7 @@ pub(crate) struct ConnectionTest {
     pub ok: bool,
     /// Why it failed, for the administrator.
     pub error: Option<String>,
-    pub tested_at: DateTime<Utc>,
+    pub tested_at: Timestamp,
 }
 
 #[derive(Clone)]
@@ -226,7 +226,7 @@ async fn test_tenant_connection(
             connection: probe.connection().to_owned(),
             ok: error.is_none(),
             error,
-            tested_at: Utc::now().trunc_subsecs(6),
+            tested_at: Timestamp::now(),
         },
     })
 }

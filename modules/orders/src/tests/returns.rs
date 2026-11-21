@@ -3,11 +3,12 @@
 //! tất; nhiều lệnh hoàn song song không vượt tiền đã thu.
 
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::Side;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use futures_util::future::join_all;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -107,7 +108,10 @@ async fn partial_return_refunds_proportionally_restocks_and_reverses_revenue() {
         // Yêu cầu mở hoãn hoàn tất đơn dù đã quá hạn đổi trả.
         let tenant = shop.default_tenant();
         order::Entity::update_many()
-            .col_expr(order::Column::DeliveredAt, Expr::value(Utc::now() - Duration::days(8)))
+            .col_expr(
+                order::Column::DeliveredAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(24 * 8)),
+            )
             .filter(order::Column::Id.eq(id))
             .scoped(&tenant)
             .exec(shop.database().write())

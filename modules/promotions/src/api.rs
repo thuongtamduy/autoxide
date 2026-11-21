@@ -21,13 +21,13 @@
 //!    Không gọi thì lượt giữ tự hết hạn ở `expires_at` (job `promotions.expire_holds`).
 //! 5. Trả hàng → [`returns`] (hàm thuần, tính trên ảnh chụp [`Evaluation`] đã lưu vào đơn).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -175,14 +175,14 @@ pub struct Cart {
     pub voucher_ids: Vec<Uuid>,
     pub gift_selections: Vec<GiftSelection>,
     // Thời điểm tính.
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     // Ngôn ngữ của `reason.text`.
     pub locale: String,
 }
 
 impl Cart {
     // Giỏ rỗng của cửa hàng `org_id` lúc `at`, ngôn ngữ `en`.
-    pub fn new(org_id: OrgId, currency: Currency, at: DateTime<Utc>) -> Self {
+    pub fn new(org_id: OrgId, currency: Currency, at: Timestamp) -> Self {
         Cart {
             org_id,
             currency,
@@ -429,7 +429,7 @@ pub struct Offer {
     pub discount: Money,
     // Số lượt còn lại — chỉ có khi chương trình có giới hạn lượt, là số thật.
     pub remaining_uses: Option<i64>,
-    pub ends_at: DateTime<Utc>,
+    pub ends_at: Timestamp,
 }
 
 // Mã / voucher chưa dùng được, kèm lý do ("thêm 120.000 ₫", "chỉ cho đơn đầu tiên").
@@ -478,11 +478,11 @@ pub struct ReserveRequest {
     // Dấu vân tay người mua đã xem; khác kết quả tính lại → `promotions.changed`.
     pub expected_fingerprint: Option<String>,
     // Hạn giữ; tối đa `AUTOXIDE_PROMOTIONS_MAX_HOLD_HOURS` sau bây giờ.
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl ReserveRequest {
-    pub fn new(order_id: Uuid, cart: Cart, expires_at: DateTime<Utc>) -> Self {
+    pub fn new(order_id: Uuid, cart: Cart, expires_at: Timestamp) -> Self {
         ReserveRequest { order_id, cart, expected_fingerprint: None, expires_at }
     }
 
@@ -516,7 +516,7 @@ pub struct Redemption {
     // Ảnh chụp kết quả tính lúc giữ.
     pub evaluation: Evaluation,
     // Hạn giữ (khi `Held`).
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 // Trạng thái của voucher trong ví.
@@ -591,9 +591,9 @@ pub struct Voucher {
     pub status: VoucherStatus,
     pub source: VoucherSource,
     pub source_ref: String,
-    pub valid_from: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-    pub issued_at: DateTime<Utc>,
+    pub valid_from: Timestamp,
+    pub expires_at: Timestamp,
+    pub issued_at: Timestamp,
     pub used_order_id: Option<Uuid>,
 }
 
@@ -608,7 +608,7 @@ pub struct AutomaticPrice {
     pub promotion_id: Uuid,
     // Giá một đơn vị sau giảm.
     pub sale_price: Money,
-    pub ends_at: DateTime<Utc>,
+    pub ends_at: Timestamp,
 }
 
 /// Khuyến mại cho module khác.
@@ -684,7 +684,7 @@ pub trait Promotions: Send + Sync {
         &self,
         tenant: &TenantContext,
         org_id: OrgId,
-        at: DateTime<Utc>,
+        at: Timestamp,
         prices: &[(Uuid, Money)],
     ) -> Result<Vec<AutomaticPrice>, Error>;
 }

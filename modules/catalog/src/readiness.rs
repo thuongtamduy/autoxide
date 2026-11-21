@@ -10,11 +10,11 @@
 //! kiện hay giấy tờ đổi, và bằng job hằng ngày cho giấy tờ hết hạn. Mở bán tính lại tại chỗ để báo
 //! đúng thứ còn thiếu.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeSet;
 
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
@@ -89,7 +89,7 @@ pub(crate) async fn compute<C: ConnectionTrait>(
     control: &impl ConnectionTrait,
     tenant: &TenantContext,
     product: &product::Model,
-    today: NaiveDate,
+    today: Date,
 ) -> Result<Readiness, Error> {
     let own: Vec<Uuid> = product_category::Entity::find()
         .filter(product_category::Column::ProductId.eq(product.id))

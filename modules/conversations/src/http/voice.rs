@@ -3,6 +3,7 @@
 //! `/voice/lines/{org_id}`), công khai (`/voice/webhooks/{provider}/{line_token}`). Số điện thoại của
 //! người mua không bao giờ có trong response — chỉ dạng che.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +16,6 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -58,14 +58,14 @@ pub(crate) struct CallResponse {
     /// `queued`, `ringing`, `in_progress`, `completed`, `no_answer`, `busy`, `failed`, `cancelled`.
     pub status: String,
     pub agent_user_id: Option<Uuid>,
-    pub answered_at: Option<DateTime<Utc>>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub answered_at: Option<Timestamp>,
+    pub ended_at: Option<Timestamp>,
     pub duration_seconds: Option<i32>,
     pub recording_enabled: bool,
     /// A recording is stored; listen at `GET /calls/{id}/recording`.
     pub recorded: bool,
-    pub recording_expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub recording_expires_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl From<Call> for CallResponse {
@@ -95,7 +95,7 @@ pub(crate) struct StartedCallResponse {
     pub call: CallResponse,
     /// Short-lived token for the voice provider's SDK; do not store it.
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// A WebRTC session for an agent.
@@ -103,7 +103,7 @@ pub(crate) struct StartedCallResponse {
 #[schema(as = ConversationAgentSession)]
 pub(crate) struct SessionResponse {
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// A call-back request. The phone number is masked (`090•••567`).
@@ -116,14 +116,14 @@ pub(crate) struct CallbackResponse {
     pub client_id: String,
     #[schema(example = "+84•••567")]
     pub phone_masked: String,
-    pub window_start: DateTime<Utc>,
-    pub window_end: DateTime<Utc>,
+    pub window_start: Timestamp,
+    pub window_end: Timestamp,
     /// `open`, `calling`, `done`, `cancelled` or `expired`.
     pub status: String,
     pub assigned_user_id: Option<Uuid>,
     pub attempts: i32,
     pub last_call_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<Callback> for CallbackResponse {
@@ -159,7 +159,7 @@ pub(crate) struct LineResponse {
     /// Path the voice provider must call (`POST`, under `/api/v1/conversations`); shown only when a
     /// new token was made — keep it, it is not shown again.
     pub webhook_path: Option<String>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl LineResponse {
@@ -277,9 +277,9 @@ pub(crate) struct CallbackRequest {
     /// An id your app makes up (1 to 100 characters): sending again returns the same request.
     client_id: String,
     /// Start of the window, within the shop's call-back hours.
-    window_start: DateTime<Utc>,
+    window_start: Timestamp,
     /// End of the window, the same day.
-    window_end: DateTime<Utc>,
+    window_end: Timestamp,
     /// `account`: the verified phone number of your account.
     #[schema(example = "account")]
     phone_source: String,
@@ -373,9 +373,9 @@ pub(crate) struct CallbackQuery {
     /// Only requests of this unit.
     org_id: Option<Uuid>,
     /// Only windows ending at or after this time.
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Only windows starting at or before this time.
-    to: Option<DateTime<Utc>>,
+    to: Option<Timestamp>,
 }
 
 /// List call-back requests in your scope.

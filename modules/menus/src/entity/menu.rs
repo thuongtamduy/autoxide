@@ -1,5 +1,6 @@
 //! Bảng `menus_menus`: một menu theo (`key`, `locale`).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,8 +15,8 @@ pub struct Model {
     pub org_id: Option<Uuid>,
     pub key: String,
     pub locale: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// Người tạo hay thay cây mục gần nhất; `None`: không biết (menu trước bản này, hay lệnh
     /// chạy bằng hệ thống).
     pub updated_by: Option<Uuid>,

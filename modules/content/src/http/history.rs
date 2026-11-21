@@ -1,5 +1,6 @@
 //! Endpoint của lịch sử phiên bản và lịch đăng / gỡ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -35,7 +35,7 @@ pub(crate) struct RevisionResponse {
     /// Display name of `created_by`; `null` when nobody is recorded, the account was deleted, or
     /// the server runs without user accounts.
     created_by_name: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
     /// The fields (`title`, `slug`, `excerpt`, `body`, media, SEO). Only when reading one
     /// revision.
     #[schema(value_type = Option<Object>)]
@@ -76,7 +76,7 @@ pub(crate) struct ScheduleResponse {
     action: Action,
     /// The revision that will be published (for `publish`).
     revision_id: Option<Uuid>,
-    run_at: DateTime<Utc>,
+    run_at: Timestamp,
     /// `scheduled`, `succeeded`, `failed` or `canceled`.
     status: String,
     /// Why it failed, an error code such as `content.schedule_outdated`.
@@ -84,8 +84,8 @@ pub(crate) struct ScheduleResponse {
     created_by: Option<Uuid>,
     /// `true` when whoever scheduled it confirmed that the AI-generated content was reviewed.
     ai_reviewed: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Schedule> for ScheduleResponse {
@@ -112,7 +112,7 @@ impl From<Schedule> for ScheduleResponse {
 pub(crate) struct ScheduleRequest {
     action: Action,
     /// When to run; must be in the future.
-    run_at: DateTime<Utc>,
+    run_at: Timestamp,
     /// For a `publish` of AI-generated content: you confirm a person reviewed it, as with
     /// `ai_reviewed` when publishing at once. Only a signed-in person may send `true`.
     #[serde(default)]

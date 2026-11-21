@@ -11,7 +11,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
 };
@@ -186,7 +186,7 @@ pub(crate) async fn create(
 }
 
 /// Ghi mốc thời gian theo trạng thái đích.
-fn stamp(row: &mut order::ActiveModel, to: OrderStatus, now: DateTime<Utc>) {
+fn stamp(row: &mut order::ActiveModel, to: OrderStatus, now: Timestamp) {
     match to {
         Confirmed => row.confirmed_at = Set(Some(now)),
         Delivered => row.delivered_at = Set(Some(now)),
@@ -203,7 +203,7 @@ pub(crate) async fn record_history(
     order_id: Uuid,
     from: Option<OrderStatus>,
     transition: &Transition,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<(), Error> {
     status_history::ActiveModel {
         id: Set(Uuid::now_v7()),

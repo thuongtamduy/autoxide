@@ -6,10 +6,10 @@
 //!   rồi ghi đè thay hẳn. Ghi đè hết hạn thì bỏ qua.
 //! - Module `always_enabled` luôn bật dù gói không nêu — kernel tự xét, không cần ở đây.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet};
 
 use autoxide_kernel::entitlement::{TenantAccess, TenantEntitlements};
-use chrono::{DateTime, Utc};
 
 /// Phần quyền dùng một gói cấp.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -48,7 +48,7 @@ pub(crate) struct Override {
     pub enabled: bool,
     /// Với hạn mức: `None` = không giới hạn.
     pub max_value: Option<i64>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 /// Quyền dùng của khách từ gói chính `base` (của thuê bao, hay gói mặc định), các gói thêm kèm số
@@ -58,7 +58,7 @@ pub(crate) fn merge(
     addons: &[(Grants, i64)],
     overrides: &[Override],
     access: TenantAccess,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> TenantEntitlements {
     let Some(base) = base else {
         return TenantEntitlements::unrestricted();
@@ -110,6 +110,7 @@ fn toggle(set: &mut BTreeSet<String>, key: &str, enabled: bool) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     fn grants(modules: &[&str], features: &[&str], limits: &[(&str, Option<i64>)]) -> Grants {
         Grants {
@@ -119,8 +120,8 @@ mod tests {
         }
     }
 
-    fn now() -> DateTime<Utc> {
-        DateTime::from_timestamp(1_800_000_000, 0).unwrap()
+    fn now() -> Timestamp {
+        Timestamp::from_unix_seconds(1_800_000_000).unwrap()
     }
 
     #[test]
@@ -177,8 +178,8 @@ mod tests {
             &["content.ai_suggestions"],
             &[("organizations.units", Some(3))],
         );
-        let later = Some(now() + chrono::Duration::days(1));
-        let earlier = Some(now() - chrono::Duration::days(1));
+        let later = Some(now() + SignedDuration::from_hours(24));
+        let earlier = Some(now() - SignedDuration::from_hours(24));
         let overrides = [
             Override {
                 kind: OverrideKind::Limit,

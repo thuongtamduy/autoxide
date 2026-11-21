@@ -278,6 +278,7 @@ async fn reset_user_mfa(
 
 #[cfg(test)]
 mod tests {
+    use autoxide_kernel::time::Timestamp;
     use autoxide_testkit::TestDatabase;
     use axum::http::StatusCode;
     use serde_json::json;
@@ -311,7 +312,7 @@ mod tests {
             .await;
             assert_eq!(status, StatusCode::OK, "{setup}");
             let secret = setup["data"]["secret"].as_str().unwrap().to_owned();
-            let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+            let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
 
             let body = json!({"code": "000000"});
             let (status, _, wrong) =

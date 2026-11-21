@@ -1,6 +1,7 @@
 //! Entity của các bảng `plans_*` (mặt điều khiển, D-253).
 
 pub(crate) mod plan {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -28,8 +29,8 @@ pub(crate) mod plan {
         pub sample_data: bool,
         /// Khách tự đăng ký được gói này (`POST /plans/signups`, D-349).
         pub self_signup: bool,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -86,6 +87,7 @@ pub(crate) mod plan_limit {
 }
 
 pub(crate) mod price {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -106,13 +108,14 @@ pub(crate) mod price {
         pub included: i64,
         pub tax_category: Option<String>,
         pub active: bool,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod subscription {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -126,26 +129,27 @@ pub(crate) mod subscription {
         pub price_id: Option<Uuid>,
         /// `trialing`, `active`, `past_due`, `suspended`, `canceled`, `deleted`.
         pub status: String,
-        pub current_period_start: DateTimeUtc,
-        pub current_period_end: DateTimeUtc,
-        pub trial_ends_at: Option<DateTimeUtc>,
-        pub grace_ends_at: Option<DateTimeUtc>,
-        pub suspended_at: Option<DateTimeUtc>,
-        pub canceled_at: Option<DateTimeUtc>,
-        pub delete_after: Option<DateTimeUtc>,
+        pub current_period_start: Timestamp,
+        pub current_period_end: Timestamp,
+        pub trial_ends_at: Option<Timestamp>,
+        pub grace_ends_at: Option<Timestamp>,
+        pub suspended_at: Option<Timestamp>,
+        pub canceled_at: Option<Timestamp>,
+        pub delete_after: Option<Timestamp>,
         pub cancel_at_period_end: bool,
         pub scheduled_plan_id: Option<Uuid>,
         pub scheduled_price_id: Option<Uuid>,
         pub trial_used: bool,
         pub billing_email: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod addon {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -157,7 +161,7 @@ pub(crate) mod addon {
         #[sea_orm(primary_key, auto_increment = false)]
         pub plan_id: Uuid,
         pub quantity: i32,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -165,6 +169,7 @@ pub(crate) mod addon {
 
 pub(crate) mod grant {
     //! Bảng `plans_override`: ghi đè riêng một khách (`override` là từ khoá của Rust).
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -180,15 +185,16 @@ pub(crate) mod grant {
         pub enabled: Option<bool>,
         pub max_value: Option<i64>,
         pub reason: String,
-        pub expires_at: Option<DateTimeUtc>,
+        pub expires_at: Option<Timestamp>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod settings {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -197,13 +203,14 @@ pub(crate) mod settings {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: i32,
-        pub updated_at: Option<DateTimeUtc>,
+        pub updated_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod usage {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -217,13 +224,14 @@ pub(crate) mod usage {
         #[sea_orm(primary_key, auto_increment = false)]
         pub period_start: String,
         pub used: i64,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod reservation {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -238,15 +246,16 @@ pub(crate) mod reservation {
         pub amount: i64,
         /// `held`, `confirmed` hay `released`.
         pub status: String,
-        pub expires_at: DateTimeUtc,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub expires_at: Timestamp,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod usage_record {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -260,13 +269,14 @@ pub(crate) mod usage_record {
         pub period_start: String,
         pub quantity: i64,
         pub reference: String,
-        pub recorded_at: DateTimeUtc,
+        pub recorded_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod billing_period {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -280,20 +290,20 @@ pub(crate) mod billing_period {
         pub kind: String,
         pub plan_id: Uuid,
         pub price_id: Option<Uuid>,
-        pub period_start: DateTimeUtc,
-        pub period_end: DateTimeUtc,
+        pub period_start: Timestamp,
+        pub period_end: Timestamp,
         pub amount_minor: i64,
         pub amount_currency: String,
         pub reference: String,
         pub invoice_id: Option<Uuid>,
         pub invoice_number: Option<String>,
         pub status: String,
-        pub due_at: DateTimeUtc,
-        pub paid_at: Option<DateTimeUtc>,
+        pub due_at: Timestamp,
+        pub paid_at: Option<Timestamp>,
         pub provider_reference: Option<String>,
         pub reminders: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

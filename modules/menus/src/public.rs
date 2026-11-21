@@ -16,6 +16,8 @@
 //! bao giờ nhận menu của nhau; mỗi khách một bộ đếm thế hệ, nên lệnh ghi của khách này không làm
 //! mất cache của khách khác. `ETag` tính cả ID khách.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -24,7 +26,6 @@ use autoxide_kernel::resource::{Resource, ResourceRef};
 use autoxide_kernel::response::Data;
 use autoxide_kernel::tenancy::{Site, TenantContext, TenantId};
 use autoxide_media::api::{MediaRef, MediaVisibility};
-use chrono::{DateTime, Duration, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -112,7 +113,7 @@ pub(crate) struct PublicMenuImage {
 pub(crate) struct Ready {
     pub menu: PublicSiteMenu,
     pub etag: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Khoá cache: (khách, website, khoá menu, ngôn ngữ hỏi).
@@ -143,7 +144,7 @@ impl PublicCache {
         }
     }
 
-    fn get(&self, key: &CacheKey, now: DateTime<Utc>) -> (u64, Option<Arc<Ready>>) {
+    fn get(&self, key: &CacheKey, now: Timestamp) -> (u64, Option<Arc<Ready>>) {
         let Ok(state) = self.inner.lock() else {
             return (0, None);
         };
@@ -152,7 +153,7 @@ impl PublicCache {
         (generation, hit)
     }
 
-    fn put(&self, generation: u64, key: CacheKey, ready: Arc<Ready>, now: DateTime<Utc>) {
+    fn put(&self, generation: u64, key: CacheKey, ready: Arc<Ready>, now: Timestamp) {
         if let Ok(mut state) = self.inner.lock()
             && state.generations.get(&key.0).copied().unwrap_or_default() == generation
         {
@@ -172,7 +173,7 @@ impl MenuService {
         site: &Site,
         key: &str,
         locale: Option<&str>,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Arc<Ready>, Error> {
         let mut problems = Vec::new();
         let (locales, default) = self.site_locales(tenant, site).await?;
@@ -198,7 +199,7 @@ impl MenuService {
         let resolved = self.resolve(tenant, &tree(items), &found.locale, now).await?;
         let menu = PublicSiteMenu { key: found.key, locale: found.locale, items: resolved };
         let etag = fingerprint(tenant.id(), &Data { data: &menu })?;
-        let mut expires_at = now + Duration::seconds(ttl);
+        let mut expires_at = now + SignedDuration::from_secs(ttl);
         if let Some(next_change) = next_change {
             expires_at = expires_at.min(next_change);
         }
@@ -215,7 +216,7 @@ impl MenuService {
         tenant: &TenantContext,
         nodes: &[Node],
         locale: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Vec<PublicSiteMenuItem>, Error> {
         let mut rows = Vec::new();
         collect(nodes, &mut rows);
@@ -350,7 +351,7 @@ struct Context<'a> {
     objects: &'a HashMap<(String, String), Resource>,
     auto: &'a HashMap<Uuid, Vec<ResourceRef>>,
     images: &'a HashMap<Uuid, MediaRef>,
-    now: DateTime<Utc>,
+    now: Timestamp,
 }
 
 fn collect<'a>(nodes: &'a [Node], rows: &mut Vec<&'a item::Model>) {
@@ -445,7 +446,7 @@ fn build_one(node: &Node, context: &Context<'_>) -> Option<PublicSiteMenuItem> {
 }
 
 /// Mốc gần nhất sau `now` mà một nhãn nổi bật bật hay tắt: cache không được giữ quá mốc đó.
-fn next_badge_change(items: &[item::Model], now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+fn next_badge_change(items: &[item::Model], now: Timestamp) -> Option<Timestamp> {
     items
         .iter()
         .filter(|row| row.badge_text.is_some())

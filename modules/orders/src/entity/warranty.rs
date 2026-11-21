@@ -1,5 +1,6 @@
 //! Bảng `orders_warranties`: bảo hành của một dòng đơn (hay một serial), có hạn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,10 +19,10 @@ pub struct Model {
     pub serial_key: String,
     pub buyer_user_id: Option<Uuid>,
     pub buyer_key: Option<String>,
-    pub starts_at: DateTimeUtc,
-    pub ends_at: DateTimeUtc,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub status: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,6 +1,7 @@
 //! Route REST của văn bản pháp lý, chấp nhận, đồng ý, quy tắc và chính sách (dưới
 //! `/api/v1/compliance`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -55,10 +55,10 @@ pub(crate) struct VersionResponse {
     body: String,
     /// SHA-256 of title and body: proof of the exact text accepted.
     sha256: String,
-    effective_from: DateTime<Utc>,
+    effective_from: Timestamp,
     /// People must accept this version again before going on.
     requires_reacceptance: bool,
-    published_at: DateTime<Utc>,
+    published_at: Timestamp,
 }
 
 impl From<version::Model> for VersionResponse {
@@ -93,8 +93,8 @@ pub(crate) struct DocumentResponse {
     /// Every version and translation, newest first (only on `GET /documents/{id}`).
     #[serde(skip_serializing_if = "Option::is_none")]
     versions: Option<Vec<VersionResponse>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 pub(crate) fn describe_document(
@@ -136,7 +136,7 @@ pub(crate) struct VersionRequest {
     /// Full text (Markdown or HTML as the interface shows it). Have a legal professional review it.
     body: String,
     /// When it takes effect; default now.
-    effective_from: Option<DateTime<Utc>>,
+    effective_from: Option<Timestamp>,
     /// Everyone must accept it again (the first version always must).
     #[serde(default)]
     requires_reacceptance: bool,
@@ -280,7 +280,7 @@ pub(crate) struct AcceptanceResponse {
     method: String,
     /// SHA-256 of the text accepted.
     sha256: String,
-    accepted_at: DateTime<Utc>,
+    accepted_at: Timestamp,
 }
 
 impl From<acceptance::Model> for AcceptanceResponse {
@@ -603,7 +603,7 @@ pub(crate) struct RulesQuery {
     key: Option<String>,
     /// Only the version of each rule in effect at this time (RFC 3339), e.g. to see the rules on the
     /// day an order was placed. Omit to get every version (the history).
-    as_of: Option<DateTime<Utc>>,
+    as_of: Option<Timestamp>,
 }
 
 /// List the legal rules: every version, or those in effect at a time.
@@ -687,7 +687,7 @@ pub(crate) struct PolicyResponse {
     key: String,
     /// Any JSON value, checked by the policy (see `PUT /policies/{key}`).
     value: serde_json::Value,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<policy::Model> for PolicyResponse {

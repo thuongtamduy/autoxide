@@ -1,8 +1,9 @@
 //! Chạy thử, xung đột, lịch, số liệu (D-222).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -74,25 +75,28 @@ async fn lich_theo_khoang_ngay_bo_ban_nhap() {
         let setup = setup(test, true).await;
         let now = running(&setup, body(setup.tree.a, json!({}))).await;
         create(&setup, body(setup.tree.a, json!({}))).await;
-        let today = crate::compliance::legal_day(Utc::now());
-        let range = |from: chrono::NaiveDate, to: chrono::NaiveDate| {
-            format!("/promotions/calendar?from={from}&to={to}")
-        };
+        let today = crate::compliance::legal_day(Timestamp::now());
+        let range = |from: Date, to: Date| format!("/promotions/calendar?from={from}&to={to}");
         let (status, found) = call(&setup.app, "GET", &range(today, today), "boss", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         let ids: Vec<_> =
             found["data"].as_array().unwrap().iter().map(|row| row["id"].clone()).collect();
         assert_eq!(ids, vec![json!(now.to_string())]);
         // Một tháng sau: chương trình (hết hạn sau 7 ngày) không còn.
-        let later = today + chrono::Days::new(30);
+        let later = today.checked_add_days(30).unwrap();
         let (_, found) = call(&setup.app, "GET", &range(later, later), "boss", None).await;
         assert_eq!(found["data"], json!([]));
         // Khoảng ngược hay quá dài: 422.
         let (status, _) = call(&setup.app, "GET", &range(later, today), "boss", None).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
-        let (status, _) =
-            call(&setup.app, "GET", &range(today, today + chrono::Days::new(400)), "boss", None)
-                .await;
+        let (status, _) = call(
+            &setup.app,
+            "GET",
+            &range(today, today.checked_add_days(400).unwrap()),
+            "boss",
+            None,
+        )
+        .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     })
     .await
@@ -111,11 +115,11 @@ async fn so_lieu_theo_ngay_sau_khi_xac_nhan() {
         let request = ReserveRequest::new(
             order,
             setup.cart(&[(variant, 1)]),
-            Utc::now() + Duration::hours(1),
+            Timestamp::now() + SignedDuration::from_hours(1),
         );
         promotions.reserve(&tenant, &request).await.unwrap();
         promotions.confirm(&tenant, order).await.unwrap();
-        let today = crate::compliance::legal_day(Utc::now());
+        let today = crate::compliance::legal_day(Timestamp::now());
         let (status, found) = call(
             &setup.app,
             "GET",

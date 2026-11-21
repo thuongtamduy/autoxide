@@ -1,6 +1,7 @@
 //! Endpoint quản trị: hàng chờ, một bình luận, đổi trạng thái (`If-Match` bắt buộc), xoá hẳn,
 //! báo cáo, cấm, trạng thái đích, xuất / xoá theo email.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -332,7 +332,7 @@ pub(crate) struct BanRequest {
     /// Why (required, 1 to 500 characters; for the records).
     reason: String,
     /// When it ends; omit for ever.
-    until: Option<DateTime<Utc>>,
+    until: Option<Timestamp>,
 }
 
 /// Ban someone from commenting.
@@ -538,8 +538,8 @@ pub(crate) struct TargetRequest {
     hidden: Option<bool>,
     /// Close by itself from then on; `null` removes it.
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>, nullable)]
-    closes_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>, nullable)]
+    closes_at: Option<Option<Timestamp>>,
 }
 
 /// Open, close or hide the comments of a target.
@@ -604,7 +604,7 @@ impl EmailQuery {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct CommentFollow {
     pub comment_id: Uuid,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Everything the comments hold about one email address.

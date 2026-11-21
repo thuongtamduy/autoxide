@@ -2,7 +2,7 @@
 //! khác (và client) dựa vào chúng.
 
 use autoxide_kernel::error::{Error, ErrorKind};
-use chrono::{Duration, Timelike, Utc};
+use autoxide_kernel::time::Timestamp;
 
 pub(crate) fn disabled() -> Error {
     Error::unavailable(
@@ -31,9 +31,9 @@ pub(crate) fn misconfigured() -> Error {
 
 /// Hết hạn mức token của ngày (UTC): chờ tới nửa đêm UTC.
 pub(crate) fn quota_exceeded() -> Error {
-    let now = Utc::now();
-    let elapsed = i64::from(now.num_seconds_from_midnight());
-    let until_midnight = (Duration::days(1).num_seconds() - elapsed).max(1);
+    let now = Timestamp::now();
+    let elapsed = now.as_unix_seconds().rem_euclid(86_400);
+    let until_midnight = (86_400 - elapsed).max(1);
     Error::too_many_requests(
         "ai.quota_exceeded",
         "Today's AI token limit (AUTOXIDE_AI_DAILY_TOKEN_LIMIT) is used up. Try again after \

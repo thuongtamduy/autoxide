@@ -7,7 +7,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -73,7 +73,7 @@ pub struct ReserveRequest {
     /// Mã tỉnh (module `address`) của nơi giao, để ưu tiên kho cùng tỉnh.
     pub ship_to_province: Option<String>,
     /// Hạn thanh toán do `orders` đặt (≤ `AUTOXIDE_INVENTORY_MAX_HOLD_HOURS` từ bây giờ).
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     pub lines: Vec<ReserveLine>,
 }
 
@@ -81,7 +81,7 @@ impl ReserveRequest {
     pub fn new(
         order_id: Uuid,
         selling_org_id: OrgId,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
         lines: Vec<ReserveLine>,
     ) -> Self {
         ReserveRequest {
@@ -180,7 +180,7 @@ pub struct Reservation {
     pub selling_org_id: OrgId,
     pub status: ReservationStatus,
     /// `None` khi đã xác nhận (hay đã kết thúc).
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Dòng không theo dõi tồn (hàng số, dịch vụ) không có phần nào ở đây.
     pub lines: Vec<ReservedLine>,
 }

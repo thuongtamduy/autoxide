@@ -12,7 +12,8 @@ use autoxide_kernel::mail::MailTemplate;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{TenantChanges, TenantId};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
@@ -55,8 +56,8 @@ pub(crate) struct ChangeInput {
 }
 
 /// Mã tham chiếu của kỳ thanh toán (D-184): `plans:<subscription_id>:<period_start>:<kind>`.
-fn period_reference(subscription: Uuid, start: DateTime<Utc>, kind: &str) -> String {
-    format!("plans:{subscription}:{}:{kind}", start.timestamp())
+fn period_reference(subscription: Uuid, start: Timestamp, kind: &str) -> String {
+    format!("plans:{subscription}:{}:{kind}", start.as_unix_seconds())
 }
 
 /// Giá theo tháng (để so nâng / hạ gói), bằng `i128` cho khỏi tràn.
@@ -73,12 +74,12 @@ fn monthly(price: Option<&price::Model>) -> i128 {
 pub(crate) fn proration(
     old: i64,
     new: i64,
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
-    at: DateTime<Utc>,
+    start: Timestamp,
+    end: Timestamp,
+    at: Timestamp,
 ) -> i64 {
-    let total = i128::from((end - start).num_seconds().max(1));
-    let left = i128::from((end - at).num_seconds().clamp(0, (end - start).num_seconds().max(1)));
+    let total = i128::from((end - start).as_secs().max(1));
+    let left = i128::from((end - at).as_secs().clamp(0, (end - start).as_secs().max(1)));
     let difference = (i128::from(new) - i128::from(old)).max(0);
     i64::try_from(difference * left / total).unwrap_or(i64::MAX)
 }
@@ -87,7 +88,7 @@ impl PlansService {
     // ---- Job ----------------------------------------------------------------------------------
 
     /// Chuyển các thuê bao tới hạn tại `at` theo bảng vòng đời; trả số thuê bao đã đổi.
-    pub(crate) async fn run_lifecycle(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn run_lifecycle(&self, at: Timestamp) -> Result<usize, Error> {
         let read = self.databases.control().read();
         let mut tenants: Vec<Uuid> = subscription::Entity::find()
             .select_only()
@@ -140,7 +141,7 @@ impl PlansService {
     }
 
     /// Một bước của thuê bao của khách `tenant` tại `at`, nếu tới hạn.
-    async fn step(&self, tenant: TenantId, at: DateTime<Utc>) -> Result<bool, Error> {
+    async fn step(&self, tenant: TenantId, at: Timestamp) -> Result<bool, Error> {
         let transaction = self.databases.control().begin_write().await?;
         let Some(sub) = rows::lock_one(
             &transaction,
@@ -155,7 +156,7 @@ impl PlansService {
             .one(&transaction)
             .await?
             .ok_or_else(|| plan_not_found(sub.plan_id))?;
-        let days = |value: i32| Duration::days(i64::from(value));
+        let days = |value: i32| SignedDuration::from_hours(24 * (i64::from(value)));
         let mut deleted = false;
         let changed = match sub.status.as_str() {
             "trialing" | "active" if sub.current_period_end <= at => {
@@ -245,7 +246,7 @@ impl PlansService {
         &self,
         connection: &C,
         subscription: Uuid,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<bool, Error> {
         let found = billing_period::Entity::find()
             .filter(billing_period::Column::SubscriptionId.eq(subscription))
@@ -264,7 +265,7 @@ impl PlansService {
         connection: &C,
         sub: subscription::Model,
         plan: &plan::Model,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<subscription::Model, Error> {
         let plan_id = sub.scheduled_plan_id.unwrap_or(sub.plan_id);
         let price_id =
@@ -292,7 +293,7 @@ impl PlansService {
         } else {
             true
         };
-        let grace = at + Duration::days(i64::from(plan.grace_days));
+        let grace = at + SignedDuration::from_hours(24 * (i64::from(plan.grace_days)));
         let to = if paid { "active" } else { "past_due" };
         self.move_to(connection, sub, to, at, |row| {
             row.plan_id = Set(plan_id);
@@ -318,7 +319,7 @@ impl PlansService {
         kind: &'static str,
         plan_id: Uuid,
         chosen: Option<&price::Model>,
-        (start, end, due): (DateTime<Utc>, DateTime<Utc>, DateTime<Utc>),
+        (start, end, due): (Timestamp, Timestamp, Timestamp),
     ) -> Result<(), Error> {
         let Some(chosen) = chosen else {
             return Ok(());
@@ -399,7 +400,7 @@ impl PlansService {
         connection: &C,
         sub: subscription::Model,
         to: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
         edit: F,
     ) -> Result<subscription::Model, Error>
     where
@@ -451,7 +452,7 @@ impl PlansService {
 
     /// Lập kỳ thanh toán sắp tới cho thuê bao có giá > 0 trong `renewal_lead_days` trước khi hết
     /// kỳ (không trùng). Trả số kỳ đã lập.
-    pub(crate) async fn run_renewals(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn run_renewals(&self, at: Timestamp) -> Result<usize, Error> {
         let read = self.databases.control().read();
         let due = subscription::Entity::find()
             .filter(subscription::Column::Status.is_in(["trialing", "active"]))
@@ -469,7 +470,10 @@ impl PlansService {
             let Some(plan) = plan::Entity::find_by_id(plan_id).one(read).await? else {
                 continue;
             };
-            if sub.current_period_end - Duration::days(i64::from(plan.renewal_lead_days)) > at {
+            if sub.current_period_end
+                - SignedDuration::from_hours(24 * (i64::from(plan.renewal_lead_days)))
+                > at
+            {
                 continue;
             }
             let Some(chosen) = (match price_id {
@@ -492,7 +496,7 @@ impl PlansService {
     /// Gửi mail nhắc cho kỳ `open`: trước hạn theo `reminder_days`, khi quá hạn, và mỗi 3 ngày
     /// trong ân hạn; ghi mốc đã gửi vào kỳ để không gửi trùng. Thuê bao chưa có email thanh toán
     /// thì bỏ qua. Trả số mail đã xếp hàng.
-    pub(crate) async fn run_reminders(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn run_reminders(&self, at: Timestamp) -> Result<usize, Error> {
         let Some(mailer) = self.mailer.clone() else {
             return Ok(0);
         };
@@ -500,9 +504,9 @@ impl PlansService {
         let open = billing_period::Entity::find()
             .filter(billing_period::Column::Status.eq("open"))
             .filter(billing_period::Column::DueAt.lte(
-                at + Duration::days(i64::from(
-                    self.reminder_days.iter().copied().max().unwrap_or(0),
-                )),
+                at + SignedDuration::from_hours(
+                    24 * (i64::from(self.reminder_days.iter().copied().max().unwrap_or(0))),
+                ),
             ))
             .limit(BATCH * 10)
             .all(read)
@@ -567,9 +571,9 @@ impl PlansService {
 
     /// Mốc nhắc của kỳ `period` tại `at`, nếu có: `before:<n>` (còn ≤ n ngày), `overdue` (vừa quá
     /// hạn), `grace:<k>` (mỗi 3 ngày quá hạn).
-    fn reminder_due(&self, period: &billing_period::Model, at: DateTime<Utc>) -> Option<String> {
+    fn reminder_due(&self, period: &billing_period::Model, at: Timestamp) -> Option<String> {
         if at < period.due_at {
-            let left = (period.due_at - at).num_days();
+            let left = (period.due_at - at).as_secs() / 86_400;
             return self
                 .reminder_days
                 .iter()
@@ -578,7 +582,7 @@ impl PlansService {
                 .min()
                 .map(|days| format!("before:{days}"));
         }
-        let late = (at - period.due_at).num_days();
+        let late = (at - period.due_at).as_secs() / 86_400;
         if late < 3 { Some("overdue".to_owned()) } else { Some(format!("grace:{}", late / 3)) }
     }
 
@@ -591,7 +595,7 @@ impl PlansService {
         actor: Actor,
         id: Uuid,
         provider_reference: String,
-        paid_at: Option<DateTime<Utc>>,
+        paid_at: Option<Timestamp>,
     ) -> Result<billing_period::Model, Error> {
         let at = now();
         let transaction = self.databases.control().begin_write().await?;
@@ -860,7 +864,8 @@ impl PlansService {
                 .one(&transaction)
                 .await?
                 .ok_or_else(|| plan_not_found(sub.plan_id))?;
-            let delete_after = at + Duration::days(i64::from(plan.retention_days));
+            let delete_after =
+                at + SignedDuration::from_hours(24 * (i64::from(plan.retention_days)));
             self.move_to(&transaction, sub, "canceled", at, |row| {
                 row.canceled_at = Set(Some(at));
                 row.delete_after = Set(Some(delete_after));
@@ -986,9 +991,9 @@ struct NewPeriod<'a> {
     price_id: Option<Uuid>,
     amount: i64,
     currency: &'a str,
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
-    due: DateTime<Utc>,
+    start: Timestamp,
+    end: Timestamp,
+    due: Timestamp,
 }
 
 pub(crate) fn billing_period_not_found(id: Uuid) -> Error {
@@ -1006,18 +1011,17 @@ pub(crate) fn billing_period_not_payable() -> Error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
 
     #[test]
     fn nang_goi_lap_ky_tinh_ti_le_lam_tron_xuong() {
-        let start = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-        let end = Utc.with_ymd_and_hms(2026, 1, 31, 0, 0, 0).unwrap();
+        let start = Timestamp::from_utc(2026, 1, 1, 0, 0, 0).unwrap();
+        let end = Timestamp::from_utc(2026, 1, 31, 0, 0, 0).unwrap();
         // Nửa kỳ còn lại, chênh 100 001 → 50 000 (làm tròn xuống, không 50 000,5).
         let half = start + (end - start) / 2;
         assert_eq!(proration(100_000, 200_001, start, end, half), 50_000);
         // Hết kỳ: 0; trước kỳ: cả phần chênh; hạ giá: 0 (không hoàn tiền).
         assert_eq!(proration(1, 2, start, end, end), 0);
-        assert_eq!(proration(0, 300, start, end, start - Duration::days(1)), 300);
+        assert_eq!(proration(0, 300, start, end, start - SignedDuration::from_hours(24)), 300);
         assert_eq!(proration(500, 100, start, end, half), 0);
         // Số lớn không tràn (i128).
         assert_eq!(proration(0, i64::MAX, start, end, start), i64::MAX);

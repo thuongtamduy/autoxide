@@ -2,6 +2,7 @@
 //! Tool không bật bộ sưu tập (`active`): chỉ tạo / sửa bản nháp, người dùng bật lên (D-109). Chữ do
 //! agent viết mặc định mang dấu `ai_assisted`, như tool banner của `content`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -11,7 +12,6 @@ use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -72,8 +72,8 @@ pub(crate) struct SaveCollectionInput {
     sort: Option<String>,
     /// A public picture (media item id).
     media_id: Option<Uuid>,
-    starts_at: Option<DateTime<Utc>>,
-    ends_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
+    ends_at: Option<Timestamp>,
     /// Texts by language (e.g. `{"vi": {"title": "…"}}`).
     #[serde(default)]
     #[schema(value_type = Object)]

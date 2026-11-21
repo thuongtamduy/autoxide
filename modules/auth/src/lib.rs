@@ -66,6 +66,7 @@ mod verify;
 #[cfg(test)]
 mod web_tests;
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Authenticator, Permission};
@@ -322,7 +323,7 @@ impl Module for AuthModule {
             databases: databases.clone(),
             delegations: delegations.clone(),
             step_up: step_up::StepUpPolicy {
-                window: chrono::Duration::minutes(config.step_up_minutes),
+                window: SignedDuration::from_mins(config.step_up_minutes),
                 settings: context.require::<dyn autoxide_kernel::tenancy::TenantSettings>().ok(),
             },
         };
@@ -365,8 +366,8 @@ impl Module for AuthModule {
             phone: phone.clone(),
             mailer: mailer.clone(),
             translations: context.translations().clone(),
-            ttl: chrono::Duration::from_std(config.reauth_ttl)
-                .unwrap_or_else(|_| chrono::Duration::minutes(10)),
+            ttl: SignedDuration::try_from(config.reauth_ttl)
+                .unwrap_or_else(|_| SignedDuration::from_mins(10)),
         });
         let login_links = Arc::new(login_link::LoginLinks {
             enabled: config.login_link,
@@ -573,6 +574,8 @@ fn random_secret() -> Result<Vec<u8>, Error> {
 #[cfg(test)]
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
+    use autoxide_kernel::time::Timestamp;
+    use jiff::SignedDuration;
 
     use std::sync::Arc;
 
@@ -751,7 +754,7 @@ pub(crate) mod testing {
             phone: phone.clone(),
             mailer: mails.clone(),
             translations: translations.clone(),
-            ttl: chrono::Duration::minutes(10),
+            ttl: SignedDuration::from_mins(10),
         });
         Services {
             reauth,
@@ -803,7 +806,7 @@ pub(crate) mod testing {
             payloads.push(row.try_get("", "payload").unwrap());
             let done = Query::update()
                 .table(Alias::new("auth_jobs"))
-                .value(Alias::new("completed_at"), chrono::Utc::now())
+                .value(Alias::new("completed_at"), Timestamp::now())
                 .and_where(Expr::col(Alias::new("id")).eq(id))
                 .to_owned();
             services.database.write().execute(&done).await.unwrap();
@@ -829,7 +832,7 @@ pub(crate) mod testing {
             services.resets.send(&services.tenant, &job).await.unwrap();
             let done = Query::update()
                 .table(Alias::new("auth_jobs"))
-                .value(Alias::new("completed_at"), chrono::Utc::now())
+                .value(Alias::new("completed_at"), Timestamp::now())
                 .and_where(Expr::col(Alias::new("id")).eq(id))
                 .to_owned();
             services.database.write().execute(&done).await.unwrap();

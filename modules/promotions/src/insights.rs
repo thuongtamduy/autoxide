@@ -1,11 +1,11 @@
 //! Chạy thử, xung đột, lịch, số liệu của chương trình (D-222). Chỉ đọc, không ghi gì.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -47,15 +47,15 @@ pub(crate) struct Conflict {
     pub status: Status,
     #[schema(inline)]
     pub exclusivity: Exclusivity,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
 }
 
 /// Counts of one day (Vietnam date).
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(as = PromotionsDailyStats)]
 pub(crate) struct DailyStats {
-    pub day: NaiveDate,
+    pub day: Date,
     /// Confirmed uses.
     pub redemptions: i64,
     /// Discount given, in minor units.
@@ -67,7 +67,7 @@ pub(crate) struct DailyStats {
 }
 
 /// Lỗi khoảng ngày: `from` sau `to` hay dài quá.
-pub(crate) fn check_range(from: NaiveDate, to: NaiveDate) -> Result<(), Error> {
+pub(crate) fn check_range(from: Date, to: Date) -> Result<(), Error> {
     if from > to {
         return Err(Error::validation(vec![FieldError::new(
             "from",
@@ -75,7 +75,7 @@ pub(crate) fn check_range(from: NaiveDate, to: NaiveDate) -> Result<(), Error> {
             "must not be after `to`",
         )]));
     }
-    if (to - from).num_days() >= MAX_RANGE_DAYS {
+    if to.days_since(from) >= MAX_RANGE_DAYS {
         return Err(Error::validation(vec![
             FieldError::new("to", "range", "the range must be at most {max} days")
                 .with_param("max", MAX_RANGE_DAYS),
@@ -145,8 +145,8 @@ impl PromotionsService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
     ) -> Result<Vec<DailyStats>, Error> {
         check_range(from, to)?;
         let view = self.promotion(tenant, principal, id).await?;

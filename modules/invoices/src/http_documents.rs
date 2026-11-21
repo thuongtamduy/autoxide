@@ -1,5 +1,6 @@
 //! Route REST của chứng từ (dưới `/api/v1/invoices`).
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use axum::extract::{Path, Query, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::NaiveDate;
 use serde::{Deserialize, Deserializer};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -74,7 +74,7 @@ pub(crate) struct DocumentRequest {
     /// Series; default the only active series of the unit for this kind and year.
     series_id: Option<Uuid>,
     /// Planned issue day; default the day it is issued.
-    issue_date: Option<NaiveDate>,
+    issue_date: Option<Date>,
     /// Line prices include taxes; default `false`.
     #[serde(default)]
     prices_include_tax: bool,
@@ -101,8 +101,8 @@ pub(crate) struct DocumentChange {
     #[schema(value_type = Option<Uuid>, nullable)]
     series_id: Option<Option<Uuid>>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<NaiveDate>, nullable)]
-    issue_date: Option<Option<NaiveDate>>,
+    #[schema(value_type = Option<Date>, nullable)]
+    issue_date: Option<Option<Date>>,
     prices_include_tax: Option<bool>,
 }
 

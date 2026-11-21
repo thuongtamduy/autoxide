@@ -4,6 +4,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
@@ -20,7 +22,6 @@ use autoxide_kernel::module::{Module, Modules, StartContext};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tenancy::migration::adopt;
 use autoxide_testkit::TestDatabase;
-use chrono::{Duration, Utc};
 use sea_orm::{ConnectionTrait, Statement};
 use serde::Serialize;
 
@@ -108,7 +109,7 @@ async fn execute(database: &Database, sql: &str) {
     database.write().execute_raw(Statement::from_string(backend, sql)).await.unwrap();
 }
 
-async fn reports(database: &Database, now: chrono::DateTime<Utc>) -> ModuleBacklog {
+async fn reports(database: &Database, now: Timestamp) -> ModuleBacklog {
     let snapshot = backlog(database, "main", &["reports"], &["reports"], now).await.unwrap();
     assert_eq!(snapshot.database, "main");
     assert_eq!(snapshot.pools.iter().map(|pool| pool.pool).collect::<Vec<_>>(), ["read", "write"]);
@@ -120,7 +121,7 @@ async fn reports(database: &Database, now: chrono::DateTime<Utc>) -> ModuleBackl
 async fn ton_dong_dem_job_cho_tuoi_va_dead_letter() {
     TestDatabase::run(async |test| {
         let (database, _modules, _outbox) = setup(test).await;
-        let empty = reports(&database, Utc::now()).await;
+        let empty = reports(&database, Timestamp::now()).await;
         assert_eq!(
             (empty.jobs_pending, empty.jobs_oldest_pending_seconds, empty.jobs_dead),
             (0, 0, 0)
@@ -137,7 +138,7 @@ async fn ton_dong_dem_job_cho_tuoi_va_dead_letter() {
         )
         .await;
         // Mười phút sau.
-        let later = Utc::now() + Duration::minutes(10);
+        let later = Timestamp::now() + SignedDuration::from_mins(10);
         let found = reports(&database, later).await;
         assert_eq!((found.jobs_pending, found.jobs_dead), (2, 1));
         assert!(
@@ -154,10 +155,10 @@ async fn ton_dong_dem_job_cho_tuoi_va_dead_letter() {
 async fn ton_dong_khong_dem_job_hen_gio_chua_toi() {
     TestDatabase::run(async |test| {
         let (database, _modules, _outbox) = setup(test).await;
-        let tomorrow = Utc::now() + Duration::days(1);
+        let tomorrow = Timestamp::now() + SignedDuration::from_hours(24);
         enqueue(&database, EnqueueOptions::default().run_at(tomorrow)).await;
 
-        let found = reports(&database, Utc::now()).await;
+        let found = reports(&database, Timestamp::now()).await;
         // Đang chờ (sẽ chạy), nhưng chưa tới hạn nên chưa "chờ lâu".
         assert_eq!((found.jobs_pending, found.jobs_oldest_pending_seconds), (1, 0));
     })
@@ -182,7 +183,7 @@ async fn ton_dong_dem_event_chua_giao() {
         )
         .await;
 
-        let later = Utc::now() + Duration::minutes(5);
+        let later = Timestamp::now() + SignedDuration::from_mins(5);
         let found = reports(&database, later).await;
         assert_eq!((found.events_pending, found.events_dead), (1, 1));
         assert!(

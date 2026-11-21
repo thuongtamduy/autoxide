@@ -1,6 +1,7 @@
 //! Endpoint của nhãn: `/api/v1/media/tags`. Gắn nhãn cho item bằng `tags` khi tải lên hay
 //! sửa item; ở đây chỉ liệt kê, đổi tên, xoá nhãn.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,8 +32,8 @@ pub(crate) struct TagResponse {
     /// Number of items (not in the trash) with this tag.
     #[schema(example = 12)]
     item_count: u64,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<TagWithCount> for TagResponse {

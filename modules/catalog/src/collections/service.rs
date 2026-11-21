@@ -1,6 +1,7 @@
 //! Quản trị bộ sưu tập: tạo, sửa, xoá, thay danh sách sản phẩm chọn tay. Phiên bản là
 //! `updated_at` (ETag / `If-Match`). Kiểm ảnh (gọi `media`) chạy trước transaction ghi.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, HashSet};
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
@@ -45,8 +45,8 @@ pub(crate) struct NewCollection {
     pub sort: Option<String>,
     pub media_id: Option<Uuid>,
     pub status: Option<String>,
-    pub starts_at: Option<DateTime<Utc>>,
-    pub ends_at: Option<DateTime<Utc>>,
+    pub starts_at: Option<Timestamp>,
+    pub ends_at: Option<Timestamp>,
     pub texts: BTreeMap<String, CollectionText>,
     /// Chữ soạn từ gợi ý của AI (Luật Trí tuệ nhân tạo — cần đối chiếu); tool MCP mặc định `true`.
     pub ai_assisted: bool,
@@ -60,8 +60,8 @@ pub(crate) struct CollectionPatch {
     pub sort: Option<String>,
     pub media_id: Option<Option<Uuid>>,
     pub status: Option<String>,
-    pub starts_at: Option<Option<DateTime<Utc>>>,
-    pub ends_at: Option<Option<DateTime<Utc>>>,
+    pub starts_at: Option<Option<Timestamp>>,
+    pub ends_at: Option<Option<Timestamp>>,
     pub texts: BTreeMap<String, CollectionText>,
     pub ai_assisted: Option<bool>,
 }
@@ -211,7 +211,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         patch: CollectionPatch,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<CollectionDetail, Error> {
         let found = self.get_collection(tenant, principal, id).await?.collection;
         principal.require(&COLLECTIONS_MANAGE)?;
@@ -306,7 +306,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
         product_ids: Vec<Uuid>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<CollectionDetail, Error> {
         let found = self.get_collection(tenant, principal, id).await?.collection;
         principal.require(&COLLECTIONS_MANAGE)?;

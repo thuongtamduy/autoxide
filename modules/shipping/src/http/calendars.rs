@@ -1,5 +1,6 @@
 //! Lịch giao (`shipping.settings.manage`) và ước tính phí giao công khai cho trang sản phẩm.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::header;
 use axum::response::IntoResponse;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -69,7 +69,7 @@ pub(crate) struct DayRequest {
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(as = ShippingCalendarDayEntry)]
 pub(crate) struct DayBody {
-    day: NaiveDate,
+    day: Date,
     kind: String,
     cutoff_minute: Option<i32>,
     note: String,
@@ -87,7 +87,7 @@ pub(crate) struct CalendarBody {
     working_days: Vec<u8>,
     /// Holidays and special days (only in single-calendar answers).
     days: Vec<DayBody>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 fn body(row: calendar::Model, days: Vec<DayBody>) -> CalendarBody {
@@ -235,7 +235,7 @@ pub(crate) async fn update_calendar(
     security(("bearer" = [])),
     params(
         ("id" = Uuid, Path, description = "Id of the calendar."),
-        ("day" = NaiveDate, Path, description = "The day, `YYYY-MM-DD`."),
+        ("day" = Date, Path, description = "The day, `YYYY-MM-DD`."),
     ),
     request_body = DayRequest,
     responses(
@@ -250,7 +250,7 @@ pub(crate) async fn set_day(
     State(service): State<Arc<ShippingService>>,
     tenant: TenantContext,
     principal: Principal,
-    Path((id, day)): Path<(Uuid, NaiveDate)>,
+    Path((id, day)): Path<(Uuid, Date)>,
     ValidJson(input): ValidJson<DayRequest>,
 ) -> Result<Data<CalendarBody>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
@@ -267,7 +267,7 @@ pub(crate) async fn set_day(
     security(("bearer" = [])),
     params(
         ("id" = Uuid, Path, description = "Id of the calendar."),
-        ("day" = NaiveDate, Path, description = "The day, `YYYY-MM-DD`."),
+        ("day" = Date, Path, description = "The day, `YYYY-MM-DD`."),
     ),
     responses(
         (status = 200, description = "The calendar after the change.", body = Data<CalendarBody>),
@@ -280,7 +280,7 @@ pub(crate) async fn delete_day(
     State(service): State<Arc<ShippingService>>,
     tenant: TenantContext,
     principal: Principal,
-    Path((id, day)): Path<(Uuid, NaiveDate)>,
+    Path((id, day)): Path<(Uuid, Date)>,
 ) -> Result<Data<CalendarBody>, Error> {
     principal.require(&SETTINGS_MANAGE)?;
     Ok(Data { data: service.delete_calendar_day(&tenant, &principal, id, day).await?.into() })

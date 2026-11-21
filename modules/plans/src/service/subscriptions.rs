@@ -1,6 +1,8 @@
 //! Thuê bao của khách: đọc, liệt kê, gán gói (đổi gói, add-on, kỳ thanh toán).
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 impl PlansService {
     pub(crate) async fn subscription(
@@ -155,8 +157,8 @@ impl PlansService {
         let row = match current {
             None => {
                 let trial = input.trial && chosen.trial_days > 0;
-                let trial_ends =
-                    trial.then(|| at + chrono::Duration::days(i64::from(chosen.trial_days)));
+                let trial_ends = trial
+                    .then(|| at + SignedDuration::from_hours(24 * (i64::from(chosen.trial_days))));
                 let row = subscription::ActiveModel {
                     id: Set(Uuid::now_v7()),
                     tenant_id: Set(tenant.as_uuid()),
@@ -252,17 +254,16 @@ impl PlansService {
 /// Mốc hết kỳ đầu từ `start` theo giá `price` (lịch dương; ngày 31 → cuối tháng sau); không có giá
 /// thì một tháng.
 pub(crate) fn period_end(
-    start: DateTime<Utc>,
+    start: Timestamp,
     price: Option<&price::Model>,
-) -> Result<DateTime<Utc>, Error> {
+) -> Result<Timestamp, Error> {
     let months = match price {
         Some(row) if row.interval == "year" => row.interval_count.saturating_mul(12),
         Some(row) => row.interval_count,
         None => 1,
     };
-    let months = u32::try_from(months.max(1)).map_err(Error::internal)?;
     start
-        .checked_add_months(Months::new(months))
+        .checked_add_months(months.max(1))
         .ok_or_else(|| Error::internal("subscription period end is out of range"))
 }
 

@@ -2,6 +2,7 @@
 //! gửi, thông báo của nền tảng. Permission được kiểm trong service TRƯỚC mọi bước tra cứu hay kiểm
 //! đầu vào.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -54,7 +54,7 @@ pub(crate) struct TemplateResponse {
     short: String,
     /// Approved Zalo ZNS template id (channel `zns`).
     zns_template_id: Option<String>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<template::Model> for TemplateResponse {
@@ -303,14 +303,14 @@ pub(crate) struct MessageResponse {
     /// Why it was skipped or canceled (see `NotificationSkipReason`); empty otherwise.
     skip_reason: String,
     /// Deferred until then.
-    not_before: Option<DateTime<Utc>>,
+    not_before: Option<Timestamp>,
     attempts: i32,
     provider_reference: Option<String>,
     /// Why it failed (error code of the provider, `unsubscribe_url_missing`, `zns_template_missing`…).
     error_code: Option<String>,
     dedupe_key: String,
-    created_at: DateTime<Utc>,
-    sent_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    sent_at: Option<Timestamp>,
 }
 
 impl From<message::Model> for MessageResponse {

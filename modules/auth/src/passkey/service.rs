@@ -6,13 +6,14 @@
 //! chủ nào hoàn tất cũng được; mỗi nghi thức dùng đúng một lần (câu `DELETE` có điều kiện
 //! quyết khi hai request cùng dùng).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set, SqlErr,
@@ -363,7 +364,7 @@ impl PasskeyService {
             tenant_id: Set(tenant.id().as_uuid()),
             user_id: Set(user_id),
             state: Set(state),
-            expires_at: Set(now() + chrono::Duration::minutes(CEREMONY_MINUTES)),
+            expires_at: Set(now() + SignedDuration::from_mins(CEREMONY_MINUTES)),
         }
         .insert(tenant.database().write())
         .await?;
@@ -449,8 +450,8 @@ fn passkey_not_found(id: Uuid) -> Error {
     Error::not_found("auth.passkey_not_found", "You have no passkey `{id}`.").with_param("id", id)
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Xoá mọi passkey của người dùng `user_id` trong `connection` (transaction của bên gọi, vd đặt

@@ -2,6 +2,8 @@
 //! theo khách, số khách theo gói, ghi đè của mọi khách, quyền dùng của một khách, tên gói trong thuê
 //! bao, `expand=subscription,usage` của danh sách khách. Cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::mail::Mailer;
@@ -155,7 +157,7 @@ async fn mail_nhac_ve_email_cua_ho_so_khi_thue_bao_khong_dat_rieng() {
             .await;
         let profile = json!({"legal_name": "Acme", "email": "invoices@acme.example"});
         ok(&app, Method::PUT, "/plans/billing-profile", "owner", Some(profile)).await;
-        let soon = chrono::Utc::now() + chrono::Duration::hours(12);
+        let soon = Timestamp::now() + SignedDuration::from_hours(12);
         sql(
             &app,
             &format!("UPDATE plans_subscription SET current_period_end = '{}'", soon.to_rfc3339()),
@@ -185,7 +187,7 @@ async fn nhan_su_nen_tang_xem_ky_thanh_toan_so_khach_ghi_de_va_quyen_dung_cua_kh
         }
 
         // Kỳ sắp hết: job lập kỳ `renewal` cho cả hai khách.
-        let soon = chrono::Utc::now() + chrono::Duration::hours(12);
+        let soon = Timestamp::now() + SignedDuration::from_hours(12);
         sql(&app, &format!("UPDATE plans_subscription SET current_period_end = '{}'", soon.to_rfc3339())).await;
         tick(&app).await;
 
@@ -214,7 +216,7 @@ async fn nhan_su_nen_tang_xem_ky_thanh_toan_so_khach_ghi_de_va_quyen_dung_cua_kh
         assert_eq!(one["data"][0]["plan_name"], "pro");
 
         // Ghi đè của mọi khách, lọc theo khách và theo hiệu lực.
-        let past = (chrono::Utc::now() - chrono::Duration::days(1)).to_rfc3339();
+        let past = (Timestamp::now() - SignedDuration::from_hours(24)).to_rfc3339();
         let overrides = [
             (acme, json!({"kind": "limit", "key": "kernel.api_requests", "max_value": 5, "reason": "test"})),
             (beta, json!({"kind": "limit", "key": "kernel.api_requests", "max_value": 9, "reason": "old", "expires_at": past})),

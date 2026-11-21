@@ -1,5 +1,6 @@
 //! Gợi ý trả lời bằng AI: chỉ là bản nháp (D-109).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -7,7 +8,6 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -25,7 +25,7 @@ pub(crate) struct DraftResponse {
     body: String,
     /// Written by AI: send it with `ai_assisted: true` so it is labelled.
     ai_assisted: bool,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<Draft> for DraftResponse {

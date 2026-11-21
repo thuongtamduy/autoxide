@@ -1,5 +1,6 @@
 //! Hồ sơ công khai của nút (D-200, D-315): đọc / sửa (quản trị), danh sách cửa hàng công khai.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::{Address, AddressInput};
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -53,7 +53,7 @@ pub(crate) struct PublicProfileResponse {
     /// Cover image (id in the `media` library).
     cover_media_id: Option<Uuid>,
     /// `null` until the profile is first saved.
-    updated_at: Option<DateTime<Utc>>,
+    updated_at: Option<Timestamp>,
 }
 
 impl From<Profile> for PublicProfileResponse {
@@ -295,7 +295,7 @@ async fn get_public_storefront(
     tenant: TenantContext,
     site: autoxide_kernel::tenancy::Site,
 ) -> Result<Response, Error> {
-    let found = service.public_storefront(&tenant, &site, Utc::now()).await?;
+    let found = service.public_storefront(&tenant, &site, Timestamp::now()).await?;
     let brand = found.brand;
     let data = StorefrontResponse {
         brand: BrandResponse {

@@ -1,6 +1,8 @@
 //! Quyền vào hỗ trợ của nhân sự nền tảng (bước 34 mục 13, D-190, D-211, D-313), qua REST với module
 //! `auth` thật (khách nền tảng + một khách), cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::Actor;
@@ -8,7 +10,8 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
+use sea_orm::sea_query::ExprTrait as _;
 use serde_json::{Value, json};
 
 use crate::role::RoleInput;
@@ -187,7 +190,7 @@ async fn ho_tro_het_han_thi_mat_quyen() {
             .shop
             .database()
             .read()
-            .query_all_raw(Statement::from_sql_and_values(
+            .query_all_raw(autoxide_kernel::database::statement(
                 setup.shop.database().read().get_database_backend(),
                 "SELECT name FROM auth_events WHERE tenant_id = $1 ORDER BY id",
                 [setup.shop.id().as_uuid().into()],
@@ -205,14 +208,19 @@ async fn ho_tro_het_han_thi_mat_quyen() {
             .app
             .database()
             .write()
-            .execute_raw(Statement::from_sql_and_values(
-                setup.app.database().write().get_database_backend(),
-                "UPDATE auth_support_grant SET expires_at = $1 WHERE id = $2",
-                [
-                    (chrono::Utc::now() - chrono::Duration::minutes(1)).into(),
-                    uuid::Uuid::parse_str(&id).unwrap().into(),
-                ],
-            ))
+            .execute(
+                &sea_orm::sea_query::Query::update()
+                    .table(sea_orm::sea_query::Alias::new("auth_support_grant"))
+                    .value(
+                        sea_orm::sea_query::Alias::new("expires_at"),
+                        sea_orm::Value::from(Timestamp::now() - SignedDuration::from_mins(1)),
+                    )
+                    .and_where(
+                        sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("id"))
+                            .eq(uuid::Uuid::parse_str(&id).unwrap()),
+                    )
+                    .to_owned(),
+            )
             .await
             .unwrap();
         let (status, _) = call(&setup, "GET", "/customers", &setup.agent, Some("shop"), None).await;

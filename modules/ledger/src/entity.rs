@@ -16,6 +16,8 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod book {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -30,7 +32,7 @@ pub(crate) mod book {
         pub fiscal_year_start_month: i32,
         /// Ngày cuối của kỳ khoá gần nhất: không bút toán nào được mang ngày ≤ ngày này.
         pub closed_through: Option<Date>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -38,6 +40,7 @@ pub(crate) mod book {
 }
 
 pub(crate) mod account {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -62,8 +65,8 @@ pub(crate) mod account {
         pub name: Option<String>,
         /// `active` hay `closed`.
         pub status: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -90,6 +93,8 @@ pub(crate) mod balance {
 }
 
 pub(crate) mod entry {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -103,7 +108,7 @@ pub(crate) mod entry {
         pub org_id: Uuid,
         pub period_id: Uuid,
         pub effective_date: Date,
-        pub posted_at: DateTimeUtc,
+        pub posted_at: Timestamp,
         pub description: String,
         pub source_module: String,
         pub source_kind: String,
@@ -121,6 +126,7 @@ pub(crate) mod entry {
 }
 
 pub(crate) mod line {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -147,6 +153,8 @@ pub(crate) mod line {
 }
 
 pub(crate) mod period {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -161,7 +169,7 @@ pub(crate) mod period {
         pub ends_on: Date,
         /// `open` hay `closed`.
         pub status: String,
-        pub closed_at: Option<DateTimeUtc>,
+        pub closed_at: Option<Timestamp>,
         pub closed_by: Option<Uuid>,
     }
 
@@ -210,6 +218,7 @@ pub(crate) mod head {
 }
 
 pub(crate) mod seal {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -225,7 +234,7 @@ pub(crate) mod seal {
         pub entry_id: Uuid,
         pub entry_hash: String,
         pub chain_hash: String,
-        pub sealed_at: DateTimeUtc,
+        pub sealed_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -233,6 +242,7 @@ pub(crate) mod seal {
 }
 
 pub(crate) mod payment {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -258,14 +268,14 @@ pub(crate) mod payment {
         pub checkout_url: Option<String>,
         pub qr_payload: Option<String>,
         pub return_url: Option<String>,
-        pub expires_at: DateTimeUtc,
-        pub captured_at: Option<DateTimeUtc>,
+        pub expires_at: Timestamp,
+        pub captured_at: Option<Timestamp>,
         pub source_module: String,
         pub source_id: Option<String>,
         pub reference: String,
         pub reference_fingerprint: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// VietQR: mã chuyển khoản trong nội dung (`AX…`), duy nhất theo khách.
         pub transfer_code: Option<String>,
         /// VietQR: tài khoản ngân hàng nhận (của người bán / khách — nền tảng không giữ tiền).
@@ -277,6 +287,7 @@ pub(crate) mod payment {
 }
 
 pub(crate) mod refund {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -295,8 +306,8 @@ pub(crate) mod refund {
         pub reason: String,
         pub reference: String,
         pub reference_fingerprint: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -304,6 +315,7 @@ pub(crate) mod refund {
 }
 
 pub(crate) mod gateway_event {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -323,8 +335,8 @@ pub(crate) mod gateway_event {
         /// `pending`, `processed`, `ignored`, `failed`.
         pub status: String,
         pub error: Option<String>,
-        pub received_at: DateTimeUtc,
-        pub processed_at: Option<DateTimeUtc>,
+        pub received_at: Timestamp,
+        pub processed_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -332,6 +344,7 @@ pub(crate) mod gateway_event {
 }
 
 pub(crate) mod statement_line {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -360,6 +373,7 @@ pub(crate) mod statement_line {
 }
 
 pub(crate) mod exception {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -384,8 +398,8 @@ pub(crate) mod exception {
         pub resolution: Option<String>,
         pub note: Option<String>,
         pub resolved_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -393,6 +407,8 @@ pub(crate) mod exception {
 }
 
 pub(crate) mod reconciliation {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -411,7 +427,7 @@ pub(crate) mod reconciliation {
         pub exceptions: i64,
         pub error: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -419,6 +435,7 @@ pub(crate) mod reconciliation {
 }
 
 pub(crate) mod flow_setting {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -439,8 +456,8 @@ pub(crate) mod flow_setting {
         /// `partner_collection` hay `seller_direct`.
         pub cod_remittance: String,
         pub updated_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -448,6 +465,7 @@ pub(crate) mod flow_setting {
 }
 
 pub(crate) mod hold {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -465,14 +483,14 @@ pub(crate) mod hold {
         pub amount_minor: i64,
         pub original_minor: i64,
         pub currency: String,
-        pub release_at: DateTimeUtc,
+        pub release_at: Timestamp,
         /// `held`, `released`.
         pub status: String,
         pub source_module: String,
         pub source_id: String,
         pub release_entry_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -480,6 +498,7 @@ pub(crate) mod hold {
 }
 
 pub(crate) mod payout {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -503,8 +522,8 @@ pub(crate) mod payout {
         pub reference: String,
         pub reference_fingerprint: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -512,6 +531,7 @@ pub(crate) mod payout {
 }
 
 pub(crate) mod bank_account {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -531,8 +551,8 @@ pub(crate) mod bank_account {
         pub feed_cursor: Option<String>,
         /// `active`, `disabled`.
         pub status: String,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -540,6 +560,7 @@ pub(crate) mod bank_account {
 }
 
 pub(crate) mod bank_transaction {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -556,11 +577,11 @@ pub(crate) mod bank_transaction {
         pub amount_minor: i64,
         pub amount_currency: String,
         pub memo: String,
-        pub booked_at: DateTimeUtc,
+        pub booked_at: Timestamp,
         /// `pending`, `matched`, `exception`, `ignored`.
         pub match_status: String,
         pub payment_id: Option<Uuid>,
-        pub received_at: DateTimeUtc,
+        pub received_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -568,6 +589,8 @@ pub(crate) mod bank_transaction {
 }
 
 pub(crate) mod fx_rate {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -586,7 +609,7 @@ pub(crate) mod fx_rate {
         /// `manual` hay `provider:<tên>`.
         pub source: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

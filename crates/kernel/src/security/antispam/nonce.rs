@@ -7,7 +7,7 @@ use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
 
@@ -51,7 +51,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
     module: &str,
     nonce: &str,
     result: Option<&str>,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 ) -> Result<Claim, Error> {
     let table = Alias::new(table_name(module));
     let hash = sha256(nonce);
@@ -63,7 +63,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
             id.into(),
             hash.as_str().into(),
             result.map(str::to_owned).into(),
-            expires_at.trunc_subsecs(6).into(),
+            expires_at.into(),
         ])
         .on_conflict(
             OnConflict::columns([Alias::new("tenant_id"), Alias::new("nonce_hash")])
@@ -91,7 +91,7 @@ pub(crate) async fn claim<C: ConnectionTrait>(
 pub(crate) async fn purge<C: ConnectionTrait>(
     connection: &C,
     module: &str,
-    before: DateTime<Utc>,
+    before: Timestamp,
 ) -> Result<u64, Error> {
     let delete = Query::delete()
         .from_table(Alias::new(table_name(module)))

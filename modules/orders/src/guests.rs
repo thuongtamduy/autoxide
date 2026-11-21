@@ -10,6 +10,8 @@
 //! Mã và token chỉ lưu bản băm; mã không bao giờ vào job hay log (gửi SMS đồng bộ, NGOÀI
 //! transaction). Số điện thoại so bằng khoá liên hệ theo khách (`SecretKey::phone_key`).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::net::IpAddr;
 
 use autoxide_address::api::AddressInput;
@@ -23,7 +25,6 @@ use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
 use autoxide_shipping::api::{QuoteItem, QuoteRequest};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
@@ -76,7 +77,7 @@ const ADDRESS_SMS: &str = answer_text!(
 pub(crate) struct CodeSent {
     pub id: Uuid,
     pub order_id: Uuid,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     /// Gửi lại được sau chừng này giây.
     pub resend_after: i64,
     /// Số đã nhận mã, dạng che.
@@ -88,7 +89,7 @@ pub(crate) struct CodeSent {
 pub(crate) struct AccessIssued {
     pub token: String,
     pub order_id: Uuid,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Token xem đơn đã kiểm.
@@ -281,7 +282,7 @@ impl OrdersService {
             .one(tenant.database().read())
             .await?;
         if let Some(last) = last {
-            let wait = resend - (at - last.created_at).num_seconds();
+            let wait = resend - (at - last.created_at).as_secs();
             if wait > 0 {
                 return Err(errors::lookup_resend_too_soon(u64::try_from(wait).unwrap_or(1)));
             }
@@ -289,7 +290,7 @@ impl OrdersService {
         let code = random_code()?;
         let id = Uuid::now_v7();
         let pepper = self.pepper(tenant).await?;
-        let expires_at = at + Duration::minutes(CODE_TTL_MINUTES);
+        let expires_at = at + SignedDuration::from_mins(CODE_TTL_MINUTES);
         lookup_code::ActiveModel {
             id: Set(id),
             tenant_id: Set(tenant.id().as_uuid()),
@@ -398,7 +399,7 @@ impl OrdersService {
             .ok_or_else(errors::lookup_code_invalid)?;
         let token = random_token(32)?;
         let at = now();
-        let expires_at = at + Duration::minutes(self.config.lookup_token_minutes);
+        let expires_at = at + SignedDuration::from_mins(self.config.lookup_token_minutes);
         lookup_token::ActiveModel {
             id: Set(Uuid::now_v7()),
             tenant_id: Set(tenant.id().as_uuid()),

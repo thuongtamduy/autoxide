@@ -5,6 +5,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -118,10 +119,7 @@ impl Automations {
                 update
                     .col_expr(Column::ErrorCode, Expr::value(Option::<String>::None))
                     .col_expr(Column::ErrorMessage, Expr::value(Option::<String>::None))
-                    .col_expr(
-                        Column::FinishedAt,
-                        Expr::value(Option::<chrono::DateTime<chrono::Utc>>::None),
-                    )
+                    .col_expr(Column::FinishedAt, Expr::value(Option::<Timestamp>::None))
                     .col_expr(Column::TriggeredBy, Expr::value(principal.user_id()))
             },
             FAILED,

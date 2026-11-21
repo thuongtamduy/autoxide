@@ -1,9 +1,9 @@
 //! Thuộc tính bắt buộc là dữ liệu có ngày hiệu lực, hàng cấm không mở bán được, hàng có điều kiện
 //! cần giấy tờ còn hạn, `readiness` và số liệu đầu trang (D-223…D-227).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 
 use super::{app, call, create_product};
@@ -55,7 +55,7 @@ async fn chuyen_trang_thai_kiem_thuoc_tinh_bat_buoc() {
             .unwrap()["id"]
             .clone();
         let food = category(&app, "Thực phẩm").await;
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         let body = json!({"attributes": [{"attribute_id": origin, "required": true, "effective_from": today}]});
         let (status, saved) =
             call(&app, "PUT", &format!("/categories/{food}/attributes"), "boss", Some(body)).await;
@@ -113,15 +113,15 @@ async fn thuoc_tinh_bat_buoc_theo_ngay_hieu_luc() {
             let (_, made) = call(&app, "POST", "/categories", "boss", Some(body)).await;
             made["data"]["id"].as_str().unwrap().to_owned()
         };
-        let today = Utc::now().date_naive();
-        let rule = |from: chrono::NaiveDate, to: Option<chrono::NaiveDate>| {
+        let today = Timestamp::now().date_utc();
+        let rule = |from: Date, to: Option<Date>| {
             json!({"attributes": [{"attribute_id": material, "required": true, "applies_to_descendants": true, "effective_from": from, "effective_to": to}]})
         };
         let (product, _) = create_product(&app, "boss", tree.a, "SHIRT-X", "Áo").await;
         in_category(&app, &product, &child).await;
         let uri = format!("/categories/{parent}/attributes");
         // Hiệu lực từ tuần sau: chưa chặn.
-        let (status, _) = call(&app, "PUT", &uri, "boss", Some(rule(today + Duration::days(7), None))).await;
+        let (status, _) = call(&app, "PUT", &uri, "boss", Some(rule(today.checked_add_days(7).unwrap(), None))).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(readiness(&app, &product).await, "ready");
         // Đã hết hạn hôm qua: không chặn.
@@ -130,7 +130,7 @@ async fn thuoc_tinh_bat_buoc_theo_ngay_hieu_luc() {
             "PUT",
             &uri,
             "boss",
-            Some(rule(today - Duration::days(30), Some(today - Duration::days(1)))),
+            Some(rule(today.checked_sub_days(30).unwrap(), Some(today.checked_sub_days(1).unwrap()))),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
@@ -215,19 +215,19 @@ async fn hang_co_dieu_kien_can_giay_to_con_han() {
         let (status, problem) = publish(&app, &product).await;
         assert_eq!((status, problem["code"].as_str()), (StatusCode::CONFLICT, Some("catalog.documents_required")));
 
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         let documents = format!("/products/{product}/documents");
         // Giấy phép đã hết hạn: vẫn thiếu.
         let expired = json!({
             "document_type": "alcohol_retail_licence", "number": "01/GP", "issued_by": "Sở Công Thương",
-            "issued_on": today - Duration::days(400), "expires_on": today - Duration::days(1),
+            "issued_on": today.checked_sub_days(400).unwrap(), "expires_on": today.checked_sub_days(1).unwrap(),
         });
         let (status, _) = call(&app, "POST", &documents, "boss", Some(expired)).await;
         assert_eq!(status, StatusCode::CREATED);
         assert_eq!(readiness(&app, &product).await, "missing_documents");
         let valid = json!({
             "document_type": "alcohol_retail_licence", "number": "02/GP", "issued_by": "Sở Công Thương",
-            "issued_on": today - Duration::days(10), "expires_on": today + Duration::days(365),
+            "issued_on": today.checked_sub_days(10).unwrap(), "expires_on": today.checked_add_days(365).unwrap(),
         });
         let (status, made) = call(&app, "POST", &documents, "boss", Some(valid)).await;
         assert_eq!(status, StatusCode::CREATED, "{made}");

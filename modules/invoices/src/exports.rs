@@ -14,6 +14,7 @@
 //! - XLSX: `rust_xlsxwriter`; số tiền là ô số (Excel lưu số thực 64 bit — đúng tuyệt đối tới
 //!   9×10^15 đơn vị nhỏ nhất; lớn hơn thì ghi dạng chữ).
 
+use autoxide_kernel::time::Date;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -27,7 +28,6 @@ use autoxide_kernel::storage::{Storage as _, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_ledger::api::{JournalLine, JournalQuery, Side};
 use bytes::Bytes;
-use chrono::NaiveDate;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -128,8 +128,8 @@ pub(crate) struct ExportInput {
     pub org: Option<OrgId>,
     pub profile: String,
     pub format: String,
-    pub from: NaiveDate,
-    pub to: NaiveDate,
+    pub from: Date,
+    pub to: Date,
 }
 
 // ---- Ghi file -----------------------------------------------------------------------------------
@@ -399,7 +399,7 @@ impl InvoicesService {
         }
         if input.to < input.from {
             problems.push(FieldError::new("to", "range", "must not be before `from`"));
-        } else if (input.to - input.from).num_days() >= MAX_DAYS {
+        } else if input.to.days_since(input.from) >= MAX_DAYS {
             problems.push(FieldError::new(
                 "to",
                 "range",
@@ -536,8 +536,8 @@ impl InvoicesService {
         &self,
         tenant: &TenantContext,
         book: Option<OrgId>,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
     ) -> Result<Vec<JournalLine>, Error> {
         let mut all = Vec::new();
         let mut page = PageRequest::first(500, Order::Asc);
@@ -611,8 +611,8 @@ impl InvoicesService {
         &self,
         tenant: &TenantContext,
         org: Option<OrgId>,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
     ) -> Result<Vec<Vec<Cell>>, Error> {
         let read = tenant.database().read();
         let mut select = document::Entity::find()
@@ -818,15 +818,15 @@ impl JobHandler for BuildExportJob {
 mod tests {
     use super::*;
     use autoxide_kernel::money::Currency;
-    use chrono::Utc;
+    use autoxide_kernel::time::Timestamp;
 
     fn line(entry: Uuid, no: i32, side: Side, account: &str, minor: i64) -> JournalLine {
         JournalLine {
             line_id: Uuid::now_v7(),
             entry_id: entry,
             org_id: Uuid::nil(),
-            effective_date: NaiveDate::from_ymd_opt(2026, 3, 2).unwrap(),
-            posted_at: Utc::now(),
+            effective_date: Date::new(2026, 3, 2).unwrap(),
+            posted_at: Timestamp::now(),
             description: "=cmd|' /C calc'!A0".to_owned(),
             source_module: "demo".to_owned(),
             source_kind: "sale".to_owned(),

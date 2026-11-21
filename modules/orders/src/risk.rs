@@ -17,6 +17,8 @@
 //! pháp của người bán — **cần người có chuyên môn xác nhận** và khách ghi vào sổ căn cứ xử lý của
 //! `compliance`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -25,7 +27,6 @@ use autoxide_kernel::event::{Actor, Delivered, EventHandler, Subscription};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -73,8 +74,8 @@ pub(crate) struct NewRule {
     pub min_orders: i32,
     pub max_fail_ratio_bp: i32,
     pub max_order_value: Option<Money>,
-    pub effective_from: Option<DateTime<Utc>>,
-    pub effective_to: Option<DateTime<Utc>>,
+    pub effective_from: Option<Timestamp>,
+    pub effective_to: Option<Timestamp>,
 }
 
 pub(crate) fn subscriptions(service: &Arc<OrdersService>) -> Vec<Subscription> {
@@ -376,7 +377,7 @@ impl OrdersService {
         phone: &str,
         reason: &str,
         note: Option<String>,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Result<cod_block::Model, Error> {
         Self::require_risk(principal)?;
         let mut problems = Vec::new();
@@ -395,7 +396,7 @@ impl OrdersService {
             ));
         }
         let at = now();
-        if expires_at <= at || expires_at > at + Duration::days(365) {
+        if expires_at <= at || expires_at > at + SignedDuration::from_hours(24 * 365) {
             problems.push(FieldError::new(
                 "expires_at",
                 "range",

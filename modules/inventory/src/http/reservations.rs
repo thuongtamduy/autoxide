@@ -1,5 +1,6 @@
 //! Endpoint chỗ giữ hàng (xem, gỡ kẹt bằng tay), kho phục vụ cửa hàng và cài đặt chọn kho.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -85,7 +85,7 @@ pub(crate) struct ReservationResponse {
     pub selling_org_id: Uuid,
     /// `held` (until `expires_at`), `confirmed`, `fulfilled`, `released` or `expired`.
     pub status: String,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     pub lines: Vec<ReservedLineResponse>,
 }
 

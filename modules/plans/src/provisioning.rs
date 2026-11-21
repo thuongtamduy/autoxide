@@ -14,6 +14,7 @@
 //! - Gói `requires_kyc`: nhân sự không cấp phát thẳng được (`plans.kyc_required`) — khách tự đăng ký
 //!   và qua định danh ở `signup.rs` (D-349), rồi đến đây bằng chính đường này.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -25,7 +26,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest, fetch_page};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{NewTenant, TenantId};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -42,6 +42,7 @@ use crate::permissions::{PROVISION, SUBSCRIPTIONS_READ};
 use crate::service::{AssignInput, PlansService, now, plan_not_found, price_not_found};
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -73,8 +74,8 @@ pub(crate) mod entity {
         /// JSON: `[{"step": …, "at": …}]`.
         pub steps: String,
         pub requested_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -541,7 +542,7 @@ pub(crate) fn routes() -> OpenApiRouter<Arc<PlansService>> {
 pub(crate) struct ProvisioningStep {
     /// `created`, `tenant_created`, `subscribed`, `seeded`, `invited` or `done`.
     step: String,
-    at: DateTime<Utc>,
+    at: Timestamp,
 }
 
 /// A request to create a tenant on a plan, and how far it went.
@@ -573,8 +574,8 @@ pub(crate) struct ProvisioningResponse {
     /// Every step done, oldest first.
     steps: Vec<ProvisioningStep>,
     requested_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<entity::Model> for ProvisioningResponse {

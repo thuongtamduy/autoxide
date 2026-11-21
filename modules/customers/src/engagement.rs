@@ -5,6 +5,8 @@
 //! mua có đồng ý `marketing` trong sổ đồng ý của `compliance`, kiểm lại ngay trước khi gửi, dừng ngay
 //! khi rút đồng ý hay khi người đó đặt đơn; `notifications` áp khung giờ và link huỷ nhận.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_compliance::api::{ConsentKey, ConsentSubject};
@@ -16,7 +18,6 @@ use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Recipient,
 };
 use autoxide_orders::api::events as orders;
-use chrono::Duration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -190,7 +191,7 @@ impl CustomersService {
             .filter(recent_view::Column::ProfileId.eq(profile.id))
             .filter(
                 recent_view::Column::ViewedAt
-                    .gte(now() - Duration::days(self.config.recent_views_days)),
+                    .gte(now() - SignedDuration::from_hours(24 * self.config.recent_views_days)),
             )
             .scoped(tenant)
             .order_by_desc(recent_view::Column::ViewedAt)
@@ -225,7 +226,7 @@ impl CustomersService {
         )
         .exec_without_returning(&transaction)
         .await?;
-        let all: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> = recent_view::Entity::find()
+        let all: Vec<(Uuid, Timestamp)> = recent_view::Entity::find()
             .filter(recent_view::Column::ProfileId.eq(profile.id))
             .scoped(tenant)
             .select_only()
@@ -257,7 +258,7 @@ impl CustomersService {
         &self,
         connection: &C,
     ) -> Result<u64, Error> {
-        let cutoff = now() - Duration::days(self.config.recent_views_days);
+        let cutoff = now() - SignedDuration::from_hours(24 * self.config.recent_views_days);
         Ok(recent_view::Entity::delete_many()
             .filter(recent_view::Column::ViewedAt.lt(cutoff))
             .exec(connection)
@@ -368,7 +369,7 @@ impl CustomersService {
             vec![(0, 0)]
         };
         for (step, minutes) in rows {
-            let run_at = at + Duration::minutes(minutes);
+            let run_at = at + SignedDuration::from_mins(minutes);
             let inserted = cart_reminder::Entity::insert(cart_reminder::ActiveModel {
                 id: Set(Uuid::now_v7()),
                 tenant_id: Set(tenant.id().as_uuid()),

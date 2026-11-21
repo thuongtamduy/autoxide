@@ -10,6 +10,7 @@ use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
 use autoxide_kernel::tenancy::DEFAULT_TENANT;
 use autoxide_kernel::tenancy::migration::{TenantTable, adopt};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, schema_snapshot};
 use sea_orm::{ConnectionTrait, Statement};
 use uuid::Uuid;
@@ -144,7 +145,7 @@ async fn run(database: &Database, sql: &str, values: Vec<sea_orm::Value>) {
     };
     database
         .write()
-        .execute_raw(Statement::from_sql_and_values(backend, sql, values))
+        .execute_raw(autoxide_kernel::database::statement(backend, sql, values))
         .await
         .unwrap();
 }
@@ -172,12 +173,14 @@ async fn seeded(test: &TestDatabase) -> (Database, Uuid, autoxide_testkit::Schem
         vec![parent.into(), "Ada".into()],
     )
     .await;
-    run(
-        &database,
-        "INSERT INTO demo_child (id, parent_id, code, created_at) VALUES (?, ?, ?, ?)",
-        vec![Uuid::now_v7().into(), parent.into(), "x".into(), chrono::Utc::now().into()],
-    )
-    .await;
+    // Có cột thời gian: dùng builder, nó thêm kiểu `timestamptz` cho tham số trên Postgres (câu viết tay
+    // gửi giá trị như chuỗi và Postgres từ chối).
+    let child = sea_orm::sea_query::Query::insert()
+        .into_table(sea_orm::sea_query::Alias::new("demo_child"))
+        .columns(["id", "parent_id", "code", "created_at"].map(sea_orm::sea_query::Alias::new))
+        .values_panic([Uuid::now_v7().into(), parent.into(), "x".into(), Timestamp::now().into()])
+        .to_owned();
+    database.write().execute(&child).await.unwrap();
     run(&database, "INSERT INTO demo_kv (key, value) VALUES (?, ?)", vec!["k".into(), "v".into()])
         .await;
     let before = schema_snapshot(database.write()).await.unwrap();

@@ -1,5 +1,6 @@
 //! Route REST của mẫu in, bản in, bản xuất kế toán và bản lưu trữ (dưới `/api/v1/invoices`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -60,8 +60,8 @@ pub(crate) struct TemplateResponse {
     version: i32,
     /// The template (Jinja syntax; see `GET /api/v1/invoices/template-defaults`).
     body: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<template::Model> for TemplateResponse {
@@ -505,16 +505,16 @@ pub(crate) struct ExportResponse {
     profile: String,
     /// `csv` or `xlsx`.
     format: String,
-    period_from: NaiveDate,
-    period_to: NaiveDate,
+    period_from: Date,
+    period_to: Date,
     /// `pending`, `running`, `ready` (download it) or `failed` (ask for a new one).
     status: String,
     size: Option<i64>,
     /// Rows in the file, without the header row.
     row_count: Option<i64>,
     error: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<export::Model> for ExportResponse {
@@ -549,9 +549,9 @@ pub(crate) struct ExportRequest {
     /// `csv` (UTF-8 with BOM, opens in Excel) or `xlsx`.
     format: String,
     /// First day, `YYYY-MM-DD`.
-    from: NaiveDate,
+    from: Date,
     /// Last day, `YYYY-MM-DD`; at most 366 days after `from`.
-    to: NaiveDate,
+    to: Date,
 }
 
 /// Export the general journal or the documents of a period.
@@ -738,8 +738,8 @@ pub(crate) struct ArchiveResponse {
     /// SHA-256 of `manifest.json`, which lists the SHA-256 of every file.
     manifest_sha256: Option<String>,
     /// Keep the archive at least until this day.
-    retain_until: Option<NaiveDate>,
-    created_at: DateTime<Utc>,
+    retain_until: Option<Date>,
+    created_at: Timestamp,
 }
 
 impl From<archive::Model> for ArchiveResponse {

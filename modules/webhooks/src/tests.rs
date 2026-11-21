@@ -1,6 +1,8 @@
 //! Test của module `webhooks` trên database gate đang chọn (gate chạy cả SQLite và
 //! Postgres), với một máy nhận HTTP thật chạy trong test.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
@@ -527,7 +529,7 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
         };
         let busy = post("https://example.com/busy").await;
         let quiet = post("https://example.com/quiet").await;
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         for (minutes, status, code) in [(10, "failed", Some(500)), (1, "succeeded", Some(204))] {
             let row = delivery::Model {
                 tenant_id: app.default_tenant().id().as_uuid(),
@@ -540,11 +542,8 @@ async fn endpoint_kem_lan_gui_moi_nhat_va_loc_trang_thai() {
                 attempts: 1,
                 response_status: code,
                 last_error: None,
-                created_at: chrono::SubsecRound::trunc_subsecs(
-                    now - chrono::Duration::minutes(minutes),
-                    6,
-                ),
-                last_attempt_at: Some(chrono::SubsecRound::trunc_subsecs(now, 6)),
+                created_at: now - SignedDuration::from_mins(minutes),
+                last_attempt_at: Some(now),
                 delivered_at: None,
             };
             delivery::Entity::insert(sea_orm::IntoActiveModel::into_active_model(row))

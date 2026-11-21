@@ -1,12 +1,13 @@
 //! Đặt hàng: `Idempotency-Key` bắt buộc và chống trùng, giữ chỗ / trả chỗ, số đơn liền, thanh toán qua
 //! `ledger`, hết hạn, thanh toán muộn, lượt đặt treo.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::atomic::Ordering;
 
 use autoxide_kernel::tenancy::{OrgId, ScopeExt};
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use futures_util::future::join_all;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
@@ -101,7 +102,7 @@ async fn checkout_requires_idempotency_key_and_replays_same_key() {
         assert_eq!(order["payment_status"], "cod_pending");
         assert_eq!(
             order["number"].as_str().unwrap(),
-            format!("{}-000001", Utc::now().format("%Y"))
+            format!("{}-000001", Timestamp::now().format("%Y"))
         );
         assert_eq!(super::minor(&order["totals"]["total"]), 400_000 - 40_000 + 30_000);
         assert_eq!(placed["data"]["payment_actions"][0]["kind"], "cod");
@@ -272,7 +273,7 @@ async fn promotion_hold_failure_releases_stock_hold_and_numbers_have_no_gaps() {
             .into_iter()
             .map(|row| row.number)
             .collect();
-        let year = Utc::now().format("%Y");
+        let year = Timestamp::now().format("%Y");
         let expected: Vec<String> = (1..=7).map(|n| format!("{year}-{n:06}")).collect();
         assert_eq!(numbers, expected);
     })
@@ -359,7 +360,7 @@ async fn online_payment_confirms_once_and_unpaid_order_expires() {
         let late: Uuid = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
         assert_eq!(placed["data"]["payment_actions"][0]["kind"], "qr");
         order::Entity::update_many()
-            .col_expr(order::Column::PaymentDueAt, Expr::value(Utc::now() - Duration::minutes(1)))
+            .col_expr(order::Column::PaymentDueAt, Expr::value(Timestamp::now() - SignedDuration::from_mins(1)))
             .filter(order::Column::Id.eq(late))
             .exec(shop.database().write())
             .await
@@ -392,7 +393,12 @@ async fn crash_after_reserve_is_recovered_by_job() {
         // Máy chết ngay sau bước giữ tồn: lượt đặt kẹt ở `reserving`, đơn chưa có.
         let id = Uuid::now_v7();
         let lines = vec![ReserveLine::new(shirt.to_string(), shirt, 2)];
-        let request = ReserveRequest::new(id, shop.tree.a, Utc::now() + Duration::hours(1), lines);
+        let request = ReserveRequest::new(
+            id,
+            shop.tree.a,
+            Timestamp::now() + SignedDuration::from_hours(1),
+            lines,
+        );
         shop.inventory.reserve(&tenant, &request).await.unwrap();
         let stuck = checkout::ActiveModel {
             id: sea_orm::Set(id),
@@ -404,8 +410,8 @@ async fn crash_after_reserve_is_recovered_by_job() {
             state: sea_orm::Set("reserving".to_owned()),
             failure_code: sea_orm::Set(None),
             holds: sea_orm::Set("{}".to_owned()),
-            created_at: sea_orm::Set(Utc::now() - Duration::hours(1)),
-            updated_at: sea_orm::Set(Utc::now() - Duration::hours(1)),
+            created_at: sea_orm::Set(Timestamp::now() - SignedDuration::from_hours(1)),
+            updated_at: sea_orm::Set(Timestamp::now() - SignedDuration::from_hours(1)),
         };
         sea_orm::ActiveModelTrait::insert(stuck, shop.database().write()).await.unwrap();
         assert_eq!(shop.inventory.available(shop.tree.a, shirt), 3);

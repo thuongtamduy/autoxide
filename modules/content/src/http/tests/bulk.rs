@@ -1,6 +1,8 @@
 //! View đã lưu, xuất danh sách, lưu trữ hàng loạt, hoàn giao việc, ghi chú trên bản ghi.
 
 use super::*;
+use autoxide_kernel::time::{Precision, Timestamp};
+use jiff::SignedDuration;
 
 /// Schema bộ lọc và view đã lưu (bước 51 P7): danh sách bài có `x-autoxide-filters` sinh từ tham
 /// số của nó; view lưu `params` sai schema thì 422 nêu từng tham số; view chung cần quyền.
@@ -316,8 +318,8 @@ async fn hoan_giao_viec_va_buoc_thiet_lap() {
             .await
             .unwrap();
         assert_eq!(past.status(), StatusCode::UNPROCESSABLE_ENTITY);
-        let later = (chrono::Utc::now() + chrono::Duration::days(30))
-            .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let later = (Timestamp::now() + SignedDuration::from_hours(24 * 30))
+            .to_rfc3339_opts(Precision::Seconds, true);
         let snoozed = me(Method::POST, "snooze", Some(json!({"until": later}))).await.unwrap();
         assert_eq!(snoozed.status(), StatusCode::OK, "{}", snoozed.json());
         assert_eq!(work("").await.unwrap().json()["data"]["items"], json!([]), "đã hoãn");

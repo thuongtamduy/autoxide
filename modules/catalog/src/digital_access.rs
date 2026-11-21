@@ -2,6 +2,7 @@
 //! quyền của người mua đang đăng nhập, xem / thu hồi / cấp lại token theo đơn. Phần gắn file và
 //! phát / thu hồi theo event ở `digital.rs`.
 
+use jiff::SignedDuration;
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::storage::Storage as _;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::Duration;
 use hmac::{Hmac, KeyInit, Mac};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -104,13 +104,14 @@ impl CatalogService {
             .one(write)
             .await?
             .ok_or_else(download_not_found)?;
-        let expires_at = now() + Duration::seconds(self.config.download_link_seconds);
-        let signature = self.link_signature(tenant, current.id, expires_at.timestamp()).await?;
+        let expires_at = now() + SignedDuration::from_secs(self.config.download_link_seconds);
+        let signature =
+            self.link_signature(tenant, current.id, expires_at.as_unix_seconds()).await?;
         let url = format!(
             "{}/catalog/public/downloads/{}/file?exp={}&sig={signature}",
             autoxide_kernel::http::API_PREFIX,
             current.id,
-            expires_at.timestamp(),
+            expires_at.as_unix_seconds(),
         );
         metrics::counter!("catalog_downloads_total").increment(1);
         Ok(FileLink { url, expires_at, remaining: current.remaining, file_name: asset.file_name })
@@ -156,7 +157,7 @@ impl CatalogService {
             .await?
             .verify_slice(&signature)
             .map_err(|_| download_not_found())?;
-        if expires < now().timestamp() {
+        if expires < now().as_unix_seconds() {
             return Err(download_not_found());
         }
         let read = tenant.database().read();

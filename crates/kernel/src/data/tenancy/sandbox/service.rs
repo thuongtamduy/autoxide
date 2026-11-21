@@ -1,14 +1,14 @@
 //! Service của sandbox: tạo, gia hạn, xoá, hết hạn; job sao cấu hình rồi kích hoạt. REST và tool
 //! MCP cùng gọi vào đây.
 
-use std::sync::Arc;
-
-use chrono::{DateTime, Duration, SubsecRound, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::sync::Arc;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -30,8 +30,8 @@ use crate::tenancy::{
     TenantStatus, errors, require_platform,
 };
 
-pub(super) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(super) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// A sandbox: a test copy of a tenant with its configuration and no personal data. Partners are
@@ -48,12 +48,12 @@ pub struct Sandbox {
     /// The real tenant it was made from.
     pub sandbox_of: Uuid,
     /// When it is deleted unless extended.
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Products asked to copy.
     pub products: u32,
     /// Role of the real tenant whose holders may enter the sandbox; `null`: the `admin` role.
     pub role_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// A new sandbox and the job copying the configuration into it.
@@ -114,7 +114,7 @@ fn describe(row: &entity::Model) -> Sandbox {
 struct SandboxChanged {
     sandbox_id: Uuid,
     sandbox_of: Uuid,
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     role_id: Option<Uuid>,
 }
 
@@ -293,7 +293,7 @@ impl TenantSandboxes {
             read_only: Set(false),
             kind: Set(TenantKind::Sandbox.as_str().to_owned()),
             sandbox_of: Set(Some(source.id().as_uuid())),
-            sandbox_expires_at: Set(Some(now + Duration::days(self.days))),
+            sandbox_expires_at: Set(Some(now + SignedDuration::from_hours(24 * self.days))),
             sandbox_options: Set(Some(serde_json::to_string(&options).map_err(Error::internal)?)),
         }
         .insert(self.control().write())
@@ -382,7 +382,7 @@ impl TenantSandboxes {
         principal.require(&SANDBOXES_MANAGE)?;
         let row = self.owned(tenant, principal, id).await?;
         let mut active = row.into_active_model();
-        active.sandbox_expires_at = Set(Some(now() + Duration::days(self.days)));
+        active.sandbox_expires_at = Set(Some(now() + SignedDuration::from_hours(24 * self.days)));
         active.updated_at = Set(now());
         let row = active.update(self.control().write()).await?;
         self.registry.invalidate(TenantId::from_uuid(id));

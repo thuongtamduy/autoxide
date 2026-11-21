@@ -8,6 +8,7 @@
 //! Bị từ chối: sửa người mua rồi phát hành lại → gửi lại **cùng số**. Đã chấp nhận: chỉ sửa bằng chứng
 //! từ điều chỉnh / thay thế, hay huỷ (NĐ 123/2020 Điều 19 sửa bởi NĐ 70/2025 — cần đối chiếu).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -24,7 +25,6 @@ use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_ledger::api::{AccountKey, LineAccount, NewEntry, NewLine, NewReversal};
-use chrono::{Datelike, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -99,7 +99,7 @@ fn not_correctable(status: &str) -> Error {
     .with_param("status", status)
 }
 
-fn rate_missing(base: Currency, quote: Currency, on: chrono::NaiveDate) -> Error {
+fn rate_missing(base: Currency, quote: Currency, on: Date) -> Error {
     Error::new(
         autoxide_kernel::error::ErrorKind::Validation,
         "invoices.rate_missing",
@@ -119,7 +119,7 @@ impl InvoicesService {
         tenant: &TenantContext,
         row: &document::Model,
         seller: OrgId,
-        on: chrono::NaiveDate,
+        on: Date,
     ) -> Result<Option<FxSnapshot>, Error> {
         let currency = Currency::parse(&row.currency)?;
         let base = self.ledger.book_currency(tenant, seller).await?;
@@ -192,7 +192,7 @@ impl InvoicesService {
         } else {
             Value::Null
         };
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         // Chứng từ ngoại tệ: chụp tỉ giá ngày lập (đọc `ledger` NGOÀI transaction ghi).
         let fx = if current.status == "draft" {
             self.fx_snapshot(tenant, &current, seller_org, current.issue_date.unwrap_or(today))
@@ -224,7 +224,7 @@ impl InvoicesService {
                             &transaction,
                             tenant,
                             &SubmitEInvoice { document_id: id },
-                            EnqueueOptions::default().unique_key(format!("{id}:{}", saved.updated_at.timestamp_micros())),
+                            EnqueueOptions::default().unique_key(format!("{id}:{}", saved.updated_at.as_unix_micros())),
                         )
                         .await?;
                         transaction.commit().await?;
@@ -267,7 +267,7 @@ impl InvoicesService {
                 }
                 if symbol_row.org_id != row.org_id
                     || symbol_row.kind != row.kind
-                    || symbol_row.year != issue_date.year()
+                    || symbol_row.year != i32::from(issue_date.year())
                 {
                     return Err(Error::validation(vec![FieldError::new(
                         "series_id",

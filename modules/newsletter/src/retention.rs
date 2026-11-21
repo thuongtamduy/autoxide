@@ -7,6 +7,8 @@
 //! event) chạy theo từng khách có dữ liệu trên database đó; token, nonce và bộ đếm quét cả
 //! database.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -17,7 +19,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
@@ -56,7 +57,7 @@ impl NewsletterService {
         &self,
         databases: &DatabaseRegistry,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
         // Khách có người đăng ký hay đăng ký trên database này (quét cả database, qua index có
@@ -93,10 +94,10 @@ impl NewsletterService {
             }
         }
         let write = database.write();
-        self.tokens.purge(write, now - chrono::Duration::days(1)).await?;
+        self.tokens.purge(write, now - SignedDuration::from_hours(24)).await?;
         self.guard.purge_nonces(write, MODULE).await?;
         Throttle::new(MODULE, 1, Duration::from_secs(3600))?
-            .purge(database, now - chrono::Duration::days(2))
+            .purge(database, now - SignedDuration::from_hours(24 * 2))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -112,9 +113,10 @@ impl NewsletterService {
     async fn cleanup_tenant(
         &self,
         tenant: &TenantContext,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Cleaned, Error> {
-        let before = now - chrono::Duration::days(i64::from(self.config.unconfirmed_days));
+        let before =
+            now - SignedDuration::from_hours(24 * (i64::from(self.config.unconfirmed_days)));
         let tenant_id = tenant.id().as_uuid();
         let transaction = tenant.database().begin_write().await?;
         let subscriptions = subscription::Entity::delete_many()

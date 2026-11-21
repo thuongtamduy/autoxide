@@ -1,5 +1,6 @@
 //! Bảng `orders_orders`: một đơn hàng.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -34,7 +35,7 @@ pub struct Model {
     pub total_minor: i64,
     pub paid_minor: i64,
     pub refunded_minor: i64,
-    pub payment_due_at: Option<DateTimeUtc>,
+    pub payment_due_at: Option<Timestamp>,
     pub attribution: Option<String>,
     pub promotions: Option<String>,
     pub stock_shortage: bool,
@@ -42,17 +43,17 @@ pub struct Model {
     pub terms_version: Option<String>,
     pub note: Option<String>,
     pub locale: String,
-    pub placed_at: DateTimeUtc,
-    pub confirmed_at: Option<DateTimeUtc>,
-    pub delivered_at: Option<DateTimeUtc>,
-    pub completed_at: Option<DateTimeUtc>,
-    pub cancelled_at: Option<DateTimeUtc>,
+    pub placed_at: Timestamp,
+    pub confirmed_at: Option<Timestamp>,
+    pub delivered_at: Option<Timestamp>,
+    pub completed_at: Option<Timestamp>,
+    pub cancelled_at: Option<Timestamp>,
     pub cancel_reason: Option<String>,
-    pub preorder_accepted_at: Option<DateTimeUtc>,
+    pub preorder_accepted_at: Option<Timestamp>,
     pub version: i32,
     pub custom_fields: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

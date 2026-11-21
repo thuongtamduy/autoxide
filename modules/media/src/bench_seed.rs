@@ -7,6 +7,8 @@
 //! của module, dòng `media_item` / `media_variant` ghi theo lô. Không xếp job, không phát event:
 //! bản nhỏ đã có sẵn, dữ liệu giả không cần audit.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -16,7 +18,6 @@ use autoxide_kernel::storage::Storage as _;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, root_of};
 use bytes::Bytes;
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use image::{DynamicImage, ImageFormat, Rgb, RgbImage};
 use sea_orm::{EntityTrait, PaginatorTrait, Set};
@@ -97,7 +98,7 @@ impl Seed {
         count: u64,
     ) -> Result<Vec<Uuid>, Error> {
         let mut random = Pseudo::new(0x3ED1A);
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let org = root_of(tenant.id()).as_uuid();
         let (mut items, mut copies, mut files) = (Vec::new(), Vec::new(), Vec::new());
         let mut ids = Vec::new();
@@ -105,7 +106,8 @@ impl Seed {
             let sample_index = usize::try_from(index % u64::from(SAMPLES)).unwrap_or(0);
             let Some(sample) = samples.get(sample_index) else { continue };
             let (id, version) = (Uuid::now_v7(), Uuid::now_v7());
-            let at = now - Duration::minutes(i64::try_from(random.below(1_051_200)).unwrap_or(0));
+            let at = now
+                - SignedDuration::from_mins(i64::try_from(random.below(1_051_200)).unwrap_or(0));
             let name = format!("{}-{index}.jpg", random.sentence(2).replace(' ', "-"));
             items.push(item::ActiveModel {
                 id: Set(id),
@@ -222,7 +224,7 @@ fn samples(widths: &[u32]) -> Result<Vec<Sample>, Error> {
 
 /// Dòng item rỗng chỉ để hỏi `wanted_widths` cỡ nào cần làm.
 fn probe_item() -> item::Model {
-    let epoch = DateTime::<Utc>::UNIX_EPOCH;
+    let epoch = Timestamp::UNIX_EPOCH;
     item::Model {
         id: Uuid::nil(),
         tenant_id: Uuid::nil(),

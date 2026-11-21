@@ -8,6 +8,7 @@
 //!    với backoff, tối đa [`MAX_ATTEMPTS`] lần — rồi lần gửi thành `failed`.
 //! 3. [`Cleanup`] chạy mỗi ngày, xoá lần gửi cũ hơn [`KEEP_DELIVERIES_DAYS`] ngày.
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -240,7 +241,7 @@ impl JobHandler for Sender {
             return Ok(());
         }
 
-        let timestamp = now().timestamp();
+        let timestamp = now().as_unix_seconds();
         let message_id = row.id.to_string();
         let sealer = self.secrets.sealer().await?;
         let secret = sealer.open(
@@ -381,7 +382,7 @@ pub(crate) struct Cleanup;
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let before = now() - chrono::Duration::days(KEEP_DELIVERIES_DAYS);
+        let before = now() - SignedDuration::from_hours(24 * KEEP_DELIVERIES_DAYS);
         let deleted = delivery::Entity::delete_many()
             .filter(delivery::Column::CreatedAt.lt(before))
             .filter(delivery::Column::Status.ne(STATUS_PENDING))

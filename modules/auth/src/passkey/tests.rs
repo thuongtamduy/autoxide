@@ -1,6 +1,8 @@
 //! Test passkey trên database gate đang chọn (gate chạy cả SQLite và Postgres), với
 //! authenticator phần mềm thay cho thiết bị thật.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::ErrorKind;
@@ -378,7 +380,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
         let change_token = crate::testing::last_token(&services);
         // 3. Lượt chờ mã MFA (TOTP đã bật, kẻ gian có một recovery code).
         let setup = services.mfa.start_totp(&tenant, ada, "ada@example.com").await.unwrap();
-        let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+        let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
         let code = crate::mfa::service::tests::code_at(&setup.secret, now);
         let recovery = services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
         let crate::session::LoginOutcome::MfaRequired { mfa_token, .. } =
@@ -419,7 +421,7 @@ async fn dat_lai_mat_khau_dong_moi_cua_mo_bang_mat_khau_cu() {
             .table(sea_orm::sea_query::Alias::new("auth_tokens"))
             .value(
                 sea_orm::sea_query::Alias::new("created_at"),
-                chrono::Utc::now() - chrono::Duration::minutes(5),
+                Timestamp::now() - SignedDuration::from_mins(5),
             )
             .to_owned();
         services.database.write().execute(&older).await.unwrap();
@@ -501,7 +503,7 @@ async fn tao_api_key_xac_nhan_bang_passkey_hay_ma_va_quan_tri_thu_hoi() {
         assert_eq!(error.code(), "auth.mfa_not_enabled");
 
         let setup = services.mfa.start_totp(&tenant, ada, "ada@example.com").await.unwrap();
-        let now = u64::try_from(chrono::Utc::now().timestamp()).unwrap();
+        let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
         let code = crate::mfa::service::tests::code_at(&setup.secret, now);
         services.mfa.confirm_totp(&tenant, ada, &code).await.unwrap();
         let wrong = agent_key("", Some(Reauth::Totp("000000".to_owned())));

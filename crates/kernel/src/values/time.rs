@@ -14,6 +14,11 @@
 //! - **Hai database như nhau**: [`Timestamp::now`] cắt về micro giây — độ chính xác của Postgres — nên giá trị
 //!   vừa tạo trong bộ nhớ bằng đúng giá trị đọc lại từ database nào cũng vậy.
 //!
+//! **SQL viết tay:** giá trị ghi đi dưới dạng chuỗi kèm tên kiểu `timestamptz` / `date`; Postgres chỉ nhận khi
+//! câu lệnh mang tên kiểu đó (`$1::"timestamptz"`). Builder của SeaORM / sea-query tự chèn; câu viết tay thì dựng
+//! bằng `autoxide_kernel::database::statement` (luật `raw-statement` của `cargo xtask check` chặn
+//! `Statement::from_sql_and_values`). Đừng tự viết `CAST(? AS timestamptz)`: SQLite đọc kiểu lạ thành số.
+//!
 //! Múi giờ, khoảng thời gian, tính lịch (thêm tháng, thứ trong tuần…) dùng thẳng `jiff` (`jiff::tz::TimeZone`,
 //! `jiff::SignedDuration`, `jiff::civil`): không có gì phải lưu hay trả ra nên không cần bọc.
 //!
@@ -32,6 +37,47 @@ use std::fmt;
 
 pub use date::Date;
 pub use timestamp::Timestamp;
+
+/// Múi giờ IANA theo tên (`Asia/Ho_Chi_Minh`, `UTC`), lấy từ bộ dữ liệu múi giờ đóng gói trong binary (không phụ
+/// thuộc máy chủ). Tên phải viết đúng hoa thường như trong bộ dữ liệu — như `chrono-tz` trước đây; `jiff` tự nó
+/// chấp nhận cả `asia/ho_chi_minh`, nhưng tên đã lưu sẽ được đọc lại và so khớp ở nơi khác, nên giữ một dạng.
+pub fn zone(name: &str) -> Option<jiff::tz::TimeZone> {
+    let zone = jiff::tz::TimeZone::get(name).ok()?;
+    (zone.iana_name() == Some(name)).then_some(zone)
+}
+
+/// Thời điểm của giờ địa phương `local` ở múi `zone` — như `chrono` `from_local_datetime(…).earliest()`:
+/// giờ không có ở địa phương (nhảy giờ mùa hè) thì `None`, giờ lặp lại (lùi giờ) thì lấy lần sớm hơn.
+pub fn from_local(zone: &jiff::tz::TimeZone, local: jiff::civil::DateTime) -> Option<Timestamp> {
+    use jiff::tz::AmbiguousOffset;
+    let offset = match zone.to_ambiguous_timestamp(local).offset() {
+        AmbiguousOffset::Unambiguous { offset } => offset,
+        // Hai lần cùng giờ: lần đầu còn mang độ lệch trước khi đổi giờ.
+        AmbiguousOffset::Fold { before, .. } => before,
+        AmbiguousOffset::Gap { .. } => return None,
+    };
+    offset.to_timestamp(local).ok().map(Timestamp::from)
+}
+
+/// Giờ trong ngày viết `HH:MM` (`09:00`, cũng nhận `9:00`), như giờ mở cửa. Không nhận giây, không nhận `24:00`.
+pub fn parse_clock(raw: &str) -> Option<jiff::civil::Time> {
+    jiff::civil::Time::strptime("%H:%M", raw).ok()
+}
+
+/// Số chữ số lẻ của giây khi viết RFC 3339 (như `chrono::SecondsFormat`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Precision {
+    /// Không phần lẻ.
+    Seconds,
+    /// 3 chữ số.
+    Millis,
+    /// 6 chữ số.
+    Micros,
+    /// 9 chữ số.
+    Nanos,
+    /// Không có, hay 3, 6, 9 chữ số tuỳ giá trị (`SecondsFormat::AutoSi`).
+    Auto,
+}
 
 /// Chuỗi không đọc được thành thời điểm hay ngày.
 #[derive(Debug, Clone, PartialEq, Eq)]

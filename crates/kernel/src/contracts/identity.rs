@@ -5,8 +5,7 @@
 //!
 //! Lưu tối thiểu (Luật Bảo vệ dữ liệu cá nhân 91/2025): `compliance` chỉ lưu kết quả, mã tham chiếu, tên
 //! đã xác thực, băm và 4 số cuối của số giấy tờ — không lưu ảnh khuôn mặt hay dữ liệu sinh trắc học.
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
@@ -120,9 +119,9 @@ impl VerificationRequest {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum VerificationSession {
     /// Mở trang của nhà cung cấp.
-    Redirect { provider_reference: String, url: String, expires_at: DateTime<Utc> },
+    Redirect { provider_reference: String, url: String, expires_at: Timestamp },
     /// Ứng dụng di động mở SDK bằng token.
-    Sdk { provider_reference: String, token: String, expires_at: DateTime<Utc> },
+    Sdk { provider_reference: String, token: String, expires_at: Timestamp },
     /// Không cần người dùng làm gì (vd tra cứu đăng ký kinh doanh); kết quả về sau.
     Pending { provider_reference: String },
 }
@@ -159,7 +158,7 @@ pub struct VerificationOutcome {
     pub document_number: Option<String>,
     /// Mức bảo đảm, vd `vneid_level_2`.
     pub assurance: Option<String>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
 }
 
 impl VerificationOutcome {

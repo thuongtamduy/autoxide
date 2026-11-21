@@ -16,7 +16,7 @@ use autoxide_kernel::money::Currency;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, root_of};
-use chrono::NaiveDate;
+use autoxide_kernel::time::Date;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set};
 use uuid::Uuid;
@@ -37,7 +37,7 @@ fn rate_exists() -> Error {
     )
 }
 
-pub(crate) fn rate_not_found(base: Currency, quote: Currency, on: NaiveDate) -> Error {
+pub(crate) fn rate_not_found(base: Currency, quote: Currency, on: Date) -> Error {
     Error::not_found(
         "ledger.exchange_rate_not_found",
         "There is no {base}/{quote} exchange rate in force on {date}. Record one with `POST \
@@ -75,7 +75,7 @@ pub(crate) struct RateInput {
     pub base: String,
     pub quote: String,
     pub rate: Decimal,
-    pub effective_date: NaiveDate,
+    pub effective_date: Date,
 }
 
 /// Kiểm cặp tiền và tỉ giá; mọi lỗi gom một lần.
@@ -113,7 +113,7 @@ impl LedgerService {
         tenant: &TenantContext,
         base: Currency,
         quote: Currency,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Option<fx_rate::Model>, Error> {
         // Vài dòng mới nhất là đủ: một ngày chỉ có một dòng mỗi nguồn.
         let rows = fx_rate::Entity::find()
@@ -140,7 +140,7 @@ impl LedgerService {
         principal: &Principal,
         base: &str,
         quote: &str,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<ExchangeRate, Error> {
         principal.require(&READ)?;
         let mut problems = Vec::new();
@@ -226,7 +226,7 @@ impl LedgerService {
         base: Currency,
         quote: Currency,
         rate: Decimal,
-        on: NaiveDate,
+        on: Date,
         source: &str,
         by: Option<Uuid>,
     ) -> Result<(Option<fx_rate::Model>, bool), Error> {
@@ -277,7 +277,7 @@ impl LedgerService {
         principal: &Principal,
         provider: Option<String>,
         base: &str,
-        on: Option<NaiveDate>,
+        on: Option<Date>,
     ) -> Result<Vec<ExchangeRate>, Error> {
         Self::require_rates_manage(tenant, principal).await?;
         let base = Currency::parse(base).map_err(|_| {

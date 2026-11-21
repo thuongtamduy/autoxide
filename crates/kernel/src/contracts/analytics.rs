@@ -24,11 +24,10 @@
 //! assert_eq!(CHECKOUT.steps.len(), 3);
 //! ```
 
+use crate::time::Timestamp;
+use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
-
-use chrono::{DateTime, Utc};
-use serde_json::Value;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -93,7 +92,7 @@ impl Prop {
 pub struct ServerHit {
     /// Website (nút) của sự kiện; `None`: nút gốc của khách.
     pub org_id: Option<OrgId>,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     /// Đối tượng, dạng `<loại>:<id>` (vd `catalog.product:0190…`).
     pub object: Option<String>,
     /// Người làm. Module `analytics` chỉ giữ khi người đó đồng ý theo dõi theo người.
@@ -101,7 +100,7 @@ pub struct ServerHit {
 }
 
 impl ServerHit {
-    pub fn new(occurred_at: DateTime<Utc>) -> Self {
+    pub fn new(occurred_at: Timestamp) -> Self {
         ServerHit { org_id: None, occurred_at, object: None, user_id: None }
     }
 

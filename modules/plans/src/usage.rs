@@ -5,6 +5,7 @@
 //! điều kiện nằm ở `WHERE` (D-181), không "đọc, kiểm, ghi", nên N request cùng lúc không vượt được
 //! hạn mức. `max` đọc từ quyền dùng (có thể từ bộ nhớ đệm); phần nguyên tử ở `adjust`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::entitlement::{
@@ -13,7 +14,6 @@ use autoxide_kernel::entitlement::{
 use autoxide_kernel::error::Error;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::TenantId;
-use chrono::{DateTime, Datelike, Months, NaiveDate, TimeZone, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
@@ -28,17 +28,15 @@ use crate::service::{PlansService, now};
 pub(crate) const NO_PERIOD: &str = "0000-00-00";
 
 /// Ngày đầu tháng (UTC) chứa `at`, dạng `YYYY-MM-DD`.
-pub(crate) fn month_start(at: DateTime<Utc>) -> String {
-    format!("{:04}-{:02}-01", at.year(), at.month())
+pub(crate) fn month_start(at: Timestamp) -> String {
+    at.date_utc().first_of_month().to_string()
 }
 
 /// Số giây từ `at` tới đầu tháng sau (UTC), ít nhất 1.
-pub(crate) fn seconds_to_next_month(at: DateTime<Utc>) -> u64 {
-    let next = NaiveDate::from_ymd_opt(at.year(), at.month(), 1)
-        .and_then(|first| first.checked_add_months(Months::new(1)))
-        .and_then(|first| first.and_hms_opt(0, 0, 0))
-        .map(|next| Utc.from_utc_datetime(&next));
-    next.map_or(1, |next| u64::try_from((next - at).num_seconds()).unwrap_or(1).max(1))
+pub(crate) fn seconds_to_next_month(at: Timestamp) -> u64 {
+    let next =
+        at.date_utc().first_of_month().checked_add_months(1).map(|first| first.start_of_day_utc());
+    next.map_or(1, |next| u64::try_from((next - at).as_secs()).unwrap_or(1).max(1))
 }
 
 /// Lượng đang dùng của một khách: `limit_key` → `used` (kỳ hiện tại cho hạn mức `metered`).
@@ -334,7 +332,7 @@ impl PlansService {
 
     /// Trả các chỗ `held` đã quá hạn (tiến trình giữ chỗ chết, hay module quên xác nhận), tối đa
     /// `batch` chỗ một lượt. Trả số chỗ đã trả.
-    pub(crate) async fn expire_holds(&self, at: DateTime<Utc>, batch: u64) -> Result<usize, Error> {
+    pub(crate) async fn expire_holds(&self, at: Timestamp, batch: u64) -> Result<usize, Error> {
         use sea_orm::{QueryOrder, QuerySelect};
         let due = reservation::Entity::find()
             .filter(reservation::Column::Status.eq("held"))
@@ -363,7 +361,7 @@ impl PlansService {
     /// giữ / xác nhận / trả nào chen giữa lúc đếm, số đếm khớp với sổ — ghi; sổ đổi thì bỏ lượt, thử
     /// lại (tối đa [`RECONCILE_ATTEMPTS`] lần, còn lại để lượt sau). Trước đây ghi tuyệt đối
     /// `used = đích` sau khi đếm: lần giữ / trả chen giữa bị ghi đè, khách vượt hạn mức (cả hai DB).
-    pub(crate) async fn reconcile(&self, _at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn reconcile(&self, _at: Timestamp) -> Result<usize, Error> {
         let catalog = self.entitlements.catalog();
         // (khoá, có chia phần, bộ đếm) của mỗi hạn mức đếm được.
         let limits: Vec<(&'static str, bool, std::sync::Arc<dyn UsageCounter>)> = catalog
@@ -505,7 +503,7 @@ impl PlansService {
     }
 
     /// Lượng đang dùng của mọi hạn mức của khách `tenant` (hạn mức `metered`: kỳ chứa `at`).
-    pub(crate) async fn usage(&self, tenant: TenantId, at: DateTime<Utc>) -> Result<Usage, Error> {
+    pub(crate) async fn usage(&self, tenant: TenantId, at: Timestamp) -> Result<Usage, Error> {
         let period = month_start(at);
         let rows = usage::Entity::find()
             .filter(usage::Column::TenantId.eq(tenant.as_uuid()))
@@ -521,7 +519,7 @@ impl PlansService {
     pub(crate) async fn usage_of_many(
         &self,
         tenants: &[TenantId],
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<BTreeMap<TenantId, Usage>, Error> {
         let mut found: BTreeMap<TenantId, Usage> = BTreeMap::new();
         if tenants.is_empty() {
@@ -660,10 +658,10 @@ mod tests {
 
     #[test]
     fn ky_thang_va_giay_toi_ky_sau() {
-        let at = Utc.with_ymd_and_hms(2026, 1, 31, 23, 59, 0).unwrap();
+        let at = Timestamp::from_utc(2026, 1, 31, 23, 59, 0).unwrap();
         assert_eq!(month_start(at), "2026-01-01");
         assert_eq!(seconds_to_next_month(at), 60);
-        let end = Utc.with_ymd_and_hms(2026, 12, 15, 0, 0, 0).unwrap();
+        let end = Timestamp::from_utc(2026, 12, 15, 0, 0, 0).unwrap();
         assert_eq!(month_start(end), "2026-12-01");
         assert_eq!(seconds_to_next_month(end), 17 * 86_400);
     }

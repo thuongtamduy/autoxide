@@ -1,6 +1,7 @@
 //! Nhập hàng: nhà cung cấp (công nợ qua `ledger`), đơn đặt hàng nhận một phần, phiếu nhập ghi sổ
 //! cái đúng một lần, ghi lại khi lỗi, trả hàng nhà cung cấp đảo bút toán.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::error::Error;
@@ -16,7 +17,6 @@ use autoxide_ledger::api::{
 };
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{NaiveDate, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -49,7 +49,7 @@ impl FakeLedger {
 fn entry(reference: &str) -> Entry {
     serde_json::from_value(json!({
         "id": Uuid::now_v7(), "book_id": Uuid::now_v7(), "org_id": Uuid::now_v7(), "period_id": Uuid::now_v7(),
-        "effective_date": "2026-11-19", "posted_at": Utc::now(), "description": "", "source_module": "inventory",
+        "effective_date": "2026-11-19", "posted_at": Timestamp::now(), "description": "", "source_module": "inventory",
         "source_kind": "receipt", "source_id": null, "reference": reference, "reverses_entry_id": null,
         "reversed_by_entry_id": null, "actor_user_id": null, "lines": [], "sequence": null, "sealed_at": null,
     }))
@@ -100,7 +100,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: AccountKey,
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Money, Error> {
         unused()
     }
@@ -130,7 +130,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         keys: &[AccountKey],
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         let posted = self.posted.lock().unwrap();
         Ok(keys
@@ -186,7 +186,7 @@ impl Ledger for FakeLedger {
         _: &TenantContext,
         _: Currency,
         _: Currency,
-        _: NaiveDate,
+        _: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         unused()
     }

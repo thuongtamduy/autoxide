@@ -1,6 +1,7 @@
 //! Endpoint quản lý banner: `/api/v1/content/banners` (bước 55, D-236). Cần `content.banners` ở nút
 //! của banner.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -110,9 +110,9 @@ pub(crate) struct BannerResponse {
     page_targets: Vec<BannerPage>,
     link: Option<BannerLink>,
     /// Shown from (included); `null`: at once.
-    starts_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
     /// Shown until (excluded); `null`: no end.
-    ends_at: Option<DateTime<Utc>>,
+    ends_at: Option<Timestamp>,
     /// Order in the placement, smallest first.
     position: i32,
     /// `draft`, `active` or `archived`.
@@ -121,8 +121,8 @@ pub(crate) struct BannerResponse {
     /// 134/2025/QH15): label it.
     ai_assisted: bool,
     created_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 pub(crate) fn banner_response(row: Banner, placement: &str) -> BannerResponse {
@@ -194,8 +194,8 @@ pub(crate) struct CreateBannerRequest {
     #[serde(default)]
     page_targets: Vec<BannerPage>,
     link: Option<BannerLink>,
-    starts_at: Option<DateTime<Utc>>,
-    ends_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
+    ends_at: Option<Timestamp>,
     /// `draft` (default) or `active`.
     status: Option<String>,
     /// Set when the text came from an AI suggestion.
@@ -228,11 +228,11 @@ pub(crate) struct UpdateBannerRequest {
     #[schema(value_type = Option<BannerLink>)]
     link: Option<Option<BannerLink>>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>)]
-    starts_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>)]
+    starts_at: Option<Option<Timestamp>>,
     #[serde(default, deserialize_with = "present")]
-    #[schema(value_type = Option<DateTime<Utc>>)]
-    ends_at: Option<Option<DateTime<Utc>>>,
+    #[schema(value_type = Option<Timestamp>)]
+    ends_at: Option<Option<Timestamp>>,
     /// `draft`, `active` or `archived`.
     status: Option<String>,
     ai_assisted: Option<bool>,

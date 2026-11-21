@@ -1,5 +1,6 @@
 //! Endpoint quy tắc làm tròn giá đẹp và đổi giá hàng loạt (D-222), dưới `/api/v1/catalog`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -44,7 +44,7 @@ pub(crate) struct RoundingRuleResponse {
     /// `up`, `down` or `nearest`.
     pub mode: String,
     pub ending_minor: Option<i64>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<rounding_rule::Model> for RoundingRuleResponse {
@@ -162,9 +162,9 @@ pub(crate) struct ChangeResponse {
     /// New price (`set`), basis points (`percent`, signed) or minor units added (`amount`, signed).
     pub value: i64,
     pub rounding_rule_id: Option<Uuid>,
-    pub valid_from: DateTime<Utc>,
+    pub valid_from: Timestamp,
     /// End of a temporary change; the earlier prices apply again after it.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
     /// `draft`, `previewed`, `approved`, `applied` or `cancelled`.
     pub status: String,
     /// Variants changed (known after the preview).
@@ -175,8 +175,8 @@ pub(crate) struct ChangeResponse {
     pub preview: Option<Value>,
     pub created_by: Option<Uuid>,
     pub approved_by: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<price_change::Model> for ChangeResponse {
@@ -219,9 +219,9 @@ pub(crate) struct CreateChangeRequest {
     pub value: i64,
     pub rounding_rule_id: Option<Uuid>,
     /// When the new prices start; omitted: now. A future time schedules them.
-    pub valid_from: Option<DateTime<Utc>>,
+    pub valid_from: Option<Timestamp>,
     /// End of a temporary change.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
 }
 
 /// Create a bulk price change for a price list, as a draft.

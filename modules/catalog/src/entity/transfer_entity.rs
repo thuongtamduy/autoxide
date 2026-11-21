@@ -1,6 +1,7 @@
 //! Entity của bảng m0014: lần nhập / xuất CSV.
 
 pub(crate) mod transfer {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -23,8 +24,8 @@ pub(crate) mod transfer {
         /// JSON: lỗi theo dòng `[{row, field, code, message}]`, tối đa 1 000.
         pub errors: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -33,6 +34,7 @@ pub(crate) mod transfer {
 
 /// Bản nháp AI cho mô tả và SEO của một sản phẩm ở một ngôn ngữ (m0015).
 pub(crate) mod suggestion {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -50,8 +52,8 @@ pub(crate) mod suggestion {
         pub status: String,
         pub model: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub decided_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub decided_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -60,6 +62,7 @@ pub(crate) mod suggestion {
 
 /// `alt` của một ảnh sản phẩm ở một ngôn ngữ (m0017, D-202).
 pub(crate) mod media_alt {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -73,7 +76,7 @@ pub(crate) mod media_alt {
         pub media_id: Uuid,
         pub locale: String,
         pub alt: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -82,6 +85,7 @@ pub(crate) mod media_alt {
 
 /// Giá trị thuộc tính của một biến thể (m0018); `options` thành nhiều dòng như của sản phẩm.
 pub(crate) mod variant_attribute {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]

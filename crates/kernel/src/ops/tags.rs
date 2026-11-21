@@ -11,12 +11,12 @@
 //!   (permission loại đó khai); tạo nhãn mới lúc gắn được, trừ khi khách bật `kernel.tags.restricted`
 //!   (khi đó cần `kernel.tags.manage`). Tối đa 50 nhãn mỗi bản ghi. Event `kernel.record_tags_changed`.
 
+use crate::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, PoisonError, RwLock};
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Alias, Condition, Expr, Order, Query as SqlQuery};
 use sea_orm::{ColumnTrait, ConnectionTrait};
 use serde::{Deserialize, Serialize};
@@ -197,8 +197,8 @@ impl TagIndex {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// A tag of the tenant.
@@ -210,7 +210,7 @@ pub(crate) struct TagView {
     pub description: Option<String>,
     /// Records carrying it.
     pub uses: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// A tag to create.

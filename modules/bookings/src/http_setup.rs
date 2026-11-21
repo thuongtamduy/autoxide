@@ -1,6 +1,8 @@
 //! Endpoint REST cấu hình đặt lịch, dưới `/api/v1/bookings`: dịch vụ, nhân viên / phòng / thiết
 //! bị, lịch tuần, ngoại lệ. Handler chỉ: lấy dữ liệu vào → gọi service → trả envelope.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -13,7 +15,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -160,8 +161,8 @@ pub(crate) struct BookingService {
     active: bool,
     performers: Vec<Uuid>,
     required: Vec<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl BookingService {
@@ -231,8 +232,8 @@ pub(crate) struct BookingResource {
     name: String,
     user_id: Option<Uuid>,
     active: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<resource::Model> for BookingResource {
@@ -298,9 +299,9 @@ pub(crate) struct CreateBookingExceptionRequest {
     /// `closed` (time off, a holiday) or `open` (an extra shift).
     #[schema(example = "closed")]
     kind: String,
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// After `starts_at`, at most 366 days later.
-    ends_at: DateTime<Utc>,
+    ends_at: Timestamp,
     /// Up to 200 characters, e.g. "Lunar New Year holiday".
     #[serde(default)]
     reason: String,
@@ -312,10 +313,10 @@ pub(crate) struct BookingException {
     id: Uuid,
     resource_id: Uuid,
     kind: String,
-    starts_at: DateTime<Utc>,
-    ends_at: DateTime<Utc>,
+    starts_at: Timestamp,
+    ends_at: Timestamp,
     reason: String,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<exception::Model> for BookingException {
@@ -339,9 +340,9 @@ pub(crate) struct ExceptionsQuery {
     /// The resource.
     resource_id: Uuid,
     /// From this moment; default now.
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Until this moment; default 90 days after `from`.
-    to: Option<DateTime<Utc>>,
+    to: Option<Timestamp>,
 }
 
 /// List bookable services.
@@ -708,8 +709,8 @@ async fn list_exceptions(
     principal: Principal,
     Query(query): Query<ExceptionsQuery>,
 ) -> Result<Data<Vec<BookingException>>, Error> {
-    let from = query.from.unwrap_or_else(Utc::now);
-    let to = query.to.unwrap_or(from + chrono::Duration::days(90));
+    let from = query.from.unwrap_or_else(Timestamp::now);
+    let to = query.to.unwrap_or(from + SignedDuration::from_hours(24 * 90));
     let rows = service.exceptions(&tenant, &principal, query.resource_id, from, to).await?;
     Ok(Data { data: rows.into_iter().map(Into::into).collect() })
 }

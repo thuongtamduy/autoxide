@@ -7,7 +7,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
 };
@@ -133,7 +133,7 @@ impl ContentService {
         principal: &Principal,
         id: Uuid,
         input: RedirectInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Redirect, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let before = self.get_redirect(tenant, principal, id).await?;
@@ -218,7 +218,7 @@ impl ContentService {
         id: Uuid,
         input: RedirectInput,
         by: Uuid,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Redirect, Error> {
         let mut problems = Vec::new();
         let locale = self.check_locale(

@@ -1,6 +1,7 @@
 //! Vận đơn: đọc (`shipping.shipments.read`), tạo tay / đặt / huỷ / tách / chia kiện / đổi trạng
 //! thái (`shipping.shipments.manage`), nhãn của hãng.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{StatusCode, header};
 use axum::response::IntoResponse;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -55,7 +55,7 @@ pub(crate) struct SummaryBody {
     service_code: Option<String>,
     tracking_number: Option<String>,
     status: ShipmentStatus,
-    status_at: DateTime<Utc>,
+    status_at: Timestamp,
     recipient_name: String,
     recipient_phone: String,
     address: Address,
@@ -67,7 +67,7 @@ pub(crate) struct SummaryBody {
     actual_fee: Option<Money>,
     /// Last refusal of the carrier when booking (`shipping.carrier_error`…).
     last_error_code: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 fn money(minor: i64, currency: &str) -> Money {
@@ -138,7 +138,7 @@ pub(crate) struct EventBody {
     status: ShipmentStatus,
     /// The carrier's own wording.
     carrier_status: String,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
     note: String,
 }
 

@@ -1,5 +1,7 @@
 //! Nhà cung cấp xác thực danh tính và gửi SMS giả cho test.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -10,7 +12,6 @@ use autoxide_kernel::identity::{
 };
 use autoxide_kernel::sms::{SmsMessage, SmsReceipt, SmsSender};
 use axum::http::HeaderMap;
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 
 /// Tên của nhà cung cấp giả.
@@ -96,7 +97,7 @@ impl IdentityVerifier for FakeIdentityVerifier {
         Ok(VerificationSession::Redirect {
             url: format!("https://kyc.example.test/{reference}"),
             provider_reference: reference,
-            expires_at: Utc::now() + Duration::minutes(30),
+            expires_at: Timestamp::now() + SignedDuration::from_mins(30),
         })
     }
 

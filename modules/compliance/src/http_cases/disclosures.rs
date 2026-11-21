@@ -1,6 +1,7 @@
 //! Route cung cấp thông tin cho cơ quan (D-364).
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
 
 // ---- Cung cấp thông tin cho cơ quan --------------------------------------------------------------
 
@@ -14,13 +15,13 @@ pub(crate) struct DisclosureResponse {
     /// Number of the authority's request.
     pub request_reference: String,
     pub legal_basis: String,
-    pub requested_at: DateTime<Utc>,
+    pub requested_at: Timestamp,
     /// `org:<unit id>` or `user:<user id>`.
     pub subject: String,
     /// Names of the fields given (the values are not kept).
     pub fields: Vec<String>,
     pub disclosed_by: Uuid,
-    pub disclosed_at: DateTime<Utc>,
+    pub disclosed_at: Timestamp,
     /// The values given — only in the answer that recorded the disclosure.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
@@ -67,7 +68,7 @@ pub(crate) struct DisclosureRequest {
     /// The legal basis the authority cites.
     pub legal_basis: String,
     /// When the request was received; defaults to now.
-    pub requested_at: Option<DateTime<Utc>>,
+    pub requested_at: Option<Timestamp>,
     /// `org:<unit id>` (a seller's legal profile and identity verification) or `user:<user id>`.
     pub subject: String,
     /// Fields to give. Units: `legal_name`, `trade_name`, `tax_code`, `registration_number`,

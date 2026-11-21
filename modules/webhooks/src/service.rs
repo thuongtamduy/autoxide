@@ -1,13 +1,13 @@
 //! Service của webhook: quản lý nơi nhận (endpoint) và xem các lần gửi. Handler REST
 //! chỉ gọi vào đây.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, EventCatalog, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QuerySelect, Set,
 };
@@ -39,9 +39,9 @@ pub(crate) struct Endpoint {
     pub url: String,
     pub description: String,
     pub events: Vec<String>,
-    pub disabled_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub disabled_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl Endpoint {
@@ -205,7 +205,7 @@ impl WebhookService {
             return Ok(HashMap::new());
         }
         let read = tenant.database().read();
-        let latest: Vec<(Uuid, chrono::DateTime<chrono::Utc>)> = delivery::Entity::find()
+        let latest: Vec<(Uuid, Timestamp)> = delivery::Entity::find()
             .select_only()
             .column(delivery::Column::EndpointId)
             .column_as(delivery::Column::CreatedAt.max(), "latest")
@@ -218,7 +218,7 @@ impl WebhookService {
         if latest.is_empty() {
             return Ok(HashMap::new());
         }
-        let wanted: HashMap<Uuid, chrono::DateTime<chrono::Utc>> = latest.into_iter().collect();
+        let wanted: HashMap<Uuid, Timestamp> = latest.into_iter().collect();
         let rows = delivery::Entity::find()
             .filter(delivery::Column::EndpointId.is_in(wanted.keys().copied()))
             .filter(delivery::Column::CreatedAt.is_in(wanted.values().copied()))
@@ -273,7 +273,7 @@ impl WebhookService {
         actor: Actor,
         id: Uuid,
         changes: EndpointChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Endpoint, Error> {
         let (url, events) =
             self.check(changes.url.as_deref(), changes.description.as_deref(), changes.events)?;
@@ -616,8 +616,8 @@ fn endpoint_not_found(id: Uuid) -> Error {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database lưu cùng một giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]

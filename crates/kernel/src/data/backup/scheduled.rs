@@ -9,6 +9,8 @@
 //! một database dù nhiều worker (nhiều `NULL` được trên cả SQLite lẫn Postgres). Lượt `running` mà
 //! `heartbeat_at` cũ hơn [`STALE_AFTER`] (tiến trình chết) bị đánh `failed` trước khi mở lượt mới.
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -17,7 +19,6 @@ use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use sea_orm::{ConnectionTrait, SqlErr};
 use uuid::Uuid;
@@ -35,7 +36,7 @@ pub const BACKUP_JOB: &str = "kernel.backup";
 /// Thời gian chạy tối đa của một lượt (mọi database).
 pub const BACKUP_TIMEOUT: Duration = Duration::from_secs(6 * 3600);
 /// Lượt `running` không nhịp quá chừng này: tiến trình đã chết.
-pub const STALE_AFTER: chrono::Duration = chrono::Duration::minutes(15);
+pub const STALE_AFTER: SignedDuration = SignedDuration::from_mins(15);
 /// Nhịp cập nhật `heartbeat_at` trong lúc chạy.
 const HEARTBEAT_EVERY: Duration = Duration::from_secs(60);
 /// Độ dài tối đa của lỗi lưu lại (như `last_error` của job).
@@ -257,7 +258,7 @@ impl ScheduledBackups {
         let bytes = sink.bytes.load(Ordering::Relaxed);
         match result {
             Ok(manifest) => {
-                let finished = Utc::now();
+                let finished = Timestamp::now();
                 let update = Query::update()
                     .table(Alias::new(TABLE))
                     .value(Alias::new("status"), "succeeded")
@@ -341,7 +342,7 @@ pub fn prefix_of(database: &str, id: Uuid) -> String {
 /// Mở một lượt `running` cho `name`; `None` khi đang có lượt khác chạy. Lượt chết (nhịp quá cũ)
 /// được đánh `failed` trước.
 async fn open(control: &Database, name: &str) -> Result<Option<Uuid>, Error> {
-    let now = Utc::now();
+    let now = Timestamp::now();
     let stale = Query::update()
         .table(Alias::new(TABLE))
         .value(Alias::new("status"), "failed")
@@ -397,7 +398,7 @@ async fn heartbeat(control: &Database, id: Uuid) {
         tokio::time::sleep(HEARTBEAT_EVERY).await;
         let update = Query::update()
             .table(Alias::new(TABLE))
-            .value(Alias::new("heartbeat_at"), Utc::now())
+            .value(Alias::new("heartbeat_at"), Timestamp::now())
             .and_where(Expr::col(Alias::new("id")).eq(id))
             .and_where(Expr::col(Alias::new("status")).eq("running"))
             .to_owned();
@@ -417,7 +418,7 @@ async fn fail(control: &Database, id: Uuid, message: &str) -> Result<(), Error> 
         .table(Alias::new(TABLE))
         .value(Alias::new("status"), "failed")
         .value(Alias::new("active_key"), Option::<String>::None)
-        .value(Alias::new("finished_at"), Utc::now())
+        .value(Alias::new("finished_at"), Timestamp::now())
         .value(Alias::new("error"), message)
         .and_where(Expr::col(Alias::new("id")).eq(id))
         .to_owned();
@@ -446,7 +447,7 @@ fn record_metrics(
     database: &str,
     succeeded: bool,
     seconds: f64,
-    success: Option<(u64, DateTime<Utc>)>,
+    success: Option<(u64, Timestamp)>,
 ) {
     let outcome = if succeeded { "succeeded" } else { "failed" };
     metrics::counter!("backup_runs_total", "outcome" => outcome).increment(1);
@@ -454,7 +455,8 @@ fn record_metrics(
     metrics::histogram!("backup_duration_seconds", &label).record(seconds);
     if let Some((bytes, at)) = success {
         metrics::gauge!("backup_size_bytes", &label).set(bytes as f64);
-        metrics::gauge!("backup_last_success_timestamp_seconds", &label).set(at.timestamp() as f64);
+        metrics::gauge!("backup_last_success_timestamp_seconds", &label)
+            .set(at.as_unix_seconds() as f64);
     }
 }
 
@@ -503,17 +505,17 @@ impl JobHandler for BackupRunner {
 
 /// Bản backup tốt mới nhất trên mọi database: `(tên database, lúc xong)`, cũ nhất trước — cho
 /// `autoxide doctor`.
-pub async fn latest_successes(control: &Database) -> Result<Vec<(String, DateTime<Utc>)>, Error> {
+pub async fn latest_successes(control: &Database) -> Result<Vec<(String, Timestamp)>, Error> {
     let select = Query::select()
         .columns([Alias::new("database_key"), Alias::new("finished_at")])
         .from(Alias::new(TABLE))
         .and_where(Expr::col(Alias::new("status")).eq("succeeded"))
         .order_by(Alias::new("finished_at"), Order::Desc)
         .to_owned();
-    let mut newest: Vec<(String, DateTime<Utc>)> = Vec::new();
+    let mut newest: Vec<(String, Timestamp)> = Vec::new();
     for row in control.read().query_all(&select).await? {
         let name: String = row.try_get("", "database_key")?;
-        let at: DateTime<Utc> = row.try_get("", "finished_at")?;
+        let at: Timestamp = row.try_get("", "finished_at")?;
         if !newest.iter().any(|(known, _)| *known == name) {
             newest.push((name, at));
         }
@@ -560,10 +562,10 @@ impl crate::doctor::Probe for BackupAge {
             Ok(databases) => databases,
             Err(error) => return Finding::failed(format!("cannot list the databases: {error}")),
         };
-        let limit = chrono::Duration::hours(
+        let limit = SignedDuration::from_hours(
             i64::try_from(self.config.interval_hours.saturating_mul(2)).unwrap_or(i64::MAX),
         );
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut old = Vec::new();
         for (_, name, _) in &databases {
             match latest.iter().find(|(known, _)| known == name) {

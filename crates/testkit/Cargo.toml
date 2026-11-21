@@ -14,10 +14,10 @@ axum.workspace = true
 # Client MCP cho test (`mcp.rs`): mã hoá header `Mcp-Name`, đọc thân response.
 base64.workspace = true
 bytes.workspace = true
-chrono.workspace = true
 rust_decimal.workspace = true
 futures-util.workspace = true
 http-body-util.workspace = true
+jiff.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

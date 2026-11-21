@@ -15,6 +15,7 @@
 //! /api/v1/kernel/texts/{locale}/{key}` (`kernel.texts.manage`); `GET
 //! /api/v1/kernel/public/texts?locale&prefix=ui.` (công khai, `ETag`) cho giao diện.
 
+use crate::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
@@ -22,7 +23,6 @@ use std::time::{Duration, Instant};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, OnConflict, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -401,7 +401,7 @@ async fn set_text(
             .with_param("max", max));
         }
     }
-    let now: DateTime<Utc> = Utc::now().trunc_subsecs(6);
+    let now: Timestamp = Timestamp::now();
     let insert = SqlQuery::insert()
         .into_table(Alias::new(TABLE))
         .columns(["id", "tenant_id", "locale", "key", "text", "updated_by", "updated_at"])

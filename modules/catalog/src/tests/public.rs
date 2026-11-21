@@ -2,8 +2,10 @@
 //! khoảng giá, tìm không dấu, ETag, sitemap, cửa hàng ẩn sản phẩm của chuỗi, người bán.
 
 use autoxide_kernel::tenancy::OrgId;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
 
 use super::{app, call, create_product};
@@ -405,7 +407,7 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
         let (_, variant) = on_sale(&app, &list, tree.chain, "H-1", "Bình hoa", 200_000).await;
         // Đủ rộng để lượt đọc đầu (sau khi dựng lại storefront) chắc chắn còn trong hạn kể cả khi máy CI
         // chậm — 2 giây từng hết hạn trước lượt đọc đầu trên Postgres 18.
-        let ends = chrono::Utc::now() + chrono::Duration::seconds(8);
+        let ends = Timestamp::now() + SignedDuration::from_secs(8);
         let body = json!({"reference": "sale", "prices": [{"variant_id": variant, "amount": vnd(150_000), "valid_to": ends}]});
         let (status, added) =
             call(&app, "POST", &format!("/price-lists/{list}/prices"), "boss", Some(body)).await;
@@ -416,7 +418,7 @@ async fn gia_tam_thoi_het_han_storefront_ve_gia_cu() {
         assert_eq!(listed["data"][0]["price_from"], vnd(150_000));
 
         // Ngủ tới khi giá tạm thật sự hết hạn (cộng một chút), không ngủ một khoảng cố định.
-        let left = (ends - chrono::Utc::now()).to_std().unwrap_or_default();
+        let left = std::time::Duration::try_from(ends - Timestamp::now()).unwrap_or_default();
         tokio::time::sleep(left + std::time::Duration::from_millis(500)).await;
         let queue = autoxide_kernel::job::JobQueue::new("catalog");
         queue
@@ -442,7 +444,7 @@ impl crate::api::SalePriceSource for TwentyOff {
         &self,
         _tenant: &autoxide_kernel::tenancy::TenantContext,
         _org_id: OrgId,
-        at: chrono::DateTime<chrono::Utc>,
+        at: Timestamp,
         prices: &[(uuid::Uuid, autoxide_kernel::money::Money)],
     ) -> Result<Vec<crate::api::SalePrice>, autoxide_kernel::error::Error> {
         Ok(prices
@@ -451,7 +453,7 @@ impl crate::api::SalePriceSource for TwentyOff {
             .map(|(id, price)| {
                 let sale =
                     autoxide_kernel::money::Money::new(price.minor() * 8 / 10, price.currency());
-                crate::api::SalePrice::new(*id, sale, at + chrono::Duration::days(1))
+                crate::api::SalePrice::new(*id, sale, at + SignedDuration::from_hours(24))
             })
             .collect())
     }

@@ -8,7 +8,7 @@ use autoxide_kernel::decimal::{Decimal, DecimalString};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::NaiveDate;
+use autoxide_kernel::time::Date;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -76,7 +76,7 @@ pub struct TaxQuoteRequest {
     /// Tax jurisdiction, e.g. `VN`.
     pub jurisdiction: String,
     /// Day the tax applies (in the seller's time zone).
-    pub tax_point: NaiveDate,
+    pub tax_point: Date,
     /// The selling unit: its tax profile (or the nearest one above) decides the regime.
     pub seller: OrgId,
     pub buyer_kind: BuyerKind,
@@ -88,7 +88,7 @@ pub struct TaxQuoteRequest {
 impl TaxQuoteRequest {
     pub fn new(
         jurisdiction: impl Into<String>,
-        tax_point: NaiveDate,
+        tax_point: Date,
         seller: OrgId,
         price_mode: PriceMode,
         currency: Currency,
@@ -170,7 +170,7 @@ pub struct TaxQuote {
 #[non_exhaustive]
 pub struct WithholdingRequest {
     pub jurisdiction: String,
-    pub on: NaiveDate,
+    pub on: Date,
     /// `marketplace` or `affiliate`.
     pub payer_kind: String,
     /// The payee's regime (`household`…); businesses declare themselves (nothing withheld).
@@ -183,7 +183,7 @@ pub struct WithholdingRequest {
 impl WithholdingRequest {
     pub fn new(
         jurisdiction: impl Into<String>,
-        on: NaiveDate,
+        on: Date,
         payer_kind: impl Into<String>,
         payee_regime: impl Into<String>,
         business_line: impl Into<String>,
@@ -270,6 +270,6 @@ pub trait TaxEngine: Send + Sync {
         &self,
         tenant: &TenantContext,
         org: OrgId,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<InvoiceRequirements, Error>;
 }

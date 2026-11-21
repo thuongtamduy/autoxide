@@ -1,6 +1,7 @@
 //! Hoá đơn của kỳ thuê bao và huỷ kỳ cùng lúc (rà đồng thời mục 8): hoá đơn phát hành ngoài
 //! transaction, kỳ bị huỷ đúng lúc đó thì hoá đơn vừa phát hành phải bị huỷ theo.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_invoices::api::{
@@ -30,7 +31,7 @@ struct SlowInvoices {
 }
 
 fn document(draft: &NewDocument) -> Document {
-    let at = chrono::Utc::now();
+    let at = Timestamp::now();
     let zero = Money::new(0, Currency::VND);
     Document {
         id: Uuid::now_v7(),

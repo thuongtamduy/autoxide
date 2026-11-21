@@ -1,5 +1,6 @@
 //! Bảng `menus_items`: một mục của menu (cây nhiều tầng, thứ tự theo `position`).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -23,8 +24,8 @@ pub struct Model {
     pub highlight: Option<String>,
     pub badge_text: Option<String>,
     pub badge_tone: Option<String>,
-    pub badge_from: Option<DateTimeUtc>,
-    pub badge_until: Option<DateTimeUtc>,
+    pub badge_from: Option<Timestamp>,
+    pub badge_until: Option<Timestamp>,
     pub feature_kind: Option<String>,
     pub feature_id: Option<String>,
 }

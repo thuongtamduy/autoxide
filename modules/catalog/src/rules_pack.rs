@@ -3,6 +3,7 @@
 //! catalog.load_restrictions`), và job hằng ngày tính lại `readiness` của sản phẩm có giấy tờ.
 //! Căn cứ pháp lý ghi trong từng quy tắc của gói — cần đối chiếu văn bản gốc (D-186).
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -10,7 +11,6 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::task::{Task, TaskArgs, TaskArgument, TaskRun};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
-use chrono::NaiveDate;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QuerySelect, Set,
 };
@@ -136,8 +136,8 @@ struct PackRule {
     required_documents: Vec<String>,
     legal_basis: String,
     source_url: String,
-    effective_from: NaiveDate,
-    effective_to: Option<NaiveDate>,
+    effective_from: Date,
+    effective_to: Option<Date>,
 }
 
 #[derive(Debug, Deserialize)]

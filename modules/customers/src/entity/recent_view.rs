@@ -1,5 +1,6 @@
 //! Bảng `customers_recent_views`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub profile_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub product_id: Uuid,
-    pub viewed_at: DateTimeUtc,
+    pub viewed_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

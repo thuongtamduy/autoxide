@@ -7,7 +7,8 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use uuid::Uuid;
 
@@ -28,7 +29,7 @@ pub(crate) struct NewRule {
     pub points_valid_months: i32,
     pub min_redeem_points: i64,
     pub max_redeem_ratio_bp: i32,
-    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_from: Option<Timestamp>,
 }
 
 /// Hạng mới (hay bản mới của một hạng).
@@ -40,7 +41,7 @@ pub(crate) struct NewTier {
     pub currency: String,
     pub earn_multiplier_bp: i32,
     pub rank: i32,
-    pub effective_from: Option<DateTime<Utc>>,
+    pub effective_from: Option<Timestamp>,
 }
 
 /// Chương trình voucher tặng.
@@ -87,11 +88,11 @@ fn currency_ok(field: &str, code: &str, problems: &mut Vec<FieldError>) {
 }
 
 /// Mốc hiệu lực: bỏ trống = ngay; trước lúc này quá 1 phút = lỗi (đồng hồ hai máy lệch nhẹ).
-fn effective(from: Option<DateTime<Utc>>) -> Result<DateTime<Utc>, Error> {
+fn effective(from: Option<Timestamp>) -> Result<Timestamp, Error> {
     let at = now();
     match from {
         None => Ok(at),
-        Some(from) if from < at - Duration::minutes(1) => Err(past_effective()),
+        Some(from) if from < at - SignedDuration::from_mins(1) => Err(past_effective()),
         Some(from) => Ok(from),
     }
 }

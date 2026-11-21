@@ -6,6 +6,7 @@
 //! miền chính, không header `Autoxide-Tenant`. Vì vậy chúng nhận [`OptionalTenant`] thay cho
 //! `TenantContext`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -16,7 +17,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use autoxide_kernel::version::Tagged;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -685,7 +685,7 @@ pub(crate) async fn unsubscribe(
 pub(crate) struct ProfileResponse {
     /// `null` until chosen.
     pub display_name: Option<String>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<Timestamp>,
 }
 
 /// Get one's display name.

@@ -5,7 +5,8 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -22,7 +23,7 @@ pub(super) const MAX_OVERLAP_HOURS: u32 = 72;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Replacing {
     pub id: Uuid,
-    pub until: DateTime<Utc>,
+    pub until: Timestamp,
     /// Trạng thái của key cũ: key mới giữ nguyên (cấu hình y hệt, không cần duyệt lại).
     pub status: &'static str,
 }
@@ -33,7 +34,7 @@ pub(crate) struct Rotation {
     /// Số giờ key cũ còn chạy (0 tới [`MAX_OVERLAP_HOURS`]); 0: thôi chạy ngay.
     pub overlap_hours: u32,
     /// Hạn của key mới; `None`: hạn dài nhất cho phép.
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Xác nhận lại như lúc tạo key: mật khẩu hiện tại, hay một yếu tố thứ hai.
     pub current_password: String,
     pub second_factor: Option<Reauth>,
@@ -81,7 +82,8 @@ impl ApiKeyService {
             current_password: rotation.current_password,
             second_factor: rotation.second_factor,
         };
-        let until = Utc::now() + Duration::hours(i64::from(rotation.overlap_hours));
+        let until =
+            Timestamp::now() + SignedDuration::from_hours(i64::from(rotation.overlap_hours));
         let status = if old.status == super::approval::PENDING {
             super::approval::PENDING
         } else {

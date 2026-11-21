@@ -1,6 +1,7 @@
 //! Đăng nhập / tạo tài khoản người mua bằng số điện thoại + mã qua SMS (bước 47,
 //! D-20261120-phone-accounts). Logic ở `crate::phone`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -10,7 +11,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -42,7 +42,7 @@ pub(crate) struct PhoneCodeResponse {
     /// Send this with the code to `POST /api/v1/auth/phone/login`.
     challenge_id: Uuid,
     /// The code stops working at this time.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 /// A sign-in code to check.

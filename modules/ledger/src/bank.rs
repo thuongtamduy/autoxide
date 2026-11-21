@@ -7,6 +7,7 @@
 //! biến động để ghi sổ, không giữ tiền. Bút toán khi khớp: Nợ `cash.bank[tài khoản]` / Có
 //! `receivable.customer`.
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -18,7 +19,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::payment::{BankAccountRef, BankDirection, BankFeed, BankTransaction};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::Duration;
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde::{Deserialize, Serialize};
@@ -417,7 +417,7 @@ impl LedgerService {
             "org": input.org.as_uuid(), "bank_account": account.id, "amount": input.amount.minor(),
             "description": description, "source_id": input.source_id,
         }))?;
-        let expiry = Duration::minutes(self.config.payment_expiry_minutes);
+        let expiry = SignedDuration::from_mins(self.config.payment_expiry_minutes);
         let (database, outbox) = (tenant.database(), &self.outbox);
         let (reference, fingerprint, input, book, description, account) =
             (&reference, &fingerprint, &input, &book, &description, &account);

@@ -5,6 +5,7 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -286,7 +287,7 @@ async fn event_xoa_tai_khoan_thu_lai_mai() {
             .unwrap()
             .unwrap();
         assert_eq!(row.try_get::<i32>("", "attempts").unwrap(), MAX_ATTEMPTS + 2);
-        let failed: Option<chrono::DateTime<chrono::Utc>> = row.try_get("", "failed_at").unwrap();
+        let failed: Option<Timestamp> = row.try_get("", "failed_at").unwrap();
         assert!(failed.is_none());
     })
     .await
@@ -391,12 +392,7 @@ async fn ben_nhan_panic_hay_dong_hong_khong_chan_event_sau() {
         let error: String = bug.try_get("", "last_error").unwrap();
         assert!(error.contains("panicked"), "{error}");
         let broken = &rows[1];
-        assert!(
-            broken
-                .try_get::<Option<chrono::DateTime<chrono::Utc>>>("", "failed_at")
-                .unwrap()
-                .is_some()
-        );
+        assert!(broken.try_get::<Option<Timestamp>>("", "failed_at").unwrap().is_some());
     })
     .await
     .unwrap();

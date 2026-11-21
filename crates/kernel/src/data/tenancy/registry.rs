@@ -18,6 +18,7 @@
 //! - Pool ít dùng nhất bị bỏ khỏi sổ khi cần chỗ; request đang giữ bản clone của nó vẫn chạy tới
 //!   xong (pool tự đóng khi không còn bản clone nào) — không bao giờ gọi `close()` ở đây.
 
+use crate::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
@@ -621,8 +622,7 @@ impl DatabaseRegistry {
         let storage_sealed: Option<String> = row.try_get("", "storage_sealed")?;
         let read_only: bool = row.try_get("", "read_only")?;
         let sandbox_of: Option<Uuid> = row.try_get("", "sandbox_of")?;
-        let sandbox_expires_at: Option<chrono::DateTime<chrono::Utc>> =
-            row.try_get("", "sandbox_expires_at")?;
+        let sandbox_expires_at: Option<Timestamp> = row.try_get("", "sandbox_expires_at")?;
         let database = self.placement_database(placement).await?;
         let mut tenant = TenantContext::new(id, slug.clone(), name, status, placement, database)
             .with_schema_ready(ready)

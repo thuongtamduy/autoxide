@@ -1,5 +1,6 @@
 //! Bảng `orders_payments`: một khoản thanh toán của đơn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -21,10 +22,10 @@ pub struct Model {
     pub tendered_minor: Option<i64>,
     pub status: String,
     pub action: Option<String>,
-    pub expires_at: Option<DateTimeUtc>,
-    pub succeeded_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub expires_at: Option<Timestamp>,
+    pub succeeded_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     pub installment: Option<String>,
 }
 

@@ -1,5 +1,6 @@
 //! `POST /quote`: báo giá cho nhân viên và agent — cùng hàm `ShippingRates::quote` mà `orders` gọi.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use axum::extract::State;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -61,7 +61,7 @@ pub(crate) struct QuoteBody {
     /// Order value after discounts, for free shipping.
     pub(crate) order_value: Money,
     /// Time of the order (default: now).
-    pub(crate) at: Option<DateTime<Utc>>,
+    pub(crate) at: Option<Timestamp>,
     /// Language of method names (default `en`).
     pub(crate) locale: Option<String>,
 }
@@ -70,10 +70,10 @@ pub(crate) struct QuoteBody {
 #[derive(Debug, Serialize, ToSchema)]
 #[schema(as = ShippingEta)]
 pub(crate) struct EtaBody {
-    earliest_date: NaiveDate,
-    latest_date: NaiveDate,
+    earliest_date: Date,
+    latest_date: Date,
     /// Order before this time to make today's dispatch.
-    order_by: Option<DateTime<Utc>>,
+    order_by: Option<Timestamp>,
     time_zone: String,
 }
 
@@ -101,7 +101,7 @@ pub(crate) struct OptionBody {
     estimated_days: Option<[u16; 2]>,
     eta: Option<EtaBody>,
     /// Store pickup: when the order is ready.
-    ready_at: Option<DateTime<Utc>>,
+    ready_at: Option<Timestamp>,
     /// Store pickup: days the parcel waits.
     hold_days: Option<u16>,
     /// Send back when placing the order; a different fee or destination answers
@@ -193,7 +193,7 @@ pub(crate) async fn request_of(
         OrgId::from_uuid(body.org_id),
         items,
         body.order_value,
-        body.at.unwrap_or_else(Utc::now),
+        body.at.unwrap_or_else(Timestamp::now),
     )
     .locale(body.locale.unwrap_or_else(|| "en".to_owned()));
     if let Some(origin) = body.origin_org_id {

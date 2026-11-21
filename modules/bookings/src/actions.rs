@@ -10,7 +10,8 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Event};
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
     IntoActiveModel, QueryFilter, Set,
@@ -358,7 +359,8 @@ impl BookingsService {
             0
         } else if at_now >= before.starts_at {
             return Err(too_late_to_cancel());
-        } else if at_now <= before.starts_at - Duration::hours(policy.free_cancel_hours) {
+        } else if at_now <= before.starts_at - SignedDuration::from_hours(policy.free_cancel_hours)
+        {
             0
         } else {
             policy.late_cancel_retain_percent
@@ -387,7 +389,7 @@ impl BookingsService {
         tenant: &TenantContext,
         caller: Caller<'_>,
         id: Uuid,
-        starts_at: DateTime<Utc>,
+        starts_at: Timestamp,
         resource_id: Option<Uuid>,
     ) -> Result<Booking, Error> {
         let mut problems: Vec<FieldError> = Vec::new();
@@ -401,7 +403,7 @@ impl BookingsService {
         }
         let policy = self.settings.policy(tenant, OrgId::from_uuid(row.org_id)).await?;
         if role == Role::Customer
-            && now() > row.starts_at - Duration::hours(policy.free_cancel_hours)
+            && now() > row.starts_at - SignedDuration::from_hours(policy.free_cancel_hours)
         {
             return Err(too_late_to_change().with_param("hours", policy.free_cancel_hours));
         }

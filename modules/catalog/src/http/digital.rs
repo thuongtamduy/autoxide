@@ -2,6 +2,7 @@
 //! của đơn cho người quản lý (`/orders/{id}/downloads`), quyền tải của người mua đang đăng nhập
 //! (`/downloads`) và tải công khai bằng token (`/public/downloads/…`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -14,7 +15,6 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -58,7 +58,7 @@ pub(crate) struct AssetResponse {
     pub download_limit: i64,
     /// Days a buyer can download after paying.
     pub grant_days: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<digital_asset::Model> for AssetResponse {
@@ -104,10 +104,10 @@ pub(crate) struct GrantResponse {
     pub file_name: String,
     /// Downloads left.
     pub remaining: i64,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     /// Set when the right was revoked (order cancelled or refunded, or by staff).
-    pub revoked_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub revoked_at: Option<Timestamp>,
+    pub created_at: Timestamp,
     /// Only right after the token was issued: the path to `POST` to spend one download, without
     /// signing in. It cannot be read again later; send it to the buyer.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -140,7 +140,7 @@ pub(crate) struct LinkResponse {
     /// Path (under the same host) to `GET` the file; works without signing in until `expires_at`,
     /// accepts `Range`, and does not spend more downloads.
     pub url: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     /// Downloads left after this one.
     pub remaining: i64,
     pub file_name: String,

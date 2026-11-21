@@ -2,6 +2,8 @@
 //! (riêng tư, khoá `conversations/recordings/<call_id>`) → xoá ở nhà cung cấp; nghe (ghi event mỗi lần
 //! mở), xoá theo yêu cầu chủ thể, xoá khi quá hạn lưu và khi tài khoản bị xoá.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -10,7 +12,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
 use autoxide_kernel::storage::{Storage, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde::{Deserialize, Serialize};
@@ -110,7 +111,10 @@ impl ConversationsService {
             let key = key_of(call_id);
             self.store(tenant)?.put(&key, content).await?;
             let ended = row.ended_at.unwrap_or_else(now);
-            let expires = ended + Duration::days(i64::from(self.config.recording_retention_days));
+            let expires = ended
+                + SignedDuration::from_hours(
+                    24 * (i64::from(self.config.recording_retention_days)),
+                );
             call::Entity::update_many()
                 .col_expr(call::Column::RecordingRef, Expr::value(Some(key)))
                 .col_expr(call::Column::RecordingExpiresAt, Expr::value(Some(expires)))
@@ -209,7 +213,7 @@ impl ConversationsService {
         call::Entity::update_many()
             .col_expr(call::Column::RecordingRef, Expr::value(Option::<String>::None))
             .col_expr(call::Column::ProviderRecordingId, Expr::value(Option::<String>::None))
-            .col_expr(call::Column::RecordingExpiresAt, Expr::value(Option::<DateTime<Utc>>::None))
+            .col_expr(call::Column::RecordingExpiresAt, Expr::value(Option::<Timestamp>::None))
             .col_expr(call::Column::UpdatedAt, Expr::value(now()))
             .filter(call::Column::Id.eq(row.id))
             .scoped(tenant)
@@ -230,7 +234,7 @@ impl ConversationsService {
     pub(crate) async fn purge_recordings(
         &self,
         tenant: &TenantContext,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<u64, Error> {
         let expired = call::Entity::find()
             .filter(call::Column::RecordingExpiresAt.lt(at))

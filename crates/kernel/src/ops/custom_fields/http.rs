@@ -1,6 +1,7 @@
 //! REST và MCP của trường tự định nghĩa.
 
 use super::*;
+use crate::time::Timestamp;
 
 impl CustomFieldsState {
     pub(super) fn require_read(
@@ -92,7 +93,7 @@ pub(super) async fn create_custom_field(
             "must be 1 to 64 lower-case letters, digits and `_`, starting with a letter",
         ));
     }
-    let now = Utc::now().trunc_subsecs(6);
+    let now = Timestamp::now();
     let mut field = CustomFieldView {
         id: Uuid::now_v7(),
         target: input.target.clone(),
@@ -226,7 +227,7 @@ pub(super) async fn update_custom_field(
     if !problems.is_empty() {
         return Err(Error::validation(problems));
     }
-    field.updated_at = Utc::now().trunc_subsecs(6);
+    field.updated_at = Timestamp::now();
     save(&tenant, &field, false).await?;
     Ok(Data { data: find(&tenant, id).await? })
 }
@@ -259,7 +260,7 @@ pub(super) async fn delete_custom_field(
     let mut field = find(&tenant, id).await?;
     let was_active = field.active;
     field.active = false;
-    field.updated_at = Utc::now().trunc_subsecs(6);
+    field.updated_at = Timestamp::now();
     save(&tenant, &field, false).await?;
     if was_active {
         state.entitlements.release(tenant.id(), &CUSTOM_FIELDS_LIMIT, &limit_reference(id)).await?;

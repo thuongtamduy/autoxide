@@ -2,6 +2,7 @@
 //! `Catalog`, chạy bộ tính thuần, cắt trần pháp luật và sàn giá (giá tham chiếu, sàn giá từ
 //! `Catalog` — ngoài mọi transaction), chia người trả tiền, dịch lý do, dấu vân tay. Không ghi gì.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -9,7 +10,6 @@ use autoxide_catalog::api::{FloorAction, PriceQuery};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::money::Money;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::json;
 use uuid::Uuid;
@@ -230,7 +230,7 @@ impl PromotionsService {
             cart,
             variants: &variants,
             ancestors: &ancestors,
-            local: cart.at.with_timezone(&zone).naive_local(),
+            local: cart.at.in_zone(&zone).datetime(),
             best_for_buyer: best,
             max_vouchers_per_class: self.config.max_vouchers_per_class,
             unlocked: &unlocked,
@@ -404,8 +404,8 @@ impl PromotionsService {
         let mut caps_by_line = vec![LineCap::default(); cart.lines.len()];
         let mut missing = vec![false; cart.lines.len()];
         // Mỗi dòng: thời điểm bắt đầu sớm nhất và trần thấp nhất của các chương trình đã áp.
-        let mut instants: BTreeMap<DateTime<Utc>, BTreeSet<Uuid>> = BTreeMap::new();
-        let mut line_info: HashMap<usize, (DateTime<Utc>, Option<i32>)> = HashMap::new();
+        let mut instants: BTreeMap<Timestamp, BTreeSet<Uuid>> = BTreeMap::new();
+        let mut line_info: HashMap<usize, (Timestamp, Option<i32>)> = HashMap::new();
         for applied in &draft.applied {
             let Some(program) = programs.get(&applied.program) else { continue };
             let max = legal
@@ -423,7 +423,7 @@ impl PromotionsService {
         for (line, (instant, _)) in &line_info {
             instants.entry(*instant).or_default().insert(cart.lines[*line].variant_id);
         }
-        let mut references: HashMap<(DateTime<Utc>, Uuid), Money> = HashMap::new();
+        let mut references: HashMap<(Timestamp, Uuid), Money> = HashMap::new();
         for (instant, variants) in &instants {
             let query = PriceQuery::new(
                 cart.org_id,

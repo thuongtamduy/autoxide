@@ -1,5 +1,6 @@
 //! Endpoint API key: người dùng tạo, xem và thu hồi key của chính mình.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -157,7 +157,7 @@ pub(crate) struct ApiKeyResponse {
     org_id: Uuid,
     /// When the key stops working. Every new key has one; `null` only for data that was never
     /// upgraded.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// IP addresses and ranges (CIDR) the key may be used from; empty: any address. A request
     /// from elsewhere gets 403 `network_not_allowed`.
     #[schema(example = json!(["203.0.113.0/24"]))]
@@ -171,10 +171,10 @@ pub(crate) struct ApiKeyResponse {
     status: String,
     /// Who approved the key and when; `null` when it needed no approval.
     approved_by: Option<Uuid>,
-    approved_at: Option<DateTime<Utc>>,
+    approved_at: Option<Timestamp>,
     /// Last time the key was used, to the minute; `null`: never used.
-    last_used_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
+    last_used_at: Option<Timestamp>,
+    created_at: Timestamp,
     /// Who uses the key: `human` (you), `agent` (an AI agent: risky commands wait for a person's
     /// approval) or `service` (another program). The audit log records it as `actor_kind`.
     #[schema(example = "agent")]
@@ -266,7 +266,7 @@ pub(crate) struct CreateApiKeyRequest {
     /// When the key stops working (RFC 3339, in the future, at most
     /// `AUTOXIDE_AUTH_API_KEY_MAX_DAYS` days ahead — 365 by default). Omit for that longest
     /// lifetime: every key expires.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// IP addresses or ranges (`203.0.113.7`, `203.0.113.0/24`, `2001:db8::/32`) the key may be
     /// used from, at most 50. Omit for any address.
     #[serde(default)]

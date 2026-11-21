@@ -1,10 +1,10 @@
 //! `dyn TaxEngine` module `tax` công bố.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::NaiveDate;
 
 use crate::api::{
     InvoiceRequirements, TaxEngine, TaxProfile, TaxQuote, TaxQuoteRequest, WithholdingQuote,
@@ -44,7 +44,7 @@ impl TaxEngine for Provider {
         &self,
         tenant: &TenantContext,
         org: OrgId,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<InvoiceRequirements, Error> {
         self.0.invoice_requirements(tenant, org, on).await
     }

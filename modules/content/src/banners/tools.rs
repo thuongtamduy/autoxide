@@ -2,6 +2,7 @@
 //! không bật banner: chỉ tạo / sửa bản nháp, người dùng bật lên (D-109). Chữ do agent viết mặc
 //! định mang dấu `ai_assisted`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -84,9 +84,9 @@ pub(crate) struct SaveBannerInput {
     link_kind: Option<String>,
     link_id: Option<String>,
     /// Shown from (RFC 3339).
-    starts_at: Option<DateTime<Utc>>,
+    starts_at: Option<Timestamp>,
     /// Shown until (RFC 3339).
-    ends_at: Option<DateTime<Utc>>,
+    ends_at: Option<Timestamp>,
     /// `draft` or `archived`; a tool never makes a banner `active`.
     status: Option<String>,
     /// The text came from AI; defaults to `true` for a tool.

@@ -1,6 +1,7 @@
 //! Service layer của `orders`: mọi logic ở đây (và ở các file tính năng `carts.rs`, …); handler
 //! REST, tool MCP, job và event đều gọi vào đây.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_address::api::AdministrativeUnits;
@@ -101,7 +102,6 @@ impl OrdersService {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên — cắt trước để hai
 /// database trả cùng một giá trị (`ETag` / `If-Match` so `updated_at`).
-pub(crate) fn now() -> chrono::DateTime<chrono::Utc> {
-    use chrono::SubsecRound;
-    chrono::Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }

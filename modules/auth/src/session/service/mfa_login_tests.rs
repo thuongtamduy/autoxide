@@ -8,7 +8,7 @@ use crate::user::NewUser;
 const PASSWORD: &str = "correct horse battery staple";
 
 fn unix_now() -> u64 {
-    u64::try_from(Utc::now().timestamp()).unwrap()
+    u64::try_from(Timestamp::now().as_unix_seconds()).unwrap()
 }
 
 /// Ada đã bật MFA. Trả về service, secret TOTP và recovery code.

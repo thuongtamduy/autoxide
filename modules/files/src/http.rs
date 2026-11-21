@@ -1,6 +1,7 @@
 //! Endpoint REST của module `files`, dưới `/api/v1/files`. Handler chỉ lấy dữ liệu vào,
 //! gọi service và trả kết quả; mọi logic nằm ở service.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +16,6 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use futures_util::{StreamExt as _, TryStreamExt as _};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -53,7 +53,7 @@ pub(crate) struct FileResponse {
     sha256: String,
     /// The user who uploaded the file.
     owner_id: Uuid,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<FileRecord> for FileResponse {
@@ -376,6 +376,7 @@ mod tests {
     use super::*;
     use autoxide_kernel::storage::Storage as _;
     use autoxide_testkit::{TestApp, TestDatabase, TestRequest};
+    use jiff::SignedDuration;
     use serde_json::Value;
 
     /// `ada`: người dùng có `files.upload`; `nobody`: không có permission nào. File lưu trên
@@ -532,7 +533,7 @@ mod tests {
                 autoxide_kernel::event::Outbox::standalone("files"),
                 crate::config::Limits { max_bytes: 64, allowed_types: None },
             );
-            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            let later = Timestamp::now() + SignedDuration::from_hours(25);
             let removed = service.clean_orphans(app.registry(), later).await.unwrap();
             assert_eq!(removed, 1);
             assert!(shared.get(&key).await.unwrap().is_some());
@@ -616,7 +617,7 @@ mod tests {
                 autoxide_kernel::event::Outbox::standalone("files"),
                 crate::config::Limits { max_bytes: 64, allowed_types: None },
             );
-            let later = chrono::Utc::now() + chrono::Duration::hours(25);
+            let later = Timestamp::now() + SignedDuration::from_hours(25);
             assert_eq!(service.clean_orphans(app.registry(), later).await.unwrap(), 2);
             assert!(own.get(&orphan_own).await.unwrap().is_none());
             assert!(own.get(&key).await.unwrap().is_some());

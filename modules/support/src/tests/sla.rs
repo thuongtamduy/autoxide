@@ -1,9 +1,10 @@
 //! Hạn trả lời (SLA): tính theo giờ làm và ngày nghỉ của nút, dừng khi chờ người mua, job đánh
 //! dấu quá hạn và tự đóng, hộp việc, báo cáo.
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{DateTime, Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -33,11 +34,11 @@ async fn set_policy(app: &TestApp, policy: Value) {
     assert_eq!(status, StatusCode::OK, "{body}");
 }
 
-fn time(value: &Value) -> DateTime<Utc> {
+fn time(value: &Value) -> Timestamp {
     value.as_str().unwrap().parse().unwrap()
 }
 
-async fn shift(app: &TestApp, id: &str, column: ticket::Column, at: DateTime<Utc>) {
+async fn shift(app: &TestApp, id: &str, column: ticket::Column, at: Timestamp) {
     ticket::Entity::update_many()
         .col_expr(column, Expr::value(at))
         .filter(ticket::Column::Id.eq(id.parse::<Uuid>().unwrap()))
@@ -58,9 +59,9 @@ async fn dong_ho_sla_dung_khi_cho_nguoi_mua() {
         let id = data["id"].as_str().unwrap().to_owned();
         let created = time(&data["created_at"]);
         // Lịch nghỉ một phút mỗi đêm (23:59–24:00): hạn có thể lùi tới một phút.
-        let near = |due: DateTime<Utc>, minutes: i64| {
-            let gap = due - created - Duration::minutes(minutes);
-            (Duration::zero()..=Duration::seconds(61)).contains(&gap)
+        let near = |due: Timestamp, minutes: i64| {
+            let gap = due - created - SignedDuration::from_mins(minutes);
+            (SignedDuration::ZERO..=SignedDuration::from_secs(61)).contains(&gap)
         };
         assert!(near(time(&data["first_response_due_at"]), 60), "{data}");
         let resolve = time(&data["resolve_due_at"]);
@@ -75,13 +76,13 @@ async fn dong_ho_sla_dung_khi_cho_nguoi_mua() {
         call(app, "POST", &format!("/tickets/{id}/messages"), "agent", Some(json!({"body": "Đã nhận"})))
             .await;
         // Người mua trả lời sau 2 giờ: hạn giải quyết lùi đúng 2 giờ.
-        let paused_at = Utc::now() - Duration::hours(2);
+        let paused_at = Timestamp::now() - SignedDuration::from_hours(2);
         shift(app, &id, ticket::Column::SlaPausedAt, paused_at).await;
         call(app, "POST", &format!("/me/tickets/{id}/messages"), "buyer", Some(json!({"body": "Còn nữa"})))
             .await;
         let (_, got) = call(app, "GET", &format!("/tickets/{id}"), "agent", None).await;
         let moved = time(&got["data"]["resolve_due_at"]) - resolve;
-        assert!((Duration::minutes(119)..=Duration::minutes(122)).contains(&moved), "{moved}");
+        assert!((SignedDuration::from_mins(119)..=SignedDuration::from_mins(122)).contains(&moved), "{moved}");
 
         // Khách vãng lai bị tắt bởi chính sách.
         let guest = json!({"category": "order", "subject": "x", "body": "y", "email": "g@example.com",
@@ -104,8 +105,13 @@ async fn job_danh_dau_qua_han_va_tu_dong_phieu() {
         let late = late["data"]["id"].as_str().unwrap().to_owned();
         let (_, solved) = call(app, "POST", "/public/tickets", "buyer", Some(body)).await;
         let solved = solved["data"]["id"].as_str().unwrap().to_owned();
-        shift(app, &late, ticket::Column::FirstResponseDueAt, Utc::now() - Duration::minutes(1))
-            .await;
+        shift(
+            app,
+            &late,
+            ticket::Column::FirstResponseDueAt,
+            Timestamp::now() - SignedDuration::from_mins(1),
+        )
+        .await;
         call(
             app,
             "PATCH",
@@ -114,13 +120,23 @@ async fn job_danh_dau_qua_han_va_tu_dong_phieu() {
             Some(json!({"status": "solved"})),
         )
         .await;
-        shift(app, &solved, ticket::Column::SolvedAt, Utc::now() - Duration::days(3)).await;
+        shift(
+            app,
+            &solved,
+            ticket::Column::SolvedAt,
+            Timestamp::now() - SignedDuration::from_hours(24 * 3),
+        )
+        .await;
 
         let service = service_of(app);
         let tenant = app.default_tenant();
-        assert_eq!(service.mark_breached(&tenant, Utc::now()).await.unwrap(), 1);
-        assert_eq!(service.mark_breached(&tenant, Utc::now()).await.unwrap(), 0, "once per ticket");
-        assert_eq!(service.auto_close(&tenant, Utc::now()).await.unwrap(), 1);
+        assert_eq!(service.mark_breached(&tenant, Timestamp::now()).await.unwrap(), 1);
+        assert_eq!(
+            service.mark_breached(&tenant, Timestamp::now()).await.unwrap(),
+            0,
+            "once per ticket"
+        );
+        assert_eq!(service.auto_close(&tenant, Timestamp::now()).await.unwrap(), 1);
 
         let (_, breached) = call(app, "GET", "/tickets?breached=true", "agent", None).await;
         assert_eq!(breached["data"].as_array().unwrap().len(), 1);
@@ -140,8 +156,8 @@ async fn job_danh_dau_qua_han_va_tu_dong_phieu() {
         assert_eq!(mine.len(), 1, "{items}");
 
         // Báo cáo.
-        let from = (Utc::now() - Duration::days(1)).to_rfc3339();
-        let to = (Utc::now() + Duration::days(1)).to_rfc3339();
+        let from = (Timestamp::now() - SignedDuration::from_hours(24)).to_rfc3339();
+        let to = (Timestamp::now() + SignedDuration::from_hours(24)).to_rfc3339();
         let uri = format!("/reports/summary?from={}&to={}", urlencode(&from), urlencode(&to));
         let (status, report) = call(app, "GET", &uri, "agent", None).await;
         assert_eq!(status, StatusCode::OK, "{report}");

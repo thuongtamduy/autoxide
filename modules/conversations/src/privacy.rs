@@ -8,6 +8,8 @@
 //! - hạn lưu: job `conversations.purge` mỗi ngày xoá cuộc trò chuyện có tin cuối quá
 //!   `AUTOXIDE_CONVERSATIONS_RETENTION_DAYS` ngày, cùng tin, con trỏ đọc và báo vi phạm của nó.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
@@ -17,7 +19,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::{Value, json};
@@ -146,12 +147,8 @@ impl ConversationsService {
 
     /// Xoá cuộc trò chuyện có tin cuối trước hạn lưu (tính từ `now`) trên `database`, theo lô; trả
     /// số cuộc đã xoá. Hạn lưu là của cả bản cài, nên quét cả database.
-    pub(crate) async fn purge(
-        &self,
-        database: &Database,
-        now: DateTime<Utc>,
-    ) -> Result<u64, Error> {
-        let before = now - chrono::Duration::days(i64::from(self.config.retention_days));
+    pub(crate) async fn purge(&self, database: &Database, now: Timestamp) -> Result<u64, Error> {
+        let before = now - SignedDuration::from_hours(24 * (i64::from(self.config.retention_days)));
         let mut total = 0;
         loop {
             let expired: Vec<(Uuid, Uuid)> = thread::Entity::find()
@@ -203,7 +200,7 @@ impl ConversationsService {
             }
         }
         Throttle::new(MODULE, 1, std::time::Duration::from_secs(60))?
-            .purge(database, now - chrono::Duration::hours(1))
+            .purge(database, now - SignedDuration::from_hours(1))
             .await?;
         if total > 0 {
             tracing::info!(threads = total, "expired conversations deleted");

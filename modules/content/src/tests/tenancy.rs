@@ -3,6 +3,8 @@
 //! đăng và ghi event ở đúng khách đó. Hai khách thật của `TestApp`: `a` dùng chung database chính,
 //! `b` có database riêng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::ai::{Embedder, TextModel};
@@ -11,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_media::api::Media;
 use autoxide_testkit::TestApp;
 use autoxide_testkit::ai::{FakeEmbedder, FakeTextModel};
-use chrono::Utc;
 
 use super::*;
 use crate::ai::semantic::{Scope, SearchQuery};
@@ -200,7 +201,7 @@ async fn lich_dang_chay_dung_khach() {
         let (_app, content, a, b) = two_tenants(test, Arc::new(FakeEmbedder::disabled())).await;
         let ada = editor();
         let entry = content.create(&b, &ada, post("Later")).await.unwrap();
-        let at = Utc::now() + chrono::Duration::hours(1);
+        let at = Timestamp::now() + SignedDuration::from_hours(1);
         let schedule =
             content.create_schedule(&b, &ada, entry.id, Action::Publish, at, None).await.unwrap();
         let payload = serde_json::to_value(RunSchedule { schedule_id: schedule.id }).unwrap();

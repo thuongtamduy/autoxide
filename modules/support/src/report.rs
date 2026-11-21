@@ -6,7 +6,7 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Condition;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde::{Deserialize, Serialize};
@@ -18,7 +18,7 @@ use crate::permissions::TICKETS_READ;
 use crate::service::SupportService;
 
 /// Cột một phiếu báo cáo cần: lúc tạo, lúc trả lời đầu, lúc xử lý xong, quá hạn, mức hài lòng.
-type Row = (DateTime<Utc>, Option<DateTime<Utc>>, Option<DateTime<Utc>>, bool, Option<i16>);
+type Row = (Timestamp, Option<Timestamp>, Option<Timestamp>, bool, Option<i16>);
 
 /// Số phiếu tối đa một báo cáo đọc (khoảng dài hơn thì thu hẹp khoảng).
 const MAX_ROWS: u64 = 100_000;
@@ -53,8 +53,8 @@ impl SupportService {
         tenant: &TenantContext,
         principal: &Principal,
         org: Option<Uuid>,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Summary, Error> {
         if to <= from {
             return Err(Error::validation(vec![FieldError::new(
@@ -79,7 +79,7 @@ impl SupportService {
                 ticket::Column::OrgId,
             ));
         }
-        type Row = (DateTime<Utc>, Option<DateTime<Utc>>, Option<DateTime<Utc>>, bool, Option<i16>);
+        type Row = (Timestamp, Option<Timestamp>, Option<Timestamp>, bool, Option<i16>);
         let rows: Vec<Row> = ticket::Entity::find()
             .select_only()
             .column(ticket::Column::CreatedAt)
@@ -104,11 +104,11 @@ fn summarize(rows: &[Row]) -> Summary {
     let (mut solved, mut breached, mut rated, mut rating) = (0u64, 0u64, 0u64, 0i64);
     for (created, responded, solved_at, late, satisfaction) in rows {
         if let Some(responded) = responded {
-            first.push((*responded - *created).num_minutes());
+            first.push((*responded - *created).as_mins());
         }
         if let Some(solved_at) = solved_at {
             solved += 1;
-            resolve.push((*solved_at - *created).num_minutes());
+            resolve.push((*solved_at - *created).as_mins());
         }
         if *late {
             breached += 1;
@@ -146,16 +146,17 @@ fn median(values: &mut [i64]) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     #[test]
     fn trung_vi_va_ti_le() {
         assert_eq!(median(&mut [5, 1, 3]), Some(3));
         assert_eq!(median(&mut [4, 1, 3, 2]), Some(2));
         assert_eq!(median(&mut []), None);
-        let at = Utc::now();
+        let at = Timestamp::now();
         let rows = [
-            (at, Some(at + chrono::Duration::minutes(10)), None, true, Some(4)),
-            (at, None, Some(at + chrono::Duration::minutes(60)), false, Some(5)),
+            (at, Some(at + SignedDuration::from_mins(10)), None, true, Some(4)),
+            (at, None, Some(at + SignedDuration::from_mins(60)), false, Some(5)),
         ];
         let summary = summarize(&rows);
         assert_eq!((summary.tickets, summary.breach_rate_bp), (2, 5000));

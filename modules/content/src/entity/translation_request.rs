@@ -1,5 +1,6 @@
 //! Bảng `content_translation_requests`: yêu cầu dịch một mục bằng AI (D-109), chạy bằng job.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,7 +18,7 @@ pub struct Model {
     /// Bản dịch đã có lúc yêu cầu (sẽ được cập nhật); `NULL`: tạo mới.
     pub target_entry_id: Option<Uuid>,
     /// `updated_at` của bản dịch lúc yêu cầu: khác lúc ghi thì có người đã sửa — không ghi đè.
-    pub target_updated_at: Option<DateTimeUtc>,
+    pub target_updated_at: Option<Timestamp>,
     /// `queued`, `running`, `succeeded`, `failed`.
     pub status: String,
     /// `<nguồn>:<ngôn ngữ>` khi đang chờ hay đang chạy, `NULL` khi xong: unique index chặn hai
@@ -29,8 +30,8 @@ pub struct Model {
     pub result_entry_id: Option<Uuid>,
     pub created_by: Option<Uuid>,
     pub created_by_api_key_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

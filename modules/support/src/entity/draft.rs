@@ -1,5 +1,6 @@
 //! Bảng `support_reply_drafts`: bản nháp trả lời của một phiếu.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,8 +13,8 @@ pub struct Model {
     pub ticket_id: Uuid,
     pub body: String,
     pub ai_assisted: bool,
-    pub created_at: DateTimeUtc,
-    pub used_at: Option<DateTimeUtc>,
+    pub created_at: Timestamp,
+    pub used_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,13 +1,13 @@
 //! Trait module `compliance` công bố: `KycGate`, `AcceptanceGate`, `ConsentLedger`, `ComplianceRules`,
 //! `PostingGate`, `AccountVerification`; và bộ hỏi `PostingVerifier` của kernel (D-202).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::identity::PartyType;
 use autoxide_kernel::tenancy::TenantId;
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use autoxide_kernel::access::{PostingVerifier, Principal};
@@ -139,7 +139,7 @@ impl ComplianceRules for Provider {
         &self,
         tenant: TenantId,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Rule>, Error> {
         let tenant = self.0.tenant(tenant).await?;
         Ok(self.0.rule_for(&tenant, key, at).await?.as_ref().map(describe_rule))

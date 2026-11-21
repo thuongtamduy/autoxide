@@ -1,8 +1,6 @@
 //! Các lỗi tìm thấy ở lượt rà soát độc lập sau khi gộp module (ngày 12/11/2026). Mỗi test giữ
 //! một lỗi không quay lại.
 
-use chrono::{Duration, Utc};
-
 use super::*;
 use crate::publishing::reading::PostFilter;
 use crate::publishing::redirects::{RedirectInput, Resolved};
@@ -10,6 +8,8 @@ use crate::publishing::schedules::Action;
 use crate::taxonomy::authors::AuthorInput;
 use crate::taxonomy::terms::{Taxonomy, TermInput};
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 fn redirect(locale: &str, from: &str, to: Uuid) -> RedirectInput {
     RedirectInput {
@@ -289,13 +289,13 @@ async fn lich_go_ghi_revision_va_huy_lich_co_event() {
         let ada = editor();
         let entry = content.create(&tenant, &ada, post("Planned")).await.unwrap();
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
-        let at = Utc::now() + Duration::hours(1);
+        let at = Timestamp::now() + SignedDuration::from_hours(1);
         let down = content
             .create_schedule(&tenant, &ada, entry.id, Action::Unpublish, at, None)
             .await
             .unwrap();
         let before = content.revision_count(&tenant, entry.id).await;
-        content.run_schedule(&tenant, down.id, Utc::now()).await.unwrap();
+        content.run_schedule(&tenant, down.id, Timestamp::now()).await.unwrap();
         assert_eq!(content.revision_count(&tenant, entry.id).await, before + 1);
 
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();

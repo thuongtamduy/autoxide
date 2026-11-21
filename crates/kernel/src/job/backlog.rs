@@ -11,11 +11,10 @@
 //! gộp vào `other`), `module` (module đã đăng ký: tập nhỏ cố định), `pool`, `state`. KHÔNG có nhãn
 //! theo khách: tra theo khách đi qua log, trace và CLI (luật code về nhãn số đo).
 
-use std::time::Duration;
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Func, Order, Query};
+use std::time::Duration;
 
 use crate::config::DatabaseBackend;
 
@@ -88,7 +87,7 @@ pub async fn backlog(
     name: &str,
     job_modules: &[&'static str],
     event_modules: &[&'static str],
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<BacklogSnapshot, Error> {
     let mut names: Vec<&'static str> = job_modules.iter().chain(event_modules).copied().collect();
     names.sort_unstable();
@@ -149,7 +148,7 @@ async fn oldest(
     table: &str,
     column: &str,
     condition: Condition,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<u64, Error> {
     let select = Query::select()
         .column(Alias::new(column))
@@ -161,8 +160,8 @@ async fn oldest(
     let Some(row) = database.read().query_one(&select).await? else {
         return Ok(0);
     };
-    let at: DateTime<Utc> = row.try_get("", column)?;
-    Ok(u64::try_from((now - at).num_seconds()).unwrap_or(0))
+    let at: Timestamp = row.try_get("", column)?;
+    Ok(u64::try_from((now - at).as_secs()).unwrap_or(0))
 }
 
 /// Kết nối của hai pool. Đọc thẳng từ pool của sqlx (không truy vấn database).
@@ -296,7 +295,7 @@ impl BacklogMonitor {
     /// Một lượt: đọc tồn đọng của mọi database. Database lỗi thì ghi log rồi bỏ qua, không làm
     /// hỏng lượt của database khác.
     pub async fn collect(&self) -> Result<Vec<BacklogSnapshot>, Error> {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut snapshots = Vec::new();
         for (_, name, database) in self.databases.databases().await? {
             match backlog(&database, &name, &self.job_modules, &self.event_modules, now).await {
@@ -396,7 +395,7 @@ pub(crate) async fn status(
     modules: &BacklogModules,
 ) -> Result<super::backlog_api::OpsBacklog, Error> {
     let (jobs, events) = modules.get()?;
-    let now = Utc::now();
+    let now = Timestamp::now();
     let backups = crate::backup::scheduled::latest_successes(registry.control()).await?;
     let mut databases = Vec::new();
     for (_, name, database) in registry.databases().await? {

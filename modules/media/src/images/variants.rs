@@ -452,6 +452,7 @@ pub(crate) mod samples {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use autoxide_kernel::time::Timestamp;
 
     #[test]
     fn lam_anh_thu_nho_giu_ti_le() {
@@ -508,8 +509,8 @@ mod tests {
             visibility: "private".into(),
             version_id: Uuid::nil(),
             uploaded_by: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
             trashed_at: None,
         };
         assert_eq!(wanted_widths(&[320, 640, 1280], &item), [320, 640]);

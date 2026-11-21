@@ -5,6 +5,8 @@
 //! Credential: khoá khai ở cấu hình, không có thì lấy credential tạm của IAM role qua dịch vụ metadata của
 //! EC2 (IMDSv2), tự làm mới trước khi hết hạn — như `object_store` dựng bằng `AmazonS3Builder::new()`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -194,7 +196,7 @@ impl S3Store {
         use base64::Engine as _;
         let credentials = self.inner.credentials.get(&self.inner.http).await?;
         let checksum = base64::engine::general_purpose::STANDARD.encode(constraints.sha256);
-        let issued = chrono::Utc::now();
+        let issued = Timestamp::now();
         let mut action = self.inner.bucket.put_object(Some(&credentials), object);
         action.headers_mut().insert("content-type", constraints.content_type.clone());
         action.headers_mut().insert("x-amz-checksum-sha256", checksum.clone());
@@ -204,7 +206,7 @@ impl S3Store {
             ("content-type".to_owned(), constraints.content_type.clone()),
             ("x-amz-checksum-sha256".to_owned(), checksum),
         ];
-        let expires_at = issued + chrono::Duration::from_std(ttl).map_err(Error::internal)?;
+        let expires_at = issued + SignedDuration::try_from(ttl).map_err(Error::internal)?;
         Ok(PresignedUpload::new("PUT", url.to_string(), headers, expires_at))
     }
 }

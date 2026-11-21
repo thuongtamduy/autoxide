@@ -10,12 +10,12 @@
 //! "Đọc được bản ghi": bộ tra của sổ đối tượng (D-123) thấy bản ghi, và người gọi có permission
 //! `<module>.read` của module sở hữu loại đó. Không thì 404 như không có (không lộ sự tồn tại).
 
+use crate::time::Timestamp;
 use std::sync::{Arc, OnceLock};
 
 use axum::Extension;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -78,7 +78,7 @@ pub(crate) struct RecordNote {
     pub body: String,
     /// Users the note mentions.
     pub mentions: Vec<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// A note to write.
@@ -98,7 +98,7 @@ pub(crate) struct ActivityItem {
     #[schema(example = "event")]
     pub kind: String,
     pub id: Uuid,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     pub actor_id: Option<Uuid>,
     pub actor_name: Option<String>,
     /// With `event`: its name, e.g. `content.entry_published`.
@@ -129,8 +129,8 @@ pub(crate) struct RecordsState {
     pub references: crate::ops::usages::ReferenceSources,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn not_found(kind: &str, id: &str) -> Error {
@@ -490,7 +490,7 @@ pub(crate) struct RecordEventsQuery {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct RecordEvent {
     pub id: Uuid,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     /// Name of the event, e.g. `content.entry_published`.
     #[schema(example = "content.entry_published")]
     pub name: String,

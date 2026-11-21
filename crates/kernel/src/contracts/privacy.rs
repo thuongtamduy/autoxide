@@ -261,7 +261,7 @@ mod tests {
                 actor: Actor::system(),
                 subject: None,
                 payload: json!({"before": {"id": id}}),
-                occurred_at: chrono::Utc::now(),
+                occurred_at: crate::time::Timestamp::now(),
             };
             assert_eq!(deleted_user(&event), Some(id));
             event.name = "auth.user_updated".to_owned();

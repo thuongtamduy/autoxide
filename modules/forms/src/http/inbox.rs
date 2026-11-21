@@ -1,5 +1,6 @@
 //! Endpoint hộp thư: bài gửi của một form, một bài, xuất CSV, xuất / xoá theo email.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::{IntoParams, ToSchema};
@@ -115,8 +115,8 @@ pub(crate) struct SubmissionResponse {
     /// field, ip_fingerprint}` — the exact text shown, the form version, when.
     #[schema(value_type = Option<Object>)]
     pub consent: Option<Value>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Submission> for SubmissionResponse {

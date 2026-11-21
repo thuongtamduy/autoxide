@@ -1,6 +1,7 @@
 //! Endpoint giữ chân người mua: yêu thích, vừa xem, giới thiệu bạn (người mua, `/me`); quy tắc nhắc
 //! giỏ bỏ dở và thưởng giới thiệu (quản trị).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use sea_orm::Set;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -46,7 +46,7 @@ pub(crate) struct MergeWishlistRequest {
 pub(crate) struct WishlistItem {
     pub product_id: Uuid,
     pub variant_id: Option<Uuid>,
-    pub added_at: DateTime<Utc>,
+    pub added_at: Timestamp,
 }
 
 impl From<wishlist_item::Model> for WishlistItem {
@@ -63,7 +63,7 @@ impl From<wishlist_item::Model> for WishlistItem {
 #[derive(Debug, Serialize, ToSchema)]
 pub(crate) struct RecentlyViewed {
     pub product_id: Uuid,
-    pub viewed_at: DateTime<Utc>,
+    pub viewed_at: Timestamp,
 }
 
 impl From<recent_view::Model> for RecentlyViewed {
@@ -111,7 +111,7 @@ pub(crate) struct ReminderRule {
     /// Minutes after a cart is abandoned at which reminders go out.
     pub delays_minutes: Vec<i64>,
     pub enabled: bool,
-    pub effective_from: DateTime<Utc>,
+    pub effective_from: Timestamp,
 }
 
 impl From<reminder_rule::Model> for ReminderRule {
@@ -149,7 +149,7 @@ pub(crate) struct ReferralRule {
     /// Goods of the first order must reach this amount (smallest currency unit).
     pub min_first_order_minor: i64,
     pub currency: String,
-    pub effective_from: DateTime<Utc>,
+    pub effective_from: Timestamp,
 }
 
 /// A new referral reward rule; it replaces the current one from now on.

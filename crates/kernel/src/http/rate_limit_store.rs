@@ -9,6 +9,8 @@
 //! Database không trả lời thì cho qua (ghi log, đếm `http_rate_limit_store_errors_total`): bộ giới hạn
 //! không được làm sự cố database nặng thêm; request vẫn hỏng ở bước sau nếu database thật sự chết.
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -138,7 +140,7 @@ impl SharedCounter {
         let throttle = self.throttle.clone();
         let database = self.registry.default_tenant().database().clone();
         tokio::spawn(async move {
-            let before = chrono::Utc::now() - chrono::Duration::minutes(10);
+            let before = Timestamp::now() - SignedDuration::from_mins(10);
             if let Err(error) = throttle.purge(&database, before).await {
                 tracing::warn!(error = %error, "purging old API key rate limit counters failed");
             }

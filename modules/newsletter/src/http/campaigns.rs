@@ -1,6 +1,7 @@
 //! Endpoint chiến dịch (`/campaigns…`). Đọc cần `newsletter.read`; soạn, sửa, xoá cần
 //! `newsletter.manage`; gửi, hẹn giờ, tạm dừng, tiếp tục, huỷ, gửi thử cần `newsletter.send`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -47,16 +47,16 @@ pub(crate) struct CampaignResponse {
     /// `static` (sent as written) or `template` (subject and bodies rendered for each recipient).
     pub format: CampaignFormat,
     pub status: CampaignStatus,
-    pub scheduled_at: Option<DateTime<Utc>>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub scheduled_at: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// Where an automatic campaign came from (`content.entry` for a new post).
     pub source: Option<String>,
     pub source_ref: Option<String>,
     /// Progress by delivery status.
     pub progress: DeliveryCounts,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Campaign> for CampaignResponse {
@@ -163,7 +163,7 @@ pub(crate) struct CampaignsQuery {
 #[schema(as = NewsletterScheduleRequest)]
 pub(crate) struct ScheduleRequest {
     /// A time in the future (at most 366 days ahead), with a time zone.
-    at: DateTime<Utc>,
+    at: Timestamp,
 }
 
 /// Where to send a test mail.

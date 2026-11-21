@@ -15,6 +15,7 @@
 //!   thống). Job chạy lại sau khi đã xong thì không làm gì.
 //! - Lịch [`CLEANUP`] mỗi ngày xoá file của lần nhập / xuất cũ hơn [`KEEP_DAYS`] ngày.
 
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -24,7 +25,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::storage::{ByteStream, Storage, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::Duration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
     QuerySelect, Set,
@@ -746,7 +746,7 @@ pub(crate) struct Cleanup(pub(crate) Arc<CatalogService>);
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
         let Some(storage) = self.0.storage.clone() else { return Ok(()) };
-        let before = now() - Duration::days(KEEP_DAYS);
+        let before = now() - SignedDuration::from_hours(24 * KEEP_DAYS);
         let rows = transfer::Entity::find()
             .filter(transfer::Column::CreatedAt.lt(before))
             .filter(transfer::Column::FileKey.is_not_null())

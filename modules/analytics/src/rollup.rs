@@ -14,6 +14,8 @@
 //! không cookie không nối được với sự kiện phía máy chủ (đơn đặt), nên các bước đếm độc lập, không
 //! đòi cùng một phiên đi qua mọi bước (D-20261118-step57-analytics).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
@@ -21,7 +23,6 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, Query, SimpleExpr};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use uuid::Uuid;
@@ -61,7 +62,7 @@ impl AnalyticsService {
     pub(crate) async fn rollup_database(
         &self,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<usize, Error> {
         let tenants: Vec<Uuid> = event::Entity::find()
             .select_only()
@@ -86,7 +87,7 @@ impl AnalyticsService {
     pub(crate) async fn rollup_tenant(
         &self,
         tenant: &TenantContext,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<usize, Error> {
         let read = tenant.database().read();
         let tenant_id = tenant.id().as_uuid();
@@ -109,7 +110,7 @@ impl AnalyticsService {
             .await?
             .into_iter()
             .collect();
-        let recent = day_of(now - chrono::Duration::days(RECENT_DAYS));
+        let recent = day_of(now - SignedDuration::from_hours(24 * RECENT_DAYS));
         let days: Vec<String> =
             raw_days.into_iter().filter(|day| *day >= recent || !done.contains(day)).collect();
         for day in &days {
@@ -123,7 +124,7 @@ impl AnalyticsService {
         &self,
         tenant: &TenantContext,
         day: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<(), Error> {
         let read = tenant.database().read();
         let tenant_id = tenant.id().as_uuid();

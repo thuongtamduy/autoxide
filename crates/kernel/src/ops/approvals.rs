@@ -12,6 +12,8 @@
 //! thì lệnh chạy thật. Tool MCP tương ứng khai `Tool::requires_approval_for_agent`: agent gọi tool đó
 //! thì bị từ chối và được chỉ sang đường REST để xin duyệt (MCP không làm được điều REST cấm).
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use axum::body::Body;
@@ -19,7 +21,6 @@ use axum::extract::{FromRequestParts, MatchedPath, Path, Query, Request, State};
 use axum::http::{HeaderName, Method, StatusCode};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -227,7 +228,7 @@ async fn checked(
             hash.into(),
             serde_json::to_string(&permissions).map_err(Error::internal)?.into(),
             "pending".into(),
-            (now + Duration::hours(LIFETIME_HOURS)).into(),
+            (now + SignedDuration::from_hours(LIFETIME_HOURS)).into(),
             now.into(),
         ])
         .to_owned();
@@ -260,8 +261,8 @@ async fn consume(
     Ok(tenant.database().write().execute(&update).await?.rows_affected() == 1)
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// A command an AI agent asked to run, waiting for a person.
@@ -280,11 +281,11 @@ pub(crate) struct ApprovalView {
     /// Any of these permissions may approve it.
     pub permissions: Vec<String>,
     pub decided_by: Option<Uuid>,
-    pub decided_at: Option<DateTime<Utc>>,
+    pub decided_at: Option<Timestamp>,
     /// Why it was rejected.
     pub reason: Option<String>,
-    pub expires_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
+    pub created_at: Timestamp,
     /// Where to look at it and decide.
     pub url: String,
 }
@@ -306,7 +307,7 @@ const COLUMNS: [&str; 11] = [
 fn view(row: &sea_orm::QueryResult) -> Result<ApprovalView, Error> {
     let id: Uuid = row.try_get("", "id")?;
     let permissions: String = row.try_get("", "permissions")?;
-    let expires_at: DateTime<Utc> = row.try_get("", "expires_at")?;
+    let expires_at: Timestamp = row.try_get("", "expires_at")?;
     let mut status: String = row.try_get("", "status")?;
     if status == "pending" && expires_at <= now() {
         status = "expired".to_owned();

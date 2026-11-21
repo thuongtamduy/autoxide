@@ -13,7 +13,7 @@
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{OrgSetting, ScopeExt, TenantContext};
-use chrono::NaiveDate;
+use autoxide_kernel::time::Date;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
@@ -41,14 +41,10 @@ fn check_days(value: &serde_json::Value) -> Result<serde_json::Value, String> {
 }
 
 /// Trạng thái hạn của lô lúc đọc.
-pub(crate) fn expiry_state(
-    expires_on: Option<NaiveDate>,
-    today: NaiveDate,
-    days: i64,
-) -> &'static str {
+pub(crate) fn expiry_state(expires_on: Option<Date>, today: Date, days: i64) -> &'static str {
     match expires_on {
         Some(day) if day < today => "expired",
-        Some(day) if day <= today + chrono::Duration::days(days) => "expiring",
+        Some(day) if today.checked_add_days(days).is_none_or(|limit| day <= limit) => "expiring",
         _ => "ok",
     }
 }
@@ -99,7 +95,7 @@ pub(crate) async fn lot_in<C: ConnectionTrait>(
     org: Uuid,
     variant: Uuid,
     code: &str,
-    expires_on: Option<NaiveDate>,
+    expires_on: Option<Date>,
     quantity: i64,
 ) -> Result<Uuid, Error> {
     lot::Entity::insert(lot::ActiveModel {
@@ -150,7 +146,7 @@ pub(crate) async fn lots_out<C: ConnectionTrait>(
     code: Option<&str>,
     quantity: i64,
 ) -> Result<Vec<(Option<Uuid>, i64)>, Error> {
-    let today = now().date_naive();
+    let today = now().date_utc();
     let all = lot::Entity::find()
         .filter(lot::Column::LevelId.eq(level))
         .scoped(tenant)
@@ -248,7 +244,7 @@ pub(crate) async fn record_in<C: ConnectionTrait>(
     tenant: &TenantContext,
     touched: &mut stock::Touched,
     mut new: stock::NewMovement,
-    lot: Option<(&str, Option<NaiveDate>)>,
+    lot: Option<(&str, Option<Date>)>,
     serials: &[String],
 ) -> Result<crate::entity::movement::Model, Error> {
     if let Some((code, expires_on)) = lot {
@@ -376,19 +372,19 @@ pub(crate) fn check_serials(
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
+    use autoxide_kernel::time::Date;
 
     use super::expiry_state;
 
     #[test]
     fn trang_thai_han_cua_lo() {
-        let today = NaiveDate::from_ymd_opt(2026, 11, 18).unwrap();
-        let day = |d| NaiveDate::from_ymd_opt(2026, 11, d);
+        let today = Date::new(2026, 11, 18).unwrap();
+        let day = |d| Date::new(2026, 11, d);
         assert_eq!(expiry_state(None, today, 30), "ok");
         assert_eq!(expiry_state(day(17), today, 30), "expired");
         assert_eq!(expiry_state(day(18), today, 30), "expiring");
-        assert_eq!(expiry_state(NaiveDate::from_ymd_opt(2026, 12, 18), today, 30), "expiring");
-        assert_eq!(expiry_state(NaiveDate::from_ymd_opt(2026, 12, 19), today, 30), "ok");
+        assert_eq!(expiry_state(Date::new(2026, 12, 18), today, 30), "expiring");
+        assert_eq!(expiry_state(Date::new(2026, 12, 19), today, 30), "ok");
         assert_eq!(expiry_state(day(30), today, 0), "ok");
     }
 }
@@ -441,8 +437,8 @@ impl crate::service::InventoryService {
         }
         let root = autoxide_kernel::tenancy::root_of(tenant.id()).as_uuid();
         let days = self.expiring_days(tenant, filter.org_id.unwrap_or(root)).await?;
-        let today = now().date_naive();
-        let soon = today + chrono::Duration::days(days);
+        let today = now().date_utc();
+        let soon = today.checked_add_days(days).unwrap_or(today);
         match filter.expiry_state.as_deref() {
             None => {}
             Some("expired") => select = select.filter(lot::Column::ExpiresOn.lt(today)),
@@ -488,7 +484,7 @@ impl crate::service::InventoryService {
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
         use sea_orm::QuerySelect;
-        let today = now().date_naive();
+        let today = now().date_utc();
         let due: Vec<(Uuid, Uuid)> = lot::Entity::find()
             .select_only()
             .column(lot::Column::TenantId)

@@ -1,5 +1,6 @@
 //! Endpoint role và permission: danh mục permission, CRUD role, role của người dùng.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Principal, Scope};
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -104,8 +104,8 @@ pub(crate) struct RoleResponse {
     /// Permissions the role denies, sorted by name; they win over every grant of the user's
     /// other roles.
     denies: Vec<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Role> for RoleResponse {

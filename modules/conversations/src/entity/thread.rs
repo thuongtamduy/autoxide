@@ -1,5 +1,6 @@
 //! Bảng `conversations_threads`: một cuộc trò chuyện giữa người mua và một nút (cửa hàng, gian hàng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -24,10 +25,10 @@ pub struct Model {
     pub draft_reply: Option<String>,
     pub draft_for: Option<Uuid>,
     pub locale: Option<String>,
-    pub last_message_at: DateTimeUtc,
-    pub closed_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub last_message_at: Timestamp,
+    pub closed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

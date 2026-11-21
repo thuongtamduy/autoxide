@@ -1,8 +1,9 @@
 //! Chương trình: tạo, sửa, khoá sau khi chạy, lưu vết, kiểm tuân thủ khi bật, rò rỉ giữa cửa hàng.
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 
 use super::{activate, body, call, create, load_legal, running, setup};
@@ -47,7 +48,7 @@ async fn khong_tao_duoc_khi_ends_at_truoc_starts_at_va_bao_moi_loi_mot_lan() {
         let setup = setup(test, true).await;
         let bad = body(
             setup.tree.a,
-            json!({"ends_at": Utc::now() - Duration::days(1), "value_bp": 20000, "title": ""}),
+            json!({"ends_at": Timestamp::now() - SignedDuration::from_hours(24), "value_bp": 20000, "title": ""}),
         );
         let (status, error) = call(&setup.app, "POST", "/promotions", "boss", Some(bad)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -70,7 +71,7 @@ async fn sua_sau_khi_chay_bi_khoa_va_moi_lan_doi_co_phien_ban() {
         let (status, error) =
             call(&setup.app, "PATCH", &uri, "boss", Some(json!({"usage_limit": 5}))).await;
         assert_eq!(status, StatusCode::CONFLICT, "{error}");
-        let later = Utc::now() + Duration::days(9);
+        let later = Timestamp::now() + SignedDuration::from_hours(24 * 9);
         let (status, changed) = call(
             &setup.app,
             "PATCH",
@@ -238,7 +239,7 @@ async fn vuot_so_ngay_giam_gia_trong_nam() {
     TestDatabase::run(async |test| {
         let setup = setup(test, true).await;
         // Năm sau, để chương trình nằm gọn trong một năm: 100 ngày đã chạy + 30 ngày > 120.
-        let year = Utc::now().format("%Y").to_string().parse::<i32>().unwrap() + 1;
+        let year = Timestamp::now().format("%Y").to_string().parse::<i32>().unwrap() + 1;
         let at = |month: u32, day: u32| format!("{year}-{month:02}-{day:02}T00:00:00Z");
         let first = create(
             &setup,
@@ -473,7 +474,7 @@ async fn flash_sale_cong_khai_voi_suat_con_that() {
         let request = crate::api::ReserveRequest::new(
             uuid::Uuid::now_v7(),
             setup.cart(&[(variant, 2)]),
-            Utc::now() + Duration::hours(1),
+            Timestamp::now() + SignedDuration::from_hours(1),
         );
         setup.promotions().reserve(&setup.tenant(), &request).await.unwrap();
         let uri = format!(
@@ -505,7 +506,7 @@ async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
     TestDatabase::run(async |test| {
         let setup = setup(test, true).await;
         let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
-        let starts = Utc::now() + Duration::hours(1);
+        let starts = Timestamp::now() + SignedDuration::from_hours(1);
         let id = create(
             &setup,
             body(
@@ -546,7 +547,7 @@ async fn nhac_khi_flash_sale_bat_dau_gui_mot_lan_kem_dong_y_rieng() {
             crate::entity::reminder::Entity::update_many()
                 .col_expr(
                     crate::entity::reminder::Column::RemindAt,
-                    Expr::value(Utc::now() - Duration::seconds(1)),
+                    Expr::value(Timestamp::now() - SignedDuration::from_secs(1)),
                 )
                 .exec(setup.app.database().write())
                 .await
@@ -577,7 +578,7 @@ async fn bam_nhac_toi_dong_thoi_chi_mot_loi_nhac() {
     TestDatabase::run(async |test| {
         let setup = std::sync::Arc::new(setup(test, true).await);
         let variant = setup.catalog.add(setup.tree.a, 200_000, &[]);
-        let starts = Utc::now() + Duration::hours(2);
+        let starts = Timestamp::now() + SignedDuration::from_hours(2);
         let id = create(
             &setup,
             body(
@@ -696,7 +697,7 @@ async fn bat_hai_chuong_trinh_cung_luc_khong_vuot_so_ngay_trong_nam() {
     TestDatabase::run(async |test| {
         let setup = setup(test, true).await;
         // Năm sau: mỗi chương trình 70 ngày (một mình không vượt 120), cả hai thì 140 > 120.
-        let year = Utc::now().format("%Y").to_string().parse::<i32>().unwrap() + 1;
+        let year = Timestamp::now().format("%Y").to_string().parse::<i32>().unwrap() + 1;
         let at = |month: u32, day: u32| format!("{year}-{month:02}-{day:02}T00:00:00Z");
         for (start, end) in [(at(1, 1), at(3, 11)), (at(5, 1), at(7, 10)), (at(9, 1), at(11, 10))] {
             let window = json!({"starts_at": start, "ends_at": end});

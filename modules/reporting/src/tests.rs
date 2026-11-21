@@ -1,6 +1,7 @@
 //! Test đường đi của số liệu (rút → đẩy → kho của cây), trên cả SQLite và Postgres: cha ở database
 //! chính, con ở database khác (testkit cấp hai database trống cùng loại).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,8 +13,7 @@ use autoxide_kernel::report::Fact;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
 use autoxide_testkit::{TestApp, TestDatabase};
-use chrono::{DateTime, NaiveDate, Utc};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Statement};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::json;
 
 use crate::config::ReportingConfig;
@@ -118,7 +118,7 @@ async fn forward_survives_root_maintenance() {
                 let backend = control.write().get_database_backend();
                 control
                     .write()
-                    .execute_raw(Statement::from_sql_and_values(
+                    .execute_raw(autoxide_kernel::database::statement(
                         backend,
                         "UPDATE kernel_tenants SET status = $1 WHERE id = $2",
                         [status.into(), id.as_uuid().into()],
@@ -212,7 +212,7 @@ async fn daily_rollup_equals_sum_of_facts() {
             let reporting = reporting.clone();
             let shop = shops[usize::try_from(index % 4).unwrap()].clone();
             async move {
-                let fact = Fact::new(SALES_AMOUNT.kind, Utc::now())
+                let fact = Fact::new(SALES_AMOUNT.kind, Timestamp::now())
                     .amount(vnd(index + 1))
                     .dimension("channel", "web");
                 reporting.record_local(&shop, uuid::Uuid::now_v7(), vec![fact]).await
@@ -283,7 +283,7 @@ async fn local_day_uses_org_timezone() {
             &sources,
             ReportingConfig::default(),
         );
-        let at = |text: &str| DateTime::parse_from_rfc3339(text).unwrap().to_utc();
+        let at = |text: &str| Timestamp::parse_rfc3339(text).unwrap();
         // 23:30 ngày 31/10 và 00:30 ngày 1/11 giờ Việt Nam (UTC+7).
         for (moment, amount) in [("2026-10-31T16:30:00Z", 1), ("2026-10-31T17:30:00Z", 2)] {
             let fact = Fact::new(SALES_AMOUNT.kind, at(moment)).amount(vnd(amount));
@@ -293,8 +293,8 @@ async fn local_day_uses_org_timezone() {
         let day = |amount: i64| {
             rows.iter().find(|row| row.amount_minor == Some(amount)).unwrap().local_day
         };
-        assert_eq!(day(1), NaiveDate::from_ymd_opt(2026, 10, 31).unwrap());
-        assert_eq!(day(2), NaiveDate::from_ymd_opt(2026, 11, 1).unwrap());
+        assert_eq!(day(1), Date::new(2026, 10, 31).unwrap());
+        assert_eq!(day(2), Date::new(2026, 11, 1).unwrap());
     })
     .await
     .unwrap();

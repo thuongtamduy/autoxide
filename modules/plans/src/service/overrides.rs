@@ -1,6 +1,7 @@
 //! Ngoại lệ quyền dùng theo khách và tính quyền dùng gộp (gói + add-on + ngoại lệ).
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
 
 impl PlansService {
     pub(crate) async fn overrides(&self, tenant: TenantId) -> Result<Vec<grant::Model>, Error> {
@@ -16,7 +17,7 @@ impl PlansService {
     pub(crate) async fn all_overrides(
         &self,
         filter: &OverrideFilter,
-        at: DateTime<Utc>,
+        at: Timestamp,
         page: &PageRequest,
     ) -> Result<Page<grant::Model>, Error> {
         let mut select = grant::Entity::find();
@@ -111,7 +112,7 @@ impl PlansService {
             enabled: Set(if is_limit { None } else { input.enabled }),
             max_value: Set(if is_limit { input.max_value } else { None }),
             reason: Set(reason),
-            expires_at: Set(input.expires_at.map(|at| at.trunc_subsecs(6))),
+            expires_at: Set(input.expires_at.map(|at| at.truncate(jiff::Unit::Microsecond))),
             created_by: Set(Some(principal.user_id())),
             created_at: Set(at),
         }
@@ -188,7 +189,7 @@ impl PlansService {
     pub(crate) async fn compute(
         &self,
         tenant: TenantId,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<TenantEntitlements, Error> {
         let read = self.control().read();
         let current = subscription::Entity::find()

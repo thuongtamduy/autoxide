@@ -1,6 +1,7 @@
 //! Endpoint mua trong ứng dụng (bước 69 P4): nhà vận hành nối sản phẩm của cửa hàng với gói; app của
 //! khách gửi bằng chứng mua; cửa hàng gửi thông báo máy chủ. Logic ở `store.rs`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -50,7 +50,7 @@ pub(crate) struct StoreProductResponse {
     product_id: String,
     /// The base plan a purchase of this product gives.
     plan_id: Uuid,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<product::Model> for StoreProductResponse {
@@ -224,10 +224,10 @@ pub(crate) struct StorePurchaseResponse {
     #[schema(example = "active")]
     state: String,
     /// When the store period ends.
-    expires_at: Option<DateTime<Utc>>,
+    expires_at: Option<Timestamp>,
     /// Made in the store's test environment.
     sandbox: bool,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<purchase::Model> for StorePurchaseResponse {

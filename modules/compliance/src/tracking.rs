@@ -11,6 +11,8 @@
 //! - Bằng chứng đồng ý ẩn danh: `consent_id` do giao diện tạo, nhóm, phiên bản, IP băm; giữ theo quy tắc
 //!   `privacy.consent_proof_days`. Người đã đăng nhập thì ghi thêm vào sổ đồng ý chung.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeSet;
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -23,7 +25,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::{Outcome, Throttle};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter,
@@ -229,7 +230,7 @@ pub(crate) struct Banner {
     pub categories: Vec<String>,
     pub policy_version: i32,
     pub position: String,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
     /// Mã đang bật.
     pub tags: Vec<tracking_tag::Model>,
 }
@@ -263,7 +264,7 @@ fn signature(categories: &[String], tags: &[tracking_tag::Model]) -> String {
 pub(crate) struct Stats {
     pub total: u64,
     pub by_category: Vec<(String, u64)>,
-    pub since: DateTime<Utc>,
+    pub since: Timestamp,
 }
 
 impl ComplianceService {
@@ -387,7 +388,7 @@ impl ComplianceService {
                 categories: effective(&[], &tags),
                 policy_version: 0,
                 position: "bottom".to_owned(),
-                updated_at: DateTime::<Utc>::UNIX_EPOCH,
+                updated_at: Timestamp::UNIX_EPOCH,
                 tags,
             },
         })
@@ -752,7 +753,7 @@ impl ComplianceService {
                     &self.secret,
                     "compliance.cookies",
                     ip,
-                    Utc::now(),
+                    Timestamp::now(),
                 )
                 .await?;
                 let throttle = Throttle::new(
@@ -838,7 +839,7 @@ impl ComplianceService {
     ) -> Result<Stats, Error> {
         principal.require(&TRACKING_MANAGE)?;
         let org = self.tracking_org(tenant, principal, Some(org)).await?;
-        let since = Utc::now() - Duration::days(30);
+        let since = Timestamp::now() - SignedDuration::from_hours(24 * 30);
         let read = tenant.database().read();
         let base = || {
             cookie_consent::Entity::find()
@@ -881,7 +882,7 @@ impl ComplianceService {
             deleted += cookie_consent::Entity::delete_many()
                 .filter(
                     cookie_consent::Column::CreatedAt
-                        .lt(Utc::now() - Duration::days(i64::from(days))),
+                        .lt(Timestamp::now() - SignedDuration::from_hours(24 * (i64::from(days)))),
                 )
                 .scoped(&tenant)
                 .exec(database.write())

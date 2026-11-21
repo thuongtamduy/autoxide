@@ -3,10 +3,11 @@
 //! hết hạn đổi trả (trừ khi bị hoãn), huỷ đơn cửa hàng không nhận kịp.
 
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::Side;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Statement};
 use serde_json::{Value, json};
@@ -225,7 +226,10 @@ async fn shipment_request_and_carrier_events_drive_the_order_and_post_balanced_r
         holds.hold_completion(&tenant, id, "dispute:1").await.unwrap();
         holds.hold_completion(&tenant, id, "dispute:1").await.unwrap();
         order::Entity::update_many()
-            .col_expr(order::Column::DeliveredAt, Expr::value(Utc::now() - Duration::days(8)))
+            .col_expr(
+                order::Column::DeliveredAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(24 * 8)),
+            )
             .filter(order::Column::Id.eq(id))
             .scoped(&tenant)
             .exec(shop.database().write())
@@ -249,7 +253,10 @@ async fn unaccepted_order_is_cancelled_after_acceptance_hours() {
         let id = cod_order(&shop).await;
         // Mặc định 0 giờ: không có bước nhận đơn, job không đụng tới.
         order::Entity::update_many()
-            .col_expr(order::Column::ConfirmedAt, Expr::value(Utc::now() - Duration::hours(5)))
+            .col_expr(
+                order::Column::ConfirmedAt,
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(5)),
+            )
             .filter(order::Column::Id.eq(id))
             .exec(shop.database().write())
             .await

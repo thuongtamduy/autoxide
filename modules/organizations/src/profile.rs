@@ -7,7 +7,7 @@ use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, NaiveDate, NaiveTime, SubsecRound, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -22,6 +22,7 @@ use crate::permissions::PROFILE_MANAGE;
 use crate::service::OrgService;
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -48,7 +49,7 @@ pub(crate) mod entity {
         pub pickup: bool,
         pub cover_media_id: Option<Uuid>,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -103,7 +104,7 @@ pub(crate) struct Profile {
     pub special_days: Vec<SpecialDay>,
     pub pickup: bool,
     pub cover_media_id: Option<Uuid>,
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<Timestamp>,
 }
 
 /// Thay đổi; `None` giữ nguyên, `Some(None)` bỏ đặt.
@@ -119,8 +120,8 @@ pub(crate) struct ProfileChanges {
     pub cover_media_id: Option<Option<Uuid>>,
 }
 
-fn time(raw: &str) -> Option<NaiveTime> {
-    NaiveTime::parse_from_str(raw, "%H:%M").ok()
+fn time(raw: &str) -> Option<jiff::civil::Time> {
+    autoxide_kernel::time::parse_clock(raw)
 }
 
 /// Kiểm giờ mở cửa và ngày đặc biệt; báo mọi lỗi một lần.
@@ -151,7 +152,7 @@ fn check_hours(hours: &[OpeningHours], days: &[SpecialDay]) -> Vec<FieldError> {
     }
     let mut seen = BTreeSet::new();
     for (index, day) in days.iter().enumerate() {
-        if NaiveDate::parse_from_str(&day.date, "%Y-%m-%d").is_err() {
+        if Date::parse_from_str(&day.date, "%Y-%m-%d").is_err() {
             problems.push(FieldError::new(
                 format!("special_days[{index}].date"),
                 "invalid",
@@ -351,7 +352,7 @@ impl OrgService {
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let transaction = tenant.database().begin_write().await?;
         principal
             .require_write_at(

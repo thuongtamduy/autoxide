@@ -1,6 +1,7 @@
 //! Service của module `invoices`: lỗi, mô tả chứng từ, ký hiệu, uỷ nhiệm. Chứng từ nháp ở
 //! [`crate::documents`], phát hành / gửi hoá đơn điện tử / sửa sai ở [`crate::issue`].
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
@@ -14,7 +15,6 @@ use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{DatabaseRegistry, OrgId, ScopeExt, TenantContext};
 use autoxide_ledger::api::Ledger;
 use autoxide_tax::api::TaxEngine;
-use chrono::{DateTime, Datelike, NaiveDate, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
@@ -22,8 +22,8 @@ use crate::api::{Buyer, Document, DocumentLine, KINDS};
 use crate::entity::{document, line, mandate, series};
 use crate::permissions::{MANDATES_MANAGE, READ, SERIES_MANAGE};
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) struct InvoicesService {
@@ -54,7 +54,7 @@ pub(crate) fn not_draft() -> Error {
     )
 }
 
-pub(crate) fn retention_hold(until: Option<NaiveDate>) -> Error {
+pub(crate) fn retention_hold(until: Option<Date>) -> Error {
     Error::conflict(
         "invoices.retention_hold",
         "Accounting documents must be kept until {until}; this one cannot be deleted.",
@@ -120,8 +120,8 @@ pub(crate) fn valid_tax_code(code: &str) -> bool {
 /// Ngày phải lưu tới: hết năm (dương lịch) của ngày lập + 10 năm (Luật Kế toán 88/2015 Điều 41,
 /// NĐ 174/2016 Điều 12 — thời hạn tính từ kết thúc kỳ kế toán năm; cần đối chiếu khi năm tài chính
 /// không theo năm dương lịch).
-pub(crate) fn retention_until(issued: NaiveDate) -> NaiveDate {
-    NaiveDate::from_ymd_opt(issued.year() + 10, 12, 31).unwrap_or(issued)
+pub(crate) fn retention_until(issued: Date) -> Date {
+    Date::new(issued.year() + 10, 12, 31).unwrap_or(issued)
 }
 
 fn describe_line(row: &line::Model, currency: &str) -> Result<DocumentLine, Error> {
@@ -222,8 +222,8 @@ pub(crate) struct MandateInput {
     pub principal: OrgId,
     pub agent: OrgId,
     pub kinds: Vec<String>,
-    pub valid_from: NaiveDate,
-    pub valid_to: Option<NaiveDate>,
+    pub valid_from: Date,
+    pub valid_to: Option<Date>,
     pub document_file_id: Option<uuid::Uuid>,
 }
 
@@ -508,7 +508,7 @@ impl InvoicesService {
         principal: uuid::Uuid,
         agent: uuid::Uuid,
         kind: &str,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<bool, Error> {
         let found = mandate::Entity::find()
             .scoped(tenant)

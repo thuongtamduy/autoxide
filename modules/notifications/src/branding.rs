@@ -6,6 +6,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
 use sea_orm::EntityTrait;
 use sea_orm::Set;
 use sea_orm::sea_query::OnConflict;
@@ -38,7 +39,7 @@ fn default_row(tenant: &TenantContext) -> branding::Model {
         background_color: DEFAULT_BACKGROUND.to_owned(),
         footer_text: None,
         updated_by: None,
-        updated_at: chrono::DateTime::UNIX_EPOCH,
+        updated_at: Timestamp::UNIX_EPOCH,
     }
 }
 

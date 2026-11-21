@@ -17,35 +17,35 @@ pub(crate) mod vouchers;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, FixedOffset, Months, NaiveTime, Offset, TimeZone, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::tz::{Offset, TimeZone};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder};
 
 use crate::entity::{loyalty_rule, tier};
 
 /// Múi giờ tính hạn điểm và ngày sinh: giờ Việt Nam (UTC+7). Lưu UTC.
-pub(crate) fn local_offset() -> FixedOffset {
-    // 7 giờ luôn nằm trong khoảng hợp lệ của `FixedOffset`; nhánh `UTC` không bao giờ chạy.
-    FixedOffset::east_opt(7 * 3600).unwrap_or_else(|| FixedOffset::east_opt(0).unwrap_or(Utc.fix()))
+pub(crate) fn local_offset() -> TimeZone {
+    TimeZone::fixed(Offset::constant(7))
 }
 
 /// Cuối ngày (23:59:59 giờ Việt Nam) của `months` tháng sau `from`.
-pub(crate) fn expiry_after(from: DateTime<Utc>, months: i32) -> DateTime<Utc> {
-    let local = from.with_timezone(&local_offset());
-    let later = local
-        .checked_add_months(Months::new(u32::try_from(months.max(1)).unwrap_or(12)))
-        .unwrap_or(local + Duration::days(365));
-    let end = later.date_naive().and_time(NaiveTime::from_hms_opt(23, 59, 59).unwrap_or_default());
-    local_offset()
-        .from_local_datetime(&end)
-        .single()
-        .map_or(later.with_timezone(&Utc), |at| at.with_timezone(&Utc))
+pub(crate) fn expiry_after(from: Timestamp, months: i32) -> Timestamp {
+    // Cộng tháng theo lịch địa phương; ngày không có ở tháng đích lùi về cuối tháng (31/01 + 1 tháng = 28/02).
+    let zone = local_offset();
+    let today = from.date_in(&zone);
+    let later = today
+        .checked_add_months(months.max(1))
+        .or_else(|| today.checked_add_days(365))
+        .unwrap_or(today);
+    let end = later.to_jiff().at(23, 59, 59, 0);
+    autoxide_kernel::time::from_local(&zone, end).unwrap_or(from)
 }
 
 /// Quy tắc đang hiệu lực lúc `at` (dòng có `effective_from` muộn nhất không sau `at`).
 pub(crate) async fn current_rule<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<Option<loyalty_rule::Model>, Error> {
     Ok(loyalty_rule::Entity::find()
         .filter(loyalty_rule::Column::EffectiveFrom.lte(at))
@@ -60,7 +60,7 @@ pub(crate) async fn current_rule<C: ConnectionTrait>(
 pub(crate) async fn current_tiers<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<Vec<tier::Model>, Error> {
     let rows = tier::Entity::find()
         .filter(tier::Column::EffectiveFrom.lte(at))
@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn han_diem_la_cuoi_ngay_gio_viet_nam() {
-        let from = "2026-01-31T20:00:00Z".parse::<DateTime<Utc>>().unwrap();
+        let from = "2026-01-31T20:00:00Z".parse::<Timestamp>().unwrap();
         // 03:00 ngày 01/02 giờ Việt Nam + 12 tháng → 23:59:59 ngày 01/02/2027 giờ Việt Nam.
         assert_eq!(expiry_after(from, 12).to_rfc3339(), "2027-02-01T16:59:59+00:00");
         assert_eq!(mul_div(i64::MAX, 3, 4), i64::MAX / 4 * 3 + 2);

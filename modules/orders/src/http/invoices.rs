@@ -1,6 +1,7 @@
 //! Endpoint hoá đơn và chứng từ của đơn (D-215, B-c5): xin xuất hoá đơn (nhân viên / người mua),
 //! danh sách và bản in PDF chứng từ cho người mua có tài khoản và cho token xem đơn vãng lai.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -68,7 +68,7 @@ pub(crate) struct DocumentResponse {
     /// Symbol and number printed on the invoice.
     symbol: Option<String>,
     number: Option<i64>,
-    issue_date: Option<NaiveDate>,
+    issue_date: Option<Date>,
     total: Option<Money>,
     /// Code to look the invoice up at the tax authority's portal.
     lookup_code: Option<String>,

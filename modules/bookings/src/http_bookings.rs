@@ -1,6 +1,7 @@
 //! Endpoint REST của lịch đặt, dưới `/api/v1/bookings`: danh sách, cửa hàng đặt hộ, xem, xác nhận,
 //! check-in, xong, vắng mặt, huỷ, đổi giờ; khách đặt ở `/public/bookings`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -84,8 +84,8 @@ pub(crate) struct BookingRecord {
     resource_id: Uuid,
     /// Places taken (classes).
     seats: i32,
-    starts_at: DateTime<Utc>,
-    ends_at: DateTime<Utc>,
+    starts_at: Timestamp,
+    ends_at: Timestamp,
     /// `held` (waiting for the deposit), `pending` (waiting for the shop), `confirmed`, `checked_in`,
     /// `completed`, `cancelled`, `no_show` or `expired` (the deposit was not paid in time).
     status: String,
@@ -95,11 +95,11 @@ pub(crate) struct BookingRecord {
     price: Money,
     deposit: BookingDepositState,
     /// Until when a `held` booking waits for the deposit.
-    hold_expires_at: Option<DateTime<Utc>>,
-    cancelled_at: Option<DateTime<Utc>>,
+    hold_expires_at: Option<Timestamp>,
+    cancelled_at: Option<Timestamp>,
     cancel_reason: Option<String>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl BookingRecord {
@@ -150,7 +150,7 @@ pub(crate) struct BookingCheckout {
     /// QR code payload, when the partner gives one.
     qr_payload: Option<String>,
     /// Pay before this moment, or the place is released.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 /// A booking just made, with the deposit checkout when one is due.
@@ -181,7 +181,7 @@ pub(crate) struct CreateBookingRequest {
     /// Omitted: the first free staff member who gives the service.
     resource_id: Option<Uuid>,
     /// On a 5-minute mark, e.g. a `starts_at` from the availability.
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// Places (classes); default 1.
     #[serde(default = "one")]
     seats: i32,
@@ -206,9 +206,9 @@ pub(crate) struct BookingsQuery {
     /// Only this staff member (or court, room…).
     resource_id: Option<Uuid>,
     /// Starting at or after this moment.
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Starting before this moment.
-    to: Option<DateTime<Utc>>,
+    to: Option<Timestamp>,
 }
 
 impl From<BookingsQuery> for BookingFilter {
@@ -235,7 +235,7 @@ pub(crate) struct CancelBookingRequest {
 #[serde(deny_unknown_fields)]
 pub(crate) struct RescheduleBookingRequest {
     /// On a 5-minute mark.
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// Another staff member who gives the service; omitted: the same one.
     resource_id: Option<Uuid>,
 }

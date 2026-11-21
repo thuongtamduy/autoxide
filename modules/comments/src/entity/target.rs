@@ -2,6 +2,7 @@
 //! `target_type`, `target_id`); dòng tạo khi có bình luận đầu tiên (hoặc khi quản trị viên đặt
 //! trạng thái).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -23,7 +24,7 @@ pub struct Model {
     /// Ẩn mọi bình luận khỏi phần công khai (vd đích đã bị xoá).
     pub hidden: bool,
     /// Tự đóng từ lúc này.
-    pub closes_at: Option<DateTimeUtc>,
+    pub closes_at: Option<Timestamp>,
     /// Số bình luận đang hiện.
     pub published_count: i32,
     /// Số bình luận chờ duyệt.
@@ -32,8 +33,8 @@ pub struct Model {
     pub published_thread_count: i32,
     /// Số bình luận gốc chờ duyệt.
     pub pending_thread_count: i32,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

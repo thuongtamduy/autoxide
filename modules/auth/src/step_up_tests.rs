@@ -2,8 +2,10 @@
 //! thật, trên cả SQLite và Postgres: phiên cũ bị đòi xác nhận lại cho permission nhạy cảm, xác nhận
 //! xong thì làm được (kể cả sau refresh), khách tắt thì không đòi, API key không bị đòi.
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -42,7 +44,7 @@ async fn viec_nhay_cam_doi_xac_thuc_lai() {
         assert_eq!(status, StatusCode::NOT_FOUND);
 
         // Phiên đã 20 phút: refresh cấp token mang `auth_time` cũ.
-        let old = chrono::Utc::now() - chrono::Duration::minutes(20);
+        let old = Timestamp::now() - SignedDuration::from_mins(20);
         Entity::update_many()
             .col_expr(Column::AuthenticatedAt, Expr::value(Some(old)))
             .filter(Column::TenantId.eq(tenant.id().as_uuid()))

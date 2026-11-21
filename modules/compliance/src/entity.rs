@@ -12,6 +12,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod rule {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -23,21 +24,22 @@ pub(crate) mod rule {
         pub jurisdiction: String,
         pub key: String,
         pub version: i64,
-        pub effective_from: DateTimeUtc,
-        pub effective_to: Option<DateTimeUtc>,
+        pub effective_from: Timestamp,
+        pub effective_to: Option<Timestamp>,
         /// JSON.
         pub body: String,
         pub legal_basis: String,
         pub needs_legal_review: bool,
         /// `bundled` hay `import`.
         pub source: String,
-        pub imported_at: DateTimeUtc,
+        pub imported_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
 }
 
 pub(crate) mod policy {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -51,7 +53,7 @@ pub(crate) mod policy {
         /// JSON.
         pub value: String,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -59,6 +61,7 @@ pub(crate) mod policy {
 }
 
 pub(crate) mod kyc_profile {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -86,12 +89,12 @@ pub(crate) mod kyc_profile {
         pub document_files: String,
         /// JSON: trường cần bổ sung và lời nhắn (`needs_info`).
         pub info_request: Option<String>,
-        pub verified_at: Option<DateTimeUtc>,
-        pub expires_at: Option<DateTimeUtc>,
+        pub verified_at: Option<Timestamp>,
+        pub expires_at: Option<Timestamp>,
         pub reason_code: Option<String>,
         pub reviewed_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// Ghi chú của người duyệt khi từ chối / thu hồi (cho người được duyệt đọc).
         pub review_note: Option<String>,
         /// `document_hash` khi nhà cung cấp xác thực hồ sơ, trống ở trạng thái khác; unique theo
@@ -104,6 +107,7 @@ pub(crate) mod kyc_profile {
 }
 
 pub(crate) mod kyc_attempt {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -121,8 +125,8 @@ pub(crate) mod kyc_attempt {
         /// `pending`, `verified`, `rejected`, `failed`.
         pub status: String,
         pub result_code: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub completed_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub completed_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -130,6 +134,7 @@ pub(crate) mod kyc_attempt {
 }
 
 pub(crate) mod kyc_callback {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -143,8 +148,8 @@ pub(crate) mod kyc_callback {
         pub provider_reference: String,
         /// Thân callback nguyên văn (đã kiểm chữ ký).
         pub body: String,
-        pub received_at: DateTimeUtc,
-        pub processed_at: Option<DateTimeUtc>,
+        pub received_at: Timestamp,
+        pub processed_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -152,6 +157,7 @@ pub(crate) mod kyc_callback {
 }
 
 pub(crate) mod document {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -168,8 +174,8 @@ pub(crate) mod document {
         pub audience: String,
         pub title: String,
         pub current_version: Option<i32>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -177,6 +183,7 @@ pub(crate) mod document {
 }
 
 pub(crate) mod version {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -194,10 +201,10 @@ pub(crate) mod version {
         pub title: String,
         pub body: String,
         pub sha256: String,
-        pub effective_from: DateTimeUtc,
+        pub effective_from: Timestamp,
         pub requires_reacceptance: bool,
         pub published_by: Option<Uuid>,
-        pub published_at: DateTimeUtc,
+        pub published_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -205,6 +212,7 @@ pub(crate) mod version {
 }
 
 pub(crate) mod acceptance {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -228,7 +236,7 @@ pub(crate) mod acceptance {
         pub user_agent: Option<String>,
         /// SHA-256 của bản đã chấp nhận.
         pub sha256: String,
-        pub accepted_at: DateTimeUtc,
+        pub accepted_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -236,6 +244,7 @@ pub(crate) mod acceptance {
 }
 
 pub(crate) mod consent {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -257,9 +266,9 @@ pub(crate) mod consent {
         pub channel: String,
         /// `granted` hay `withdrawn`.
         pub state: String,
-        pub granted_at: Option<DateTimeUtc>,
-        pub withdrawn_at: Option<DateTimeUtc>,
-        pub updated_at: DateTimeUtc,
+        pub granted_at: Option<Timestamp>,
+        pub withdrawn_at: Option<Timestamp>,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -267,6 +276,7 @@ pub(crate) mod consent {
 }
 
 pub(crate) mod consent_record {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -283,7 +293,7 @@ pub(crate) mod consent_record {
         pub evidence: String,
         pub source: String,
         pub source_ref: String,
-        pub recorded_at: DateTimeUtc,
+        pub recorded_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -291,6 +301,7 @@ pub(crate) mod consent_record {
 }
 
 pub(crate) mod account_verification {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -305,8 +316,8 @@ pub(crate) mod account_verification {
         pub phone: Option<String>,
         /// SHA-256 của số; `''` khi chưa có.
         pub phone_key: String,
-        pub phone_verified_at: Option<DateTimeUtc>,
-        pub updated_at: DateTimeUtc,
+        pub phone_verified_at: Option<Timestamp>,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -314,6 +325,7 @@ pub(crate) mod account_verification {
 }
 
 pub(crate) mod phone_challenge {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -329,9 +341,9 @@ pub(crate) mod phone_challenge {
         /// SHA-256 của (pepper của khách, ID, mã) — mã không bao giờ lưu nguyên văn.
         pub code_hash: String,
         pub attempts: i32,
-        pub expires_at: DateTimeUtc,
-        pub consumed_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub expires_at: Timestamp,
+        pub consumed_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -339,6 +351,7 @@ pub(crate) mod phone_challenge {
 }
 
 pub(crate) mod legal_profile {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -366,8 +379,8 @@ pub(crate) mod legal_profile {
         pub phone: Option<String>,
         pub email: Option<String>,
         pub kyc_profile_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -375,6 +388,7 @@ pub(crate) mod legal_profile {
 }
 
 pub(crate) mod website {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -396,14 +410,14 @@ pub(crate) mod website {
         /// `revoked`.
         pub moit_status: String,
         pub moit_reference: Option<String>,
-        pub submitted_at: Option<DateTimeUtc>,
-        pub decided_at: Option<DateTimeUtc>,
+        pub submitted_at: Option<Timestamp>,
+        pub decided_at: Option<Timestamp>,
         pub logo_link_url: Option<String>,
         pub logo_image_url: Option<String>,
         /// Phiên bản danh sách kiểm lúc nộp.
         pub checklist_version: Option<i32>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -411,6 +425,7 @@ pub(crate) mod website {
 }
 
 pub(crate) mod website_page {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -425,7 +440,7 @@ pub(crate) mod website_page {
         pub page_kind: String,
         /// `content.entry:<id>`.
         pub resource: String,
-        pub linked_at: DateTimeUtc,
+        pub linked_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -435,6 +450,7 @@ pub(crate) mod website_page {
 // ---- Dữ liệu cá nhân (D-360) -------------------------------------------------------------------
 
 pub(crate) mod purpose {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -459,7 +475,7 @@ pub(crate) mod purpose {
         pub retention: Option<String>,
         pub active: bool,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -467,6 +483,7 @@ pub(crate) mod purpose {
 }
 
 pub(crate) mod incident {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -482,20 +499,20 @@ pub(crate) mod incident {
         pub severity: String,
         /// `open`, `contained`, `reported`, `closed`.
         pub status: String,
-        pub detected_at: DateTimeUtc,
+        pub detected_at: Timestamp,
         /// `detected_at` + giờ của quy tắc `privacy.incident`.
-        pub report_due_at: DateTimeUtc,
+        pub report_due_at: Timestamp,
         /// Mốc nhắc (giờ sau khi phát hiện) đã gửi gần nhất; 0 khi chưa nhắc.
         pub reminded_hours: i32,
-        pub authority_notified_at: Option<DateTimeUtc>,
+        pub authority_notified_at: Option<Timestamp>,
         pub authority_reference: Option<String>,
-        pub subjects_notified_at: Option<DateTimeUtc>,
+        pub subjects_notified_at: Option<Timestamp>,
         /// JSON: mảng loại dữ liệu bị ảnh hưởng.
         pub data_categories: String,
         pub affected_count: Option<i64>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -503,6 +520,7 @@ pub(crate) mod incident {
 }
 
 pub(crate) mod incident_entry {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -515,7 +533,7 @@ pub(crate) mod incident_entry {
         pub incident_id: Uuid,
         pub body: String,
         pub author_user_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -523,6 +541,7 @@ pub(crate) mod incident_entry {
 }
 
 pub(crate) mod subject_request {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -540,17 +559,17 @@ pub(crate) mod subject_request {
         pub subject_kind: String,
         /// Email / số đã chuẩn hoá / ID người dùng.
         pub subject: String,
-        pub received_at: DateTimeUtc,
-        pub due_at: DateTimeUtc,
+        pub received_at: Timestamp,
+        pub due_at: Timestamp,
         /// `received`, `in_progress`, `fulfilled`, `rejected`.
         pub status: String,
         pub reason: Option<String>,
         pub notes: Option<String>,
         pub handled_by: Option<Uuid>,
-        pub closed_at: Option<DateTimeUtc>,
+        pub closed_at: Option<Timestamp>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -560,6 +579,7 @@ pub(crate) mod subject_request {
 // ---- Mã theo dõi quảng cáo và đồng ý cookie (D-235, D-361) --------------------------------------
 
 pub(crate) mod tracking_tag {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -577,8 +597,8 @@ pub(crate) mod tracking_tag {
         /// `active` hay `paused`.
         pub status: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -586,6 +606,7 @@ pub(crate) mod tracking_tag {
 }
 
 pub(crate) mod cookie_setting {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -605,7 +626,7 @@ pub(crate) mod cookie_setting {
         /// `bottom`, `top` hay `center`.
         pub position: String,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -613,6 +634,7 @@ pub(crate) mod cookie_setting {
 }
 
 pub(crate) mod cookie_consent {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -631,7 +653,7 @@ pub(crate) mod cookie_consent {
         /// Băm khối IP (`ip_hash::fingerprint`), không giữ IP thô.
         pub ip_hash: Option<String>,
         pub user_id: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -641,6 +663,7 @@ pub(crate) mod cookie_consent {
 // ---- Vụ việc: báo vi phạm, khiếu nại, cung cấp thông tin cho cơ quan (D-363) --------------------
 
 pub(crate) mod case {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -673,11 +696,11 @@ pub(crate) mod case {
         /// `upheld`, `rejected`, `partially_upheld` hay `''`.
         pub decision: String,
         pub decision_reason: Option<String>,
-        pub ack_due_at: DateTimeUtc,
-        pub acknowledged_at: Option<DateTimeUtc>,
-        pub respond_by: DateTimeUtc,
-        pub decide_by: DateTimeUtc,
-        pub decided_at: Option<DateTimeUtc>,
+        pub ack_due_at: Timestamp,
+        pub acknowledged_at: Option<Timestamp>,
+        pub respond_by: Timestamp,
+        pub decide_by: Timestamp,
+        pub decided_at: Option<Timestamp>,
         pub decided_by: Option<Uuid>,
         /// SHA-256 của mã tra cứu trả cho người báo (chỉ lưu băm).
         pub tracking_hash: String,
@@ -686,8 +709,8 @@ pub(crate) mod case {
         /// Mốc quá hạn đã nhắc: `''`, `ack`, `decide`.
         pub overdue_notified: String,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -714,6 +737,7 @@ pub(crate) mod case_respondent {
 }
 
 pub(crate) mod case_entry {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -732,7 +756,7 @@ pub(crate) mod case_entry {
         pub body: String,
         /// JSON: ID file (module `files`).
         pub files: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -740,6 +764,7 @@ pub(crate) mod case_entry {
 }
 
 pub(crate) mod disclosure {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -753,13 +778,13 @@ pub(crate) mod disclosure {
         pub authority: String,
         pub request_reference: String,
         pub legal_basis: String,
-        pub requested_at: DateTimeUtc,
+        pub requested_at: Timestamp,
         /// `org:<id>` hay `user:<id>`.
         pub subject: String,
         /// JSON: TÊN trường đã cung cấp, không giá trị.
         pub fields: String,
         pub disclosed_by: Uuid,
-        pub disclosed_at: DateTimeUtc,
+        pub disclosed_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

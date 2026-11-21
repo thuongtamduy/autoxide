@@ -2,6 +2,7 @@
 //! `/api/v1/compliance`, kèm hai endpoint công khai cho giao diện: cấu hình đồng ý (chỉ trả mã của nhóm
 //! người xem đã đồng ý) và ghi bằng chứng đồng ý ẩn danh.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +16,6 @@ use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use autoxide_kernel::version::Tagged;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -110,8 +110,8 @@ pub(crate) struct TagResponse {
     pub status: String,
     /// Consent category it needs.
     pub category: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<tracking_tag::Model> for TagResponse {
@@ -147,7 +147,7 @@ pub(crate) struct SettingsResponse {
     pub policy_version: i32,
     /// `bottom`, `top` or `center`.
     pub position: String,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<Banner> for SettingsResponse {
@@ -465,7 +465,7 @@ pub(crate) struct StatsQuery {
 pub(crate) struct StatsResponse {
     pub org_id: Uuid,
     /// Start of the period (the last 30 days).
-    pub since: DateTime<Utc>,
+    pub since: Timestamp,
     /// Choices recorded.
     pub total: u64,
     /// Choices that accepted each category.
@@ -636,7 +636,7 @@ async fn public_consent_config(
     let granted: Vec<&str> =
         query.granted.as_deref().unwrap_or_default().split(',').map(str::trim).collect();
     let version =
-        banner.tags.iter().map(|tag| tag.updated_at).fold(banner.updated_at, DateTime::max);
+        banner.tags.iter().map(|tag| tag.updated_at).fold(banner.updated_at, Timestamp::max);
     let mut categories = Vec::new();
     for key in std::iter::once("necessary").chain(banner.categories.iter().map(String::as_str)) {
         let template = match key {

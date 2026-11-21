@@ -11,13 +11,14 @@
 //!
 //! Mọi câu đếm dùng index bắt đầu bằng `tenant_id`, chạy như nhau trên SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, JoinType, OnConflict, Order, Query};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use uuid::Uuid;
@@ -56,7 +57,7 @@ impl CatalogService {
         tenant: &TenantContext,
         order_id: Uuid,
         lines: &[SoldLine],
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         let mut quantities: BTreeMap<Uuid, i64> = BTreeMap::new();
         for line in lines {
@@ -101,7 +102,7 @@ impl CatalogService {
         tenant: &TenantContext,
         products: &[Uuid],
     ) -> Result<(), Error> {
-        let since = now() - Duration::days(WINDOW_DAYS);
+        let since = now() - SignedDuration::from_hours(24 * WINDOW_DAYS);
         for product in products {
             let units = self.units_sold(tenant, *product, since).await?;
             let pairs = self.co_purchased(tenant, *product, since).await?;
@@ -161,7 +162,7 @@ impl CatalogService {
         &self,
         tenant: &TenantContext,
         product: Uuid,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> Result<i64, Error> {
         let mut select = Query::select();
         select
@@ -188,7 +189,7 @@ impl CatalogService {
         &self,
         tenant: &TenantContext,
         product: Uuid,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> Result<Vec<(Uuid, i64)>, Error> {
         let (mine, other) = (Alias::new("mine"), Alias::new("other"));
         let count =
@@ -323,7 +324,7 @@ pub(crate) struct RefreshSales(pub(crate) Arc<CatalogService>);
 #[async_trait::async_trait]
 impl JobHandler for RefreshSales {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let since = now() - Duration::days(WINDOW_DAYS);
+        let since = now() - SignedDuration::from_hours(24 * WINDOW_DAYS);
         let rows: Vec<(Uuid, Uuid)> = sold_product::Entity::find()
             .select_only()
             .column(sold_product::Column::TenantId)

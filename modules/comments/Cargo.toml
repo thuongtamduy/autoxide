@@ -12,10 +12,10 @@ publish.workspace = true
 bench-seed = []
 
 [dependencies]
+jiff.workspace = true
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
-chrono.workspace = true
 pulldown-cmark.workspace = true
 sea-orm.workspace = true
 serde.workspace = true

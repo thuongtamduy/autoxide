@@ -1,6 +1,7 @@
 //! Entity của bảng m0020: lần tạo sản phẩm nháp từ ảnh bằng AI.
 
 pub(crate) mod image_draft {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -25,8 +26,8 @@ pub(crate) mod image_draft {
         /// Mô hình đã trả lời.
         pub model: Option<String>,
         pub created_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

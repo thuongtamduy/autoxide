@@ -1,6 +1,8 @@
 //! Báo khi có hàng lại (D-201): xác nhận hai bước, đồng ý riêng, một lần mỗi đợt có hàng, dừng bằng
 //! link, người đã đăng nhập báo vào tài khoản.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +11,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantId, root_of};
 use autoxide_notifications::api::{Notification, NotificationKind, Notifier, Outcome, Recipient};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -71,7 +72,7 @@ async fn sell_all(shop: &Shop, variant: Uuid, quantity: i64) {
     let request = ReserveRequest::new(
         Uuid::now_v7(),
         shop.tree.store,
-        Utc::now() + Duration::minutes(30),
+        Timestamp::now() + SignedDuration::from_mins(30),
         vec![ReserveLine::new("1", variant, quantity)],
     );
     api.reserve(&shop.default_tenant(), &request).await.unwrap();

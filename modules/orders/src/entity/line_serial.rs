@@ -1,5 +1,6 @@
 //! Bảng `orders_line_serials`: số serial của dòng đơn ghi khi chuẩn bị hàng (mở bảo hành theo serial).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,7 +14,7 @@ pub struct Model {
     pub line_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub serial: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

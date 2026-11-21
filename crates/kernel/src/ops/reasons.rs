@@ -14,11 +14,11 @@
 //! Service của module kiểm mã người dùng gửi bằng [`ReasonCodes::ensure`]. Dòng dữ liệu lưu mã,
 //! không lưu nhãn: đổi nhãn không sửa lịch sử; mã đã dùng không xoá được, chỉ tắt.
 
+use crate::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock};
 
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, OnConflict, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -467,8 +467,8 @@ async fn set_reason(
     Ok(Data { data: state.reasons(&tenant, &list, true, language).await? })
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn routes(state: ReasonsState) -> OpenApiRouter {

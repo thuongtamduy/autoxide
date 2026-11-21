@@ -1,5 +1,6 @@
 //! Bảng `content_authors`: hồ sơ tác giả của `content`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,8 +18,8 @@ pub struct Model {
     pub bio: String,
     pub avatar_media_id: Option<Uuid>,
     pub website_url: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

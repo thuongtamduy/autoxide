@@ -13,6 +13,8 @@
 // Bộ đo là code công cụ: hỏng thì dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -27,7 +29,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, ro
 use autoxide_promotions::api::{Cart, CartLine, Promotions};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::Utc;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -49,7 +50,7 @@ const STAFF: [&str; 4] =
 struct FakeCatalog {
     org: OrgId,
     currency: Currency,
-    since: chrono::DateTime<Utc>,
+    since: Timestamp,
 }
 
 impl FakeCatalog {
@@ -155,8 +156,8 @@ async fn call(app: &TestApp, method: Method, uri: &str, body: Option<Value>) -> 
 async fn running(app: &TestApp, org: OrgId, index: usize, targets: &[Uuid]) {
     let body = json!({
         "org_id": org, "kind": "percent_off", "currency": "VND", "value_bp": 1000,
-        "starts_at": Utc::now() - chrono::Duration::hours(1),
-        "ends_at": Utc::now() + chrono::Duration::days(7),
+        "starts_at": Timestamp::now() - SignedDuration::from_hours(1),
+        "ends_at": Timestamp::now() + SignedDuration::from_hours(24 * 7),
         "priority": index % 7, "locale": "vi", "title": format!("Chương trình {index}"),
         "terms": "Áp dụng cho sản phẩm được chọn",
     });
@@ -207,7 +208,7 @@ fn main() {
             let catalog = Arc::new(FakeCatalog {
                 org: store,
                 currency,
-                since: Utc::now() - chrono::Duration::days(30),
+                since: Timestamp::now() - SignedDuration::from_hours(24 * 30),
             });
             let staff = STAFF.map(|name| (name, Scope::Tenant));
             let app = TestApp::builder(test)
@@ -252,7 +253,7 @@ fn main() {
             let tenant = app.default_tenant();
             // Giỏ thứ i lấy 50 biến thể liên tiếp, xoay vòng: chạm nhiều chương trình khác nhau.
             let cart = |round: usize| {
-                let mut cart = Cart::new(store, currency, Utc::now());
+                let mut cart = Cart::new(store, currency, Timestamp::now());
                 for line in 0..LINES {
                     let variant = variants[(round * LINES + line) % variants.len()];
                     let price = Money::new(PRICE, currency);

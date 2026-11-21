@@ -3,13 +3,13 @@
 //! thông báo chính thức, không viết cứng ngày lễ. Mỗi lịch thuộc một nút; quản lý cần
 //! `shipping.settings.manage` ở nút đó. Phương thức gắn lịch qua `calendar_id`.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter,
     QueryOrder, Set,
@@ -63,7 +63,7 @@ fn check_fields(problems: &mut Vec<FieldError>, fields: &CalendarFields) {
         check_length(problems, "name", name.trim(), 1, 200);
     }
     if let Some(zone) = &fields.time_zone
-        && zone.parse::<chrono_tz::Tz>().is_err()
+        && autoxide_kernel::time::zone(zone).is_none()
     {
         problems.push(FieldError::new(
             "time_zone",
@@ -198,7 +198,7 @@ impl ShippingService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        day: NaiveDate,
+        day: Date,
         input: DayInput,
     ) -> Result<CalendarView, Error> {
         let mut problems = Vec::new();
@@ -248,7 +248,7 @@ impl ShippingService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        day: NaiveDate,
+        day: Date,
     ) -> Result<CalendarView, Error> {
         let transaction = tenant.database().begin_write().await?;
         let row = find_calendar(&transaction, tenant, id).await?;
@@ -272,14 +272,14 @@ impl ShippingService {
         &self,
         tenant: &TenantContext,
         calendar_id: Option<Uuid>,
-        from: NaiveDate,
+        from: Date,
     ) -> Result<Calendar, Error> {
         let Some(id) = calendar_id else { return Ok(Calendar::standard()) };
         let read = tenant.database().read();
         let Some(row) = calendar::Entity::find_by_id(id).scoped(tenant).one(read).await? else {
             return Ok(Calendar::standard());
         };
-        let until = from.checked_add_days(chrono::Days::new(400)).unwrap_or(from);
+        let until = from.checked_add_days(400).unwrap_or(from);
         let days = calendar_day::Entity::find()
             .filter(calendar_day::Column::CalendarId.eq(id))
             .filter(calendar_day::Column::Day.gte(from))
@@ -297,7 +297,9 @@ impl ShippingService {
             rules.insert(day.day, rule);
         }
         Ok(Calendar {
-            time_zone: row.time_zone.parse().unwrap_or(chrono_tz::Asia::Ho_Chi_Minh),
+            time_zone: autoxide_kernel::time::zone(&row.time_zone)
+                .or_else(|| autoxide_kernel::time::zone(DEFAULT_TIME_ZONE))
+                .unwrap_or(jiff::tz::TimeZone::UTC),
             working_weekdays: row.working_weekdays,
             days: rules,
         })

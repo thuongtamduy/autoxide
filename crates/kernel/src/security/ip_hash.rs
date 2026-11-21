@@ -22,11 +22,11 @@
 //! database cũng tính lại được khoá và thử hết các khối IPv4 (2^24). Máy chủ cảnh báo lúc khởi
 //! động; khi chạy thật hãy đặt khoá ngoài database.
 
+use crate::time::Timestamp;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
@@ -59,7 +59,7 @@ pub async fn bucket(
     secret: &SecretKey,
     scope: &str,
     ip: IpAddr,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<String, Error> {
     let key = secret
         .derive(&format!("autoxide/ip-hash/bucket/v2/{scope}/{}", now.format("%Y-%m-%d")))

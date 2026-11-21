@@ -3,6 +3,7 @@
 //! nút trong phạm vi, có mọi permission của role, `admin` chỉ ở gốc) — luật là cách gán role cho
 //! mọi người trong nhóm, nên không được dùng để tự nâng quyền.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::access::{OrgTarget, Permission, Principal};
@@ -11,7 +12,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
 use autoxide_kernel::work::{Severity, WorkItem, WorkSource};
-use chrono::{SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, EntityTrait as _, PaginatorTrait as _,
@@ -147,7 +147,7 @@ impl ScimService {
             org_id,
             role_id,
             created_by: principal.user_id(),
-            created_at: Utc::now().trunc_subsecs(6),
+            created_at: Timestamp::now(),
         };
         mapping::ActiveModel::from(row.clone()).insert(&transaction).await.map_err(|error| {
             match error.sql_err() {

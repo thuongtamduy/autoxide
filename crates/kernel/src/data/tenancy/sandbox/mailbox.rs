@@ -8,8 +8,7 @@
 //!   trong transaction ghi): dòng là nhật ký cho người thử xem, mất một dòng khi database lỗi không
 //!   làm hỏng nghiệp vụ.
 //! - Người trong sandbox đọc bằng `GET /api/v1/kernel/sandbox/messages` (`kernel.sandboxes.read`).
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,6 +28,7 @@ const SHORT_MAX: usize = 320;
 
 pub(crate) mod entity {
     //! Bảng `kernel_sandbox_messages`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -45,7 +45,7 @@ pub(crate) mod entity {
         pub subject: Option<String>,
         /// JSON: chi tiết của lời gọi (số tiền, nội dung…).
         pub body: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -164,7 +164,7 @@ pub async fn hold_back(tenant: &TenantContext, message: HeldMessage) -> Result<(
         recipient: Set(short(message.recipient)),
         subject: Set(short(message.subject)),
         body: Set(message.body.to_string()),
-        created_at: Set(Utc::now().trunc_subsecs(6)),
+        created_at: Set(Timestamp::now()),
     }
     .insert(tenant.database().write())
     .await?;
@@ -201,7 +201,7 @@ pub struct SandboxMessage {
     pub subject: Option<String>,
     /// Details of the call (amounts, text, payload).
     pub body: Value,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 fn describe(row: entity::Model) -> SandboxMessage {

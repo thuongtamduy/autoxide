@@ -31,13 +31,12 @@ mod run;
 mod steps;
 mod store;
 
-use std::collections::HashSet;
-use std::sync::Arc;
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use sea_orm::DatabaseTransaction;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Query};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
+use std::sync::Arc;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -630,9 +629,9 @@ pub struct TenantRelocation {
     pub tables: Vec<super::TenantTableRows>,
     /// Why the last run stopped; running it again resumes it.
     pub error: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
 }
 
 /// Lỗi của phần tách / gộp (mã ổn định, bản dịch ở `crates/kernel/locales/vi.json`).

@@ -1,6 +1,8 @@
 //! Vị trí hiển thị và banner (bước 55, D-236): kiểm khi lưu, đọc công khai theo khung giờ, theo
 //! nhánh, theo trang, cache, thứ tự, chương trình khuyến mại kết thúc. Chạy trên cả hai database.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -10,7 +12,6 @@ use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceResolver};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId};
 use autoxide_media::api::{Media, MediaRef, MediaVisibility};
-use chrono::{Duration, Utc};
 use serde_json::json;
 
 use super::*;
@@ -138,8 +139,11 @@ fn text(placement: &str, title: &str) -> NewBanner {
 
 async fn titles(h: &Harness, site: &Site, keys: &[&str], page: &PageContext) -> Vec<Vec<String>> {
     let keys: Vec<String> = keys.iter().map(|key| (*key).to_owned()).collect();
-    let found =
-        h.service.public_placements(&h.tenant, site, &keys, page, Utc::now(), false).await.unwrap();
+    let found = h
+        .service
+        .public_placements(&h.tenant, site, &keys, page, Timestamp::now(), false)
+        .await
+        .unwrap();
     found
         .placements
         .into_iter()
@@ -361,14 +365,14 @@ async fn banner_ngoai_khung_gio_khong_hien() {
             .create_placement(&h.tenant, &manager(), placement("top", "strip", "text"))
             .await
             .unwrap();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut later = text("top", "later");
-        later.fields.starts_at = Some(now + Duration::seconds(30));
+        later.fields.starts_at = Some(now + SignedDuration::from_secs(30));
         let mut ending = text("top", "ending");
-        ending.fields.ends_at = Some(now + Duration::seconds(20));
+        ending.fields.ends_at = Some(now + SignedDuration::from_secs(20));
         let mut past = text("top", "past");
-        past.fields.starts_at = Some(now - Duration::hours(2));
-        past.fields.ends_at = Some(now - Duration::hours(1));
+        past.fields.starts_at = Some(now - SignedDuration::from_hours(2));
+        past.fields.ends_at = Some(now - SignedDuration::from_hours(1));
         for banner in [later, ending, past] {
             h.service.create_banner(&h.tenant, &manager(), banner, Via::Rest).await.unwrap();
         }
@@ -391,7 +395,7 @@ async fn banner_ngoai_khung_gio_khong_hien() {
             found.placements[0].banners.iter().map(|b| b.row.title.as_str()).collect();
         assert_eq!(shown, ["ending"]);
         assert!(found.max_age <= 20 && found.max_age >= 19, "max-age {}", found.max_age);
-        let found = read(now + Duration::seconds(40)).await;
+        let found = read(now + SignedDuration::from_secs(40)).await;
         let shown: Vec<&str> =
             found.placements[0].banners.iter().map(|b| b.row.title.as_str()).collect();
         assert_eq!(shown, ["later"]);
@@ -400,7 +404,7 @@ async fn banner_ngoai_khung_gio_khong_hien() {
         let mut draft = text("top", "draft");
         draft.fields.status = Some("draft".to_owned());
         h.service.create_banner(&h.tenant, &manager(), draft, Via::Rest).await.unwrap();
-        assert_eq!(read(now + Duration::seconds(40)).await.placements[0].banners.len(), 1);
+        assert_eq!(read(now + SignedDuration::from_secs(40)).await.placements[0].banners.len(), 1);
     })
     .await
     .unwrap();
@@ -416,9 +420,9 @@ async fn max_age_la_moc_gan_nhat_cua_moi_vi_tri() {
                 .await
                 .unwrap();
         }
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut soon = text("b", "soon");
-        soon.fields.starts_at = Some(now + Duration::seconds(10));
+        soon.fields.starts_at = Some(now + SignedDuration::from_secs(10));
         h.service.create_banner(&h.tenant, &manager(), text("a", "a"), Via::Rest).await.unwrap();
         h.service.create_banner(&h.tenant, &manager(), soon, Via::Rest).await.unwrap();
         // doc_nhieu_vi_tri_mot_lan_goi: một lời gọi trả cả hai vị trí, theo thứ tự hỏi.
@@ -546,7 +550,7 @@ async fn banner_khach_khac_khong_thay() {
                 &Site::whole(&other),
                 &["top".to_owned()],
                 &PageContext::default(),
-                Utc::now(),
+                Timestamp::now(),
                 true,
             )
             .await
@@ -634,7 +638,14 @@ async fn link_toi_doi_tuong_khong_con_cong_khai_bi_bo() {
         let keys = vec!["top".to_owned()];
         let found = h
             .service
-            .public_placements(&h.tenant, &site, &keys, &PageContext::default(), Utc::now(), false)
+            .public_placements(
+                &h.tenant,
+                &site,
+                &keys,
+                &PageContext::default(),
+                Timestamp::now(),
+                false,
+            )
             .await
             .unwrap();
         assert_eq!(found.placements[0].banners[0].href.as_deref(), Some("/p/p1"));
@@ -794,8 +805,8 @@ async fn vi_tri_day_va_cong_cu_ai_chi_tao_nhap() {
             .await
             .unwrap();
         let window = BannerPatch {
-            starts_at: Some(Some(Utc::now())),
-            ends_at: Some(Some(Utc::now() - Duration::hours(1))),
+            starts_at: Some(Some(Timestamp::now())),
+            ends_at: Some(Some(Timestamp::now() - SignedDuration::from_hours(1))),
             ..Default::default()
         };
         let error = h

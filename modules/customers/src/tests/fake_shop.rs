@@ -1,6 +1,7 @@
 //! `Catalog` và `Inventory` giả cho báo yêu thích: giá công khai và tồn đặt tay, đăng ký báo có hàng
 //! của `inventory` theo tài khoản.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -55,7 +56,7 @@ fn snapshot(variant: Uuid, product: Uuid) -> VariantSnapshot {
         "requires_shipping": true, "track_inventory": true, "sale_mode": "in_stock",
         "preorder_available_on": null, "preorder_limit": null, "preorder_ends_at": null,
         "allow_backorder": false, "lot_tracked": false, "serial_tracked": false,
-        "warranty_months": null, "image_media_id": null, "updated_at": chrono::Utc::now(),
+        "warranty_months": null, "image_media_id": null, "updated_at": Timestamp::now(),
     });
     // `VariantSnapshot` là `#[non_exhaustive]`: crate khác dựng qua serde.
     serde_json::from_value(json).unwrap()

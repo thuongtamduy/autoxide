@@ -2,6 +2,7 @@
 //! cả tài khoản người mua vốn không có permission) và nhân viên chăm sóc khách
 //! (`/buyers/{buyer_id}/addresses`, `shipping.addresses.read`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -109,7 +109,7 @@ pub(crate) struct AddressResponse {
     address: Address,
     postal_code: Option<String>,
     is_default: bool,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<BuyerAddress> for AddressResponse {

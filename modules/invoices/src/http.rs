@@ -1,5 +1,6 @@
 //! Route REST của ký hiệu chứng từ và uỷ nhiệm lập hoá đơn (dưới `/api/v1/invoices`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -43,8 +43,8 @@ pub(crate) struct SeriesResponse {
     einvoice_provider: Option<String>,
     /// `active` or `inactive`.
     status: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<series::Model> for SeriesResponse {
@@ -198,14 +198,14 @@ pub(crate) struct MandateResponse {
     /// The unit that issues for the seller (e.g. the marketplace).
     agent_org_id: Uuid,
     kinds: Vec<String>,
-    valid_from: NaiveDate,
-    valid_to: Option<NaiveDate>,
+    valid_from: Date,
+    valid_to: Option<Date>,
     /// The signed mandate (file in the `files` module).
     document_file_id: Option<Uuid>,
     /// `active` or `revoked`.
     status: String,
-    created_at: DateTime<Utc>,
-    revoked_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    revoked_at: Option<Timestamp>,
 }
 
 impl From<mandate::Model> for MandateResponse {
@@ -236,8 +236,8 @@ pub(crate) struct MandateRequest {
     agent_org_id: Uuid,
     /// Kinds of invoice, e.g. `["vat_invoice"]`.
     kinds: Vec<String>,
-    valid_from: NaiveDate,
-    valid_to: Option<NaiveDate>,
+    valid_from: Date,
+    valid_to: Option<Date>,
     document_file_id: Option<Uuid>,
 }
 

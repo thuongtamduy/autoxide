@@ -7,8 +7,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use chrono::{DateTime, Datelike, Duration, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};
-use chrono_tz::Tz;
+use autoxide_kernel::time::{self, Date, Timestamp};
+use jiff::SignedDuration;
+use jiff::tz::TimeZone;
 use uuid::Uuid;
 
 /// Độ mịn của ô giờ bị chiếm.
@@ -20,12 +21,12 @@ pub(crate) const START_STEP_MINUTES: i64 = 15;
 /// Một khoảng [start, end) theo UTC.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Span {
-    pub start: DateTime<Utc>,
-    pub end: DateTime<Utc>,
+    pub start: Timestamp,
+    pub end: Timestamp,
 }
 
 impl Span {
-    pub(crate) fn new(start: DateTime<Utc>, end: DateTime<Utc>) -> Self {
+    pub(crate) fn new(start: Timestamp, end: Timestamp) -> Self {
         Span { start, end }
     }
 
@@ -52,15 +53,15 @@ pub(crate) struct Shape {
 
 impl Shape {
     /// Khoảng phục vụ khách khi bắt đầu lúc `start`.
-    pub(crate) fn service_span(&self, start: DateTime<Utc>) -> Span {
-        Span::new(start, start + Duration::minutes(self.duration))
+    pub(crate) fn service_span(&self, start: Timestamp) -> Span {
+        Span::new(start, start + SignedDuration::from_mins(self.duration))
     }
 
     /// Khoảng tài nguyên bị chiếm (gồm đệm) khi bắt đầu lúc `start`.
-    pub(crate) fn occupied_span(&self, start: DateTime<Utc>) -> Span {
+    pub(crate) fn occupied_span(&self, start: Timestamp) -> Span {
         Span::new(
-            start - Duration::minutes(self.buffer_before),
-            start + Duration::minutes(self.duration + self.buffer_after),
+            start - SignedDuration::from_mins(self.buffer_before),
+            start + SignedDuration::from_mins(self.duration + self.buffer_after),
         )
     }
 }
@@ -75,21 +76,21 @@ pub(crate) struct Plan {
     pub open: Vec<Span>,
     pub closed: Vec<Span>,
     /// Đầu các ô 5 phút đã bị chiếm.
-    pub busy: BTreeSet<DateTime<Utc>>,
+    pub busy: BTreeSet<Timestamp>,
 }
 
 impl Plan {
     /// Khoảng làm việc giao với [from, to): (lịch lặp ∪ ca thêm) − nghỉ, đã gộp và sắp.
-    pub(crate) fn working(&self, zone: Tz, from: DateTime<Utc>, to: DateTime<Utc>) -> Vec<Span> {
+    pub(crate) fn working(&self, zone: &TimeZone, from: Timestamp, to: Timestamp) -> Vec<Span> {
         let mut spans: Vec<Span> = if self.always_open {
             vec![Span::new(from, to)]
         } else {
-            let first = from.with_timezone(&zone).date_naive() - Duration::days(1);
-            let last = to.with_timezone(&zone).date_naive() + Duration::days(1);
+            let first = from.date_in(zone).pred().unwrap_or(from.date_in(zone));
+            let last = to.date_in(zone).succ().unwrap_or(to.date_in(zone));
             let mut found = Vec::new();
             let mut day = first;
             while day <= last {
-                let weekday = day.weekday().number_from_monday();
+                let weekday = u32::from(day.weekday().to_monday_one_offset().unsigned_abs());
                 for range in self.weekly.iter().filter(|range| range.weekday == weekday) {
                     let start = local(zone, day, range.start_minute);
                     let end = local(zone, day, range.end_minute);
@@ -97,7 +98,8 @@ impl Plan {
                         found.push(Span::new(start, end));
                     }
                 }
-                day += Duration::days(1);
+                let Some(next) = day.succ() else { break };
+                day = next;
             }
             found
         };
@@ -114,12 +116,16 @@ impl Plan {
     }
 
     /// Cả khoảng chiếm của lịch bắt đầu lúc `start` nằm trong giờ làm việc.
-    pub(crate) fn within_hours(&self, zone: Tz, shape: Shape, start: DateTime<Utc>) -> bool {
+    pub(crate) fn within_hours(&self, zone: &TimeZone, shape: Shape, start: Timestamp) -> bool {
         let occupied = shape.occupied_span(start);
         // Giờ làm việc quanh lịch là đủ (một ngày mỗi bên cho ca qua nửa đêm).
-        self.working(zone, occupied.start - Duration::days(1), occupied.end + Duration::days(1))
-            .iter()
-            .any(|span| span.contains(&occupied))
+        self.working(
+            zone,
+            occupied.start - SignedDuration::from_hours(24),
+            occupied.end + SignedDuration::from_hours(24),
+        )
+        .iter()
+        .any(|span| span.contains(&occupied))
     }
 
     /// Không ô nào của `span` đã bị chiếm.
@@ -129,14 +135,14 @@ impl Plan {
 }
 
 /// Đầu các ô 5 phút phủ `span` (làm tròn ra ngoài).
-pub(crate) fn cells(span: Span) -> Vec<DateTime<Utc>> {
+pub(crate) fn cells(span: Span) -> Vec<Timestamp> {
     let step = SLOT_MINUTES * 60;
-    let start = span.start.timestamp().div_euclid(step) * step;
-    let end = span.end.timestamp();
+    let start = span.start.as_unix_seconds().div_euclid(step) * step;
+    let end = span.end.as_unix_seconds();
     let mut found = Vec::new();
     let mut at = start;
     while at < end {
-        if let Some(cell) = DateTime::from_timestamp(at, 0) {
+        if let Some(cell) = Timestamp::from_unix_seconds(at) {
             found.push(cell);
         }
         at += step;
@@ -146,23 +152,26 @@ pub(crate) fn cells(span: Span) -> Vec<DateTime<Utc>> {
 
 /// Giờ địa phương `minute` phút sau nửa đêm ngày `day` ở `zone`, theo UTC. Giờ không tồn tại (giờ
 /// mùa hè nhảy tới) lấy thời điểm hợp lệ kế tiếp; giờ lặp hai lần lấy lần đầu.
-fn local(zone: Tz, day: NaiveDate, minute: i64) -> DateTime<Utc> {
-    let date = day + Duration::days(minute.div_euclid(1440));
+fn local(zone: &TimeZone, day: Date, minute: i64) -> Timestamp {
+    let date = day.checked_add_days(minute.div_euclid(1440)).unwrap_or(day);
     let minute = minute.rem_euclid(1440);
-    let time = NaiveTime::from_hms_opt(
-        u32::try_from(minute / 60).unwrap_or(0),
-        u32::try_from(minute % 60).unwrap_or(0),
+    let time = jiff::civil::Time::new(
+        i8::try_from(minute / 60).unwrap_or(0),
+        i8::try_from(minute % 60).unwrap_or(0),
+        0,
         0,
     )
-    .unwrap_or(NaiveTime::MIN);
-    let mut naive = date.and_time(time);
+    .unwrap_or(jiff::civil::Time::MIN);
+    let mut naive = date.to_jiff().to_datetime(time);
     for _ in 0..4 {
-        if let Some(found) = zone.from_local_datetime(&naive).earliest() {
-            return found.with_timezone(&Utc);
+        if let Some(found) = time::from_local(zone, naive) {
+            return found;
         }
-        naive += Duration::minutes(30);
+        let Ok(later) = naive.checked_add(SignedDuration::from_mins(30)) else { break };
+        naive = later;
     }
-    Utc.from_utc_datetime(&naive)
+    // Không gặp giờ hợp lệ nào (không xảy ra với múi giờ thật): coi giờ đó là UTC, như trước.
+    TimeZone::UTC.to_timestamp(naive).map_or_else(|_| date.start_of_day_utc(), Timestamp::from)
 }
 
 /// Gộp các khoảng chồng hay sát nhau.
@@ -200,36 +209,36 @@ fn subtract(spans: Vec<Span>, holes: &[Span]) -> Vec<Span> {
 }
 
 /// Thời điểm đầu tiên ≥ `at` nằm trên lưới [`START_STEP_MINUTES`].
-fn align_up(at: DateTime<Utc>) -> DateTime<Utc> {
+fn align_up(at: Timestamp) -> Timestamp {
     let step = START_STEP_MINUTES * 60;
-    let seconds = at.timestamp() + i64::from(at.nanosecond() > 0);
+    let seconds = at.as_unix_seconds() + i64::from(at.to_jiff().subsec_nanosecond() > 0);
     let aligned = (seconds + step - 1).div_euclid(step) * step;
-    DateTime::from_timestamp(aligned, 0).unwrap_or(at)
+    Timestamp::from_unix_seconds(aligned).unwrap_or(at)
 }
 
 /// Một giờ còn trống.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Opening {
     pub resource_id: Uuid,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub seats_left: i32,
 }
 
 /// Câu hỏi giờ trống cho một dịch vụ.
 pub(crate) struct Query<'a> {
-    pub zone: Tz,
+    pub zone: TimeZone,
     pub shape: Shape,
     pub capacity: i32,
-    pub from: DateTime<Utc>,
-    pub to: DateTime<Utc>,
-    pub now: DateTime<Utc>,
+    pub from: Timestamp,
+    pub to: Timestamp,
+    pub now: Timestamp,
     /// Nhân viên làm được dịch vụ (chọn một).
     pub performers: &'a [Plan],
     /// Phòng / thiết bị dịch vụ cần (cần cả).
     pub required: &'a [Plan],
     /// Buổi đã mở của dịch vụ (lớp học): (tài nguyên, giờ bắt đầu) → chỗ còn lại.
-    pub sessions: &'a BTreeMap<(Uuid, DateTime<Utc>), i32>,
+    pub sessions: &'a BTreeMap<(Uuid, Timestamp), i32>,
 }
 
 /// Mọi giờ còn trống trong [from, to), sắp theo giờ rồi theo tài nguyên.
@@ -237,11 +246,14 @@ pub(crate) fn openings(query: &Query<'_>) -> Vec<Opening> {
     let mut found = Vec::new();
     let earliest = query.from.max(query.now);
     for plan in query.performers {
-        for span in
-            plan.working(query.zone, query.from - Duration::days(1), query.to + Duration::days(1))
-        {
-            let mut start =
-                align_up((span.start + Duration::minutes(query.shape.buffer_before)).max(earliest));
+        for span in plan.working(
+            &query.zone,
+            query.from - SignedDuration::from_hours(24),
+            query.to + SignedDuration::from_hours(24),
+        ) {
+            let mut start = align_up(
+                (span.start + SignedDuration::from_mins(query.shape.buffer_before)).max(earliest),
+            );
             while start < query.to {
                 let occupied = query.shape.occupied_span(start);
                 if occupied.end > span.end {
@@ -250,7 +262,7 @@ pub(crate) fn openings(query: &Query<'_>) -> Vec<Opening> {
                 if let Some(opening) = check(query, plan, start) {
                     found.push(opening);
                 }
-                start += Duration::minutes(START_STEP_MINUTES);
+                start = start + SignedDuration::from_mins(START_STEP_MINUTES);
             }
         }
     }
@@ -259,7 +271,7 @@ pub(crate) fn openings(query: &Query<'_>) -> Vec<Opening> {
 }
 
 /// Giờ `start` của `plan` còn trống không (đã biết nằm trong giờ làm của `plan`).
-fn check(query: &Query<'_>, plan: &Plan, start: DateTime<Utc>) -> Option<Opening> {
+fn check(query: &Query<'_>, plan: &Plan, start: Timestamp) -> Option<Opening> {
     let service = query.shape.service_span(start);
     let opening = |seats_left| Opening {
         resource_id: plan.resource_id,
@@ -276,7 +288,7 @@ fn check(query: &Query<'_>, plan: &Plan, start: DateTime<Utc>) -> Option<Opening
         return None;
     }
     for room in query.required {
-        if !room.free(occupied) || !room.within_hours(query.zone, query.shape, start) {
+        if !room.free(occupied) || !room.within_hours(&query.zone, query.shape, start) {
             return None;
         }
     }
@@ -287,8 +299,8 @@ fn check(query: &Query<'_>, plan: &Plan, start: DateTime<Utc>) -> Option<Opening
 mod tests {
     use super::*;
 
-    fn at(text: &str) -> DateTime<Utc> {
-        DateTime::parse_from_rfc3339(text).unwrap().with_timezone(&Utc)
+    fn at(text: &str) -> Timestamp {
+        Timestamp::parse_rfc3339(text).unwrap()
     }
 
     fn staff(weekly: Vec<Weekly>) -> Plan {
@@ -300,19 +312,19 @@ mod tests {
         vec![Weekly { weekday: 1, start_minute: 9 * 60, end_minute: 12 * 60 }]
     }
 
-    fn starts(found: &[Opening], zone: Tz) -> Vec<String> {
-        found.iter().map(|o| o.starts_at.with_timezone(&zone).format("%H:%M").to_string()).collect()
+    fn starts(found: &[Opening], zone: &TimeZone) -> Vec<String> {
+        found.iter().map(|o| o.starts_at.in_zone(zone).strftime("%H:%M").to_string()).collect()
     }
 
     fn query<'a>(
-        zone: Tz,
+        zone: &TimeZone,
         shape: Shape,
         performers: &'a [Plan],
         required: &'a [Plan],
-        sessions: &'a BTreeMap<(Uuid, DateTime<Utc>), i32>,
+        sessions: &'a BTreeMap<(Uuid, Timestamp), i32>,
     ) -> Query<'a> {
         Query {
-            zone,
+            zone: zone.clone(),
             shape,
             capacity: 1,
             // Thứ Hai 2026-11-23, cả ngày theo UTC ± 1 ngày.
@@ -327,7 +339,7 @@ mod tests {
 
     #[test]
     fn gio_trong_tru_nghi_va_dem_thuan() {
-        let zone: Tz = "Asia/Ho_Chi_Minh".parse().unwrap();
+        let zone = &time::zone("Asia/Ho_Chi_Minh").unwrap();
         let shape = Shape { duration: 60, buffer_before: 0, buffer_after: 15 };
         let mut plan = staff(monday_morning());
         // Nghỉ 10:00–10:30 (giờ VN = 03:00–03:30 UTC).
@@ -345,7 +357,7 @@ mod tests {
 
     #[test]
     fn dem_truoc_can_cho_trong_truoc_gio_bat_dau() {
-        let zone = Tz::UTC;
+        let zone = &TimeZone::UTC;
         let shape = Shape { duration: 30, buffer_before: 15, buffer_after: 0 };
         let plan = staff(monday_morning());
         let sessions = BTreeMap::new();
@@ -360,8 +372,8 @@ mod tests {
         let shape = Shape { duration: 60, buffer_before: 0, buffer_after: 0 };
         let plan = staff(monday_morning());
         let sessions = BTreeMap::new();
-        let hanoi: Tz = "Asia/Ho_Chi_Minh".parse().unwrap();
-        let tokyo: Tz = "Asia/Tokyo".parse().unwrap();
+        let hanoi = &time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let tokyo = &time::zone("Asia/Tokyo").unwrap();
         let in_hanoi = openings(&query(hanoi, shape, std::slice::from_ref(&plan), &[], &sessions));
         let in_tokyo = openings(&query(tokyo, shape, std::slice::from_ref(&plan), &[], &sessions));
         // Cùng 9:00 giờ địa phương.
@@ -375,7 +387,7 @@ mod tests {
     fn gio_mua_he_van_dung_gio_dia_phuong() {
         // New York đổi giờ ngày 2026-11-01 (02:00 EDT → 01:00 EST). Thứ Hai 2/11 9:00 = 14:00 UTC;
         // thứ Hai 26/10 9:00 = 13:00 UTC.
-        let zone: Tz = "America/New_York".parse().unwrap();
+        let zone = &time::zone("America/New_York").unwrap();
         let shape = Shape { duration: 60, buffer_before: 0, buffer_after: 0 };
         let plan = staff(monday_morning());
         let sessions = BTreeMap::new();
@@ -387,7 +399,7 @@ mod tests {
         let firsts: Vec<_> = found
             .iter()
             .filter(|o| {
-                let local = o.starts_at.with_timezone(&zone);
+                let local = o.starts_at.in_zone(zone);
                 local.hour() == 9 && local.minute() == 0
             })
             .map(|o| o.starts_at)
@@ -397,7 +409,7 @@ mod tests {
 
     #[test]
     fn phong_can_trong_va_buoi_lop_dem_cho() {
-        let zone = Tz::UTC;
+        let zone = &TimeZone::UTC;
         let shape = Shape { duration: 60, buffer_before: 0, buffer_after: 0 };
         let plan = staff(monday_morning());
         let mut room =
@@ -443,8 +455,8 @@ mod tests {
             ..Plan::default()
         };
         let shape = Shape { duration: 60, buffer_before: 0, buffer_after: 0 };
-        assert!(plan.within_hours(Tz::UTC, shape, at("2026-11-24T18:00:00Z")));
-        assert!(!plan.within_hours(Tz::UTC, shape, at("2026-11-24T18:05:00Z")));
+        assert!(plan.within_hours(&TimeZone::UTC, shape, at("2026-11-24T18:00:00Z")));
+        assert!(!plan.within_hours(&TimeZone::UTC, shape, at("2026-11-24T18:05:00Z")));
         assert_eq!(
             cells(Span::new(at("2026-11-24T18:02:00Z"), at("2026-11-24T18:11:00Z"))).len(),
             3

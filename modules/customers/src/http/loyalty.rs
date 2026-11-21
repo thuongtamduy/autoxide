@@ -1,6 +1,7 @@
 //! Endpoint điểm thưởng: quy tắc, hạng, chương trình voucher (quản trị); điểm của một khách và điều
 //! chỉnh tay (nhân viên); điểm của chính mình và đổi điểm lấy voucher (người mua).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -37,7 +37,7 @@ pub(crate) struct LoyaltyRule {
     pub min_redeem_points: i64,
     /// Points pay at most this share of an order, in basis points (`5000` = 50%).
     pub max_redeem_ratio_bp: i32,
-    pub effective_from: DateTime<Utc>,
+    pub effective_from: Timestamp,
 }
 
 impl LoyaltyRule {
@@ -72,7 +72,7 @@ pub(crate) struct CreateLoyaltyRuleRequest {
     /// 1 to 10000.
     max_redeem_ratio_bp: i32,
     /// Omitted: now. Never in the past.
-    effective_from: Option<DateTime<Utc>>,
+    effective_from: Option<Timestamp>,
 }
 
 /// A membership tier version.
@@ -87,7 +87,7 @@ pub(crate) struct MembershipTier {
     pub earn_multiplier_bp: i32,
     /// Higher wins when several tiers are reached.
     pub rank: i32,
-    pub effective_from: DateTime<Utc>,
+    pub effective_from: Timestamp,
 }
 
 impl MembershipTier {
@@ -116,7 +116,7 @@ pub(crate) struct CreateMembershipTierRequest {
     /// `10000` = ×1.
     earn_multiplier_bp: i32,
     rank: i32,
-    effective_from: Option<DateTime<Utc>>,
+    effective_from: Option<Timestamp>,
 }
 
 /// A voucher reward: a voucher promotion given on birthdays, after a purchase or for points.
@@ -175,7 +175,7 @@ pub(crate) struct PointsLot {
     pub remaining: i64,
     /// Held for orders waiting for payment.
     pub held: i64,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl From<points_lot::Model> for PointsLot {
@@ -224,7 +224,7 @@ pub(crate) struct PointsEntry {
     pub points: i64,
     pub reference: String,
     pub reason: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<points_entry::Model> for PointsEntry {

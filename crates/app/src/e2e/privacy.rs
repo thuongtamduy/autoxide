@@ -10,9 +10,10 @@
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{TenantContext, TenantMoves};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -96,29 +97,23 @@ async fn xoa_tai_khoan_xoa_so_dien_thoai_va_ban_xuat_co_phan_compliance() {
         // Số đã xác thực (đường mã SMS có bài riêng ở `posting_verification`).
         let write = platform.database().write();
         let backend = write.get_database_backend();
-        let sql = if backend == sea_orm::DbBackend::Postgres {
-            "INSERT INTO compliance_account_verifications (tenant_id, user_id, phone, phone_key, \
-             phone_verified_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)"
-        } else {
-            "INSERT INTO compliance_account_verifications (tenant_id, user_id, phone, phone_key, \
-             phone_verified_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-        };
-        let now = Utc::now();
-        write
-            .execute_raw(Statement::from_sql_and_values(
-                backend,
-                sql,
-                [
-                    platform.id().as_uuid().into(),
-                    user.into(),
-                    "+84912345678".into(),
-                    "k".into(),
-                    now.into(),
-                    now.into(),
-                ],
-            ))
-            .await
-            .unwrap();
+        let now = Timestamp::now();
+        let insert = sea_orm::sea_query::Query::insert()
+            .into_table(sea_orm::sea_query::Alias::new("compliance_account_verifications"))
+            .columns(
+                ["tenant_id", "user_id", "phone", "phone_key", "phone_verified_at", "updated_at"]
+                    .map(sea_orm::sea_query::Alias::new),
+            )
+            .values_panic([
+                platform.id().as_uuid().into(),
+                user.into(),
+                "+84912345678".into(),
+                "k".into(),
+                now.into(),
+                now.into(),
+            ])
+            .to_owned();
+        write.execute(&insert).await.unwrap();
 
         let data = app.modules().personal_data().export(&platform, user).await.unwrap();
         assert_eq!(data["compliance"]["phone_verification"]["phone"], "+84912345678", "{data:?}");
@@ -146,7 +141,7 @@ async fn xoa_tai_khoan_xoa_so_dien_thoai_va_ban_xuat_co_phan_compliance() {
             "SELECT COUNT(*) AS n FROM compliance_account_verifications WHERE user_id = ?"
         };
         let row = read
-            .query_one_raw(Statement::from_sql_and_values(backend, sql, [user.into()]))
+            .query_one_raw(autoxide_kernel::database::statement(backend, sql, [user.into()]))
             .await
             .unwrap()
             .unwrap();
@@ -204,7 +199,7 @@ async fn su_co_qua_moc_gui_mail_toi_nguoi_nhan_canh_bao() {
         assert!(status.is_success(), "{status} {body}");
         let input = json!({
             "title": "Database copy exposed", "severity": "high",
-            "detected_at": (Utc::now() - Duration::hours(25)).to_rfc3339(),
+            "detected_at": (Timestamp::now() - SignedDuration::from_hours(25)).to_rfc3339(),
         });
         let (status, opened) = call(&app, Method::POST, "/compliance/incidents", "staff", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED, "{opened}");

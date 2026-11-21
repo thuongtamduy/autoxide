@@ -1,6 +1,8 @@
 //! Dữ liệu đã gửi: CSV, xuất / xoá theo email, dọn theo thời hạn, tài khoản bị xoá.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 #[tokio::test]
 async fn xuat_csv_chan_injection_va_tim_theo_chu() {
@@ -134,7 +136,7 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
             .await
             .unwrap();
 
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         assert_eq!(
             service
                 .cleanup(
@@ -150,7 +152,7 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
             .cleanup(
                 &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
                 &database,
-                now + chrono::Duration::days(31),
+                now + SignedDuration::from_hours(24 * 31),
             )
             .await
             .unwrap();
@@ -159,7 +161,7 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
             .cleanup(
                 &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
                 &database,
-                now + chrono::Duration::days(91),
+                now + SignedDuration::from_hours(24 * 91),
             )
             .await
             .unwrap();
@@ -169,7 +171,7 @@ async fn don_theo_thoi_han_chay_lai_khong_loi() {
                 .cleanup(
                     &autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone()),
                     &database,
-                    now + chrono::Duration::days(91)
+                    now + SignedDuration::from_hours(24 * 91)
                 )
                 .await
                 .unwrap(),
@@ -292,7 +294,7 @@ async fn don_dep_xoa_bai_mo_coi() {
             .await
             .unwrap();
 
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         assert_eq!(
             service
                 .cleanup(

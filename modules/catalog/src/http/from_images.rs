@@ -1,5 +1,6 @@
 //! Tạo sản phẩm nháp từ ảnh bằng AI (D-229): `/products/from-images`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -60,8 +60,8 @@ pub(crate) struct ImageDraftResponse {
     pub product_id: Option<Uuid>,
     /// Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`.
     pub error_code: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
 }
 
 impl From<image_draft::Model> for ImageDraftResponse {

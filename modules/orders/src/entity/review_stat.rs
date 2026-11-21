@@ -1,5 +1,6 @@
 //! Bảng `orders_review_stats`: thống kê sao của đánh giá đang công khai theo sản phẩm.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,7 +19,7 @@ pub struct Model {
     pub count_4: i64,
     pub count_5: i64,
     pub media_count: i64,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -1,6 +1,7 @@
 //! Route REST của vòng đời thuê bao (bước 35 phần E / F): khách đổi, huỷ, tiếp tục; nhà vận hành
 //! huỷ ngay, khoá hẳn khách, thu tay kỳ thanh toán.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -50,22 +50,22 @@ pub(crate) struct BillingPeriodResponse {
     kind: String,
     plan_id: Uuid,
     price_id: Option<Uuid>,
-    period_start: DateTime<Utc>,
-    period_end: DateTime<Utc>,
+    period_start: Timestamp,
+    period_end: Timestamp,
     amount: Money,
     /// Unique per tenant: `plans:<subscription_id>:<period start>:<kind>`.
     reference: String,
     /// `open`, `paid` or `void`.
     status: String,
-    due_at: DateTime<Utc>,
-    paid_at: Option<DateTime<Utc>>,
+    due_at: Timestamp,
+    paid_at: Option<Timestamp>,
     /// The payment provider's reference (or the bank transfer's), when paid.
     provider_reference: Option<String>,
     /// The operator's invoice for the period (`GET /api/v1/invoices/documents/{id}` for the
     /// operator), and its series and number.
     invoice_id: Option<Uuid>,
     invoice_number: Option<String>,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<billing_period::Model> for BillingPeriodResponse {
@@ -142,7 +142,7 @@ pub(crate) struct MarkPaidRequest {
     #[validate(length(min = 1, max = 200))]
     provider_reference: String,
     /// When it was paid; default now.
-    paid_at: Option<DateTime<Utc>>,
+    paid_at: Option<Timestamp>,
 }
 
 async fn own_subscription(

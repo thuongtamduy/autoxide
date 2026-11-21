@@ -3,10 +3,11 @@
 //! lại theo điều kiện đã chụp, người mua huỷ trước mốc chốt → hoàn đủ.
 
 use autoxide_kernel::money::Currency;
+use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::AccountKey;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
@@ -161,7 +162,7 @@ async fn chua_tra_phan_con_lai_thi_chua_giao_qua_han_thi_huy_va_giu_lai() {
         advance_plan::Entity::update_many()
             .col_expr(
                 advance_plan::Column::BalanceDueAt,
-                Expr::value(Utc::now() - Duration::hours(1)),
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(1)),
             )
             .filter(advance_plan::Column::OrderId.eq(id))
             .exec(shop.database().write())

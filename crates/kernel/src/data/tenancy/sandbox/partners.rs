@@ -15,12 +15,13 @@
 //! Không bọc: `TextModel` / `Embedder` (không có hệ quả pháp lý hay tiền, hạn mức AI đếm riêng cho
 //! sandbox), `ExchangeRateSource` (chỉ đọc dữ liệu công khai), `Storage`.
 
+use crate::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::any::Any;
 use std::sync::{Arc, OnceLock};
 
 use axum::http::HeaderMap;
 use bytes::Bytes;
-use chrono::{Duration, NaiveDate, Utc};
 use serde_json::json;
 
 use super::mailbox::{HeldChannel, HeldMessage, HeldReason, hold_back};
@@ -287,8 +288,8 @@ impl PaymentGateway for GuardedPayments {
     async fn statement(
         &self,
         tenant: TenantId,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
         cursor: Option<String>,
     ) -> Result<StatementPage, Error> {
         if self.guard.sandbox(tenant).await?.is_none() {
@@ -640,7 +641,7 @@ impl IdentityVerifier for GuardedIdentity {
         let mut outcome = VerificationOutcome::new(provider_reference, OutcomeStatus::Verified)
             .verified_name("Sandbox")
             .assurance("sandbox");
-        outcome.expires_at = Some(Utc::now() + Duration::days(30));
+        outcome.expires_at = Some(Timestamp::now() + SignedDuration::from_hours(24 * 30));
         Ok(outcome)
     }
 
@@ -714,7 +715,7 @@ impl VoiceProvider for GuardedVoice {
         .await?;
         Ok(BrowserSession {
             token: format!("{SANDBOX_PREFIX}VOICE-{}", uuid::Uuid::now_v7()),
-            expires_at: Utc::now() + Duration::minutes(10),
+            expires_at: Timestamp::now() + SignedDuration::from_mins(10),
         })
     }
 
@@ -788,7 +789,8 @@ mod tests {
     #[test]
     fn ma_thanh_toan_gia_mang_so_tien() {
         let amount = Money::from_columns(125_000, "VND").unwrap();
-        let intent = PaymentIntent::new(uuid::Uuid::now_v7(), amount, "card", "Order", Utc::now());
+        let intent =
+            PaymentIntent::new(uuid::Uuid::now_v7(), amount, "card", "Order", Timestamp::now());
         let reference = payment_ref(&intent);
         assert!(reference.starts_with(SANDBOX_PREFIX));
         assert_eq!(amount_of_ref(&reference), Some(amount));

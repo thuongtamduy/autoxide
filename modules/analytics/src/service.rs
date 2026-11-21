@@ -1,6 +1,7 @@
 //! Service của module `analytics`: phần dùng chung của nhận sự kiện (`ingest.rs`), gộp
 //! (`rollup.rs`), báo cáo (`reports.rs`), dọn và quyền riêng tư (`privacy.rs`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_compliance::api::{ConsentKey, ConsentLedger, ConsentSubject};
@@ -8,7 +9,6 @@ use autoxide_kernel::analytics::AnalyticsCatalog;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
 use uuid::Uuid;
 
 use crate::config::AnalyticsConfig;
@@ -50,15 +50,15 @@ pub(crate) fn personal_key() -> ConsentKey {
 }
 
 /// Ngày UTC `YYYY-MM-DD` của `at`.
-pub(crate) fn day_of(at: DateTime<Utc>) -> String {
+pub(crate) fn day_of(at: Timestamp) -> String {
     at.format("%Y-%m-%d").to_string()
 }
 
 /// Ngày `YYYY-MM-DD`.
-pub(crate) fn day_text(day: NaiveDate) -> String {
+pub(crate) fn day_text(day: Date) -> String {
     day.format("%Y-%m-%d").to_string()
 }
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now()
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }

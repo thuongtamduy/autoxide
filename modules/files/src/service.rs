@@ -12,6 +12,7 @@
 //! Theo khách (bước 33): mọi hàm nhận `&TenantContext`; dòng ở database của khách, lọc `.scoped`;
 //! nội dung ở nơi lưu của khách (`TenantStorage`: khoá có tiền tố khách, D-259).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::Principal;
@@ -21,7 +22,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::storage::{ByteStream, Storage, TenantStorage};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -489,8 +489,8 @@ fn hex(bytes: &[u8]) -> String {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 #[cfg(test)]

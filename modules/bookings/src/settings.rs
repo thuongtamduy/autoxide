@@ -6,7 +6,7 @@ use std::sync::Arc;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, OrgSetting, TenantContext};
 use autoxide_organizations::api::OrgDirectory;
-use chrono_tz::Tz;
+use jiff::tz::TimeZone;
 use serde_json::Value;
 
 pub(crate) const FREE_CANCEL_HOURS: OrgSetting = OrgSetting::new(
@@ -156,11 +156,15 @@ impl Settings {
 
     /// Múi giờ của nút `org` (`organizations.timezone`, kế thừa theo cây); chưa đặt hay không đọc
     /// được thì UTC.
-    pub(crate) async fn timezone(&self, tenant: &TenantContext, org: OrgId) -> Result<Tz, Error> {
+    pub(crate) async fn timezone(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+    ) -> Result<TimeZone, Error> {
         Ok(self
             .value(tenant, org, "organizations.timezone")
             .await?
-            .and_then(|value| value.as_str().and_then(|name| name.parse::<Tz>().ok()))
-            .unwrap_or(Tz::UTC))
+            .and_then(|value| value.as_str().and_then(autoxide_kernel::time::zone))
+            .unwrap_or(TimeZone::UTC))
     }
 }

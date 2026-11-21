@@ -7,6 +7,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::error::Error;
@@ -157,7 +159,7 @@ async fn insert_item(tenant: &TenantContext, name: &str) {
             Uuid::now_v7().into(),
             name.into(),
             1999i64.into(),
-            chrono::Utc::now().into(),
+            Timestamp::now().into(),
         ])
         .to_owned();
     tenant.database().write().execute(&insert).await.unwrap();
@@ -358,7 +360,7 @@ async fn dry_run_khong_doi_gi_roi_doi_that_qua_rest_va_doi_ve() {
         assert_eq!(job.try_get::<i32>("", "attempts").unwrap(), 0);
         let update = Query::update()
             .table(Alias::new("shop_jobs"))
-            .value(Alias::new("run_at"), chrono::Utc::now() - chrono::Duration::seconds(1))
+            .value(Alias::new("run_at"), Timestamp::now() - SignedDuration::from_secs(1))
             .to_owned();
         spare.write().execute(&update).await.unwrap();
         assert!(worker.run_once().await.unwrap() >= 1);

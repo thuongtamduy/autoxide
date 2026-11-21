@@ -18,12 +18,12 @@
 //! - **Đổi định nghĩa:** nhãn, lựa chọn, ràng buộc đổi được; `key` không bao giờ; `data_type` chỉ khi
 //!   chưa bản ghi nào có giá trị (`kernel.custom_field_type_locked`, 409). Xoá là tắt (`active=false`).
 
+use crate::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::{Arc, OnceLock};
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, NaiveDate, SubsecRound, Utc};
 use sea_orm::sea_query::{Alias, Condition, Expr, Order, Query as SqlQuery};
 use sea_orm::{ColumnTrait, ConnectionTrait};
 use serde::{Deserialize, Serialize};
@@ -149,8 +149,8 @@ pub struct CustomFieldView {
     pub personal_data: bool,
     pub position: i32,
     pub active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Sổ loại bản ghi tham gia, điền khi khởi động; tra định nghĩa từ database. Clone rẻ.
@@ -511,7 +511,7 @@ fn apply(
     field.max = settings.max.or(field.max.take());
     for (name, bound) in [("min", &field.min), ("max", &field.max)] {
         if bound.as_deref().is_some_and(|bound| {
-            bound.parse::<f64>().is_err() && NaiveDate::parse_from_str(bound, "%Y-%m-%d").is_err()
+            bound.parse::<f64>().is_err() && Date::parse_from_str(bound, "%Y-%m-%d").is_err()
         }) {
             problems.push(FieldError::new(
                 name,

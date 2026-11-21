@@ -15,7 +15,8 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Timelike, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
@@ -75,7 +76,7 @@ pub(crate) struct NewBooking {
     pub service_id: Uuid,
     /// `None`: nhân viên bất kỳ còn trống (mục 3).
     pub resource_id: Option<Uuid>,
-    pub starts_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
     pub seats: i32,
     pub customer: Customer,
     pub note: String,
@@ -182,15 +183,18 @@ pub(crate) fn check_customer(problems: &mut Vec<FieldError>, customer: &mut Cust
 }
 
 /// Giờ bắt đầu phải nằm trên lưới 5 phút.
-pub(crate) fn check_start(problems: &mut Vec<FieldError>, field: &str, start: DateTime<Utc>) {
-    if start.second() != 0 || start.nanosecond() != 0 || !start.minute().is_multiple_of(5) {
+pub(crate) fn check_start(problems: &mut Vec<FieldError>, field: &str, start: Timestamp) {
+    // Đúng phút chia hết cho 5, không lẻ giây (giờ UTC và giờ địa phương cùng lưới 5 phút).
+    let on_grid =
+        start.as_unix_seconds().rem_euclid(300) == 0 && start.to_jiff().subsec_nanosecond() == 0;
+    if !on_grid {
         problems.push(FieldError::new(
             field,
             "invalid",
             "must be on a 5-minute mark, e.g. 09:00 or 09:05",
         ));
     }
-    if start <= Utc::now() {
+    if start <= Timestamp::now() {
         problems.push(FieldError::new(field, "range", "must be in the future"));
     }
 }
@@ -202,7 +206,7 @@ pub(crate) async fn reserve(
     tenant: &TenantContext,
     service: &ServiceView,
     resource_id: Uuid,
-    start: DateTime<Utc>,
+    start: Timestamp,
     seats: i32,
     booking_id: Uuid,
 ) -> Result<Option<Uuid>, Error> {
@@ -332,7 +336,7 @@ impl BookingsService {
         tenant: &TenantContext,
         service: &ServiceView,
         resource_id: Option<Uuid>,
-        start: DateTime<Utc>,
+        start: Timestamp,
     ) -> Result<Vec<resource::Model>, Error> {
         if let Some(wanted) = resource_id
             && !service.performers.contains(&wanted)
@@ -347,7 +351,7 @@ impl BookingsService {
             service,
             None,
             resource_id,
-            span.start - Duration::days(1),
+            span.start - SignedDuration::from_hours(24),
             span.end,
         )
         .await?;
@@ -365,8 +369,8 @@ impl BookingsService {
             let Some(row) = rows.iter().find(|row| row.id == plan.resource_id) else { continue };
             let zone = zone_of(row.org_id).await?;
             let rooms_ok =
-                loaded.required.iter().all(|room: &Plan| room.within_hours(zone, shape, start));
-            if plan.within_hours(zone, shape, start) && rooms_ok {
+                loaded.required.iter().all(|room: &Plan| room.within_hours(&zone, shape, start));
+            if plan.within_hours(&zone, shape, start) && rooms_ok {
                 found.push(row.clone());
             }
         }
@@ -425,7 +429,8 @@ impl BookingsService {
                 Origin::Customer if policy.require_approval => PENDING,
                 Origin::Customer => CONFIRMED,
             };
-            let hold = (status == HELD).then(|| now() + Duration::minutes(policy.hold_minutes));
+            let hold =
+                (status == HELD).then(|| now() + SignedDuration::from_mins(policy.hold_minutes));
             let mut attempt = self
                 .insert(
                     tenant, principal, origin, &service, candidate, &input, status, total, deposit,
@@ -465,7 +470,7 @@ impl BookingsService {
         status: &str,
         total: Money,
         deposit: i64,
-        hold: Option<DateTime<Utc>>,
+        hold: Option<Timestamp>,
         actor: Actor,
     ) -> Result<Booking, Error> {
         let id = Uuid::now_v7();

@@ -12,6 +12,7 @@
 //! - `Carrier`: gọi hãng ngoài transaction, có giới hạn thời gian; lỗi → `unavailable`.
 //! - `free_over` so với `order_value` → 0đ.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_address::api::AddressInput;
@@ -296,7 +297,7 @@ impl ShippingService {
                 _ => None,
             };
             let calendar =
-                self.calendar_for(tenant, method.calendar_id, request.at.date_naive()).await?;
+                self.calendar_for(tenant, method.calendar_id, request.at.date_utc()).await?;
             for (amount, pickup, service, days) in options {
                 let mut option =
                     self.option(&method, kind, amount, pickup, service, days, load, request)?;
@@ -528,7 +529,7 @@ impl ShippingService {
         store: OrgId,
         calendar: &crate::eta::Calendar,
         request: &QuoteRequest,
-    ) -> Result<chrono::DateTime<chrono::Utc>, Error> {
+    ) -> Result<Timestamp, Error> {
         let prep = pickup_point::Entity::find()
             .filter(pickup_point::Column::MethodId.eq(method.id))
             .filter(pickup_point::Column::OrgId.eq(store.as_uuid()))

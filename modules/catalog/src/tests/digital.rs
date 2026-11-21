@@ -2,6 +2,7 @@
 //! `orders` (nhận lại không phát thêm), trừ lượt đồng thời không vượt giới hạn, địa chỉ ký hết hạn
 //! hay bị thu hồi, địa chỉ ký của khách này không dùng được ở khách khác.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_files::api::{FileInfo, Files, OpenedFile};
@@ -42,7 +43,7 @@ impl Files for FakeFiles {
         if id != FILE_ID {
             return Err(Error::internal("the fake holds one file only"));
         }
-        Ok(FileInfo::new(id, "Sách điện tử.pdf", "application/pdf", 30, "ab", chrono::Utc::now()))
+        Ok(FileInfo::new(id, "Sách điện tử.pdf", "application/pdf", 30, "ab", Timestamp::now()))
     }
 
     async fn open(

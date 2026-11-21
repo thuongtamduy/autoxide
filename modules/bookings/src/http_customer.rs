@@ -2,6 +2,7 @@
 //! nhập, khách vãng lai bằng mã một lần gửi tới số điện thoại; có cọc thì lịch được giữ tạm và câu
 //! trả lời mang trang trả cọc của đối tác.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::State;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -35,7 +35,7 @@ pub(crate) struct CustomerBookingRequest {
     /// A staff member (or court, room…) from the availability; omitted: the first one free.
     resource_id: Option<Uuid>,
     /// A `starts_at` from the availability.
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// Places (classes); default 1.
     #[serde(default = "one")]
     seats: i32,

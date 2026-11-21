@@ -1,6 +1,7 @@
 //! Bên bị phản ánh: tra vụ của mình và gửi phản hồi; tra vụ bằng mã của người báo.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
 
 impl ComplianceService {
     /// `principal` là bên bị phản ánh của vụ: chủ đối tượng, hay người có `compliance.cases.respond`
@@ -83,7 +84,7 @@ impl ComplianceService {
             return Err(case_not_found());
         }
         check_body(body, files)?;
-        if !OPEN.contains(&before.status.as_str()) || Utc::now() > before.respond_by {
+        if !OPEN.contains(&before.status.as_str()) || Timestamp::now() > before.respond_by {
             return Err(response_closed());
         }
         let line =

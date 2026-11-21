@@ -1,6 +1,7 @@
 //! Quyền vào hỗ trợ của nhân sự nền tảng (D-190, D-211, D-313): phía khách xem, tự thu hồi; phía
 //! nền tảng cấp, xem, thu hồi.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -52,14 +52,14 @@ pub(crate) struct SupportGrantResponse {
     /// Number of the authority's document, for `legal_request`.
     legal_reference: Option<String>,
     granted_by: Option<Uuid>,
-    starts_at: DateTime<Utc>,
-    expires_at: DateTime<Utc>,
+    starts_at: Timestamp,
+    expires_at: Timestamp,
     /// When the staff first entered under it; `null`: not used.
-    first_used_at: Option<DateTime<Utc>>,
-    revoked_at: Option<DateTime<Utc>>,
+    first_used_at: Option<Timestamp>,
+    revoked_at: Option<Timestamp>,
     /// `true` when the tenant revoked it.
     revoked_by_tenant: bool,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<SupportGrant> for SupportGrantResponse {

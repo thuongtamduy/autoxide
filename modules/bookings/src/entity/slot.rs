@@ -1,5 +1,6 @@
 //! Bảng `bookings_slots`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -10,7 +11,7 @@ pub struct Model {
     pub id: Uuid,
     pub tenant_id: Uuid,
     pub resource_id: Uuid,
-    pub slot_start: DateTimeUtc,
+    pub slot_start: Timestamp,
     pub booking_id: Option<Uuid>,
     pub session_id: Option<Uuid>,
 }

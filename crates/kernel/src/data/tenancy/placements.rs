@@ -12,13 +12,12 @@
 //! - Placement `main` (database điều khiển) không có trạng thái riêng: `serve` đòi nó đủ migration
 //!   trước khi khởi động.
 
-use std::sync::Arc;
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
+use std::sync::Arc;
 use uuid::Uuid;
 
 use super::admin::placement;
@@ -125,8 +124,8 @@ impl Placements {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 impl Placements {

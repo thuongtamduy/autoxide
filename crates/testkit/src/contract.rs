@@ -9,6 +9,7 @@
 //! `anyOf`, `allOf`, `$ref`, giới hạn số và độ dài, `format` `uuid` / `date-time` / `date`) — không
 //! thêm thư viện cho vài trăm dòng. `pattern` không kiểm (cần thư viện regex).
 
+use autoxide_kernel::time::Date;
 use serde_json::Value;
 
 /// Tìm operation của `method` + `path` trong tài liệu: đường dẫn mẫu `{…}` khớp một đoạn bất kỳ;
@@ -295,8 +296,8 @@ fn limit(
 fn format_ok(format: &str, text: &str) -> bool {
     match format {
         "uuid" => uuid::Uuid::parse_str(text).is_ok(),
-        "date-time" => chrono::DateTime::parse_from_rfc3339(text).is_ok(),
-        "date" => chrono::NaiveDate::parse_from_str(text, "%Y-%m-%d").is_ok(),
+        "date-time" => autoxide_kernel::time::Timestamp::parse_rfc3339(text).is_ok(),
+        "date" => Date::parse_from_str(text, "%Y-%m-%d").is_ok(),
         _ => true,
     }
 }

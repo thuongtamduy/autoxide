@@ -1,5 +1,6 @@
 //! Bảng `content_banners`: banner của một vị trí (bước 55, D-236).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -32,16 +33,16 @@ pub struct Model {
     pub link_kind: String,
     pub link_url: Option<String>,
     pub link_id: Option<String>,
-    pub starts_at: Option<DateTimeUtc>,
-    pub ends_at: Option<DateTimeUtc>,
+    pub starts_at: Option<Timestamp>,
+    pub ends_at: Option<Timestamp>,
     pub position: i32,
     /// `draft`, `active`, `archived`.
     pub status: String,
     pub ai_assisted: bool,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
     /// Phiên bản (`ETag`).
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

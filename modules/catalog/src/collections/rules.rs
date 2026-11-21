@@ -1,11 +1,12 @@
 //! Quy tắc của bộ sưu tập `rule`: JSON có schema cố định, kiểm ở service. Mọi điều kiện cùng phải
 //! đúng (`match: all`); tối đa [`MAX_CONDITIONS`] điều kiện để câu lọc luôn đi theo index sẵn có.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -58,7 +59,7 @@ impl Rules {
     }
 
     /// Bộ lọc công khai tương ứng lúc `now`.
-    pub(crate) fn filter(&self, locale: &str, now: DateTime<Utc>) -> PublicFilter {
+    pub(crate) fn filter(&self, locale: &str, now: Timestamp) -> PublicFilter {
         PublicFilter {
             locale: locale.to_owned(),
             attributes: self.attributes.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
@@ -66,7 +67,9 @@ impl Rules {
             price_max: self.price_max,
             on_sale: self.on_promotion,
             category_ids: self.category_ids.clone(),
-            published_after: self.new_within_days.map(|days| now - Duration::days(days)),
+            published_after: self
+                .new_within_days
+                .map(|days| now - SignedDuration::from_hours(24 * days)),
             ..Default::default()
         }
     }

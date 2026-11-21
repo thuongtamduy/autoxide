@@ -1,5 +1,6 @@
 //! Endpoint xem audit log, dưới `/api/v1/audit`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Permission, Principal};
@@ -8,7 +9,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -70,9 +70,9 @@ pub(crate) struct AuditEntryResponse {
     /// Other facts about the change.
     details: Option<Value>,
     /// When the change happened.
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
     /// When the audit log recorded it (shortly after).
-    recorded_at: DateTime<Utc>,
+    recorded_at: Timestamp,
 }
 
 impl From<entity::Model> for AuditEntryResponse {
@@ -141,7 +141,7 @@ pub(crate) struct ActivityResponse {
     /// Record that changed, as `<kind>:<id>`.
     subject: Option<String>,
     actor_user_id: Option<Uuid>,
-    occurred_at: DateTime<Utc>,
+    occurred_at: Timestamp,
 }
 
 /// How many lines.
@@ -301,7 +301,6 @@ mod tests {
     use autoxide_kernel::event::{Actor, Delivered, EventHandler};
     use autoxide_testkit::{TestApp, TestDatabase};
     use axum::http::StatusCode;
-    use chrono::SubsecRound;
     use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
     use serde_json::json;
 
@@ -327,7 +326,7 @@ mod tests {
         )
         .actor(Actor::user(actor))
         .subject(Some(subject.to_owned()))
-        .occurred_at(Utc::now().trunc_subsecs(6))
+        .occurred_at(Timestamp::now())
     }
 
     async fn get(app: &TestApp, uri: &str, as_who: &str) -> (StatusCode, Value) {
@@ -494,7 +493,7 @@ mod tests {
                 )
                 .actor(Actor::user(Uuid::now_v7()))
                 .subject(Some(subject))
-                .occurred_at(Utc::now().trunc_subsecs(6));
+                .occurred_at(Timestamp::now());
                 if tenant.id() == a.id() {
                     seeded.push(("id", event.id.to_string()));
                 }
@@ -593,7 +592,7 @@ mod tests {
                 )
                 .actor(Actor::user(actor))
                 .subject(Some("shop.item:1".to_owned()))
-                .occurred_at(Utc::now().trunc_subsecs(6));
+                .occurred_at(Timestamp::now());
                 recorder.handle(&delivered).await.unwrap();
             }
             let (status, body) = get(&app, "/api/v1/audit/activity", "clerk").await;

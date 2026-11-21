@@ -44,6 +44,7 @@ mod scope;
 pub(crate) mod settings;
 mod site;
 
+use crate::time::Timestamp;
 use std::fmt;
 use std::sync::Arc;
 
@@ -315,7 +316,7 @@ struct Inner {
     /// Chỉ đọc (`kernel_tenants.read_only`): lệnh ghi bị chặn ở chỗ giải khách của request.
     read_only: bool,
     /// Sandbox (D-232): khách gốc và hạn; `None` với khách thật.
-    sandbox: Option<(TenantId, Option<chrono::DateTime<chrono::Utc>>)>,
+    sandbox: Option<(TenantId, Option<Timestamp>)>,
 }
 
 impl TenantContext {
@@ -391,11 +392,7 @@ impl TenantContext {
     /// Cùng khách, là sandbox của khách `of`, hết hạn lúc `expires_at` (sổ database dựng từ
     /// `kernel_tenants`; test dựng).
     #[must_use]
-    pub fn with_sandbox_of(
-        self,
-        of: TenantId,
-        expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    ) -> Self {
+    pub fn with_sandbox_of(self, of: TenantId, expires_at: Option<Timestamp>) -> Self {
         let inner = Arc::unwrap_or_clone(self.0);
         TenantContext(Arc::new(Inner { sandbox: Some((of, expires_at)), ..inner }))
     }
@@ -411,7 +408,7 @@ impl TenantContext {
     }
 
     /// Hạn của sandbox; `None` với khách thật.
-    pub fn sandbox_expires_at(&self) -> Option<chrono::DateTime<chrono::Utc>> {
+    pub fn sandbox_expires_at(&self) -> Option<Timestamp> {
         self.0.sandbox.and_then(|(_, at)| at)
     }
 

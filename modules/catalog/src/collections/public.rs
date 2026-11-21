@@ -9,7 +9,7 @@
 use autoxide_kernel::error::Error;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Query;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -34,7 +34,7 @@ pub(crate) fn ascending(sort: &str) -> bool {
 }
 
 /// Bộ sưu tập có hiện lúc `now` không.
-pub(crate) fn shown(row: &collection::Model, now: DateTime<Utc>) -> bool {
+pub(crate) fn shown(row: &collection::Model, now: Timestamp) -> bool {
     row.status == "active"
         && row.starts_at.is_none_or(|at| at <= now)
         && row.ends_at.is_none_or(|at| at > now)
@@ -56,7 +56,7 @@ impl CatalogService {
         site: &Site,
         locale: &str,
         slug: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<(collection::Model, collection_text::Model), Error> {
         let locale = self.locale(locale)?;
         let read = tenant.database().read();
@@ -86,7 +86,7 @@ impl CatalogService {
         site: &Site,
         found: (collection::Model, collection_text::Model),
         page: &PageRequest,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<PublicCollection, Error> {
         let (row, text) = found;
         let products =
@@ -101,7 +101,7 @@ impl CatalogService {
         locale: &str,
         row: &collection::Model,
         page: &PageRequest,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Page<PublicCard>, Error> {
         let mut filter = if row.kind == "rule" {
             let rules: Rules = serde_json::from_str(&row.rules).unwrap_or_default();

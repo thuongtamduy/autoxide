@@ -12,6 +12,7 @@ mod consents;
 mod sending;
 mod subscribe;
 
+use autoxide_kernel::time::Timestamp;
 use std::net::IpAddr;
 
 use autoxide_kernel::database::Database;
@@ -91,7 +92,7 @@ pub(crate) async fn store_subscriptions(h: &Harness) -> usize {
         h.service.apply_subscription(&h.tenant, &job).await.unwrap();
         let done = Query::update()
             .table(Alias::new("newsletter_jobs"))
-            .value(Alias::new("completed_at"), chrono::Utc::now())
+            .value(Alias::new("completed_at"), Timestamp::now())
             .and_where(Expr::col(Alias::new("id")).eq(id))
             .to_owned();
         h.database.write().execute(&done).await.unwrap();
@@ -146,7 +147,7 @@ pub(crate) async fn next_job(database: &Database, any_time: bool) -> Option<(Uui
         .order_by(Alias::new("id"), Order::Asc)
         .limit(1);
     if !any_time {
-        select.and_where(Expr::col(Alias::new("run_at")).lte(chrono::Utc::now()));
+        select.and_where(Expr::col(Alias::new("run_at")).lte(Timestamp::now()));
     }
     let row = database.read().query_one(&select).await.unwrap()?;
     let payload: String = row.try_get("", "payload").unwrap();
@@ -177,7 +178,7 @@ pub(crate) async fn run_job(harness: &Harness, any_time: bool) -> Option<String>
     }
     let done = Query::update()
         .table(Alias::new("newsletter_jobs"))
-        .value(Alias::new("completed_at"), chrono::Utc::now())
+        .value(Alias::new("completed_at"), Timestamp::now())
         .and_where(Expr::col(Alias::new("id")).eq(id))
         .to_owned();
     harness.database.write().execute(&done).await.unwrap();

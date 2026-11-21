@@ -1,5 +1,6 @@
 //! Bảng `conversations_reads`: con trỏ "đã đọc tới đâu" của từng người trong một cuộc trò chuyện.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,7 +14,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: Uuid,
     pub last_read_message_id: Uuid,
-    pub read_at: DateTimeUtc,
+    pub read_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

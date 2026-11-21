@@ -1,6 +1,7 @@
 //! Service của module `customers`: phần dùng chung của mọi file (ngữ cảnh, giờ, che liên hệ). Logic
 //! nằm ở đây và các file cùng cấp, không ở handler (luật kiến trúc 5).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::custom_fields::CustomFields;
@@ -10,7 +11,6 @@ use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantId};
-use chrono::{DateTime, SubsecRound, Utc};
 
 /// Mã nước mặc định khi chuẩn hoá số điện thoại nhập không có `+` (Việt Nam).
 pub(crate) const DEFAULT_COUNTRY: &str = "84";
@@ -57,8 +57,8 @@ impl CustomersService {
 }
 
 /// Giờ hiện tại, cắt tới micro giây (Postgres lưu tới micro giây; `If-Match` so đúng từng số).
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Số điện thoại đã che cho nhân viên (D-226): `+84912345412` → `09•• ••• 412`. Số ngoài Việt Nam

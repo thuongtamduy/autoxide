@@ -6,7 +6,7 @@
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, root_of};
-use chrono::Utc;
+use autoxide_kernel::time::Timestamp;
 
 use super::*;
 use crate::api::{QuoteItem, QuoteRequest, ShippingRates};
@@ -376,7 +376,7 @@ async fn api_shipping_qua_testapp() {
             tree.a,
             vec![QuoteItem::new(Uuid::now_v7(), 1).weight(Some(300))],
             Money::new(100_000, vnd),
-            Utc::now(),
+            Timestamp::now(),
         )
         .destination(destination)
         .locale("en");

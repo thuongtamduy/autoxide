@@ -1,6 +1,7 @@
 //! Đăng nhập qua nhà cung cấp danh tính (bước 40 P3): luồng đăng nhập (`/oidc/…`), liên kết của
 //! chính chủ (`/me/identities…`) và quản trị nhà cung cấp của khách (`/oidc-providers…`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{Principal, Realm};
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::{OptionalTenant, TenantContext};
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -121,8 +121,8 @@ pub(crate) struct IdentityResponse {
     email: Option<String>,
     /// Whether the provider said it verified that email.
     email_verified: bool,
-    created_at: DateTime<Utc>,
-    last_login_at: Option<DateTime<Utc>>,
+    created_at: Timestamp,
+    last_login_at: Option<Timestamp>,
 }
 
 impl From<LinkedIdentity> for IdentityResponse {
@@ -170,8 +170,8 @@ pub(crate) struct ProviderResponse {
     /// Role new accounts get; `null`: none.
     default_role_id: Option<Uuid>,
     enabled: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Provider> for ProviderResponse {

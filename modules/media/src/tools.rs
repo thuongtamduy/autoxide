@@ -4,6 +4,7 @@
 //! nhỏ ([`MAX_TOOL_BYTES`]) — lời gọi MCP còn chịu giới hạn thân request chung của máy chủ.
 //! File lớn tải lên qua REST.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -79,7 +79,7 @@ pub(crate) struct UpdateMediaInput {
     id: Uuid,
     /// The `updated_at` of the item as you last read it. The change is refused if the
     /// item changed since; read it again and retry.
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
     /// New file name, 1 to 255 characters.
     name: Option<String>,
     /// Text alternative for screen readers, up to 1000 characters; `""` clears it.
@@ -111,7 +111,7 @@ pub(crate) struct SetAltInput {
     id: Uuid,
     /// The `updated_at` of the item as you last read it. The change is refused if the
     /// item changed since; read it again and retry.
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
     /// BCP 47 language code, one the server offers (e.g. `vi`).
     locale: String,
     /// Text alternative in this language, up to 1000 characters; `null` removes the

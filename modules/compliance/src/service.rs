@@ -2,6 +2,7 @@
 //! khiển), chính sách của khách. KYC ở [`crate::kyc`], văn bản ở [`crate::documents`], đồng ý ở
 //! [`crate::consents`].
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::identity::IdentityVerifier;
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::Deserialize;
@@ -22,8 +22,8 @@ use crate::entity::{policy, rule};
 use crate::events;
 use crate::permissions::{POLICIES_MANAGE, RULES_MANAGE};
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Gói quy tắc `vn` đi kèm máy chủ.
@@ -105,8 +105,8 @@ struct Pack {
 struct PackRule {
     key: String,
     version: i64,
-    effective_from: DateTime<Utc>,
-    effective_to: Option<DateTime<Utc>>,
+    effective_from: Timestamp,
+    effective_to: Option<Timestamp>,
     body: Value,
     legal_basis: String,
     #[serde(default = "yes")]
@@ -269,7 +269,7 @@ impl ComplianceService {
         &self,
         jurisdiction: &str,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<rule::Model>, Error> {
         let rows = rule::Entity::find()
             .filter(rule::Column::Jurisdiction.eq(jurisdiction))
@@ -306,7 +306,7 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         key: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<rule::Model>, Error> {
         let jurisdiction = self.jurisdiction(tenant).await?;
         self.effective_rule(&jurisdiction, key, at).await
@@ -464,5 +464,5 @@ impl ComplianceService {
 pub(crate) struct RuleFilter {
     pub jurisdiction: Option<String>,
     pub key: Option<String>,
-    pub as_of: Option<DateTime<Utc>>,
+    pub as_of: Option<Timestamp>,
 }

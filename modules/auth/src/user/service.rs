@@ -2,13 +2,13 @@
 //! lệnh CLI và tool MCP (ở các mục sau) chỉ gọi vào đây.
 
 use autoxide_kernel::access::Realm;
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tokens::OneTimeTokens;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter, QuerySelect, Set,
@@ -72,7 +72,7 @@ pub(crate) enum UserStatus {
 }
 
 /// Một dòng của [`UserService::facts`]: ID, cờ có mật khẩu, cờ bật TOTP (`x` / `NULL`), lần đăng nhập cuối.
-type FactsRow = (Uuid, Option<String>, Option<String>, Option<DateTime<Utc>>);
+type FactsRow = (Uuid, Option<String>, Option<String>, Option<Timestamp>);
 
 /// Tài khoản của chính người gọi, kèm dữ kiện `GET /me` cần (xem [`UserService::own_account`]).
 #[derive(Debug, Clone)]
@@ -88,7 +88,7 @@ pub(crate) struct OwnAccount {
 pub(crate) struct AccountFacts {
     pub has_password: bool,
     pub mfa_enabled: bool,
-    pub last_sign_in_at: Option<DateTime<Utc>>,
+    pub last_sign_in_at: Option<Timestamp>,
 }
 
 // Service không giữ database: mỗi hàm nhận khách của request (`TenantContext`) và làm việc trên
@@ -219,7 +219,7 @@ impl UserService {
         actor: Actor,
         id: Uuid,
         changes: UserChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<User, Error> {
         let name = changes.name.as_ref().map(|name| name.trim().to_owned());
         let mut problems: Vec<FieldError> =
@@ -236,9 +236,9 @@ impl UserService {
             None => None,
         };
         let time_zone = match &changes.time_zone {
-            Some(Some(raw)) => match raw.trim().parse::<chrono_tz::Tz>() {
-                Ok(zone) => Some(Some(zone.name().to_owned())),
-                Err(_) => {
+            Some(Some(raw)) => match autoxide_kernel::time::zone(raw.trim()) {
+                Some(_) => Some(Some(raw.trim().to_owned())),
+                None => {
                     problems.push(FieldError::new(
                         "time_zone",
                         "invalid",
@@ -295,7 +295,7 @@ impl UserService {
                 );
             }
             Some(false) => {
-                update = update.col_expr(Column::DisabledAt, Expr::value(None::<DateTime<Utc>>));
+                update = update.col_expr(Column::DisabledAt, Expr::value(None::<Timestamp>));
             }
             None => {}
         }
@@ -409,7 +409,7 @@ impl UserService {
         transaction: &DatabaseTransaction,
         id: Uuid,
         email: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<String, Error> {
         let row = Entity::find_by_id(id)
             .scoped(tenant)
@@ -681,8 +681,8 @@ pub(crate) fn search_text(email: &str, name: &str) -> String {
     autoxide_kernel::search::fold(&format!("{email} {name}"))
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn email_taken(email: &str) -> Error {

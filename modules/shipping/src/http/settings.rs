@@ -1,6 +1,7 @@
 //! Cài đặt vận chuyển của cửa hàng: vùng, phương thức, bậc phí, điểm nhận tại cửa hàng. Mọi
 //! endpoint cần `shipping.settings.manage` ở nút của bản ghi.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -13,7 +14,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -106,7 +106,7 @@ pub(crate) struct ZoneResponse {
     org_id: Uuid,
     name: String,
     regions: Vec<RegionBody>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<ZoneView> for ZoneResponse {
@@ -481,7 +481,7 @@ pub(crate) struct MethodResponse {
     /// Weight tiers (only in `GET /methods/{id}` and after changes).
     rates: Vec<RateBody>,
     pickup_points: Vec<PickupBody>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 /// Tiền từ hai cột; mã tiền tệ hỏng (không xảy ra: đã kiểm lúc ghi) thì số 0 của cùng loại tiền

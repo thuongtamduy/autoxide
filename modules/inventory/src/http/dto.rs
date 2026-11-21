@@ -2,7 +2,7 @@
 //! người gọi API, bằng tiếng Anh.
 
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::{Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -33,7 +33,7 @@ pub(crate) struct LevelResponse {
     pub reorder_point: Option<i64>,
     /// Weighted average unit cost of the stock; `null` until goods with a cost come in.
     pub average_cost: Option<Money>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<level::Model> for LevelResponse {
@@ -111,7 +111,7 @@ pub(crate) struct MovementResponse {
     pub source_type: String,
     pub source_id: Uuid,
     pub actor_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<movement::Model> for MovementResponse {
@@ -174,7 +174,7 @@ pub(crate) struct AdjustmentLineRequest {
     /// omit it to take the lots that expire first.
     pub lot_code: Option<String>,
     /// Expiry date of the lot, when adding.
-    pub expires_on: Option<chrono::NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Exactly `|quantity|` serial numbers when the variant tracks serials.
     #[serde(default)]
     pub serials: Vec<String>,
@@ -203,7 +203,7 @@ pub(crate) struct AdjustmentResponse {
     pub org_id: Uuid,
     pub reference: String,
     pub actor_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     pub movements: Vec<MovementResponse>,
 }
 

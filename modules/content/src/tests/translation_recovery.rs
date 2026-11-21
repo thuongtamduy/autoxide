@@ -1,6 +1,8 @@
 //! Sửa sau rà soát (D-111): yêu cầu dịch kẹt ở `running` bị yêu cầu mới thay chỗ; yêu cầu đã
 //! huỷ không bị job đang chạy ghi đè thành "thành công".
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::ai::{Part, Prompt};
@@ -42,7 +44,7 @@ async fn yeu_cau_ket_bi_thay_va_huy_khong_bi_ghi_de() {
             .col_expr(translation_request::Column::Status, Expr::value("running"))
             .col_expr(
                 translation_request::Column::UpdatedAt,
-                Expr::value(chrono::Utc::now() - chrono::Duration::minutes(20)),
+                Expr::value(Timestamp::now() - SignedDuration::from_mins(20)),
             )
             .filter(translation_request::Column::Id.eq(stuck.id))
             .exec(database.write())

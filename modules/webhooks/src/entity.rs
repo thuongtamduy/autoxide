@@ -1,6 +1,7 @@
 //! Entity của bảng `webhooks_endpoint` và `webhooks_delivery` (SeaORM).
 
 pub(crate) mod endpoint {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -17,9 +18,9 @@ pub(crate) mod endpoint {
         pub secret: String,
         /// JSON: danh sách tên event.
         pub events: String,
-        pub disabled_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub disabled_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -32,6 +33,7 @@ pub(crate) mod endpoint {
 }
 
 pub(crate) mod delivery {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -50,9 +52,9 @@ pub(crate) mod delivery {
         pub attempts: i32,
         pub response_status: Option<i32>,
         pub last_error: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub last_attempt_at: Option<DateTimeUtc>,
-        pub delivered_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub last_attempt_at: Option<Timestamp>,
+        pub delivered_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

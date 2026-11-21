@@ -6,7 +6,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::report::FactSource;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 
@@ -92,7 +93,7 @@ async fn add<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     source: &str,
-    hour: DateTime<Utc>,
+    hour: Timestamp,
     currency: &str,
     value: i64,
 ) -> Result<(), Error> {
@@ -113,7 +114,7 @@ async fn ensure_row<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     source: &str,
-    hour: DateTime<Utc>,
+    hour: Timestamp,
     currency: &str,
 ) -> Result<(), Error> {
     metric_hour::Entity::insert(metric_hour::ActiveModel {
@@ -146,7 +147,7 @@ impl Automations {
         &self,
         tenant: &TenantContext,
         source: &str,
-        hour: DateTime<Utc>,
+        hour: Timestamp,
         currency: &str,
         value: i64,
     ) -> Result<(), Error> {
@@ -168,11 +169,13 @@ impl Automations {
     pub(crate) async fn prune_metrics(&self, database: &Database) -> Result<(), Error> {
         let now = now();
         metric_hour::Entity::delete_many()
-            .filter(metric_hour::Column::Hour.lt(now - Duration::days(KEEP_DAYS)))
+            .filter(metric_hour::Column::Hour.lt(now - SignedDuration::from_hours(24 * KEEP_DAYS)))
             .exec(database.write())
             .await?;
         metric_seen::Entity::delete_many()
-            .filter(metric_seen::Column::CreatedAt.lt(now - Duration::days(SEEN_DAYS)))
+            .filter(
+                metric_seen::Column::CreatedAt.lt(now - SignedDuration::from_hours(24 * SEEN_DAYS)),
+            )
             .exec(database.write())
             .await?;
         Ok(())

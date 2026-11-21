@@ -1,6 +1,8 @@
 //! Sửa bài: update, update_inner và apply (áp thay đổi lên bản ghi).
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 impl ContentService {
     /// Sửa bản nháp của mục `id`. Cần `content.write`. Mục đang công khai thì bật
@@ -12,7 +14,7 @@ impl ContentService {
         id: Uuid,
         fields: EntryFields,
         save_revision: bool,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         let revise =
             Revise { forced: save_revision.then_some(Reason::ExplicitSave), restored_from: None };
@@ -27,7 +29,7 @@ impl ContentService {
         id: Uuid,
         fields: EntryFields,
         revise: Revise,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         let Revise { forced, restored_from } = revise;
         permissions::require_create(principal)?;
@@ -67,7 +69,7 @@ impl ContentService {
         }
         let reason = if forced.is_some() {
             forced
-        } else if now - before.revised_at > chrono::Duration::minutes(BACKGROUND_SAVE_MINUTES) {
+        } else if now - before.revised_at > SignedDuration::from_mins(BACKGROUND_SAVE_MINUTES) {
             Some(Reason::BackgroundSave)
         } else {
             None

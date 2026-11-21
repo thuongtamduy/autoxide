@@ -1,5 +1,6 @@
 //! Tài khoản hãng (`shipping.carriers.manage`) và webhook công khai của hãng.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::body::Bytes;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -72,12 +72,12 @@ pub(crate) struct AccountResponse {
     /// `never`, `ok` or `failed`: result of the last connection test, or of the last call the
     /// carrier refused for bad credentials.
     check_status: String,
-    checked_at: Option<DateTime<Utc>>,
+    checked_at: Option<Timestamp>,
     check_error_code: Option<String>,
     /// Only in the answer of the create call: the address the carrier posts status updates to.
     /// Keep it; it cannot be shown again.
     webhook_path: Option<String>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<AccountView> for AccountResponse {

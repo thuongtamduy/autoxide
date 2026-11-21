@@ -8,13 +8,13 @@
 //! không đếm hai lần. Số liệu cục bộ chưa đẩy đi theo dữ liệu (chính sách `ByOrg`) và được đẩy
 //! bình thường dưới khách mới. Nhật ký ở `reporting_rehomes` (database của khách nhận).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, TenantContext, TenantId};
-use chrono::{NaiveDate, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
@@ -76,8 +76,8 @@ impl JobHandler for RehomeJob {
     }
 }
 
-fn now() -> chrono::DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 impl Reporting {
@@ -235,7 +235,7 @@ async fn recompute_daily<C: ConnectionTrait>(
         .exec(connection)
         .await?;
     // `CAST(SUM(…) AS BIGINT)`: Postgres trả `numeric` cho tổng của `bigint`.
-    let groups: Vec<(Uuid, String, NaiveDate, String, i64, i64, i64)> = fact::Entity::find()
+    let groups: Vec<(Uuid, String, Date, String, i64, i64, i64)> = fact::Entity::find()
         .select_only()
         .column(fact::Column::OrgId)
         .column(fact::Column::Kind)

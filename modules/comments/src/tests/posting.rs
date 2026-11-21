@@ -1,5 +1,6 @@
 //! Tạo, sửa, xoá bình luận; pipeline kiểm duyệt; chống spam; đọc luồng.
 
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::antispam::AntispamConfig;
@@ -478,7 +479,7 @@ async fn sua_trong_thoi_han_va_xoa_mem() {
 
         // Hết thời hạn sửa (đẩy lúc tạo về quá khứ).
         let mut row = h.service.find(&h.tenant, id).await.unwrap().into_active_model();
-        row.created_at = Set(crate::service::now() - chrono::Duration::minutes(16));
+        row.created_at = Set(crate::service::now() - SignedDuration::from_mins(16));
         row.update(h.database.write()).await.unwrap();
         assert_eq!(
             h.service
@@ -545,7 +546,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
         let moderator = admin();
         let bob = member(&h.service, "Bob", &[]).await;
         let client = ClientInfo::default();
-        let until = crate::service::now() + chrono::Duration::hours(1);
+        let until = crate::service::now() + SignedDuration::from_hours(1);
         let ban = h
             .service
             .ban(
@@ -640,7 +641,7 @@ async fn lenh_cam_het_han_thi_gui_lai_duoc() {
             .unwrap()
             .unwrap()
             .into_active_model();
-        row.until = Set(Some(crate::service::now() - chrono::Duration::seconds(1)));
+        row.until = Set(Some(crate::service::now() - SignedDuration::from_secs(1)));
         row.update(h.database.write()).await.unwrap();
         assert_eq!(
             h.service.post(&h.tenant, Some(&bob), &client, signed("Xin chào")).await.unwrap().shown,

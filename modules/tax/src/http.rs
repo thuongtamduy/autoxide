@@ -1,5 +1,6 @@
 //! Route REST của module `tax`, dưới `/api/v1/tax`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, require_platform, root_of};
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -144,10 +144,10 @@ pub(crate) struct DataQuery {
     /// Only this category (rates).
     category: Option<String>,
     /// Only what is in force on this day (`YYYY-MM-DD`).
-    on: Option<NaiveDate>,
+    on: Option<Date>,
 }
 
-fn in_force_on(from: &str, to: Option<&String>, on: Option<NaiveDate>) -> bool {
+fn in_force_on(from: &str, to: Option<&String>, on: Option<Date>) -> bool {
     on.is_none_or(|on| {
         let day = on.format("%Y-%m-%d").to_string();
         from <= day.as_str() && to.is_none_or(|to| day.as_str() < to.as_str())
@@ -400,7 +400,7 @@ pub(crate) struct QuoteRequest {
     #[schema(example = "VN")]
     jurisdiction: String,
     /// Day the tax applies (`YYYY-MM-DD`, in the seller's time zone).
-    tax_point: NaiveDate,
+    tax_point: Date,
     /// The selling unit; default the tenant's root. Its tax profile (or the nearest above) decides
     /// the regime; without one the seller declares VAT by credit.
     seller_org_id: Option<Uuid>,
@@ -463,7 +463,7 @@ pub(crate) struct WithholdingInput {
     #[schema(example = "VN")]
     jurisdiction: String,
     /// Day of the payment.
-    on: NaiveDate,
+    on: Date,
     /// `marketplace` or `affiliate`.
     #[schema(example = "marketplace")]
     payer_kind: String,
@@ -521,7 +521,7 @@ pub(crate) struct ProfileResponse {
     /// `true` when the profile is the unit's own; `false` when it comes from a unit above.
     own: bool,
     updated_by: Option<Uuid>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 fn respond(row: &profile::Model, asked: Option<OrgId>) -> ProfileResponse {
@@ -670,7 +670,7 @@ pub(crate) struct PackResponse {
     source_note: String,
     content_sha256: String,
     imported_by: Option<Uuid>,
-    imported_at: DateTime<Utc>,
+    imported_at: Timestamp,
 }
 
 impl From<pack::Model> for PackResponse {

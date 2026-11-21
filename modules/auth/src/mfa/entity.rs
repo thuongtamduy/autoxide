@@ -1,6 +1,7 @@
 //! Entity của bảng `auth_totp` và `auth_recovery_code` (SeaORM).
 
 pub(crate) mod totp {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -13,9 +14,9 @@ pub(crate) mod totp {
         pub tenant_id: Uuid,
         pub user_id: Uuid,
         pub secret: String,
-        pub confirmed_at: Option<DateTimeUtc>,
+        pub confirmed_at: Option<Timestamp>,
         pub last_used_step: Option<i64>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -28,6 +29,7 @@ pub(crate) mod totp {
 }
 
 pub(crate) mod recovery_code {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -40,8 +42,8 @@ pub(crate) mod recovery_code {
         pub tenant_id: Uuid,
         pub user_id: Uuid,
         pub code_hash: String,
-        pub used_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
+        pub used_at: Option<Timestamp>,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

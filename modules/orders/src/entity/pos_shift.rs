@@ -1,5 +1,6 @@
 //! Bảng `orders_pos_shifts`: ca bán hàng của một quầy (tiền đầu ca, tiền đếm được, chênh lệch).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,20 +14,20 @@ pub struct Model {
     pub register_code: String,
     pub open_key: Option<String>,
     pub opened_by: Uuid,
-    pub opened_at: DateTimeUtc,
+    pub opened_at: Timestamp,
     pub currency: String,
     pub opening_cash_minor: i64,
     pub closed_by: Option<Uuid>,
-    pub closed_at: Option<DateTimeUtc>,
+    pub closed_at: Option<Timestamp>,
     pub expected_cash_minor: Option<i64>,
     pub counted_cash_minor: Option<i64>,
     pub variance_minor: Option<i64>,
     pub variance_reason: Option<String>,
     pub variance_note: Option<String>,
     pub approved_by: Option<Uuid>,
-    pub approved_at: Option<DateTimeUtc>,
+    pub approved_at: Option<Timestamp>,
     pub status: String,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

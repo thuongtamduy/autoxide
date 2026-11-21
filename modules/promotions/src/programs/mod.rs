@@ -14,6 +14,7 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -110,7 +111,7 @@ pub(crate) struct PromotionFilter {
     pub org_id: Option<Uuid>,
     pub q: Option<String>,
     /// Chỉ chương trình có thời gian chạy giao với [từ, tới) (lịch), trừ bản nháp và đã huỷ.
-    pub window: Option<(chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>)>,
+    pub window: Option<(Timestamp, Timestamp)>,
 }
 
 pub(crate) fn not_found(id: Uuid) -> Error {

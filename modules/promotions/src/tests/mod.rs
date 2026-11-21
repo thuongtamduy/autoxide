@@ -9,6 +9,8 @@ mod programs;
 mod redemption;
 mod vouchers;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -22,7 +24,6 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, root_of};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{DateTime, Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -50,7 +51,7 @@ pub(crate) fn money(minor: i64) -> Money {
 /// (sản phẩm, nút sở hữu, danh mục) của biến thể giả.
 pub(crate) type FakeVariant = (Uuid, OrgId, Vec<Uuid>);
 /// Lịch sử giá: (từ lúc, giá).
-pub(crate) type PriceHistory = Vec<(DateTime<Utc>, Money)>;
+pub(crate) type PriceHistory = Vec<(Timestamp, Money)>;
 
 /// `dyn Catalog` giả: biến thể và lịch sử giá đặt sẵn.
 #[derive(Default)]
@@ -82,10 +83,10 @@ impl FakeCatalog {
     pub(crate) fn add(&self, org: OrgId, price: i64, categories: &[Uuid]) -> Uuid {
         let variant = Uuid::now_v7();
         self.variants.lock().unwrap().insert(variant, (Uuid::now_v7(), org, categories.to_vec()));
-        self.prices
-            .lock()
-            .unwrap()
-            .insert(variant, vec![(Utc::now() - Duration::days(30), money(price))]);
+        self.prices.lock().unwrap().insert(
+            variant,
+            vec![(Timestamp::now() - SignedDuration::from_hours(24 * 30), money(price))],
+        );
         variant
     }
 
@@ -102,12 +103,12 @@ impl FakeCatalog {
             "track_inventory": true, "sale_mode": SaleMode::InStock, "preorder_available_on": null,
             "preorder_limit": null, "preorder_ends_at": null, "allow_backorder": false,
             "lot_tracked": false, "serial_tracked": false, "warranty_months": null,
-            "image_media_id": null, "updated_at": Utc::now(),
+            "image_media_id": null, "updated_at": Timestamp::now(),
         }))
         .ok()
     }
 
-    fn price(&self, id: Uuid, at: DateTime<Utc>, before: bool) -> Option<PriceSnapshot> {
+    fn price(&self, id: Uuid, at: Timestamp, before: bool) -> Option<PriceSnapshot> {
         let prices = self.prices.lock().unwrap();
         let (from, amount) = prices
             .get(&id)?
@@ -243,8 +244,8 @@ impl FakeLedger {
             scope: key.scope.clone(),
             channel: key.channel.clone(),
             state: if granted { "granted" } else { "withdrawn" }.to_owned(),
-            granted_at: Some(Utc::now()),
-            withdrawn_at: (!granted).then(Utc::now),
+            granted_at: Some(Timestamp::now()),
+            withdrawn_at: (!granted).then(Timestamp::now),
             subject_value: None,
         }
     }
@@ -318,9 +319,9 @@ impl Setup {
 
     /// Giỏ ở cửa hàng A với các dòng (biến thể, số lượng), giá lấy từ catalog giả.
     pub(crate) fn cart(&self, lines: &[(Uuid, i64)]) -> Cart {
-        let mut cart = Cart::new(self.tree.a, vnd(), Utc::now());
+        let mut cart = Cart::new(self.tree.a, vnd(), Timestamp::now());
         for (index, (variant, quantity)) in lines.iter().enumerate() {
-            let price = self.catalog.price(*variant, Utc::now(), false).unwrap().amount;
+            let price = self.catalog.price(*variant, Timestamp::now(), false).unwrap().amount;
             cart.lines.push(CartLine::new(format!("l{index}"), *variant, *quantity, price));
         }
         cart
@@ -397,8 +398,8 @@ pub(crate) fn body(org: OrgId, extra: Value) -> Value {
         "kind": "percent_off",
         "currency": "VND",
         "value_bp": 1000,
-        "starts_at": Utc::now() - Duration::hours(1),
-        "ends_at": Utc::now() + Duration::days(7),
+        "starts_at": Timestamp::now() - SignedDuration::from_hours(1),
+        "ends_at": Timestamp::now() + SignedDuration::from_hours(24 * 7),
         "locale": "vi",
         "title": "Giảm giá",
         "terms": "Áp dụng toàn cửa hàng",
@@ -473,7 +474,7 @@ pub(crate) async fn expire_now(setup: &Setup, order: Uuid) -> bool {
     crate::entity::redemption::Entity::update_many()
         .col_expr(
             crate::entity::redemption::Column::ExpiresAt,
-            Expr::value(Some(Utc::now() - Duration::seconds(1))),
+            Expr::value(Some(Timestamp::now() - SignedDuration::from_secs(1))),
         )
         .filter(crate::entity::redemption::Column::OrderId.eq(order))
         .filter(crate::entity::redemption::Column::Status.eq("held"))

@@ -20,7 +20,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::sync::{ChangesQuery, SyncChange, SyncLog, SyncResource};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder, Set,
     SqlErr,
@@ -203,7 +203,7 @@ impl NoteService {
         principal: &Principal,
         id: Uuid,
         changes: NoteChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Note, Error> {
         let actor = Actor::from(principal);
         let title = check(changes.title.as_deref(), changes.body.as_deref())?;
@@ -460,8 +460,8 @@ fn snapshot(note: &Note) -> Value {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt
 /// trước để hai database trả về cùng một giá trị.
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Bộ đếm thật cho job đối soát: số ghi chú của khách.

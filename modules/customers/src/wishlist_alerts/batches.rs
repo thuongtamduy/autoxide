@@ -3,13 +3,14 @@
 //! đồng ý, còn hàng / còn giảm đủ, còn bán. Transaction ngắn đánh dấu "đã báo" có điều kiện (worker
 //! khác đã báo thì bỏ dòng đó), rồi sau commit mới gọi `Notifier` với `dedupe_key` theo lô.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, root_of};
 use autoxide_notifications::api::{Notification, Recipient};
-use chrono::{DateTime, Duration, Timelike, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
@@ -42,15 +43,15 @@ fn minutes(raw: &str) -> Option<i64> {
 
 /// `at` có nằm trong khung `{"from": "07:00", "to": "22:00"}` (giờ địa phương lệch `offset` phút)
 /// không. Khung hỏng thì coi như không mở.
-fn inside(window: &Value, offset: i64, at: DateTime<Utc>) -> bool {
+fn inside(window: &Value, offset: i64, at: Timestamp) -> bool {
     let (Some(from), Some(to)) = (
         window.get("from").and_then(Value::as_str).and_then(minutes),
         window.get("to").and_then(Value::as_str).and_then(minutes),
     ) else {
         return false;
     };
-    let local = at + Duration::minutes(offset);
-    let now_minutes = i64::from(local.hour()) * 60 + i64::from(local.minute());
+    let local = at + SignedDuration::from_mins(offset);
+    let now_minutes = local.as_unix_seconds().rem_euclid(86_400) / 60;
     if from <= to {
         (from..to).contains(&now_minutes)
     } else {
@@ -61,7 +62,7 @@ fn inside(window: &Value, offset: i64, at: DateTime<Utc>) -> bool {
 /// Khung giờ gửi được lúc `at` theo thân quy tắc `notifications.send_windows`: phải nằm trong MỌI
 /// khung của các kênh có khung (kênh `null` không giới hạn); không kênh nào có khung → 07:00–22:00.
 /// Trả (trong khung không, độ lệch giờ phút).
-pub(crate) fn window_open(body: Option<&Value>, at: DateTime<Utc>) -> (bool, i64) {
+pub(crate) fn window_open(body: Option<&Value>, at: Timestamp) -> (bool, i64) {
     let offset = body
         .and_then(|body| body.get("utc_offset_minutes"))
         .and_then(Value::as_i64)
@@ -124,7 +125,7 @@ impl CustomersService {
             .into_tuple()
             .all(tenant.database().read())
             .await?;
-        let day = (at + Duration::minutes(offset)).date_naive().to_string();
+        let day = (at + SignedDuration::from_mins(offset)).date_utc().to_string();
         for profile in profiles {
             if self.alert_profile(tenant, profile, &day, at).await? {
                 sent += 1;
@@ -158,7 +159,7 @@ impl CustomersService {
         tenant: &TenantContext,
         profile: Uuid,
         day: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<bool, Error> {
         let read = tenant.database().read();
         let Some(setting) =
@@ -196,7 +197,7 @@ impl CustomersService {
         // Transaction ngắn: đánh dấu "đã báo" có điều kiện, đặt mốc mới, xoá hàng đợi, ghi lô.
         let transaction = tenant.database().begin_write().await?;
         let mut lines = Vec::new();
-        let cutoff = at - Duration::days(COOLDOWN_DAYS);
+        let cutoff = at - SignedDuration::from_hours(24 * COOLDOWN_DAYS);
         for item in &items {
             let (column, price_drop) = if item.queue.kind == PRICE_DROP {
                 (wishlist_item::Column::PriceDropAlertedAt, true)

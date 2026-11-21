@@ -13,7 +13,6 @@ autoxide-kernel.workspace = true
 autoxide-ledger.workspace = true
 autoxide-tax.workspace = true
 axum.workspace = true
-chrono.workspace = true
 bytes.workspace = true
 futures-util.workspace = true
 krilla.workspace = true

@@ -25,13 +25,13 @@
 //!   request) không thêm truy vấn. Đặt / bỏ trên máy chủ này xoá cache ngay; máy chủ khác thấy
 //!   trong TTL.
 
+use crate::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 use std::time::{Duration, Instant};
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
@@ -463,6 +463,7 @@ pub(crate) async fn copy_plain(
 
 mod entity {
     //! Bảng `kernel_tenant_settings`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -477,7 +478,7 @@ mod entity {
         pub value: String,
         pub secret: bool,
         pub updated_by: Option<Uuid>,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -511,11 +512,11 @@ pub(crate) struct SettingState {
     is_set: bool,
     /// The value, for settings that are not secret and are set.
     value: Option<String>,
-    updated_at: Option<DateTime<Utc>>,
+    updated_at: Option<Timestamp>,
     /// For a setting of a partner connection: the last time the connection was used (or tested
     /// with `POST /api/v1/kernel/settings/{name}/test`).
     #[serde(skip_serializing_if = "Option::is_none")]
-    last_used_at: Option<DateTime<Utc>>,
+    last_used_at: Option<Timestamp>,
     /// For a setting of a partner connection: why its last use failed; omitted when it worked.
     #[serde(skip_serializing_if = "Option::is_none")]
     last_error: Option<String>,
@@ -665,7 +666,7 @@ impl SettingsService {
         } else {
             value.to_owned()
         };
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let row = entity::ActiveModel {
             tenant_id: Set(tenant.id().as_uuid()),
             name: Set(name.to_owned()),

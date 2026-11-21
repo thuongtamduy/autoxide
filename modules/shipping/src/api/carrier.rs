@@ -1,13 +1,13 @@
 //! Hãng vận chuyển: bộ nối là module riêng (`shipping-<hãng>`) cài [`ShippingCarrier`] và đăng ký
 //! vào [`CarrierRegistry`]. Mở ra ngoài qua `autoxide_shipping::api::…` (`pub use` ở `api.rs`).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::Money;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -316,7 +316,7 @@ pub struct CarrierUpdate {
     /// Nguyên văn trạng thái của hãng.
     pub carrier_status: String,
     /// Đã đổi sang UTC (hãng Việt Nam hay gửi giờ địa phương không kèm múi giờ).
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     /// Hãng báo đã thu (chỉ để đối chiếu; số tiền COD thật lấy từ yêu cầu giao).
     pub cod_collected: Option<Money>,
     pub fee: Option<Money>,
@@ -328,7 +328,7 @@ impl CarrierUpdate {
         event_id: impl Into<String>,
         tracking_number: impl Into<String>,
         status: ShipmentStatus,
-        occurred_at: DateTime<Utc>,
+        occurred_at: Timestamp,
     ) -> Self {
         CarrierUpdate {
             event_id: event_id.into(),
@@ -369,16 +369,16 @@ impl CarrierUpdate {
 pub struct CodStatement {
     /// Mã bảng kê của hãng (chống nhập trùng).
     pub reference: String,
-    pub period_from: NaiveDate,
-    pub period_to: NaiveDate,
+    pub period_from: Date,
+    pub period_to: Date,
     pub lines: Vec<CodStatementLine>,
 }
 
 impl CodStatement {
     pub fn new(
         reference: impl Into<String>,
-        period_from: NaiveDate,
-        period_to: NaiveDate,
+        period_from: Date,
+        period_to: Date,
         lines: Vec<CodStatementLine>,
     ) -> Self {
         CodStatement { reference: reference.into(), period_from, period_to, lines }
@@ -461,8 +461,8 @@ pub trait ShippingCarrier: Send + Sync {
     async fn cod_statement(
         &self,
         _account: &CarrierAccount,
-        _from: NaiveDate,
-        _to: NaiveDate,
+        _from: Date,
+        _to: Date,
     ) -> Result<Option<CodStatement>, Error> {
         Ok(None)
     }

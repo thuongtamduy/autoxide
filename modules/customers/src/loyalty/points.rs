@@ -10,7 +10,7 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::rows::{self, Bounds};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde_json::json;
@@ -489,7 +489,7 @@ impl CustomersService {
     pub(crate) async fn expire_lots(
         &self,
         tenant: &TenantContext,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<u64, Error> {
         let due: Vec<Uuid> = points_lot::Entity::find()
             .filter(points_lot::Column::ExpiresAt.lte(at))

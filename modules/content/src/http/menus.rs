@@ -1,5 +1,6 @@
 //! Endpoint quản lý menu: `/menus`. Đọc cần `content.read`; `PUT` cần `content.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -26,8 +26,8 @@ pub(crate) struct MenuResponse {
     key: String,
     locale: String,
     items: Vec<MenuItemResponse>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 /// A menu item: points to an entry, a term or an address.
@@ -119,7 +119,7 @@ pub(crate) struct MenuSummary {
     id: Uuid,
     key: String,
     locale: String,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 /// List menus.

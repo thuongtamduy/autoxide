@@ -2,9 +2,10 @@
 //! liệu nền thì không báo.
 
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
-use chrono::{DateTime, Duration, Utc};
-use chrono_tz::Tz;
+use jiff::SignedDuration;
+use jiff::tz::TimeZone;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::{Value, json};
 
@@ -14,15 +15,15 @@ use crate::entity::metric_hour;
 use crate::service::rules::{Rule, parse_json};
 
 /// 2026-11-16 là thứ Hai; kiểm lúc 08:00 giờ Việt Nam (01:00 UTC) cho ngày Chủ nhật 15/11.
-fn slot() -> DateTime<Utc> {
-    DateTime::parse_from_rfc3339("2026-11-16T01:00:00Z").unwrap().to_utc()
+fn slot() -> Timestamp {
+    Timestamp::parse_rfc3339("2026-11-16T01:00:00Z").unwrap()
 }
 
 /// Doanh thu `value` vào giữa ngày địa phương `days_before` ngày trước ngày được kiểm (15/11).
 async fn revenue(tenant: &TenantContext, days_before: i64, value: i64) {
     // 12:00 giờ Việt Nam = 05:00 UTC.
-    let hour = DateTime::parse_from_rfc3339("2026-11-15T05:00:00Z").unwrap().to_utc()
-        - Duration::days(days_before);
+    let hour = Timestamp::parse_rfc3339("2026-11-15T05:00:00Z").unwrap()
+        - SignedDuration::from_hours(24 * days_before);
     metric_hour::ActiveModel {
         tenant_id: Set(tenant.id().as_uuid()),
         source: Set("fact:shop.revenue".to_owned()),
@@ -59,10 +60,10 @@ fn metric_of(rule: &Rule) -> MetricTrigger {
 }
 
 async fn check(harness: &Harness, rule: &Rule) {
-    let zone: Tz = rule.timezone.parse().unwrap();
+    let zone: TimeZone = autoxide_kernel::time::zone(&rule.timezone).unwrap();
     harness
         .service
-        .check_metric(&harness.tenant, rule, &metric_of(rule), slot(), zone)
+        .check_metric(&harness.tenant, rule, &metric_of(rule), slot(), &zone)
         .await
         .unwrap();
 }
@@ -182,9 +183,9 @@ async fn so_lieu_tom_tat_doc_bang_quyen_nguoi_chay() {
         check(&harness, &rule).await;
         assert!(harness.runs(rule.id).await.is_empty());
         harness.shop.counters.pending.store(12, std::sync::atomic::Ordering::SeqCst);
-        let zone: Tz = rule.timezone.parse().unwrap();
-        let next_day = slot() + Duration::days(1);
-        harness.service.check_metric(&harness.tenant, &rule, &metric_of(&rule), next_day, zone).await.unwrap();
+        let zone: TimeZone = autoxide_kernel::time::zone(&rule.timezone).unwrap();
+        let next_day = slot() + SignedDuration::from_hours(24);
+        harness.service.check_metric(&harness.tenant, &rule, &metric_of(&rule), next_day, &zone).await.unwrap();
         let runs = harness.runs(rule.id).await;
         assert_eq!(runs.len(), 1);
         assert_eq!(parse_json(&runs[0].context)["event"]["value"], json!(12));

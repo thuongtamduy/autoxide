@@ -2,6 +2,8 @@
 //! thiết bị, lịch làm việc lặp theo thứ (giờ địa phương của nút) và ngoại lệ (nghỉ, ca thêm, UTC).
 //! Cần `bookings.services.manage` ở nút của bản ghi.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashSet};
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +12,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
     QueryOrder, Set,
@@ -159,8 +160,8 @@ pub(crate) struct WeeklyInput {
 pub(crate) struct NewException {
     pub resource_id: Uuid,
     pub kind: String,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub reason: String,
 }
 
@@ -911,7 +912,7 @@ impl BookingsService {
         }
         if input.ends_at <= input.starts_at {
             problems.push(FieldError::new("ends_at", "range", "must be after `starts_at`"));
-        } else if input.ends_at - input.starts_at > chrono::Duration::days(366) {
+        } else if input.ends_at - input.starts_at > SignedDuration::from_hours(24 * 366) {
             problems.push(FieldError::new(
                 "ends_at",
                 "range",
@@ -1007,8 +1008,8 @@ impl BookingsService {
         tenant: &TenantContext,
         principal: &Principal,
         resource_id: Uuid,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Vec<exception::Model>, Error> {
         self.get_resource(tenant, principal, resource_id).await?;
         Self::exception_rows(tenant.database().read(), tenant, &[resource_id], from, to).await
@@ -1018,8 +1019,8 @@ impl BookingsService {
         connection: &C,
         tenant: &TenantContext,
         resources: &[Uuid],
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Vec<exception::Model>, Error> {
         Ok(exception::Entity::find()
             .filter(exception::Column::ResourceId.is_in(resources.iter().copied()))

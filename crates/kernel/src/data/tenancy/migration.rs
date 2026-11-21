@@ -430,7 +430,7 @@ async fn count<C: ConnectionTrait>(
     sql: &str,
     values: Vec<sea_orm::Value>,
 ) -> Result<i64, DbErr> {
-    let statement = Statement::from_sql_and_values(backend, sql, values);
+    let statement = crate::database::statement(backend, sql, values);
     let row = connection.query_one_raw(statement).await?;
     row.ok_or_else(|| custom("COUNT returned no row".to_owned()))?.try_get_by_index::<i64>(0)
 }
@@ -778,7 +778,7 @@ async fn rebuild<C: ConnectionTrait>(
                 Vec::new(),
             ),
         };
-        connection.execute_raw(Statement::from_sql_and_values(backend, sql, values)).await?;
+        connection.execute_raw(crate::database::statement(backend, sql, values)).await?;
         let before = count(
             connection,
             backend,

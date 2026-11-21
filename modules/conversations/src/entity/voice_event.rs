@@ -1,5 +1,6 @@
 //! Bảng `conversations_voice_events`: webhook của nhà cung cấp thoại, nguyên văn đã kiểm chữ ký.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     pub notification: String,
     pub body: String,
     pub status: String,
-    pub received_at: DateTimeUtc,
+    pub received_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

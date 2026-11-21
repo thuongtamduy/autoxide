@@ -1,7 +1,6 @@
 //! Hình dạng JSON trả ra. Nhân viên thấy bản nháp AI và số tin người mua chưa được đọc; người mua thấy
 //! số tin của cửa hàng mình chưa đọc.
-
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -36,10 +35,10 @@ pub(crate) struct ThreadResponse {
     /// AI draft for an agent to edit and send (staff only); never sent by itself.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub draft_reply: Option<String>,
-    pub last_message_at: DateTime<Utc>,
-    pub closed_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub last_message_at: Timestamp,
+    pub closed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ThreadResponse {
@@ -88,7 +87,7 @@ pub(crate) struct MessageResponse {
     pub auto_reply: bool,
     /// The author recalled the message.
     pub recalled: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<Message> for MessageResponse {
@@ -117,7 +116,7 @@ pub(crate) struct ReadResponse {
     pub user_id: Uuid,
     /// The last message this person has read.
     pub last_read_message_id: Uuid,
-    pub read_at: DateTime<Utc>,
+    pub read_at: Timestamp,
 }
 
 impl From<read::Model> for ReadResponse {
@@ -160,8 +159,8 @@ pub(crate) struct ReportResponse {
     pub reason: String,
     /// `open` or `resolved`.
     pub status: String,
-    pub resolved_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub resolved_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl From<crate::abuse::Report> for ReportResponse {

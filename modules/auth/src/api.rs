@@ -11,7 +11,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 /// Một tài khoản người dùng. Không bao giờ mang mật khẩu hay hash của nó.
@@ -23,11 +23,11 @@ pub struct User {
     /// Tên hiển thị.
     pub name: String,
     /// Lúc tài khoản bị khoá; `None` là đang hoạt động.
-    pub disabled_at: Option<DateTime<Utc>>,
+    pub disabled_at: Option<Timestamp>,
     /// Lúc chủ tài khoản xác nhận `email` là của mình (qua mail); `None`: chưa xác minh.
-    pub email_verified_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub email_verified_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// Nhân sự (có role) hay người mua của khách (không permission nào) — bước 34, D-309.
     pub realm: autoxide_kernel::access::Realm,
     /// Ngôn ngữ ưa thích (`en`, `vi`) cho mail, thông báo gửi chậm; `None`: theo request (D-308).
@@ -119,11 +119,11 @@ impl NewInvitation {
 pub struct InvitationSummary {
     pub id: Uuid,
     pub email: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl InvitationSummary {
-    pub fn new(id: Uuid, email: impl Into<String>, expires_at: DateTime<Utc>) -> Self {
+    pub fn new(id: Uuid, email: impl Into<String>, expires_at: Timestamp) -> Self {
         InvitationSummary { id, email: email.into(), expires_at }
     }
 }
@@ -166,7 +166,7 @@ pub trait AccountRecovery: Send + Sync {
 pub struct PhoneCodeSent {
     /// ID của mã; người dùng gửi lại cùng mã họ nhận được.
     pub id: Uuid,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Gửi và kiểm mã một lần qua SMS cho đăng nhập bằng số điện thoại (bước 47,

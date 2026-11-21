@@ -1,5 +1,6 @@
 //! Tool MCP của `invoices`: cùng service, cùng permission với REST.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -251,9 +252,9 @@ pub(crate) struct ExportInput {
     /// `csv` or `xlsx`.
     format: String,
     /// First day, `YYYY-MM-DD`.
-    from: chrono::NaiveDate,
+    from: Date,
     /// Last day, `YYYY-MM-DD`.
-    to: chrono::NaiveDate,
+    to: Date,
 }
 
 /// Which export.

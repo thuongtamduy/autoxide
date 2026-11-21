@@ -1,5 +1,6 @@
 //! Đặt, gỡ, đọc rào quyền; áp rào lúc dựng `Principal`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
@@ -9,7 +10,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler, Outbox, Subscription};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenancyMode, TenantContext, TenantId};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde_json::json;
@@ -29,7 +29,7 @@ pub(crate) struct GuardrailView {
     pub set_by_tenant_id: Uuid,
     pub max_permissions: Vec<String>,
     pub updated_by: Uuid,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<entity::Model> for GuardrailView {
@@ -144,7 +144,7 @@ impl GuardrailService {
                 set_by_tenant_id: Set(rail.set_by_tenant_id),
                 max_permissions: Set(rail.max_permissions),
                 updated_by: Set(rail.updated_by),
-                updated_at: Set(Utc::now().trunc_subsecs(6)),
+                updated_at: Set(Timestamp::now()),
             };
             entity::Entity::insert(copy)
                 .on_conflict(
@@ -211,7 +211,7 @@ impl GuardrailService {
         }
         let permissions: BTreeSet<String> = permissions.into_iter().collect();
         let stored = permissions.iter().cloned().collect::<Vec<_>>().join(" ");
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let set_by = caller.tenant_id().as_uuid();
         let row = entity::ActiveModel {
             id: Set(Uuid::now_v7()),

@@ -3,6 +3,7 @@
 //! `plans`) — từ handler event và job, không bao giờ trong transaction ghi. Không có `notifications`
 //! thì không gửi gì (mail nhắc thanh toán vẫn đi như cũ).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantId;
 use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Notifier, Recipient,
 };
-use chrono::{DateTime, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -98,7 +98,7 @@ impl EventHandler for StatusNotices {
 impl PlansService {
     /// Báo quản trị viên của khách đã dùng từ 80% một hạn mức — mỗi khách tối đa một lần mỗi tháng.
     /// Chạy sau lượt đối soát hằng ngày; lỗi của một khách chỉ ghi log.
-    pub(crate) async fn notify_near_limit(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn notify_near_limit(&self, at: Timestamp) -> Result<usize, Error> {
         let Some(notifier) = &self.notifier else {
             return Ok(0);
         };

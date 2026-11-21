@@ -1,5 +1,6 @@
 //! Bảng `newsletter_lists`: danh sách bản tin.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -25,8 +26,8 @@ pub struct Model {
     /// Chỉ bài mới bằng ngôn ngữ này (`en`/`vi`); `None`: mọi ngôn ngữ.
     pub new_post_locale: Option<String>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

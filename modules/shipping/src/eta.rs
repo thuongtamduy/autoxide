@@ -4,8 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Datelike, Days, NaiveDate, NaiveTime, TimeZone, Timelike, Utc};
-use chrono_tz::Tz;
+use autoxide_kernel::time::{self, Date, Timestamp};
+use jiff::SignedDuration;
+use jiff::tz::TimeZone;
 
 use crate::api::Eta;
 
@@ -25,30 +26,30 @@ pub(crate) enum DayRule {
 /// Lịch đã nạp.
 #[derive(Debug, Clone)]
 pub(crate) struct Calendar {
-    pub time_zone: Tz,
+    pub time_zone: TimeZone,
     pub working_weekdays: i32,
-    pub days: BTreeMap<NaiveDate, DayRule>,
+    pub days: BTreeMap<Date, DayRule>,
 }
 
 impl Calendar {
     /// Lịch mặc định khi phương thức không gắn lịch: thứ Hai – thứ Bảy, giờ Việt Nam.
     pub(crate) fn standard() -> Self {
         Calendar {
-            time_zone: chrono_tz::Asia::Ho_Chi_Minh,
+            time_zone: time::zone(DEFAULT_TIME_ZONE).unwrap_or(TimeZone::UTC),
             working_weekdays: 0b011_1111,
             days: BTreeMap::new(),
         }
     }
 
-    fn works(&self, day: NaiveDate) -> bool {
+    fn works(&self, day: Date) -> bool {
         match self.days.get(&day) {
             Some(DayRule::Closed) => false,
             Some(DayRule::Special(_)) => true,
-            None => self.working_weekdays & (1 << day.weekday().num_days_from_monday()) != 0,
+            None => self.working_weekdays & (1 << day.weekday().to_monday_zero_offset()) != 0,
         }
     }
 
-    fn cutoff(&self, day: NaiveDate, method: Option<i32>) -> Option<i32> {
+    fn cutoff(&self, day: Date, method: Option<i32>) -> Option<i32> {
         match self.days.get(&day) {
             Some(DayRule::Special(cutoff)) => cutoff.or(method),
             _ => method,
@@ -56,24 +57,24 @@ impl Calendar {
     }
 
     /// Ngày làm việc đầu tiên từ `day` (gồm `day`), tối đa một năm.
-    fn next_working(&self, day: NaiveDate) -> NaiveDate {
+    fn next_working(&self, day: Date) -> Date {
         let mut current = day;
         for _ in 0..366 {
             if self.works(current) {
                 return current;
             }
-            current = current.checked_add_days(Days::new(1)).unwrap_or(current);
+            current = current.succ().unwrap_or(current);
         }
         day
     }
 
     /// Cộng `count` ngày làm việc sau `day`.
-    fn add_working(&self, day: NaiveDate, count: u16) -> NaiveDate {
+    fn add_working(&self, day: Date, count: u16) -> Date {
         let mut current = day;
         let mut left = count;
         let mut guard = 0;
         while left > 0 && guard < 800 {
-            current = current.checked_add_days(Days::new(1)).unwrap_or(current);
+            current = current.succ().unwrap_or(current);
             if self.works(current) {
                 left -= 1;
             }
@@ -83,15 +84,16 @@ impl Calendar {
     }
 
     /// Lúc `minute` phút của ngày `day` theo múi giờ lịch, ra UTC.
-    fn at(&self, day: NaiveDate, minute: i32) -> Option<DateTime<Utc>> {
-        let time = NaiveTime::from_num_seconds_from_midnight_opt(
-            u32::try_from(minute.clamp(0, 1439) * 60).ok()?,
+    fn at(&self, day: Date, minute: i32) -> Option<Timestamp> {
+        let minute = minute.clamp(0, 1439);
+        let clock = jiff::civil::Time::new(
+            i8::try_from(minute / 60).ok()?,
+            i8::try_from(minute % 60).ok()?,
             0,
-        )?;
-        self.time_zone
-            .from_local_datetime(&day.and_time(time))
-            .earliest()
-            .map(|local| local.with_timezone(&Utc))
+            0,
+        )
+        .ok()?;
+        time::from_local(&self.time_zone, day.to_jiff().to_datetime(clock))
     }
 }
 
@@ -99,7 +101,7 @@ impl Calendar {
 /// giao sau `days = (ít nhất, nhiều nhất)` ngày làm việc (`same_day`: 0 ngày).
 pub(crate) fn estimate(
     calendar: &Calendar,
-    at: DateTime<Utc>,
+    at: Timestamp,
     cutoff_minute: Option<i32>,
     same_day: bool,
     days: Option<(u16, u16)>,
@@ -110,22 +112,19 @@ pub(crate) fn estimate(
         (false, Some(days)) => days,
         (false, None) => return None,
     };
-    let local = at.with_timezone(&calendar.time_zone);
-    let today = local.date_naive();
-    let minute = i32::try_from(local.hour() * 60 + local.minute()).unwrap_or(0);
+    let local = at.in_zone(&calendar.time_zone);
+    let today = Date::from(local.date());
+    let minute = i32::from(local.hour()) * 60 + i32::from(local.minute());
     let cutoff = calendar.cutoff(today, cutoff_minute);
     let in_time = calendar.works(today) && cutoff.is_none_or(|limit| minute < limit);
-    let dispatch = if in_time {
-        today
-    } else {
-        calendar.next_working(today.checked_add_days(Days::new(1)).unwrap_or(today))
-    };
+    let dispatch =
+        if in_time { today } else { calendar.next_working(today.succ().unwrap_or(today)) };
     let order_by = if in_time { cutoff.and_then(|limit| calendar.at(today, limit)) } else { None };
     Some(Eta::new(
         calendar.add_working(dispatch, min),
         calendar.add_working(dispatch, max),
         order_by,
-        calendar.time_zone.name(),
+        calendar.time_zone.iana_name().unwrap_or("UTC"),
     ))
 }
 
@@ -147,7 +146,7 @@ impl Hours {
         let mut days: BTreeMap<u8, (i32, i32)> = BTreeMap::new();
         for range in ranges {
             let minutes =
-                |time: NaiveTime| i32::try_from(time.num_seconds_from_midnight() / 60).unwrap_or(0);
+                |time: jiff::civil::Time| i32::from(time.hour()) * 60 + i32::from(time.minute());
             let (opens, closes) = (minutes(range.opens), minutes(range.closes));
             let entry = days.entry(range.day).or_insert((opens, closes));
             entry.0 = entry.0.min(opens);
@@ -156,11 +155,11 @@ impl Hours {
         Hours(Some(days))
     }
 
-    fn window(&self, calendar: &Calendar, day: NaiveDate) -> Option<(i32, i32)> {
+    fn window(&self, calendar: &Calendar, day: Date) -> Option<(i32, i32)> {
         if !calendar.works(day) {
             return None;
         }
-        let weekday = u8::try_from(day.weekday().number_from_monday()).unwrap_or(1);
+        let weekday = day.weekday().to_monday_one_offset().unsigned_abs();
         match &self.0 {
             None => Some((DEFAULT_OPENS, DEFAULT_CLOSES)),
             Some(days) => days.get(&weekday).copied(),
@@ -173,13 +172,13 @@ impl Hours {
 pub(crate) fn ready_at(
     calendar: &Calendar,
     hours: &Hours,
-    at: DateTime<Utc>,
+    at: Timestamp,
     prep_hours: i32,
-) -> DateTime<Utc> {
-    let ready = at + chrono::Duration::hours(i64::from(prep_hours.max(0)));
-    let local = ready.with_timezone(&calendar.time_zone);
-    let mut day = local.date_naive();
-    let minute = i32::try_from(local.hour() * 60 + local.minute()).unwrap_or(0);
+) -> Timestamp {
+    let ready = at + SignedDuration::from_hours(i64::from(prep_hours.max(0)));
+    let local = ready.in_zone(&calendar.time_zone);
+    let mut day = Date::from(local.date());
+    let minute = i32::from(local.hour()) * 60 + i32::from(local.minute());
     if let Some((opens, closes)) = hours.window(calendar, day) {
         if minute >= opens && minute < closes {
             return ready;
@@ -189,7 +188,7 @@ pub(crate) fn ready_at(
         }
     }
     for _ in 0..60 {
-        day = day.checked_add_days(Days::new(1)).unwrap_or(day);
+        day = day.succ().unwrap_or(day);
         if let Some((opens, _)) = hours.window(calendar, day) {
             return calendar.at(day, opens).unwrap_or(ready);
         }
@@ -199,19 +198,17 @@ pub(crate) fn ready_at(
 
 #[cfg(test)]
 mod tests {
-    use chrono::TimeZone;
 
     use super::*;
 
-    fn vn(day: u32, hour: u32, minute: u32) -> DateTime<Utc> {
-        chrono_tz::Asia::Ho_Chi_Minh
-            .with_ymd_and_hms(2026, 11, day, hour, minute, 0)
+    fn vn(day: i8, hour: i8, minute: i8) -> Timestamp {
+        let vietnam = time::zone("Asia/Ho_Chi_Minh").unwrap();
+        time::from_local(&vietnam, jiff::civil::datetime(2026, 11, day, hour, minute, 0, 0))
             .unwrap()
-            .with_timezone(&Utc)
     }
 
-    fn date(day: u32) -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 11, day).unwrap()
+    fn date(day: i8) -> Date {
+        Date::new(2026, 11, day).unwrap()
     }
 
     #[test]

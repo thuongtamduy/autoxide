@@ -1,6 +1,8 @@
 //! Giữ chỗ: không bán quá tồn khi nhiều request cùng lúc, xác nhận / trả / xuất / hết hạn, chọn
 //! kho, combo, bán khi hết hàng, nhập lại hàng trả về.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_catalog::api::SaleMode;
@@ -9,7 +11,6 @@ use autoxide_kernel::reference::Submitted;
 use autoxide_kernel::tenancy::OrgId;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use futures_util::future::join_all;
 use sea_orm::{ConnectionTrait, Statement};
 use serde::{Deserialize, Serialize};
@@ -32,7 +33,7 @@ fn request(org: OrgId, lines: &[(&str, Uuid, i64)]) -> ReserveRequest {
     ReserveRequest::new(
         Uuid::now_v7(),
         org,
-        Utc::now() + Duration::minutes(30),
+        Timestamp::now() + SignedDuration::from_mins(30),
         lines
             .iter()
             .map(|(key, variant, quantity)| ReserveLine::new(*key, *variant, *quantity))
@@ -164,7 +165,7 @@ async fn expire_now(app: &TestApp) {
 async fn age_holds(app: &TestApp) {
     let write = app.database().write();
     let backend = write.get_database_backend();
-    let past = (Utc::now() - Duration::minutes(1)).to_rfc3339();
+    let past = (Timestamp::now() - SignedDuration::from_mins(1)).to_rfc3339();
     let sql = match backend {
         sea_orm::DatabaseBackend::Postgres => {
             format!(
@@ -433,7 +434,7 @@ async fn khong_nguon_thi_loi_va_han_giu_qua_dai() {
             api.reserve(&tenant, &request(shop.tree.chain, &[("1", item, 1)])).await.unwrap_err();
         assert_eq!(error.code(), "inventory.no_source");
         let mut long = request(shop.tree.a, &[("1", item, 1)]);
-        long.expires_at = Utc::now() + Duration::hours(100);
+        long.expires_at = Timestamp::now() + SignedDuration::from_hours(100);
         let error = api.reserve(&tenant, &long).await.unwrap_err();
         assert_eq!(error.code(), "inventory.hold_too_long");
     })

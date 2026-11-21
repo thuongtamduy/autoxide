@@ -1,6 +1,7 @@
 //! Khách: `/me/bookings` (khách có tài khoản xem lịch của mình), tệp lịch `.ics`, và đường của khách
 //! vãng lai — xin mã một lần, huỷ lịch bằng mã (đặt lịch bằng mã ở `POST /public/bookings`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use sea_orm::EntityTrait;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -63,7 +63,7 @@ pub(crate) struct BookingCodeSent {
     /// Send it back with the code.
     challenge_id: Uuid,
     /// The code works until this moment, once.
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 /// A guest cancels a booking.
@@ -84,7 +84,7 @@ fn calendar(row: &Booking, title: &str) -> String {
             .replace(',', "\\,")
             .replace(['\r', '\n'], " ")
     };
-    let stamp = |at: DateTime<Utc>| at.format("%Y%m%dT%H%M%SZ").to_string();
+    let stamp = |at: Timestamp| at.format("%Y%m%dT%H%M%SZ").to_string();
     let status = match row.status.as_str() {
         "cancelled" | "expired" => "CANCELLED",
         "held" | "pending" => "TENTATIVE",
@@ -272,10 +272,11 @@ async fn guest_cancel(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     #[test]
     fn tep_lich_dung_chuan_va_thoat_ky_tu() {
-        let at = DateTime::parse_from_rfc3339("2026-11-23T02:00:00Z").unwrap().to_utc();
+        let at = Timestamp::parse_rfc3339("2026-11-23T02:00:00Z").unwrap();
         let row = Booking {
             id: Uuid::nil(),
             tenant_id: Uuid::nil(),
@@ -285,7 +286,7 @@ mod tests {
             session_id: None,
             seats: 1,
             starts_at: at,
-            ends_at: at + chrono::Duration::hours(1),
+            ends_at: at + SignedDuration::from_hours(1),
             status: "confirmed".to_owned(),
             customer_user_id: None,
             customer_name: "A".to_owned(),

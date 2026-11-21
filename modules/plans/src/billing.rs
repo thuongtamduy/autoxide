@@ -12,6 +12,7 @@
 //! Giá của gói là số khách trả (đã gồm thuế). `plans` không tự đánh số, không tự tính thuế, không tự
 //! ghi sổ.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_invoices::api::{Buyer, NewDocument, NewDocumentLine};
@@ -23,7 +24,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{TenantContext, TenantId, root_of};
 use autoxide_ledger::api::NewPayment;
-use chrono::{DateTime, Utc};
 use sea_orm::{ActiveModelTrait, ActiveValue::Set, ConnectionTrait, EntityTrait};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -57,7 +57,7 @@ pub(crate) struct PayResponse {
     pub checkout_url: Option<String>,
     /// QR payload, when the partner gives one.
     pub qr_payload: Option<String>,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 pub(crate) fn billing_profile_required() -> Error {

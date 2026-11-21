@@ -5,7 +5,7 @@
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::search;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, Site, TenantContext};
-use chrono::Utc;
+use autoxide_kernel::time::{Date, Timestamp};
 use sea_orm::sea_query::{IntoCondition, Query};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter};
 
@@ -76,7 +76,7 @@ impl CatalogService {
                         }
                         _ => None,
                     },
-                    "date" => chrono::NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+                    "date" => Date::parse_from_str(raw, "%Y-%m-%d")
                         .ok()
                         .map(|date| product_attribute::Column::ValueDate.eq(date).into_condition()),
                     _ => options.iter().find(|option| option.code == raw).map(|option| {
@@ -208,7 +208,7 @@ impl CatalogService {
             condition = condition.add(storefront_entry::Column::SalePriceMinor.is_not_null()).add(
                 Condition::any()
                     .add(storefront_entry::Column::SaleEndsAt.is_null())
-                    .add(storefront_entry::Column::SaleEndsAt.gt(Utc::now())),
+                    .add(storefront_entry::Column::SaleEndsAt.gt(Timestamp::now())),
             );
         }
         if let Some(seller) = filter.seller.filter(|_| !skip.seller) {

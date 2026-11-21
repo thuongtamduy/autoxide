@@ -14,6 +14,7 @@ use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{
     OrgId, RelocationInput, RelocationKind, TenantContext, TenantId, TenantRelocations,
 };
+use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_ledger::api::{AccountKey, Ledger, LineAccount, NewEntry, NewLine};
 use autoxide_testkit::{TestApp, TestDatabase};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
@@ -117,18 +118,7 @@ fn text(row: &sea_orm::QueryResult, column: &str) -> String {
             })*
         };
     }
-    attempt!(
-        Uuid,
-        chrono::DateTime<chrono::Utc>,
-        chrono::NaiveDate,
-        i64,
-        i32,
-        i16,
-        bool,
-        f64,
-        String,
-        Vec<u8>
-    );
+    attempt!(Uuid, Timestamp, Date, i64, i32, i16, bool, f64, String, Vec<u8>);
     "?".to_owned()
 }
 

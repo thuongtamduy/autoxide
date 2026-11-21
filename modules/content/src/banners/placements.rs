@@ -5,7 +5,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter,
@@ -133,7 +133,7 @@ impl ContentService {
         principal: &Principal,
         key: &str,
         input: PlacementInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Placement, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let found = self.placement_by_key(tenant, key).await?;
@@ -201,8 +201,8 @@ impl ContentService {
         connection: &C,
         tenant: &TenantContext,
         found: &Placement,
-        expected: Option<DateTime<Utc>>,
-        at: DateTime<Utc>,
+        expected: Option<Timestamp>,
+        at: Timestamp,
     ) -> Result<(), Error> {
         let updated = placement::Entity::update_many()
             .col_expr(placement::Column::UpdatedAt, Expr::value(at))
@@ -267,7 +267,7 @@ pub(crate) fn checked(
     tenant: &TenantContext,
     input: PlacementInput,
     id: Uuid,
-    at: DateTime<Utc>,
+    at: Timestamp,
     before: Option<&Placement>,
 ) -> Result<Placement, Error> {
     let mut problems = Vec::new();

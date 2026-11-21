@@ -9,12 +9,12 @@
 //! Module đó phải đăng ký SAU `catalog` trong `crates/app/src/modules.rs`. Không module nào đọc
 //! bảng `catalog_…` (luật kiến trúc 1). File này không tham chiếu phần bên trong module.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
-use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -200,11 +200,11 @@ pub struct VariantSnapshot {
     pub track_inventory: bool,
     pub sale_mode: SaleMode,
     /// Ngày dự kiến có hàng khi `Preorder` (theo múi giờ của nút).
-    pub preorder_available_on: Option<NaiveDate>,
+    pub preorder_available_on: Option<Date>,
     /// Tổng suất đặt trước; `None` = không giới hạn.
     pub preorder_limit: Option<i64>,
     /// Hết nhận đặt trước.
-    pub preorder_ends_at: Option<DateTime<Utc>>,
+    pub preorder_ends_at: Option<Timestamp>,
     /// Cờ cũ, còn đọc được tới khi `inventory`, `orders` chuyển hết sang `sale_mode` (D-204):
     /// `true` khi `sale_mode` là `Backorder`.
     pub allow_backorder: bool,
@@ -214,7 +214,7 @@ pub struct VariantSnapshot {
     pub warranty_months: Option<i32>,
     pub image_media_id: Option<Uuid>,
     /// Phiên bản của biến thể, để bên chụp ghi kèm.
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 /// Câu hỏi giá: giá của các biến thể ở cửa hàng `org_id` lúc `at`.
@@ -232,19 +232,14 @@ pub struct PriceQuery {
     /// Thị trường (bước 63; giờ `None`) — D-222.
     pub market: Option<String>,
     pub currency: Currency,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     /// Tối đa [`MAX_IDS`].
     pub variant_ids: Vec<Uuid>,
 }
 
 impl PriceQuery {
     /// Câu hỏi giá chung (không nhóm khách, kênh, thị trường) ở cửa hàng `org_id` lúc `at`.
-    pub fn new(
-        org_id: OrgId,
-        currency: Currency,
-        at: DateTime<Utc>,
-        variant_ids: Vec<Uuid>,
-    ) -> Self {
+    pub fn new(org_id: OrgId, currency: Currency, at: Timestamp, variant_ids: Vec<Uuid>) -> Self {
         PriceQuery {
             org_id,
             company_id: None,
@@ -297,9 +292,9 @@ pub struct PriceSnapshot {
     pub tax_inclusive: bool,
     /// Giá gạch (chỉ để hiển thị).
     pub compare_at: Option<Money>,
-    pub valid_from: DateTime<Utc>,
+    pub valid_from: Timestamp,
     /// Hết hiệu lực (giá tạm thời); `None` = tới khi có dòng mới.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
 }
 
 /// Khi giá dưới sàn thì làm gì (D-222).
@@ -430,11 +425,11 @@ pub struct SalePrice {
     /// Giá một đơn vị sau giảm, cùng tiền tệ với giá niêm yết đã gửi.
     pub sale_price: Money,
     /// Lúc giá giảm hết.
-    pub ends_at: DateTime<Utc>,
+    pub ends_at: Timestamp,
 }
 
 impl SalePrice {
-    pub fn new(variant_id: Uuid, sale_price: Money, ends_at: DateTime<Utc>) -> Self {
+    pub fn new(variant_id: Uuid, sale_price: Money, ends_at: Timestamp) -> Self {
         SalePrice { variant_id, sale_price, ends_at }
     }
 }
@@ -450,7 +445,7 @@ pub trait SalePriceSource: Send + Sync {
         &self,
         tenant: &TenantContext,
         org_id: OrgId,
-        at: DateTime<Utc>,
+        at: Timestamp,
         prices: &[(Uuid, Money)],
     ) -> Result<Vec<SalePrice>, Error>;
 }

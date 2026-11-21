@@ -7,6 +7,8 @@
 //! - Chờ người mua (`pending_customer`): `sla_paused_at` = lúc bắt đầu chờ; người mua viết lại thì
 //!   cộng phút làm việc đã chờ vào `sla_paused_minutes` và dời hạn giải quyết.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -17,7 +19,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::pagination::{Order, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::work::{Severity, WorkItem, WorkSource};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Condition;
 use sea_orm::{
     ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, QuerySelect, Set,
@@ -42,10 +43,10 @@ const ACTIVE: [&str; 3] = ["open", "pending_agent", "pending_customer"];
 /// Hạn của một phiếu theo chính sách: (phản hồi đầu, giải quyết). `None` khi lịch không có giờ làm.
 pub(crate) fn due_dates(
     policy: &Policy,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
     priority: Priority,
     paused_minutes: i64,
-) -> (Option<DateTime<Utc>>, Option<DateTime<Utc>>) {
+) -> (Option<Timestamp>, Option<Timestamp>) {
     let Some(calendar) = policy.calendar() else {
         return (None, None);
     };
@@ -65,7 +66,7 @@ pub(crate) fn transition(
     to: Status,
     resolution: Option<Resolution>,
     policy: &Policy,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) {
     apply_status(row, before, to, resolution, at);
     let resumes = before.sla_paused_at.is_some() && !matches!(to, Status::PendingCustomer);
@@ -87,7 +88,7 @@ impl SupportService {
     pub(crate) async fn mark_breached(
         &self,
         tenant: &TenantContext,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<u64, Error> {
         let late = Condition::any()
             .add(
@@ -143,11 +144,11 @@ impl SupportService {
     pub(crate) async fn auto_close(
         &self,
         tenant: &TenantContext,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<u64, Error> {
         let rows = ticket::Entity::find()
             .filter(ticket::Column::Status.eq(Status::Solved.as_str()))
-            .filter(ticket::Column::SolvedAt.lt(at - chrono::Duration::days(1)))
+            .filter(ticket::Column::SolvedAt.lt(at - SignedDuration::from_hours(24)))
             .scoped(tenant)
             .limit(BATCH)
             .all(tenant.database().read())
@@ -163,9 +164,9 @@ impl SupportService {
                     policy
                 }
             };
-            let due = before
-                .solved_at
-                .map(|solved| solved + chrono::Duration::days(i64::from(policy.auto_close_days)));
+            let due = before.solved_at.map(|solved| {
+                solved + SignedDuration::from_hours(24 * (i64::from(policy.auto_close_days)))
+            });
             if due.is_none_or(|due| due > at) {
                 continue;
             }

@@ -15,14 +15,14 @@
 //! Giao **ít nhất một lần**: nối lại bằng `Last-Event-ID` gửi lại event trong khoảng `GRACE` trước
 //! event đó; client khử trùng theo `id`.
 
-use std::collections::{BTreeMap, HashMap};
-use std::sync::{Arc, Mutex};
-use std::time::Duration;
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query};
 use serde::Serialize;
+use std::collections::{BTreeMap, HashMap};
+use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::{broadcast, mpsc, watch};
 use uuid::Uuid;
 
@@ -79,7 +79,7 @@ pub(crate) const WS_RECHECK_SECONDS: Setting = Setting::new(
 pub(crate) const GRACE: Duration = Duration::from_secs(5);
 /// Event đã giao được giữ chừng này rồi bị dọn (`KEEP_DELIVERED` của bộ phát); nối lại với ID cũ
 /// hơn thì client nhận `reset` (tải lại trạng thái) thay vì đọc bù.
-const RETENTION: chrono::Duration = chrono::Duration::days(7);
+const RETENTION: SignedDuration = SignedDuration::from_hours(24 * 7);
 /// Một kết nối sống tối đa chừng này rồi máy chủ đóng; client nối lại bằng `Last-Event-ID` và
 /// quyền được xét lại (permission bị thu hồi không giữ stream mãi).
 pub(crate) const LIFETIME: Duration = Duration::from_secs(30 * 60);
@@ -145,7 +145,7 @@ impl StreamConfig {
 pub(crate) struct StreamedEvent {
     pub id: Uuid,
     pub name: String,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     pub subject: Option<String>,
     pub actor_kind: String,
     pub payload: serde_json::Value,
@@ -186,9 +186,9 @@ struct Source {
     database: Database,
     listeners: usize,
     /// Lúc bắt đầu lượt hỏi trước (`None`: chưa hỏi lần nào).
-    since: Option<DateTime<Utc>>,
+    since: Option<Timestamp>,
     /// ID đã phát trong khoảng `GRACE` gần nhất → thời điểm của nó.
-    seen: HashMap<Uuid, DateTime<Utc>>,
+    seen: HashMap<Uuid, Timestamp>,
 }
 
 #[derive(Default)]
@@ -391,7 +391,7 @@ impl StreamHub {
         let (sender, receiver) = mpsc::channel(256);
         // Client nối lại đã có event `Last-Event-ID`: coi như đã gửi, kẻo bản phát trực tiếp của
         // chính event đó đến trễ (poller chưa phát lúc client ngắt) lại gửi lần nữa.
-        let delivered: HashMap<Uuid, DateTime<Utc>> =
+        let delivered: HashMap<Uuid, Timestamp> =
             last_event_id.and_then(|id| time_of(id).map(|at| (id, at))).into_iter().collect();
         let connection = Connection {
             hub: self.clone(),
@@ -476,7 +476,7 @@ impl StreamHub {
 
     /// Một lượt hỏi mọi database đang có người nghe; phát event mới.
     pub(crate) async fn poll_once(&self) -> Result<usize, Error> {
-        let targets: Vec<(PlacementId, Database, Option<DateTime<Utc>>)> = {
+        let targets: Vec<(PlacementId, Database, Option<Timestamp>)> = {
             let mut sources = lock(&self.0.sources);
             sources.retain(|_, source| source.listeners > 0);
             sources
@@ -486,7 +486,7 @@ impl StreamHub {
         };
         let mut sent = 0;
         for (placement, database, since) in targets {
-            let started = Utc::now();
+            let started = Timestamp::now();
             let from = since.unwrap_or(started) - grace();
             let events = self.read(&database, None, &self.all_names(), from, None).await?;
             let mut sources = lock(&self.0.sources);
@@ -519,7 +519,7 @@ impl StreamHub {
         database: &Database,
         tenant: Option<Uuid>,
         names: &[&'static str],
-        from: DateTime<Utc>,
+        from: Timestamp,
         after: Option<Uuid>,
     ) -> Result<Vec<StreamedEvent>, Error> {
         let mut by_module: BTreeMap<&'static str, Vec<&'static str>> = BTreeMap::new();
@@ -611,7 +611,7 @@ struct Connection {
     live: broadcast::Receiver<Arc<StreamedEvent>>,
     sender: mpsc::Sender<Frame>,
     /// ID đã gửi gần đây → thời điểm (khử trùng giữa đọc bù và phát trực tiếp).
-    delivered: HashMap<Uuid, DateTime<Utc>>,
+    delivered: HashMap<Uuid, Timestamp>,
     /// ID cuối đã gửi (hay client báo qua `Last-Event-ID`).
     last: Option<Uuid>,
     _ticket: Option<Ticket>,
@@ -655,7 +655,7 @@ impl Connection {
         let Some(at) = time_of(last) else {
             return self.send(Frame::Reset).await;
         };
-        if at < Utc::now() - RETENTION {
+        if at < Timestamp::now() - RETENTION {
             return self.send(Frame::Reset).await;
         }
         let names: Vec<&'static str> = self.filter.names.keys().copied().collect();
@@ -747,21 +747,21 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn grace() -> chrono::Duration {
-    chrono::Duration::from_std(GRACE).unwrap_or_else(|_| chrono::Duration::seconds(5))
+fn grace() -> SignedDuration {
+    SignedDuration::try_from(GRACE).unwrap_or_else(|_| SignedDuration::from_secs(5))
 }
 
 /// UUIDv7 nhỏ nhất của mili giây `at`: so sánh ID (khoá chính, có index) thay cho `occurred_at`
 /// (không có index) — UUIDv7 bắt đầu bằng thời điểm tạo, xếp theo byte trên cả hai database.
-fn lowest_id_at(at: DateTime<Utc>) -> Uuid {
-    let millis = u128::try_from(at.timestamp_millis()).unwrap_or(0);
+fn lowest_id_at(at: Timestamp) -> Uuid {
+    let millis = u128::try_from(at.as_unix_millis()).unwrap_or(0);
     Uuid::from_u128(millis << 80)
 }
 
 /// Thời điểm tạo ghi trong UUIDv7 `id`.
-fn time_of(id: Uuid) -> Option<DateTime<Utc>> {
+fn time_of(id: Uuid) -> Option<Timestamp> {
     let (seconds, nanos) = id.get_timestamp()?.to_unix();
-    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+    Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
 /// Người gọi thấy event cần `permission` tới đâu; `None`: không thấy.
@@ -819,12 +819,12 @@ mod tests {
 
     #[test]
     fn id_nho_nhat_cua_mot_thoi_diem() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = Uuid::now_v7();
-        let floor = lowest_id_at(now - chrono::Duration::seconds(1));
+        let floor = lowest_id_at(now - SignedDuration::from_secs(1));
         assert!(floor < id);
-        assert!(lowest_id_at(now + chrono::Duration::seconds(1)) > id);
+        assert!(lowest_id_at(now + SignedDuration::from_secs(1)) > id);
         let at = time_of(id).unwrap();
-        assert!((at - now).num_seconds().abs() < 2);
+        assert!((at - now).as_secs().abs() < 2);
     }
 }

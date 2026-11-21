@@ -9,12 +9,12 @@
 //!   từng tham số. Phạm vi `personal` (của người lưu), `node` (một nút, kèm `org_id`) hay `tenant`;
 //!   hai phạm vi chung cần `kernel.views.share`.
 
+use crate::time::{Date, Timestamp};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Cond, Expr, Order, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -220,8 +220,8 @@ pub(crate) fn check_params(
             "number" => text.parse::<f64>().is_ok(),
             "boolean" => text == "true" || text == "false",
             "uuid" => text.parse::<Uuid>().is_ok(),
-            "date-time" => DateTime::parse_from_rfc3339(&text).is_ok(),
-            "date" => chrono::NaiveDate::parse_from_str(&text, "%Y-%m-%d").is_ok(),
+            "date-time" => Timestamp::parse_rfc3339(&text).is_ok(),
+            "date" => Date::parse_from_str(&text, "%Y-%m-%d").is_ok(),
             _ => parameter.values.as_ref().is_none_or(|allowed| allowed.contains(&text)),
         };
         if !fits {
@@ -255,8 +255,8 @@ pub(crate) struct SavedView {
     pub group_by: Option<String>,
     /// `compact` or `comfortable`.
     pub density: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// A view to save.
@@ -311,8 +311,8 @@ pub(crate) struct ViewsState {
     pub lists: ListSchemas,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn check_shape(
@@ -731,7 +731,7 @@ pub(crate) async fn export_user(
     rows.iter()
         .map(|row| {
             let params: String = row.try_get("", "params")?;
-            let created: DateTime<Utc> = row.try_get("", "created_at")?;
+            let created: Timestamp = row.try_get("", "created_at")?;
             Ok(BTreeMap::from([
                 ("resource", Value::String(row.try_get("", "resource")?)),
                 ("name", Value::String(row.try_get("", "name")?)),

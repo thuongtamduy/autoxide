@@ -23,11 +23,11 @@ mod altcha;
 mod nonce;
 mod token;
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
+use sea_orm::ConnectionTrait;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-
-use chrono::{DateTime, Duration, SubsecRound, Utc};
-use sea_orm::ConnectionTrait;
 
 use crate::access::Principal;
 use crate::config::{ConfigReader, Invalid, Setting, parse_in_range};
@@ -395,7 +395,7 @@ pub enum Verdict {
 pub struct Checked {
     pub verdict: Verdict,
     nonce: Option<String>,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl Checked {
@@ -438,9 +438,9 @@ impl std::fmt::Debug for SpamGuard {
 #[non_exhaustive]
 pub struct IssuedToken {
     pub token: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     /// Gửi sớm hơn lúc này thì bài bị giữ lại.
-    pub submit_after: DateTime<Utc>,
+    pub submit_after: Timestamp,
     /// Tham số đề, nếu có đề.
     pub challenge: Option<serde_json::Value>,
 }
@@ -471,7 +471,7 @@ impl SpamGuard {
     /// thì như token sai).
     pub async fn issue(&self, tenant: &TenantContext, scope: &str) -> Result<IssuedToken, Error> {
         check_scope(scope)?;
-        let now = Utc::now().trunc_subsecs(0);
+        let now = Timestamp::now().truncate(jiff::Unit::Second);
         let mut nonce = [0u8; 16];
         getrandom::fill(&mut nonce)
             .map_err(|error| Error::internal(format!("random number generator: {error}")))?;
@@ -492,7 +492,7 @@ impl SpamGuard {
         submission: &Submission<'_>,
         limits: &Limits,
     ) -> Result<Checked, Error> {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut reasons = Vec::new();
         let mut nonce = None;
         let mut expires_at = now + self.max_age();
@@ -533,13 +533,13 @@ impl SpamGuard {
                     return Ok(Checked {
                         verdict: Verdict::Accept,
                         nonce: Some(form.nonce),
-                        expires_at: form.issued_at + self.max_age() + Duration::hours(1),
+                        expires_at: form.issued_at + self.max_age() + SignedDuration::from_hours(1),
                     });
                 }
                 if form.issued_at + self.min_fill() > now {
                     reasons.push("too_fast");
                 }
-                expires_at = form.issued_at + self.max_age() + Duration::hours(1);
+                expires_at = form.issued_at + self.max_age() + SignedDuration::from_hours(1);
                 let outcome = self
                     .challenge
                     .verify(submission.scope, &form.nonce, submission.challenge)
@@ -609,19 +609,21 @@ impl SpamGuard {
         connection: &C,
         module: &str,
     ) -> Result<u64, Error> {
-        nonce::purge(connection, module, Utc::now()).await
+        nonce::purge(connection, module, Timestamp::now()).await
     }
 
-    fn max_age(&self) -> Duration {
-        Duration::from_std(self.config.token_max_age).unwrap_or_else(|_| Duration::hours(2))
+    fn max_age(&self) -> SignedDuration {
+        SignedDuration::try_from(self.config.token_max_age)
+            .unwrap_or_else(|_| SignedDuration::from_hours(2))
     }
 
-    fn min_fill(&self) -> Duration {
-        Duration::from_std(self.config.min_fill).unwrap_or_else(|_| Duration::seconds(3))
+    fn min_fill(&self) -> SignedDuration {
+        SignedDuration::try_from(self.config.min_fill)
+            .unwrap_or_else(|_| SignedDuration::from_secs(3))
     }
 }
 
-fn discard(reason: &'static str, now: DateTime<Utc>) -> Checked {
+fn discard(reason: &'static str, now: Timestamp) -> Checked {
     Checked { verdict: Verdict::Discard { reason }, nonce: None, expires_at: now }
 }
 

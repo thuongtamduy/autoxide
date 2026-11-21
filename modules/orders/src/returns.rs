@@ -22,7 +22,6 @@ use autoxide_kernel::numbering;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_promotions::api::Evaluation;
-use chrono::Datelike;
 use sea_orm::sea_query::{Expr, ExprTrait};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, DatabaseTransaction, EntityTrait, QueryFilter, Set,
@@ -316,7 +315,7 @@ impl OrdersService {
                 }
                 let return_lines = plan.lines;
                 let id = Uuid::now_v7();
-                let year = now.year();
+                let year = now.date_utc().year();
                 let sequence =
                     numbering::next(&transaction, tenant.id(), &format!("orders.return:{year}"))
                         .await?;

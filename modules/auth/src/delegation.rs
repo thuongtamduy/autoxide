@@ -12,7 +12,7 @@ use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::tenancy::{
     DatabaseRegistry, OrgId, OrgTree, ScopeExt, TenantContext, TenantId, root_of,
 };
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder, Set,
@@ -23,6 +23,7 @@ use uuid::Uuid;
 use crate::events;
 
 pub(crate) mod entity {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -41,10 +42,10 @@ pub(crate) mod entity {
         pub org_id: Uuid,
         pub reason: String,
         pub granted_by: Option<Uuid>,
-        pub expires_at: Option<DateTimeUtc>,
-        pub revoked_at: Option<DateTimeUtc>,
+        pub expires_at: Option<Timestamp>,
+        pub revoked_at: Option<Timestamp>,
         pub revoked_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -63,7 +64,7 @@ pub(crate) struct NewDelegation {
     pub child_tenant_id: Uuid,
     pub role_id: Uuid,
     pub org_id: Option<Uuid>,
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     pub reason: String,
 }
 
@@ -76,12 +77,12 @@ pub(crate) struct DelegationService {
     pub catalog: autoxide_kernel::access::PermissionCatalog,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Uỷ quyền còn hiệu lực lúc `at`.
-fn live(at: DateTime<Utc>) -> Condition {
+fn live(at: Timestamp) -> Condition {
     Condition::all().add(entity::Column::RevokedAt.is_null()).add(
         Condition::any()
             .add(entity::Column::ExpiresAt.is_null())

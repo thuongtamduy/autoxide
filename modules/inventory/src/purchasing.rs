@@ -11,7 +11,7 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::search;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::NaiveDate;
+use autoxide_kernel::time::Date;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveValue::Set, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
@@ -73,7 +73,7 @@ pub(crate) struct PurchaseLineInput {
 pub(crate) struct PurchaseOrderInput {
     pub org_id: Uuid,
     pub supplier_id: Uuid,
-    pub expected_on: Option<NaiveDate>,
+    pub expected_on: Option<Date>,
     pub note: Option<String>,
     pub lines: Vec<PurchaseLineInput>,
 }

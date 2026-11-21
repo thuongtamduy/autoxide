@@ -17,6 +17,7 @@
 //!
 //! Kernel chỉ dựng chữ, không biết khái niệm chứng từ hay đơn hàng: dữ liệu do module đưa vào.
 
+use crate::time::Date;
 use std::collections::BTreeSet;
 use std::io::Write;
 
@@ -230,7 +231,7 @@ pub fn format_money(minor: i64, currency: Currency, locale: &str) -> String {
 /// Ngày `YYYY-MM-DD` (hay thời điểm RFC 3339) theo ngôn ngữ: `vi` → `dd/mm/yyyy`, khác giữ ISO.
 pub fn format_date(text: &str, locale: &str) -> String {
     let day = text.get(..10).unwrap_or(text);
-    match chrono::NaiveDate::parse_from_str(day, "%Y-%m-%d") {
+    match Date::parse_from_str(day, "%Y-%m-%d") {
         Ok(date) if locale == "vi" => date.format("%d/%m/%Y").to_string(),
         Ok(date) => date.format("%Y-%m-%d").to_string(),
         Err(_) => text.to_owned(),

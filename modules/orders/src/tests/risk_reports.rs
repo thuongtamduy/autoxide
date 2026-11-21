@@ -5,9 +5,10 @@ use autoxide_kernel::access::Scope;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, TenantId};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -88,7 +89,7 @@ async fn quy_tac_buoc_tra_truoc_khi_rui_ro_cao_va_danh_sach_chan() {
         assert_eq!(status, StatusCode::CREATED);
 
         // Danh sách chặn: luôn có lý do trong danh sách và hạn ≤ 365 ngày.
-        let far = Utc::now() + Duration::days(400);
+        let far = Timestamp::now() + SignedDuration::from_hours(24 * 400);
         let (status, invalid) = boss
             .send(
                 "POST",
@@ -100,7 +101,7 @@ async fn quy_tac_buoc_tra_truoc_khi_rui_ro_cao_va_danh_sach_chan() {
         let fields: Vec<&str> =
             invalid["errors"].as_array().unwrap().iter().map(|e| e["field"].as_str().unwrap()).collect();
         assert!(fields.contains(&"reason_code") && fields.contains(&"expires_at"), "{invalid}");
-        let soon = Utc::now() + Duration::days(30);
+        let soon = Timestamp::now() + SignedDuration::from_hours(24 * 30);
         let (status, blocked) = boss
             .send(
                 "POST",
@@ -154,8 +155,8 @@ async fn bao_cao_ban_hang_theo_pham_vi() {
             let (status, placed) = cod_at(&shop, org, "0911222333").await;
             assert_eq!(status, StatusCode::CREATED, "{placed}");
         }
-        let from = (Utc::now() - Duration::days(1)).to_rfc3339();
-        let to = (Utc::now() + Duration::days(1)).to_rfc3339();
+        let from = (Timestamp::now() - SignedDuration::from_hours(24)).to_rfc3339();
+        let to = (Timestamp::now() + SignedDuration::from_hours(24)).to_rfc3339();
         let uri = |group: &str| {
             format!(
                 "/reports/sales?group_by={group}&from={}&to={}",
@@ -191,7 +192,7 @@ async fn bao_cao_ban_hang_theo_pham_vi() {
         assert_eq!(status, StatusCode::FORBIDDEN);
         let long = format!(
             "/reports/sales?group_by=org&from={}&to={}",
-            urlencode(&(Utc::now() - Duration::days(400)).to_rfc3339()),
+            urlencode(&(Timestamp::now() - SignedDuration::from_hours(24 * 400)).to_rfc3339()),
             urlencode(&to)
         );
         let (status, _) = Call::as_user(&shop, "boss").send("GET", &long, None).await;

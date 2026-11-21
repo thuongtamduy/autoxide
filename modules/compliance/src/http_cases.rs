@@ -2,6 +2,7 @@
 //! phạm sở hữu trí tuệ / hàng giả, khiếu nại, phản hồi của bên bị phản ánh, quyết định, cung cấp thông
 //! tin cho cơ quan, lý do được ẩn đánh giá.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -67,7 +67,7 @@ pub(crate) struct CaseEntryResponse {
     pub body: String,
     /// Ids of files (module `files`).
     pub files: Vec<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<case_entry::Model> for CaseEntryResponse {
@@ -122,21 +122,21 @@ pub(crate) struct CaseResponse {
     /// Reason of the decision; shown to the reporter and the reported party.
     pub decision_reason: Option<String>,
     /// Acknowledge the case before this time (legal rule `cases.deadlines`).
-    pub ack_due_at: DateTime<Utc>,
-    pub acknowledged_at: Option<DateTime<Utc>>,
+    pub ack_due_at: Timestamp,
+    pub acknowledged_at: Option<Timestamp>,
     /// The reported party may answer until this time.
-    pub respond_by: DateTime<Utc>,
+    pub respond_by: Timestamp,
     /// Decide before this time (working days of the legal rule `cases.deadlines`; 24 hours for
     /// a request of an authority).
-    pub decide_by: DateTime<Utc>,
+    pub decide_by: Timestamp,
     /// `true` while open and past `decide_by`.
     pub overdue: bool,
-    pub decided_at: Option<DateTime<Utc>>,
+    pub decided_at: Option<Timestamp>,
     pub decided_by: Option<Uuid>,
     /// Why the anti-spam checks held it; `null` when not held.
     pub held_reason: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     /// The tracking code for the reporter — only in the answer that created the case.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tracking_token: Option<String>,
@@ -156,7 +156,7 @@ pub(crate) fn describe_case(
 ) -> CaseResponse {
     CaseResponse {
         reference: reference(row.id),
-        overdue: is_open(&row.status) && row.decide_by < Utc::now(),
+        overdue: is_open(&row.status) && row.decide_by < Timestamp::now(),
         rights: serde_json::from_str(&row.rights).unwrap_or_default(),
         id: row.id,
         kind: row.kind,
@@ -213,9 +213,9 @@ pub(crate) struct RespondentCaseResponse {
     pub decision: String,
     pub decision_reason: Option<String>,
     /// Answer with `POST /cases/{id}/responses` before this time.
-    pub respond_by: DateTime<Utc>,
-    pub decide_by: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
+    pub respond_by: Timestamp,
+    pub decide_by: Timestamp,
+    pub created_at: Timestamp,
     /// Status changes, restrictions, answers and the decision, oldest first.
     pub entries: Vec<CaseEntryResponse>,
 }
@@ -257,7 +257,7 @@ fn describe_for_respondent(detail: CaseDetail) -> RespondentCaseResponse {
 pub(crate) struct CaseStep {
     /// `status`, `restriction` or `decision`.
     pub kind: String,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
 }
 
 /// The state of a report or complaint, for the person who sent it.
@@ -272,11 +272,11 @@ pub(crate) struct TrackedCaseResponse {
     pub restricted: bool,
     pub decision: String,
     pub decision_reason: Option<String>,
-    pub ack_due_at: DateTime<Utc>,
-    pub acknowledged_at: Option<DateTime<Utc>>,
-    pub decide_by: DateTime<Utc>,
-    pub decided_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub ack_due_at: Timestamp,
+    pub acknowledged_at: Option<Timestamp>,
+    pub decide_by: Timestamp,
+    pub decided_at: Option<Timestamp>,
+    pub created_at: Timestamp,
     pub steps: Vec<CaseStep>,
 }
 

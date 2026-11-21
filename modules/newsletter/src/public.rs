@@ -24,6 +24,8 @@
 //! Gọi bằng tài khoản có `newsletter.subscribe` (máy chủ website): bỏ qua bẫy / token / đề, vẫn
 //! bị giới hạn theo tài khoản. Đăng nhập mà không có quyền đó thì đi đường của người lạ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use std::time::Duration;
@@ -36,7 +38,6 @@ use autoxide_kernel::http::ClientInfo;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext, link_token, resolve_link_token};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
 };
@@ -364,7 +365,7 @@ impl NewsletterService {
             None
         } else {
             let ids: Vec<String> = to_confirm.iter().map(|list| list.row.id.to_string()).collect();
-            let ttl = chrono::Duration::hours(i64::from(self.config.confirm_hours));
+            let ttl = SignedDuration::from_hours(i64::from(self.config.confirm_hours));
             let subject = row.id.to_string();
             Some(
                 self.tokens
@@ -790,7 +791,7 @@ async fn mark_unsubscribed<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     delivery_id: Uuid,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<(), Error> {
     delivery::Entity::update_many()
         .scoped(tenant)

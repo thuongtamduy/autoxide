@@ -4,8 +4,7 @@
 //! Một mục có đúng một trong ba kiểu đích: địa chỉ (`url`), đối tượng của sổ đối tượng (`ref`),
 //! hoặc không có đích (nhóm tiêu đề, vd một cột của bảng xổ). Kiểm đối tượng có thật nằm ở
 //! `service.rs` (cần sổ đối tượng, gọi ngoài transaction).
-
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 use autoxide_kernel::error::FieldError;
@@ -46,8 +45,8 @@ pub(crate) struct RefInput {
 pub(crate) struct BadgeInput {
     pub text: String,
     pub tone: String,
-    pub from: Option<DateTime<Utc>>,
-    pub until: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
+    pub until: Option<Timestamp>,
 }
 
 /// Một mục như người gọi gửi (cây).
@@ -337,9 +336,8 @@ pub(crate) fn is_link(url: &str) -> bool {
 }
 
 /// Thời điểm cắt tới micro giây: hai database lưu cùng một giá trị.
-pub(crate) fn micros(at: DateTime<Utc>) -> DateTime<Utc> {
-    use chrono::SubsecRound;
-    at.trunc_subsecs(6)
+pub(crate) fn micros(at: Timestamp) -> Timestamp {
+    at.truncate(jiff::Unit::Microsecond)
 }
 
 /// Dựng cây từ danh sách mục đã theo thứ tự.
@@ -357,6 +355,7 @@ pub(crate) fn tree(items: Vec<item::Model>) -> Vec<Node> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     fn link(label: &str, url: &str) -> ItemInput {
         ItemInput { label: Some(label.into()), url: Some(url.into()), ..ItemInput::default() }
@@ -390,8 +389,8 @@ mod tests {
                 badge: Some(BadgeInput {
                     text: String::new(),
                     tone: "red".into(),
-                    from: Some(Utc::now()),
-                    until: Some(Utc::now() - chrono::Duration::hours(1)),
+                    from: Some(Timestamp::now()),
+                    until: Some(Timestamp::now() - SignedDuration::from_hours(1)),
                 }),
                 ..ItemInput::default()
             },

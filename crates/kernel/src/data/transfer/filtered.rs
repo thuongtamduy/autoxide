@@ -10,17 +10,16 @@
 //! Kèm đọc cấu trúc bảng ở database (khoá chính, unique index, foreign key) để kế hoạch tìm xung
 //! đột trước khi chép, không phải giữa lúc chép.
 
+use crate::time::{Date, Precision, Timestamp};
 use sea_orm::sea_query::{Condition, OnConflict};
 
 use super::{
     BATCH_ROWS, Column, Kind, TENANT_COLUMN, TenantTables, TransferError, convert, fresh, read,
 };
 use crate::database::Database;
-
-use chrono::SecondsFormat;
 use futures_util::TryStreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SimpleExpr, Value};
-use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, StreamTrait};
+use sea_orm::{ConnectionTrait, DatabaseBackend, StreamTrait};
 
 /// Một dòng đọc từ nguồn: tên cột và giá trị, theo thứ tự cột của nguồn.
 #[derive(Debug, Clone)]
@@ -61,10 +60,9 @@ pub(crate) type Rewrite<'a> = &'a (dyn Fn(&mut Row) -> Result<(), TransferError>
 pub(crate) fn canonical(value: &Value) -> Option<String> {
     match value {
         Value::Uuid(value) => value.map(|id| id.to_string()),
-        Value::ChronoDateTimeUtc(value) => {
-            value.map(|at| at.to_rfc3339_opts(SecondsFormat::Micros, true))
-        }
-        Value::ChronoDate(value) => value.map(|day| day.to_string()),
+        Value::Enum(_) => Timestamp::from_sql_value(value)
+            .map(|at| at.to_rfc3339_opts(Precision::Micros, true))
+            .or_else(|| Date::from_sql_value(value).map(|day| day.to_string())),
         Value::String(value) => value.clone(),
         Value::SmallInt(value) => value.map(|number| number.to_string()),
         Value::Int(value) => value.map(|number| number.to_string()),
@@ -352,12 +350,12 @@ pub(crate) async fn primary_key<C: ConnectionTrait>(
 ) -> Result<Vec<String>, TransferError> {
     let backend = connection.get_database_backend();
     let statement = match backend {
-        DatabaseBackend::Sqlite => Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite => crate::database::statement(
             backend,
             "SELECT name FROM pragma_table_info(?) WHERE pk > 0 ORDER BY pk",
             [table.into()],
         ),
-        DatabaseBackend::Postgres => Statement::from_sql_and_values(
+        DatabaseBackend::Postgres => crate::database::statement(
             backend,
             "SELECT a.attname::text AS name FROM pg_index i JOIN pg_attribute a \
              ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey) \
@@ -382,7 +380,7 @@ pub(crate) async fn unique_indexes<C: ConnectionTrait>(
     match backend {
         DatabaseBackend::Sqlite => {
             let list = connection
-                .query_all_raw(Statement::from_sql_and_values(
+                .query_all_raw(crate::database::statement(
                     backend,
                     "SELECT name, origin, partial FROM pragma_index_list(?) WHERE \"unique\" = 1",
                     [table.into()],
@@ -397,7 +395,7 @@ pub(crate) async fn unique_indexes<C: ConnectionTrait>(
                     continue;
                 }
                 let columns = connection
-                    .query_all_raw(Statement::from_sql_and_values(
+                    .query_all_raw(crate::database::statement(
                         backend,
                         "SELECT name FROM pragma_index_info(?) ORDER BY seqno",
                         [name.into()],
@@ -419,7 +417,7 @@ pub(crate) async fn unique_indexes<C: ConnectionTrait>(
         }
         DatabaseBackend::Postgres => {
             let rows = connection
-                .query_all_raw(Statement::from_sql_and_values(
+                .query_all_raw(crate::database::statement(
                     backend,
                     "SELECT c.relname::text AS index_name, a.attname::text AS name \
                      FROM pg_index i JOIN pg_class c ON c.oid = i.indexrelid \
@@ -452,14 +450,14 @@ pub(crate) async fn foreign_keys<C: ConnectionTrait>(
 ) -> Result<Vec<ForeignKey>, TransferError> {
     let backend = connection.get_database_backend();
     let statement = match backend {
-        DatabaseBackend::Sqlite => Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite => crate::database::statement(
             backend,
             "SELECT id, \"from\" AS col, \"table\" AS parent, \"to\" AS parent_col, \
              (SELECT COUNT(*) FROM pragma_foreign_key_list(?1) f2 WHERE f2.id = f.id) AS width \
              FROM pragma_foreign_key_list(?1) f",
             [table.into()],
         ),
-        DatabaseBackend::Postgres => Statement::from_sql_and_values(
+        DatabaseBackend::Postgres => crate::database::statement(
             backend,
             "SELECT 0 AS id, a.attname::text AS col, cf.relname::text AS parent, \
              af.attname::text AS parent_col, array_length(con.conkey, 1)::bigint AS width \

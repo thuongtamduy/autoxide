@@ -34,6 +34,8 @@
 //! `app.get(…).host("shop-a.test")` gửi request tới tên miền đó. App không bao giờ hỏi DNS thật:
 //! bản ghi TXT đặt ở `app.dns()` ([`FakeDns`]).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
@@ -199,7 +201,7 @@ impl TestApp {
 
         // Lùi `moving_since` một giờ: xa hơn mọi thời gian chờ test đặt, nhưng không đổi gì khác
         // của lượt dời (trạng thái, lease, bảng đã chép).
-        let earlier = chrono::Utc::now() - chrono::Duration::hours(1);
+        let earlier = Timestamp::now() - SignedDuration::from_hours(1);
         let update = Query::update()
             .table(Alias::new("kernel_tenant_moves"))
             .value(Alias::new("moving_since"), earlier)

@@ -8,10 +8,10 @@
 //! - `POST /api/v1/kernel/jobs/{id}/retry` (`kernel.jobs.manage`) — đưa job hỏng hẳn về hàng đợi, có
 //!   event `kernel.job_retried` (audit).
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, Order, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -161,7 +161,7 @@ pub(crate) async fn clear_file<C: ConnectionTrait>(connection: &C, id: Uuid) -> 
         .table(Alias::new(TABLE))
         .value(Alias::new("file_name"), Option::<String>::None)
         .value(Alias::new("file_size"), Option::<i64>::None)
-        .value(Alias::new("file_expires_at"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("file_expires_at"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("id")).eq(id))
         .to_owned();
     connection.execute(&update).await?;
@@ -171,7 +171,7 @@ pub(crate) async fn clear_file<C: ConnectionTrait>(connection: &C, id: Uuid) -> 
 /// (khách, job) có file hết hạn trước `at` trong database này, tối đa 500 mỗi lượt.
 pub(crate) async fn expired_files(
     database: &crate::database::Database,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<Vec<(Uuid, Uuid)>, Error> {
     let select = SqlQuery::select()
         .columns(["tenant_id", "id"])
@@ -278,8 +278,8 @@ pub(crate) struct JobRunView {
     pub error: Option<String>,
     /// The file the job wrote (a list export), until it expires.
     pub file: Option<JobFile>,
-    pub created_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
 }
 
 /// A file written by a job.
@@ -292,7 +292,7 @@ pub(crate) struct JobFile {
     /// Size in bytes.
     pub size: i64,
     /// When it is deleted.
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// How far a job is.
@@ -320,7 +320,7 @@ fn view(row: &sea_orm::QueryResult) -> Result<JobRunView, Error> {
     let result: Option<String> = row.try_get("", "result")?;
     let file_name: Option<String> = row.try_get("", "file_name")?;
     let file_size: Option<i64> = row.try_get("", "file_size")?;
-    let file_expires: Option<DateTime<Utc>> = row.try_get("", "file_expires_at")?;
+    let file_expires: Option<Timestamp> = row.try_get("", "file_expires_at")?;
     let id: Uuid = row.try_get("", "id")?;
     Ok(JobRunView {
         id,
@@ -532,7 +532,7 @@ async fn retry_job(
         .table(Alias::new(TABLE))
         .value(Alias::new("status"), "queued")
         .value(Alias::new("error"), Option::<String>::None)
-        .value(Alias::new("finished_at"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("finished_at"), Option::<Timestamp>::None)
         .value(Alias::new("updated_at"), crate::job::queue::now())
         .and_where(Expr::col(Alias::new("id")).eq(id))
         .to_owned();

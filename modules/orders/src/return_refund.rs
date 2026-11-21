@@ -204,7 +204,7 @@ pub(crate) fn refund_for(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+    use autoxide_kernel::time::Timestamp;
     use serde_json::json;
 
     fn line(key: &str, quantity: i64, subtotal: i64, total: i64) -> line::Model {
@@ -243,12 +243,12 @@ mod tests {
             preorder_delayed_to: None,
             advance_minor: None,
             preorder_commit_at: None,
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
         }
     }
 
     fn order(total: i64) -> order::Model {
-        let now = Utc::now();
+        let now = Timestamp::now();
         order::Model {
             id: Uuid::now_v7(),
             tenant_id: Uuid::nil(),

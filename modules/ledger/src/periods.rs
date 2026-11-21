@@ -5,6 +5,7 @@
 //! tổng các dòng sau kỳ đó tới D. Tổng dùng `CAST(SUM(…) AS BIGINT)`: Postgres trả `numeric` cho
 //! `SUM(bigint)`.
 
+use autoxide_kernel::time::Date;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -14,7 +15,6 @@ use autoxide_kernel::money::Money;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::NaiveDate;
 use sea_orm::sea_query::{Expr, Query, SimpleExpr};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -32,12 +32,12 @@ fn period_not_found() -> Error {
     Error::not_found("ledger.period_not_found", "There is no such accounting period.")
 }
 
-fn period_order(previous: NaiveDate) -> Error {
+fn period_order(previous: Date) -> Error {
     Error::conflict("ledger.period_order", "Close the earlier period ({previous}) before this one.")
         .with_param("previous", previous.format("%Y-%m-%d").to_string())
 }
 
-fn period_not_ended(ends_on: NaiveDate) -> Error {
+fn period_not_ended(ends_on: Date) -> Error {
     Error::conflict(
         "ledger.period_not_ended",
         "The period ends on {date}; close it after that day.",
@@ -70,8 +70,8 @@ pub(crate) async fn signed_sums<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     accounts: Option<&[Uuid]>,
-    after: Option<NaiveDate>,
-    through: Option<NaiveDate>,
+    after: Option<Date>,
+    through: Option<Date>,
 ) -> Result<HashMap<Uuid, i64>, Error> {
     let mut select = line::Entity::find()
         .scoped(tenant)
@@ -97,7 +97,7 @@ async fn last_closed<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     book_id: Uuid,
-    on: NaiveDate,
+    on: Date,
 ) -> Result<Option<period::Model>, Error> {
     Ok(period::Entity::find()
         .scoped(tenant)
@@ -116,7 +116,7 @@ pub(crate) async fn balances_as_of<C: ConnectionTrait>(
     tenant: &TenantContext,
     book_id: Uuid,
     accounts: &[account::Model],
-    on: NaiveDate,
+    on: Date,
 ) -> Result<HashMap<Uuid, i64>, Error> {
     let ids: Vec<Uuid> = accounts.iter().map(|row| row.id).collect();
     let snapshot = last_closed(connection, tenant, book_id, on).await?;
@@ -190,7 +190,7 @@ impl LedgerService {
         connection: &C,
         tenant: &TenantContext,
         found: &account::Model,
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Money, Error> {
         match as_of {
             None => Ok(Self::account_view(connection, tenant, found.clone()).await?.balance),
@@ -213,7 +213,7 @@ impl LedgerService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<(account::Model, Money), Error> {
         let found = self.account_for(tenant, principal, &READ, id).await?;
         let amount = Self::account_balance(tenant.database().read(), tenant, &found, as_of).await?;
@@ -227,8 +227,8 @@ impl LedgerService {
         tenant: &TenantContext,
         principal: &Principal,
         book_id: Uuid,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
     ) -> Result<(book::Model, Vec<TrialRow>), Error> {
         if from > to {
             return Err(Error::validation(vec![autoxide_kernel::error::FieldError::new(
@@ -246,7 +246,7 @@ impl LedgerService {
             .order_by_asc(account::Column::Id)
             .all(read)
             .await?;
-        let opening = match from.pred_opt() {
+        let opening = match from.pred() {
             Some(day) => balances_as_of(read, tenant, book.id, &accounts, day).await?,
             None => HashMap::new(),
         };
@@ -410,7 +410,7 @@ impl LedgerService {
         &self,
         tenant: &TenantContext,
         key: &crate::api::AccountKey,
-        as_of: Option<NaiveDate>,
+        as_of: Option<Date>,
     ) -> Result<Money, Error> {
         let read = tenant.database().read();
         let Some(book) = Self::find_book(read, tenant, key.book).await? else {

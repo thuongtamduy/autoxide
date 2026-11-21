@@ -1,5 +1,6 @@
 //! Endpoint quản trị danh mục, bảng giá, dòng giá và sàn giá, dưới `/api/v1/catalog`.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -14,7 +15,6 @@ use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -468,9 +468,9 @@ pub(crate) struct PriceRequest {
     #[schema(inline)]
     pub compare_at: Option<Money>,
     /// When the price starts; omitted: now. A future time schedules the price.
-    pub valid_from: Option<DateTime<Utc>>,
+    pub valid_from: Option<Timestamp>,
     /// End of a temporary price; the earlier price applies again after it.
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_to: Option<Timestamp>,
 }
 
 /// Prices to add to a price list.
@@ -576,7 +576,7 @@ pub(crate) struct ResolveQuery {
     pub currency: String,
     pub customer_group: Option<String>,
     /// Default: now.
-    pub at: Option<DateTime<Utc>>,
+    pub at: Option<Timestamp>,
 }
 
 /// The price of a variant and why.
@@ -599,8 +599,8 @@ pub(crate) struct ResolvedPriceDto {
     pub amount: Money,
     pub tax_inclusive: bool,
     pub compare_at: Option<Money>,
-    pub valid_from: DateTime<Utc>,
-    pub valid_to: Option<DateTime<Utc>>,
+    pub valid_from: Timestamp,
+    pub valid_to: Option<Timestamp>,
 }
 
 impl From<PriceSnapshot> for ResolvedPriceDto {
@@ -644,7 +644,7 @@ async fn resolve_price(
 ) -> Result<Data<ResolvedPriceResponse>, Error> {
     principal.require(&PRICES_READ)?;
     let currency = Currency::parse(&query.currency)?;
-    let at = query.at.unwrap_or_else(Utc::now);
+    let at = query.at.unwrap_or_else(Timestamp::now);
     let mut price_query = PriceQuery::new(OrgId::from_uuid(query.org_id), currency, at, vec![id]);
     if let Some(group) = query.customer_group {
         price_query = price_query.for_customer_group(group);

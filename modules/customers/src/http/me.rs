@@ -1,6 +1,7 @@
 //! Endpoint của người mua về hồ sơ của chính mình (`/me`): chỉ cần đăng nhập, không cần permission
 //! (như `orders`); liên hệ không bị che.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::pagination::{Page, PageQuery, PageRequest};
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
-use chrono::NaiveDate;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use validator::Validate;
@@ -51,7 +51,7 @@ pub(crate) struct UpdateMeRequest {
     /// Up to 200 characters.
     full_name: Option<String>,
     email: Option<String>,
-    birthday: Option<NaiveDate>,
+    birthday: Option<Date>,
     /// `female`, `male`, `other` or an empty string.
     gender: Option<String>,
 }

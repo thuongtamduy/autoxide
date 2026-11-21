@@ -2,6 +2,8 @@
 //! `version`, số bài của danh mục và tác giả, tìm theo chữ, lịch đăng của mọi bài, câu kiểm SEO
 //! theo ngôn ngữ, ảnh trong bản xem trước, lịch đăng mang `ai_reviewed`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -146,7 +148,7 @@ async fn bo_loc_moi_va_truong_moi_cua_danh_sach_bai() {
         // Lịch đăng: lọc `scheduled`, danh sách lịch của mọi bài, `ai_reviewed` chỉ của người.
         let entry = send(&app, "GET", &format!("/entries/{}", id(&ai)), "admin", None).await;
         let etag = entry.header(header::ETAG).to_owned();
-        let at = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+        let at = (Timestamp::now() + SignedDuration::from_hours(24)).to_rfc3339();
         let schedule = json!({"action": "publish", "run_at": at, "ai_reviewed": true});
         let by_key = app
             .post(&format!("/api/v1/content/entries/{}/schedules", id(&ai)))

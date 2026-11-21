@@ -1,5 +1,6 @@
 //! Bảng `support_auto_replies`: nhật ký trả lời tự động.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,7 +19,7 @@ pub struct Model {
     pub confidence_bp: i32,
     pub feedback: Option<String>,
     pub reply_message_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

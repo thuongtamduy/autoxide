@@ -2,10 +2,9 @@
 //! chép — tham chiếu vắt qua ranh giới (theo foreign key trong module) và giá trị unique đã có ở
 //! khách nhận. Không đổi gì.
 
-use std::collections::{HashMap, HashSet};
-
-use chrono::{SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Query};
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 use super::policy::{Mode, Resolved, Treatment};
@@ -63,7 +62,7 @@ pub(crate) fn pending(kind: TableKind, tenant: TenantId) -> Condition {
     match kind {
         TableKind::Jobs => condition
             .add(Expr::col(Alias::new("completed_at")).is_null())
-            .add(Expr::col(Alias::new("run_at")).lte(Utc::now().trunc_subsecs(6))),
+            .add(Expr::col(Alias::new("run_at")).lte(Timestamp::now())),
         _ => condition.add(Expr::col(Alias::new("delivered_at")).is_null()),
     }
 }

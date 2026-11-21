@@ -9,13 +9,14 @@
 //! `GET /api/v1/kernel/jobs/{id}/file`; file giữ `AUTOXIDE_JOBS_FILE_RETENTION_DAYS` ngày rồi job dọn
 //! hằng ngày xoá.
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, OnceLock, PoisonError, RwLock};
 
 use axum::body::Body;
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -306,8 +307,8 @@ fn key(id: Uuid) -> String {
     format!("jobs/{id}.csv")
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Export a list.
@@ -542,7 +543,7 @@ impl JobHandler for ExportRunner {
         let (stored, produced) = tokio::join!(store.put(&file_key, Box::pin(stream)), producer);
         let (rows, truncated) = produced?;
         let size = stored?;
-        let expires_at = now() + Duration::days(i64::from(self.retention_days));
+        let expires_at = now() + SignedDuration::from_hours(24 * (i64::from(self.retention_days)));
         let file = runs::JobFile {
             url: format!("{}/kernel/jobs/{id}/file", crate::http::API_PREFIX),
             name: info.file_name.to_owned(),

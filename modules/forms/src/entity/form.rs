@@ -1,5 +1,6 @@
 //! Bảng `forms_forms`: định nghĩa form hiện hành. JSON lưu dạng chữ.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -36,8 +37,8 @@ pub struct Model {
     /// Số ngày giữ bài gửi; `None`: theo cấu hình; `0`: giữ mãi.
     pub retention_days: Option<i32>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

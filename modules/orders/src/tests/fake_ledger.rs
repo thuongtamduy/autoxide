@@ -1,6 +1,8 @@
 //! Sổ cái giả cho test của `orders`: lượt thu (gửi lại cùng mã tham chiếu trả lượt cũ, hạn 30 phút),
 //! hoàn tiền, cài đặt dòng tiền tự thu; bút toán nhớ theo mã tham chiếu, số dư bên Nợ trừ bên Có.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::sync::Mutex;
 
 use autoxide_kernel::error::Error;
@@ -14,7 +16,6 @@ use autoxide_ledger::api::{
     LineAccount, NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment,
     OpenAccount, Payment, Payout, Refund, Settled, Settlement, Side,
 };
-use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
 
 fn unused<T>() -> Result<T, Error> {
@@ -73,9 +74,9 @@ impl FakeLedger {
             "checkout_url": if qr { None } else { Some(format!("https://pay.example/{id}")) },
             "qr_payload": if qr { Some(format!("000201-{id}")) } else { None },
             "transfer_code": if qr { Some("AX123") } else { None }, "bank_account_id": null,
-            "expires_at": Utc::now() + chrono::Duration::minutes(30), "captured_at": null,
+            "expires_at": Timestamp::now() + SignedDuration::from_mins(30), "captured_at": null,
             "source_module": "orders", "source_id": null, "reference": reference,
-            "created_at": Utc::now(), "updated_at": Utc::now(),
+            "created_at": Timestamp::now(), "updated_at": Timestamp::now(),
         }))
         .unwrap();
         payments.push(made.clone());
@@ -121,7 +122,7 @@ impl Ledger for FakeLedger {
         }
         let made: Entry = serde_json::from_value(serde_json::json!({
             "id": Uuid::now_v7(), "book_id": entry.book.as_uuid(), "org_id": entry.book.as_uuid(),
-            "period_id": Uuid::now_v7(), "effective_date": "2026-11-18", "posted_at": Utc::now(),
+            "period_id": Uuid::now_v7(), "effective_date": "2026-11-18", "posted_at": Timestamp::now(),
             "description": entry.description, "source_module": entry.source_module,
             "source_kind": entry.source_kind, "source_id": entry.source_id, "reference": entry.reference,
             "reverses_entry_id": null, "reversed_by_entry_id": null, "actor_user_id": null,
@@ -149,7 +150,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         key: AccountKey,
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Money, Error> {
         Ok(Money::new(self.balance_of(&key), key.currency))
     }
@@ -180,7 +181,7 @@ impl Ledger for FakeLedger {
             serde_json::from_value(serde_json::json!({
                 "id": Uuid::now_v7(), "payment_id": refund.payment, "amount": refund.amount,
                 "status": "succeeded", "provider_ref": null, "reason": refund.reason,
-                "reference": refund.reference, "created_at": Utc::now(), "updated_at": Utc::now(),
+                "reference": refund.reference, "created_at": Timestamp::now(), "updated_at": Timestamp::now(),
             }))
             .unwrap(),
         ))
@@ -192,7 +193,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: &[AccountKey],
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         unused()
     }
@@ -241,7 +242,7 @@ impl Ledger for FakeLedger {
         _: &TenantContext,
         _: Currency,
         _: Currency,
-        _: NaiveDate,
+        _: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         unused()
     }

@@ -10,13 +10,13 @@
 //! - Cache: `max-age` = min([`MAX_AGE_SECONDS`], số giây tới mốc bắt đầu / kết thúc gần nhất trong
 //!   tương lai của mọi vị trí) — CDN không giữ banner đã hết giờ.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{HashMap, HashSet};
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::resource::Resource;
 use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
 use autoxide_media::api::{MediaRef, MediaVisibility};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QueryOrder};
 use uuid::Uuid;
 
@@ -75,7 +75,7 @@ impl ContentService {
         site: &Site,
         keys: &[String],
         page: &PageContext,
-        now: DateTime<Utc>,
+        now: Timestamp,
         strict: bool,
     ) -> Result<PublicPlacements, Error> {
         let mut problems = Vec::new();
@@ -151,7 +151,7 @@ impl ContentService {
             .filter(|at| *at > now)
             .min();
         let max_age =
-            next.map_or(MAX_AGE_SECONDS, |at| (at - now).num_seconds().clamp(0, MAX_AGE_SECONDS));
+            next.map_or(MAX_AGE_SECONDS, |at| (at - now).as_secs().clamp(0, MAX_AGE_SECONDS));
         let showing: Vec<Banner> = rows
             .into_iter()
             .filter(|row| row.starts_at.is_none_or(|at| at <= now))

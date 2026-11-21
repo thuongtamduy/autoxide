@@ -5,7 +5,7 @@ use autoxide_catalog::api::PriceQuery;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::tenancy::{ScopeExt, Site, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -37,7 +37,7 @@ pub(crate) struct ProductCode {
     pub discount: Money,
     /// Uses left, only when the coupon or promotion has a real limit; `null` otherwise.
     pub uses_left: Option<i64>,
-    pub ends_at: DateTime<Utc>,
+    pub ends_at: Timestamp,
 }
 
 /// Biến thể không thuộc sản phẩm (hay không có) — một lỗi cho cả hai, không lộ biến thể của ai.

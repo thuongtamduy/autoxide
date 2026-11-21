@@ -1,6 +1,7 @@
 //! Cài đặt hỗ trợ theo nút: nhóm nhân viên, thành viên, quy tắc tự phân công
 //! (`support.settings.manage`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -29,7 +29,7 @@ pub(crate) struct TeamResponse {
     id: Uuid,
     org_id: Uuid,
     name: String,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 impl From<Team> for TeamResponse {
@@ -50,7 +50,7 @@ pub(crate) struct MemberResponse {
     user_id: Uuid,
     /// Takes new tickets in round-robin assignment.
     accepting: bool,
-    last_assigned_at: Option<DateTime<Utc>>,
+    last_assigned_at: Option<Timestamp>,
 }
 
 impl From<Member> for MemberResponse {

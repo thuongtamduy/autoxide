@@ -1,6 +1,7 @@
 //! Sổ cái giả cho test của `shipping`: nhớ bút toán theo mã tham chiếu (gửi lại cùng mã không ghi
 //! thêm, như `ledger` thật), tài khoản theo khoá, số dư bên Nợ trừ bên Có.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Mutex;
 
 use autoxide_kernel::error::Error;
@@ -14,7 +15,6 @@ use autoxide_ledger::api::{
     LineAccount, NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment,
     OpenAccount, Payment, Payout, Refund, Settled, Settlement, Side,
 };
-use chrono::{NaiveDate, Utc};
 use uuid::Uuid;
 
 fn unused<T>() -> Result<T, Error> {
@@ -84,7 +84,7 @@ impl Ledger for FakeLedger {
         }
         let made: Entry = serde_json::from_value(serde_json::json!({
             "id": Uuid::now_v7(), "book_id": entry.book.as_uuid(), "org_id": entry.book.as_uuid(),
-            "period_id": Uuid::now_v7(), "effective_date": "2026-11-18", "posted_at": Utc::now(),
+            "period_id": Uuid::now_v7(), "effective_date": "2026-11-18", "posted_at": Timestamp::now(),
             "description": entry.description, "source_module": entry.source_module,
             "source_kind": entry.source_kind, "source_id": entry.source_id, "reference": entry.reference,
             "reverses_entry_id": null, "reversed_by_entry_id": null, "actor_user_id": null,
@@ -112,7 +112,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         key: AccountKey,
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Money, Error> {
         Ok(Money::new(self.balance_of(&key), key.currency))
     }
@@ -142,7 +142,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: &[AccountKey],
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         unused()
     }
@@ -186,7 +186,7 @@ impl Ledger for FakeLedger {
         _: &TenantContext,
         _: Currency,
         _: Currency,
-        _: NaiveDate,
+        _: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         unused()
     }

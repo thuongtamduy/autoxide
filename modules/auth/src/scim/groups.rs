@@ -7,10 +7,10 @@
 //! nhân sự của gói giữ chỗ ngoài transaction. Đồng bộ lỗi (vượt hạn mức, gỡ admin cuối cùng) thì
 //! trả lỗi để hệ thống danh tính gửi lại; gửi lại không đổi nhóm thêm lần nữa, chỉ đồng bộ lại.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeSet, HashMap};
 
 use autoxide_kernel::tenancy::{ScopeExt as _, TenantContext};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait as _, ColumnTrait as _, ConnectionTrait, DatabaseTransaction,
@@ -32,8 +32,8 @@ const NAME_MAX_LENGTH: usize = 255;
 /// Nhiều thành viên nhất trong một lần ghi nhóm.
 const MAX_MEMBERS: usize = 10_000;
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn group_not_found(id: &str) -> ScimError {

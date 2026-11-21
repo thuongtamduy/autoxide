@@ -10,6 +10,8 @@
 //! xuất, event) chạy theo từng khách có dữ liệu trên database đó; xoá dấu vết IP, bài mồ côi,
 //! nonce và bộ đếm quét cả database.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -20,7 +22,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext, TenantId};
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, Query};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
@@ -64,7 +65,7 @@ impl FormsService {
         &self,
         databases: &DatabaseRegistry,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Cleaned, Error> {
         let mut cleaned = Cleaned::default();
         // Khách có form hay bản xuất trên database này (quét cả database, qua index có
@@ -96,7 +97,8 @@ impl FormsService {
                 }
             }
         }
-        let ip_before = now - chrono::Duration::days(i64::from(self.config.ip_retention_days));
+        let ip_before =
+            now - SignedDuration::from_hours(24 * (i64::from(self.config.ip_retention_days)));
         let write = database.write();
         cleaned.fingerprints = submission::Entity::update_many()
             .col_expr(submission::Column::IpFingerprint, Expr::value(Option::<String>::None))
@@ -117,7 +119,7 @@ impl FormsService {
             .rows_affected;
         self.guard.purge_nonces(write, "forms").await?;
         Throttle::new("forms", 1, Duration::from_secs(3600))?
-            .purge(database, now - chrono::Duration::days(1))
+            .purge(database, now - SignedDuration::from_hours(24))
             .await?;
         if cleaned != Cleaned::default() {
             tracing::info!(
@@ -136,10 +138,11 @@ impl FormsService {
     async fn cleanup_tenant(
         &self,
         tenant: &TenantContext,
-        now: DateTime<Utc>,
+        now: Timestamp,
         cleaned: &mut Cleaned,
     ) -> Result<(), Error> {
-        let spam_before = now - chrono::Duration::days(i64::from(self.config.spam_retention_days));
+        let spam_before =
+            now - SignedDuration::from_hours(24 * (i64::from(self.config.spam_retention_days)));
         let forms = form::Entity::find().scoped(tenant).all(tenant.database().read()).await?;
         let default_days = self.retention_days(tenant).await?;
         for form in &forms {
@@ -151,7 +154,7 @@ impl FormsService {
                 .and_then(|days| u32::try_from(days).ok())
                 .unwrap_or(default_days);
             if days > 0 {
-                let before = now - chrono::Duration::days(i64::from(days));
+                let before = now - SignedDuration::from_hours(24 * (i64::from(days)));
                 cleaned.expired += self.expire(tenant, form, before, None, "retention").await?;
             }
         }
@@ -165,7 +168,7 @@ impl FormsService {
         &self,
         tenant: &TenantContext,
         form: &form::Model,
-        before: DateTime<Utc>,
+        before: Timestamp,
         status: Option<SubmissionStatus>,
         reason: &str,
     ) -> Result<u64, Error> {

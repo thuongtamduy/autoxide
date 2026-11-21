@@ -15,6 +15,8 @@
 //! - **Tóm tắt AI** (D-109): job gọi `TextModel` ngoài transaction, kết quả theo JSON Schema thành bản
 //!   nháp; chỉ bản nhân viên duyệt mới công khai, kèm nhãn AI.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -29,7 +31,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetc
 use autoxide_kernel::resource::BadgeResolver;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, ConnectionTrait, EntityTrait, PaginatorTrait,
@@ -77,7 +78,7 @@ pub(crate) struct PublicFilter {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct StaffFilter {
     pub status: Option<String>,
-    pub created_after: Option<DateTime<Utc>>,
+    pub created_after: Option<Timestamp>,
     pub product_id: Option<Uuid>,
 }
 
@@ -317,7 +318,9 @@ impl OrdersService {
             .one(tenant.database().read())
             .await?
             .ok_or_else(errors::review_not_found)?;
-        if now() - current.created_at > Duration::days(self.config.review_edit_days) {
+        if now() - current.created_at
+            > SignedDuration::from_hours(24 * self.config.review_edit_days)
+        {
             return Err(errors::review_edit_closed());
         }
         let mut problems = Vec::new();
@@ -605,7 +608,7 @@ impl OrdersService {
             crate::notices::REVIEW_HIDDEN.key(),
             autoxide_notifications::api::Recipient::User(row.author_user_id),
             json!({"reason": row.hidden_reason}),
-            format!("orders:review:{}:hidden:{}", row.id, row.updated_at.timestamp_micros()),
+            format!("orders:review:{}:hidden:{}", row.id, row.updated_at.as_unix_micros()),
         );
         if let Err(error) = notifier.notify(tenant.id(), notification).await {
             tracing::warn!(review_id = %row.id, code = error.code(), "review hidden notice not sent");

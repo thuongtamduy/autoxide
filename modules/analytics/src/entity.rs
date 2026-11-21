@@ -11,6 +11,7 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod event {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -21,7 +22,7 @@ pub(crate) mod event {
         pub id: Uuid,
         pub tenant_id: Uuid,
         pub site_org_id: Uuid,
-        pub occurred_at: DateTimeUtc,
+        pub occurred_at: Timestamp,
         /// Ngày UTC `YYYY-MM-DD`.
         pub day: String,
         #[sea_orm(column_name = "type")]
@@ -93,6 +94,7 @@ pub(crate) mod funnel_daily {
 }
 
 pub(crate) mod day_key {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -104,7 +106,7 @@ pub(crate) mod day_key {
         #[sea_orm(primary_key, auto_increment = false)]
         pub day: String,
         pub key: String,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -112,6 +114,7 @@ pub(crate) mod day_key {
 }
 
 pub(crate) mod rollup {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -122,7 +125,7 @@ pub(crate) mod rollup {
         pub tenant_id: Uuid,
         #[sea_orm(primary_key, auto_increment = false)]
         pub day: String,
-        pub rolled_at: DateTimeUtc,
+        pub rolled_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

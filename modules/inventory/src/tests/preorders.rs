@@ -1,15 +1,16 @@
 //! Hàng đặt trước (D-204): không vượt suất khi đặt đồng thời, hàng về chia theo thứ tự đặt, huỷ
 //! trả lại suất.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_catalog::api::SaleMode;
 use autoxide_kernel::job::{EnqueueOptions, JobQueue};
 use autoxide_kernel::tenancy::OrgId;
 use autoxide_testkit::{TestApp, TestDatabase};
-use chrono::{Duration, Utc};
 use futures_util::future::join_all;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
 use super::{assert_consistent, drain, level, shop, stock_in};
@@ -24,7 +25,7 @@ fn request(org: OrgId, variant: Uuid, quantity: i64) -> ReserveRequest {
     ReserveRequest::new(
         Uuid::now_v7(),
         org,
-        Utc::now() + Duration::minutes(30),
+        Timestamp::now() + SignedDuration::from_mins(30),
         vec![ReserveLine::new("1", variant, quantity)],
     )
 }
@@ -44,7 +45,7 @@ async fn allocated(app: &TestApp, order: Uuid) -> i64 {
         }
     };
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(backend, sql, [order.into()]))
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, [order.into()]))
         .await
         .unwrap()
         .unwrap();

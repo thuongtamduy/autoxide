@@ -5,10 +5,10 @@
 //! Kiểu này vừa là dạng lưu trong cột JSON `fields` (và ảnh chụp ở `forms_form_versions`), vừa
 //! là dạng của API: đổi tên trường ở đây là đổi hợp đồng — chỉ thêm, không đổi.
 
+use autoxide_kernel::time::Date;
 use std::collections::HashSet;
 
 use autoxide_kernel::error::FieldError;
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use utoipa::ToSchema;
@@ -557,7 +557,7 @@ fn check_value(
                     }
                 }
                 FieldType::Date => {
-                    if NaiveDate::parse_from_str(&text, "%Y-%m-%d").is_err() || text.len() != 10 {
+                    if Date::parse_from_str(&text, "%Y-%m-%d").is_err() || text.len() != 10 {
                         return fail(FieldError::new(
                             path,
                             "date",

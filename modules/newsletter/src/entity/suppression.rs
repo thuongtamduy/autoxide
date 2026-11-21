@@ -1,5 +1,6 @@
 //! Bảng `newsletter_suppressions`: địa chỉ không bao giờ nhận mail chiến dịch.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,7 +17,7 @@ pub struct Model {
     pub reason: String,
     /// Ghi chú của quản trị viên hay mã lỗi SMTP.
     pub note: Option<String>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

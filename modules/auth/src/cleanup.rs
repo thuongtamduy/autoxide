@@ -2,11 +2,12 @@
 //! refresh token hết hạn hay đã thu hồi, lượt MFA hết hạn. Không có job này các bảng
 //! đó lớn mãi (D-047).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler, Schedule};
-use chrono::Utc;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, Query};
 
@@ -25,8 +26,8 @@ pub(crate) struct Cleanup;
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
-        let now = Utc::now();
-        let day_ago = now - chrono::Duration::days(1);
+        let now = Timestamp::now();
+        let day_ago = now - SignedDuration::from_hours(24);
         let connection = job.database.write();
         let mut removed = 0;
         // Số đếm của cửa sổ đã qua lâu và không còn khoá (bảng `auth_throttle` của kernel).
@@ -54,7 +55,7 @@ impl JobHandler for Cleanup {
         removed +=
             autoxide_kernel::tokens::OneTimeTokens::new("auth").purge(connection, now).await?;
         // Lời mời hết hạn quá lâu (D-312); event audit của nó giữ.
-        let stale = now - chrono::Duration::days(crate::invitation::KEEP_DAYS);
+        let stale = now - SignedDuration::from_hours(24 * (crate::invitation::KEEP_DAYS));
         let expired = Condition::all().add(Expr::col(Alias::new("expires_at")).lt(stale));
         removed += delete(connection, "auth_invitation", expired).await?;
         // Nghi thức passkey bỏ dở.

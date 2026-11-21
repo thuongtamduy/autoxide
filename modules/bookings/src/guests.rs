@@ -8,7 +8,8 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, Set};
 use uuid::Uuid;
@@ -30,7 +31,7 @@ const PER_PHONE_PER_HOUR: u64 = 5;
 #[derive(Debug, Clone)]
 pub(crate) struct Challenge {
     pub id: Uuid,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 pub(crate) fn code_invalid() -> Error {
@@ -100,7 +101,7 @@ impl BookingsService {
         let at = now();
         let recent = guest_challenge::Entity::find()
             .filter(guest_challenge::Column::Phone.eq(phone.as_str()))
-            .filter(guest_challenge::Column::CreatedAt.gt(at - Duration::hours(1)))
+            .filter(guest_challenge::Column::CreatedAt.gt(at - SignedDuration::from_hours(1)))
             .scoped(tenant)
             .count(tenant.database().read())
             .await?;
@@ -110,7 +111,7 @@ impl BookingsService {
         let code = random_code()?;
         let id = Uuid::now_v7();
         let pepper = self.pepper(tenant).await?;
-        let expires_at = at + Duration::minutes(TTL_MINUTES);
+        let expires_at = at + SignedDuration::from_mins(TTL_MINUTES);
         let transaction = tenant.database().begin_write().await?;
         guest_challenge::ActiveModel {
             id: Set(id),

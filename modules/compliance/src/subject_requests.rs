@@ -14,7 +14,8 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -50,7 +51,7 @@ pub(crate) struct NewRequest {
     pub kind: String,
     pub channel: String,
     pub subject: String,
-    pub received_at: Option<DateTime<Utc>>,
+    pub received_at: Option<Timestamp>,
     pub notes: Option<String>,
 }
 
@@ -93,7 +94,7 @@ impl ComplianceService {
         &self,
         tenant: &TenantContext,
         kind: &str,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<i64, Error> {
         let rule = self.rule_for(tenant, "privacy.subject_requests", at).await?;
         Ok(rule
@@ -135,7 +136,7 @@ impl ComplianceService {
         }
         let at = now();
         let received_at = input.received_at.unwrap_or(at);
-        if received_at > at + Duration::minutes(5) {
+        if received_at > at + SignedDuration::from_mins(5) {
             problems.push(FieldError::new("received_at", "range", "must not be in the future"));
         }
         if input.notes.as_deref().is_some_and(|notes| notes.len() > 5000) {
@@ -155,7 +156,7 @@ impl ComplianceService {
             subject_kind: subject_kind.to_owned(),
             subject,
             received_at,
-            due_at: received_at + Duration::hours(hours),
+            due_at: received_at + SignedDuration::from_hours(hours),
             status: "received".to_owned(),
             reason: None,
             notes: input.notes,
@@ -213,7 +214,7 @@ impl ComplianceService {
         if overdue {
             select = select
                 .filter(subject_request::Column::Status.is_in(["received", "in_progress"]))
-                .filter(subject_request::Column::DueAt.lt(Utc::now()));
+                .filter(subject_request::Column::DueAt.lt(Timestamp::now()));
         }
         fetch_page(
             select,

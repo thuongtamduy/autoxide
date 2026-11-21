@@ -1,5 +1,6 @@
 //! Tool MCP của dữ liệu cá nhân và mã theo dõi (D-360, D-361): cùng service, cùng permission với REST.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::i18n::Language;
 use autoxide_kernel::mcp::{NoInput, PageInput, Tool};
 use autoxide_kernel::pagination::Page;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -49,7 +49,7 @@ pub(crate) struct IncidentInput {
     /// `low`, `medium`, `high` or `critical`.
     severity: String,
     /// When it was detected (the 72-hour deadline counts from here); defaults to now.
-    detected_at: Option<DateTime<Utc>>,
+    detected_at: Option<Timestamp>,
     #[serde(default)]
     data_categories: Vec<String>,
     affected_count: Option<i64>,
@@ -85,7 +85,7 @@ pub(crate) struct RequestInput {
     /// A user id, an email address or a phone number.
     subject: String,
     /// When it was received; defaults to now.
-    received_at: Option<DateTime<Utc>>,
+    received_at: Option<Timestamp>,
     notes: Option<String>,
 }
 

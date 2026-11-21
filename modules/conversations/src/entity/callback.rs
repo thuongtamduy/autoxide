@@ -1,5 +1,6 @@
 //! Bảng `conversations_callback_requests`: người mua xin cửa hàng gọi lại.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,16 +17,16 @@ pub struct Model {
     pub phone_sealed: Option<String>,
     pub phone_masked: String,
     pub phone_source: String,
-    pub window_start: DateTimeUtc,
-    pub window_end: DateTimeUtc,
-    pub recording_ack_at: Option<DateTimeUtc>,
+    pub window_start: Timestamp,
+    pub window_end: Timestamp,
+    pub recording_ack_at: Option<Timestamp>,
     pub status: String,
     pub open_key: Option<String>,
     pub assigned_user_id: Option<Uuid>,
     pub attempts: i32,
     pub last_call_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

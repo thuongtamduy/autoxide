@@ -1,5 +1,6 @@
 //! Bảng `orders_fulfillments`: một lần giao của đơn.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,8 +15,8 @@ pub struct Model {
     pub lines: String,
     pub status: String,
     pub cod_collected_minor: Option<i64>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

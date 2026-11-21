@@ -23,10 +23,9 @@
 //! assert_eq!(source.event(), "invoices.document_issued");
 //! ```
 
-use std::collections::BTreeMap;
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use serde_json::Value;
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -85,7 +84,7 @@ pub struct Fact {
     pub kind: &'static str,
     /// Nút sở hữu ở khách nguồn; `None`: nút gốc của khách.
     pub org_id: Option<OrgId>,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     /// Số tiền — có khi loại là [`Measure::Amount`].
     pub amount: Option<Money>,
     /// Số đếm — có khi loại là [`Measure::Quantity`].
@@ -96,7 +95,7 @@ pub struct Fact {
 
 impl Fact {
     /// Số liệu loại `kind` xảy ra lúc `occurred_at`, chưa có số tiền, số đếm hay chiều nào.
-    pub fn new(kind: &'static str, occurred_at: DateTime<Utc>) -> Self {
+    pub fn new(kind: &'static str, occurred_at: Timestamp) -> Self {
         Fact {
             kind,
             org_id: None,

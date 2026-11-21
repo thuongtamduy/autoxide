@@ -1,5 +1,6 @@
 //! Endpoint dòng tồn, sổ biến động và điều chỉnh tồn, dưới `/api/v1/inventory`.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -169,9 +169,9 @@ pub(crate) struct MovementsQuery {
     #[param(inline)]
     pub kind: Option<KindDto>,
     /// Lines written at or after this time.
-    pub from: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
     /// Lines written before this time.
-    pub to: Option<DateTime<Utc>>,
+    pub to: Option<Timestamp>,
 }
 
 /// List the stock movement ledger in your scope.
@@ -308,12 +308,12 @@ pub(crate) struct LotResponse {
     pub org_id: Uuid,
     pub variant_id: Uuid,
     pub lot_code: String,
-    pub expires_on: Option<chrono::NaiveDate>,
+    pub expires_on: Option<Date>,
     /// Units of this lot on hand.
     pub on_hand: i64,
     /// `ok`, `expiring` (within `inventory.expiring_days`) or `expired`, computed when read.
     pub expiry_state: String,
-    pub received_at: DateTime<Utc>,
+    pub received_at: Timestamp,
 }
 
 impl From<crate::lots::LotView> for LotResponse {

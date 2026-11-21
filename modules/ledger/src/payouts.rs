@@ -7,6 +7,8 @@
 //! Đối tác không trả lời → giữ `pending`: gửi lại cùng `reference`, hoặc lịch `ledger.check_payouts`
 //! gửi lại (đối tác chống trùng theo ID lượt chi) và hỏi trạng thái lượt `sent`.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -19,7 +21,6 @@ use autoxide_kernel::payment::{PayoutGateway, PayoutIntent, PayoutStatus};
 use autoxide_kernel::reference::{self, Reference, Submitted};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
-use chrono::{Duration, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
 use serde_json::json;
 use uuid::Uuid;
@@ -367,7 +368,7 @@ impl LedgerService {
         &self,
         database: &autoxide_kernel::database::Database,
     ) -> Result<u64, Error> {
-        let stale = Utc::now() - Duration::minutes(1);
+        let stale = Timestamp::now() - SignedDuration::from_mins(1);
         let due: Vec<(Uuid, Uuid)> = payout::Entity::find()
             .select_only()
             .column(payout::Column::TenantId)
