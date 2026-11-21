@@ -509,3 +509,82 @@ async fn hai_callback_cung_luot_chi_phat_mot_event() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn ket_qua_muon_cua_luot_cu_khong_xac_thuc_lai_ho_so_da_thu_hoi() {
+    TestDatabase::run(async |test| {
+        let (app, verifier) = app(test).await;
+        let (profile, reference) = start(&app, "alice").await;
+        // Người duyệt xác thực tay khi lượt ở nhà cung cấp còn chờ, rồi thu hồi.
+        let (status, approved) =
+            call(&app, "POST", &format!("/kyc/profiles/{profile}/approve"), "admin", None).await;
+        assert_eq!(status, StatusCode::OK, "{approved}");
+        let body = json!({"reason_code": "forged_document"});
+        let (status, revoked) =
+            call(&app, "POST", &format!("/kyc/profiles/{profile}/revoke"), "admin", Some(body))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{revoked}");
+        // Kết quả của lượt cũ về muộn: trước đây xác thực lại hồ sơ vừa bị thu hồi (cả hai DB).
+        verifier.complete(&reference, true, "NGUYEN VAN A", "001099012345");
+        assert_eq!(callback(&app, &reference).await, StatusCode::NO_CONTENT);
+        run_jobs(&app).await;
+        let (_, found) =
+            call(&app, "GET", &format!("/kyc/profiles/{profile}"), "admin", None).await;
+        assert_eq!(found["data"]["status"], "revoked", "{found}");
+
+        // Lượt cũ khi đã mở lượt mới: kết quả của lượt cũ không quyết hồ sơ.
+        let (_, old) = start(&app, "bob").await;
+        let (bob, _) = start(&app, "bob").await;
+        verifier.complete(&old, true, "TRAN VAN B", "001099054321");
+        assert_eq!(callback(&app, &old).await, StatusCode::NO_CONTENT);
+        run_jobs(&app).await;
+        let (_, found) = call(&app, "GET", &format!("/kyc/profiles/{bob}"), "admin", None).await;
+        assert_eq!(found["data"]["status"], "pending", "{found}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn hai_ho_so_cung_giay_to_xac_thuc_cung_luc_chi_mot_ho_so_verified() {
+    TestDatabase::run(async |test| {
+        let (app, verifier) = app(test).await;
+        for (pair, document) in
+            [(["alice", "bob"], "001099012345"), (["admin", "staff"], "001099067890")]
+        {
+            let mut references = Vec::new();
+            let mut profiles = Vec::new();
+            for who in pair {
+                let (profile, reference) = start(&app, who).await;
+                verifier.complete(&reference, true, "NGUYEN VAN A", document);
+                profiles.push(profile);
+                references.push(reference);
+            }
+            // Hai callback, hai job chạy cùng lúc. Trước đây mỗi bên khoá hồ sơ của mình, cùng thấy
+            // "chưa ai dùng giấy tờ này" và cùng `verified`.
+            let (one, two) =
+                tokio::join!(callback(&app, &references[0]), callback(&app, &references[1]));
+            assert_eq!((one, two), (StatusCode::NO_CONTENT, StatusCode::NO_CONTENT));
+            run_jobs(&app).await;
+            let mut statuses = Vec::new();
+            for profile in &profiles {
+                let (_, found) =
+                    call(&app, "GET", &format!("/kyc/profiles/{profile}"), "admin", None).await;
+                statuses.push((
+                    found["data"]["status"].as_str().unwrap().to_owned(),
+                    found["data"]["reason_code"].as_str().map(str::to_owned),
+                ));
+            }
+            statuses.sort();
+            assert_eq!(
+                statuses,
+                vec![
+                    ("pending".to_owned(), Some("duplicate_document".to_owned())),
+                    ("verified".to_owned(), None),
+                ]
+            );
+        }
+    })
+    .await
+    .unwrap();
+}
