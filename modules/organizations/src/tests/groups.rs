@@ -242,3 +242,36 @@ async fn nhom_cua_khach_khac_khong_tim_thay() {
     .await
     .unwrap();
 }
+
+/// Tìm nút và nhóm theo tên: `%` và `_` trong `q` là chữ thường, không phải ký tự đại diện của
+/// `LIKE`.
+#[tokio::test]
+async fn tim_theo_ten_khong_coi_phan_tram_la_dai_dien() {
+    TestDatabase::run(async |test| {
+        let app = build(test, |builder| builder.user("boss", 9, &MANAGE)).await;
+        let tree = tree(&app).await;
+        let sale = group(&app, "boss", "Sale 50% off").await;
+        let under = group(&app, "boss", "North_East").await;
+        group(&app, "boss", "Northern Coast").await;
+
+        let names = async |path: &str| {
+            let found = expect(&app, "GET", path, "boss", None, StatusCode::OK).await;
+            let mut ids: Vec<String> = found["data"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| row["id"].as_str().unwrap().to_owned())
+                .collect();
+            ids.sort();
+            ids
+        };
+        assert_eq!(names("/groups?q=%25").await, vec![sale.clone()], "`%` khớp đúng chữ `%`");
+        assert_eq!(names("/groups?q=50%25").await, vec![sale]);
+        assert_eq!(names("/groups?q=north_").await, vec![under], "`_` không khớp mọi ký tự");
+        assert!(names("/units?q=%25").await.is_empty(), "không nút nào có `%` trong tên");
+        assert!(names("/units?q=_").await.is_empty(), "không nút nào có `_` trong tên");
+        assert_eq!(names("/units?q=ha%20noi").await, vec![tree.s1]);
+    })
+    .await
+    .unwrap();
+}
