@@ -39,6 +39,12 @@ fn text(value: &Value) -> Option<&str> {
     value.as_str()
 }
 
+/// Như [`text`], nhưng ngày sau năm 9999 (`+10000-…`, `chrono` biểu diễn được) là `None`: ngoài khoảng của
+/// `jiff`, các hàm cộng ngày / tháng trả `None` thay vì một giá trị không lưu được.
+fn date_text(value: &Value) -> Option<&str> {
+    value.as_str().filter(|day| !day.starts_with('+'))
+}
+
 #[test]
 fn chuoi_luu_sqlite_va_json_giong_het_chrono() {
     for row in rows("timestamps") {
@@ -104,14 +110,16 @@ fn ngay_giong_het_chrono() {
         for (months, expected) in row["add_months"].as_object().unwrap() {
             let months: i32 = months.parse().unwrap();
             let found = ours.checked_add_months(months).map(|day| day.to_string());
-            assert_eq!(found.as_deref(), text(expected), "{row} {months}");
+            assert_eq!(found.as_deref(), date_text(expected), "{row} {months}");
         }
         let show = |day: Option<Date>| day.map(|day| day.to_string());
-        assert_eq!(show(ours.checked_add_days(40)).as_deref(), text(&row["add_days_40"]));
-        assert_eq!(show(ours.succ()).as_deref(), text(&row["succ"]), "{row}");
+        assert_eq!(show(ours.checked_add_days(40)).as_deref(), date_text(&row["add_days_40"]));
+        assert_eq!(show(ours.succ()).as_deref(), date_text(&row["succ"]), "{row}");
         assert_eq!(show(ours.pred()).as_deref(), text(&row["pred"]), "{row}");
         assert_eq!(ours.format("%d/%m/%Y"), row["ddmmyyyy"].as_str().unwrap());
-        assert_eq!(ours.start_of_day_utc().to_json_string(), row["start_of_day"].as_str().unwrap());
+        // 9999-12-31T00:00Z vượt giới hạn trên của `jiff`: kẹp về `Timestamp::MAX`.
+        let start = row["start_of_day"].as_str().unwrap().parse().unwrap_or(Timestamp::MAX);
+        assert_eq!(ours.start_of_day_utc(), start, "{row}");
     }
     assert_eq!("2026-02-29".parse::<Date>().ok(), None);
     assert_eq!("2026-11-21T00:00:00".parse::<Date>().ok(), None);

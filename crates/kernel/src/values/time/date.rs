@@ -101,10 +101,15 @@ impl Date {
         Date(self.0.last_of_month())
     }
 
-    /// 00:00 của ngày này theo UTC.
+    /// 00:00 của ngày này theo UTC. Ngày sát giới hạn lịch (9999-12-31, -9999-01-01) không có thời điểm biểu diễn
+    /// được: kẹp về [`Timestamp::MAX`](super::Timestamp::MAX) / [`MIN`](super::Timestamp::MIN), để so sánh "trước /
+    /// sau ngày này" vẫn đúng chiều.
     pub fn start_of_day_utc(self) -> super::Timestamp {
-        let at = self.0.to_zoned_datetime(jiff::tz::TimeZone::UTC).map(|zoned| zoned.timestamp());
-        super::Timestamp::exact(at.unwrap_or(jiff::Timestamp::UNIX_EPOCH))
+        match self.0.to_zoned_datetime(jiff::tz::TimeZone::UTC) {
+            Ok(zoned) => super::Timestamp::exact(zoned.timestamp()),
+            Err(_) if self.0.year() > 0 => super::Timestamp::MAX,
+            Err(_) => super::Timestamp::MIN,
+        }
     }
 
     /// Thời điểm bắt đầu ngày này ở múi giờ `zone` (ngày đổi giờ mùa hè bắt đầu lúc 01:00 thì lấy lúc đó).
