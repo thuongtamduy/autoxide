@@ -3,6 +3,6 @@
   password and email changes, users and roles in `auth`, tags, notes, views, texts, approvals, bulk
   actions and exports in the kernel, address validation, a few `catalog`, `forms` and `promotions`
   bodies — now do the same instead of ignoring it, and their schemas say `additionalProperties:
-  false`. A client that sent extra fields to these endpoints must stop sending them. SCIM 2.0,
+  false`. The MCP tools `auth.create_api_key` and `auth.create_role`, which share those bodies, refuse unknown fields too. A client that sent extra fields to these endpoints must stop sending them. SCIM 2.0,
   partner callbacks, the cart line (`PUT /api/v1/orders/carts/{id}/lines/{variant_id}`) and bodies
   built from several parts are unchanged.

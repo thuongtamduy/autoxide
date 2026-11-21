@@ -308,7 +308,7 @@ mod tests {
         }));
         assert_eq!(
             rules(&open),
-            vec![("api-closed-body", "POST".to_owned()), ("api-closed-body", "GET".to_owned())]
+            vec![("api-closed-body", "GET".to_owned()), ("api-closed-body", "POST".to_owned())]
         );
         let bytes = document(json!({
             "requestBody": {"content": {"application/json": {"schema": {"type": "string", "format": "binary"}}}}
