@@ -80,6 +80,9 @@ pub(crate) async fn run_backup(settings: Settings, directory: PathBuf) -> Result
     }
     let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
     let result = async {
+        // Backup chỉ chứa bảng của module đang bật: còn dữ liệu của module đang tắt thì dừng.
+        crate::modules::refuse_dormant_data(&runtime.modules, &runtime.database, "backup create")
+            .await?;
         let migrator = runtime.modules.migrator().map_err(|error| error.to_string())?;
         let names = runtime.modules.names();
         let scratch =
@@ -179,7 +182,16 @@ pub(crate) async fn run_restore(settings: Settings, directory: PathBuf) -> Resul
             }
         };
         let names = runtime.modules.names();
-        let tables = copy_modules(&source, &runtime.database, &names).await;
+        // Bản backup có dữ liệu của module mà bản cài này đang tắt: dừng, không bỏ sót nó.
+        let tables =
+            match crate::modules::refuse_dormant_data(&runtime.modules, &source, "backup restore")
+                .await
+            {
+                Ok(()) => copy_modules(&source, &runtime.database, &names)
+                    .await
+                    .map_err(|error| error.to_string()),
+                Err(error) => Err(error),
+            };
         let _ = source.close().await;
         let restored = async {
             let tables = tables.map_err(|error| error.to_string())?;

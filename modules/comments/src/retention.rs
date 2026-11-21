@@ -109,6 +109,7 @@ impl CommentsService {
         let ip_before =
             now - SignedDuration::from_hours(24 * (i64::from(self.config.ip_retention_days)));
         let write = database.write();
+        // tenant-scope: job hạn lưu IP, chạy cho mọi khách trên database.
         cleaned.fingerprints = comment::Entity::update_many()
             .col_expr(comment::Column::IpFingerprint, Expr::value(Option::<String>::None))
             .filter(comment::Column::IpFingerprint.is_not_null())
@@ -119,6 +120,7 @@ impl CommentsService {
         // Khoá người báo của khách (`ip:<dấu vết>`) cũng là dấu vết IP: quá hạn thì thành
         // `expired:<id báo cáo>` — vẫn duy nhất trong `(tenant_id, comment_id, reporter_key)`.
         loop {
+            // tenant-scope: job hạn lưu người báo cáo, mọi khách trên database.
             let expired: Vec<Uuid> = report::Entity::find()
                 .select_only()
                 .column(report::Column::Id)
@@ -133,6 +135,7 @@ impl CommentsService {
                 break;
             }
             for id in expired {
+                // tenant-scope: job hạn lưu; ID lấy từ câu quét ở trên.
                 cleaned.reporters += report::Entity::update_many()
                     .col_expr(report::Column::ReporterKey, Expr::value(format!("expired:{id}")))
                     .filter(report::Column::Id.eq(id))

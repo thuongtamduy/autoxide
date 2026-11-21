@@ -83,6 +83,7 @@ impl RelocateTable for AuditRelocation {
         let mut written = 0;
         for row in self.entries(context).await? {
             // Khoá chính chỉ là `id`: dòng đã có ở đích (ghi lại khi tách) là cùng một lịch sử.
+            // tenant-scope: khoá chính `id` duy nhất mọi khách; tra ở database đích khi dời khách.
             if entity::Entity::find_by_id(row.id).one(target).await?.is_some() {
                 continue;
             }

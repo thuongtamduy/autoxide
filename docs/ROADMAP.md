@@ -89,7 +89,7 @@ Xong cả giai đoạn (33–37, 40): xem [`roadmap/done.md`](roadmap/done.md).
 Thứ cộng đồng cần là lý do để tin và đường để đóng góp. Không dựng module mới trước bản 1.0, trừ bộ nối nhà cung cấp
 thật (P7).
 
-- [ ] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
+- [x] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
       MCP, không job, không nhận event, không chạy migration trên database mới; database đã có bảng của module tắt thì
       giữ nguyên dữ liệu; bật thiếu phụ thuộc thì báo rõ phải bật thêm gì; `doctor` liệt kê module bật / tắt;
       `docs/openapi.json` trong repo vẫn sinh với mọi module; test tập tối thiểu trên cả hai database
@@ -101,7 +101,7 @@ thật (P7).
       publish-check` (đóng gói + build thử mọi crate sẽ đăng; `publish = false` giữ tới khi chủ dự án bảo đăng), job
       `semver` ở PR phát hành. Còn lại cho P4 / P5: rustdoc của kernel và testkit đang viết tiếng Việt (docs.rs cần
       tiếng Anh); một hàm gộp chuỗi migration bảng phụ trợ (outbox, job) cho module mới
-- [ ] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
+- [x] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
       hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
       cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm
 - [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
@@ -114,7 +114,7 @@ thật (P7).
       của bên thứ ba
 - [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam (D-20261121-vn-providers), mỗi bộ nối một module nhỏ sau trait của core,
       viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
-  - [ ] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
+  - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
   - [ ] Thanh toán: SePay
   - [ ] Thanh toán: MoMo

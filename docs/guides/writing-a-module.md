@@ -211,6 +211,8 @@ AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD='correct horse battery staple' \
   cargo run -p acme-server -- serve               # http://127.0.0.1:8080; creates the first administrator
 ```
 
+Which modules run is a setting, `AUTOXIDE_MODULES` (see [`docs/MODULES.md`](../MODULES.md)): by default every official module and every module you added; `AUTOXIDE_MODULES=official,-bookmarks` turns yours off, and a module turned on brings the modules it names in `Module::depends_on`. `acme openapi` and `acme mcp-manifest` always print the full contract.
+
 With no settings the server keeps its data in SQLite under `./data`. For PostgreSQL set `DATABASE_URL=postgres://…`; nothing else changes. `acme config --env-example > .env.example` writes a documented list of every setting, and `acme doctor` checks an installation step by step.
 
 In another terminal, sign in and call your module. The administrator created on first start holds every permission, including the ones your module declares:

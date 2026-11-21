@@ -72,6 +72,12 @@ impl Module for InventoryModule {
         "inventory"
     }
 
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["catalog"]
+    }
+
     fn description(&self) -> &'static str {
         "Stock per variant and warehouse with an append-only movement ledger, reservations that \
          never oversell, transfers, stock counts, lots, serials and purchasing."

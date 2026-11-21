@@ -11,6 +11,7 @@ pub mod mail;
 pub mod moderation;
 pub mod payment;
 pub mod privacy;
+pub mod provider;
 pub mod push;
 pub mod report;
 pub mod resource;

@@ -167,6 +167,7 @@ impl ConversationsService {
             let transaction = database.begin_write().await?;
             // Xoá cuộc trò chuyện trước, nhắc lại điều kiện hạn lưu: tin mới tới giữa lúc quét thì cuộc
             // đó còn lại — và chỉ xoá dòng con của cuộc đã thật sự bị xoá.
+            // tenant-scope: job hạn lưu, xoá cuộc trò chuyện quá hạn của mọi khách.
             let removed = thread::Entity::delete_many()
                 .filter(thread::Column::Id.is_in(ids.clone()))
                 .filter(thread::Column::LastMessageAt.lt(before))
@@ -178,16 +179,19 @@ impl ConversationsService {
                 .from(thread::Entity)
                 .and_where(thread::Column::Id.is_in(ids.clone()))
                 .to_owned();
+            // tenant-scope: dòng con của cuộc vừa xoá (job hạn lưu, mọi khách).
             message::Entity::delete_many()
                 .filter(message::Column::ThreadId.is_in(ids.clone()))
                 .filter(message::Column::ThreadId.not_in_subquery(survivors.clone()))
                 .exec(&transaction)
                 .await?;
+            // tenant-scope: dòng con của cuộc vừa xoá (job hạn lưu, mọi khách).
             read::Entity::delete_many()
                 .filter(read::Column::ThreadId.is_in(ids.clone()))
                 .filter(read::Column::ThreadId.not_in_subquery(survivors.clone()))
                 .exec(&transaction)
                 .await?;
+            // tenant-scope: dòng con của cuộc vừa xoá (job hạn lưu, mọi khách).
             report::Entity::delete_many()
                 .filter(report::Column::ThreadId.is_in(ids))
                 .filter(report::Column::ThreadId.not_in_subquery(survivors))

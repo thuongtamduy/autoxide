@@ -211,6 +211,8 @@ AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD='correct horse battery staple' \
   cargo run -p acme-server -- serve               # http://127.0.0.1:8080; creates the first administrator
 ```
 
+Module nào chạy là một biến cấu hình, `AUTOXIDE_MODULES` (xem [`docs/MODULES.vi.md`](../MODULES.vi.md)): mặc định là mọi module chính thức và mọi module bạn thêm; `AUTOXIDE_MODULES=official,-bookmarks` tắt module của bạn, và module được bật kéo theo các module nó nêu trong `Module::depends_on`. `acme openapi` và `acme mcp-manifest` luôn in hợp đồng đầy đủ.
+
 Không cấu hình gì thì máy chủ giữ dữ liệu trong SQLite dưới `./data`. Dùng PostgreSQL thì đặt `DATABASE_URL=postgres://…`; không gì khác thay đổi. `acme config --env-example > .env.example` ghi ra danh sách mọi biến cấu hình kèm mô tả, và `acme doctor` kiểm một bản cài từng bước.
 
 Ở một terminal khác, đăng nhập rồi gọi module của bạn. Quản trị viên tạo lúc khởi động lần đầu có mọi permission, kể cả những cái module của bạn khai:

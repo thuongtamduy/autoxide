@@ -468,3 +468,113 @@ async fn loc_nhom_cho_nhan_su_nen_tang_va_tool_mcp() {
     .await
     .unwrap();
 }
+
+/// Tool MCP (bước 70 P7): đặt cấu hình thường, bỏ cấu hình, thử kết nối; secret chỉ đặt qua REST.
+#[tokio::test]
+async fn tool_dat_va_bo_cau_hinh_khong_nhan_secret() {
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("shop")
+            .user_in("shop", "owner", 1, &["kernel.settings.manage"])
+            .user_in("shop", "reader", 2, &[])
+            .module(Renamed)
+            .build()
+            .await
+            .unwrap();
+        let client = app.mcp("owner").await.unwrap();
+        let account = "demo.connection.partner.account";
+        let set = client
+            .call_tool(tool("kernel.set_setting", json!({"name": account, "value": "acct-9"})))
+            .await
+            .unwrap();
+        assert_eq!(set.structured_content.unwrap()["data"]["value"], "acct-9");
+        let secret = client
+            .call_tool(tool(
+                "kernel.set_setting",
+                json!({"name": "demo.connection.partner.key", "value": "sk-1"}),
+            ))
+            .await;
+        assert!(format!("{secret:?}").contains("kernel.setting_secret_rest_only"), "{secret:?}");
+        let untestable =
+            client.call_tool(tool("kernel.test_connection", json!({"name": account}))).await;
+        assert!(format!("{untestable:?}").contains("kernel.connection_untestable"));
+        let deleted = client
+            .call_tool(tool("kernel.delete_setting", json!({"name": account})))
+            .await
+            .unwrap();
+        assert_eq!(deleted.structured_content.unwrap()["data"]["deleted"], true);
+        let listed = client
+            .call_tool(tool("kernel.list_settings", json!({"group": "connection"})))
+            .await
+            .unwrap();
+        let listed = listed.structured_content.unwrap()["data"].clone();
+        assert!(listed.as_array().unwrap().iter().all(|row| row["is_set"] == false), "{listed}");
+        client.cancel().await.unwrap();
+        // Thiếu permission: không thấy tool ghi.
+        let reader = app.mcp("reader").await.unwrap();
+        let refused = reader
+            .call_tool(tool("kernel.set_setting", json!({"name": account, "value": "x"})))
+            .await;
+        assert!(refused.is_err() || format!("{refused:?}").contains("permission"), "{refused:?}");
+        reader.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}
+
+/// Tài khoản nhà cung cấp theo khách (bước 70 P7): khách chưa đặt → `provider.not_configured`,
+/// không rơi về tài khoản của khách khác; định danh webhook của hai khách khác nhau và chỉ mở đúng
+/// đường của nó.
+#[tokio::test]
+async fn tai_khoan_nha_cung_cap_theo_tung_khach() {
+    use autoxide_kernel::provider::{ProviderAccounts, WebhookEndpoint};
+
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .tenant("one")
+            .tenant("two")
+            .user_in("one", "one", 1, &["kernel.settings.manage"])
+            .user_in("two", "two", 2, &["kernel.settings.manage"])
+            .module(Renamed)
+            .build()
+            .await
+            .unwrap();
+        let accounts = app.api::<ProviderAccounts>().unwrap();
+        let (one, two) = (app.tenant("one").await.unwrap(), app.tenant("two").await.unwrap());
+        let path = "/api/v1/kernel/settings/demo.connection.partner.key";
+        let set = app.put(path).token("one").json(json!({"value": "key-of-one"})).send().await;
+        assert_eq!(set.unwrap().status(), StatusCode::OK);
+
+        let found = accounts.require(&one, &PARTNER_KEY).await.unwrap();
+        assert_eq!(found.as_str(), "key-of-one");
+        assert!(!format!("{found:?}").contains("key-of-one"));
+        let missing = accounts.require(&two, &PARTNER_KEY).await.unwrap_err();
+        assert_eq!((missing.code(), missing.kind().status()), ("provider.not_configured", 422));
+        assert!(accounts.get(&two, &PARTNER_ACCOUNT).await.unwrap().is_none());
+        assert_eq!(accounts.tenant(two.id()).await.unwrap().id(), two.id());
+
+        const HOOK: &str = "/api/v1/demo/hooks/partner";
+        accounts.register_webhook(WebhookEndpoint::new("demo.connection.partner", HOOK, "Paste."));
+        let token_one = accounts.webhook_token(&one, HOOK).await.unwrap();
+        let token_two = accounts.webhook_token(&two, HOOK).await.unwrap();
+        assert_ne!(token_one, token_two);
+        assert_eq!(accounts.resolve_webhook(HOOK, &token_one).await.unwrap().id(), one.id());
+        assert_eq!(accounts.resolve_webhook(HOOK, &token_two).await.unwrap().id(), two.id());
+        for (path, token) in [("/api/v1/demo/hooks/other", token_one.as_str()), (HOOK, "nope")] {
+            let refused = accounts.resolve_webhook(path, token).await.unwrap_err();
+            assert_eq!(
+                (refused.code(), refused.kind().status()),
+                ("provider.webhook_unknown", 404)
+            );
+        }
+
+        let listed =
+            app.get("/api/v1/kernel/connections/webhooks").token("one").send().await.unwrap();
+        assert_eq!(listed.status(), StatusCode::OK, "{}", listed.json());
+        let listed = listed.json();
+        assert_eq!(listed["data"][0]["path"], format!("{HOOK}/{token_one}"));
+        assert_eq!(listed["data"][0]["connection"], "demo.connection.partner");
+    })
+    .await
+    .unwrap();
+}

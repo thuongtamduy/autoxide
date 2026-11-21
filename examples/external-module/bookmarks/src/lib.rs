@@ -60,6 +60,12 @@ impl Module for BookmarksModule {
         "Bookmarks: links each user keeps, with a title."
     }
 
+    // The modules this one cannot run without: here `auth`, whose "account deleted" event it
+    // listens to. Turning `bookmarks` on (`AUTOXIDE_MODULES`) turns them on with it.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["auth"]
+    }
+
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
         self.config = Some(BookmarksConfig::read(reader)?);
         Ok(())

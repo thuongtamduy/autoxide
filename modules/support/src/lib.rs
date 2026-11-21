@@ -70,6 +70,11 @@ impl Module for SupportModule {
         "support"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn description(&self) -> &'static str {
         "Customer support tickets: messages, internal notes, guest access by ticket token, staff \
          scope by organization unit, and hand-over to consumer complaints."

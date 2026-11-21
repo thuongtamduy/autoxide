@@ -275,14 +275,18 @@ impl PaymentGateway for GuardedPayments {
         })
     }
 
-    fn verify_webhook(
+    async fn verify_webhook(
         &self,
         tenant: TenantId,
         headers: &HeaderMap,
         body: &[u8],
     ) -> Result<GatewayNotification, Error> {
         // Đối tác thật không biết giao dịch giả nên không gửi webhook cho sandbox; kiểm chữ ký thật.
-        self.inner.verify_webhook(tenant, headers, body)
+        self.inner.verify_webhook(tenant, headers, body).await
+    }
+
+    fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
+        self.inner.webhook_ack()
     }
 
     async fn statement(
@@ -359,13 +363,17 @@ impl BankFeed for GuardedBankFeed {
         self.inner.provider()
     }
 
-    fn verify_webhook(
+    async fn verify_webhook(
         &self,
         tenant: TenantId,
         headers: &HeaderMap,
         body: &[u8],
     ) -> Result<Vec<BankTransaction>, Error> {
-        self.inner.verify_webhook(tenant, headers, body)
+        self.inner.verify_webhook(tenant, headers, body).await
+    }
+
+    fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
+        self.inner.webhook_ack()
     }
 
     async fn fetch(

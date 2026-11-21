@@ -489,6 +489,31 @@ async fn nang_cap_tu_ban_phat_hanh_truoc_giu_nguyen_du_lieu() {
         drop(container);
 
         // --- bản hiện tại, cùng database ---
+        // Không đặt `AUTOXIDE_MODULES` thì module hạng thử nghiệm không chạy nữa
+        // (D-20261121-module-selection). Bản cũ đã ghi dữ liệu vào một module như vậy (`newsletter`):
+        // người nâng cấp không được mất chức năng trong im lặng — `doctor` phải nêu tên module và
+        // đúng dòng cấu hình cần thêm. Test làm như người nâng cấp: thêm đúng dòng đó rồi chạy tiếp.
+        for arguments in [&["migrate", "up"][..], &["doctor"]] {
+            let output = current(directory.path(), &environment, arguments);
+            assert!(output.status.success(), "new `{}`: {}", arguments.join(" "), text(&output));
+        }
+        let report = text(&current(directory.path(), &environment, &["doctor"]));
+        assert!(report.contains("modules_turned_off"), "doctor must report the modules: {report}");
+        let setting = report
+            .split("AUTOXIDE_MODULES=")
+            .nth(1)
+            .map(|rest| {
+                rest.chars()
+                    .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, ',' | '_' | '-'))
+                    .collect::<String>()
+            })
+            .unwrap_or_else(|| panic!("doctor must give the AUTOXIDE_MODULES line to add: {report}"));
+        assert!(
+            setting.split(',').any(|name| name == "newsletter"),
+            "the line must turn `newsletter` back on: AUTOXIDE_MODULES={setting}"
+        );
+        let mut environment = environment.clone();
+        environment.push(("AUTOXIDE_MODULES".to_owned(), setting));
         for arguments in [&["migrate", "up"][..], &["doctor"]] {
             let output = current(directory.path(), &environment, arguments);
             assert!(output.status.success(), "new `{}`: {}", arguments.join(" "), text(&output));
