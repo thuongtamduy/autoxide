@@ -12,6 +12,8 @@ mod collections;
 mod config;
 mod copywriting;
 mod derived;
+mod digital;
+mod digital_access;
 mod entity;
 mod errors;
 mod events;
@@ -141,6 +143,8 @@ impl Module for CatalogModule {
             embedder: context.require::<dyn autoxide_kernel::ai::Embedder>().ok(),
             storage: context.require::<dyn autoxide_kernel::storage::Storage>().ok(),
             text_model: context.require::<dyn autoxide_kernel::ai::TextModel>().ok(),
+            files: context.require::<dyn autoxide_files::api::Files>().ok(),
+            secrets: context.require::<autoxide_kernel::secret::SecretKey>()?,
         });
         // Bộ sưu tập trong sổ đối tượng: banner, menu trỏ tới (bước 55).
         context.resource_type(

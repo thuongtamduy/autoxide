@@ -284,9 +284,39 @@ so nothing is fixed to one trade. Text values may carry translations: `{"attribu
 "Rửa tay", "texts": {"en": "Hand wash"}}`. The public product page lists them under each variant
 (`variants[].attributes`) in the language asked.
 
+## Digital products
+
+A product of kind `digital` is delivered as download links instead of being shipped (plan feature
+`catalog.digital`).
+
+1. Upload the file with `POST /api/v1/files` (or a direct upload, `/api/v1/files/uploads`).
+2. Attach it to the variant: `POST /variants/{id}/digital-assets` `{"file_id": …, "download_limit": 5,
+   "grant_days": 30}` (`catalog.products.write`). The content is copied, so deleting the uploaded
+   file later does not affect buyers. A digital product cannot go on sale without a file
+   (`catalog.digital_asset_missing`).
+3. When module `orders` confirms a **paid** order (`orders.order_confirmed` with `payment_status`
+   `paid`), each order line of a digital variant gets one download right per file: `download_limit`
+   downloads, valid `grant_days` days. Receiving the event again gives nothing more. Cancelling the
+   order, or a refund not tied to a return, revokes the rights at once.
+4. Buyers with an account list their rights with `GET /downloads` and spend one with
+   `POST /downloads/{id}`. Staff with `catalog.downloads.manage` see an order's rights
+   (`GET /orders/{id}/downloads`), revoke them (`POST /orders/{id}/downloads/revoke`) or give new
+   tokens to send to a buyer without an account (`POST /orders/{id}/downloads/reissue`, the only time
+   a `token_path` is shown).
+5. Spending a download (`POST /public/downloads/{token}`, no sign-in) answers a signed file address
+   valid `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS`; it accepts `Range` to resume and does not spend
+   more downloads. Addresses are signed with a key of the tenant: one tenant's address does not work
+   on another's domain.
+
+Services (`service`) are neither shipped nor stocked; bundles (`bundle`) take stock from each
+component (`PUT /variants/{id}/components`); pre-orders use the variant's `sale_mode`.
+
 ## Settings
 
 | Variable | Default | Meaning |
 |---|---|---|
 | `AUTOXIDE_CATALOG_LOCALES` | `en,vi` | Languages product and category texts may be written in |
 | `AUTOXIDE_CATALOG_PRODUCT_PATH_PREFIX` | `products` | First segment of a product's public address |
+| `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS` | `300` | Seconds a signed file address of a digital product stays valid |
+| `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT` | `5` | Downloads per file when the file sets none |
+| `AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS` | `30` | Days a buyer can download when the file sets none |

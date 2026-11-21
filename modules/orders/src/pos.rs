@@ -24,13 +24,16 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::money::{Currency, Money};
 use autoxide_kernel::reference::{Submitted, fingerprint};
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_ledger::api::{
     AccountKey, Counterparty, LineAccount, NewEntry, NewLine, OpenAccount, Side,
 };
 use chrono::{Datelike, Duration};
 use sea_orm::sea_query::Expr;
-use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -162,8 +165,8 @@ impl OrdersService {
     }
 
     /// Tiền mặt dự kiến trong két của ca: tiền đầu ca + tiền mặt thực vào của các lượt bán.
-    async fn expected_cash(
-        &self,
+    async fn expected_cash<C: ConnectionTrait>(
+        connection: &C,
         tenant: &TenantContext,
         shift: &pos_shift::Model,
     ) -> Result<i64, Error> {
@@ -173,7 +176,7 @@ impl OrdersService {
             .filter(pos_sale::Column::ShiftId.eq(shift.id))
             .scoped(tenant)
             .into_tuple()
-            .all(tenant.database().write())
+            .all(connection)
             .await?;
         Ok(shift.opening_cash_minor + sales.iter().sum::<i64>())
     }
@@ -198,40 +201,50 @@ impl OrdersService {
         if shift.status != OPEN {
             return Err(errors::shift_not_open());
         }
-        let expected = self.expected_cash(tenant, &shift).await?;
-        let variance = counted - expected;
-        let mut problems = Vec::new();
-        if counted < 0 {
-            problems.push(FieldError::new("counted_cash", "negative", "must not be negative"));
-        }
         let reason = reason.map(|reason| reason.trim().to_owned()).filter(|r| !r.is_empty());
         let note = note.map(|note| note.trim().to_owned()).filter(|n| !n.is_empty());
-        if variance != 0 {
-            match &reason {
-                Some(code) => {
-                    if let Err(error) = self.reasons.ensure(tenant, CASH_VARIANCE, code).await {
-                        problems.push(FieldError::new(
-                            "variance_reason",
-                            "invalid",
-                            "is not a reason of the list `orders.cash_variance`",
-                        ));
-                        tracing::debug!(code = error.code(), "cash variance reason refused");
-                    }
+        // Đọc danh mục lý do và ngưỡng duyệt NGOÀI transaction ghi.
+        let reason_known = match &reason {
+            Some(code) => match self.reasons.ensure(tenant, CASH_VARIANCE, code).await {
+                Ok(_) => true,
+                Err(error) => {
+                    tracing::debug!(code = error.code(), "cash variance reason refused");
+                    false
                 }
-                None => problems.push(FieldError::new(
-                    "variance_reason",
-                    "required",
-                    "is required when the counted cash differs from the expected cash",
-                )),
+            },
+            None => true,
+        };
+        let problems_for = |variance: i64| {
+            let mut problems = Vec::new();
+            if counted < 0 {
+                problems.push(FieldError::new("counted_cash", "negative", "must not be negative"));
             }
-            if note.as_ref().is_none_or(|note| note.chars().count() > 1000) {
-                problems.push(FieldError::new(
-                    "variance_note",
-                    "required",
-                    "is required (up to 1000 characters) when the cash differs",
-                ));
+            if variance != 0 {
+                match &reason {
+                    Some(_) if !reason_known => problems.push(FieldError::new(
+                        "variance_reason",
+                        "invalid",
+                        "is not a reason of the list `orders.cash_variance`",
+                    )),
+                    Some(_) => {}
+                    None => problems.push(FieldError::new(
+                        "variance_reason",
+                        "required",
+                        "is required when the counted cash differs from the expected cash",
+                    )),
+                }
+                if note.as_ref().is_none_or(|note| note.chars().count() > 1000) {
+                    problems.push(FieldError::new(
+                        "variance_note",
+                        "required",
+                        "is required (up to 1000 characters) when the cash differs",
+                    ));
+                }
             }
-        }
+            problems
+        };
+        let preview = Self::expected_cash(tenant.database().read(), tenant, &shift).await?;
+        let problems = problems_for(counted - preview);
         if !problems.is_empty() {
             return Err(Error::validation(problems));
         }
@@ -241,9 +254,32 @@ impl OrdersService {
             .as_ref()
             .and_then(Value::as_i64)
             .unwrap_or(200_000);
+        // Khoá độc quyền dòng ca rồi mới cộng tiền kỳ vọng (D-181): lượt bán đang ghi giữ khoá chia
+        // sẻ — đóng ca chờ chúng xong và cộng cả chúng; lượt bán đến sau thấy ca đã đóng. Trước
+        // đây tiền kỳ vọng tính ngoài transaction: lượt bán chen giữa làm lệch số dư két.
+        let transaction = tenant.database().begin_write().await?;
+        let Some(current) = rows::lock_one(
+            &transaction,
+            pos_shift::Entity::find_by_id(id)
+                .filter(pos_shift::Column::Status.eq(OPEN))
+                .scoped(tenant),
+        )
+        .await?
+        else {
+            return Err(errors::shift_not_open());
+        };
+        let expected = Self::expected_cash(&transaction, tenant, &current).await?;
+        let variance = counted - expected;
+        if expected != preview {
+            // Có lượt bán chen giữa lúc kiểm và lúc khoá: kiểm lại với số mới.
+            let problems = problems_for(variance);
+            if !problems.is_empty() {
+                return Err(Error::validation(problems));
+            }
+        }
         let status = if variance.abs() > threshold { PENDING_APPROVAL } else { CLOSED };
         let at = now();
-        let closed = pos_shift::Entity::update_many()
+        pos_shift::Entity::update_many()
             .col_expr(pos_shift::Column::Status, Expr::value(status))
             .col_expr(pos_shift::Column::OpenKey, Expr::value(Option::<String>::None))
             .col_expr(pos_shift::Column::ClosedBy, Expr::value(principal.user_id()))
@@ -251,17 +287,14 @@ impl OrdersService {
             .col_expr(pos_shift::Column::ExpectedCashMinor, Expr::value(expected))
             .col_expr(pos_shift::Column::CountedCashMinor, Expr::value(counted))
             .col_expr(pos_shift::Column::VarianceMinor, Expr::value(variance))
-            .col_expr(pos_shift::Column::VarianceReason, Expr::value(reason))
-            .col_expr(pos_shift::Column::VarianceNote, Expr::value(note))
+            .col_expr(pos_shift::Column::VarianceReason, Expr::value(reason.clone()))
+            .col_expr(pos_shift::Column::VarianceNote, Expr::value(note.clone()))
             .col_expr(pos_shift::Column::UpdatedAt, Expr::value(at))
             .filter(pos_shift::Column::Id.eq(id))
-            .filter(pos_shift::Column::Status.eq(OPEN))
             .scoped(tenant)
-            .exec(tenant.database().write())
+            .exec(&transaction)
             .await?;
-        if closed.rows_affected == 0 {
-            return Err(errors::shift_not_open());
-        }
+        transaction.commit().await?;
         if status == CLOSED {
             self.finish_shift(tenant, Actor::user(principal.user_id()), id).await?;
         }
@@ -635,6 +668,19 @@ impl OrdersService {
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
+                // Khoá chia sẻ dòng ca, chỉ khi ca còn mở (D-181): nhiều lượt bán cùng ca chạy song
+                // song, còn đóng ca (khoá độc quyền) chờ các lượt đang ghi xong rồi mới cộng tiền —
+                // không bán vào ca đã đóng, tiền kỳ vọng không thiếu lượt bán chen giữa (cả hai DB).
+                let open = rows::lock_one_shared(
+                    &transaction,
+                    pos_shift::Entity::find_by_id(shift.id)
+                        .filter(pos_shift::Column::Status.eq(OPEN))
+                        .scoped(tenant),
+                )
+                .await?;
+                if open.is_none() {
+                    return Err(errors::shift_not_open());
+                }
                 let at = now();
                 let inserted = pos_sale::Entity::insert(pos_sale::ActiveModel {
                     tenant_id: Set(tenant.id().as_uuid()),

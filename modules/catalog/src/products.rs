@@ -880,6 +880,9 @@ impl CatalogService {
             problems.push(FieldError::new("variants", "required", "turn on at least one variant"));
         }
         fail_if_any(problems)?;
+        if parse_kind(&product.kind) == ProductKind::Digital {
+            crate::digital::require_assets(connection, tenant, product.id).await?;
+        }
         self.check_tax_category_known(tenant, product).await?;
         // Tính lại tại chỗ (không tin cột dẫn xuất): báo đúng thuộc tính / giấy tờ còn thiếu.
         self.readiness_of(connection, tenant, product).await?.require()

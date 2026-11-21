@@ -19,13 +19,21 @@ use crate::entity::promotion;
 use crate::events::{self, Change};
 use crate::model::Status;
 use crate::permissions::PUBLISH;
-use crate::service::{PromotionsService, bump_revision, now, readable, writable};
+use crate::service::{PromotionsService, bump_revision, lock_revision, now, readable, writable};
 
 /// Hạn mức số chương trình đang bật của một khách (bước 35).
 pub(crate) const ACTIVE_PROMOTIONS: Limit = Limit::count(
     "promotions.active_promotions",
     "Promotions turned on at the same time (scheduled, running or paused).",
 );
+
+fn changed_while_checking(id: Uuid) -> Error {
+    Error::conflict(
+        "promotions.changed_while_activating",
+        "Promotion `{id}` changed while it was being checked for activation. Activate it again.",
+    )
+    .with_param("id", id)
+}
 
 pub(crate) fn invalid_transition(from: Status, to: Status) -> Error {
     Error::conflict(
@@ -93,9 +101,10 @@ impl PromotionsService {
             return Err(activation_error(&failed));
         }
         let warnings: Vec<Check> = checks.into_iter().filter(|found| !found.ok).collect();
+        let limit = self.legal_limit_of(&crate::compiled::program_of(&view)).await?;
         let key = entitlement_key(id);
         self.entitlements.reserve(tenant.id(), &ACTIVE_PROMOTIONS, 1, &key).await?;
-        let activated = self.write_activation(tenant, principal, id).await;
+        let activated = self.write_activation(tenant, principal, &view, limit.as_ref()).await;
         match &activated {
             Ok(_) => self.entitlements.confirm(tenant.id(), &ACTIVE_PROMOTIONS, &key).await?,
             Err(_) => self.entitlements.release(tenant.id(), &ACTIVE_PROMOTIONS, &key).await?,
@@ -103,12 +112,16 @@ impl PromotionsService {
         Ok(Activated { view: activated?, warnings })
     }
 
+    /// Ghi lần bật của chương trình `checked` (bản đã qua bộ kiểm ngoài transaction). `limit`: hạn
+    /// mức luật đã tìm ngoài transaction, để kiểm lại tổng số ngày giảm giá dưới khoá.
     async fn write_activation(
         &self,
         tenant: &TenantContext,
         principal: &Principal,
-        id: Uuid,
+        checked: &PromotionView,
+        limit: Option<&crate::legal::LegalLimit>,
     ) -> Result<PromotionView, Error> {
+        let id = checked.row.id;
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
         let view =
@@ -116,6 +129,23 @@ impl PromotionsService {
         writable(principal, &transaction, &PUBLISH, view.row.org_id, || not_found(id)).await?;
         if view.status() != Status::Draft {
             return Err(invalid_transition(view.status(), Status::Active));
+        }
+        // Bộ kiểm tuân thủ chạy ngoài transaction (gọi `catalog`). Chương trình đổi giữa lúc kiểm
+        // và lúc ghi (sửa bản nháp, duyệt thêm sản phẩm của người bán) thì kết quả kiểm không còn
+        // đúng: báo để gọi lại, không bật bản chưa kiểm vượt trần pháp lý.
+        if view.snapshot() != checked.snapshot() {
+            return Err(changed_while_checking(id));
+        }
+        // Tổng số ngày giảm giá trong năm cộng cả chương trình khác: hai lần bật cùng lúc từng cùng
+        // thấy chương trình kia còn nháp và cùng qua, tổng vượt trần (cả hai DB — bước kiểm ngoài
+        // transaction). Khoá chung của khách rồi kiểm lại trong transaction (D-181).
+        lock_revision(&transaction, tenant).await?;
+        if let Some(limit) = limit {
+            let program = crate::compiled::program_of(&view);
+            let duration = self.duration_check(&transaction, tenant, &program, limit).await?;
+            if !duration.ok {
+                return Err(activation_error(&[&duration]));
+            }
         }
         let at = now();
         let next = if view.row.starts_at > at { Status::Scheduled } else { Status::Active };

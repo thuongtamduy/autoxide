@@ -20,10 +20,11 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::money::Money;
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{TenantContext, TenantId, root_of};
 use autoxide_ledger::api::NewPayment;
 use chrono::{DateTime, Utc};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
+use sea_orm::{ActiveModelTrait, ActiveValue::Set, ConnectionTrait, EntityTrait};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -109,6 +110,11 @@ impl PlansService {
         else {
             return Ok(());
         };
+        if period.status == "void" && period.invoice_id.is_some() {
+            // Lượt trước gắn hoá đơn vào kỳ vừa bị huỷ nhưng chưa huỷ xong hoá đơn (lỗi giữa
+            // chừng): huỷ lại — `cancel` của `invoices` gọi lại vô hại.
+            return self.cancel_invoice(&period).await;
+        }
         if period.invoice_id.is_some() || period.status == "void" || period.amount_minor <= 0 {
             return Ok(());
         }
@@ -179,13 +185,25 @@ impl PlansService {
             (Some(symbol), Some(number)) => Some(format!("{symbol}-{number:07}")),
             _ => None,
         };
-        billing_period::Entity::update_many()
-            .col_expr(billing_period::Column::InvoiceId, Some(issued.id).into())
-            .col_expr(billing_period::Column::InvoiceNumber, number.into())
-            .col_expr(billing_period::Column::UpdatedAt, now().into())
-            .filter(billing_period::Column::Id.eq(period_id))
-            .exec(control.write())
-            .await?;
+        // Hoá đơn phát hành ngoài transaction (có thể gọi nhà cung cấp): kỳ có thể vừa bị huỷ trong
+        // lúc đó, và `void_period` đã đọc `invoice_id` trống nên không huỷ hoá đơn nào. Khoá kỳ
+        // (cùng khoá với `void_period`, D-181) rồi gắn hoá đơn; kỳ đã huỷ thì huỷ luôn hoá đơn vừa
+        // phát hành — kỳ huỷ không bao giờ còn hoá đơn GTGT hiệu lực (cả hai DB).
+        let transaction = control.begin_write().await?;
+        let Some(current) =
+            rows::lock_one(&transaction, billing_period::Entity::find_by_id(period_id)).await?
+        else {
+            return Ok(());
+        };
+        let mut row: billing_period::ActiveModel = current.into();
+        row.invoice_id = Set(Some(issued.id));
+        row.invoice_number = Set(number);
+        row.updated_at = Set(now());
+        let attached = row.update(&transaction).await?;
+        transaction.commit().await?;
+        if attached.status == "void" {
+            self.cancel_invoice(&attached).await?;
+        }
         Ok(())
     }
 

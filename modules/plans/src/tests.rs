@@ -4,6 +4,7 @@
 
 mod billing;
 mod enforcement;
+mod invoicing;
 mod lifecycle;
 mod provisioning;
 mod signup;
@@ -26,9 +27,19 @@ const EXPORT: Feature = Feature::new("demo.export", "Export items.");
 #[derive(Default)]
 struct Demo {
     real: Arc<std::sync::atomic::AtomicI64>,
+    /// Có thì lần đếm đầu tiên dừng giữa chừng (test chen lệnh vào lúc đối soát đang đếm).
+    gate: Option<Arc<CountGate>>,
 }
 
-struct RealCount(Arc<std::sync::atomic::AtomicI64>);
+/// Chặn một lần đếm: báo `entered`, chờ `release`.
+#[derive(Default)]
+struct CountGate {
+    armed: std::sync::atomic::AtomicBool,
+    entered: tokio::sync::Notify,
+    release: tokio::sync::Notify,
+}
+
+struct RealCount(Arc<std::sync::atomic::AtomicI64>, Option<Arc<CountGate>>);
 
 #[async_trait::async_trait]
 impl autoxide_kernel::entitlement::UsageCounter for RealCount {
@@ -36,7 +47,14 @@ impl autoxide_kernel::entitlement::UsageCounter for RealCount {
         &self,
         _tenant: &autoxide_kernel::tenancy::TenantContext,
     ) -> Result<i64, autoxide_kernel::error::Error> {
-        Ok(self.0.load(std::sync::atomic::Ordering::SeqCst))
+        let value = self.0.load(std::sync::atomic::Ordering::SeqCst);
+        if let Some(gate) = &self.1
+            && gate.armed.swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            gate.entered.notify_one();
+            gate.release.notified().await;
+        }
+        Ok(value)
     }
 }
 
@@ -49,7 +67,7 @@ impl Module for Demo {
         &mut self,
         context: &mut autoxide_kernel::module::StartContext<'_>,
     ) -> Result<(), autoxide_kernel::error::Error> {
-        context.usage_counter(&ITEMS, Arc::new(RealCount(self.real.clone())))
+        context.usage_counter(&ITEMS, Arc::new(RealCount(self.real.clone(), self.gate.clone())))
     }
 
     fn features(&self) -> Vec<Feature> {
@@ -677,7 +695,13 @@ async fn giu_cho_het_han_duoc_tra() {
         assert_eq!(used(&app, "demo.items").await, 5);
         // Mọi chỗ giữ coi như quá hạn; chỗ đã xác nhận không bị trả.
         sql(&app, "UPDATE plans_reservation SET expires_at = '2000-01-01T00:00:00Z'").await;
-        app.modules().worker(4).unwrap().run_once().await.unwrap();
+        // Chạy tới khi hết job: đối soát tính cả chỗ giữ quá hạn (job trả chỗ trừ lại sau).
+        let worker = app.modules().worker(4).unwrap();
+        for _ in 0..3 {
+            if worker.run_once().await.unwrap() == 0 {
+                break;
+            }
+        }
         assert_eq!(used(&app, "demo.items").await, 2);
     })
     .await
@@ -696,6 +720,35 @@ async fn doi_soat_sua_so_lech() {
         real.store(7, std::sync::atomic::Ordering::SeqCst);
         app.modules().worker(4).unwrap().run_once().await.unwrap();
         assert_eq!(used(&app, "demo.items").await, 11, "7 thật + 4 đang giữ");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn doi_soat_khong_ghi_de_lan_giu_cho_chen_giua() {
+    TestDatabase::run(async |test| {
+        let gate = Arc::new(CountGate::default());
+        gate.armed.store(true, std::sync::atomic::Ordering::SeqCst);
+        let demo = Demo { gate: Some(gate.clone()), ..Demo::default() };
+        demo.real.store(5, std::sync::atomic::Ordering::SeqCst);
+        let app = app_with(test, demo).await;
+        let acme = limited(&app, 100).await;
+        let handle = handle(&app);
+        handle.reserve(acme, &ITEMS, 2, "demo.item:a").await.unwrap();
+        let worker = app.modules().worker(4).unwrap();
+        // Đối soát đang đếm số thật thì có thêm một lần giữ chỗ. Trước đây đối soát ghi tuyệt đối
+        // `used = thật + chỗ giữ đã đọc trước khi đếm`: lần giữ chen giữa bị xoá khỏi sổ (cả hai DB).
+        let run = async {
+            worker.run_once().await.unwrap();
+        };
+        let poke = async {
+            gate.entered.notified().await;
+            handle.reserve(acme, &ITEMS, 3, "demo.item:b").await.unwrap();
+            gate.release.notify_one();
+        };
+        tokio::join!(run, poke);
+        assert_eq!(used(&app, "demo.items").await, 10, "5 thật + 2 + 3 đang giữ");
     })
     .await
     .unwrap();

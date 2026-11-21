@@ -72,6 +72,10 @@ pub(crate) struct CatalogService {
     pub(crate) storage: Option<Arc<dyn autoxide_kernel::storage::Storage>>,
     /// `dyn TextModel` của module `ai` khi đã cài: bản nháp mô tả và SEO (D-109).
     pub(crate) text_model: Option<Arc<dyn autoxide_kernel::ai::TextModel>>,
+    /// `dyn Files` của module `files` khi đã cài: nhận file của hàng số người bán đã tải lên.
+    pub(crate) files: Option<Arc<dyn autoxide_files::api::Files>>,
+    /// Khoá ký của kernel: ký địa chỉ file của hàng số theo khách.
+    pub(crate) secrets: Arc<autoxide_kernel::secret::SecretKey>,
 }
 
 impl crate::api::CatalogExtensions for CatalogService {

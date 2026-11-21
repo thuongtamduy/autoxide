@@ -9,11 +9,13 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::reference::Submitted;
+use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::Set, ColumnTrait, EntityTrait, QueryFilter, QueryOrder,
+    ActiveModelTrait, ActiveValue::Set, ColumnTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    QueryOrder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -113,6 +115,17 @@ fn already_reviewed() -> Error {
     )
 }
 
+/// Đọc và khoá dòng chương trình `id` tới hết `transaction` ghi.
+async fn locked_program(
+    transaction: &DatabaseTransaction,
+    tenant: &TenantContext,
+    id: Uuid,
+) -> Result<promotion::Model, Error> {
+    rows::lock_one(transaction, promotion::Entity::find_by_id(id).scoped(tenant))
+        .await?
+        .ok_or_else(|| not_found(id))
+}
+
 /// Chương trình nhận người bán tham gia: flash sale chưa bắt đầu (`draft` hay `scheduled`).
 fn open_for_sellers(row: &promotion::Model) -> bool {
     row.kind == Kind::FlashSale.as_str()
@@ -177,11 +190,9 @@ impl PromotionsService {
         }
         let seller = request.org_id;
         let transaction = tenant.database().begin_write().await?;
-        let program = promotion::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| not_found(id))?;
+        // Khoá dòng chương trình (D-181): đăng ký, duyệt và đổi trạng thái chương trình nối đuôi
+        // nhau trên Postgres — người bán không sửa được lần đăng ký đang được duyệt.
+        let program = locked_program(&transaction, tenant, id).await?;
         // Người bán thấy chương trình của sàn ở nút cấp trên của mình; nút khác thì như không có.
         let lineage =
             OrgTree::ancestors(&transaction, tenant.id(), OrgId::from_uuid(seller)).await?;
@@ -320,11 +331,9 @@ impl PromotionsService {
     ) -> Result<ParticipationView, Error> {
         let actor = Actor::from(principal);
         let transaction = tenant.database().begin_write().await?;
-        let program = promotion::Entity::find_by_id(id)
-            .scoped(tenant)
-            .one(&transaction)
-            .await?
-            .ok_or_else(|| not_found(id))?;
+        // Khoá dòng chương trình trước khi đọc lần đăng ký (D-181): duyệt và từ chối cùng lúc từng
+        // cùng thấy `pending` trên Postgres — suất flash sale đã thêm nhưng hồ sơ ghi `rejected`.
+        let program = locked_program(&transaction, tenant, id).await?;
         writable(principal, &transaction, &PUBLISH, program.org_id, || not_found(id)).await?;
         let found = participation::Entity::find_by_id(participation_id)
             .filter(participation::Column::PromotionId.eq(id))
