@@ -361,13 +361,19 @@ pub trait PaymentGateway: Send + Sync {
     ) -> Result<GatewayPaymentStatus, Error>;
 
     /// Kiểm chữ ký trên **thân thô** (so sánh thời gian hằng) và cửa sổ thời gian chống phát lại,
-    /// rồi mới đọc nội dung. Sai → [`signature_invalid`].
-    fn verify_webhook(
+    /// rồi mới đọc nội dung. Sai → [`signature_invalid`]. `async` để bộ nối đọc secret của khách
+    /// `tenant` (kho cấu hình theo khách) — không bao giờ kiểm bằng secret của khách khác.
+    async fn verify_webhook(
         &self,
         tenant: TenantId,
         headers: &axum::http::HeaderMap,
         body: &[u8],
     ) -> Result<GatewayNotification, Error>;
+
+    /// Câu trả lời đối tác chờ khi webhook đã nhận xong; `None`: envelope chuẩn `{"data": …}`.
+    fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
+        None
+    }
 
     /// Sao kê các ngày `[from, to]`.
     async fn statement(
@@ -552,16 +558,22 @@ impl BankBatch {
 // `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
 #[async_trait::async_trait]
 pub trait BankFeed: Send + Sync {
-    /// Tên ổn định, nằm trong đường dẫn webhook `/api/v1/ledger/bank-feeds/{provider}`.
+    /// Tên ổn định, nằm trong đường dẫn webhook `/api/v1/ledger/bank-feeds/{provider}/{hook}`.
     fn provider(&self) -> &'static str;
 
-    /// Kiểu đẩy: kiểm chữ ký trên **thân thô** rồi mới đọc. Sai → [`signature_invalid`].
-    fn verify_webhook(
+    /// Kiểu đẩy: kiểm chữ ký trên **thân thô** rồi mới đọc. Sai → [`signature_invalid`]. `async`
+    /// để bộ nối đọc secret của khách `tenant`.
+    async fn verify_webhook(
         &self,
         tenant: TenantId,
         headers: &axum::http::HeaderMap,
         body: &[u8],
     ) -> Result<Vec<BankTransaction>, Error>;
+
+    /// Câu trả lời nguồn biến động chờ khi webhook đã nhận xong; `None`: envelope chuẩn.
+    fn webhook_ack(&self) -> Option<crate::provider::WebhookAck> {
+        None
+    }
 
     /// Kiểu kéo: biến động sau `cursor` (lần đầu `None`).
     async fn fetch(

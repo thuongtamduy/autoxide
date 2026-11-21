@@ -44,6 +44,7 @@ pub mod mcp;
 mod ownership;
 mod payment;
 mod postgres;
+mod provider;
 mod push;
 mod s3;
 mod schema;
@@ -66,6 +67,7 @@ pub use payment::{
     FAKE_PROVIDER, FAKE_RATE_PROVIDER, FakeBankFeed, FakeExchangeRateSource, FakePaymentGateway,
     FakePayoutGateway, FakePayoutOutcome,
 };
+pub use provider::{FakeProviderServer, ProviderRequest};
 pub use push::{FakeMobilePushSender, FakeWebPushSender, FakeZnsSender};
 pub use s3::{
     TEST_S3_ACCESS_KEY_ID, TEST_S3_BUCKET, TEST_S3_ENDPOINT, TEST_S3_SECRET_ACCESS_KEY, s3_settings,

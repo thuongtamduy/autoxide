@@ -206,29 +206,61 @@ async fn test_tenant_connection(
     Path(name): Path<String>,
 ) -> Result<Data<ConnectionTest>, Error> {
     principal.require(&crate::tenancy::SETTINGS_MANAGE)?;
-    let probe = connection_of(&name)
-        .and_then(|connection| state.probes.find(connection))
-        .ok_or_else(|| {
+    Ok(Data { data: test(&state.probes, &tenant, &name).await? })
+}
+
+/// Thử kết nối mà cài đặt `name` thuộc về, với cài đặt của khách `tenant`; ghi kết quả như một lần
+/// dùng. REST và tool MCP dùng chung.
+async fn test(
+    probes: &ConnectionProbes,
+    tenant: &TenantContext,
+    name: &str,
+) -> Result<ConnectionTest, Error> {
+    let probe =
+        connection_of(name).and_then(|connection| probes.find(connection)).ok_or_else(|| {
             Error::not_found(
                 "kernel.connection_untestable",
                 "Setting `{name}` belongs to no partner connection that can be tested.",
             )
-            .with_param("name", name.clone())
+            .with_param("name", name)
         })?;
-    let error = match tokio::time::timeout(TEST_TIMEOUT, probe.test(&tenant)).await {
+    let error = match tokio::time::timeout(TEST_TIMEOUT, probe.test(tenant)).await {
         Ok(Ok(())) => None,
         Ok(Err(error)) => Some(error.message()),
         Err(_) => Some("the partner did not answer within 15 seconds".to_owned()),
     };
-    ConnectionStatus.record(&tenant, probe.connection(), error.as_deref()).await;
-    Ok(Data {
-        data: ConnectionTest {
-            connection: probe.connection().to_owned(),
-            ok: error.is_none(),
-            error,
-            tested_at: Timestamp::now(),
-        },
+    ConnectionStatus.record(tenant, probe.connection(), error.as_deref()).await;
+    Ok(ConnectionTest {
+        connection: probe.connection().to_owned(),
+        ok: error.is_none(),
+        error,
+        tested_at: Timestamp::now(),
     })
+}
+
+/// Input of `kernel.test_connection`.
+#[derive(Debug, Deserialize, validator::Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct TestConnection {
+    /// A setting of the connection, e.g. `mail.connection.smtp.url`.
+    #[schema(example = "mail.connection.smtp.url")]
+    name: String,
+}
+
+pub(crate) fn tools(probes: ConnectionProbes) -> Vec<crate::mcp::Tool> {
+    vec![
+        crate::mcp::Tool::new(
+            "test_connection",
+            "Test the partner connection a setting belongs to (e.g. `mail.connection.smtp.url` \
+             tests the mail server) with the current tenant's settings, and record the result. \
+             Answers `ok` and, when it failed, why. Gives up after 15 seconds.",
+            move |tenant: TenantContext, _principal: Principal, input: TestConnection| {
+                let probes = probes.clone();
+                async move { test(&probes, &tenant, &input.name).await }
+            },
+        )
+        .requires(crate::tenancy::SETTINGS_MANAGE),
+    ]
 }
 
 pub(crate) fn routes(state: ConnectionsState) -> OpenApiRouter {

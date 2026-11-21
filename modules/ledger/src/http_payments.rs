@@ -35,6 +35,7 @@ pub(crate) fn routes(service: Arc<LedgerService>) -> OpenApiRouter {
         .routes(routes!(get_payment))
         .routes(routes!(create_refund))
         .routes(routes!(receive_webhook))
+        .routes(routes!(receive_tenant_webhook))
         .routes(routes!(list_exceptions))
         .routes(routes!(resolve_exception))
         .routes(routes!(list_reconciliations, run_reconciliation))
@@ -337,6 +338,46 @@ async fn receive_webhook(
 ) -> Result<Data<WebhookReceipt>, Error> {
     service.receive_webhook(&tenant, &provider, &headers, &body).await?;
     Ok(Data { data: WebhookReceipt { received: true } })
+}
+
+/// Receive a notification from a payment partner at a tenant's own address.
+///
+/// No sign-in. The last part of the address identifies the tenant (copy the address from
+/// `GET /api/v1/kernel/connections/webhooks`); the notification is then checked with that tenant's
+/// secret at the partner before anything is stored. A notification sent again is stored once; it
+/// is processed in the background. The answer is the one the partner expects (its documented
+/// acknowledgement), or the standard envelope when the partner expects nothing special.
+#[utoipa::path(
+    post,
+    path = "/webhooks/{provider}/{hook}",
+    extensions(("x-public" = json!(true))),
+    operation_id = "receive_ledger_tenant_webhook",
+    params(
+        ("provider" = String, Path, description = "Partner name, e.g. `momo`."),
+        ("hook" = String, Path, description = "The tenant's webhook identifier."),
+    ),
+    request_body(content = String, description = "The partner's notification, as the partner sends it.", content_type = "application/json"),
+    responses(
+        (status = 200, description = "Stored (or stored before). The body is the partner's expected acknowledgement when it has one.", body = Data<WebhookReceipt>),
+        (status = 204, description = "Stored (or stored before), for partners that expect an empty answer."),
+        (status = 401, description = "The signature is not valid; code `payment.signature_invalid`.", body = Problem),
+        (status = 404, description = "The address is not known; code `provider.webhook_unknown`.", body = Problem),
+        (status = 413, description = "The body is larger than `AUTOXIDE_LEDGER_WEBHOOK_MAX_BYTES`.", body = Problem),
+        (status = 422, description = "The partner is not installed on this server (`ledger.gateway_not_configured`) or the tenant has not set its account (`provider.not_configured`).", body = Problem),
+    )
+)]
+async fn receive_tenant_webhook(
+    State(service): State<Arc<LedgerService>>,
+    Path((provider, hook)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<Response, Error> {
+    let tenant = service.webhook_tenant("webhooks", &provider, &hook).await?;
+    service.receive_webhook(&tenant, &provider, &headers, &body).await?;
+    Ok(match service.gateway(Some(&provider))?.webhook_ack() {
+        Some(ack) => ack.into_response(),
+        None => Data { data: WebhookReceipt { received: true } }.into_response(),
+    })
 }
 
 // ---- Hàng chờ, đối soát ------------------------------------------------------------------------------

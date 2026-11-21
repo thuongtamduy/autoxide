@@ -502,7 +502,7 @@ impl LedgerService {
         body: &[u8],
     ) -> Result<u64, Error> {
         let feed = self.bank_feed(provider)?;
-        let transactions = match feed.verify_webhook(tenant.id(), headers, body) {
+        let transactions = match feed.verify_webhook(tenant.id(), headers, body).await {
             Ok(found) => found,
             Err(error) => {
                 metrics::counter!("ledger_bank_feed_rejected_total", "provider" => feed.provider())

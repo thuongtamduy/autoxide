@@ -122,6 +122,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-365** Loại bên làm (`ActorKind`) và lệnh cần duyệt khi agent gọi (bước 51 P12, D-224) — 2026-11-17
 - **[D-20261118-step41-kernel-prep](D-20261118-step41-kernel-prep.md)** Ba API kernel cho module thương mại: `Subscription::optional`, `csv::read`, `slug` — 2026-11-18
 - **[D-20261119-step61-stream-audience](D-20261119-step61-stream-audience.md)** Stream SSE của kernel đưa event tới "người được nêu tên" — 2026-11-19
+- **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
 
 ## Database, dữ liệu, job, event
 
@@ -289,7 +290,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-254** Bảng phụ trợ theo khách, worker và bộ phát trên nhiều database (bước 33 A4) — 2026-11-15
 - **D-255** Trait của kernel và `api` của module nhận khách (bước 33 A4b) — 2026-11-15
 - **D-256** Lọc theo khách và kiểm schema theo khách (bước 33 A5) — 2026-11-15
-- **D-258** Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15
+- **D-258** Cấu hình và secret theo khách (bước 33 A7, D-190) — 2026-11-15 · *thay một phần bởi D-20261121-provider-accounts*
 - **D-259** Thứ ngoài bảng theo khách ở kernel (bước 33 A8, D-190) — 2026-11-15
 - **D-261** Placement: URL mã hoá, `schema_state`, `migrate --all` (bước 33 A9b) — 2026-11-15
 - **D-276** `audit` theo khách: mỗi khách một chuỗi băm (bước 33 B5) — 2026-11-15
