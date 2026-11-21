@@ -487,6 +487,7 @@ mod tests {
                 },
                 client: crate::oidc::OidcClient::new(false).unwrap(),
                 users: services.users.clone(),
+                roles: services.roles.clone(),
                 sessions: services.sessions.clone(),
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
                 secrets: autoxide_kernel::secret::SecretKey::new(services.database.clone(), None),

@@ -985,6 +985,8 @@ export type CallbackHoursRange = {
 
 /** What the provider sent back to `redirect_uri`. */
 export type CallbackRequest = {
+  /** The `browser_secret` from the start call, when it asked to bind the browser. */
+  browser_secret?: string | null;
   /** The `code` query parameter. */
   code: string;
   /** The `state` query parameter, unchanged. */
@@ -12350,6 +12352,8 @@ export type Data_StartResponse = {
      * and `state` in the query.
      */
     authorization_url: string;
+    /** Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback. */
+    browser_secret?: string | null;
     /** Seconds left to finish; after that, start again. */
     expires_in: number;
   };
@@ -18715,6 +18719,8 @@ export type LinkProductRequest = {
 
 /** Start linking a provider to your account; proves it is you first. */
 export type LinkStartRequest = {
+  /** `true`: the link can only be finished together with the `browser_secret` returned here. */
+  bind_browser?: boolean;
   /** Your current password. */
   current_password?: string;
   /**
@@ -29973,6 +29979,12 @@ export type StartPasskeyRegistrationRequest = {
 
 /** Where the interface wants the provider to send the browser back. */
 export type StartRequest = {
+  /**
+   * `true`: the sign-in can only be finished together with the `browser_secret` returned
+   * here, so a leaked `code` and `state` cannot be used from another browser. Keep the secret
+   * in the browser (for example in session storage) and send it to the callback. Recommended.
+   */
+  bind_browser?: boolean;
   /** A page of the interface, exactly as listed in the provider's `redirect_uris`. */
   redirect_uri: string;
 };
@@ -29984,6 +29996,8 @@ export type StartResponse = {
    * and `state` in the query.
    */
   authorization_url: string;
+  /** Only when `bind_browser` was `true`: send it back as `browser_secret` to the callback. */
+  browser_secret?: string | null;
   /** Seconds left to finish; after that, start again. */
   expires_in: number;
 };
