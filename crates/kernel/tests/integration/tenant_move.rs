@@ -551,3 +551,107 @@ async fn chi_nhan_su_nen_tang_doi_duoc_khach() {
     .await
     .unwrap();
 }
+
+/// Module `legacy` có trong chương trình nhưng đang tắt (`AUTOXIDE_MODULES`), với một bảng cấp
+/// khách hàng từ hồi nó còn chạy.
+struct Legacy;
+
+struct CreateLegacyNotes;
+
+impl MigrationName for CreateLegacyNotes {
+    fn name(&self) -> &str {
+        "m0001_create_legacy_notes"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for CreateLegacyNotes {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .create_table(
+                Table::create()
+                    .table("legacy_notes")
+                    .col(schema::uuid("tenant_id"))
+                    .col(schema::uuid("id"))
+                    .primary_key(Index::create().col("tenant_id").col("id"))
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager.drop_table(Table::drop().table("legacy_notes").to_owned()).await
+    }
+}
+
+impl Module for Legacy {
+    fn name(&self) -> &'static str {
+        "legacy"
+    }
+
+    fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
+        vec![Box::new(CreateLegacyNotes)]
+    }
+}
+
+/// Bước 70 P1: lượt dời chỉ chép bảng của module đang bật. Khách còn dữ liệu của một module đang
+/// tắt thì dry-run nêu lý do chặn và lệnh dời thật bị từ chối — dữ liệu không bị để lại trong im
+/// lặng; khách không có dữ liệu như vậy vẫn dời được. Việc kiểm cũng thấy dữ liệu ở placement.
+#[tokio::test]
+async fn khach_con_du_lieu_cua_module_tat_thi_khong_doi_duoc() {
+    use autoxide_kernel::module::Modules;
+    use sea_orm::ConnectionTrait as _;
+
+    TestDatabase::run(async |test| {
+        let app = TestApp::builder(test)
+            .setting("AUTOXIDE_TENANCY_CACHE_SECONDS", "1")
+            .module_turned_off(Legacy)
+            .tenant("a")
+            .tenant("b")
+            .placement("spare")
+            .user("platform", 1, &PLATFORM)
+            .build()
+            .await
+            .unwrap();
+        assert_eq!(app.modules().inactive()[0].name, "legacy");
+        // Chưa có bảng nào của `legacy`: không có gì để báo.
+        assert!(app.modules().dormant_everywhere().await.unwrap().0.is_empty());
+
+        // Hồi `legacy` còn chạy: bảng của nó, và một dòng của khách `a`.
+        let a = app.tenant("a").await.unwrap();
+        let legacy = Modules::new(vec![Box::new(Legacy)]).unwrap().migrator().unwrap();
+        legacy.up(app.database()).await.unwrap();
+        let (dormant, _) = app.modules().dormant_everywhere().await.unwrap();
+        assert_eq!(dormant.len(), 1);
+        assert!(dormant[0].tables_with_data.is_empty(), "{dormant:?}");
+        let insert = Query::insert()
+            .into_table(Alias::new("legacy_notes"))
+            .columns([Alias::new("tenant_id"), Alias::new("id")])
+            .values_panic([a.id().as_uuid().into(), Uuid::now_v7().into()])
+            .to_owned();
+        a.database().write().execute(&insert).await.unwrap();
+        let (dormant, _) = app.modules().dormant_everywhere().await.unwrap();
+        assert_eq!(dormant[0].tables_with_data, ["legacy_notes"]);
+
+        let moves = app.api::<TenantMoves>().unwrap();
+        let plan = moves.plan("a", "spare", false, Language::En).await.unwrap();
+        assert!(!plan.ready, "{plan:?}");
+        let answer = app
+            .post("/api/v1/kernel/tenants/a/move")
+            .token("platform")
+            .json(json!({"to": "spare", "dry_run": false}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), 409, "{}", answer.json());
+        let problem = answer.json();
+        assert_eq!(problem["code"], json!("tenant_move_modules_off"), "{problem}");
+        assert!(problem["detail"].as_str().unwrap().contains("(legacy)"), "{problem}");
+
+        // Khách `b` không có dữ liệu của `legacy`: kế hoạch dời không bị chặn.
+        let plan = moves.plan("b", "spare", false, Language::En).await.unwrap();
+        assert!(plan.ready, "{plan:?}");
+    })
+    .await
+    .unwrap();
+}

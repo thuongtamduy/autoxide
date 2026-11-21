@@ -151,7 +151,21 @@ pub async fn dormant_with_data(
     modules: &Modules,
     database: &Database,
 ) -> Result<Vec<DormantModule>, String> {
-    let dormant = modules.dormant(database).await.map_err(|error| format!("database: {error}"))?;
+    // Đã khởi động thì xem cả database của từng placement (khách có database riêng); chưa thì chỉ
+    // có database điều khiển để xem.
+    let dormant = if modules.tenancy().is_some() {
+        let (dormant, unreachable) =
+            modules.dormant_everywhere().await.map_err(|error| format!("database: {error}"))?;
+        if !unreachable.is_empty() {
+            tracing::warn!(
+                placements = %unreachable.join(", "),
+                "cannot reach these placements to check for data of modules that are turned off"
+            );
+        }
+        dormant
+    } else {
+        modules.dormant(database).await.map_err(|error| format!("database: {error}"))?
+    };
     Ok(dormant.into_iter().filter(|module| !module.tables_with_data.is_empty()).collect())
 }
 
@@ -161,7 +175,13 @@ pub fn dormant_notice(modules: &Modules, dormant: &[DormantModule]) -> (String, 
     let listed: Vec<String> = dormant
         .iter()
         .map(|module| {
-            format!("{} ({} table(s) with rows)", module.name, module.tables_with_data.len())
+            let mut text =
+                format!("{} ({} table(s) with rows", module.name, module.tables_with_data.len());
+            if !module.placements.is_empty() {
+                text.push_str(&format!("; also in placement {}", module.placements.join(", ")));
+            }
+            text.push(')');
+            text
         })
         .collect();
     let message = format!(

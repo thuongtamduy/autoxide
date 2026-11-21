@@ -117,6 +117,31 @@ async fn da_co_quan_tri_vien_thi_khong_tao_them() {
     .unwrap();
 }
 
+/// Task của module đang tắt (bước 70 P1) được bỏ qua kèm cảnh báo, không chặn khởi động — người
+/// chọn tập module nhỏ hơn không phải sửa thêm danh sách task; task còn lại vẫn chạy.
+#[tokio::test]
+async fn task_cua_module_dang_tat_duoc_bo_qua() {
+    TestDatabase::run(async |test| {
+        let extra = [
+            ("AUTOXIDE_MODULES", "official,-tax,-invoices"),
+            ("AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD", PASSWORD),
+            ("AUTOXIDE_STARTUP_TASKS", "tax.import_pack,newsletter.anything,address.import"),
+        ];
+
+        start_and_stop(settings(test.url(), &extra)).await.unwrap();
+
+        // Tên sai của một module ĐANG BẬT vẫn là lỗi.
+        let extra = [
+            ("AUTOXIDE_MODULES", "official,-tax,-invoices"),
+            ("AUTOXIDE_STARTUP_TASKS", "tax.import_pack,address.no_such_task"),
+        ];
+        let error = start_and_stop(settings(test.url(), &extra)).await.unwrap_err();
+        assert!(error.contains("there is no task `address.no_such_task`"), "{error}");
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn task_khong_co_thi_tu_choi_khoi_dong() {
     TestDatabase::run(async |test| {

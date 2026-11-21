@@ -256,6 +256,8 @@ struct Setup {
     retained: Vec<&'static str>,
     /// Chính sách tách / gộp của mọi module (`Module::relocation`, bước 38).
     policies: super::relocate::Policies,
+    /// Module có trong binary nhưng đang tắt (`AUTOXIDE_MODULES`): lượt dời không chép bảng của chúng.
+    inactive: Vec<&'static str>,
 }
 
 impl MoveSetup {
@@ -267,9 +269,28 @@ impl MoveSetup {
         placements: super::Placements,
         retained: Vec<&'static str>,
         policies: super::relocate::Policies,
+        inactive: Vec<&'static str>,
     ) {
-        let _ =
-            self.0.set(Setup { modules, control_plane, migrator, placements, retained, policies });
+        let _ = self.0.set(Setup {
+            modules,
+            control_plane,
+            migrator,
+            placements,
+            retained,
+            policies,
+            inactive,
+        });
+    }
+
+    /// Module đang tắt còn dữ liệu của khách `tenant` ở `database` (bước 70 P1): dời, tách hay gộp
+    /// khách lúc này sẽ để dữ liệu đó lại.
+    pub(crate) async fn inactive_with_data(
+        &self,
+        database: &Database,
+        tenant: TenantId,
+    ) -> Result<Vec<&'static str>, Error> {
+        let inactive = &self.get()?.inactive;
+        Ok(crate::module::inactive_with_tenant_data(database.read(), inactive, tenant).await?)
     }
 
     /// Chính sách tách / gộp của mọi module.

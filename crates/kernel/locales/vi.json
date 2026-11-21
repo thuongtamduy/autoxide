@@ -336,6 +336,7 @@
   "tenant_moving": "Khách đang được dời sang vị trí dữ liệu khác. Hãy chờ việc dời xong, hoặc huỷ bằng `autoxide tenant move <tenant> --abort`.",
   "tenant_not_found": "Không có khách hàng `{tenant}`.",
   "tenant_not_suspended": "Chỉ xoá được khách đang tạm khoá: tạm khoá trước (`PATCH` khách với `status: suspended`), xuất dữ liệu nếu cần, rồi xoá.",
+  "tenant_move_modules_off": "Khách còn dữ liệu của module đang tắt ({modules}); chỉ dữ liệu của module đang bật được chuyển, nên dữ liệu đó sẽ bị để lại. Bật các module đó (AUTOXIDE_MODULES), khởi động lại rồi thử lại.",
   "tenant_placement_behind": "Vị trí dữ liệu `{placement}` còn migration chưa áp dụng: chạy `autoxide migrate up --all` trước.",
   "tenant_placement_not_found": "Không có vị trí dữ liệu `{placement}`.",
   "tenant_placement_storage_in_use": "{tenants} khách đang giữ dữ liệu ở vị trí dữ liệu `{placement}`; đổi nơi lưu file của nó sẽ làm mất file của họ. Hãy dời họ sang vị trí khác trước, hoặc thêm `--force` khi nơi lưu mới đã có đúng các file đó (vd chỉ đổi khoá truy cập).",

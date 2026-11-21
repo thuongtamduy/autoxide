@@ -128,6 +128,7 @@ pub async fn start(settings: Settings, migrations: Migrations) -> Result<Runtime
         .idempotency(modules.api::<dyn IdempotencyStore>())
         .translations(modules.translations().clone())
         .deprecations(modules.deprecations())
+        .experimental(modules.experimental())
         .body_limits(modules.body_limits())
         .entitlements(modules.entitlements())
         .sync(modules.sync_resources())

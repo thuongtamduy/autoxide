@@ -153,6 +153,8 @@ pub struct DormantModule {
     /// Bảng của module đang có dòng (không tính bảng job, event và lịch sử migration); rỗng nghĩa
     /// là bảng có đó nhưng chưa từng được dùng.
     pub tables_with_data: Vec<String>,
+    /// Placement (ngoài `main`) có dữ liệu của module; chỉ [`Modules::dormant_everywhere`] điền.
+    pub placements: Vec<String>,
 }
 
 /// Kết quả chọn: module chạy, module nghỉ, và module được bật kèm vì module khác cần.
@@ -344,6 +346,59 @@ pub(super) fn select(
     Ok(Selected { modules: active, inactive, implied })
 }
 
+/// Bảng của module `module` trong `connection` đang có dòng — của khách `tenant` nếu nêu (bảng
+/// không có cột `tenant_id` thì bỏ qua), của bất kỳ ai nếu không. Không tính bảng job, event và
+/// lịch sử migration: chúng có dòng không có nghĩa là người dùng có dữ liệu ở module. `None`:
+/// database chưa từng có bảng của module.
+pub(crate) async fn tables_with_data<C: ConnectionTrait>(
+    connection: &C,
+    module: &str,
+    tenant: Option<crate::tenancy::TenantId>,
+) -> Result<Option<Vec<String>>, DbErr> {
+    if !crate::migration::table_exists(connection, &format!("{module}_migrations")).await? {
+        return Ok(None);
+    }
+    let custom = |error: crate::transfer::TransferError| DbErr::Custom(error.to_string());
+    let tables = crate::transfer::module_tables(connection, &[module]).await.map_err(custom)?;
+    let infrastructure = [crate::event::table_name(module), crate::job::table_name(module)];
+    let mut found = Vec::new();
+    for table in tables {
+        if infrastructure.contains(&table) {
+            continue;
+        }
+        let mut query = Query::select();
+        query.expr_as(Expr::val(1), Alias::new("present")).from(Alias::new(&table)).limit(1);
+        if let Some(tenant) = tenant {
+            let columns = crate::transfer::columns(connection, &table).await.map_err(custom)?;
+            if !columns.iter().any(|column| column.name == "tenant_id") {
+                continue;
+            }
+            query.cond_where(crate::transfer::tenant_is(tenant));
+        }
+        if connection.query_one(&query).await?.is_some() {
+            found.push(table);
+        }
+    }
+    Ok(Some(found))
+}
+
+/// Tên các module trong `inactive` còn dữ liệu của khách `tenant` ở `connection` — thứ một lượt
+/// dời / tách / gộp khách sẽ để lại, vì nó chỉ chép bảng của module đang bật.
+pub(crate) async fn inactive_with_tenant_data<C: ConnectionTrait>(
+    connection: &C,
+    inactive: &[&'static str],
+    tenant: crate::tenancy::TenantId,
+) -> Result<Vec<&'static str>, DbErr> {
+    let mut found = Vec::new();
+    for module in inactive {
+        let tables = tables_with_data(connection, module, Some(tenant)).await?;
+        if tables.is_some_and(|tables| !tables.is_empty()) {
+            found.push(*module);
+        }
+    }
+    Ok(found)
+}
+
 impl Modules {
     /// Đăng ký những module của `modules` mà `selection` bật (xem đầu file). Đây là cửa DUY NHẤT
     /// binary dùng để đăng ký: danh sách module do bên gọi đưa vào, nên module viết ngoài repo đi
@@ -373,42 +428,80 @@ impl Modules {
 
     /// Module đang tắt mà `database` còn bảng của nó — bản cài từng chạy module đó. Chỉ đọc; không
     /// đổi gì. Với mỗi module, nêu bảng đang có dữ liệu để người cài biết tắt nó có làm mất chức
-    /// năng đang dùng không.
+    /// năng đang dùng không. Chỉ xem MỘT database; xem cả các placement thì
+    /// [`dormant_everywhere`](Self::dormant_everywhere).
     pub async fn dormant(&self, database: &Database) -> Result<Vec<DormantModule>, DbErr> {
-        let connection = database.read();
         let mut dormant = Vec::new();
         for module in &self.inactive {
-            let history = format!("{}_migrations", module.name);
-            if !crate::migration::table_exists(connection, &history).await? {
-                continue;
+            if let Some(tables_with_data) =
+                tables_with_data(database.read(), module.name, None).await?
+            {
+                dormant.push(DormantModule {
+                    name: module.name,
+                    stability: module.stability,
+                    tables_with_data,
+                    placements: Vec::new(),
+                });
             }
-            let tables = crate::transfer::module_tables(connection, &[module.name])
-                .await
-                .map_err(|error| DbErr::Custom(error.to_string()))?;
-            // Bảng hạ tầng của kernel có dòng không có nghĩa là người dùng có dữ liệu ở module.
-            let infrastructure =
-                [crate::event::table_name(module.name), crate::job::table_name(module.name)];
-            let mut tables_with_data = Vec::new();
-            for table in tables {
-                if infrastructure.contains(&table) {
-                    continue;
-                }
-                let mut query = Query::select();
-                query
-                    .expr_as(Expr::val(1), Alias::new("present"))
-                    .from(Alias::new(&table))
-                    .limit(1);
-                if connection.query_one(&query).await?.is_some() {
-                    tables_with_data.push(table);
-                }
-            }
-            dormant.push(DormantModule {
-                name: module.name,
-                stability: module.stability,
-                tables_with_data,
-            });
         }
         Ok(dormant)
+    }
+
+    /// Như [`dormant`](Self::dormant) nhưng xem database điều khiển VÀ database của mọi placement
+    /// (khách có database riêng giữ dữ liệu của họ ở đó). Gọi sau [`start`](Self::start).
+    /// Placement không kết nối được thì bỏ qua và nêu tên trong `unreachable` — một câu nhắc không
+    /// được chặn việc khởi động.
+    pub async fn dormant_everywhere(&self) -> Result<(Vec<DormantModule>, Vec<String>), DbErr> {
+        let registry = self.tenancy().ok_or_else(|| {
+            DbErr::Custom("start the modules before looking at the placements".to_owned())
+        })?;
+        let mut dormant = self.dormant(registry.control()).await?;
+        let mut unreachable = Vec::new();
+        if self.inactive.is_empty() {
+            return Ok((dormant, unreachable));
+        }
+        let placements = match self.placements(&registry) {
+            Ok(placements) => placements.list().await.map_err(|e| DbErr::Custom(e.message())),
+            Err(error) => Err(DbErr::Custom(error.to_string())),
+        }?;
+        for placement in placements {
+            let id = crate::tenancy::PlacementId::from_uuid(placement.id);
+            if id == crate::tenancy::MAIN_PLACEMENT {
+                continue;
+            }
+            let Ok(database) = registry.placement_database(id).await else {
+                unreachable.push(placement.name);
+                continue;
+            };
+            for module in &self.inactive {
+                let Some(tables) = tables_with_data(database.read(), module.name, None).await?
+                else {
+                    continue;
+                };
+                let position = match dormant.iter().position(|found| found.name == module.name) {
+                    Some(position) => position,
+                    None => {
+                        dormant.push(DormantModule {
+                            name: module.name,
+                            stability: module.stability,
+                            tables_with_data: Vec::new(),
+                            placements: Vec::new(),
+                        });
+                        dormant.len() - 1
+                    }
+                };
+                if !tables.is_empty() {
+                    let entry = &mut dormant[position];
+                    entry.placements.push(placement.name.clone());
+                    for table in tables {
+                        if !entry.tables_with_data.contains(&table) {
+                            entry.tables_with_data.push(table);
+                        }
+                    }
+                }
+            }
+        }
+        Ok((dormant, unreachable))
     }
 
     /// Người cài tự đặt `AUTOXIDE_MODULES` (không phải mặc định của chương trình).

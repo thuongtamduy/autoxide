@@ -488,6 +488,7 @@ impl Modules {
             placements,
             retained,
             policies,
+            self.inactive.iter().map(|module| module.name).collect(),
         );
         self.backlog.fill(self.job_modules(), self.events.modules());
         Ok(())
