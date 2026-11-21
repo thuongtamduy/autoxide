@@ -1,8 +1,8 @@
 //! Nhóm khách: nhóm tay, nhóm theo quy tắc, cắm vào `orders` (nhóm, mã nhóm giá), MCP.
 
 use autoxide_testkit::TestDatabase;
+use autoxide_testkit::mcp::CallToolRequestParams;
 use axum::http::StatusCode;
-use rmcp::model::CallToolRequestParams;
 use serde_json::{Value, json};
 use uuid::Uuid;
 

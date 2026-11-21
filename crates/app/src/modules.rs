@@ -283,16 +283,13 @@ mod tests {
         .unwrap();
     }
 
-    /// Đầu-cuối: chương trình thật, database thật (gate chạy cả hai), client MCP thật.
+    /// Đầu-cuối: chương trình thật, database thật (gate chạy cả hai), client MCP (đặc tả 2026-07-28).
     /// Quản trị viên đăng nhập, gọi tool ghi qua MCP; thay đổi vào audit log, ghi đúng
     /// người làm.
     #[tokio::test]
     async fn client_mcp_goi_tool_ghi_va_vao_audit_log() {
         use autoxide_auth::api::{Accounts, NewAccount};
-        use rmcp::ServiceExt as _;
-        use rmcp::model::CallToolRequestParams;
-        use rmcp::transport::StreamableHttpClientTransport;
-        use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
+        use autoxide_testkit::mcp::{CallToolRequestParams, McpClient};
         use sea_orm::{ConnectionTrait, Statement};
         use serde_json::json;
         use tower::ServiceExt as _;
@@ -349,17 +346,12 @@ mod tests {
             let body: serde_json::Value = serde_json::from_slice(&body).unwrap();
             let token = body["data"]["access_token"].as_str().unwrap().to_owned();
 
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let url = format!("http://{}/mcp", listener.local_addr().unwrap());
-            let router = runtime.api.router.clone();
-            let server = tokio::spawn(async move { axum::serve(listener, router).await });
-            autoxide_kernel::tls::install_crypto_provider();
-            let config = StreamableHttpClientTransportConfig::with_uri(url).auth_header(token);
-            let client =
-                ().serve(StreamableHttpClientTransport::from_config(config)).await.unwrap();
+            // Client MCP của testkit gửi thẳng vào router của chương trình (đủ mọi lớp HTTP: xác thực,
+            // Problem, nhật ký…), không cần mở cổng TCP.
+            let client = McpClient::new(runtime.api.router.clone(), "/mcp", Some(&token));
 
             let tools = client.list_all_tools().await.unwrap();
-            let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
+            let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_str()).collect();
             for expected in ["auth.whoami", "auth.list_permissions", "auth.update_user"] {
                 assert!(names.contains(&expected), "{names:?}");
             }
@@ -375,7 +367,6 @@ mod tests {
             assert_eq!(updated.is_error, Some(false), "{updated:?}");
             assert_eq!(updated.structured_content.unwrap()["data"]["name"], "Robert");
             client.cancel().await.unwrap();
-            server.abort();
 
             assert!(runtime.dispatcher.run_once().await.unwrap() >= 1);
             let backend = runtime.database.read().get_database_backend();

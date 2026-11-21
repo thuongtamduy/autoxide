@@ -2,9 +2,9 @@
 //! resource schema khớp OpenAPI, prompt của `content` / `comments` theo permission.
 
 use autoxide_kernel::mcp::SCHEMA_MIME;
+use autoxide_testkit::mcp::{GetPromptRequestParams, ReadResourceRequestParams, ResourceContents};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use rmcp::model::{GetPromptRequestParams, ReadResourceRequestParams, ResourceContents};
 use serde_json::Value;
 
 /// App với mọi module của binary; `agent` có quyền đọc / viết nháp nội dung và kiểm duyệt bình

@@ -22,7 +22,10 @@ const MAX_DETAIL_BYTES: usize = 4096;
 /// Đổi response lỗi chưa phải Problem Details thành Problem Details.
 pub(super) async fn normalize(response: Response) -> Response {
     let status = response.status();
-    if !(status.is_client_error() || status.is_server_error()) || is_problem(&response) {
+    // Lỗi JSON-RPC của endpoint MCP giữ nguyên thân: đặc tả MCP đòi (client đọc mã lỗi trong thân).
+    let json_rpc = response.extensions().get::<super::mcp::JsonRpcBody>().is_some();
+    if !(status.is_client_error() || status.is_server_error()) || is_problem(&response) || json_rpc
+    {
         return response;
     }
 

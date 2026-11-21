@@ -1,10 +1,12 @@
-//! Endpoint MCP (Streamable HTTP) ở `/mcp`, dựng bằng `rmcp` (D-068).
+//! Endpoint MCP (Streamable HTTP) ở `/mcp` (D-068). Giao thức do kernel tự cài theo đặc tả công khai
+//! (`mcp/protocol.rs`, `mcp/transport.rs`; thay thư viện `rmcp` — D-20261121-time-library), phục vụ cả bản
+//! mới (`2026-07-28`: không bắt tay, `_meta` theo request, `server/discover`) lẫn các bản cũ còn `initialize`.
 //!
 //! - Không giữ phiên (stateless) và trả JSON: mỗi request độc lập, chạy được trên nhiều
 //!   máy chủ như REST.
 //! - Xác thực như REST (`Authorization: Bearer <access token hoặc API key>`), ở một lớp
-//!   chạy trước `rmcp`: thiếu hay sai token thì 401 kiểu Problem. Người gọi
-//!   ([`Principal`]) được đặt vào request; handler đọc lại từ đó.
+//!   chạy trước phần giao thức: thiếu hay sai token thì 401 kiểu Problem. Người gọi
+//!   ([`Principal`]) được đặt vào request; phần giao thức đọc lại từ đó.
 //! - `tools/list` chỉ liệt kê tool người gọi có permission; `tools/call` tool khác coi
 //!   như không tồn tại.
 //! - Lỗi của tool trả về như kết quả lỗi của tool (`isError`), kèm `code` ổn định và
@@ -16,26 +18,23 @@
 //!   cho `tools/list`; một endpoint mỗi module thì client nào cũng dùng được, và agent chỉ làm việc với
 //!   một module không phải nạp mô tả của gần hai trăm tool.
 
+mod protocol;
+mod transport;
+
+pub(super) use self::transport::JsonRpcBody;
+
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 
 use axum::Router;
 use axum::extract::Request;
 use axum::http::{HeaderValue, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use rmcp::model::{
-    CallToolRequestParams, CallToolResponse, CallToolResult, GetPromptRequestParams,
-    GetPromptResponse, GetPromptResult, Implementation, ListPromptsResult, ListResourcesResult,
-    ListToolsResult, PaginatedRequestParams, ReadResourceRequestParams, ReadResourceResponse,
-    ReadResourceResult, ResourceContents, Role, ServerCapabilities, ServerConfig, ToolAnnotations,
-};
-use rmcp::service::{RequestContext, RoleServer};
-use rmcp::transport::streamable_http_server::session::local::LocalSessionManager;
-use rmcp::transport::streamable_http_server::{StreamableHttpServerConfig, StreamableHttpService};
-use rmcp::{ErrorData, ServerHandler};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
+use self::protocol::RpcError;
+use self::transport::Caller;
 use crate::access::{Authenticator, Principal};
 use crate::config::CorsOrigins;
 use crate::error::{Error, ErrorKind};
@@ -103,41 +102,26 @@ pub(super) fn router(
         entitlements,
         request_log,
     };
-    let mut config = StreamableHttpServerConfig::default()
-        .with_legacy_session_mode(false)
-        .with_json_response(true)
-        .with_sse_keep_alive(None)
-        // Mỗi request mang token riêng, nên kiểm `Host` (chống DNS rebinding cho máy chủ
-        // không xác thực) không cần; tên miền do người cài chọn.
-        .disable_allowed_hosts();
-    config = match origins {
-        // Như CORS: không khai origin nào thì trình duyệt không gọi được.
-        CorsOrigins::None => config.enforce_origin_validation(),
-        CorsOrigins::Any => config.disable_allowed_origins(),
-        CorsOrigins::List(list) => config.with_allowed_origins(list.clone()),
+    let origins = Arc::new(origins.clone());
+    let endpoint = |server: McpServer, origins: Arc<CorsOrigins>| {
+        // Mọi phương thức vào cùng một hàm: `GET` / `DELETE` của bản cũ nhận 405 có giải thích.
+        axum::routing::any(move |request: Request| {
+            transport::handle(server.clone(), origins.clone(), request)
+        })
     };
     let mut router = Router::new();
     for module in server.modules() {
         let only = server.only(&module);
-        let service = StreamableHttpService::new(
-            move || Ok(only.clone()),
-            Arc::new(LocalSessionManager::default()),
-            config.clone(),
-        );
-        router = router.route_service(&module_path(&module), service);
+        router = router.route_service(&module_path(&module), endpoint(only, origins.clone()));
     }
-    let service = StreamableHttpService::new(
-        move || Ok(server.clone()),
-        Arc::new(LocalSessionManager::default()),
-        config,
-    );
-    let router = router.route_service(MCP_PATH, service).route_layer(middleware::from_fn(
-        move |request: Request, next: Next| authenticate(authenticator.clone(), request, next),
-    ));
+    let router =
+        router.route_service(MCP_PATH, endpoint(server, origins)).route_layer(middleware::from_fn(
+            move |request: Request, next: Next| authenticate(authenticator.clone(), request, next),
+        ));
     Some(router)
 }
 
-/// Lớp xác thực: đặt [`Principal`] vào request, hoặc trả 401.
+/// Lớp xác thực: đặt [`Principal`] và khách vào request, hoặc trả 401.
 async fn authenticate(
     authenticator: Arc<dyn Authenticator>,
     request: Request,
@@ -161,16 +145,7 @@ async fn authenticate(
         Ok((principal, tenant)) => {
             request.extensions_mut().insert(principal);
             request.extensions_mut().insert(tenant);
-            let secret = SecretResult::default();
-            request.extensions_mut().insert(secret.clone());
-            let mut response = next.run(request).await;
-            if secret.0.load(Ordering::Relaxed) {
-                // Kết quả có secret chỉ trả một lần: không cho ai lưu lại response (D-149).
-                response
-                    .headers_mut()
-                    .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-            }
-            response
+            next.run(request).await
         }
         Err(error) => {
             let mut response = error.into_response();
@@ -184,32 +159,8 @@ async fn authenticate(
     }
 }
 
-/// Cờ chung giữa lớp xác thực và `call_tool`: request đã gọi một tool trả secret. `Arc` vì
-/// rmcp chép phần đầu request (kèm extensions) sang ngữ cảnh của tool — bản chép vẫn trỏ
-/// cùng một cờ.
-#[derive(Clone, Default)]
-struct SecretResult(Arc<AtomicBool>);
-
-/// Khách, người gọi và ngôn ngữ của request đang xử lý.
-fn caller(
-    context: &RequestContext<RoleServer>,
-) -> Result<(TenantContext, Principal, Language), ErrorData> {
-    let parts = context.extensions.get::<axum::http::request::Parts>();
-    let principal = parts.and_then(|parts| parts.extensions.get::<Principal>()).cloned();
-    let tenant = parts.and_then(|parts| parts.extensions.get::<TenantContext>()).cloned();
-    let (Some(principal), Some(tenant)) = (principal, tenant) else {
-        return Err(ErrorData::internal_error(
-            "the MCP request reached the server without a caller",
-            None,
-        ));
-    };
-    let accept = parts
-        .and_then(|parts| parts.headers.get(header::ACCEPT_LANGUAGE))
-        .and_then(|value| value.to_str().ok());
-    Ok((tenant, principal, Language::negotiate(accept)))
-}
-
-fn describe(tool: &Tool) -> rmcp::model::Tool {
+/// Tool cho `tools/list`: mô tả kèm permission cần có và cảnh báo deprecated; gợi ý chỉ đọc / phá huỷ.
+fn describe(tool: &Tool) -> Value {
     let mut description = tool.description().to_owned();
     match (tool.permission(), tool.alternative()) {
         (Some(permission), Some(alternative)) => description.push_str(&format!(
@@ -227,13 +178,15 @@ fn describe(tool: &Tool) -> rmcp::model::Tool {
         description.push_str(&deprecation.sentence(tool.name()));
     }
     let schema = match tool.input_schema() {
-        Value::Object(object) => object.clone(),
-        _ => serde_json::Map::new(),
+        Value::Object(object) => Value::Object(object.clone()),
+        _ => Value::Object(Map::new()),
     };
-    let annotations =
-        ToolAnnotations::new().read_only(tool.is_read_only()).destructive(tool.is_destructive());
-    rmcp::model::Tool::new(tool.name().to_owned(), description, Arc::new(schema))
-        .annotate(annotations)
+    json!({
+        "name": tool.name(),
+        "description": description,
+        "inputSchema": schema,
+        "annotations": {"readOnlyHint": tool.is_read_only(), "destructiveHint": tool.is_destructive()},
+    })
 }
 
 impl McpServer {
@@ -311,19 +264,19 @@ impl McpServer {
 
     /// Lỗi khi đọc resource hay dựng prompt (không có "kết quả lỗi" như tool): lỗi giao thức
     /// mang cùng `code`, `message` và `errors` như Problem của REST trong `data`.
-    fn protocol_error(&self, what: &str, error: &Error, language: Language) -> ErrorData {
+    fn protocol_error(&self, what: &str, error: &Error, language: Language) -> RpcError {
         if error.kind() == ErrorKind::Internal {
             tracing::error!(what, error = ?error, "MCP resource or prompt failed");
-            return ErrorData::internal_error("internal error", None);
+            return RpcError::internal();
         }
-        let body = self.failure(what, error, language).structured_content.unwrap_or(Value::Null);
+        let body = self.failure_body(what, error, language);
         let message =
             body.get("message").and_then(Value::as_str).unwrap_or("invalid request").to_owned();
-        ErrorData::invalid_params(message, Some(body))
+        RpcError::invalid_params(message).with_data(body)
     }
 
-    /// Lỗi của tool thành kết quả lỗi mà agent đọc được.
-    fn failure(&self, tool: &str, error: &Error, language: Language) -> CallToolResult {
+    /// Lỗi của tool thành thân kết quả lỗi mà agent đọc được (`code`, `message`, `errors`).
+    fn failure_body(&self, tool: &str, error: &Error, language: Language) -> Value {
         if error.kind() == ErrorKind::Internal {
             tracing::error!(tool, error = ?error, "MCP tool failed");
         }
@@ -346,7 +299,239 @@ impl McpServer {
                 .collect();
             body["errors"] = Value::Array(fields);
         }
-        CallToolResult::structured_error(body)
+        body
+    }
+
+    /// Một request JSON-RPC đã qua lớp HTTP. Kết quả là `result` (chưa gắn trường của bản mới); lỗi là
+    /// lỗi JSON-RPC.
+    pub(super) async fn dispatch(
+        &self,
+        method: &str,
+        params: Map<String, Value>,
+        caller: &Caller,
+    ) -> Result<Map<String, Value>, RpcError> {
+        match method {
+            "initialize" => Ok(object(json!({
+                "protocolVersion": protocol::negotiate_initialize(
+                    params.get("protocolVersion").and_then(Value::as_str).unwrap_or_default()
+                ),
+                "capabilities": protocol::capabilities(),
+                "serverInfo": protocol::server_info(),
+                "instructions": INSTRUCTIONS,
+            }))),
+            // Bản mới bỏ `ping` (kết nối không còn là phiên).
+            "ping" if !caller.modern => Ok(Map::new()),
+            "server/discover" => Ok(object(json!({
+                "supportedVersions": protocol::SUPPORTED_VERSIONS,
+                "capabilities": protocol::capabilities(),
+                "instructions": INSTRUCTIONS,
+                // Như nhau với mọi người gọi: cache chung được, nhưng không giữ (bản cài có thể đổi).
+                "ttlMs": 0,
+                "cacheScope": "public",
+            }))),
+            "tools/list" => Ok(object(json!({"tools": self.list_tools(caller).await}))),
+            "tools/call" => self.call(params, caller).await,
+            "resources/list" => Ok(object(json!({"resources": self.list_resources(caller).await}))),
+            "resources/read" => self.read_resource(&params, caller).await,
+            "resources/templates/list" => Ok(object(json!({"resourceTemplates": []}))),
+            "prompts/list" => Ok(object(json!({"prompts": self.list_prompts(caller).await}))),
+            "prompts/get" => self.get_prompt(&params, caller).await,
+            other => Err(RpcError::method_not_found(other)),
+        }
+    }
+
+    async fn list_tools(&self, caller: &Caller) -> Vec<Value> {
+        let mut listed = Vec::new();
+        for tool in self.tools.iter().filter(|tool| tool.allows(&caller.principal)) {
+            // Tool của module gói không có: không liệt kê (lỗi tra quyền dùng: cũng không).
+            if matches!(self.plan_allows(tool, caller.tenant.id()).await, Ok((true, _))) {
+                listed.push(describe(tool));
+            }
+        }
+        listed
+    }
+
+    async fn call(
+        &self,
+        params: Map<String, Value>,
+        caller: &Caller,
+    ) -> Result<Map<String, Value>, RpcError> {
+        let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+        let tool = self
+            .tools
+            .iter()
+            .find(|tool| tool.name() == name && tool.allows(&caller.principal))
+            .ok_or_else(|| {
+                // Tool không có và tool không được dùng trả cùng một lỗi.
+                RpcError::invalid_params(format!(
+                    "Unknown tool `{name}`. Call `tools/list` for the tools you may use."
+                ))
+            })?;
+        if tool.is_secret() {
+            caller.secret.store(true, Ordering::Relaxed);
+        }
+        let arguments = match params.get("arguments") {
+            None | Some(Value::Null) => Value::Null,
+            Some(Value::Object(arguments)) => Value::Object(arguments.clone()),
+            Some(_) => return Err(RpcError::invalid_params("`arguments` must be an object")),
+        };
+        metrics::counter!("mcp_tool_calls_total").increment(1);
+        // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
+        self.entitlements.count_request(caller.tenant.id());
+        let started = std::time::Instant::now();
+        let outcome =
+            self.run(tool, caller.tenant.clone(), caller.principal.clone(), arguments).await;
+        // Nhật ký lệnh của agent (D-202): tên tool và mã lỗi, không bao giờ tham số.
+        if let Some(request_log) = &self.request_log {
+            request_log.record_tool(
+                &caller.tenant,
+                &caller.principal,
+                tool.name(),
+                outcome.as_ref().err().map(|error| error.code().to_owned()),
+                started.elapsed(),
+                caller.request_id.clone(),
+            );
+        }
+        let mut result = match outcome {
+            Ok(value) => protocol::tool_result(envelope(value), false),
+            Err(error) => {
+                protocol::tool_result(self.failure_body(tool.name(), &error, caller.language), true)
+            }
+        };
+        if let Some(deprecation) = tool.deprecation() {
+            warn_deprecated(&mut result, tool.name(), deprecation);
+        }
+        Ok(result)
+    }
+
+    async fn list_resources(&self, caller: &Caller) -> Vec<Value> {
+        let mut listed = Vec::new();
+        for resource in self.resources.iter().filter(|resource| resource.allows(&caller.principal))
+        {
+            if matches!(
+                self.module_allowed(resource.module(), caller.tenant.id()).await,
+                Ok((true, _))
+            ) {
+                listed.push(describe_resource(resource));
+            }
+        }
+        listed
+    }
+
+    async fn read_resource(
+        &self,
+        params: &Map<String, Value>,
+        caller: &Caller,
+    ) -> Result<Map<String, Value>, RpcError> {
+        let uri = params.get("uri").and_then(Value::as_str).unwrap_or_default();
+        // Resource không có, không được đọc, hay thuộc module gói của khách không có: cùng một lỗi.
+        let unknown = || {
+            RpcError::invalid_params(format!(
+                "Unknown resource `{uri}`. Call `resources/list` for the resources you may read."
+            ))
+        };
+        let resource = self
+            .resources
+            .iter()
+            .find(|resource| resource.uri() == uri && resource.allows(&caller.principal))
+            .ok_or_else(unknown)?;
+        if !matches!(
+            self.module_allowed(resource.module(), caller.tenant.id()).await,
+            Ok((true, _))
+        ) {
+            return Err(unknown());
+        }
+        metrics::counter!("mcp_resource_reads_total").increment(1);
+        let text = resource
+            .read(caller.tenant.clone(), caller.principal.clone())
+            .await
+            .map_err(|error| self.protocol_error(resource.uri(), &error, caller.language))?;
+        Ok(object(json!({
+            "contents": [{"uri": resource.uri(), "mimeType": resource.mime_type(), "text": text}]
+        })))
+    }
+
+    async fn list_prompts(&self, caller: &Caller) -> Vec<Value> {
+        let mut listed = Vec::new();
+        for prompt in self.prompts.iter().filter(|prompt| prompt.allows(&caller.principal)) {
+            let module = prompt.name().split('.').next().unwrap_or_default();
+            if matches!(self.module_allowed(module, caller.tenant.id()).await, Ok((true, _))) {
+                listed.push(describe_prompt(prompt));
+            }
+        }
+        listed
+    }
+
+    async fn get_prompt(
+        &self,
+        params: &Map<String, Value>,
+        caller: &Caller,
+    ) -> Result<Map<String, Value>, RpcError> {
+        let name = params.get("name").and_then(Value::as_str).unwrap_or_default();
+        let language = caller.language;
+        let unknown = || {
+            RpcError::invalid_params(format!(
+                "Unknown prompt `{name}`. Call `prompts/list` for the prompts you may use."
+            ))
+        };
+        let prompt = self
+            .prompts
+            .iter()
+            .find(|prompt| prompt.name() == name && prompt.allows(&caller.principal))
+            .ok_or_else(unknown)?;
+        let module = prompt.name().split('.').next().unwrap_or_default();
+        if !matches!(self.module_allowed(module, caller.tenant.id()).await, Ok((true, _))) {
+            return Err(unknown());
+        }
+        let mut values = std::collections::BTreeMap::new();
+        let mut invalid = Vec::new();
+        let arguments = match params.get("arguments") {
+            Some(Value::Object(arguments)) => arguments.clone(),
+            _ => Map::new(),
+        };
+        for (name, value) in arguments {
+            match value {
+                Value::String(text) => {
+                    values.insert(name, text);
+                }
+                // Client MCP gửi đối số là chuỗi; số hay bool đổi sang chuỗi cho tiện.
+                Value::Number(_) | Value::Bool(_) => {
+                    values.insert(name, value.to_string());
+                }
+                _ => {
+                    invalid.push(crate::error::FieldError::new(name, "invalid", "must be a string"))
+                }
+            }
+        }
+        if !invalid.is_empty() {
+            let error = Error::validation(invalid);
+            return Err(self.protocol_error(prompt.name(), &error, language));
+        }
+        if values.values().any(|value| value.contains('\0')) {
+            return Err(self.protocol_error(prompt.name(), &super::nul_refused(), language));
+        }
+        let messages = prompt
+            .render(values)
+            .map_err(|error| self.protocol_error(prompt.name(), &error, language))?;
+        let messages: Vec<Value> = messages
+            .into_iter()
+            .map(|message| {
+                let (role, text) = match message {
+                    PromptMessage::User(text) => ("user", text),
+                    PromptMessage::Assistant(text) => ("assistant", text),
+                };
+                json!({"role": role, "content": protocol::text_block(text)})
+            })
+            .collect();
+        Ok(object(json!({"description": prompt.description(), "messages": messages})))
+    }
+}
+
+/// Đối tượng JSON dựng bằng `json!({…})` thành `Map` (giá trị khác: rỗng — không xảy ra).
+fn object(value: Value) -> Map<String, Value> {
+    match value {
+        Value::Object(map) => map,
+        _ => Map::new(),
     }
 }
 
@@ -406,20 +591,21 @@ pub(crate) async fn module_allowed(
 /// header `Deprecation` / `Sunset` của endpoint — D-059). Tên tool là tập cố định do code khai, nên
 /// dùng làm nhãn số đo được.
 fn warn_deprecated(
-    result: &mut CallToolResult,
+    result: &mut Map<String, Value>,
     tool: &str,
     deprecation: &crate::mcp::ToolDeprecation,
 ) {
     metrics::counter!("mcp_deprecated_tool_calls_total", "tool" => tool.to_owned()).increment(1);
-    let mut meta = result.meta.take().unwrap_or_default();
-    meta.0.insert(
-        "autoxide/deprecation".to_owned(),
-        json!({"since": deprecation.since, "sunset": deprecation.sunset, "successor": deprecation.successor}),
-    );
-    result.meta = Some(meta);
-    result
-        .content
-        .push(rmcp::model::ContentBlock::text(format!("Warning: {}", deprecation.sentence(tool))));
+    let meta = result.entry("_meta").or_insert_with(|| Value::Object(Map::new()));
+    if let Value::Object(meta) = meta {
+        meta.insert(
+            "autoxide/deprecation".to_owned(),
+            json!({"since": deprecation.since, "sunset": deprecation.sunset, "successor": deprecation.successor}),
+        );
+    }
+    if let Some(Value::Array(content)) = result.get_mut("content") {
+        content.push(protocol::text_block(format!("Warning: {}", deprecation.sentence(tool))));
+    }
 }
 
 /// Kết quả tool theo đúng envelope của REST: một trang (`Page`: `data` + `pagination`)
@@ -431,254 +617,40 @@ fn envelope(value: Value) -> Value {
     if is_page { value } else { json!({ "data": value }) }
 }
 
-impl ServerHandler for McpServer {
-    fn get_info(&self) -> ServerConfig {
-        ServerConfig::new(
-            ServerCapabilities::builder()
-                .enable_tools()
-                .enable_resources()
-                .enable_prompts()
-                .build(),
-        )
-        .with_server_info(Implementation::new("autoxide", env!("CARGO_PKG_VERSION")))
-        .with_instructions(INSTRUCTIONS)
-    }
-
-    async fn list_tools(
-        &self,
-        _request: Option<PaginatedRequestParams>,
-        context: RequestContext<RoleServer>,
-    ) -> Result<ListToolsResult, ErrorData> {
-        let (tenant, principal, _) = caller(&context)?;
-        let mut listed = Vec::new();
-        for tool in self.tools.iter().filter(|tool| tool.allows(&principal)) {
-            // Tool của module gói không có: không liệt kê (lỗi tra quyền dùng: cũng không).
-            if matches!(self.plan_allows(tool, tenant.id()).await, Ok((true, _))) {
-                listed.push(describe(tool));
-            }
-        }
-        Ok(ListToolsResult::with_all_items(listed))
-    }
-
-    async fn call_tool(
-        &self,
-        request: CallToolRequestParams,
-        context: RequestContext<RoleServer>,
-    ) -> Result<CallToolResponse, ErrorData> {
-        let (tenant, principal, language) = caller(&context)?;
-        let tool = self
-            .tools
-            .iter()
-            .find(|tool| tool.name() == request.name && tool.allows(&principal))
-            .ok_or_else(|| {
-                // Tool không có và tool không được dùng trả cùng một lỗi.
-                ErrorData::invalid_params(
-                    format!(
-                        "Unknown tool `{}`. Call `tools/list` for the tools you may use.",
-                        request.name
-                    ),
-                    None,
-                )
-            })?;
-        if tool.is_secret()
-            && let Some(secret) = context
-                .extensions
-                .get::<axum::http::request::Parts>()
-                .and_then(|parts| parts.extensions.get::<SecretResult>())
-        {
-            secret.0.store(true, Ordering::Relaxed);
-        }
-        let arguments = request.arguments.map_or(Value::Null, Value::Object);
-        metrics::counter!("mcp_tool_calls_total").increment(1);
-        // Đếm cho hạn mức `kernel.api_requests` (REST và MCP), như lớp HTTP.
-        self.entitlements.count_request(tenant.id());
-        let started = std::time::Instant::now();
-        let outcome = self.run(tool, tenant.clone(), principal.clone(), arguments).await;
-        // Nhật ký lệnh của agent (D-202): tên tool và mã lỗi, không bao giờ tham số.
-        if let Some(request_log) = &self.request_log {
-            let request_id =
-                context.extensions.get::<axum::http::request::Parts>().and_then(|parts| {
-                    crate::ops::request_log::header_text(
-                        parts.headers.get(&super::request_id::REQUEST_ID_HEADER),
-                        128,
-                    )
-                });
-            request_log.record_tool(
-                &tenant,
-                &principal,
-                tool.name(),
-                outcome.as_ref().err().map(|error| error.code().to_owned()),
-                started.elapsed(),
-                request_id,
-            );
-        }
-        let mut result = match outcome {
-            Ok(value) => CallToolResult::structured(envelope(value)),
-            Err(error) => self.failure(tool.name(), &error, language),
-        };
-        if let Some(deprecation) = tool.deprecation() {
-            warn_deprecated(&mut result, tool.name(), deprecation);
-        }
-        Ok(result.into())
-    }
-
-    async fn list_resources(
-        &self,
-        _request: Option<PaginatedRequestParams>,
-        context: RequestContext<RoleServer>,
-    ) -> Result<ListResourcesResult, ErrorData> {
-        let (tenant, principal, _) = caller(&context)?;
-        let mut listed = Vec::new();
-        for resource in self.resources.iter().filter(|resource| resource.allows(&principal)) {
-            if matches!(self.module_allowed(resource.module(), tenant.id()).await, Ok((true, _))) {
-                listed.push(describe_resource(resource));
-            }
-        }
-        Ok(ListResourcesResult::with_all_items(listed))
-    }
-
-    async fn read_resource(
-        &self,
-        request: ReadResourceRequestParams,
-        context: RequestContext<RoleServer>,
-    ) -> Result<ReadResourceResponse, ErrorData> {
-        let (tenant, principal, language) = caller(&context)?;
-        // Resource không có, không được đọc, hay thuộc module gói của khách không có: cùng một lỗi.
-        let unknown = || {
-            ErrorData::invalid_params(
-                format!(
-                    "Unknown resource `{}`. Call `resources/list` for the resources you may read.",
-                    request.uri
-                ),
-                None,
-            )
-        };
-        let resource = self
-            .resources
-            .iter()
-            .find(|resource| resource.uri() == request.uri && resource.allows(&principal))
-            .ok_or_else(unknown)?;
-        if !matches!(self.module_allowed(resource.module(), tenant.id()).await, Ok((true, _))) {
-            return Err(unknown());
-        }
-        metrics::counter!("mcp_resource_reads_total").increment(1);
-        let text = resource
-            .read(tenant, principal)
-            .await
-            .map_err(|error| self.protocol_error(resource.uri(), &error, language))?;
-        let contents =
-            ResourceContents::text(text, resource.uri()).with_mime_type(resource.mime_type());
-        Ok(ReadResourceResult::new(vec![contents]).into())
-    }
-
-    async fn list_prompts(
-        &self,
-        _request: Option<PaginatedRequestParams>,
-        context: RequestContext<RoleServer>,
-    ) -> Result<ListPromptsResult, ErrorData> {
-        let (tenant, principal, _) = caller(&context)?;
-        let mut listed = Vec::new();
-        for prompt in self.prompts.iter().filter(|prompt| prompt.allows(&principal)) {
-            let module = prompt.name().split('.').next().unwrap_or_default();
-            if matches!(self.module_allowed(module, tenant.id()).await, Ok((true, _))) {
-                listed.push(describe_prompt(prompt));
-            }
-        }
-        Ok(ListPromptsResult::with_all_items(listed))
-    }
-
-    async fn get_prompt(
-        &self,
-        request: GetPromptRequestParams,
-        context: RequestContext<RoleServer>,
-    ) -> Result<GetPromptResponse, ErrorData> {
-        let (tenant, principal, language) = caller(&context)?;
-        let unknown = || {
-            ErrorData::invalid_params(
-                format!(
-                    "Unknown prompt `{}`. Call `prompts/list` for the prompts you may use.",
-                    request.name
-                ),
-                None,
-            )
-        };
-        let prompt = self
-            .prompts
-            .iter()
-            .find(|prompt| prompt.name() == request.name && prompt.allows(&principal))
-            .ok_or_else(unknown)?;
-        let module = prompt.name().split('.').next().unwrap_or_default();
-        if !matches!(self.module_allowed(module, tenant.id()).await, Ok((true, _))) {
-            return Err(unknown());
-        }
-        let mut values = std::collections::BTreeMap::new();
-        let mut invalid = Vec::new();
-        for (name, value) in request.arguments.clone().unwrap_or_default() {
-            match value {
-                Value::String(text) => {
-                    values.insert(name, text);
-                }
-                // Client MCP gửi đối số là chuỗi; số hay bool đổi sang chuỗi cho tiện.
-                Value::Number(_) | Value::Bool(_) => {
-                    values.insert(name, value.to_string());
-                }
-                _ => {
-                    invalid.push(crate::error::FieldError::new(name, "invalid", "must be a string"))
-                }
-            }
-        }
-        if !invalid.is_empty() {
-            let error = Error::validation(invalid);
-            return Err(self.protocol_error(prompt.name(), &error, language));
-        }
-        if values.values().any(|value| value.contains('\0')) {
-            return Err(self.protocol_error(prompt.name(), &super::nul_refused(), language));
-        }
-        let messages = prompt
-            .render(values)
-            .map_err(|error| self.protocol_error(prompt.name(), &error, language))?;
-        let messages = messages
-            .into_iter()
-            .map(|message| match message {
-                PromptMessage::User(text) => rmcp::model::PromptMessage::new_text(Role::User, text),
-                PromptMessage::Assistant(text) => {
-                    rmcp::model::PromptMessage::new_text(Role::Assistant, text)
-                }
-            })
-            .collect();
-        Ok(GetPromptResult::new(messages).with_description(prompt.description()).into())
-    }
-}
-
 /// Resource cho `resources/list`; mô tả kèm permission cần có, như tool.
-fn describe_resource(resource: &McpResource) -> rmcp::model::Resource {
+fn describe_resource(resource: &McpResource) -> Value {
     let mut description = resource.description().to_owned();
     if let Some(permission) = resource.permission() {
         description.push_str(&format!(" Requires permission `{}`.", permission.name()));
     }
-    rmcp::model::Resource::new(resource.uri(), resource.name())
-        .with_description(description)
-        .with_mime_type(resource.mime_type())
+    json!({
+        "uri": resource.uri(),
+        "name": resource.name(),
+        "description": description,
+        "mimeType": resource.mime_type(),
+    })
 }
 
 /// Prompt cho `prompts/list`; mô tả kèm tool mà prompt dẫn tới.
-fn describe_prompt(prompt: &Prompt) -> rmcp::model::Prompt {
+fn describe_prompt(prompt: &Prompt) -> Value {
     let mut description = prompt.description().to_owned();
     let tools = prompt.tools();
     if !tools.is_empty() {
         let names: Vec<String> = tools.iter().map(|tool| format!("`{tool}`")).collect();
         description.push_str(&format!(" Leads to the tools {}.", names.join(", ")));
     }
-    let arguments = prompt
+    let arguments: Vec<Value> = prompt
         .arguments()
         .iter()
         .map(|argument| {
-            rmcp::model::PromptArgument::new(argument.name)
-                .with_description(argument.description)
-                .with_required(argument.required)
+            json!({
+                "name": argument.name,
+                "description": argument.description,
+                "required": argument.required,
+            })
         })
         .collect();
-    rmcp::model::Prompt::new(prompt.name(), Some(description), Some(arguments))
+    json!({"name": prompt.name(), "description": description, "arguments": arguments})
 }
 
 #[cfg(test)]
