@@ -690,3 +690,34 @@ async fn tam_dung_va_ket_thuc_cung_luc_khong_phat_event_sai() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn bat_hai_chuong_trinh_cung_luc_khong_vuot_so_ngay_trong_nam() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        // Năm sau: mỗi chương trình 70 ngày (một mình không vượt 120), cả hai thì 140 > 120.
+        let year = Utc::now().format("%Y").to_string().parse::<i32>().unwrap() + 1;
+        let at = |month: u32, day: u32| format!("{year}-{month:02}-{day:02}T00:00:00Z");
+        for (start, end) in [(at(1, 1), at(3, 11)), (at(5, 1), at(7, 10)), (at(9, 1), at(11, 10))] {
+            let window = json!({"starts_at": start, "ends_at": end});
+            let first = create(&setup, body(setup.tree.a, window.clone())).await;
+            let second = create(&setup, body(setup.tree.a, window)).await;
+            // Bật cùng lúc. Bộ kiểm chạy ngoài transaction: cả hai từng cùng thấy chương trình
+            // kia còn nháp và cùng bật, tổng số ngày giảm giá vượt trần (cả hai database).
+            let (one, two) = tokio::join!(activate(&setup, &first), activate(&setup, &second));
+            let ok = [&one, &two].iter().filter(|(status, _)| *status == StatusCode::OK).count();
+            assert_eq!(ok, 1, "{} / {}", one.1, two.1);
+            let failed = if one.0 == StatusCode::OK { &two } else { &one };
+            assert_eq!(failed.0, StatusCode::UNPROCESSABLE_ENTITY, "{}", failed.1);
+            assert_eq!(failed.1["code"], "promotions.exceeds_duration_limit");
+            // Lượt sau trên cùng mục tiêu: dọn để mỗi lượt bắt đầu từ 0 ngày đã dùng.
+            let winner = if one.0 == StatusCode::OK { &first } else { &second };
+            let (status, _) =
+                call(&setup.app, "POST", &format!("/promotions/{winner}/cancel"), "boss", None)
+                    .await;
+            assert_eq!(status, StatusCode::OK);
+        }
+    })
+    .await
+    .unwrap();
+}

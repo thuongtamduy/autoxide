@@ -114,3 +114,53 @@ async fn dang_ky_dong_thoi_chi_mot_dong() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn duyet_va_tu_choi_cung_luc_khong_lech_suat() {
+    use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        for _ in 0..4 {
+            let mine = setup.catalog.add(setup.tree.a, 200_000, &[]);
+            let starts = Utc::now() + Duration::hours(2);
+            let id = create(
+                &setup,
+                body(
+                    setup.tree.chain,
+                    json!({"kind": "flash_sale", "value_bp": null, "starts_at": starts}),
+                ),
+            )
+            .await;
+            let uri = format!("/promotions/{id}/participations");
+            let offer = json!({"org_id": setup.tree.a.as_uuid(), "items": [{"variant_id": mine, "value_bp": 2000}]});
+            let (status, applied) = call(&setup.app, "POST", &uri, "store_a", Some(offer)).await;
+            assert_eq!(status, StatusCode::CREATED, "{applied}");
+            let participation = applied["data"]["id"].as_str().unwrap().to_owned();
+            // Duyệt và từ chối cùng lúc. Postgres từng cho cả hai cùng thấy `pending`: suất flash
+            // sale đã thêm nhưng hồ sơ ghi `rejected` (giá flash có hiệu lực cho lần bị từ chối).
+            let (approve, reject) =
+                (format!("{uri}/{participation}/approve"), format!("{uri}/{participation}/reject"));
+            let (approved, rejected) = tokio::join!(
+                call(&setup.app, "POST", &approve, "boss", None),
+                call(&setup.app, "POST", &reject, "boss", None),
+            );
+            assert_eq!(approved.0, StatusCode::OK, "{}", approved.1);
+            assert!(
+                rejected.0 == StatusCode::OK || rejected.0 == StatusCode::CONFLICT,
+                "{}",
+                rejected.1
+            );
+            let (_, list) = call(&setup.app, "GET", &uri, "boss", None).await;
+            let program = id.parse::<uuid::Uuid>().unwrap();
+            let items = crate::entity::flash_item::Entity::find()
+                .filter(crate::entity::flash_item::Column::PromotionId.eq(program))
+                .count(setup.app.database().read())
+                .await
+                .unwrap();
+            assert_eq!(list["data"][0]["status"], "approved", "{list}");
+            assert_eq!(items, 1);
+        }
+    })
+    .await
+    .unwrap();
+}
