@@ -229,6 +229,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.create_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.current_tenant` | — | read-only |
 | `kernel.decide_approval` | — | writes |
+| `kernel.delete_setting` | `kernel.settings.manage` | destructive |
 | `kernel.export_tenant` | `kernel.data.export` | writes |
 | `kernel.extend_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.get_migration_run` | `kernel.tenants.operate` | read-only |
@@ -237,6 +238,7 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.get_tenant_export` | `kernel.data.export` | read-only |
 | `kernel.get_tenant_move` | `kernel.tenants.read` | read-only |
 | `kernel.list_approvals` | — | read-only |
+| `kernel.list_connection_webhooks` | `kernel.settings.manage` | read-only |
 | `kernel.list_custom_fields` | — | read-only |
 | `kernel.list_domains` | `kernel.domains.manage` | read-only |
 | `kernel.list_modules` | `kernel.modules.read` | read-only |
@@ -251,6 +253,8 @@ The tools of this version, by module (`docs/mcp-tools.json` has their full input
 | `kernel.ops_backlog` | `kernel.ops.read` | read-only |
 | `kernel.promote_sandbox` | `kernel.sandboxes.manage` | writes |
 | `kernel.request_log` | `kernel.devtools.read` | read-only |
+| `kernel.set_setting` | `kernel.settings.manage` | writes |
+| `kernel.test_connection` | `kernel.settings.manage` | writes |
 | `kernel.update_domain` | `kernel.domains.manage` | writes |
 | `kernel.verify_domain` | `kernel.domains.manage` | writes |
 | `ledger.balance` | `ledger.read` | read-only |

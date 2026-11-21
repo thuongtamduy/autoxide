@@ -244,7 +244,11 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 "kernel.get_module",
                 "kernel.ops_backlog",
                 "kernel.navigation",
+                "kernel.set_setting",
+                "kernel.delete_setting",
                 "kernel.list_settings",
+                "kernel.test_connection",
+                "kernel.list_connection_webhooks",
                 "kernel.current_tenant",
                 "kernel.list_tenants",
                 "kernel.get_tenant",
@@ -309,6 +313,7 @@ async fn liet_ke_moi_module_theo_thu_tu_dang_ky_kem_khai_bao() {
                 ],
                 "always_enabled": false,
                 "requires": [],
+                "stability": "official",
             })
         );
     })

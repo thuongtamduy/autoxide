@@ -31,6 +31,7 @@ impl OrdersService {
             .column(cart_line::Column::CartId)
             .from(cart_line::Entity)
             .to_owned();
+        // tenant-scope: job quét giỏ bỏ dở của mọi khách; xử lý từng giỏ theo `tenant_id` của nó.
         let due = cart::Entity::find()
             .filter(cart::Column::Status.eq(ACTIVE))
             .filter(cart::Column::BuyerUserId.is_not_null())

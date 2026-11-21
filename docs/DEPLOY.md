@@ -178,6 +178,12 @@ docker compose up -d --build
 
 The `migrate` service applies new migrations before the new server starts.
 
+**Updating from 0.17 or earlier:** experimental modules (bookings, newsletter, comments, support,
+conversations, analytics, reporting, automations) no longer run unless `AUTOXIDE_MODULES` names
+them. Nothing is deleted, and the startup log and `autoxide doctor` tell you when the database
+holds data of a module that is off, with the line to add — see
+[MODULES.md](MODULES.md#upgrading-from-017-or-earlier). This applies to setups B and C too.
+
 ### 6. Back up and restore
 
 ```bash
@@ -383,6 +389,7 @@ into a new database.
 | Setting | What for |
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (default) or `postgres://user:password@host:5432/db` |
+| `AUTOXIDE_MODULES` | Which modules run: `official` (default), `core`, `all`, names to add, `-name` to leave out. Experimental modules must be named. See [MODULES.md](MODULES.md) |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Signs access tokens; required in production, the same on every server |
 | `AUTOXIDE_SECRET_KEY` | Signs short-lived tokens of every module and keys the hashes of visitors' IP addresses; optional: when unset, one is generated once and kept in the database. Set it (outside the database, the same on every server) in production: with the key in the database, anyone holding a database backup can open the secrets stored encrypted and work the IP blocks back out of the stored hashes |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Old values of `AUTOXIDE_SECRET_KEY`, separated by commas, while rotating the key; remove them after `autoxide secrets reseal` |

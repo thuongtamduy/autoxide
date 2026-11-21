@@ -151,7 +151,7 @@ pub async fn copy_modules(
 }
 
 /// Bảng của `modules` theo thứ tự tạo, bỏ bảng `<module>_migrations`.
-async fn module_tables<C: ConnectionTrait>(
+pub(crate) async fn module_tables<C: ConnectionTrait>(
     connection: &C,
     modules: &[&str],
 ) -> Result<Vec<String>, TransferError> {

@@ -166,6 +166,7 @@ pub(crate) struct Cleanup;
 #[async_trait::async_trait]
 impl JobHandler for Cleanup {
     async fn run(&self, job: &JobContext) -> Result<(), Error> {
+        // tenant-scope: job dọn key hết hạn của mọi khách trên database.
         let removed = Entity::delete_many()
             .filter(Column::ExpiresAt.lt(now()))
             .exec(job.database.write())

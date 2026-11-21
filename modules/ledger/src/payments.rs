@@ -477,7 +477,7 @@ impl LedgerService {
         body: &[u8],
     ) -> Result<(), Error> {
         let gateway = self.gateway(Some(provider))?;
-        let notification = match gateway.verify_webhook(tenant.id(), headers, body) {
+        let notification = match gateway.verify_webhook(tenant.id(), headers, body).await {
             Ok(notification) => notification,
             Err(error) => {
                 metrics::counter!("ledger_webhook_rejected_total", "provider" => gateway.provider())

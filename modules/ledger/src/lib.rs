@@ -40,6 +40,8 @@ mod tests_fx;
 #[cfg(test)]
 mod tests_payments;
 #[cfg(test)]
+mod tests_provider_webhooks;
+#[cfg(test)]
 mod tests_vietqr;
 
 use std::sync::Arc;
@@ -189,6 +191,16 @@ impl Module for LedgerModule {
                 "/bank-feeds/{provider}",
                 self.config.webhook_max_bytes,
             ),
+            autoxide_kernel::http::BodyLimit::new(
+                axum::http::Method::POST,
+                "/webhooks/{provider}/{hook}",
+                self.config.webhook_max_bytes,
+            ),
+            autoxide_kernel::http::BodyLimit::new(
+                axum::http::Method::POST,
+                "/bank-feeds/{provider}/{hook}",
+                self.config.webhook_max_bytes,
+            ),
         ]
     }
 
@@ -221,6 +233,10 @@ impl Module for LedgerModule {
             tax: context.require::<dyn autoxide_tax::api::TaxEngine>().ok(),
             jobs: context.jobs(),
             config: self.config,
+            accounts: context
+                .require::<autoxide_kernel::provider::ProviderAccounts>()
+                .ok()
+                .map(|accounts| (*accounts).clone()),
         });
         self.service = Some(service.clone());
         context.provide::<dyn api::Ledger>(Arc::new(provider::Provider(service)))

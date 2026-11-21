@@ -190,7 +190,7 @@ impl PaymentGateway for FakePaymentGateway {
         Ok(if known { GatewayPaymentStatus::Pending } else { GatewayPaymentStatus::Expired })
     }
 
-    fn verify_webhook(
+    async fn verify_webhook(
         &self,
         _tenant: TenantId,
         headers: &HeaderMap,
@@ -444,7 +444,7 @@ impl BankFeed for FakeBankFeed {
         FAKE_PROVIDER
     }
 
-    fn verify_webhook(
+    async fn verify_webhook(
         &self,
         _tenant: TenantId,
         headers: &HeaderMap,

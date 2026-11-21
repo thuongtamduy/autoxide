@@ -66,23 +66,26 @@ cần bản phát hành sau 0.16.0; với PostgreSQL, nhiều máy chủ và HTT
 
 ### Bản chạy nhanh có những gì
 
-Image phát hành đăng ký mọi module của binary `autoxide` (mọi thư mục trong `modules/` trừ module mẫu
-`notes`); `GET /api/v1/kernel/modules` liệt kê chúng trên máy chủ của bạn. Mỗi module trả lời dưới
+Image phát hành chứa mọi module của binary `autoxide` (mọi thư mục trong `modules/` trừ module mẫu
+`notes`). Máy chủ mặc định chạy các module hạng core và chính thức; module hạng thử nghiệm (đánh dấu
+\* bên dưới) tắt cho tới khi bạn nêu tên trong `AUTOXIDE_MODULES` — xem
+[`docs/MODULES.vi.md`](docs/MODULES.vi.md) về các hạng và cách chọn.
+`GET /api/v1/kernel/modules` liệt kê module đang chạy trên máy chủ của bạn. Mỗi module trả lời dưới
 `/api/v1/<module>`.
 
 | Mảng | Module |
 | --- | --- |
 | Tài khoản và quyền | `auth` (đăng nhập, role, API key, xác thực hai bước, passkey), `organizations` (khách, đơn vị, cửa hàng), `audit`, `idempotency` |
-| Nền tảng | `files`, `mail`, `notifications`, `webhooks`, `ai` (tắt tới khi bạn cấu hình nhà cung cấp), `address` (đơn vị hành chính Việt Nam), `compliance`, `plans` (gói và thuê bao), `reporting`, `automations` |
-| Website | `content` (bài viết, trang), `media`, `menus`, `forms`, `newsletter`, `comments`, `analytics` |
+| Nền tảng | `files`, `mail`, `notifications`, `webhooks`, `ai` (tắt tới khi bạn cấu hình nhà cung cấp), `address` (đơn vị hành chính Việt Nam), `compliance`, `plans` (gói và thuê bao), `reporting`\*, `automations`\* |
+| Website | `content` (bài viết, trang), `media`, `menus`, `forms`, `newsletter`\*, `comments`\*, `analytics`\* |
 | Thương mại | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers`, `tax`, `ledger` (tiền), `invoices` |
-| Dịch vụ | `bookings`, `support`, `conversations` |
+| Dịch vụ | `bookings`\*, `support`\*, `conversations`\* |
 
-Không phải bật gì để thử, và module bạn không ghi dữ liệu thì không tốn gì. Module nói chuyện với dịch
-vụ bên ngoài (nhà cung cấp AI, đối tác thanh toán hay vận chuyển, SMTP) không gửi gì ra ngoài cho tới
-khi bạn cấu hình. Mỗi khách được dùng module nào do gói của khách quyết
-([`docs/PLANS.vi.md`](docs/PLANS.vi.md)); tập module máy chủ chạy cố định lúc build binary
-([`docs/MODULE_GUIDE.vi.md`](docs/MODULE_GUIDE.vi.md)), và xem danh sách cần permission
+Không phải bật gì để thử các module hạng core và chính thức, và module bạn không ghi dữ liệu thì
+không tốn gì. Module nói chuyện với dịch vụ bên ngoài (nhà cung cấp AI, đối tác thanh toán hay vận
+chuyển, SMTP) không gửi gì ra ngoài cho tới khi bạn cấu hình. Mỗi khách được dùng module nào do gói
+của khách quyết ([`docs/PLANS.vi.md`](docs/PLANS.vi.md)); tập module máy chủ chạy chọn bằng
+`AUTOXIDE_MODULES` ([`docs/MODULES.vi.md`](docs/MODULES.vi.md)), và xem danh sách cần permission
 `kernel.modules.read` (quản trị viên có sẵn).
 
 ### Sửa một bản ghi: `If-Match`

@@ -76,6 +76,11 @@ impl Module for AnalyticsModule {
         "analytics"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn description(&self) -> &'static str {
         "Cookieless website analytics kept in your own database: pages, sources, UTM campaigns, \
          most viewed objects and funnels; per-person tracking only with consent."

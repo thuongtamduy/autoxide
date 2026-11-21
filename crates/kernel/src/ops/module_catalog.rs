@@ -304,6 +304,9 @@ pub(crate) struct ModuleInfo {
     always_enabled: bool,
     /// Modules this module uses; a plan that turns this module on must turn them on too.
     requires: Vec<String>,
+    /// `official`, or `experimental`: the module's API and data may still change between
+    /// releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
+    stability: String,
 }
 
 impl ModuleInfo {
@@ -477,6 +480,7 @@ impl ModuleInfo {
                 .collect(),
             always_enabled: false,
             requires: Vec::new(),
+            stability: module.stability().as_str().to_owned(),
         }
     }
 }

@@ -20,6 +20,7 @@ pub(crate) mod invoices_print;
 pub(crate) mod ledger_flows;
 pub(crate) mod media;
 pub(crate) mod migrations;
+pub(crate) mod module_selection;
 pub(crate) mod moit;
 pub(crate) mod notifications;
 pub(crate) mod orders;
