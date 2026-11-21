@@ -35,6 +35,15 @@ curl -sS "$API/api/v1/content/entries" -H "Authorization: Bearer $TOKEN" -H 'Acc
 # expect: 422
 ```
 
+Trường gõ sai tên hay không có trong thân request bị từ chối bằng `422` (mã `invalid_body`, `detail` nêu tên trường và các trường được nhận) thay vì bị lặng lẽ bỏ qua:
+
+<!-- example: unknown-field -->
+```bash
+curl -sS "$API/api/v1/auth/login" \
+  --json '{"email":"admin@example.com","pasword":"correct horse battery staple"}'
+# expect: 422
+```
+
 Bản ghi không tồn tại:
 
 <!-- example: not-found -->

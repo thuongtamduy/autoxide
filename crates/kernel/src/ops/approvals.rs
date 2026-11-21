@@ -364,6 +364,7 @@ pub(crate) struct ApprovalsQuery {
 
 /// Why a request is rejected.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RejectRequest {
     /// 1 to 500 characters, shown to the agent.
     pub reason: String,

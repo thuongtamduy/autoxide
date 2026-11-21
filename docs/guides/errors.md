@@ -35,6 +35,15 @@ curl -sS "$API/api/v1/content/entries" -H "Authorization: Bearer $TOKEN" -H 'Acc
 # expect: 422
 ```
 
+A misspelt or unknown field in the body is refused with `422` (code `invalid_body`, the `detail` names the field and the fields expected) rather than silently ignored:
+
+<!-- example: unknown-field -->
+```bash
+curl -sS "$API/api/v1/auth/login" \
+  --json '{"email":"admin@example.com","pasword":"correct horse battery staple"}'
+# expect: 422
+```
+
 A record that does not exist:
 
 <!-- example: not-found -->

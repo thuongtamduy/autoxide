@@ -215,6 +215,7 @@ pub(crate) struct TagView {
 
 /// A tag to create.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NewTag {
     /// 1 to 50 characters; unique in the tenant, ignoring case and accents.
     pub name: String,
@@ -227,6 +228,7 @@ pub(crate) struct NewTag {
 
 /// Changes to a tag; omitted fields stay.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct TagChanges {
     pub name: Option<String>,
     pub color: Option<String>,
@@ -236,6 +238,7 @@ pub(crate) struct TagChanges {
 
 /// The tag to merge into.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct MergeTag {
     /// Every record of the merged tag gets this tag; the merged tag is deleted.
     pub into: Uuid,
@@ -243,6 +246,7 @@ pub(crate) struct MergeTag {
 
 /// The tags of a record.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RecordTagsInput {
     /// The tags the record has after the call (replaces the current ones).
     #[serde(default)]

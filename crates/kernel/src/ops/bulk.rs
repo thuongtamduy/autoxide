@@ -156,6 +156,7 @@ impl Job for BulkJob {
 
 /// Records to act on: either `ids`, or `filter` with `expected_count`.
 #[derive(Debug, Clone, Default, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct BulkRequest {
     /// Up to 500 record ids.
     #[serde(default)]

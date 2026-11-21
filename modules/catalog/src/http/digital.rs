@@ -81,6 +81,7 @@ impl From<digital_asset::Model> for AssetResponse {
 /// Attach a file to a digital variant.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = CatalogAttachDigitalAsset)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AttachAssetRequest {
     /// A file you uploaded with `POST /api/v1/files` (or `/api/v1/files/uploads`). Its content is
     /// copied: deleting the uploaded file later does not affect buyers.

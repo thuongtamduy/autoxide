@@ -131,6 +131,7 @@ impl From<Role> for RoleResponse {
 
 /// The full content of a role.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RoleRequest {
     /// Unique. Lowercase letters, digits, `_` and `-`, starting with a letter.
     #[schema(example = "editor")]
@@ -180,6 +181,7 @@ impl From<RoleRequest> for RoleInput {
 
 /// The complete list of roles a user should have.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct UserRolesRequest {
     /// Ids of the roles. Replaces every role the user had; `[]` removes all.
     #[validate(length(max = 100))]

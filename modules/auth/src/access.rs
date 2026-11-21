@@ -60,12 +60,27 @@ impl Authenticator for RequestAuthenticator {
         let verified = self.sessions.verify_access(token)?;
         let (tenant, user_id) = (verified.tenant, verified.user);
         let tenant = self.tenant(tenant, crate::token::invalid_token).await?;
-        // Dòng người dùng và quyền đọc trong một câu (D-319).
-        let (user, principal) = self
-            .roles
-            .user_principal(&tenant, user_id)
-            .await?
-            .ok_or_else(crate::token::invalid_token)?;
+        // Dòng người dùng, quyền và phiên còn sống đọc trong một câu (D-319,
+        // D-20261121-access-token-revocation). Token cũ không mang phiên (`sid`) thì chỉ kiểm
+        // người dùng, như trước.
+        let (user, principal) = match verified.session {
+            Some(session) => {
+                let (user, principal, live) = self
+                    .roles
+                    .session_principal(&tenant, user_id, session)
+                    .await?
+                    .ok_or_else(crate::token::invalid_token)?;
+                if !live {
+                    return Err(crate::token::session_ended());
+                }
+                (user, principal)
+            }
+            None => self
+                .roles
+                .user_principal(&tenant, user_id)
+                .await?
+                .ok_or_else(crate::token::invalid_token)?,
+        };
         if !user.is_active() {
             return Err(crate::user::user_disabled());
         }

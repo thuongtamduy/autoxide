@@ -397,7 +397,7 @@ into a new database.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` to run the API and background work in separate processes |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (default): compress JSON and text with gzip or brotli; `false` when a reverse proxy or CDN in front already compresses |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | How long a CDN may keep a public read (default `60`), see [A CDN in front of Autoxide](#a-cdn-in-front-of-autoxide) |
-| `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, on the API port: when you turn it on, block `/metrics` in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
+| `AUTOXIDE_HTTP_METRICS` | Prometheus metrics at `/metrics`, which has no authentication. Add `AUTOXIDE_HTTP_METRICS_ADDRESS` (e.g. `127.0.0.1:9090`) to serve it on its own port, away from the API; without it, `/metrics` is on the API port: block it in your reverse proxy (Caddy: `respond /metrics 404`) and scrape it from the machine itself |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Send traces to an OpenTelemetry collector |
 
 Check the configuration without starting anything: `autoxide config`. It lists every
@@ -884,8 +884,11 @@ every gate run.
 
 ## Monitoring
 
-Turn on `AUTOXIDE_HTTP_METRICS=true` and let Prometheus scrape `/metrics` from the machine itself
-(block `/metrics` in the reverse proxy). Besides the request figures (`http_requests_total`,
+Turn on `AUTOXIDE_HTTP_METRICS=true`. `/metrics` has no authentication, so give it its own port with
+`AUTOXIDE_HTTP_METRICS_ADDRESS` — `127.0.0.1:9090` on a machine, `0.0.0.0:9090` in a container or a
+Kubernetes pod (publish that port to Prometheus only, never to the internet) — and point Prometheus
+at it; `/metrics` then leaves the API port. Without it, `/metrics` is served on the API port: block
+it in the reverse proxy and scrape it from the machine itself. Besides the request figures (`http_requests_total`,
 `http_request_duration_seconds`), every process that runs background work (`AUTOXIDE_PROCESS_ROLE`
 `all` or `worker`) updates the backlog gauges every `AUTOXIDE_METRICS_BACKLOG_SECONDS` (default 30),
 labelled by `database` and `module`:

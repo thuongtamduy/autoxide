@@ -393,7 +393,7 @@ database mới.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | CDN được giữ một lượt đọc công khai bao lâu (mặc định `60`), xem [CDN phía trước Autoxide](#cdn-phía-trước-autoxide) |
-| `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, cùng cổng với API: khi bật, hãy chặn `/metrics` ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
+| `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, không có xác thực. Thêm `AUTOXIDE_HTTP_METRICS_ADDRESS` (vd `127.0.0.1:9090`) để phục vụ nó ở port riêng, tách khỏi API; không có biến đó thì `/metrics` nằm cùng port với API: hãy chặn nó ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
@@ -851,8 +851,11 @@ gate.
 
 ## Theo dõi (monitoring)
 
-Bật `AUTOXIDE_HTTP_METRICS=true` và để Prometheus đọc `/metrics` ngay trên máy (chặn `/metrics` ở
-reverse proxy). Ngoài số đo request (`http_requests_total`, `http_request_duration_seconds`), mọi tiến
+Bật `AUTOXIDE_HTTP_METRICS=true`. `/metrics` không có xác thực, nên cho nó port riêng bằng
+`AUTOXIDE_HTTP_METRICS_ADDRESS` — `127.0.0.1:9090` trên một máy, `0.0.0.0:9090` trong container hay pod
+Kubernetes (chỉ mở port đó cho Prometheus, không bao giờ ra internet) — rồi trỏ Prometheus vào đó;
+`/metrics` khi ấy rời port của API. Không có biến đó thì `/metrics` nằm cùng port với API: chặn nó ở
+reverse proxy và để Prometheus đọc ngay trên máy. Ngoài số đo request (`http_requests_total`, `http_request_duration_seconds`), mọi tiến
 trình chạy việc nền (`AUTOXIDE_PROCESS_ROLE` là `all` hay `worker`) cập nhật các gauge tồn đọng mỗi
 `AUTOXIDE_METRICS_BACKLOG_SECONDS` giây (mặc định 30), gắn nhãn `database` và `module`:
 

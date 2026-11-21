@@ -172,6 +172,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 - **[D-20261119-step69-sync](D-20261119-step69-sync.md)** Đồng bộ khi mất mạng: luồng thay đổi `<module>_changes` theo con trỏ, `412` kèm bản hiện tại, lô ghi chạy từng lệnh như request REST — 2026-11-19
 - **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
+- **[D-20261121-api-shape](D-20261121-api-shape.md)** Thân request đóng ở mọi endpoint, gate kiểm hình dạng API trên openapi.json — 2026-11-21
 
 ## MCP, AI, agent dùng API
 
@@ -261,6 +262,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-access-token-revocation](D-20261121-access-token-revocation.md)** Access token của phiên đã kết thúc bị từ chối ngay — 2026-11-21
 - **[D-20261121-admin-password-file](D-20261121-admin-password-file.md)** Mật khẩu tự sinh của quản trị viên đầu tiên ghi ra file, không vào log — 2026-11-21
 - **[D-20261121-automation-credential](D-20261121-automation-credential.md)** Luật tự động hoá mang quyền của credential đã tạo / bật nó — 2026-11-21
 - **[D-20261121-export-entry](D-20261121-export-entry.md)** Xuất dữ liệu và tạo sandbox của khách khác cần vào khách đó — 2026-11-21
@@ -582,3 +584,4 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step39-checkout-batch](D-20261120-step39-checkout-batch.md)** Đặt hàng ghi mọi dòng đơn và dòng thuế bằng `INSERT` nhiều dòng — 2026-11-20
 - **[D-20261120-step39-hot-paths](D-20261120-step39-hot-paths.md)** Đo đường nóng của sản phẩm, đếm câu SQL mỗi request, gộp N+1 ở đọc công khai của cửa hàng — 2026-11-20
 - **[D-20261120-step39-index-review](D-20261120-step39-index-review.md)** Rà index bằng EXPLAIN trên bộ dữ liệu `full`: không thêm migration — 2026-11-20
+- **[D-20261121-metrics-address](D-20261121-metrics-address.md)** `/metrics` trên port riêng — 2026-11-21

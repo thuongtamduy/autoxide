@@ -27,6 +27,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// The account whose password to reset.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ResetRequest {
     #[validate(length(min = 1, max = 254))]
     #[schema(example = "ada@example.com")]
@@ -39,6 +40,7 @@ pub(crate) struct ResetRequest {
 
 /// A new password, with the token from the reset mail.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ResetConfirmation {
     /// The token from the reset mail.
     token: String,
