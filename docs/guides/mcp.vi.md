@@ -417,14 +417,14 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 Làm trọn trên máy của bạn, từ một thư mục trống tới một trợ lý trả lời được câu hỏi về tồn kho và doanh số. Bắt đầu từ mục [Chạy nhanh](../../README.vi.md#chạy-nhanh) (`compose.quickstart.yml`), nên máy chủ ở `http://127.0.0.1:8080`.
 
-**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong log (`docker compose -f compose.quickstart.yml logs autoxide | grep -i password`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, danh mục, báo cáo và soạn hoá đơn nháp:
+**1. Đăng nhập và tạo key cho trợ lý.** Dùng mật khẩu của quản trị viên trong log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Chỉ cho key đúng thứ trợ lý cần — ở đây là đọc tồn kho, sản phẩm, giá, báo cáo và soạn hoá đơn nháp:
 
 ```bash
 API=http://127.0.0.1:8080
 TOKEN=$(curl -sS "$API/api/v1/auth/login" \
   --json '{"email":"admin@example.com","password":"<mật khẩu trong log>"}' | jq -r .data.access_token)
 curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
-  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","reporting.read","analytics.read","invoices.write"],"current_password":"<mật khẩu trong log>"}' \
+  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<mật khẩu trong log>"}' \
   | jq -r .data.key
 ```
 

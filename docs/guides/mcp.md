@@ -417,14 +417,14 @@ curl -sS "$API/api/v1/openapi/content.json"
 
 A walk-through on your own machine, from an empty directory to an assistant that answers questions about stock and sales. It starts from the [Quickstart](../../README.md#quickstart) (`compose.quickstart.yml`), so the server is at `http://127.0.0.1:8080`.
 
-**1. Sign in and make a key for the assistant.** Use the administrator's password from the log (`docker compose -f compose.quickstart.yml logs autoxide | grep -i password`). Give the key only what the assistant needs — here, reading stock, catalog and reports, and drafting invoices:
+**1. Sign in and make a key for the assistant.** Use the administrator's password from the log (`docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"`). Give the key only what the assistant needs — here, reading stock, products, prices and reports, and drafting invoices:
 
 ```bash
 API=http://127.0.0.1:8080
 TOKEN=$(curl -sS "$API/api/v1/auth/login" \
   --json '{"email":"admin@example.com","password":"<password from the log>"}' | jq -r .data.access_token)
 curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
-  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","reporting.read","analytics.read","invoices.write"],"current_password":"<password from the log>"}' \
+  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<password from the log>"}' \
   | jq -r .data.key
 ```
 

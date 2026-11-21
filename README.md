@@ -25,7 +25,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
 
 docker compose -f compose.quickstart.yml up -d
 # The administrator admin@example.com gets a generated password, written to the log once
-docker compose -f compose.quickstart.yml logs autoxide | grep -i password
+docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
 ```
 
 Then open <http://127.0.0.1:8080/> (name, version and links), <http://127.0.0.1:8080/api/docs>

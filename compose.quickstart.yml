@@ -9,7 +9,7 @@
 #    AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD (without it a password is generated and logged once).
 #
 # 2. docker compose -f compose.quickstart.yml up -d
-#    docker compose -f compose.quickstart.yml logs autoxide | grep -i password
+#    docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
 #
 # 3. Open http://127.0.0.1:8080/ (links), http://127.0.0.1:8080/api/docs (API reference).
 #

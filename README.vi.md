@@ -25,7 +25,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
 
 docker compose -f compose.quickstart.yml up -d
 # Quản trị viên admin@example.com có mật khẩu tự sinh, ghi vào log một lần
-docker compose -f compose.quickstart.yml logs autoxide | grep -i password
+docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
 ```
 
 Rồi mở <http://127.0.0.1:8080/> (tên, phiên bản và các đường dẫn), <http://127.0.0.1:8080/api/docs>
