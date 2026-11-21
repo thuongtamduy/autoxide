@@ -557,7 +557,7 @@ certificate. Verifying, removing a domain or suspending its tenant reaches every
 Each tenant has two kinds of accounts. **Staff** (`realm: staff`, the default) work with roles and
 permissions. **Customers** (`realm: customer`) are the accounts of the tenant's shop: they sign in,
 have no permission, and are separate from staff even with the same email. Customers register with
-`POST /api/v1/auth/register` and sign in with `POST /api/v1/auth/login`, both with
+`POST /api/v1/auth/registrations` and sign in with `POST /api/v1/auth/login`, both with
 `"realm": "customer"`; a tenant closes customer sign-up with the organization setting
 `auth.customer_registration` (`false`). Staff manage them with `GET /api/v1/auth/customers` and
 `PATCH /api/v1/auth/customers/{id}` (permissions `auth.customers.read`, `auth.customers.manage`).

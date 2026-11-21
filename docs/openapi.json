@@ -35664,6 +35664,29 @@
         ],
         "type": "object"
       },
+      "Data_RegistrationResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an\naccount or not.",
+            "properties": {
+              "email": {
+                "description": "The email, normalized. A mail went to it: either a link to confirm the new account, or,\nwhen it already had one, a notice to sign in or reset the password.",
+                "example": "ada@example.com",
+                "type": "string"
+              }
+            },
+            "required": [
+              "email"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_RelocationPlan": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -87577,6 +87600,20 @@
         ],
         "type": "object"
       },
+      "RegistrationResponse": {
+        "description": "What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an\naccount or not.",
+        "properties": {
+          "email": {
+            "description": "The email, normalized. A mail went to it: either a link to confirm the new account, or,\nwhen it already had one, a notice to sign in or reset the password.",
+            "example": "ada@example.com",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
       "RejectRequest": {
         "description": "Why a request is rejected.",
         "properties": {
@@ -104869,7 +104906,7 @@
                 }
               }
             },
-            "description": "Too many failed sign-ins for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header."
+            "description": "Too many failed sign-ins for this email from this address, or for this email overall; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header."
           },
           "default": {
             "content": {
@@ -105075,7 +105112,7 @@
     },
     "/api/v1/auth/login/mfa": {
       "post": {
-        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email. Needs no tenant header: the `mfa_token`\nnames its tenant.",
+        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the account. Needs no tenant header: the `mfa_token`\nnames its tenant.",
         "operationId": "auth_login_mfa",
         "parameters": [
           {
@@ -105752,7 +105789,7 @@
         "x-permissions": []
       },
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the email. Once the change is confirmed, the OLD address gets\na mail saying so, with a token to report the change if the owner did not make it\n(`POST /api/v1/auth/email-change/report`, valid 7 days).",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the account. Once the change is confirmed, the OLD address gets\na mail saying so, with a token to report the change if the owner did not make it\n(`POST /api/v1/auth/email-change/report`, valid 7 days).",
         "operationId": "auth_change_email",
         "parameters": [
           {
@@ -107570,7 +107607,7 @@
     },
     "/api/v1/auth/me/password": {
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the email.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.",
         "operationId": "auth_change_password",
         "parameters": [
           {
@@ -109822,7 +109859,8 @@
     },
     "/api/v1/auth/register": {
       "post": {
-        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.",
+        "deprecated": true,
+        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.\n\n**Deprecated** since 2026-11-21. It will be removed on 2027-05-21. Use `/api/v1/auth/registrations` instead.",
         "operationId": "auth_register",
         "parameters": [
           {
@@ -109908,7 +109946,85 @@
             "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
           }
         },
-        "summary": "Create your own account.",
+        "summary": "Create your own account (deprecated: use `POST /api/v1/auth/registrations`).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true,
+        "x-sunset": "2027-05-21"
+      }
+    },
+    "/api/v1/auth/registrations": {
+      "post": {
+        "description": "Open only when the server enables self-registration (or, for `customer`, when the tenant\nlets customers create accounts); otherwise answers 403. Always answers 202 with the same\nbody for a valid request: a new account (without any role) gets a mail to confirm the\naddress; an email that already has an account gets a notice instead, and nothing changes.\nThen sign in with `POST /api/v1/auth/login`. Replaces `POST /api/v1/auth/register`, which\ntells with 409 that an email is taken.",
+        "operationId": "auth_request_registration",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RegistrationResponse"
+                }
+              }
+            },
+            "description": "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one)."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, e.g. a password shorter than 12 characters; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Create your own account, without telling whether the email already has one.",
         "tags": [
           "auth"
         ],

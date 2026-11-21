@@ -217,6 +217,7 @@ impl LoginLinks {
         }
         let user_id: Uuid = consumed.subject.parse().map_err(|_| invalid())?;
         let transaction = tenant.database().begin_write().await?;
+        self.claim_unverified(&transaction, &tenant, user_id).await?;
         let event = events::LoginLinkUsed::default();
         self.outbox
             .record(
@@ -230,6 +231,54 @@ impl LoginLinks {
         transaction.commit().await?;
         let outcome = self.sessions.login_with_link(&tenant, user_id, user_agent).await?;
         Ok((tenant, outcome))
+    }
+}
+
+impl LoginLinks {
+    /// Tài khoản chưa ai xác minh email mà link gửi tới email đó vừa được mở: người mở mới là chủ
+    /// email. Đánh dấu email đã xác minh và gỡ mọi cửa đặt trước khi email được xác minh — mật khẩu,
+    /// phiên, passkey, API key, TOTP, liên kết ngoài — vì có thể do người khác đăng ký trước bằng
+    /// email này đặt (D-20261121-login-link-claims). Tài khoản đã xác minh: không đổi gì.
+    async fn claim_unverified(
+        &self,
+        transaction: &sea_orm::DatabaseTransaction,
+        tenant: &TenantContext,
+        user_id: Uuid,
+    ) -> Result<(), Error> {
+        use crate::user::entity as user;
+        use autoxide_kernel::tenancy::ScopeExt as _;
+        use sea_orm::sea_query::Expr;
+        use sea_orm::{ColumnTrait as _, EntityTrait as _, QueryFilter as _};
+        let Some(account) = autoxide_kernel::rows::lock_one(
+            transaction,
+            user::Entity::find_by_id(user_id).scoped(tenant),
+        )
+        .await?
+        else {
+            return Ok(());
+        };
+        if account.email_verified_at.is_some() || account.email.is_empty() {
+            return Ok(());
+        }
+        let now = now();
+        user::Entity::update_many()
+            .col_expr(user::Column::PasswordHash, Expr::value(None::<String>))
+            .col_expr(user::Column::EmailVerifiedAt, Expr::value(Some(now)))
+            .col_expr(user::Column::UpdatedAt, Expr::value(now))
+            .filter(user::Column::Id.eq(user_id))
+            .scoped(tenant)
+            .exec(transaction)
+            .await?;
+        let actor = Actor::user(user_id);
+        SessionService::revoke_user(transaction, tenant, user_id).await?;
+        crate::passkey::remove_all_in(transaction, tenant, &self.outbox, actor, user_id, false)
+            .await?;
+        crate::api_key::revoke_all_in(transaction, tenant, &self.outbox, actor, user_id).await?;
+        crate::mfa::service::remove_in(transaction, tenant, &self.outbox, actor, user_id, false)
+            .await?;
+        crate::oidc::identity::delete_for_user(transaction, tenant, user_id).await?;
+        tracing::info!(%user_id, "unverified account claimed by its email owner");
+        Ok(())
     }
 }
 
@@ -345,6 +394,16 @@ mod tests {
         TestDatabase::run(async |test| {
             let services = services(test).await;
             let user = ada(&services).await;
+            // Email đã xác minh: link không gỡ TOTP (chỉ gỡ cửa của tài khoản chưa xác minh).
+            let transaction = services.database.begin_write().await.unwrap();
+            let (tenant, email) = (&services.tenant, "ada@example.com");
+            let now = Timestamp::now();
+            services
+                .users
+                .apply_verified_email(tenant, &transaction, user, email, now)
+                .await
+                .unwrap();
+            transaction.commit().await.unwrap();
             let setup =
                 services.mfa.start_totp(&services.tenant, user, "ada@example.com").await.unwrap();
             let now = u64::try_from(Timestamp::now().as_unix_seconds()).unwrap();
@@ -415,6 +474,35 @@ mod tests {
                 won += usize::from(task.await.unwrap());
             }
             assert_eq!(won, 1);
+        })
+        .await
+        .unwrap();
+    }
+
+    /// Tài khoản chưa xác minh email (có thể do người khác đăng ký trước): mở link gửi tới email đó
+    /// thì email thành đã xác minh và mật khẩu, phiên đặt trước đó bị gỡ.
+    #[tokio::test]
+    async fn link_tren_tai_khoan_chua_xac_minh_go_mat_khau_cu() {
+        TestDatabase::run(async |test| {
+            let services = services(test).await;
+            let tenant = &services.tenant;
+            let id = ada(&services).await;
+            let early = services.sessions.login(tenant, "ada@example.com", PASSWORD, None).await;
+            let LoginOutcome::Tokens(early) = early.unwrap() else { panic!("không MFA") };
+            let links = links(&services, true);
+            links
+                .request(tenant, "ada@example.com", Realm::Staff, false, Language::En)
+                .await
+                .unwrap();
+            send(&services, &links).await;
+            let token = last_token(&services);
+            links.confirm(Some(tenant), &token, None, None).await.unwrap();
+            let user = services.users.get(tenant, id).await.unwrap().unwrap();
+            assert!(user.email_verified_at.is_some(), "email đã xác minh");
+            let again = services.sessions.login(tenant, "ada@example.com", PASSWORD, None).await;
+            assert!(again.is_err(), "mật khẩu đặt trước khi xác minh bị gỡ");
+            let refreshed = services.sessions.refresh(Some(tenant), &early.refresh_token).await;
+            assert!(refreshed.is_err(), "phiên cũ bị thu hồi");
         })
         .await
         .unwrap();
