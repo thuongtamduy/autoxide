@@ -206,6 +206,7 @@ fn render_avif(original: &[u8], widths: &[u32]) -> Result<Vec<Rendered>, String>
 }
 
 /// Mã hoá AVIF; ảnh có kênh trong suốt giữ kênh đó.
+#[cfg(feature = "avif")]
 fn encode_avif(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, String> {
     let encoder = ravif::Encoder::new()
         .with_quality(AVIF_QUALITY)
@@ -224,4 +225,11 @@ fn encode_avif(image: &DynamicImage, transparent: bool) -> Result<Vec<u8>, Strin
         encoder.encode_rgb(ravif::Img::new(&pixels[..], width, height))
     };
     encoded.map(|done| done.avif_file).map_err(|error| format!("avif: {error}"))
+}
+
+/// Bản build không có feature `avif`: cấu hình đã chặn `AUTOXIDE_MEDIA_AVIF=true` lúc khởi động, nên không job
+/// nào tới đây; vẫn trả lỗi rõ thay vì dừng chương trình nếu lỡ tới.
+#[cfg(not(feature = "avif"))]
+fn encode_avif(_image: &DynamicImage, _transparent: bool) -> Result<Vec<u8>, String> {
+    Err("this server was built without the `avif` feature".to_owned())
 }
