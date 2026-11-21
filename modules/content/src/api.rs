@@ -7,6 +7,7 @@
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 /// Một menu cũ: khoá, ngôn ngữ và cây mục (đã theo thứ tự).
@@ -58,7 +59,7 @@ pub struct PublishedSnapshot {
     pub plain_text: String,
     /// Revision của bản đã đăng (không phải bản nháp).
     pub revision_id: Uuid,
-    pub published_at: chrono::DateTime<chrono::Utc>,
+    pub published_at: Timestamp,
 }
 
 /// Đọc bản đã đăng của bài / trang. Lấy bằng `context.require::<dyn PublishedEntries>()` (đăng ký

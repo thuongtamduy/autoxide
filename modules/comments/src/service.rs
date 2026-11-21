@@ -9,6 +9,8 @@
 //! đổi trong CÙNG transaction với trạng thái, bằng `UPDATE … SET n = n + k` (không đọc rồi ghi),
 //! nên đúng cả khi nhiều request chạy cùng lúc, trên cả hai database.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -24,7 +26,6 @@ use autoxide_kernel::tenancy::{
     DatabaseRegistry, ScopeExt, TenantContext, TenantSettings, parsed_setting,
 };
 use autoxide_kernel::tokens::OneTimeTokens;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, Set, SqlErr};
 use serde::{Deserialize, Serialize};
@@ -174,8 +175,8 @@ impl Status {
 pub(crate) const STATUSES: &str = "`pending`, `published`, `rejected`, `spam`, `deleted`";
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn is_unique_violation(error: &DbErr) -> bool {
@@ -208,10 +209,10 @@ pub(crate) async fn ensure_target<C: ConnectionTrait>(
     config: &CommentsConfig,
     kind: &str,
     id: &str,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<(), Error> {
     let closes_at = (config.auto_close_days > 0)
-        .then(|| now + chrono::Duration::days(i64::from(config.auto_close_days)));
+        .then(|| now + SignedDuration::from_hours(24 * (i64::from(config.auto_close_days))));
     let row = target::ActiveModel {
         tenant_id: Set(tenant.id().as_uuid()),
         target_type: Set(kind.to_owned()),

@@ -8,6 +8,8 @@
 //! dòng `content_published`, term và tác giả. Không phát event, không xếp job lập index: dữ liệu
 //! giả không cần audit; bài đo tìm theo ý nghĩa tự lập index khi cần.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +17,6 @@ use autoxide_kernel::bench_seed::{self, Pseudo, SeedArgs};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::{EntityTrait, IntoActiveModel, PaginatorTrait, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -161,7 +162,7 @@ impl Seed {
         count: u64,
     ) -> Result<Vec<Uuid>, Error> {
         let mut random = Pseudo::new(0xC0DE);
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let mut batch = Batch::default();
         let mut ids = Vec::new();
         let mut group = None;
@@ -197,10 +198,11 @@ impl Seed {
         index: u64,
         locale: &str,
         translation_of: Option<Uuid>,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Entry, Error> {
         let id = Uuid::now_v7();
-        let at = now - Duration::minutes(i64::try_from(random.below(1_576_800)).unwrap_or(0));
+        let at =
+            now - SignedDuration::from_mins(i64::try_from(random.below(1_576_800)).unwrap_or(0));
         let by = random.pick(&pool.users).copied().unwrap_or_default();
         let mut row = blank(tenant, id, Kind::Post, locale, None, by, at);
         if let Some(group) = translation_of {

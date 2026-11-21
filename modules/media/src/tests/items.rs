@@ -2,6 +2,8 @@
 //! quyền tải, job dọn, API cho module khác, dữ liệu cá nhân, tìm không dấu.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 /// Mỗi định dạng ảnh: nội dung, SHA-256, loại và kích thước đúng; loại không khai thì máy
 /// chủ tự nhận.
@@ -519,9 +521,9 @@ async fn job_don_thung_rac_va_mo_coi() {
 
         // Hôm nay: chưa quá hạn.
         let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone());
-        assert_eq!(media.purge_expired(&registry, &database, Utc::now()).await.unwrap(), 0);
+        assert_eq!(media.purge_expired(&registry, &database, Timestamp::now()).await.unwrap(), 0);
         // 31 ngày sau: cả hai quá hạn.
-        let later = Utc::now() + chrono::Duration::days(31);
+        let later = Timestamp::now() + SignedDuration::from_hours(24 * 31);
         assert_eq!(media.purge_expired(&registry, &database, later).await.unwrap(), 2);
         assert!(storage.keys().await.unwrap().is_empty());
 
@@ -541,7 +543,7 @@ async fn job_don_thung_rac_va_mo_coi() {
         let foreign = put(format!("files/{}", Uuid::now_v7())).await;
         let odd = put("media/readme.txt".to_owned()).await;
 
-        assert_eq!(media.clean_orphans(&registry, Utc::now()).await.unwrap(), 2);
+        assert_eq!(media.clean_orphans(&registry, Timestamp::now()).await.unwrap(), 2);
         let mut expected = vec![live.storage_key(), fresh, foreign, odd];
         expected.sort();
         assert_eq!(storage.keys().await.unwrap(), expected);
@@ -710,7 +712,7 @@ async fn khoa_file_co_tien_to_khach() {
         let orphan = format!("tenants/{}/media/{}/{old}", other.id(), Uuid::now_v7());
         storage.put(&orphan, body(b"x")).await.unwrap();
         let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(database.clone());
-        assert_eq!(media.clean_orphans(&registry, Utc::now()).await.unwrap(), 0);
+        assert_eq!(media.clean_orphans(&registry, Timestamp::now()).await.unwrap(), 0);
         assert!(storage.get(&orphan).await.unwrap().is_some());
         assert!(storage.get(&prefixed).await.unwrap().is_some());
     })

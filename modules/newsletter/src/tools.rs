@@ -5,6 +5,7 @@
 //! Kiểu đầu vào riêng cho MCP, chỉ trường phẳng (JSON Schema của tool không `$ref`). Tool gửi /
 //! hẹn giờ nhận `version` — giá trị `ETag` tool đọc trả về — y như `If-Match` của REST.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -117,7 +117,7 @@ pub(crate) struct ScheduleInput {
     /// Id of the campaign.
     id: Uuid,
     /// When to start sending: a future time with a time zone, e.g. `2026-12-01T08:00:00Z`.
-    at: DateTime<Utc>,
+    at: Timestamp,
     /// The `version` you read (or `*`).
     version: String,
 }

@@ -9,6 +9,7 @@
 //! ghi nội dung trước, rồi dòng; xoá dòng trước, rồi nội dung. Nội dung còn sót lại (xoá
 //! hỏng, máy chủ tắt giữa chừng) do job dọn mồ côi xoá sau (`jobs.rs`).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -22,7 +23,6 @@ use autoxide_kernel::privacy::{PersonalData, deleted_user};
 use autoxide_kernel::rows;
 use autoxide_kernel::storage::{Storage, StoredFile, TenantStorage};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
@@ -417,7 +417,7 @@ impl MediaService {
         principal: &Principal,
         id: Uuid,
         changes: ItemChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
         let mut problems = Vec::new();
@@ -881,8 +881,8 @@ pub(crate) fn folder_gone(field: &str) -> Error {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Lỗi khi nội dung lớn hơn giới hạn.

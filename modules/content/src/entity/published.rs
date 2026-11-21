@@ -1,5 +1,6 @@
 //! Bảng `content_published`: bản công khai của mục (chỉ có khi đang công khai).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -41,16 +42,16 @@ pub struct Model {
     /// Chép từ mục khi đăng (D-362).
     pub ai_assisted: bool,
     /// Bị ẩn tạm vì vụ việc (D-363): trang công khai trả 451, danh sách bỏ qua.
-    pub restricted_at: Option<DateTimeUtc>,
+    pub restricted_at: Option<Timestamp>,
     /// Người (phiên đăng nhập, không phải API key) đã xác nhận duyệt nội dung do AI tạo khi đăng.
     pub ai_reviewed_by: Option<Uuid>,
-    pub ai_reviewed_at: Option<DateTimeUtc>,
+    pub ai_reviewed_at: Option<Timestamp>,
     /// Ngày hiển thị là ngày đăng (sửa được).
-    pub published_at: DateTimeUtc,
-    pub first_published_at: DateTimeUtc,
+    pub published_at: Timestamp,
+    pub first_published_at: Timestamp,
     /// Lần cuối nội dung công khai đổi (cho sitemap `lastmod`, feed `updated`).
-    pub content_modified_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub content_modified_at: Timestamp,
+    pub updated_at: Timestamp,
     /// Trường tự định nghĩa chép từ mục khi đăng (bước 51 P19); đọc công khai chỉ trả trường mức
     /// `public` đang bật.
     pub custom_fields: Option<String>,

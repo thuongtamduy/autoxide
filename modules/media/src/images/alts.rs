@@ -5,13 +5,13 @@
 //! Đặt / xoá bản dịch là một thay đổi của item: cùng `If-Match`, cùng event `media.item_updated`
 //! (ảnh chụp trước / sau kèm `alts`), `updated_at` của item đổi nên `ETag` đổi theo.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::{Value, json};
@@ -106,7 +106,7 @@ impl MediaService {
         id: Uuid,
         locale: &str,
         alt: Option<&str>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Item, Error> {
         principal.require(&MEDIA_WRITE)?;
         let locale = self.alt_locale(tenant, locale).await?;

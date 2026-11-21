@@ -4,8 +4,9 @@
 
 use autoxide_content::api::{LegacyMenu, LegacyMenuItem, LegacyTarget};
 use autoxide_kernel::error::ErrorKind;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use uuid::Uuid;
 
 use super::{PUBLIC_IMAGE, admin, harness};
@@ -69,7 +70,7 @@ async fn giai_doi_tuong_va_bo_doi_tuong_khong_cong_khai() {
                 &autoxide_kernel::tenancy::Site::whole(t),
                 "main",
                 Some("vi"),
-                Utc::now(),
+                Timestamp::now(),
             )
             .await
             .unwrap();
@@ -164,7 +165,13 @@ async fn nhom_con_tu_lay_co_gioi_han() {
         }];
         service.create(t, &admin(), menu("main", "en", items)).await.unwrap();
         let ready = service
-            .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, Utc::now())
+            .public_menu(
+                t,
+                &autoxide_kernel::tenancy::Site::whole(t),
+                "main",
+                None,
+                Timestamp::now(),
+            )
             .await
             .unwrap();
         let shop = &ready.menu.items[0];
@@ -182,13 +189,13 @@ async fn nhan_het_han_tu_an() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
         let (service, t) = (&harness.service, &harness.tenant);
-        let now = crate::items::micros(Utc::now());
+        let now = crate::items::micros(Timestamp::now());
         let badge = |from: Option<i64>, until: Option<i64>| {
             Some(BadgeInput {
                 text: "-50%".into(),
                 tone: "sale".into(),
-                from: from.map(|hours| now + Duration::hours(hours)),
-                until: until.map(|hours| now + Duration::hours(hours)),
+                from: from.map(|hours| now + SignedDuration::from_hours(hours)),
+                until: until.map(|hours| now + SignedDuration::from_hours(hours)),
             })
         };
         let items = vec![
@@ -204,23 +211,27 @@ async fn nhan_het_han_tu_an() {
             .unwrap();
         let shown: Vec<bool> = ready.menu.items.iter().map(|item| item.badge.is_some()).collect();
         assert_eq!(shown, [true, false, false, true]);
-        assert_eq!(ready.expires_at, now + Duration::seconds(60), "the next change is 1 hour away");
+        assert_eq!(
+            ready.expires_at,
+            now + SignedDuration::from_secs(60),
+            "the next change is 1 hour away"
+        );
 
         // Một giờ sau: "Now" tắt, nên bản đã giải chỉ dùng được tới đúng lúc đó.
         service.cache.clear(t.id());
-        let later = now + Duration::minutes(59) + Duration::seconds(30);
+        let later = now + SignedDuration::from_mins(59) + SignedDuration::from_secs(30);
         let ready = service
             .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", None, later)
             .await
             .unwrap();
-        assert_eq!(ready.expires_at, now + Duration::hours(1));
+        assert_eq!(ready.expires_at, now + SignedDuration::from_hours(1));
         let after = service
             .public_menu(
                 t,
                 &autoxide_kernel::tenancy::Site::whole(t),
                 "main",
                 None,
-                now + Duration::hours(1),
+                now + SignedDuration::from_hours(1),
             )
             .await
             .unwrap();
@@ -279,7 +290,7 @@ async fn ngon_ngu_mac_dinh_va_cache() {
         let (service, t) = (&harness.service, &harness.tenant);
         let (saved, _) =
             service.create(t, &admin(), menu("main", "en", vec![link("Home", "/")])).await.unwrap();
-        let now = Utc::now();
+        let now = Timestamp::now();
         let ready = service
             .public_menu(t, &autoxide_kernel::tenancy::Site::whole(t), "main", Some("VI"), now)
             .await
@@ -432,7 +443,7 @@ async fn hai_khach_cung_khoa_khong_lo_menu_va_cache() {
             .create(b, &admin(), menu("main", "en", vec![link("Home B", "/")]))
             .await
             .unwrap();
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         // Khách A đọc trước (vào cache), rồi khách B: mỗi khách menu của mình.
         let cached_a = service
@@ -627,11 +638,11 @@ async fn ngon_ngu_cua_menu_theo_website() {
                 .unwrap();
         }
         let site = Site::of(t, shop).await.unwrap();
-        let ready = service.public_menu(t, &site, "main", None, Utc::now()).await.unwrap();
+        let ready = service.public_menu(t, &site, "main", None, Timestamp::now()).await.unwrap();
         assert_eq!(ready.menu.locale, "vi", "mặc định của website");
-        let refused = service.public_menu(t, &site, "main", Some("en"), Utc::now()).await;
+        let refused = service.public_menu(t, &site, "main", Some("en"), Timestamp::now()).await;
         assert_eq!(refused.unwrap_err().kind(), ErrorKind::Validation);
-        let whole = service.public_menu(t, &Site::whole(t), "main", None, Utc::now()).await;
+        let whole = service.public_menu(t, &Site::whole(t), "main", None, Timestamp::now()).await;
         assert_eq!(whole.unwrap().menu.locale, "en");
     })
     .await

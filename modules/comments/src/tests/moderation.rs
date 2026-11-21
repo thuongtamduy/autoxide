@@ -1,6 +1,7 @@
 //! Kiểm duyệt, báo cáo, mail báo trả lời, dữ liệu cá nhân, dọn theo thời hạn, event của module
 //! sở hữu đích.
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::event::{Delivered, EventHandler};
@@ -175,7 +176,7 @@ async fn duyet_xoa_han_hang_cho_va_event() {
             "permission_denied"
         );
 
-        let stale = posted.comment.row.updated_at - chrono::Duration::seconds(1);
+        let stale = posted.comment.row.updated_at - SignedDuration::from_secs(1);
         assert_eq!(
             h.service
                 .set_status(&h.tenant, &moderator, id, Status::Published, Some(stale))
@@ -478,7 +479,7 @@ async fn don_theo_thoi_han() {
         // Cả hai từng hiện (rồi bị giữ lại / đánh spam): không bao giờ tự bị xoá.
         let shown_once = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
             .await
             .unwrap();
         assert_eq!((shown_once.deleted, shown_once.cleared), (0, 0));
@@ -491,7 +492,7 @@ async fn don_theo_thoi_han() {
         }
         let later = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
             .await
             .unwrap();
         assert_eq!((later.deleted, later.cleared), (1, 1));
@@ -502,13 +503,17 @@ async fn don_theo_thoi_han() {
         assert_eq!(counts(&h.database, POST).await, (1, 0));
         let ips = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 91))
             .await
             .unwrap();
         assert_eq!((ips.deleted, ips.cleared, ips.fingerprints), (0, 0, 1));
         assert_eq!(
             h.service
-                .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+                .cleanup(
+                    &h.service.databases,
+                    &h.database,
+                    now + SignedDuration::from_hours(24 * 91)
+                )
                 .await
                 .unwrap(),
             crate::retention::Cleaned::default()
@@ -591,7 +596,7 @@ async fn event_cua_chu_dich_dong_va_an() {
             hidden: Some(false),
             closes_at: None,
         };
-        let stale = target.updated_at.unwrap() - chrono::Duration::seconds(1);
+        let stale = target.updated_at.unwrap() - SignedDuration::from_secs(1);
         assert_eq!(
             h.service
                 .set_target(&h.tenant, &admin(), KIND, POST, change(), Some(stale))
@@ -608,7 +613,7 @@ async fn event_cua_chu_dich_dong_va_an() {
         assert!(reopened.is_open(crate::service::now()));
         assert_eq!(h.service.public_comment(&h.tenant, id).await.unwrap().row.id, id);
         // Tự đóng sau `closes_at`.
-        let past = Some(Some(crate::service::now() - chrono::Duration::minutes(1)));
+        let past = Some(Some(crate::service::now() - SignedDuration::from_mins(1)));
         let auto = crate::posting::targets::TargetChange { closes_at: past, ..Default::default() };
         h.service.set_target(&h.tenant, &admin(), KIND, POST, auto, None).await.unwrap();
         assert_eq!(
@@ -676,7 +681,7 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         let now = crate::service::now();
         let cleaned = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(31))
+            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 31))
             .await
             .unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
@@ -697,7 +702,7 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         assert_eq!(before.iter().filter(|r| r.reporter_key.starts_with("ip:")).count(), 2);
         let later = h
             .service
-            .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+            .cleanup(&h.service.databases, &h.database, now + SignedDuration::from_hours(24 * 91))
             .await
             .unwrap();
         assert_eq!(later.reporters, 2);
@@ -718,7 +723,11 @@ async fn bao_cao_khong_lam_binh_luan_da_hien_bi_xoa() {
         assert_eq!(keys.iter().filter(|key| key.starts_with("user:")).count(), 1);
         assert_eq!(
             h.service
-                .cleanup(&h.service.databases, &h.database, now + chrono::Duration::days(91))
+                .cleanup(
+                    &h.service.databases,
+                    &h.database,
+                    now + SignedDuration::from_hours(24 * 91)
+                )
                 .await
                 .unwrap()
                 .reporters,
@@ -760,7 +769,7 @@ async fn duyet_trong_luc_don_thi_khong_xoa() {
         assert_eq!(counts(&h.database, POST).await, (1, 0));
 
         // Lần dọn sau (đọc mới): spam chưa từng hiện bị xoá, bình luận đã duyệt thì không.
-        let later = crate::service::now() + chrono::Duration::days(31);
+        let later = crate::service::now() + SignedDuration::from_hours(24 * 31);
         let cleaned = h.service.cleanup(&h.service.databases, &h.database, later).await.unwrap();
         assert_eq!((cleaned.deleted, cleaned.cleared), (1, 0));
         assert!(
@@ -870,7 +879,7 @@ async fn an_dich_dong_thoi_voi_doi_han_khong_mat_lenh_an() {
         let h = service(test, open_config()).await;
         let client = visitor("203.0.113.14");
         as_guest(&h.service, &client, guest("Ada", "Mở đích")).await.unwrap();
-        let later = Some(Some(crate::service::now() + chrono::Duration::days(30)));
+        let later = Some(Some(crate::service::now() + SignedDuration::from_hours(24 * 30)));
         for _ in 0..4 {
             let hide =
                 crate::posting::targets::TargetChange { hidden: Some(true), ..Default::default() };

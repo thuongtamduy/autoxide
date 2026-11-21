@@ -7,6 +7,7 @@
 //! `Removed` → đóng và ẩn. `comments` không viết cứng tên event của module nào. Số đếm nằm ở
 //! `comments_targets`, đếm theo lô tối đa 100 đích.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Delivered, EventHandler};
 use autoxide_kernel::resource::{Resource, ResourceChange, ResourceEvent};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::json;
 
@@ -36,14 +36,14 @@ pub(crate) struct Target {
     /// Trạng thái đã đặt (`open` / `closed`).
     pub state: String,
     pub hidden: bool,
-    pub closes_at: Option<DateTime<Utc>>,
+    pub closes_at: Option<Timestamp>,
     pub published_count: i32,
     pub pending_count: i32,
     /// Số bình luận gốc (câu hỏi) đang hiện / chờ duyệt.
     pub published_threads: i32,
     pub pending_threads: i32,
     /// `None` khi chưa có dòng nào (chưa có bình luận, chưa ai đặt trạng thái).
-    pub updated_at: Option<DateTime<Utc>>,
+    pub updated_at: Option<Timestamp>,
 }
 
 impl Target {
@@ -78,7 +78,7 @@ impl Target {
     }
 
     /// Có nhận bình luận mới lúc `now` không.
-    pub(crate) fn is_open(&self, now: DateTime<Utc>) -> bool {
+    pub(crate) fn is_open(&self, now: Timestamp) -> bool {
         self.state == "open" && !self.hidden && self.closes_at.is_none_or(|at| at > now)
     }
 
@@ -106,7 +106,7 @@ pub(crate) struct TargetChange {
     pub state: Option<String>,
     pub hidden: Option<bool>,
     /// `Some(None)`: bỏ hạn tự đóng.
-    pub closes_at: Option<Option<DateTime<Utc>>>,
+    pub closes_at: Option<Option<Timestamp>>,
 }
 
 pub(crate) fn target_not_found() -> Error {
@@ -307,7 +307,7 @@ impl CommentsService {
         kind: &str,
         id: &str,
         change: TargetChange,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Target, Error> {
         principal.require(&COMMENTS_MANAGE)?;
         self.check_target(kind, id)?;
@@ -332,7 +332,7 @@ impl CommentsService {
         kind: &str,
         id: &str,
         change: TargetChange,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Target, Error> {
         let now = now();
         let transaction = tenant.database().begin_write().await?;

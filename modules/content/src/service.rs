@@ -5,6 +5,7 @@
 //! kết quả, cùng permission (luật kiến trúc 8). Mỗi lệnh ghi đi cùng event trong CÙNG
 //! transaction (luật kiến trúc 3).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::ai::{Embedder, TextModel};
@@ -14,7 +15,6 @@ use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext, TenantSettings, parsed_setting};
 use autoxide_media::api::Media;
 use autoxide_organizations::api::OrgDirectory;
-use chrono::{DateTime, SubsecRound, Utc};
 
 use crate::config::{self, ContentConfig, Languages};
 
@@ -269,8 +269,8 @@ pub(crate) fn invalid(problems: Vec<FieldError>) -> Error {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn entry_not_found(id: uuid::Uuid) -> Error {

@@ -1,6 +1,7 @@
 //! Thao tác đổi trạng thái của mục: đăng, gỡ, lưu trữ, chuyển trang, xoá. Mọi thao tác bắt
 //! buộc `If-Match` (D-102).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -27,7 +27,7 @@ pub(crate) struct PublishRequest {
     /// The date shown as the publication date. Default: unchanged, or now on first publish.
     /// Needs `content.publish`: with only `content.publish_own` it must be left out (422,
     /// `errors[].code` `not_allowed`).
-    pub published_at: Option<DateTime<Utc>>,
+    pub published_at: Option<Timestamp>,
     /// For an entry marked `ai_generated`: you, a person, reviewed the content and take
     /// editorial responsibility for it. Recorded on the published version (readers see
     /// `ai_reviewed`). Only a signed-in person may send `true`; an API key gets 403

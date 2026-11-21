@@ -8,7 +8,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, Set,
@@ -319,7 +319,7 @@ impl FormsService {
         principal: &Principal,
         id: Uuid,
         input: FormInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Form, Error> {
         principal.require(&FORMS_MANAGE)?;
         let before = self.find_form(tenant, id).await?;
@@ -466,7 +466,7 @@ impl FormsService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(), Error> {
         principal.require(&FORMS_MANAGE)?;
         let before = self.find_form(tenant, id).await?;
@@ -671,7 +671,7 @@ async fn snapshot<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     row: &form::Model,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<(), Error> {
     form_version::Model {
         id: Uuid::now_v7(),

@@ -17,6 +17,8 @@
 //!    (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS`); xoá theo email và xoá form xoá luôn file xuất của
 //!    form đó — file chứa dữ liệu cá nhân.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -28,7 +30,6 @@ use autoxide_kernel::rows;
 use autoxide_kernel::storage::{ByteStream, Storage as _, StoredFile};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 use futures_util::StreamExt as _;
 use hmac::{Hmac, KeyInit, Mac};
 use sea_orm::{
@@ -103,7 +104,7 @@ pub(crate) struct ExportView {
     pub row: export::Model,
     pub state: ExportState,
     /// Link tải và lúc nó hết hạn (chỉ khi `ready`, file chưa hết hạn giữ).
-    pub download: Option<(String, DateTime<Utc>)>,
+    pub download: Option<(String, Timestamp)>,
 }
 
 /// Bộ chạy job `forms.export_submissions`.
@@ -226,12 +227,12 @@ impl FormsService {
             (ExportState::Ready, Some(kept)) if kept > now() => {
                 let minutes = i64::from(self.config.export_link_minutes);
                 // Link không sống lâu hơn file.
-                let expires = (now() + chrono::Duration::minutes(minutes)).min(kept);
-                let signature = self.signature(tenant, row.id, expires.timestamp()).await?;
+                let expires = (now() + SignedDuration::from_mins(minutes)).min(kept);
+                let signature = self.signature(tenant, row.id, expires.as_unix_seconds()).await?;
                 let path = format!(
                     "/api/v1/forms/exports/{}/file?expires={}&signature={signature}",
                     row.id,
-                    expires.timestamp()
+                    expires.as_unix_seconds()
                 );
                 // Có `AUTOXIDE_HTTP_PUBLIC_URL` thì link tuyệt đối; không thì đường dẫn trên API.
                 Some((self.public_url.link(&path).unwrap_or(path), expires))
@@ -282,7 +283,7 @@ impl FormsService {
             .await?
             .verify_slice(&signature)
             .map_err(|_| link_invalid())?;
-        if expires < now().timestamp() {
+        if expires < now().as_unix_seconds() {
             return Err(link_invalid());
         }
         let row = export::Entity::find_by_id(id)
@@ -322,7 +323,7 @@ impl FormsService {
         running.update(tenant.database().write()).await?;
         let result = Self::write_export(service, tenant, &row).await;
         let finished = now();
-        let keep = chrono::Duration::hours(i64::from(service.config.export_keep_hours));
+        let keep = SignedDuration::from_hours(i64::from(service.config.export_keep_hours));
         let transaction = tenant.database().begin_write().await?;
         let mut done = row.clone().into_active_model();
         done.finished_at = Set(Some(finished));
@@ -423,7 +424,7 @@ impl FormsService {
     pub(crate) async fn expired_exports(
         &self,
         tenant: &TenantContext,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Vec<export::Model>, Error> {
         Ok(export::Entity::find()
             .scoped(tenant)

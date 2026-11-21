@@ -2,6 +2,7 @@
 //! (D-102). Tên, slug, mô tả theo từng ngôn ngữ (`content_term_translations`); thiếu bản dịch
 //! thì hiển thị bằng ngôn ngữ mặc định và ghi rõ ngôn ngữ thật đã trả.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait,
@@ -348,7 +348,7 @@ impl ContentService {
         principal: &Principal,
         id: Uuid,
         input: TermInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<TermWithTexts, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let before = self.term_with_texts(tenant, id).await?;

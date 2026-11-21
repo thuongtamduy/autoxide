@@ -16,6 +16,7 @@
 //!   (`autoxide_kernel::tenancy::link_token`, D-281): bấm link ở tên miền chính vẫn tới đúng khách.
 //! - Giới hạn số mail xác minh tới một địa chỉ mỗi ngày bằng `Throttle` (`posting.rs`).
 
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, ErrorKind};
@@ -297,7 +298,7 @@ impl CommentsService {
                     UNSUBSCRIBE,
                     &follower.id.to_string(),
                     None,
-                    chrono::Duration::days(UNSUBSCRIBE_DAYS),
+                    SignedDuration::from_hours(24 * UNSUBSCRIBE_DAYS),
                 )
                 .await?;
             let unsubscribe = self

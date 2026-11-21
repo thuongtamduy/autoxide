@@ -1,6 +1,7 @@
 //! Endpoint quản lý danh sách (`/lists`, `/lists/{id}`). Đọc cần `newsletter.read`; ghi cần
 //! `newsletter.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -42,8 +42,8 @@ pub(crate) struct ListResponse {
     pub new_post_locale: Option<Locale>,
     /// Subscriptions by status.
     pub subscriptions: SubscriptionCounts,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ListResponse {

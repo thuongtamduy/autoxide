@@ -1,9 +1,9 @@
-use chrono::{Duration, Utc};
-
 use super::*;
 use crate::publishing::redirects::Resolved;
 use crate::publishing::schedules::Action;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 fn title(resolved: Resolved) -> String {
     match resolved {
@@ -87,12 +87,12 @@ async fn hen_gio_dang_va_go() {
                 &ada,
                 entry.id,
                 Action::Publish,
-                Utc::now() - Duration::minutes(1),
+                Timestamp::now() - SignedDuration::from_mins(1),
                 None,
             )
             .await;
         assert_eq!(past.unwrap_err().fields()[0].code, "schedule_in_past");
-        let at = Utc::now() + Duration::hours(1);
+        let at = Timestamp::now() + SignedDuration::from_hours(1);
         let schedule = content
             .create_schedule(&tenant, &ada, entry.id, Action::Publish, at, None)
             .await
@@ -114,8 +114,8 @@ async fn hen_gio_dang_va_go() {
         let later = EntryFields { title: Some("Edited later".into()), ..Default::default() };
         content.update(&tenant, &ada, entry.id, later, false, None).await.unwrap();
 
-        content.run_schedule(&tenant, schedule.id, Utc::now()).await.unwrap();
-        content.run_schedule(&tenant, schedule.id, Utc::now()).await.unwrap();
+        content.run_schedule(&tenant, schedule.id, Timestamp::now()).await.unwrap();
+        content.run_schedule(&tenant, schedule.id, Timestamp::now()).await.unwrap();
         assert_eq!(
             title(
                 content
@@ -155,7 +155,7 @@ async fn hen_gio_dang_va_go() {
             .create_schedule(&tenant, &ada, entry.id, Action::Unpublish, at, None)
             .await
             .unwrap();
-        content.run_schedule(&tenant, take_down.id, Utc::now()).await.unwrap();
+        content.run_schedule(&tenant, take_down.id, Timestamp::now()).await.unwrap();
         assert_eq!(
             content
                 .resolve(
@@ -183,7 +183,7 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
         let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
         let entry = content.create(&tenant, &ada, post("Original")).await.unwrap();
-        let at = Utc::now() + Duration::hours(1);
+        let at = Timestamp::now() + SignedDuration::from_hours(1);
         let schedule = content
             .create_schedule(&tenant, &ada, entry.id, Action::Publish, at, None)
             .await
@@ -191,7 +191,7 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
         let manual = EntryFields { title: Some("Manual".into()), ..Default::default() };
         content.update(&tenant, &ada, entry.id, manual, false, None).await.unwrap();
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
-        content.run_schedule(&tenant, schedule.id, Utc::now()).await.unwrap();
+        content.run_schedule(&tenant, schedule.id, Timestamp::now()).await.unwrap();
         let rows = content.list_schedules(&tenant, &ada, entry.id).await.unwrap();
         assert_eq!(
             (rows[0].status.as_str(), rows[0].error_code.as_deref()),
@@ -226,7 +226,9 @@ async fn lich_loi_thoi_va_chay_dong_thoi() {
                 let (a, b) = (content.clone(), content.clone());
                 let (ta, tb) = (tenant.clone(), tenant.clone());
                 (
-                    tokio::spawn(async move { a.run_schedule(&ta, schedule.id, Utc::now()).await }),
+                    tokio::spawn(async move {
+                        a.run_schedule(&ta, schedule.id, Timestamp::now()).await
+                    }),
                     tokio::spawn(async move {
                         b.publish(&tb, &editor(), entry.id, Some(entry.updated_at), None, false)
                             .await

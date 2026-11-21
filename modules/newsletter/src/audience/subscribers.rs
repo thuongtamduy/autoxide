@@ -1,6 +1,7 @@
 //! Người đăng ký phía quản trị: tìm, đọc, nhập nhiều người (kèm nguồn đồng ý), sửa, chặn, xoá;
 //! xuất / xoá mọi thứ về một email (quyền của chủ dữ liệu).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{HashMap, HashSet};
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, SortValue, fetch_page, fetch_page_by};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{OnConflict, Query};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
@@ -507,7 +507,7 @@ impl NewsletterService {
         principal: &Principal,
         id: Uuid,
         change: SubscriberChange,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Subscriber, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let before = self.find_subscriber(tenant, id).await?;
@@ -599,7 +599,7 @@ impl NewsletterService {
         actor: Actor,
         subscriber_id: Uuid,
         list: &List,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<bool, Error> {
         let updated = subscription::Entity::update_many()
             .scoped(tenant)
@@ -760,7 +760,7 @@ pub(crate) async fn upsert_subscriber<C: ConnectionTrait>(
     connection: &C,
     tenant: &TenantContext,
     person: &ImportPerson,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<(subscriber::Model, bool), Error> {
     let attributes = person.attributes.clone().unwrap_or_default();
     let fresh = subscriber::ActiveModel {
@@ -810,7 +810,7 @@ pub(crate) async fn set_subscription<C: ConnectionTrait>(
     existing: Option<subscription::Model>,
     (subscriber_id, list_id): (Uuid, Uuid),
     wanted: Wanted,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<subscription::Model, Error> {
     let Wanted { status, consent, hold_reason } = wanted;
     let confirmed_at = (status == SubscriptionStatus::Confirmed).then_some(now);

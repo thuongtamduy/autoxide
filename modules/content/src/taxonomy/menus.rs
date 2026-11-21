@@ -3,13 +3,13 @@
 //! Bản công khai tính sẵn đường dẫn và tiêu đề; mục trỏ tới nội dung chưa công khai thì ẩn
 //! (cả nhánh con của nó). Thiếu menu ở một ngôn ngữ thì dùng ngôn ngữ mặc định (D-102).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
@@ -100,7 +100,7 @@ impl ContentService {
         key: &str,
         locale: Option<&str>,
         items: Vec<ItemInput>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&CONTENT_MANAGE)?;
         let mut problems = Vec::new();

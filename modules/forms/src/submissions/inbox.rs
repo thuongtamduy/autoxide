@@ -1,6 +1,7 @@
 //! Hộp thư quản trị: liệt kê, đọc, đổi trạng thái, xoá bài gửi; xuất CSV; xuất / xoá mọi bài
 //! của một email (quyền của chủ dữ liệu). Mỗi bài đọc kèm trường của ĐÚNG phiên bản lúc gửi.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{HashMap, HashSet};
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Order, Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ColumnTrait, Condition, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -244,7 +244,7 @@ impl FormsService {
         principal: &Principal,
         id: Uuid,
         status: SubmissionStatus,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Submission, Error> {
         principal.require(&FORMS_REVIEW)?;
         let before = self.find_submission(tenant, id).await?;

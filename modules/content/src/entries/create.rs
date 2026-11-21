@@ -1,6 +1,7 @@
 //! Tạo, ghi và đọc bài: create / insert / get / list / published_paths.
 
 use super::*;
+use autoxide_kernel::time::Timestamp;
 
 impl ContentService {
     /// Tạo một mục nháp. Cần `content.write` hoặc `content.write_own` (khi đó trang cha phải là
@@ -315,12 +316,12 @@ impl ContentService {
         &self,
         tenant: &TenantContext,
         ids: &[Uuid],
-    ) -> Result<std::collections::HashMap<Uuid, (String, DateTime<Utc>)>, Error> {
+    ) -> Result<std::collections::HashMap<Uuid, (String, Timestamp)>, Error> {
         if ids.is_empty() {
             return Ok(std::collections::HashMap::new());
         }
         use crate::entity::published;
-        let rows: Vec<(Uuid, String, DateTime<Utc>)> = published::Entity::find()
+        let rows: Vec<(Uuid, String, Timestamp)> = published::Entity::find()
             .scoped(tenant)
             .select_only()
             .column(published::Column::EntryId)

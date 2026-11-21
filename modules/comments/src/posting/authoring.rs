@@ -12,7 +12,8 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, Set,
 };
@@ -59,7 +60,7 @@ fn name_taken() -> Error {
 pub(crate) struct Profile {
     pub user_id: Uuid,
     pub display_name: String,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl CommentsService {
@@ -98,7 +99,7 @@ impl CommentsService {
         }
         let now = now();
         let minutes = i64::from(self.config.edit_minutes);
-        if minutes == 0 || before.created_at + chrono::Duration::minutes(minutes) < now {
+        if minutes == 0 || before.created_at + SignedDuration::from_mins(minutes) < now {
             return Err(edit_window_passed());
         }
         let mut problems = Vec::new();

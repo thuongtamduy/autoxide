@@ -1,5 +1,6 @@
 //! Bảng `media_variant`: ảnh thu nhỏ của một phiên bản nội dung (D-093).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,7 +17,7 @@ pub struct Model {
     pub height: i32,
     pub content_type: String,
     pub size: i64,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -10,6 +10,7 @@
 //! Câu trả lời cho nhận, giữ lại và bỏ đi GIỐNG HỆT (cùng mã 201, cùng hình dạng, ID cùng định
 //! dạng — bỏ đi thì ID giả): bot không phân biệt được.
 
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -132,7 +133,7 @@ impl FormsService {
             fields::sender_email(&form.fields, form.row.reply_to_field.as_deref(), &answers.data)
                 .map(|email| autoxide_kernel::email::normalize(&email));
         let content_hash = antispam::content_hash(&data);
-        let since = now() - chrono::Duration::hours(DUPLICATE_HOURS);
+        let since = now() - SignedDuration::from_hours(DUPLICATE_HOURS);
         let duplicate = submission::Entity::find()
             .scoped(tenant)
             .filter(submission::Column::FormId.eq(form.row.id))

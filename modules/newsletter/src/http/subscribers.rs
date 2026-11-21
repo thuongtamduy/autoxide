@@ -2,6 +2,7 @@
 //! `newsletter.read`; nhập, sửa, xoá cần `newsletter.manage`; xuất / xoá theo email cần
 //! `newsletter.export`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::{IntoParams, ToSchema};
@@ -41,9 +41,9 @@ pub(crate) struct SubscriptionResponse {
     pub consent: Option<Value>,
     /// Why the anti-spam checks held the sign-up (it then needed confirming by mail).
     pub hold_reason: Option<String>,
-    pub requested_at: DateTime<Utc>,
-    pub confirmed_at: Option<DateTime<Utc>>,
-    pub unsubscribed_at: Option<DateTime<Utc>>,
+    pub requested_at: Timestamp,
+    pub confirmed_at: Option<Timestamp>,
+    pub unsubscribed_at: Option<Timestamp>,
 }
 
 impl From<Membership> for SubscriptionResponse {
@@ -82,8 +82,8 @@ pub(crate) struct SubscriberResponse {
     /// `manual`); `null`: it is not.
     pub suppressed: Option<String>,
     pub subscriptions: Vec<SubscriptionResponse>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Subscriber> for SubscriberResponse {
@@ -396,7 +396,7 @@ pub(crate) struct DeliveryResponse {
     pub campaign_id: Uuid,
     /// `pending`, `sent`, `failed` or `skipped`.
     pub status: String,
-    pub sent_at: Option<DateTime<Utc>>,
+    pub sent_at: Option<Timestamp>,
     /// Why it was skipped or failed.
     pub error: Option<String>,
 }

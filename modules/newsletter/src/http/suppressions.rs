@@ -1,6 +1,7 @@
 //! Endpoint danh sách chặn (`/suppressions…`) và báo bounce (`/bounces`). Đọc cần
 //! `newsletter.read`; ghi cần `newsletter.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,7 +32,7 @@ pub(crate) struct SuppressionResponse {
     pub reason: String,
     /// A note, or the SMTP code of a bounce.
     pub note: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<suppression::Model> for SuppressionResponse {

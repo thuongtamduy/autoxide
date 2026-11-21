@@ -1,5 +1,7 @@
 //! Danh sách, nhập, xuất / xoá theo email, dọn dẹp, bài mới, tài khoản bị xoá.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
@@ -264,13 +266,13 @@ async fn don_dang_ky_chua_xac_nhan() {
         let registry = autoxide_kernel::tenancy::DatabaseRegistry::single(h.database.clone());
         assert_eq!(
             h.service
-                .cleanup(&registry, &h.database, chrono::Utc::now())
+                .cleanup(&registry, &h.database, Timestamp::now())
                 .await
                 .unwrap()
                 .subscriptions,
             0
         );
-        let later = chrono::Utc::now() + chrono::Duration::days(31);
+        let later = Timestamp::now() + SignedDuration::from_hours(24 * 31);
         let cleaned = h.service.cleanup(&registry, &h.database, later).await.unwrap();
         assert_eq!((cleaned.subscriptions, cleaned.subscribers), (1, 1));
         assert_eq!(subscribers(&h.database).await, 1);

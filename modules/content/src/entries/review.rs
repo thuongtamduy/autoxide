@@ -7,7 +7,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 use crate::entries::{Entry, summary};
@@ -23,7 +23,7 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
         withdraw: bool,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;

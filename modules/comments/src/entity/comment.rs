@@ -1,5 +1,6 @@
 //! Bảng `comments_comments`: một bình luận (gốc hay trả lời).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -40,9 +41,9 @@ pub struct Model {
     pub hold_reason: Option<String>,
     /// SHA-256 của token sửa của khách.
     pub edit_token_hash: Option<String>,
-    pub edited_at: Option<DateTimeUtc>,
+    pub edited_at: Option<Timestamp>,
     /// Lần đầu được hiện.
-    pub published_at: Option<DateTimeUtc>,
+    pub published_at: Option<Timestamp>,
     /// `ip_hash::fingerprint`; xoá sau `AUTOXIDE_COMMENTS_IP_RETENTION_DAYS`.
     pub ip_fingerprint: Option<String>,
     /// `en` hoặc `vi` (ngôn ngữ của mail gửi cho tác giả).
@@ -61,11 +62,11 @@ pub struct Model {
     /// Số báo cáo vi phạm.
     pub report_count: i32,
     /// Lúc bị giữ lại vì đủ báo cáo — chỉ một lần.
-    pub reports_held_at: Option<DateTimeUtc>,
+    pub reports_held_at: Option<Timestamp>,
     /// Trạng thái trước khi bị ẩn vì vụ việc của `compliance` (D-363); `None`: không bị ẩn.
     pub restricted_status: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

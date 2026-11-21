@@ -10,6 +10,8 @@ pub(crate) mod compose;
 pub(crate) mod new_posts;
 pub(crate) mod sending;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -18,7 +20,6 @@ use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -198,7 +199,7 @@ pub(crate) struct CampaignFilter {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Action {
     Send,
-    Schedule(DateTime<Utc>),
+    Schedule(Timestamp),
     Pause,
     Resume,
     Cancel,
@@ -391,7 +392,7 @@ impl NewsletterService {
         principal: &Principal,
         id: Uuid,
         input: CampaignInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Campaign, Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let before = self.find_campaign(tenant, id).await?;
@@ -465,7 +466,7 @@ impl NewsletterService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(), Error> {
         principal.require(&NEWSLETTER_MANAGE)?;
         let before = self.find_campaign(tenant, id).await?;
@@ -516,7 +517,7 @@ impl NewsletterService {
         principal: &Principal,
         id: Uuid,
         action: Action,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Campaign, Error> {
         principal.require(&NEWSLETTER_SEND)?;
         let before = self.find_campaign(tenant, id).await?;
@@ -533,7 +534,7 @@ impl NewsletterService {
         }
         let now = now();
         if let Action::Schedule(at) = action
-            && (at <= now || at > now + chrono::Duration::days(SCHEDULE_MAX_DAYS))
+            && (at <= now || at > now + SignedDuration::from_hours(24 * SCHEDULE_MAX_DAYS))
         {
             return Err(Error::validation(vec![
                 FieldError::new(
@@ -708,7 +709,7 @@ impl NewsletterService {
         id: Uuid,
         run: i32,
         after: Option<Uuid>,
-        run_at: Option<DateTime<Utc>>,
+        run_at: Option<Timestamp>,
     ) -> Result<(), Error> {
         let key = match after {
             Some(after) => format!("newsletter.prepare:{id}:{run}:{after}"),
@@ -732,7 +733,7 @@ impl NewsletterService {
         id: Uuid,
         run: i32,
         seq: u32,
-        run_at: Option<DateTime<Utc>>,
+        run_at: Option<Timestamp>,
     ) -> Result<(), Error> {
         let mut options =
             EnqueueOptions::default().unique_key(format!("newsletter.send:{id}:{run}:{seq}"));
@@ -829,7 +830,7 @@ fn content_changed(before: &campaign::Model, after: &campaign::Model) -> bool {
 }
 
 /// Chiến dịch nháp rỗng của danh sách `list_id`.
-pub(crate) fn blank(tenant: &TenantContext, list_id: Uuid, now: DateTime<Utc>) -> campaign::Model {
+pub(crate) fn blank(tenant: &TenantContext, list_id: Uuid, now: Timestamp) -> campaign::Model {
     campaign::Model {
         id: Uuid::now_v7(),
         tenant_id: tenant.id().as_uuid(),

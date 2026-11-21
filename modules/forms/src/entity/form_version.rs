@@ -1,6 +1,7 @@
 //! Bảng `forms_form_versions`: ảnh chụp danh sách trường mỗi khi trường đổi — bài gửi cũ luôn
 //! đọc được với đúng nhãn lúc gửi.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,7 +16,7 @@ pub struct Model {
     pub version: i32,
     /// JSON: danh sách trường của phiên bản này.
     pub fields: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

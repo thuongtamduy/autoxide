@@ -5,6 +5,8 @@
 use super::*;
 use crate::library::direct::StartMediaUpload;
 use autoxide_kernel::tenancy::{DatabaseRegistry, TenantContext};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sha2::{Digest, Sha256};
 
 fn sha(content: &[u8]) -> String {
@@ -164,8 +166,8 @@ async fn luot_bo_do_duoc_don() {
             media.start_upload(&tenant, &ada, start("a.png", "image/png", &png)).await.unwrap();
         storage.put_presigned(&link.url, png);
 
-        assert_eq!(media.purge_uploads(&registry, &database, Utc::now()).await.unwrap(), 0);
-        let later = Utc::now() + chrono::Duration::hours(3);
+        assert_eq!(media.purge_uploads(&registry, &database, Timestamp::now()).await.unwrap(), 0);
+        let later = Timestamp::now() + SignedDuration::from_hours(3);
         assert_eq!(media.purge_uploads(&registry, &database, later).await.unwrap(), 1);
         assert_eq!(media.purge_uploads(&registry, &database, later).await.unwrap(), 0);
         assert!(storage.bytes(link.url.strip_prefix("memory://").unwrap()).is_none());

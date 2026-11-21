@@ -8,12 +8,12 @@
 //!   hai lệnh chuyển chéo nhau không cùng qua được bước kiểm vòng lặp; SQLite vốn chỉ có một
 //!   người ghi. Mỗi khách một bộ dòng khoá (bước 33): khách này không chờ khách kia.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::error::Error;
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use uuid::Uuid;
@@ -109,7 +109,7 @@ pub(crate) async fn repath_descendants<C: ConnectionTrait>(
     id: Uuid,
     old: &str,
     new: &str,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<Vec<Moved>, Error> {
     let mut moved = Vec::new();
     for child in published_descendants(connection, tenant, id).await? {
@@ -183,7 +183,7 @@ pub(crate) async fn redirect_moved<C: ConnectionTrait>(
     locale: &str,
     moved: &[Moved],
     by: Option<Uuid>,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<(), Error> {
     for (entry_id, old, new) in moved {
         clear_automatic(connection, tenant, locale, new).await?;
@@ -226,7 +226,7 @@ pub(crate) struct Generated<'a> {
     pub status: i32,
     pub source: &'a str,
     pub by: Option<Uuid>,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
 }
 
 /// Ghi (thay) chuyển hướng tự động ở `row.from` — chuyển hướng làm tay đang có thì giữ nguyên.

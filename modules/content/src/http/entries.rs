@@ -1,5 +1,6 @@
 //! Endpoint quản trị của mục: danh sách, tạo, đọc, sửa bản nháp.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -70,7 +70,7 @@ pub(crate) struct EntryResponse {
     ai_assisted: bool,
     /// When the writer asked for a review (`POST /entries/{id}/request-review`); `null`: no
     /// review pending. Cleared when the entry is published.
-    review_requested_at: Option<DateTime<Utc>>,
+    review_requested_at: Option<Timestamp>,
     /// Who asked for the review.
     review_requested_by: Option<Uuid>,
     /// For a translation made by the server's AI: the revision of the source it was translated
@@ -84,8 +84,8 @@ pub(crate) struct EntryResponse {
     /// AI agent).
     #[schema(example = "api_key")]
     created_via: String,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
     /// Categories and tags, in order (the first category is the main one). Set with
     /// `PUT /api/v1/content/entries/{id}/terms`; takes effect at once.
     term_ids: Vec<Uuid>,
@@ -93,7 +93,7 @@ pub(crate) struct EntryResponse {
     /// `PUT /api/v1/content/entries/{id}/authors`; takes effect at once.
     author_ids: Vec<Uuid>,
     /// When the public version was last published; `null` while the entry is not public.
-    published_at: Option<DateTime<Utc>>,
+    published_at: Option<Timestamp>,
     /// Address of the public version, e.g. `/blog/duong-den-da-lat` or `/about/team` (a page
     /// carries the path of its parents); `null` while the entry is not public. It does not hold
     /// the language: the website decides how `locale` shows in its addresses.

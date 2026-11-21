@@ -1,6 +1,7 @@
 //! Đọc công khai vị trí banner (bước 55, D-236): không cần đăng nhập; khách theo tên miền /
 //! header, website theo `site`. `Cache-Control: public, max-age=<tới mốc gần nhất>` và `ETag` (→ 304).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -9,7 +10,6 @@ use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::{IntoParams, ToSchema};
@@ -211,8 +211,9 @@ pub(crate) async fn list_public_placements(
     Query(query): Query<PageQuery>,
 ) -> Result<Response, Error> {
     let keys: Vec<String> = keys.keys.split(',').map(str::to_owned).collect();
-    let found =
-        service.public_placements(&tenant, &site, &keys, &page(&query), Utc::now(), false).await?;
+    let found = service
+        .public_placements(&tenant, &site, &keys, &page(&query), Timestamp::now(), false)
+        .await?;
     let PublicPlacements { locale, placements, max_age } = found;
     let data = PublicPlacementsResponse {
         locale,
@@ -247,8 +248,9 @@ pub(crate) async fn get_public_placement(
     Path(key): Path<String>,
     Query(query): Query<PageQuery>,
 ) -> Result<Response, Error> {
-    let found =
-        service.public_placements(&tenant, &site, &[key], &page(&query), Utc::now(), true).await?;
+    let found = service
+        .public_placements(&tenant, &site, &[key], &page(&query), Timestamp::now(), true)
+        .await?;
     let max_age = found.max_age;
     let ready = found
         .placements

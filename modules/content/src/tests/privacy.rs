@@ -1,7 +1,8 @@
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 use super::*;
 use crate::publishing::schedules::Action;
@@ -36,7 +37,7 @@ async fn xoa_tai_khoan_va_xuat_du_lieu() {
                 &ada,
                 entry.id,
                 Action::Publish,
-                Utc::now() + Duration::days(1),
+                Timestamp::now() + SignedDuration::from_hours(24),
                 None,
             )
             .await

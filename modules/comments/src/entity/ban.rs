@@ -1,5 +1,6 @@
 //! Bảng `comments_bans`: cấm bình luận theo người dùng, email hay dấu vết IP.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,9 +17,9 @@ pub struct Model {
     pub value: String,
     pub reason: String,
     /// Hết cấm lúc này; `None`: vĩnh viễn.
-    pub until: Option<DateTimeUtc>,
+    pub until: Option<Timestamp>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

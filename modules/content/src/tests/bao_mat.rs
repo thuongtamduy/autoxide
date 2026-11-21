@@ -3,7 +3,8 @@
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::event::{Delivered, EventHandler};
-use chrono::{Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::EntityTrait;
 
 use super::*;
@@ -40,7 +41,7 @@ async fn go_va_luu_tru_huy_lich_dang() {
         let (content, _, database) = service(test, config(&[])).await;
         let tenant = TenantContext::default_on(database.clone());
         let ada = editor();
-        let at = Utc::now() + Duration::hours(1);
+        let at = Timestamp::now() + SignedDuration::from_hours(1);
 
         let entry = content.create(&tenant, &ada, post("Taken down")).await.unwrap();
         content.publish(&tenant, &ada, entry.id, None, None, false).await.unwrap();
@@ -49,7 +50,7 @@ async fn go_va_luu_tru_huy_lich_dang() {
             .await
             .unwrap();
         content.unpublish(&tenant, &ada, entry.id, None).await.unwrap();
-        content.run_schedule(&tenant, planned.id, Utc::now()).await.unwrap();
+        content.run_schedule(&tenant, planned.id, Timestamp::now()).await.unwrap();
         assert_eq!(content.get(&tenant, &ada, entry.id).await.unwrap().status, "draft");
         assert_eq!(
             content
@@ -79,7 +80,7 @@ async fn go_va_luu_tru_huy_lich_dang() {
             .unwrap();
         content.archive(&tenant, &ada, archived.id, None).await.unwrap();
         for id in [up.id, down.id] {
-            content.run_schedule(&tenant, id, Utc::now()).await.unwrap();
+            content.run_schedule(&tenant, id, Timestamp::now()).await.unwrap();
         }
         assert_eq!(content.get(&tenant, &ada, archived.id).await.unwrap().status, "archived");
         assert!(matches!(
@@ -131,7 +132,7 @@ async fn publish_own_bi_gioi_han() {
         content.publish(&tenant, &ada, mine.id, None, None, false).await.unwrap();
 
         let dated = content.create(&tenant, &bot, post("Dated")).await.unwrap();
-        let when = Some(Utc::now() + Duration::days(30));
+        let when = Some(Timestamp::now() + SignedDuration::from_hours(24 * 30));
         let error = content.publish(&tenant, &bot, dated.id, None, when, false).await.unwrap_err();
         assert_eq!(error.code(), "validation_failed");
         assert_eq!(field_codes(&error), [("published_at".into(), "not_allowed".into())]);

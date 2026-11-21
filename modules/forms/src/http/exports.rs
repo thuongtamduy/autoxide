@@ -1,6 +1,7 @@
 //! Endpoint xuất CSV lớn bằng job (`submissions/exports.rs`): yêu cầu một bản xuất, xem trạng
 //! thái và lấy link tải, tải file qua link ký (không cần đăng nhập).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -12,7 +13,6 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -45,16 +45,16 @@ pub(crate) struct ExportResponse {
     pub row_count: Option<i64>,
     /// Size of the file in bytes, once `ready`.
     pub size: Option<i64>,
-    pub created_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
     /// When the file is deleted (`AUTOXIDE_FORMS_EXPORT_KEEP_HOURS` after it was finished).
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// Link to the file, only while `ready`: it needs no sign-in, so it can be opened in a
     /// browser, and it works until `download_expires_at`. An absolute URL when
     /// `AUTOXIDE_HTTP_PUBLIC_URL` is set, otherwise a path on this API. Get the export again
     /// for a fresh link.
     pub download_url: Option<String>,
-    pub download_expires_at: Option<DateTime<Utc>>,
+    pub download_expires_at: Option<Timestamp>,
 }
 
 impl From<ExportView> for ExportResponse {

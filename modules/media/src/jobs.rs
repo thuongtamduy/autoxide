@@ -15,6 +15,8 @@
 //! (tra qua sổ database), chỉ với khách đang lưu file ở nơi đang quét. Khoá của khách không còn
 //! trong sổ thì để nguyên.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -25,7 +27,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{
     DEFAULT_TENANT, DatabaseRegistry, FileStore, ScopeExt, TenantContext, TenantId,
 };
-use chrono::{DateTime, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -74,9 +75,9 @@ impl MediaService {
         &self,
         databases: &DatabaseRegistry,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
-        let before = now - chrono::Duration::days(i64::from(self.config.trash_days));
+        let before = now - SignedDuration::from_hours(24 * (i64::from(self.config.trash_days)));
         // Khách có item quá hạn trên database này (quét cả database qua index `_sweep_idx`).
         let tenants: Vec<Uuid> = Entity::find()
             .select_only()
@@ -106,7 +107,7 @@ impl MediaService {
     async fn purge_expired_of(
         &self,
         tenant: &TenantContext,
-        before: DateTime<Utc>,
+        before: Timestamp,
     ) -> Result<u64, Error> {
         let mut purged = 0;
         loop {
@@ -136,7 +137,7 @@ impl MediaService {
     pub(crate) async fn clean_orphans(
         &self,
         databases: &DatabaseRegistry,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
         let mut removed = 0;
         for store in databases.file_stores(self.storage.clone()).await? {
@@ -153,10 +154,10 @@ impl MediaService {
         &self,
         databases: &DatabaseRegistry,
         store: &FileStore,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<u64, Error> {
         let storage = &store.storage;
-        let cutoff = now - chrono::Duration::hours(ORPHAN_GRACE_HOURS);
+        let cutoff = now - SignedDuration::from_hours(ORPHAN_GRACE_HOURS);
         // Khoá thật ở nơi lưu (không qua tiền tố khách): của khách mặc định và của mọi khách khác.
         let mut keys = storage.keys_with_prefix(KEY_PREFIX).await?;
         keys.extend(
@@ -245,9 +246,9 @@ fn parse_media_key(key: &str) -> Option<(Uuid, Uuid)> {
 }
 
 /// Thời điểm tạo ghi trong UUIDv7.
-fn created_at(id: Uuid) -> Option<DateTime<Utc>> {
+fn created_at(id: Uuid) -> Option<Timestamp> {
     let (seconds, nanos) = id.get_timestamp()?.to_unix();
-    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+    Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
 #[cfg(test)]
@@ -274,7 +275,7 @@ mod tests {
         );
         assert_eq!(parse_key(&format!("tenants/{other}/files/{item}")), None);
         assert_eq!(parse_key(&format!("tenants/x/media/{item}/{version}")), None);
-        let age = Utc::now() - created_at(version).unwrap();
-        assert!(age.num_seconds().abs() < 5);
+        let age = Timestamp::now() - created_at(version).unwrap();
+        assert!(age.as_secs().abs() < 5);
     }
 }

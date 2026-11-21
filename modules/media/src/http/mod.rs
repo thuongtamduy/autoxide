@@ -9,12 +9,12 @@ mod items;
 mod tags;
 mod uploads;
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{PageQuery, PageRequest};
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -106,10 +106,10 @@ pub(crate) struct MediaItemResponse {
     /// account no longer exists; absent otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     uploaded_by_name: Option<Option<String>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
     /// When the item was moved to the trash; `null` when it is not in the trash.
-    trashed_at: Option<DateTime<Utc>>,
+    trashed_at: Option<Timestamp>,
     /// Tags of the item, sorted by name.
     #[schema(example = json!(["logo", "brand"]))]
     tags: Vec<String>,

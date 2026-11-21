@@ -1,6 +1,8 @@
 use super::*;
 use crate::publishing::reading::PostFilter;
 use autoxide_kernel::tenancy::TenantContext;
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 
 pub(super) const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 
@@ -17,7 +19,7 @@ async fn bai_cong_khai_sitemap_feed() {
         for (index, title) in ["Phở Hà Nội", "Bún chả", "Cà phê trứng"].iter().enumerate()
         {
             let entry = content.create(&tenant, &ada, post(title)).await.unwrap();
-            let at = chrono::Utc::now() - chrono::Duration::days(10 - index as i64);
+            let at = Timestamp::now() - SignedDuration::from_hours(24 * (10 - index as i64));
             content.publish(&tenant, &ada, entry.id, None, Some(at), false).await.unwrap();
             published.push(entry);
         }
@@ -162,7 +164,7 @@ async fn xem_truoc() {
             "content.not_found"
         );
         let (token, expires) = content.preview_token(&tenant, &ada, entry.id).await.unwrap();
-        assert!(expires > chrono::Utc::now() + chrono::Duration::seconds(590));
+        assert!(expires > Timestamp::now() + SignedDuration::from_secs(590));
         content.update(&tenant, &ada, entry.id, fields("Draft v2"), false, None).await.unwrap();
         assert_eq!(
             content.preview(None, &token).await.unwrap().1.title,
@@ -180,7 +182,7 @@ async fn xem_truoc() {
                 "{bad}"
             );
         }
-        let past = chrono::Utc::now() - chrono::Duration::seconds(1);
+        let past = Timestamp::now() - SignedDuration::from_secs(1);
         let expired =
             crate::publishing::preview::sign(SECRET, tenant.id(), entry.id, past).unwrap();
         assert_eq!(

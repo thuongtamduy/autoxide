@@ -7,13 +7,14 @@
 //! gốc, `published_count` / `published_thread_count` của đích. Làm từng đích một nên biết trước số
 //! trả lời của mỗi bình luận gốc, không phải sửa lại dòng đã ghi. Không phát event.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::bench_seed::{self, Pseudo, SeedArgs};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::task::{Task, TaskArgs, TaskRun};
 use autoxide_kernel::tenancy::{DatabaseRegistry, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::{EntityTrait, PaginatorTrait, Set};
 use uuid::Uuid;
 
@@ -70,7 +71,7 @@ impl TaskRun for Seed {
             return Err(bench_seed::refused("there are no entries to comment on"));
         }
         let users = bench_seed::read_ids(&args.ids, bench_seed::USERS_KEY).unwrap_or_default();
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let users = profiles(&tenant, &users, now).await?;
         let made = comments(&tenant, &entries, &users, args.count, now).await?;
         Ok(format!("Made {made} published comments on {} posts.", entries.len()))
@@ -81,7 +82,7 @@ impl TaskRun for Seed {
 async fn profiles(
     tenant: &TenantContext,
     users: &[Uuid],
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<Vec<(Uuid, String)>, Error> {
     let mut random = Pseudo::new(0x9F0);
     let named: Vec<(Uuid, String)> = users
@@ -110,7 +111,7 @@ async fn comments(
     entries: &[Uuid],
     users: &[(Uuid, String)],
     count: u64,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<u64, Error> {
     let mut random = Pseudo::new(0xC0FFEE);
     let targets = entries.len() as u64;
@@ -146,16 +147,16 @@ fn thread(
     entry: Uuid,
     users: &[(Uuid, String)],
     share: u64,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<u64, Error> {
     let tenant_id = tenant.id().as_uuid();
     let target_id = entry.to_string();
     let roots = (share * ROOT_PER_MILLE / 1000).max(1);
-    let started =
-        now - Duration::minutes(i64::try_from(random.below(1_000_000)).unwrap_or(0) + 10_000);
+    let started = now
+        - SignedDuration::from_mins(i64::try_from(random.below(1_000_000)).unwrap_or(0) + 10_000);
     let mut rows: Vec<comment::Model> = Vec::new();
     for position in 0..share {
-        let at = started + Duration::seconds(i64::try_from(position * 37).unwrap_or(0));
+        let at = started + SignedDuration::from_secs(i64::try_from(position * 37).unwrap_or(0));
         let words = 12 + usize::try_from(random.below(30)).unwrap_or(0);
         let body = random.sentence(words);
         let (user_id, name) = match random.pick(users) {

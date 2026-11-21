@@ -4,6 +4,7 @@
 //! Mỗi lệnh ghi đi cùng một event trong CÙNG transaction (luật kiến trúc 3). Kiểm đối tượng đích
 //! (sổ đối tượng, có thể gọi module khác) chạy TRƯỚC transaction: transaction ghi phải ngắn.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, Site, TenantContext, root_of};
 use autoxide_media::api::Media;
-use chrono::{DateTime, Utc};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, PaginatorTrait,
     QueryFilter, QueryOrder, QuerySelect, SqlErr,
@@ -180,7 +180,7 @@ impl MenuService {
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
-        let now = micros(Utc::now());
+        let now = micros(Timestamp::now());
         let transaction = tenant.database().begin_write().await?;
         // Website do người gọi nêu: ngoài phạm vi → 403; nút đang khoá → `org_frozen`.
         if let Some(principal) = principal {
@@ -227,7 +227,7 @@ impl MenuService {
         principal: &Principal,
         id: Uuid,
         items: Vec<ItemInput>,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(Menu, Vec<Node>), Error> {
         principal.require(&MENUS_MANAGE)?;
         let found = self.find(tenant, id).await?;
@@ -260,7 +260,7 @@ impl MenuService {
         if !problems.is_empty() {
             return Err(invalid(problems));
         }
-        let now = micros(Utc::now());
+        let now = micros(Timestamp::now());
         let transaction = tenant.database().begin_write().await?;
         principal.require_write_at(&transaction, &MENUS_MANAGE, target(tenant, &found)).await?;
         // Kiểm phiên bản trong chính câu UPDATE: hai người sửa cùng lúc thì một người nhận 412.

@@ -2,6 +2,7 @@
 //! service (service kiểm permission) → trả envelope. Mọi route đăng ký qua `routes!` để có tài
 //! liệu OpenAPI (luật kiến trúc 6).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -57,9 +57,9 @@ pub(crate) struct MenuBadge {
     #[schema(example = "sale")]
     tone: String,
     /// Shown from this moment; omitted: at once.
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Hidden from this moment on; omitted: never.
-    until: Option<DateTime<Utc>>,
+    until: Option<Timestamp>,
 }
 
 /// A menu item to save. It links to at most one of `url` and `ref`; with neither it is a
@@ -182,8 +182,8 @@ pub(crate) struct SiteMenu {
     #[schema(example = "vi")]
     locale: String,
     items: Vec<SiteMenuItem>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 /// The object a saved item links to. With `include=targets`, also how it stands now.
@@ -300,8 +300,8 @@ pub(crate) struct SiteMenuSummary {
     /// Who created the menu or last replaced its items; `null` when unknown (menus saved
     /// before this field existed, or changed by the system).
     updated_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl SiteMenuSummary {
@@ -540,9 +540,9 @@ async fn get_public_menu(
     Path(key): Path<String>,
     Query(query): Query<PublicQuery>,
 ) -> Result<Response, Error> {
-    let now = Utc::now();
+    let now = Timestamp::now();
     let ready = service.public_menu(&tenant, &site, &key, query.locale.as_deref(), now).await?;
-    let seconds = (ready.expires_at - now).num_seconds();
+    let seconds = (ready.expires_at - now).as_secs();
     let cache =
         if seconds > 0 { format!("public, max-age={seconds}") } else { "no-cache".to_owned() };
     let mut response = Data { data: &ready.menu }.into_response();

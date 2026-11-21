@@ -1,5 +1,6 @@
 //! Bảng `forms_exports`: bản xuất CSV chạy bằng job.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -22,10 +23,10 @@ pub struct Model {
     pub size: Option<i64>,
     /// Khoá của file ở nơi lưu, khi đã ghi.
     pub storage_key: Option<String>,
-    pub created_at: DateTimeUtc,
-    pub finished_at: Option<DateTimeUtc>,
+    pub created_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
     /// Sau lúc này job dọn dẹp xoá file và dòng.
-    pub expires_at: Option<DateTimeUtc>,
+    pub expires_at: Option<Timestamp>,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

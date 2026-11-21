@@ -1,5 +1,6 @@
 //! Bảng `comments_reports`: báo cáo vi phạm; mỗi người báo một bình luận một lần.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -19,7 +20,7 @@ pub struct Model {
     pub reason: String,
     /// Ghi chú của người báo (chỉ người kiểm duyệt xem).
     pub note: Option<String>,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

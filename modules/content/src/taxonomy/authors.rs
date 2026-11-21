@@ -2,6 +2,7 @@
 //! `user_id` của tài khoản (không foreign key, không phụ thuộc module `auth`). Một mục có
 //! nhiều tác giả theo thứ tự (người đầu là chính); gắn tác giả có hiệu lực ngay.
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 
 use autoxide_kernel::access::Principal;
@@ -9,7 +10,6 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Query;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter,
@@ -255,7 +255,7 @@ impl ContentService {
         principal: &Principal,
         id: Uuid,
         input: AuthorInput,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Author, Error> {
         principal.require(&CONTENT_MANAGE)?;
         let before = author::Entity::find_by_id(id)

@@ -3,6 +3,8 @@
 //! quá nhiều lần, gửi lại cùng token, `If-Match` bắt buộc, CSV, xuất / xoá theo email, giới hạn
 //! thân request, tool MCP. Gate chạy trên cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::mail::Mailer;
@@ -647,7 +649,7 @@ async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
         assert_eq!(config.retention_days, 0);
         let (service, _, _, _) =
             crate::testing::service_with_settings(test, config, antispam, settings).await;
-        let later = chrono::Utc::now() + chrono::Duration::days(2);
+        let later = Timestamp::now() + SignedDuration::from_hours(24 * 2);
         let cleaned = service.cleanup(app.registry(), app.database(), later).await.unwrap();
         assert_eq!(cleaned.expired, 1);
         // Chỉ bài của form `contact` ở khách B hết hạn.

@@ -2,6 +2,7 @@
 //! lời. Token huỷ của từng mail nằm ở `comments_tokens` (mục đích `unsubscribe`, D-130 của
 //! `newsletter`: token riêng cho từng mail, chỉ lưu bản băm).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,7 +17,7 @@ pub struct Model {
     pub comment_id: Uuid,
     /// Email đã xác minh (chữ thường).
     pub email: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

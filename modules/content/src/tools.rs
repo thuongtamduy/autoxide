@@ -8,6 +8,7 @@
 //! Kiểu đầu vào riêng cho MCP (không dùng lại kiểu của REST): JSON Schema của tool phải tự
 //! đủ, không `$ref` — thân bài khai là object chung (máy chủ vẫn kiểm đầy đủ).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -16,7 +17,6 @@ use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::pagination::{Page, PageQuery};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, etag};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -57,7 +57,7 @@ async fn versioned(
 }
 
 /// Phiên bản mong đợi từ tham số `version` (bắt buộc, như `If-Match` của REST).
-fn expected(version: &str) -> Result<Option<DateTime<Utc>>, Error> {
+fn expected(version: &str) -> Result<Option<Timestamp>, Error> {
     IfMatch::from_value(version).expected()
 }
 

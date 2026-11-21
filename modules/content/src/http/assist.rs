@@ -1,6 +1,7 @@
 //! Endpoint trợ giúp biên tập (D-109): kiểm SEO (không AI), gợi ý SEO (AI). Không endpoint nào
 //! ở đây ghi vào mục; người xem gợi ý rồi áp bằng `PATCH /entries/{id}`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -13,7 +14,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -222,8 +222,8 @@ pub(crate) struct TranslationRequestResponse {
     /// marked `ai_generated`.
     result_entry_id: Option<Uuid>,
     created_by: Option<Uuid>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<TranslationRequest> for TranslationRequestResponse {

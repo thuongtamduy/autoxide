@@ -21,6 +21,8 @@
 //! Một lô chỉ là vài trăm lần ghi vào database (đưa mail vào hàng đợi), nên xong rất xa dưới
 //! 240 giây — job queue coi job giữ quá 300 giây là chết.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -29,7 +31,6 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, QueryTrait, Set};
 use serde::{Deserialize, Serialize};
@@ -312,7 +313,7 @@ impl NewsletterService {
             return Ok(batch);
         }
         let now = now();
-        let lease = now - chrono::Duration::seconds(LEASE_SECONDS);
+        let lease = now - SignedDuration::from_secs(LEASE_SECONDS);
         let mut fresh = Vec::new();
         for item in pending {
             match (item.unsubscribe_token_hash.is_some(), item.claimed_at) {
@@ -381,7 +382,7 @@ impl NewsletterService {
         // Lô sau, giãn theo tốc độ cấu hình.
         let millis = i64::from(self.config.batch_size) * 60_000
             / i64::from(Ord::max(self.config.send_rate_per_minute, 1));
-        let next = Some(now + chrono::Duration::milliseconds(millis));
+        let next = Some(now + SignedDuration::from_millis(millis));
         let transaction = tenant.database().begin_write().await?;
         self.enqueue_send(&transaction, tenant, row.id, job.run, job.seq + 1, next).await?;
         transaction.commit().await?;
@@ -457,10 +458,7 @@ impl NewsletterService {
                         delivery::Column::UnsubscribeTokenHash,
                         Expr::value(Option::<String>::None),
                     )
-                    .col_expr(
-                        delivery::Column::ClaimedAt,
-                        Expr::value(Option::<DateTime<Utc>>::None),
-                    )
+                    .col_expr(delivery::Column::ClaimedAt, Expr::value(Option::<Timestamp>::None))
                     .filter(delivery::Column::Id.eq(item.id))
                     .filter(delivery::Column::Status.eq(DeliveryStatus::Pending.as_str()))
                     .exec(tenant.database().write())
@@ -551,7 +549,7 @@ impl NewsletterService {
         row: &campaign::Model,
         list: &List,
         items: &[delivery::Model],
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Checks, Error> {
         let read = tenant.database().read();
         let ids: Vec<Uuid> = items.iter().map(|item| item.subscriber_id).collect();
@@ -591,7 +589,7 @@ impl NewsletterService {
             .collect();
         let mut ads = HashMap::new();
         if row.advertising && self.config.advertising_max_per_day > 0 {
-            let since = now - chrono::Duration::hours(24);
+            let since = now - SignedDuration::from_hours(24);
             let advertising = campaign::Entity::find()
                 .scoped(tenant)
                 .select_only()

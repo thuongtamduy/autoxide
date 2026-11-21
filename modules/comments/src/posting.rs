@@ -21,6 +21,7 @@
 pub(crate) mod authoring;
 pub(crate) mod targets;
 
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -272,7 +273,9 @@ impl CommentsService {
             .filter(comment::Column::TargetType.eq(kind.as_str()))
             .filter(comment::Column::TargetId.eq(target_id.as_str()))
             .filter(comment::Column::ContentHash.eq(content_hash.as_str()))
-            .filter(comment::Column::CreatedAt.gt(now - chrono::Duration::hours(DUPLICATE_HOURS)))
+            .filter(
+                comment::Column::CreatedAt.gt(now - SignedDuration::from_hours(DUPLICATE_HOURS)),
+            )
             .count(tenant.database().read())
             .await?
             > 0;
@@ -497,7 +500,7 @@ impl CommentsService {
                         VERIFY,
                         &row.id.to_string(),
                         Some(email),
-                        chrono::Duration::hours(VERIFY_HOURS),
+                        SignedDuration::from_hours(VERIFY_HOURS),
                     )
                     .await?,
             ),

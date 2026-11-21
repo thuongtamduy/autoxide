@@ -1,5 +1,6 @@
 //! Bảng `content_schedules`: lịch đăng / gỡ một mục.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -15,15 +16,15 @@ pub struct Model {
     pub action: String,
     /// Revision được ghim (lịch đăng).
     pub revision_id: Option<Uuid>,
-    pub run_at: DateTimeUtc,
+    pub run_at: Timestamp,
     /// `scheduled`, `running`, `succeeded`, `failed`, `canceled`.
     pub status: String,
     pub error_code: Option<String>,
     pub created_by: Option<Uuid>,
     /// Người xác nhận đã duyệt nội dung do AI tạo lúc đặt lịch; dùng khi lịch chạy.
     pub ai_reviewed_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

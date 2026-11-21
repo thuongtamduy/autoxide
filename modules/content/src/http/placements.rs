@@ -1,6 +1,7 @@
 //! Endpoint quản lý vị trí hiển thị banner: `/api/v1/content/placements` (bước 55, D-236). Đọc cần
 //! `content.manage` hay `content.banners`; ghi cần `content.manage`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
@@ -71,8 +71,8 @@ pub(crate) struct PlacementResponse {
     preset_key: Option<String>,
     /// Off: public reads leave it out.
     active: bool,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl Ratio {

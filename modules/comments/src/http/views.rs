@@ -1,8 +1,8 @@
 //! Hình dạng trả về của module, dùng chung cho REST và tool MCP. Kiểu công khai (`PublicComment`…)
 //! KHÔNG BAO GIỜ có email, dấu vết IP, lý do giữ lại hay trạng thái thật của bình luận chưa hiện.
 //! Tên schema mang tiền tố `Comment…` để không trùng module khác (D-140).
-
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -66,8 +66,8 @@ pub(crate) struct PublicComment {
     /// Deleted by its author: no text or name, kept so its replies stay in place.
     pub deleted: bool,
     /// When the author last changed it.
-    pub edited_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
+    pub edited_at: Option<Timestamp>,
+    pub created_at: Timestamp,
     /// Shown replies (top-level comments only).
     pub reply_count: i32,
 }
@@ -140,13 +140,13 @@ pub(crate) struct PostedComment {
     /// only here. Posting again with the same `form_token` returns a new one.
     pub edit_token: Option<String>,
     /// Until when the author may change it (`null`: never).
-    pub editable_until: Option<DateTime<Utc>>,
+    pub editable_until: Option<Timestamp>,
 }
 
 impl PostedComment {
     pub(crate) fn new(posted: Posted, edit_minutes: u32) -> Self {
         let editable_until = (edit_minutes > 0).then(|| {
-            posted.comment.row.created_at + chrono::Duration::minutes(i64::from(edit_minutes))
+            posted.comment.row.created_at + SignedDuration::from_mins(i64::from(edit_minutes))
         });
         PostedComment {
             status: if posted.shown == Status::Published {
@@ -227,10 +227,10 @@ pub(crate) struct CommentDetail {
     pub locale: Option<String>,
     pub reply_count: i32,
     pub report_count: i32,
-    pub edited_at: Option<DateTime<Utc>>,
-    pub published_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub edited_at: Option<Timestamp>,
+    pub published_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Comment> for CommentDetail {
@@ -296,7 +296,7 @@ pub(crate) struct TargetResponse {
     /// The comments are hidden from everyone (e.g. the target was deleted).
     pub hidden: bool,
     /// When it closes by itself, if set.
-    pub closes_at: Option<DateTime<Utc>>,
+    pub closes_at: Option<Timestamp>,
     /// Shown comments (0 when hidden).
     pub comment_count: i32,
     /// Comments waiting for approval (`null` in the public answer).
@@ -357,17 +357,17 @@ pub(crate) struct BanResponse {
     pub value: String,
     pub reason: String,
     /// When it ends; `null`: never.
-    pub until: Option<DateTime<Utc>>,
+    pub until: Option<Timestamp>,
     /// Still in force.
     pub active: bool,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<ban::Model> for BanResponse {
     fn from(row: ban::Model) -> Self {
         BanResponse {
-            active: row.until.is_none_or(|until| until > Utc::now()),
+            active: row.until.is_none_or(|until| until > Timestamp::now()),
             id: row.id,
             kind: row.kind,
             value: row.value,
@@ -390,7 +390,7 @@ pub(crate) struct ReportResponse {
     pub note: Option<String>,
     /// The reporting account, when signed in.
     pub reporter_user_id: Option<Uuid>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<report::Model> for ReportResponse {

@@ -1,5 +1,6 @@
 //! Endpoint của thư mục: `/api/v1/media/folders`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -32,8 +32,8 @@ pub(crate) struct FolderResponse {
     /// Items directly in this folder (not in its subfolders), not counting the trash.
     #[schema(example = 12)]
     pub(super) item_count: i64,
-    pub(super) created_at: DateTime<Utc>,
-    pub(super) updated_at: DateTime<Utc>,
+    pub(super) created_at: Timestamp,
+    pub(super) updated_at: Timestamp,
 }
 
 /// Which folders to list.

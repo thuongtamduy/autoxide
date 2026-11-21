@@ -1,5 +1,6 @@
 //! Bảng `content_entries`: bản nháp làm việc của mỗi mục (bài, trang; mỗi bản dịch một dòng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -48,17 +49,17 @@ pub struct Model {
     /// Một người viết hay sửa từ gợi ý của AI (Luật 134/2025/QH15, D-362); bỏ cần `content.publish`.
     pub ai_assisted: bool,
     /// Bị ẩn tạm vì vụ việc (D-363); `None`: không. Chỉ bộ nghe event của `compliance` đổi.
-    pub restricted_at: Option<DateTimeUtc>,
+    pub restricted_at: Option<Timestamp>,
     /// Giá trị trường tự định nghĩa của khách (bước 51 P19), JSON; `None`: không có.
     pub custom_fields: Option<String>,
     /// Lúc bên viết xin duyệt (`NULL`: không xin, hay đã đăng / rút lại).
-    pub review_requested_at: Option<DateTimeUtc>,
+    pub review_requested_at: Option<Timestamp>,
     pub review_requested_by: Option<Uuid>,
     /// Bản dịch do máy chủ dịch từ revision này của bản gốc (D-109); `NULL`: không phải.
     pub translated_from_revision_id: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
-    pub revised_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub revised_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

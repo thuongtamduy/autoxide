@@ -1,5 +1,6 @@
 //! Bảng `content_redirects`: chuyển hướng từ một đường dẫn cũ.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -23,8 +24,8 @@ pub struct Model {
     /// Khoá tìm (`search::fold` của đường dẫn cũ và địa chỉ đích): `q` của danh sách.
     pub search_key: String,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

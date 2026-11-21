@@ -7,6 +7,7 @@
 //!   yêu cầu; tạo mới mà bản dịch đã có người tạo thì thôi. Cả hai: `content.translation_conflict`.
 //! - Không bao giờ tự đăng. Bản dịch mang `ai_generated = true` và `translated_from_revision_id`.
 
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -39,7 +40,7 @@ const MAX_ATTEMPTS: i32 = 8;
 const RUN_BUDGET: std::time::Duration = std::time::Duration::from_secs(240);
 /// Yêu cầu "đang chạy" mà không đổi trong chừng này coi như đã chết (worker bị cắt, tiến trình
 /// chết ở lần chạy cuối): yêu cầu mới cùng ngôn ngữ được thay nó.
-const STALE_AFTER: chrono::Duration = chrono::Duration::minutes(15);
+const STALE_AFTER: SignedDuration = SignedDuration::from_mins(15);
 /// Ước lượng ký tự mỗi token (thấp, cho chữ có dấu) để chia lô.
 const CHARS_PER_TOKEN: usize = 3;
 

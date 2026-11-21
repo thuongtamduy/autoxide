@@ -2,6 +2,7 @@
 //! không đọc `auth` (D-046), nên tên nằm ở đây; `user_id` không có foreign key. Khoá chính
 //! (`tenant_id`, `user_id`).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,8 +18,8 @@ pub struct Model {
     /// `text::name_key` của tên, unique trong khách: hai người không trùng tên, kể cả tên viết bằng chữ Kirin /
     /// Hy Lạp trông như tên Latin (chống mạo danh).
     pub name_key: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

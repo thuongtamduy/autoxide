@@ -1,6 +1,8 @@
 //! Gửi chiến dịch, huỷ một chạm, trang lựa chọn, bounce, hẹn giờ.
 
 use autoxide_kernel::event::{Delivered, EventHandler};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::mail::Mailer;
@@ -393,7 +395,7 @@ async fn hen_gio_va_huy() {
         let weekly = list(&h, "weekly", true).await;
         import(&h, weekly.row.id, &emails("reader", 3)).await;
         let draft = campaign(&h, weekly.row.id, false).await;
-        let past = chrono::Utc::now() - chrono::Duration::hours(1);
+        let past = Timestamp::now() - SignedDuration::from_hours(1);
         assert_eq!(
             h.service
                 .change_state(&h.tenant, &admin(), draft.row.id, Action::Schedule(past), None)
@@ -402,8 +404,8 @@ async fn hen_gio_va_huy() {
                 .code(),
             "validation_failed"
         );
-        let stale = Some(draft.row.updated_at - chrono::Duration::seconds(1));
-        let later = chrono::Utc::now() + chrono::Duration::hours(1);
+        let stale = Some(draft.row.updated_at - SignedDuration::from_secs(1));
+        let later = Timestamp::now() + SignedDuration::from_hours(1);
         assert_eq!(
             h.service
                 .change_state(&h.tenant, &admin(), draft.row.id, Action::Schedule(later), stale)
@@ -446,7 +448,7 @@ async fn hen_gio_va_huy() {
                 &h.tenant,
                 &admin(),
                 draft.row.id,
-                Action::Schedule(later + chrono::Duration::hours(1)),
+                Action::Schedule(later + SignedDuration::from_hours(1)),
                 None,
             )
             .await
@@ -501,7 +503,7 @@ async fn sua_chien_dich_hen_gio_ve_nhap() {
         let weekly = list(&h, "weekly", true).await;
         import(&h, weekly.row.id, &emails("reader", 2)).await;
         let draft = campaign(&h, weekly.row.id, false).await;
-        let later = chrono::Utc::now() + chrono::Duration::hours(1);
+        let later = Timestamp::now() + SignedDuration::from_hours(1);
         let scheduled = h
             .service
             .change_state(&h.tenant, &admin(), draft.row.id, Action::Schedule(later), None)

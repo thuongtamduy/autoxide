@@ -10,7 +10,7 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
     QuerySelect, Set,
@@ -46,7 +46,7 @@ pub(crate) struct NewBan {
     pub kind: String,
     pub value: String,
     pub reason: String,
-    pub until: Option<DateTime<Utc>>,
+    pub until: Option<Timestamp>,
 }
 
 /// Bộ lọc danh sách lệnh cấm.
@@ -132,7 +132,7 @@ impl CommentsService {
         principal: &Principal,
         id: Uuid,
         to: Status,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Comment, Error> {
         principal.require(&COMMENTS_MODERATE)?;
         if to == Status::Deleted {

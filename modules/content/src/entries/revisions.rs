@@ -3,7 +3,7 @@
 //! có hiệu lực ngay, không qua nháp.
 
 use autoxide_kernel::error::Error;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ActiveModelTrait, ConnectionTrait, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -87,7 +87,7 @@ pub(crate) async fn record<C: ConnectionTrait>(
     entry: &entry::Model,
     reason: Reason,
     by: Option<Uuid>,
-    at: DateTime<Utc>,
+    at: Timestamp,
 ) -> Result<revision::Model, Error> {
     let snapshot = serde_json::to_string(&Snapshot::of(entry)).map_err(Error::internal)?;
     Ok(revision::ActiveModel {
@@ -164,7 +164,7 @@ impl ContentService {
         principal: &Principal,
         entry_id: Uuid,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Entry, Error> {
         permissions::require_create(principal)?;
         // Không cần `content.read`: khôi phục là sửa mục, quyền sửa (kể cả `content.write_own`

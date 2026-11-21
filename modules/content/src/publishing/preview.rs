@@ -12,10 +12,11 @@
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, ScopeExt, TenantContext, TenantId, ensure_serving};
+use autoxide_kernel::time::Timestamp;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
+use jiff::SignedDuration;
 use sha2::Sha256;
 use uuid::Uuid;
 
@@ -35,13 +36,13 @@ impl ContentService {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-    ) -> Result<(String, DateTime<Utc>), Error> {
+    ) -> Result<(String, Timestamp), Error> {
         permissions::require_create(principal)?;
         let secret = self.preview_secret()?;
         let entry = self.load_checked(tenant, id, None).await?;
         permissions::require_write(principal, &entry)?;
         permissions::require_org(principal, tenant, &entry, permissions::Need::Write).await?;
-        let expires = now() + chrono::Duration::seconds(i64::from(self.config.preview_ttl_seconds));
+        let expires = now() + SignedDuration::from_secs(i64::from(self.config.preview_ttl_seconds));
         Ok((sign(secret, tenant.id(), entry.id, expires)?, expires))
     }
 
@@ -91,7 +92,7 @@ impl ContentService {
         let (id, expires) = head.split_at_checked(16).ok_or_else(invalid)?;
         let id = Uuid::from_slice(id).map_err(|_| invalid())?;
         let expires = i64::from_be_bytes(expires.try_into().map_err(|_| invalid())?);
-        if expires < now().timestamp() {
+        if expires < now().as_unix_seconds() {
             return Err(invalid());
         }
         use sea_orm::EntityTrait as _;
@@ -118,10 +119,10 @@ pub(crate) fn sign(
     secret: &str,
     tenant: TenantId,
     id: Uuid,
-    expires: DateTime<Utc>,
+    expires: Timestamp,
 ) -> Result<String, Error> {
     let mut payload = id.as_bytes().to_vec();
-    payload.extend(expires.timestamp().to_be_bytes());
+    payload.extend(expires.as_unix_seconds().to_be_bytes());
     if tenant != DEFAULT_TENANT {
         payload.extend(tenant.as_uuid().as_bytes());
     }

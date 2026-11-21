@@ -5,6 +5,7 @@
 //! ghi đi cùng event trong CÙNG transaction (luật kiến trúc 3); gọi mạng (chống spam) và xếp mail
 //! nằm NGOÀI transaction.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::antispam::SpamGuard;
@@ -18,7 +19,6 @@ use autoxide_kernel::resource::ResourceDirectory;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::DatabaseRegistry;
 use autoxide_kernel::tokens::OneTimeTokens;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{DbErr, SqlErr};
 use uuid::Uuid;
 
@@ -107,8 +107,8 @@ impl NewsletterService {
 }
 
 /// Bây giờ, cắt tới micro giây để hai database trả cùng giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn is_unique_violation(error: &DbErr) -> bool {

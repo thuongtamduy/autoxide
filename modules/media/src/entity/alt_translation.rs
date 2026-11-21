@@ -1,6 +1,7 @@
 //! Bảng `media_alt_translations`: `alt` của một item bằng một ngôn ngữ khác ngôn ngữ mặc định
 //! (D-202). `media_item.alt` vẫn là bản mặc định, dùng khi ngôn ngữ được hỏi chưa có bản dịch.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,7 +17,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub locale: String,
     pub alt: String,
-    pub updated_at: DateTimeUtc,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

@@ -10,7 +10,7 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::moderation::{RestrictionChange, restriction};
 use autoxide_kernel::tenancy::ScopeExt;
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
@@ -39,7 +39,7 @@ impl EventHandler for Listener {
         else {
             return Ok(());
         };
-        let value: Option<DateTime<Utc>> = match change {
+        let value: Option<Timestamp> = match change {
             RestrictionChange::Restricted => Some(now()),
             RestrictionChange::Restored => None,
             _ => return Ok(()),
