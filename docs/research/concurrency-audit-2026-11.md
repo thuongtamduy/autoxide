@@ -97,7 +97,7 @@ rồi xác nhận xanh trên cả hai database.
 | 21 | `modules/orders/src/guests.rs` `consume_code` | Không có transaction, không giới hạn lần thử lúc xác nhận | Dò mã | Đã sửa (#271) — đỏ trên cả hai DB |
 | 22 | `modules/auth/src/invitation.rs` `accept` / `accept_roles` ↔ `revoke` | Ghi `accepted` và gán role không điều kiện | Lời mời vừa thu hồi vẫn cho người được mời nhận role | Đã sửa (#274) — đỏ 1/3 trên Postgres |
 | 23 | `modules/automations/src/service/rules.rs` `enable_rule` / `set_status` | Kiểm luật ngoài transaction; không so version khi bật | Agent sửa luật chen giữa: luật do agent viết thành ACTIVE dưới quyền người, vượt bước duyệt | Đã sửa (#272): bật luật so phiên bản đã kiểm. Chưa có test tái hiện thứ tự chen giữa |
-| 24 | `modules/auth/src/oidc/mod.rs` `unlink` | Kiểm "cách đăng nhập cuối" ngoài transaction | Gỡ hai liên kết cùng lúc: người dùng tự khoá mình ra ngoài | Chưa sửa (cả hai DB, thấp) |
+| 24 | `modules/auth/src/oidc/mod.rs` `unlink` | Kiểm "cách đăng nhập cuối" ngoài transaction | Gỡ hai liên kết cùng lúc: người dùng tự khoá mình ra ngoài | Đã sửa (bước 66): khoá dòng người dùng, đếm lại mật khẩu / passkey / liên kết trong transaction; test `go_hai_lien_ket_cung_luc_khong_mat_ca_hai` chạy cả hai DB |
 
 ### Trạng thái máy, event trùng, bộ đếm
 

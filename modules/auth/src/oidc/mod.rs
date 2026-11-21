@@ -20,6 +20,8 @@ mod jwt;
 pub(crate) mod provider;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod unlink_tests;
 
 use std::sync::Arc;
 
@@ -254,35 +256,51 @@ impl OidcService {
 
     /// Gỡ liên kết `id` của người dùng `user_id`. Không gỡ cách đăng nhập cuối cùng (không mật
     /// khẩu, không passkey, không liên kết nào khác): `auth.identity_last_method`.
+    ///
+    /// Kiểm và gỡ trong CÙNG transaction, sau khi khoá dòng người dùng (`rows::lock_one`, D-181):
+    /// hai lần gỡ hai liên kết cùng lúc nối đuôi nhau, bên sau đếm lại thấy chỉ còn một cách thì
+    /// từ chối. Trước đây kiểm ngoài transaction: trên Postgres cả hai cùng thấy "còn hai liên
+    /// kết" và người dùng tự khoá mình ra ngoài (mục 24 của bản rà lỗi đua 11/2026).
     pub(crate) async fn unlink(
         &self,
         tenant: &TenantContext,
         user_id: Uuid,
         id: Uuid,
-        passkeys: &crate::passkey::PasskeyService,
     ) -> Result<(), Error> {
-        let linked = identity::for_user(tenant, user_id).await?;
-        let Some(target) = linked.iter().find(|identity| identity.id == id) else {
+        use crate::passkey::entity::passkey;
+        use crate::user::entity as user;
+        use autoxide_kernel::tenancy::ScopeExt as _;
+        use sea_orm::{ColumnTrait as _, EntityTrait as _, PaginatorTrait as _, QueryFilter as _};
+
+        let transaction = tenant.database().begin_write().await?;
+        let Some(account) = autoxide_kernel::rows::lock_one(
+            &transaction,
+            user::Entity::find_by_id(user_id).scoped(tenant),
+        )
+        .await?
+        else {
+            transaction.rollback().await?;
             return Err(identity::not_found(id));
         };
-        let has_password = self
-            .users
-            .own_account(tenant, user_id)
+        let linked = identity::for_user_in(&transaction, tenant, user_id).await?;
+        let Some(target) = linked.iter().find(|identity| identity.id == id) else {
+            transaction.rollback().await?;
+            return Err(identity::not_found(id));
+        };
+        let has_passkey = passkey::Entity::find()
+            .filter(passkey::Column::UserId.eq(user_id))
+            .scoped(tenant)
+            .count(&transaction)
             .await?
-            .is_some_and(|account| account.has_password);
-        let first = autoxide_kernel::pagination::PageRequest::first(
-            1,
-            autoxide_kernel::pagination::Order::Asc,
-        );
-        let has_passkey = !passkeys.list(tenant, user_id, &first).await?.data.is_empty();
-        if !has_password && !has_passkey && linked.len() <= 1 {
+            > 0;
+        if account.password_hash.is_none() && !has_passkey && linked.len() <= 1 {
+            transaction.rollback().await?;
             return Err(Error::conflict(
                 "auth.identity_last_method",
                 "This is your last way to sign in, so it cannot be removed. Set a password or \
                  add a passkey first.",
             ));
         }
-        let transaction = tenant.database().begin_write().await?;
         if !identity::delete_one(&transaction, tenant, user_id, id).await? {
             transaction.rollback().await?;
             return Err(identity::not_found(id));
