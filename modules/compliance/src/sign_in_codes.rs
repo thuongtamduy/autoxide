@@ -18,8 +18,8 @@ use autoxide_kernel::rows;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, sms_disabled};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::throttle::{Outcome, Throttle};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde_json::json;
@@ -29,8 +29,8 @@ use crate::entity::{account_verification, phone_challenge};
 use crate::events;
 use crate::service::{ComplianceService, now};
 use crate::verification::{
-    CHALLENGE_KEEP_HOURS, HOUR, OTP_PURPOSE, SMS_TIMEOUT, challenge_not_found, code_hash, otp_attempts_exceeded,
-    otp_invalid, otp_throttled, random_code, same,
+    CHALLENGE_KEEP_HOURS, HOUR, OTP_PURPOSE, SMS_TIMEOUT, challenge_not_found, code_hash,
+    otp_attempts_exceeded, otp_invalid, otp_throttled, random_code, same,
 };
 
 /// Chủ của mã đăng nhập: chưa có tài khoản.
@@ -200,7 +200,11 @@ impl ComplianceService {
     /// Báo [`otp_daily_limit`] khi các mã `rows` (của cùng một số) tạo trong 24 giờ trước `at` đã bị
     /// nhập sai tổng cộng `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY` lần. Tính từ bảng mã (giữ
     /// [`CHALLENGE_KEEP_HOURS`] giờ) nên chạy như nhau trên cả hai database, không thêm bảng đếm.
-    fn check_wrong_today(&self, rows: &[phone_challenge::Model], at: Timestamp) -> Result<(), Error> {
+    fn check_wrong_today(
+        &self,
+        rows: &[phone_challenge::Model],
+        at: Timestamp,
+    ) -> Result<(), Error> {
         let since = at - WRONG_WINDOW;
         let recent = rows.iter().filter(|row| row.created_at > since && row.attempts > 0);
         let wrong: i64 = recent.clone().map(|row| i64::from(row.attempts)).sum();

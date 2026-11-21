@@ -139,7 +139,11 @@ async fn sai_qua_han_muc_moi_ngay_thi_khoa_so() {
         let sent_before = sms.sent.lock().unwrap().len();
         let error = codes.send(&tenant, "0912000111", None).await.unwrap_err();
         assert_eq!(error.code(), "compliance.otp_daily_limit");
-        assert_eq!(sms.sent.lock().unwrap().len(), sent_before, "không gửi SMS khi số đang bị khoá");
+        assert_eq!(
+            sms.sent.lock().unwrap().len(),
+            sent_before,
+            "không gửi SMS khi số đang bị khoá"
+        );
         // Số khác không bị ảnh hưởng.
         codes.send(&tenant, "0912000222", None).await.unwrap();
 
@@ -147,7 +151,8 @@ async fn sai_qua_han_muc_moi_ngay_thi_khoa_so() {
         {
             use sea_orm::sea_query::Expr;
             use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
-            let past = autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(25);
+            let past =
+                autoxide_kernel::time::Timestamp::now() - jiff::SignedDuration::from_hours(25);
             crate::entity::phone_challenge::Entity::update_many()
                 .col_expr(crate::entity::phone_challenge::Column::CreatedAt, Expr::value(past))
                 .filter(crate::entity::phone_challenge::Column::Phone.eq("+84912000111"))
