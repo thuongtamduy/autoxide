@@ -35,12 +35,46 @@ jobs:
           fi
           grep -q "^## \[$version\]" CHANGELOG.md || { echo "CHANGELOG.md has no section [$version]" >&2; exit 1; }
 
-  # Gate đầy đủ chia nhiều máy, dùng chung với ci.yml (build archive một lần rồi 8 shard; D-20261120-release-gate-sharded).
-  # Trước đây chạy cả gate trên MỘT máy (tới 60 phút). PostgreSQL 16 như trước: bản 18 đã chạy ở lần
-  # push lên main của cùng commit.
-  gate:
+  # Dùng lại kết quả CI của đúng commit (D-20261121-ci-batch-release-faster): nếu workflow CI trên `main` của
+  # ĐÚNG SHA của tag đã `success` (gate SQLite + PostgreSQL 16 và 18, upgrade-test, quét secret — đúng thứ D-300
+  # đòi trước khi phát hành) thì không chạy lại gate. Chưa có lần chạy, đang chạy hay đỏ thì `reuse=false`
+  # và job `gate` bên dưới chạy như cũ. Chạy lại bằng tay (workflow_dispatch) cũng kiểm theo SHA của tag đã chọn.
+  ci-result:
     needs: verify
     if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reuse: ${{ steps.ci.outputs.reuse }}
+    steps:
+      - id: ci
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          # Lần chạy của ci.yml do push vào `main` trên đúng commit này; lấy lần mới nhất.
+          result="$(gh api -X GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+            -f head_sha="$SHA" -f event=push -f branch=main -f per_page=1 \
+            --jq '.workflow_runs[0] | "\(.status // "none") \(.conclusion // "none") \(.html_url // "")"' || true)"
+          echo "CI on main for $SHA: ${result:-none}"
+          case "$result" in
+            "completed success "*)
+              echo "reuse=true" >> "$GITHUB_OUTPUT"
+              echo "CI on main already passed the full gate for this commit: skipping the gate here." ;;
+            *)
+              echo "reuse=false" >> "$GITHUB_OUTPUT"
+              echo "No green CI run on main for this commit: running the gate." ;;
+          esac
+
+  # Gate đầy đủ chia nhiều máy, dùng chung với ci.yml (build archive một lần rồi 8 shard; D-20261120-release-gate-sharded).
+  # Chỉ chạy khi CI trên `main` chưa xanh cho đúng commit này. PostgreSQL 16 như trước: bản 18 đã chạy ở lần
+  # push lên main của cùng commit.
+  gate:
+    needs: [verify, ci-result]
+    if: ${{ !github.event.repository.private && needs.ci-result.outputs.reuse != 'true' }}
     uses: ./.github/workflows/gate.yml
     with:
       postgres-18: false
@@ -49,6 +83,8 @@ jobs:
   # `publish` ghép các digest thành một image đa nền tảng.
   image:
     needs: [verify, gate]
+    # Gate bị bỏ qua (CI trên main đã xanh) thì vẫn build; gate đỏ hay bị huỷ thì không.
+    if: ${{ !cancelled() && needs.verify.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.gate.result) }}
     strategy:
       fail-fast: true
       matrix:

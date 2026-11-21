@@ -84,10 +84,10 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-public-ci-openapi-dup](D-20261118-public-ci-openapi-dup.md)** Repo công khai: CI tự chạy; pull request chỉ gate trên PostgreSQL 16; bắt tham số OpenAPI khai trùng bằng `lint` thay vì thêm `tsc` vào gate (D-197, D-243, D-300) — 2026-11-18 · **chủ dự án quyết**
 - **[D-20261119-changelog-fragments](D-20261119-changelog-fragments.md)** Thay đổi cho changelog ghi bằng file mảnh trong `changelog.d/`, gộp lúc phát hành — 2026-11-19
 - **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành nhiều job song song (theo phần và shard), main lưu cache, Postgres chia suất có sàn — 2026-11-19
-- **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
+- **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19 · *thay một phần bởi D-20261121-ci-batch-release-faster*
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
 - **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19 · *thay một phần bởi D-20261121-drop-mobile-sdk, D-20261121-mobile-sdk-on-demand*
-- **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết**
+- **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết** · *thay một phần bởi D-20261121-ci-batch-release-faster*
 - **[D-20261120-build-faster](D-20261120-build-faster.md)** Build nhanh hơn: archive test của CI dùng opt-level 0 cho thư viện ngoài; không dùng cargo-hakari; đề xuất tách kernel — 2026-11-20
 - **[D-20261120-ci-nextest-archive](D-20261120-ci-nextest-archive.md)** CI build test một lần thành archive của nextest, các máy test chỉ tải về và chạy — 2026-11-20
 - **[D-20261120-docker-chef](D-20261120-docker-chef.md)** Image Docker tách lớp thư viện ngoài bằng cargo-chef để cache gha giữ được — 2026-11-20
@@ -95,6 +95,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-drop-mobile-sdk](D-20261121-drop-mobile-sdk.md)** Bỏ SDK di động (Swift, Kotlin, Dart), giữ SDK TypeScript — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết** · *thay một phần bởi D-20261121-drop-mobile-sdk*
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
