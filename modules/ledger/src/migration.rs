@@ -22,6 +22,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(CreateFlows),
         Box::new(CreateExchangeRates),
         Box::new(AddListIndexes),
+        Box::new(AddBankPaymentIndex),
     ]
 }
 
@@ -1018,5 +1019,40 @@ impl MigrationTrait for AddListIndexes {
                 .await?;
         }
         Ok(())
+    }
+}
+
+/// Index tra biến động số dư theo thanh toán: khớp một biến động mới kiểm biến động khác đã nhận
+/// cùng thanh toán chưa (hai lần chuyển tiền cho một mã).
+struct AddBankPaymentIndex;
+
+impl MigrationName for AddBankPaymentIndex {
+    fn name(&self) -> &str {
+        "m0011_add_bank_payment_index"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddBankPaymentIndex {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        index(
+            manager,
+            "ledger_bank_transactions",
+            "ledger_bank_transactions_payment_idx",
+            &["tenant_id", "payment_id"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("ledger_bank_transactions_payment_idx")
+                    .table(Alias::new("ledger_bank_transactions"))
+                    .to_owned(),
+            )
+            .await
     }
 }

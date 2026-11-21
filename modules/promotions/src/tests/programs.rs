@@ -722,3 +722,24 @@ async fn bat_hai_chuong_trinh_cung_luc_khong_vuot_so_ngay_trong_nam() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn tim_theo_ten_coi_phan_tram_va_gach_duoi_la_chu() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        for title in ["Giảm 50% toàn bộ", "Giảm 500k"] {
+            create(&setup, body(setup.tree.a, json!({"title": title}))).await;
+        }
+        let count = async |q: &str| {
+            let uri = format!("/promotions?q={}", q.replace('%', "%25"));
+            let (status, list) = call(&setup.app, "GET", &uri, "boss", None).await;
+            assert_eq!(status, StatusCode::OK, "{list}");
+            list["data"].as_array().unwrap().len()
+        };
+        assert_eq!(count("50%").await, 1);
+        assert_eq!(count("_").await, 0);
+        assert_eq!(count("50").await, 2);
+    })
+    .await
+    .unwrap();
+}
