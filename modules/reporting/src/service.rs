@@ -1,6 +1,7 @@
 //! Service của module `reporting`: ai thấy gì (phạm vi theo cây khách hàng và cây tổ chức), đọc kho
 //! của cây, quy đổi nhiều tiền tệ. REST và tool MCP cùng gọi vào đây (luật kiến trúc 8).
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
 
@@ -15,7 +16,6 @@ use autoxide_kernel::tenancy::{
 };
 use autoxide_ledger::api::Ledger;
 use autoxide_organizations::api::{OrgDirectory, OrgGroups};
-use chrono::{Datelike, Duration, NaiveDate, Utc};
 use sea_orm::sea_query::{Expr, Func};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, QueryTrait};
 use uuid::Uuid;
@@ -109,8 +109,8 @@ const MAX_DAYS: i64 = 3660;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Filter {
     pub kind: Option<String>,
-    pub from: Option<NaiveDate>,
-    pub to: Option<NaiveDate>,
+    pub from: Option<Date>,
+    pub to: Option<Date>,
     pub tenant_ids: Vec<Uuid>,
     pub org_ids: Vec<Uuid>,
     /// Nhóm nút (D-232): chỉ số liệu của chính khách người xem ở các nút thuộc nhóm, giao phạm vi.
@@ -149,14 +149,14 @@ pub(crate) struct SummaryGroup {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct MissingRate {
     pub currency: String,
-    pub day: NaiveDate,
+    pub day: Date,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Summary {
     pub kind: String,
-    pub from: NaiveDate,
-    pub to: NaiveDate,
+    pub from: Date,
+    pub to: Date,
     pub group_by: GroupBy,
     pub groups: Vec<SummaryGroup>,
     pub totals: SummaryGroup,
@@ -168,8 +168,8 @@ pub(crate) struct Summary {
 pub(crate) struct Lag {
     pub tenant_id: TenantId,
     pub pending: u64,
-    pub oldest_pending_at: Option<chrono::DateTime<Utc>>,
-    pub last_received_at: Option<chrono::DateTime<Utc>>,
+    pub oldest_pending_at: Option<Timestamp>,
+    pub last_received_at: Option<Timestamp>,
 }
 
 /// Phần người xem được thấy: kho của khách gốc nào, khách nguồn nào, nút nào (`None`: mọi nút).
@@ -374,9 +374,9 @@ impl Reporting {
     }
 
     /// Khoảng ngày của câu hỏi: mặc định 30 ngày gần nhất (theo UTC).
-    fn range(filter: &Filter, group_by: GroupBy) -> Result<(NaiveDate, NaiveDate), Error> {
-        let to = filter.to.unwrap_or_else(|| Utc::now().date_naive());
-        let from = filter.from.unwrap_or(to - Duration::days(29));
+    fn range(filter: &Filter, group_by: GroupBy) -> Result<(Date, Date), Error> {
+        let to = filter.to.unwrap_or_else(|| Timestamp::now().date_utc());
+        let from = filter.from.unwrap_or(to.checked_sub_days(29).unwrap_or(to));
         if from > to {
             return Err(Error::new(
                 ErrorKind::Validation,
@@ -385,7 +385,7 @@ impl Reporting {
             ));
         }
         let max = group_by.max_days();
-        if (to - from).num_days() + 1 > max {
+        if to.days_since(from) + 1 > max {
             return Err(Error::new(
                 ErrorKind::Validation,
                 "reporting.range_too_large",
@@ -445,7 +445,7 @@ impl Reporting {
         let sum = |column: daily::Column| {
             Expr::from(Func::cast_as(Func::sum(Expr::col(column)), "BIGINT"))
         };
-        let rows: Vec<(Uuid, NaiveDate, String, i64, i64, i64)> = select
+        let rows: Vec<(Uuid, Date, String, i64, i64, i64)> = select
             .column(extra_column)
             .column(daily::Column::LocalDay)
             .column(daily::Column::Currency)
@@ -459,7 +459,7 @@ impl Reporting {
             .all(store.database().read())
             .await?;
         // Tỉ giá đọc trước, ngoài transaction, theo khách của NGƯỜI XEM (sổ tỉ giá của họ).
-        let mut rates: HashMap<(String, NaiveDate), Option<rust_decimal::Decimal>> = HashMap::new();
+        let mut rates: HashMap<(String, Date), Option<rust_decimal::Decimal>> = HashMap::new();
         if let Some(target) = query.currency {
             for (_, day, currency, ..) in &rows {
                 if currency.is_empty() || currency == target.code() {
@@ -479,9 +479,10 @@ impl Reporting {
         for (extra, day, currency, amount, quantity, facts) in rows {
             let key = match query.group_by {
                 GroupBy::Day => day.to_string(),
-                GroupBy::Week => (day
-                    - Duration::days(i64::from(day.weekday().num_days_from_monday())))
-                .to_string(),
+                GroupBy::Week => day
+                    .checked_sub_days(i64::from(day.weekday().to_monday_zero_offset()))
+                    .unwrap_or(day)
+                    .to_string(),
                 GroupBy::Month => format!("{:04}-{:02}-01", day.year(), day.month()),
                 GroupBy::Tenant | GroupBy::Org | GroupBy::Group => extra.to_string(),
             };
@@ -559,7 +560,7 @@ impl Reporting {
         viewer: &TenantContext,
         currency: &str,
         target: Currency,
-        day: NaiveDate,
+        day: Date,
     ) -> Result<Option<rust_decimal::Decimal>, Error> {
         let Some(ledger) = &self.ledger else { return Ok(None) };
         let base = Money::from_columns(0, currency)?.currency();
@@ -642,23 +643,19 @@ impl Reporting {
                 Ok(context) => context,
                 Err(_) => continue,
             };
-            let (pending, oldest): (i64, Option<chrono::DateTime<Utc>>) =
-                local_fact::Entity::find()
-                    .select_only()
-                    .column_as(
-                        Expr::from(Func::count(Expr::col(local_fact::Column::Id))),
-                        "pending",
-                    )
-                    .column_as(
-                        Expr::from(Func::min(Expr::col(local_fact::Column::CreatedAt))),
-                        "oldest",
-                    )
-                    .filter(local_fact::Column::TenantId.eq(tenant.as_uuid()))
-                    .filter(local_fact::Column::ForwardedAt.is_null())
-                    .into_tuple()
-                    .one(context.database().read())
-                    .await?
-                    .unwrap_or((0, None));
+            let (pending, oldest): (i64, Option<Timestamp>) = local_fact::Entity::find()
+                .select_only()
+                .column_as(Expr::from(Func::count(Expr::col(local_fact::Column::Id))), "pending")
+                .column_as(
+                    Expr::from(Func::min(Expr::col(local_fact::Column::CreatedAt))),
+                    "oldest",
+                )
+                .filter(local_fact::Column::TenantId.eq(tenant.as_uuid()))
+                .filter(local_fact::Column::ForwardedAt.is_null())
+                .into_tuple()
+                .one(context.database().read())
+                .await?
+                .unwrap_or((0, None));
             let last = match &store {
                 None => None,
                 Some(store) => fact::Entity::find()
@@ -666,7 +663,7 @@ impl Reporting {
                     .column_as(Expr::from(Func::max(Expr::col(fact::Column::ReceivedAt))), "last")
                     .filter(fact::Column::TenantId.eq(root.as_uuid()))
                     .filter(fact::Column::SourceTenantId.eq(tenant.as_uuid()))
-                    .into_tuple::<Option<chrono::DateTime<Utc>>>()
+                    .into_tuple::<Option<Timestamp>>()
                     .one(store.database().read())
                     .await?
                     .flatten(),
@@ -696,7 +693,7 @@ impl Reporting {
         }
         let context = self.databases.tenant(tenant).await.map_err(|_| tenant_not_found())?;
         let result = local_fact::Entity::update_many()
-            .col_expr(local_fact::Column::ForwardedAt, Expr::value(None::<chrono::DateTime<Utc>>))
+            .col_expr(local_fact::Column::ForwardedAt, Expr::value(None::<Timestamp>))
             .filter(local_fact::Column::TenantId.eq(tenant.as_uuid()))
             .filter(local_fact::Column::ForwardedAt.is_not_null())
             .exec(context.database().write())

@@ -1,5 +1,6 @@
 //! Bảng `bookings_sessions`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -11,8 +12,8 @@ pub struct Model {
     pub tenant_id: Uuid,
     pub service_id: Uuid,
     pub resource_id: Uuid,
-    pub starts_at: DateTimeUtc,
-    pub ends_at: DateTimeUtc,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub capacity: i32,
     pub booked: i32,
 }

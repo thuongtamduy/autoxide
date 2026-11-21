@@ -1,5 +1,6 @@
 //! Bảng `bookings_services`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -23,8 +24,8 @@ pub struct Model {
     pub deposit_value: i64,
     pub capacity: i32,
     pub active: bool,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

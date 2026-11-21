@@ -1,13 +1,13 @@
 //! Tool MCP của module `analytics` — chỉ đọc. Mỗi tool: một kiểu đầu vào, permission như endpoint
 //! REST tương ứng, thân là lời gọi service (luật kiến trúc 8).
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::mcp::Tool;
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::NaiveDate;
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -27,10 +27,10 @@ pub(crate) struct RangeInput {
     site: Option<Uuid>,
     /// First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.
     #[schema(value_type = Option<String>, format = Date)]
-    from: Option<NaiveDate>,
+    from: Option<Date>,
     /// Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.
     #[schema(value_type = Option<String>, format = Date)]
-    to: Option<NaiveDate>,
+    to: Option<Date>,
 }
 
 /// A ranking over a website and a range of days.
@@ -39,9 +39,9 @@ pub(crate) struct RangeInput {
 pub(crate) struct TopInput {
     site: Option<Uuid>,
     #[schema(value_type = Option<String>, format = Date)]
-    from: Option<NaiveDate>,
+    from: Option<Date>,
     #[schema(value_type = Option<String>, format = Date)]
-    to: Option<NaiveDate>,
+    to: Option<Date>,
     /// Rows to return, 1 to 100; defaults to 10.
     #[validate(range(min = 1, max = 100))]
     limit: Option<u64>,
@@ -57,9 +57,9 @@ pub(crate) struct FunnelInput {
     key: String,
     site: Option<Uuid>,
     #[schema(value_type = Option<String>, format = Date)]
-    from: Option<NaiveDate>,
+    from: Option<Date>,
     #[schema(value_type = Option<String>, format = Date)]
-    to: Option<NaiveDate>,
+    to: Option<Date>,
 }
 
 async fn top(

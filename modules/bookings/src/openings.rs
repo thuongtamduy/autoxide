@@ -1,12 +1,13 @@
 //! Nạp lịch từ database rồi gọi hàm thuần [`crate::availability`]: giờ trống công khai và kiểm
 //! "trong giờ làm" khi đặt chỗ.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::{BTreeMap, HashMap};
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
-use chrono_tz::Tz;
+use jiff::tz::TimeZone;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter};
 use uuid::Uuid;
 
@@ -26,15 +27,15 @@ pub(crate) struct AvailabilityQuery {
     /// Chỉ nhân viên / phòng của nút này; múi giờ của nút này.
     pub org_id: Option<Uuid>,
     pub resource_id: Option<Uuid>,
-    pub from: DateTime<Utc>,
-    pub to: DateTime<Utc>,
+    pub from: Timestamp,
+    pub to: Timestamp,
 }
 
 /// Giờ trống cùng những gì khách cần biết trước khi đặt (giá, cọc, chính sách huỷ).
 #[derive(Debug, Clone)]
 pub(crate) struct Availability {
     pub service: ServiceView,
-    pub zone: Tz,
+    pub zone: TimeZone,
     pub policy: Policy,
     pub openings: Vec<Opening>,
 }
@@ -51,7 +52,7 @@ pub(crate) fn shape_of(service: &ServiceView) -> Shape {
 pub(crate) struct Loaded {
     pub performers: Vec<Plan>,
     pub required: Vec<Plan>,
-    pub sessions: BTreeMap<(Uuid, DateTime<Utc>), i32>,
+    pub sessions: BTreeMap<(Uuid, Timestamp), i32>,
 }
 
 impl BookingsService {
@@ -60,11 +61,12 @@ impl BookingsService {
         connection: &C,
         tenant: &TenantContext,
         resources: &[resource::Model],
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<HashMap<Uuid, Plan>, Error> {
         let ids: Vec<Uuid> = resources.iter().map(|row| row.id).collect();
-        let (wide_from, wide_to) = (from - Duration::days(2), to + Duration::days(2));
+        let (wide_from, wide_to) =
+            (from - SignedDuration::from_hours(24 * 2), to + SignedDuration::from_hours(24 * 2));
         let weekly = Self::schedule_rows(connection, tenant, &ids).await?;
         let exceptions = Self::exception_rows(connection, tenant, &ids, wide_from, wide_to).await?;
         let busy = slot::Entity::find()
@@ -114,8 +116,8 @@ impl BookingsService {
         service: &ServiceView,
         org: Option<Uuid>,
         resource_id: Option<Uuid>,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Loaded, Error> {
         let ids: Vec<Uuid> = service.performers.iter().chain(&service.required).copied().collect();
         let rows = resource::Entity::find()
@@ -137,8 +139,8 @@ impl BookingsService {
         let required = service.required.iter().filter_map(|id| plans.remove(id)).collect();
         let open = session::Entity::find()
             .filter(session::Column::ServiceId.eq(service.row.id))
-            .filter(session::Column::StartsAt.gte(from - Duration::days(1)))
-            .filter(session::Column::StartsAt.lt(to + Duration::days(1)))
+            .filter(session::Column::StartsAt.gte(from - SignedDuration::from_hours(24)))
+            .filter(session::Column::StartsAt.lt(to + SignedDuration::from_hours(24)))
             .scoped(tenant)
             .all(connection)
             .await?;
@@ -158,7 +160,7 @@ impl BookingsService {
         let mut problems = Vec::new();
         if query.to <= query.from {
             problems.push(FieldError::new("to", "range", "must be after `from`"));
-        } else if query.to - query.from > Duration::days(MAX_RANGE_DAYS) {
+        } else if query.to - query.from > SignedDuration::from_hours(24 * MAX_RANGE_DAYS) {
             problems.push(
                 FieldError::new("to", "range", "ask for at most {days} days at a time")
                     .with_param("days", MAX_RANGE_DAYS),
@@ -184,7 +186,7 @@ impl BookingsService {
         )
         .await?;
         let openings = availability::openings(&availability::Query {
-            zone,
+            zone: zone.clone(),
             shape: shape_of(&service),
             capacity: service.row.capacity,
             from: query.from,

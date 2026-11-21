@@ -8,6 +8,7 @@ use autoxide_compliance::api::{
     ComplianceRules, ConsentEvidence, ConsentKey, ConsentLedger, ConsentSubject,
 };
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Notifier, Recipient,
 };
@@ -219,7 +220,7 @@ async fn rut_dong_y_huy_tin_quang_cao_dang_cho() {
 
         // Quy tắc khung giờ đi kèm `compliance`: SMS quảng cáo 07:00–22:00 giờ Việt Nam.
         let rules = app.api::<dyn ComplianceRules>().unwrap();
-        let rule = rules.effective(DEFAULT_TENANT, "notifications.send_windows", chrono::Utc::now()).await.unwrap().unwrap();
+        let rule = rules.effective(DEFAULT_TENANT, "notifications.send_windows", Timestamp::now()).await.unwrap().unwrap();
         assert_eq!(rule.body["utc_offset_minutes"], 420);
         assert_eq!(rule.body["marketing"]["sms"]["from"], "07:00");
         assert!(rule.legal_basis.contains("91/2020"));

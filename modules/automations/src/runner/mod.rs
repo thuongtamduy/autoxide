@@ -23,7 +23,8 @@ use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, Condition, EntityTrait, PaginatorTrait, QueryFilter, Set,
@@ -73,8 +74,8 @@ pub(crate) struct StepLog {
     /// `succeeded`, `failed`, `skipped`, `waiting`, `awaiting_approval`, `stopped` (a `stop_if`
     /// that held) or `rejected`.
     pub status: String,
-    pub started_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub started_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
     /// The tool's result (cut down when large).
     #[schema(value_type = Option<Object>)]
     pub result: Option<Value>,
@@ -158,7 +159,7 @@ impl Automations {
         .await?;
         let recent = run::Entity::find()
             .filter(run::Column::RuleId.eq(rule.id))
-            .filter(run::Column::CreatedAt.gt(now - Duration::hours(1)))
+            .filter(run::Column::CreatedAt.gt(now - SignedDuration::from_hours(1)))
             .filter(run::Column::Status.ne(SKIPPED))
             .scoped(tenant)
             .count(&transaction)
@@ -225,7 +226,7 @@ impl Automations {
         let updated = rule::Entity::update_many()
             .col_expr(rule::Column::Status, Expr::value(PAUSED))
             .col_expr(rule::Column::StatusReason, Expr::value(reason))
-            .col_expr(rule::Column::NextRunAt, Expr::value(Option::<DateTime<Utc>>::None))
+            .col_expr(rule::Column::NextRunAt, Expr::value(Option::<Timestamp>::None))
             .col_expr(rule::Column::UpdatedAt, Expr::value(now()))
             .filter(rule::Column::Id.eq(rule.id))
             .filter(rule::Column::Status.eq(ACTIVE))
@@ -310,7 +311,7 @@ impl Automations {
     /// Lấy lần chạy để chạy: `queued` / `waiting`, hay `running` đã quá hạn giữ.
     async fn claim(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<run::Model>, Error> {
         let now = now();
-        let stale = now - Duration::minutes(RUNNING_LEASE_MINUTES);
+        let stale = now - SignedDuration::from_mins(RUNNING_LEASE_MINUTES);
         let claimed = run::Entity::update_many()
             .col_expr(run::Column::Status, Expr::value(RUNNING))
             .col_expr(run::Column::UpdatedAt, Expr::value(now))

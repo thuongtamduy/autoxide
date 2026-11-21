@@ -5,7 +5,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, QueryFilter, QuerySelect};
 use uuid::Uuid;
 
@@ -20,9 +20,9 @@ pub(crate) struct BookingFilter {
     pub status: Option<String>,
     pub resource_id: Option<Uuid>,
     /// Bắt đầu từ lúc này.
-    pub from: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
     /// Bắt đầu trước lúc này.
-    pub to: Option<DateTime<Utc>>,
+    pub to: Option<Timestamp>,
 }
 
 impl BookingFilter {

@@ -11,8 +11,8 @@ use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, root_of};
-use chrono::{DateTime, Utc};
-use chrono_tz::Tz;
+use autoxide_kernel::time::{self, Timestamp};
+use jiff::tz::TimeZone;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -103,13 +103,13 @@ impl Automations {
             actions: Set(input.body.actions.to_string()),
             status: Set(status.to_owned()),
             status_reason: Set(None),
-            timezone: Set(zone.name().to_owned()),
+            timezone: Set(zone_name(&zone)),
             run_as: Set(principal.user_id()),
             created_by: Set(principal.user_id()),
             created_by_kind: Set(principal.actor_kind().as_str().to_owned()),
             updated_by: Set(principal.user_id()),
             version: Set(1),
-            next_run_at: Set(next_run(&body, status, zone, now)),
+            next_run_at: Set(next_run(&body, status, &zone, now)),
             created_at: Set(now),
             updated_at: Set(now),
         }
@@ -166,7 +166,7 @@ impl Automations {
         principal: &Principal,
         id: Uuid,
         changes: RuleChanges,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Rule, Error> {
         if let Some(name) = &changes.name {
             check_name(name)?;
@@ -214,8 +214,8 @@ impl Automations {
                 row.status_reason = Set(None);
             }
         }
-        row.timezone = Set(zone.name().to_owned());
-        row.next_run_at = Set(next_run(&body, &status, zone, now));
+        row.timezone = Set(zone_name(&zone));
+        row.next_run_at = Set(next_run(&body, &status, &zone, now));
         row.version = Set(before.version + 1);
         row.updated_by = Set(principal.user_id());
         row.updated_at = Set(now);
@@ -241,7 +241,7 @@ impl Automations {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Rule, Error> {
         if principal.actor_kind() == ActorKind::Agent {
             return Err(human_required());
@@ -264,7 +264,7 @@ impl Automations {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Rule, Error> {
         self.get_rule(tenant, principal, id).await?;
         self.set_status(tenant, principal, id, (DISABLED, None), expected).await
@@ -277,8 +277,8 @@ impl Automations {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        (status, body): (&str, Option<(&RuleBody, Tz, i32)>),
-        expected: Option<DateTime<Utc>>,
+        (status, body): (&str, Option<(&RuleBody, TimeZone, i32)>),
+        expected: Option<Timestamp>,
     ) -> Result<Rule, Error> {
         let now = now();
         let transaction = tenant.database().begin_write().await?;
@@ -301,8 +301,8 @@ impl Automations {
         row.status_reason = Set(None);
         if let Some((body, zone, _)) = body {
             row.run_as = Set(principal.user_id());
-            row.timezone = Set(zone.name().to_owned());
-            row.next_run_at = Set(next_run(body, status, zone, now));
+            row.timezone = Set(zone_name(&zone));
+            row.next_run_at = Set(next_run(body, status, &zone, now));
         } else {
             row.next_run_at = Set(None);
         }
@@ -329,7 +329,7 @@ impl Automations {
         tenant: &TenantContext,
         principal: &Principal,
         id: Uuid,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<(), Error> {
         self.get_rule(tenant, principal, id).await?;
         let transaction = tenant.database().begin_write().await?;
@@ -368,7 +368,7 @@ impl Automations {
         connection: &C,
         tenant: &TenantContext,
         row: rule::ActiveModel,
-        expected: Option<DateTime<Utc>>,
+        expected: Option<Timestamp>,
     ) -> Result<Rule, Error> {
         let mut update = Entity::update(row).validate()?.scoped(tenant);
         if let Some(expected) = expected {
@@ -382,26 +382,36 @@ impl Automations {
 
     /// Múi giờ của lịch: khai trong kích hoạt, không thì của nút (`organizations.timezone`, kế
     /// thừa theo cây), không đọc được thì UTC.
-    pub(crate) async fn zone(&self, tenant: &TenantContext, org: OrgId, body: &RuleBody) -> Tz {
-        if let Some(zone) = body.timezone {
-            return zone;
+    pub(crate) async fn zone(
+        &self,
+        tenant: &TenantContext,
+        org: OrgId,
+        body: &RuleBody,
+    ) -> TimeZone {
+        if let Some(zone) = &body.timezone {
+            return zone.clone();
         }
-        let Some(orgs) = &self.orgs else { return Tz::UTC };
+        let Some(orgs) = &self.orgs else { return TimeZone::UTC };
         match orgs.setting(tenant, org, "organizations.timezone").await {
             Ok(found) => found
                 .and_then(|setting| setting.value)
-                .and_then(|value| value.as_str().and_then(|text| text.parse::<Tz>().ok()))
-                .unwrap_or(Tz::UTC),
+                .and_then(|value| value.as_str().and_then(time::zone))
+                .unwrap_or(TimeZone::UTC),
             Err(error) => {
                 tracing::warn!(%error, "cannot read the time zone of a unit; using UTC");
-                Tz::UTC
+                TimeZone::UTC
             }
         }
     }
 }
 
 /// Lần chạy theo lịch kế tiếp của luật đang bật.
-fn next_run(body: &RuleBody, status: &str, zone: Tz, now: DateTime<Utc>) -> Option<DateTime<Utc>> {
+/// Tên IANA của múi giờ để lưu (`Asia/Ho_Chi_Minh`); múi nào ở đây cũng lấy theo tên nên luôn có tên.
+fn zone_name(zone: &TimeZone) -> String {
+    zone.iana_name().unwrap_or("UTC").to_owned()
+}
+
+fn next_run(body: &RuleBody, status: &str, zone: &TimeZone, now: Timestamp) -> Option<Timestamp> {
     if status != ACTIVE {
         return None;
     }

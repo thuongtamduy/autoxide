@@ -1,12 +1,12 @@
 //! Đặt chỗ: không chồng giờ khi nhiều người đặt cùng lúc, lớp học không vượt sức chứa, giữ tạm khi
 //! trả cọc, huỷ / đổi giờ / vắng mặt theo chính sách.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::sync::Arc;
 
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{DateTime, Duration, NaiveDate, Utc};
 use sea_orm::{ConnectionTrait, Statement};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -48,7 +48,7 @@ async fn shop(test: &TestDatabase) -> (Shop, Payments) {
     (shop, ledger)
 }
 
-fn at(day: NaiveDate, hour_vn: u32, minute: u32) -> DateTime<Utc> {
+fn at(day: Date, hour_vn: i8, minute: i8) -> Timestamp {
     utc(day, hour_vn - 7, minute)
 }
 
@@ -57,7 +57,7 @@ async fn book(
     app: &TestApp,
     who: &str,
     service: &str,
-    start: DateTime<Utc>,
+    start: Timestamp,
     extra: Value,
 ) -> (StatusCode, Value) {
     let mut body = json!({
@@ -465,7 +465,8 @@ async fn huy_muon_giu_coc_theo_chinh_sach() {
         );
         // Khách không huỷ được lịch đã bắt đầu.
         let (_, body) =
-            book(&shop, "eve", &haircut, at(day + Duration::days(7), 9, 0), json!({})).await;
+            book(&shop, "eve", &haircut, at(day.checked_add_days(7).unwrap(), 9, 0), json!({}))
+                .await;
         let started = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
         sql(
             &shop,
@@ -631,7 +632,7 @@ async fn hai_lan_doi_gio_cung_luc_khong_ro_cho() {
         }
         let (_, got) =
             call(&shop, "GET", &format!("/bookings/bookings/{id}"), Some("ann"), None).await;
-        let kept: DateTime<Utc> = got["data"]["starts_at"].as_str().unwrap().parse().unwrap();
+        let kept: Timestamp = got["data"]["starts_at"].as_str().unwrap().parse().unwrap();
         // Mọi giờ khác giờ lịch đang giữ đều trống.
         for hour in [9, 10, 11] {
             let start = at(day, hour, 0);

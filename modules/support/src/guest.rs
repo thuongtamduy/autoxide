@@ -4,6 +4,8 @@
 //! qua email hay SMS. Đăng ký tài khoản sau đó thì `POST /me/claim` gộp các phiếu cùng liên lạc đã
 //! xác thực vào tài khoản.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::access::Principal;
@@ -16,7 +18,6 @@ use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use autoxide_notifications::api::{Notification, Recipient};
-use chrono::Utc;
 use sea_orm::{ColumnTrait, Condition, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
@@ -174,7 +175,8 @@ impl SupportService {
             .await?
             .ok_or_else(|| not_found(id))?;
         let expired = row.closed_at.is_some_and(|closed| {
-            closed + chrono::Duration::days(self.config.token_days_after_close) < Utc::now()
+            closed + SignedDuration::from_hours(24 * self.config.token_days_after_close)
+                < Timestamp::now()
         });
         if expired { Err(not_found(id)) } else { Ok(row) }
     }
@@ -207,7 +209,7 @@ impl SupportService {
         // Khoá dòng phiếu: N lần đoán mã cùng lúc nối đuôi nhau, mỗi lần thấy số lần thử của lần
         // trước — không thì Postgres cho cả N cùng thấy 0 lần thử và giới hạn 5 lần mất tác dụng.
         let current = crate::service::lock_ticket(&transaction, tenant, id).await?;
-        let live = current.otp_expires_at.is_some_and(|at| at > Utc::now())
+        let live = current.otp_expires_at.is_some_and(|at| at > Timestamp::now())
             && current.otp_attempts < OTP_ATTEMPTS;
         let mut row = current.clone().into_active_model();
         if live && current.otp_hash.as_deref() == Some(expected.as_str()) {
@@ -253,7 +255,7 @@ impl SupportService {
             .ok_or_else(|| not_found(ticket.id))?;
         let mut row = current.into_active_model();
         row.otp_hash = Set(Some(hash));
-        row.otp_expires_at = Set(Some(now() + chrono::Duration::minutes(OTP_MINUTES)));
+        row.otp_expires_at = Set(Some(now() + SignedDuration::from_mins(OTP_MINUTES)));
         row.otp_attempts = Set(0);
         ticket::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
         transaction.commit().await?;

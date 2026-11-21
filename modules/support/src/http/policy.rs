@@ -1,5 +1,6 @@
 //! Chính sách hỗ trợ theo nút và báo cáo (bước 53 mục 3).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -8,7 +9,6 @@ use autoxide_kernel::http::ValidJson;
 use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -140,9 +140,9 @@ pub(crate) async fn reset_policy(
 #[into_params(parameter_in = Query)]
 pub(crate) struct ReportQuery {
     /// Tickets created from this moment (included).
-    from: DateTime<Utc>,
+    from: Timestamp,
     /// … to this moment (excluded).
-    to: DateTime<Utc>,
+    to: Timestamp,
     /// Only this unit and the units below it.
     org_id: Option<Uuid>,
 }

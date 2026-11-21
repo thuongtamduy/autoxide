@@ -15,6 +15,7 @@
 //! (`privacy.rs`), nên không nối được phiên của hai ngày và không dò ngược ra IP. Không lưu IP,
 //! không lưu user agent.
 
+use autoxide_kernel::time::Timestamp;
 use std::net::IpAddr;
 use std::time::Duration;
 
@@ -26,7 +27,6 @@ use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, root_of};
 use autoxide_kernel::throttle::Throttle;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
@@ -125,7 +125,7 @@ impl AnalyticsService {
         site: &Site,
         visitor: Visitor<'_>,
         events: Vec<Value>,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Ingested, Error> {
         let total = u32::try_from(events.len()).unwrap_or(u32::MAX);
         let dropped_all = Ingested { accepted: 0, dropped: total };
@@ -249,7 +249,7 @@ impl AnalyticsService {
         &self,
         tenant: &TenantContext,
         day: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<String, Error> {
         let find = || {
             day_key::Entity::find()

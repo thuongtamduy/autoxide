@@ -4,9 +4,10 @@
 
 use autoxide_inventory::api::{Inventory, ReserveLine, ReserveRequest};
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, root_of};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::Utc;
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -59,7 +60,7 @@ async fn ton_dau_ky_cho_bien_the_cua_catalog_that() {
         let request = ReserveRequest::new(
             Uuid::now_v7(),
             root_of(DEFAULT_TENANT),
-            Utc::now() + chrono::Duration::minutes(15),
+            Timestamp::now() + SignedDuration::from_mins(15),
             vec![ReserveLine::new("1", variant_id, 5)],
         );
         let held = inventory.reserve(&tenant, &request).await.unwrap().into_inner();

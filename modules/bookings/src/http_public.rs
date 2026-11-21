@@ -1,6 +1,7 @@
 //! Endpoint công khai (không cần đăng nhập) dưới `/api/v1/bookings/public`: dịch vụ đang nhận đặt và
 //! giờ trống. Giờ trống cache ngắn bằng HTTP (D-20261118-step60-bookings mục 4).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -94,8 +94,8 @@ pub(crate) struct PublicServicesQuery {
 pub(crate) struct BookingOpening {
     /// The staff member (or court, room…) free at this time.
     resource_id: Uuid,
-    starts_at: DateTime<Utc>,
-    ends_at: DateTime<Utc>,
+    starts_at: Timestamp,
+    ends_at: Timestamp,
     /// `starts_at` in the local time of the unit, with its offset, e.g. `2026-11-23T09:00:00+07:00`.
     local_start: String,
     /// Places left (always 1 for one-to-one services).
@@ -120,7 +120,7 @@ impl BookingAvailability {
         let zone = found.zone;
         Ok(BookingAvailability {
             service_id: found.service.row.id,
-            timezone: zone.name().to_owned(),
+            timezone: zone.iana_name().unwrap_or("UTC").to_owned(),
             terms: PublicBookingTerms {
                 deposit,
                 free_cancel_hours: found.policy.free_cancel_hours,
@@ -135,7 +135,7 @@ impl BookingAvailability {
                     resource_id: opening.resource_id,
                     starts_at: opening.starts_at,
                     ends_at: opening.ends_at,
-                    local_start: opening.starts_at.with_timezone(&zone).to_rfc3339(),
+                    local_start: opening.starts_at.to_rfc3339_in(&zone),
                     seats_left: opening.seats_left,
                 })
                 .collect(),
@@ -154,9 +154,9 @@ pub(crate) struct AvailabilityParams {
     /// Only this staff member (or court, room…); omitted: anyone who gives the service.
     pub resource_id: Option<Uuid>,
     /// Start of the range.
-    pub from: DateTime<Utc>,
+    pub from: Timestamp,
     /// End of the range, at most 31 days after `from`.
-    pub to: DateTime<Utc>,
+    pub to: Timestamp,
 }
 
 impl From<AvailabilityParams> for AvailabilityQuery {

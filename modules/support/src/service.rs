@@ -5,6 +5,7 @@
 //! phạm vi permission ở nút của phiếu (`scope_condition`, `require_at`); phiếu ngoài phạm vi báo như
 //! không có (404). Người mua chỉ chạm phiếu của chính mình; khách vãng lai chạm một phiếu bằng token.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -15,7 +16,6 @@ use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::tenancy::{OrgId, OrgTree, TenantContext, root_of};
 use autoxide_media::api::Media;
 use autoxide_notifications::api::Notifier;
-use chrono::{DateTime, SubsecRound, Utc};
 use uuid::Uuid;
 
 use crate::config::SupportConfig;
@@ -126,8 +126,8 @@ pub(crate) fn hidden(result: Result<(), Error>, id: Uuid) -> Result<(), Error> {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên — cắt trước để hai
 /// database trả cùng một giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Gom lỗi đầu vào và báo một lần (D-083).

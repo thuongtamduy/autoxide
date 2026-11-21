@@ -3,12 +3,12 @@
 //! lời theo ưu tiên (phút làm việc), giờ làm, ngày nghỉ, múi giờ, số ngày tự đóng, cho khách vãng
 //! lai mở phiếu, cài đặt trả lời tự động.
 
+use autoxide_kernel::time::Date;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_of};
-use chrono::NaiveDate;
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -40,7 +40,7 @@ pub(crate) struct Policy {
     pub business_hours: Vec<WorkingHours>,
     /// Days off (`YYYY-MM-DD`, local date).
     #[schema(value_type = Vec<String>, example = json!(["2026-09-02"]))]
-    pub holidays: Vec<NaiveDate>,
+    pub holidays: Vec<Date>,
     /// Offset of the unit's local time from UTC, in minutes (Vietnam: 420).
     pub utc_offset_minutes: i32,
     /// A solved ticket closes after this many days without a new message (1 to 90).

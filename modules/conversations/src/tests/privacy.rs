@@ -3,8 +3,10 @@
 use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::tenancy::ScopeExt;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::json;
@@ -25,7 +27,7 @@ async fn het_han_luu_thi_xoa() {
         thread::Entity::update_many()
             .col_expr(
                 thread::Column::LastMessageAt,
-                Expr::value(chrono::Utc::now() - chrono::Duration::days(366)),
+                Expr::value(Timestamp::now() - SignedDuration::from_hours(24 * 366)),
             )
             .filter(thread::Column::Id.eq(old_id))
             .scoped(&tenant)

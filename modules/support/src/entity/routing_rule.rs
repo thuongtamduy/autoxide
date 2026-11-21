@@ -1,5 +1,6 @@
 //! Bảng `support_routing_rules`: quy tắc tự phân công phiếu mới vào nhóm.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,7 +15,7 @@ pub struct Model {
     pub channel: Option<String>,
     pub team_id: Uuid,
     pub position: i32,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

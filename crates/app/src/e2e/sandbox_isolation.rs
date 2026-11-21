@@ -3,6 +3,8 @@
 //! đọc được qua REST (tool MCP `kernel.list_sandbox_messages` gọi cùng hàm); khách thật không bị ảnh hưởng. Chạy với khách gốc ở database chung và
 //! database riêng, trên cả SQLite và Postgres.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -84,7 +86,7 @@ async fn owner(app: &TestApp, shop: &TenantContext) -> String {
         .execute_raw(Statement::from_sql_and_values(
             write.get_database_backend(),
             "UPDATE auth_user SET email_verified_at = $1 WHERE email = $2",
-            [chrono::Utc::now().into(), email.into()],
+            [Timestamp::now().into(), email.into()],
         ))
         .await
         .unwrap();
@@ -139,7 +141,7 @@ async fn isolation(dedicated: bool) {
         let gateways = app.modules().contributions::<dyn PaymentGateway>();
         assert_eq!(gateways.len(), 1);
         let amount = Money::from_columns(250_000, "VND").unwrap();
-        let expires = chrono::Utc::now() + chrono::Duration::minutes(15);
+        let expires = Timestamp::now() + SignedDuration::from_mins(15);
         let intent =
             PaymentIntent::new(uuid::Uuid::now_v7(), amount, "card", "Sandbox order", expires);
         let payment = gateways[0].create_payment(sandbox.id(), &intent).await.unwrap();

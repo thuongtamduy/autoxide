@@ -13,6 +13,7 @@
 
 pub(crate) mod record;
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -21,8 +22,8 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::report::{FactSource, Measure};
 use autoxide_kernel::summary::{MetricValue, SummaryMetric, SummaryMetrics};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{DateTime, Datelike, Duration, NaiveDate, TimeZone, Timelike, Utc};
-use chrono_tz::Tz;
+use jiff::civil::Weekday;
+use jiff::tz::TimeZone;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder};
 use serde_json::{Value, json};
 
@@ -86,7 +87,7 @@ impl MetricSources {
 /// Một lần đọc số liệu và mức nền của nó.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Reading {
-    pub day: NaiveDate,
+    pub day: Date,
     pub value: i64,
     /// `None`: chưa đủ dữ liệu nền.
     pub baseline: Option<i64>,
@@ -141,37 +142,36 @@ fn explanation(trigger: &MetricTrigger, reading: &Reading) -> String {
     }
 }
 
-fn weekday_name(day: chrono::Weekday) -> &'static str {
+fn weekday_name(day: Weekday) -> &'static str {
     match day {
-        chrono::Weekday::Mon => "Monday",
-        chrono::Weekday::Tue => "Tuesday",
-        chrono::Weekday::Wed => "Wednesday",
-        chrono::Weekday::Thu => "Thursday",
-        chrono::Weekday::Fri => "Friday",
-        chrono::Weekday::Sat => "Saturday",
-        chrono::Weekday::Sun => "Sunday",
+        Weekday::Monday => "Monday",
+        Weekday::Tuesday => "Tuesday",
+        Weekday::Wednesday => "Wednesday",
+        Weekday::Thursday => "Thursday",
+        Weekday::Friday => "Friday",
+        Weekday::Saturday => "Saturday",
+        Weekday::Sunday => "Sunday",
     }
 }
 
 /// Khoảng UTC của ngày địa phương `day` theo `zone`.
-fn day_range(day: NaiveDate, zone: Tz) -> (DateTime<Utc>, DateTime<Utc>) {
-    let start = |day: NaiveDate| {
-        day.and_hms_opt(0, 0, 0)
-            .and_then(|midnight| zone.from_local_datetime(&midnight).earliest())
-            .map_or_else(
-                || day.and_hms_opt(0, 0, 0).unwrap_or_default().and_utc(),
-                |at| at.with_timezone(&Utc),
-            )
+// Nửa đêm địa phương không có (nhảy giờ đúng lúc 0 giờ) thì lấy nửa đêm UTC, như trước.
+fn day_range(day: Date, zone: &TimeZone) -> (Timestamp, Timestamp) {
+    let start = |day: Date| {
+        let midnight = day.to_jiff().to_datetime(jiff::civil::Time::midnight());
+        autoxide_kernel::time::from_local(zone, midnight).unwrap_or_else(|| day.start_of_day_utc())
     };
-    (start(day), start(day + Duration::days(1)))
+    (start(day), start(days_before(day, -1)))
+}
+
+/// Ngày cách `day` về trước `days` ngày (âm: về sau). Ra ngoài lịch (năm ±9999) thì giữ `day`.
+fn days_before(day: Date, days: i64) -> Date {
+    day.checked_sub_days(days).unwrap_or(day)
 }
 
 /// Đầu giờ UTC chứa `at`.
-pub(crate) fn hour_of(at: DateTime<Utc>) -> DateTime<Utc> {
-    at.with_minute(0)
-        .and_then(|at| at.with_second(0))
-        .and_then(|at| at.with_nanosecond(0))
-        .unwrap_or(at)
+pub(crate) fn hour_of(at: Timestamp) -> Timestamp {
+    at.truncate(jiff::Unit::Hour)
 }
 
 impl Automations {
@@ -182,8 +182,8 @@ impl Automations {
         tenant: &TenantContext,
         rule: &Rule,
         trigger: &MetricTrigger,
-        slot: DateTime<Utc>,
-        zone: Tz,
+        slot: Timestamp,
+        zone: &TimeZone,
     ) -> Result<(), Error> {
         let reading = if let Some(kind) = trigger.metric.strip_prefix("fact:") {
             self.fact_reading(tenant, kind, trigger.currency.as_deref(), slot, zone).await?
@@ -230,12 +230,12 @@ impl Automations {
         tenant: &TenantContext,
         kind: &str,
         currency: Option<&str>,
-        slot: DateTime<Utc>,
-        zone: Tz,
+        slot: Timestamp,
+        zone: &TimeZone,
     ) -> Result<Option<Reading>, Error> {
         let source = format!("fact:{kind}");
-        let day = slot.with_timezone(&zone).date_naive() - Duration::days(1);
-        let earliest = day - Duration::days(BASELINE_WEEKS * 7);
+        let day = days_before(slot.date_in(zone), 1);
+        let earliest = days_before(day, BASELINE_WEEKS * 7);
         let (from, first_day_end) = day_range(earliest, zone);
         let (_, to) = day_range(day, zone);
         let rows = self.hours(tenant, &source, currency, from, to).await?;
@@ -248,7 +248,7 @@ impl Automations {
             .one(tenant.database().read())
             .await?;
         let tracked = first.is_some_and(|first| first.hour < first_day_end);
-        let sum = |day: NaiveDate| {
+        let sum = |day: Date| {
             let (start, end) = day_range(day, zone);
             rows.iter()
                 .filter(|row| row.hour >= start && row.hour < end)
@@ -256,8 +256,7 @@ impl Automations {
                 .sum::<i64>()
         };
         let baseline = tracked.then(|| {
-            let total: i64 =
-                (1..=BASELINE_WEEKS).map(|week| sum(day - Duration::days(7 * week))).sum();
+            let total: i64 = (1..=BASELINE_WEEKS).map(|week| sum(days_before(day, 7 * week))).sum();
             total / BASELINE_WEEKS
         });
         Ok(Some(Reading { day, value: sum(day), baseline }))
@@ -271,8 +270,8 @@ impl Automations {
         rule: &Rule,
         id: &str,
         currency: Option<&str>,
-        slot: DateTime<Utc>,
-        zone: Tz,
+        slot: Timestamp,
+        zone: &TimeZone,
     ) -> Result<Option<Reading>, Error> {
         let Some(metric) = self.metrics.summary(id) else { return Ok(None) };
         let Some(authenticator) = &self.authenticator else { return Ok(None) };
@@ -297,12 +296,12 @@ impl Automations {
         }
         let source = format!("summary:{id}");
         self.record_sample(tenant, &source, hour_of(slot), &unit, value).await?;
-        let day = slot.with_timezone(&zone).date_naive();
-        let (from, _) = day_range(day - Duration::days(BASELINE_WEEKS * 7), zone);
+        let day = slot.date_in(zone);
+        let (from, _) = day_range(days_before(day, BASELINE_WEEKS * 7), zone);
         let rows = self.hours(tenant, &source, Some(&unit), from, slot).await?;
         let mut samples = Vec::new();
         for week in 1..=BASELINE_WEEKS {
-            let (start, end) = day_range(day - Duration::days(7 * week), zone);
+            let (start, end) = day_range(days_before(day, 7 * week), zone);
             // Mẫu cuối của ngày đó.
             let last = rows
                 .iter()
@@ -324,8 +323,8 @@ impl Automations {
         tenant: &TenantContext,
         source: &str,
         currency: Option<&str>,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: Timestamp,
+        to: Timestamp,
     ) -> Result<Vec<metric_hour::Model>, Error> {
         let mut select = metric_hour::Entity::find()
             .filter(metric_hour::Column::Source.eq(source))
@@ -370,7 +369,7 @@ mod tests {
     }
 
     fn reading(value: i64, baseline: Option<i64>) -> Reading {
-        Reading { day: NaiveDate::from_ymd_opt(2026, 11, 16).unwrap_or_default(), value, baseline }
+        Reading { day: Date::new(2026, 11, 16).unwrap_or_default(), value, baseline }
     }
 
     #[test]
@@ -393,9 +392,8 @@ mod tests {
 
     #[test]
     fn ngay_dia_phuong_thanh_khoang_utc() {
-        let vietnam = chrono_tz::Asia::Ho_Chi_Minh;
-        let (start, end) =
-            day_range(NaiveDate::from_ymd_opt(2026, 11, 16).unwrap_or_default(), vietnam);
+        let vietnam = &autoxide_kernel::time::zone("Asia/Ho_Chi_Minh").unwrap();
+        let (start, end) = day_range(Date::new(2026, 11, 16).unwrap_or_default(), vietnam);
         assert_eq!(start.to_rfc3339(), "2026-11-15T17:00:00+00:00");
         assert_eq!(end.to_rfc3339(), "2026-11-16T17:00:00+00:00");
     }

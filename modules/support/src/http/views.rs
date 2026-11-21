@@ -1,7 +1,6 @@
 //! Hình dạng JSON trả ra. Nhân viên thấy liên lạc đầy đủ; người mua và khách vãng lai thấy email /
 //! số điện thoại đã che (D-202) và không thấy ghi chú nội bộ.
-
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -30,10 +29,10 @@ pub(crate) struct TicketResponse {
     pub assignee_user_id: Option<Uuid>,
     pub team_id: Option<Uuid>,
     /// Answer the customer before this (business hours of the unit).
-    pub first_response_due_at: Option<DateTime<Utc>>,
+    pub first_response_due_at: Option<Timestamp>,
     /// Solve the ticket before this; the clock stops while waiting for the customer.
-    pub resolve_due_at: Option<DateTime<Utc>>,
-    pub first_responded_at: Option<DateTime<Utc>>,
+    pub resolve_due_at: Option<Timestamp>,
+    pub first_responded_at: Option<Timestamp>,
     /// A response-time target was missed.
     pub breached: bool,
     /// The consumer complaint this ticket became (module `compliance`).
@@ -44,11 +43,11 @@ pub(crate) struct TicketResponse {
     pub escalated_to_platform: bool,
     /// Customer rating after the ticket was solved, 1 to 5.
     pub satisfaction: Option<i16>,
-    pub last_message_at: DateTime<Utc>,
-    pub solved_at: Option<DateTime<Utc>>,
-    pub closed_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub last_message_at: Timestamp,
+    pub solved_at: Option<Timestamp>,
+    pub closed_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Who asked. Customers and guests see their own email or phone number masked.
@@ -132,7 +131,7 @@ pub(crate) struct MessageResponse {
     pub ai_assisted: bool,
     /// Sent automatically from an approved answer (label it "Automatic answer").
     pub auto_reply: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<Message> for MessageResponse {

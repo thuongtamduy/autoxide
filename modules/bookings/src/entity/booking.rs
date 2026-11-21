@@ -1,5 +1,6 @@
 //! Bảng `bookings_bookings`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,8 +15,8 @@ pub struct Model {
     pub resource_id: Uuid,
     pub session_id: Option<Uuid>,
     pub seats: i32,
-    pub starts_at: DateTimeUtc,
-    pub ends_at: DateTimeUtc,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub status: String,
     pub customer_user_id: Option<Uuid>,
     pub customer_name: String,
@@ -29,14 +30,14 @@ pub struct Model {
     pub deposit_status: String,
     pub refund_minor: i64,
     pub payment_id: Option<Uuid>,
-    pub hold_expires_at: Option<DateTimeUtc>,
-    pub reminded_24h_at: Option<DateTimeUtc>,
-    pub reminded_2h_at: Option<DateTimeUtc>,
-    pub cancelled_at: Option<DateTimeUtc>,
+    pub hold_expires_at: Option<Timestamp>,
+    pub reminded_24h_at: Option<Timestamp>,
+    pub reminded_2h_at: Option<Timestamp>,
+    pub cancelled_at: Option<Timestamp>,
     pub cancel_reason: Option<String>,
     pub created_by: Option<Uuid>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

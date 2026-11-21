@@ -1,6 +1,7 @@
 //! Endpoint REST của module `analytics`, dưới `/api/v1/analytics`. Handler chỉ: lấy dữ liệu vào →
 //! gọi service → trả envelope. Báo cáo chỉ đọc bảng gộp; quyền kiểm tại nút của website.
 
+use autoxide_kernel::time::Date;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Data, Problem};
 use autoxide_kernel::tenancy::{Site, SiteQuery, TenantContext};
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderMap, StatusCode, header};
-use chrono::NaiveDate;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -202,10 +202,10 @@ pub(crate) struct RangeQuery {
     pub site: Option<Uuid>,
     /// First day (UTC, `YYYY-MM-DD`); omitted: 29 days before `to`.
     #[param(value_type = Option<String>, format = Date)]
-    pub from: Option<NaiveDate>,
+    pub from: Option<Date>,
     /// Last day (UTC, `YYYY-MM-DD`); omitted: today. At most 400 days from `from`.
     #[param(value_type = Option<String>, format = Date)]
-    pub to: Option<NaiveDate>,
+    pub to: Option<Date>,
 }
 
 /// How many rows.

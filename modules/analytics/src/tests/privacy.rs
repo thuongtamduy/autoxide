@@ -5,6 +5,7 @@ use autoxide_kernel::event::{Delivered, EventHandler};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
+use jiff::SignedDuration;
 use sea_orm::EntityTrait;
 use serde_json::json;
 
@@ -122,7 +123,7 @@ async fn het_han_thi_xoa_su_kien_tho() {
         // Số gộp còn (giữ 790 ngày), tới khi quá hạn của chúng.
         let days = daily::Entity::find().all(h.app.database().read()).await.unwrap();
         assert!(days.iter().any(|row| row.day == "2026-11-01"));
-        let later = at(9, 12) + chrono::Duration::days(800);
+        let later = at(9, 12) + SignedDuration::from_hours(24 * 800);
         let cleaned = h.service.cleanup(h.app.database(), later).await.unwrap();
         assert!(cleaned.daily > 0);
         assert!(daily::Entity::find().all(h.app.database().read()).await.unwrap().is_empty());

@@ -1,6 +1,8 @@
 //! Trả lời tự động (D-230), với `FakeTextModel` trả phân loại định sẵn: chỉ gửi chữ đã duyệt hay mẫu
 //! câu của nguồn dữ liệu, luật quyết trong Rust, không bao giờ tự động cho việc rủi ro.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::ai::TextModel;
@@ -9,7 +11,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::ai::FakeTextModel;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -78,7 +79,7 @@ async fn setup(test: &TestDatabase, auto_reply: bool, blocked: &[&str]) -> Setup
     let body = json!({"org_id": root, "name": "Giờ mở cửa", "bodies": {"vi": ANSWER, "en": "We open 8:00–21:00."}});
     let (_, saved) = call(&app, "POST", "/macros", "agent", Some(body)).await;
     let macro_id = saved["data"]["id"].as_str().unwrap().to_owned();
-    let due = (Utc::now() + Duration::days(30)).date_naive().to_string();
+    let due = (Timestamp::now() + SignedDuration::from_hours(24 * 30)).date_utc().to_string();
     let approve =
         json!({"enabled": true, "questions": {"vi": ["Mấy giờ mở cửa?"]}, "review_due_on": due});
     let (status, body) =
@@ -319,7 +320,7 @@ async fn het_han_ra_lai_thoi_dung() {
             .col_expr(
                 crate::entity::saved_reply::Column::ReviewDueOn,
                 sea_orm::sea_query::Expr::value(
-                    (Utc::now() - Duration::days(1)).date_naive().to_string(),
+                    (Timestamp::now() - SignedDuration::from_hours(24)).date_utc().to_string(),
                 ),
             )
             .filter(

@@ -1,6 +1,8 @@
 //! Tin nhắn: gửi (chống trùng theo `client_id` của máy gửi), danh sách, thu hồi trong
 //! [`RECALL_WINDOW`], "đang gõ". Tin chỉ thêm — không sửa được.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
@@ -9,8 +11,6 @@ use autoxide_kernel::job::EnqueueOptions;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use autoxide_kernel::throttle::Throttle;
-use chrono::DateTime;
-use chrono::Utc;
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serde_json::json;
@@ -29,7 +29,7 @@ use crate::settings::Policy;
 use crate::threads::actor_of;
 
 /// Thu hồi được trong chừng này sau khi gửi (D-20261119-step61-conversations).
-pub(crate) const RECALL_WINDOW: chrono::Duration = chrono::Duration::minutes(2);
+pub(crate) const RECALL_WINDOW: SignedDuration = SignedDuration::from_mins(2);
 /// Số ảnh tối đa của một tin.
 pub(crate) const MEDIA_MAX: usize = 5;
 /// Độ dài tối đa của `client_id`.
@@ -162,7 +162,7 @@ impl ConversationsService {
         author: Option<Uuid>,
         body: String,
         new: &NewMessage,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Message>, Error> {
         self.insert_row(connection, tenant, thread, kind, author, body, new, false, None, at).await
     }
@@ -179,7 +179,7 @@ impl ConversationsService {
         new: &NewMessage,
         auto_reply: bool,
         call_id: Option<Uuid>,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<Option<Message>, Error> {
         let row = message::Model {
             id: Uuid::now_v7(),
@@ -265,10 +265,10 @@ impl ConversationsService {
         let side = if customer_wrote { "staff" } else { "customer" };
         let minutes = i64::from(self.config.notify_after_minutes);
         let window = minutes * 60;
-        let bucket = message.created_at.timestamp().div_euclid(window);
+        let bucket = message.created_at.as_unix_seconds().div_euclid(window);
         let job = NotifyJob { thread_id: thread.id, side: side.to_owned(), message_id: message.id };
         let options = EnqueueOptions::default()
-            .run_at(message.created_at + chrono::Duration::minutes(minutes))
+            .run_at(message.created_at + SignedDuration::from_mins(minutes))
             .unique_key(format!("notify:{}:{side}:{bucket}", thread.id));
         self.parts.jobs.enqueue(connection, tenant, &job, options).await?;
         Ok(())
@@ -405,7 +405,7 @@ impl ConversationsService {
                 "conversations.recall_expired",
                 "A message can only be recalled within {minutes} minutes of sending it.",
             )
-            .with_param("minutes", RECALL_WINDOW.num_minutes()));
+            .with_param("minutes", RECALL_WINDOW.as_mins()));
         }
         let transaction = tenant.database().begin_write().await?;
         message::Entity::update_many()

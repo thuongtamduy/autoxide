@@ -10,6 +10,8 @@
 //!
 //! Mọi việc chạy lại bao nhiêu lần cũng ra cùng kết quả (bên nhận event chịu được nhận lại).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_compliance::api::ConsentSubject;
@@ -20,7 +22,6 @@ use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::privacy::PersonalData;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::throttle::Throttle;
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::{Value, json};
@@ -55,17 +56,18 @@ impl AnalyticsService {
     pub(crate) async fn cleanup(
         &self,
         database: &Database,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Cleaned, Error> {
         let write = database.write();
-        let raw_before = now - chrono::Duration::days(i64::from(self.config.raw_retention_days));
+        let raw_before =
+            now - SignedDuration::from_hours(24 * (i64::from(self.config.raw_retention_days)));
         let events = event::Entity::delete_many()
             .filter(event::Column::OccurredAt.lt(raw_before))
             .exec(write)
             .await?
             .rows_affected;
         let kept_before =
-            day_of(now - chrono::Duration::days(i64::from(self.config.retention_days)));
+            day_of(now - SignedDuration::from_hours(24 * (i64::from(self.config.retention_days))));
         let daily = daily::Entity::delete_many()
             .filter(daily::Column::Day.lt(kept_before.as_str()))
             .exec(write)
@@ -87,7 +89,7 @@ impl AnalyticsService {
             .exec(write)
             .await?;
         Throttle::new("analytics", 1, std::time::Duration::from_secs(60))?
-            .purge(database, now - chrono::Duration::hours(1))
+            .purge(database, now - SignedDuration::from_hours(1))
             .await?;
         let cleaned = Cleaned { events, daily, keys };
         if cleaned != Cleaned::default() {

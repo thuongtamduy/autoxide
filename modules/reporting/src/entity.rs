@@ -17,6 +17,8 @@ macro_rules! tenant_scoped {
 }
 
 pub(crate) mod local_fact {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -32,7 +34,7 @@ pub(crate) mod local_fact {
         pub kind: String,
         /// Nút sở hữu; số liệu không nêu nút thì là nút gốc (= ID của khách).
         pub org_id: Uuid,
-        pub occurred_at: DateTimeUtc,
+        pub occurred_at: Timestamp,
         /// Ngày theo múi giờ của nút nguồn lúc rút.
         pub local_day: Date,
         pub amount_minor: Option<i64>,
@@ -40,8 +42,8 @@ pub(crate) mod local_fact {
         pub quantity: Option<i64>,
         /// JSON `{tên chiều: giá trị}`.
         pub dimensions: String,
-        pub created_at: DateTimeUtc,
-        pub forwarded_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub forwarded_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -49,6 +51,8 @@ pub(crate) mod local_fact {
 }
 
 pub(crate) mod fact {
+    use autoxide_kernel::time::Date;
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -63,13 +67,13 @@ pub(crate) mod fact {
         pub source_tenant_id: Uuid,
         pub kind: String,
         pub org_id: Uuid,
-        pub occurred_at: DateTimeUtc,
+        pub occurred_at: Timestamp,
         pub local_day: Date,
         pub amount_minor: Option<i64>,
         pub amount_currency: Option<String>,
         pub quantity: Option<i64>,
         pub dimensions: String,
-        pub received_at: DateTimeUtc,
+        pub received_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -97,6 +101,7 @@ pub(crate) mod dimension {
 }
 
 pub(crate) mod daily {
+    use autoxide_kernel::time::Date;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -127,6 +132,7 @@ pub(crate) mod daily {
 
 pub(crate) mod rehome {
     //! Nhật ký dời kho báo cáo (bước 38): một dòng mỗi lượt tách / gộp, ở database của khách nhận.
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -143,8 +149,8 @@ pub(crate) mod rehome {
         /// `running` / `done`.
         pub status: String,
         pub moved_facts: i64,
-        pub started_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub started_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}

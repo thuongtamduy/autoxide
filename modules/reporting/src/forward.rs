@@ -9,6 +9,8 @@
 //! Đẩy theo cờ `forwarded_at IS NULL`, không theo "id lớn hơn lần trước": id UUIDv7 sinh lúc ghi,
 //! dòng id nhỏ có thể commit muộn hơn dòng id lớn.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -16,7 +18,6 @@ use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{TenantContext, TenantId, ensure_serving};
-use chrono::{Duration, SubsecRound, Utc};
 use sea_orm::sea_query::{Expr, ExprTrait as _, OnConflict};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -127,7 +128,7 @@ impl Reporting {
 
     /// Xoá số liệu cục bộ đã đẩy quá hạn giữ; trả số dòng đã xoá.
     pub(crate) async fn prune_local(&self, database: &Database) -> Result<u64, Error> {
-        let cutoff = now() - Duration::days(self.config.local_retention_days);
+        let cutoff = now() - SignedDuration::from_hours(24 * self.config.local_retention_days);
         let result = local_fact::Entity::delete_many()
             .filter(local_fact::Column::ForwardedAt.lt(cutoff))
             .exec(database.write())
@@ -136,8 +137,8 @@ impl Reporting {
     }
 }
 
-fn now() -> chrono::DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Một transaction ở database của khách gốc: chèn từng số liệu (trùng thì bỏ qua), số liệu thật sự

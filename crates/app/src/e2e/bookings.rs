@@ -2,6 +2,8 @@
 //! thanh toán giả (webhook ký đúng), khách huỷ muộn thì `ledger` hoàn đúng phần theo chính sách,
 //! nhắc lịch đi qua `notifications` thật và không gửi hai lần.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Scope;
@@ -11,7 +13,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
 use autoxide_ledger::api::Ledger;
 use autoxide_testkit::{FakePaymentGateway, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Timelike, Utc};
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -95,15 +96,15 @@ async fn coc_qua_ledger_huy_muon_hoan_theo_chinh_sach() {
         let service = service["data"]["id"].as_str().unwrap().to_owned();
 
         // Ngày mai 10:00 giờ VN (03:00 UTC).
-        let day = (Utc::now() + Duration::days(2)).date_naive();
-        let start = day.and_hms_opt(3, 0, 0).unwrap().and_utc();
+        let day = (Timestamp::now() + SignedDuration::from_hours(24 * 2)).date_utc();
+        let start = day.start_of_day_utc() + SignedDuration::from_hours(3);
         let (status, availability) = call(
             &app,
             "GET",
             &format!(
                 "/bookings/public/availability?service_id={service}&from={}&to={}",
-                (start - Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ"),
-                (start + Duration::hours(1)).format("%Y-%m-%dT%H:%M:%SZ")
+                (start - SignedDuration::from_hours(1)).format("%Y-%m-%dT%H:%M:%SZ"),
+                (start + SignedDuration::from_hours(1)).format("%Y-%m-%dT%H:%M:%SZ")
             ),
             "ann",
             None,
@@ -152,8 +153,8 @@ async fn coc_qua_ledger_huy_muon_hoan_theo_chinh_sach() {
         let free = json!({"name": "Consultation", "duration_minutes": 30, "price": {"amount": "0", "currency": "VND"}, "performers": [night]});
         let free = ok(&app, "POST", "/bookings/services", free, StatusCode::CREATED).await;
         let free = free["data"]["id"].as_str().unwrap().to_owned();
-        let soon = Utc::now() + Duration::minutes(90);
-        let soon = soon.date_naive().and_hms_opt(soon.hour(), soon.minute() / 5 * 5, 0).unwrap().and_utc();
+        let soon = Timestamp::now() + SignedDuration::from_mins(90);
+        let soon = Timestamp::from_unix_seconds(soon.as_unix_seconds().div_euclid(300) * 300).unwrap();
         let body = json!({"service_id": free, "starts_at": soon, "customer": {"name": "Binh", "email": "binh@example.com"}});
         ok(&app, "POST", "/bookings/bookings", body, StatusCode::CREATED).await;
         for _ in 0..2 {

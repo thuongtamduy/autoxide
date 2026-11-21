@@ -9,7 +9,7 @@
 use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::{OrgId, Site, TenantContext, root_of};
-use chrono::{Duration, NaiveDate};
+use autoxide_kernel::time::Date;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Func, Order, Query};
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde::Serialize;
@@ -32,8 +32,8 @@ pub(crate) const TOP_MAX: u64 = 100;
 #[derive(Debug, Clone)]
 pub(crate) struct Range {
     pub site: OrgId,
-    pub from: NaiveDate,
-    pub to: NaiveDate,
+    pub from: Date,
+    pub to: Date,
 }
 
 impl Range {
@@ -63,7 +63,7 @@ pub(crate) struct Ranked {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 pub(crate) struct DayCount {
     #[schema(value_type = String, format = Date)]
-    pub day: NaiveDate,
+    pub day: Date,
     pub views: i64,
     pub visitors: i64,
 }
@@ -74,9 +74,9 @@ pub(crate) struct Overview {
     /// The website (organization unit).
     pub site: uuid::Uuid,
     #[schema(value_type = String, format = Date)]
-    pub from: NaiveDate,
+    pub from: Date,
     #[schema(value_type = String, format = Date)]
-    pub to: NaiveDate,
+    pub to: Date,
     /// Sum of the daily unique visitors (no cookies: one person on two days counts twice).
     pub visitors: i64,
     /// Page views.
@@ -115,9 +115,9 @@ pub(crate) struct FunnelReport {
     pub key: String,
     pub description: String,
     #[schema(value_type = String, format = Date)]
-    pub from: NaiveDate,
+    pub from: Date,
     #[schema(value_type = String, format = Date)]
-    pub to: NaiveDate,
+    pub to: Date,
     pub steps: Vec<FunnelStep>,
 }
 
@@ -159,15 +159,15 @@ impl AnalyticsService {
         tenant: &TenantContext,
         principal: &Principal,
         site: Option<uuid::Uuid>,
-        from: Option<NaiveDate>,
-        to: Option<NaiveDate>,
+        from: Option<Date>,
+        to: Option<Date>,
     ) -> Result<Range, Error> {
-        let to = to.unwrap_or_else(|| now().date_naive());
-        let from = from.unwrap_or(to - Duration::days(DEFAULT_DAYS - 1));
+        let to = to.unwrap_or_else(|| now().date_utc());
+        let from = from.unwrap_or(to.checked_sub_days(DEFAULT_DAYS - 1).unwrap_or(to));
         if from > to {
             return Err(errors::range_reversed());
         }
-        if (to - from).num_days() + 1 > RANGE_MAX_DAYS {
+        if to.days_since(from) + 1 > RANGE_MAX_DAYS {
             return Err(errors::range_too_long(RANGE_MAX_DAYS));
         }
         let site = match site {
@@ -202,7 +202,7 @@ impl AnalyticsService {
         let days = rows
             .iter()
             .filter_map(|row| {
-                NaiveDate::parse_from_str(&row.day, "%Y-%m-%d").ok().map(|day| DayCount {
+                Date::parse_from_str(&row.day, "%Y-%m-%d").ok().map(|day| DayCount {
                     day,
                     views: row.views,
                     visitors: row.visitors,

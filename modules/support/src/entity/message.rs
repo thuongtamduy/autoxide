@@ -1,5 +1,6 @@
 //! Bảng `support_messages`: tin nhắn của phiếu — chỉ thêm, không sửa (ẩn kèm lý do).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,12 +17,12 @@ pub struct Model {
     pub body: String,
     pub media_ids: String,
     pub mentions: String,
-    pub hidden_at: Option<DateTimeUtc>,
+    pub hidden_at: Option<Timestamp>,
     pub hidden_by: Option<Uuid>,
     pub hidden_reason: Option<String>,
     pub ai_assisted: bool,
     pub auto_reply: bool,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

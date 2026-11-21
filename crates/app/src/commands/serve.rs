@@ -6,6 +6,7 @@
 //! migration để nhiều bản khởi động cùng lúc không chạy chồng (`startup.rs`,
 //! D-20261121-migrate-on-start).
 
+use autoxide_kernel::time::Timestamp;
 use std::future::Future;
 use std::process::ExitCode;
 
@@ -147,7 +148,7 @@ where
                     _ = tick.tick() => false,
                     changed = stopped.changed() => changed.is_err() || *stopped.borrow(),
                 };
-                entitlements.flush_usage(&node, chrono::Utc::now().timestamp() / 60).await;
+                entitlements.flush_usage(&node, Timestamp::now().as_unix_seconds() / 60).await;
                 if stop {
                     break;
                 }

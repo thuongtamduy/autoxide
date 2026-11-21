@@ -5,7 +5,6 @@ use autoxide_kernel::access::{OrgTarget, Permission, Principal};
 use autoxide_kernel::error::Error;
 use autoxide_kernel::summary::{MetricInfo, MetricValue, SummaryMetric};
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
-use chrono::Duration;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use uuid::Uuid;
 
@@ -39,10 +38,10 @@ impl Analytics for AnalyticsService {
             return Err(errors::kind_invalid());
         }
         let days = i64::from(days).clamp(1, RANGE_MAX_DAYS);
-        let to = now().date_naive();
+        let to = now().date_utc();
         let range = Range {
             site: site.unwrap_or_else(|| root_of(tenant.id())),
-            from: to - Duration::days(days - 1),
+            from: to.checked_sub_days(days - 1).unwrap_or(to),
             to,
         };
         let prefix = format!("{kind}:");
@@ -128,8 +127,8 @@ impl SummaryMetric for Visitors {
         target: OrgTarget,
     ) -> Result<MetricValue, Error> {
         principal.require_at(tenant.database().read(), &ANALYTICS_READ, target).await?;
-        let to = now().date_naive();
-        let from = to - Duration::days(6);
+        let to = now().date_utc();
+        let from = to.checked_sub_days(6).unwrap_or(to);
         let visitors: Option<i64> = daily::Entity::find()
             .select_only()
             .column_as(sum_bigint(daily::Column::Visitors), "visitors")

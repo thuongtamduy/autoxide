@@ -8,7 +8,7 @@ use autoxide_kernel::access::{OrgTarget, Principal, Scope};
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Outbox;
 use autoxide_kernel::tenancy::{OrgId, TenantContext, root_of};
-use chrono::{DateTime, SubsecRound, Utc};
+use autoxide_kernel::time::Timestamp;
 use uuid::Uuid;
 
 use crate::settings::Settings;
@@ -27,8 +27,8 @@ pub(crate) struct BookingsService {
 
 /// Bây giờ, cắt tới micro giây: Postgres lưu tới micro giây, SQLite lưu nguyên. Cắt trước để hai
 /// database trả về cùng một giá trị.
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Nút của bản ghi mới khi người tạo không nêu: gốc nếu có `permission` cho cả khách; nút duy nhất

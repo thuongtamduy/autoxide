@@ -1,5 +1,6 @@
 //! Endpoint REST của luật, dưới `/api/v1/automations/rules`.
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
@@ -11,7 +12,6 @@ use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::version::{IfMatch, Tagged};
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
@@ -63,9 +63,9 @@ pub(crate) struct RuleResponse {
     /// Raised by one on every change of the rule; each run records the version it used.
     version: i32,
     /// When the schedule or metric check runs next.
-    next_run_at: Option<DateTime<Utc>>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
+    next_run_at: Option<Timestamp>,
+    created_at: Timestamp,
+    updated_at: Timestamp,
 }
 
 impl From<Rule> for RuleResponse {

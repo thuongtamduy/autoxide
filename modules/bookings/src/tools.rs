@@ -2,12 +2,12 @@
 //! permission như endpoint REST tương ứng, thân là MỘT lời gọi service — không có logic riêng (luật
 //! kiến trúc 8).
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::mcp::{PageInput, Tool};
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
@@ -31,9 +31,9 @@ pub(crate) struct ListBookingsInput {
     /// Only this staff member (or court, room…).
     resource_id: Option<Uuid>,
     /// Starting at or after this moment.
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Starting before this moment.
-    to: Option<DateTime<Utc>>,
+    to: Option<Timestamp>,
     /// 1 to 200; default 50.
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
@@ -50,7 +50,7 @@ pub(crate) struct CreateBookingInput {
     /// Omitted: the first free staff member who gives the service.
     resource_id: Option<Uuid>,
     /// A `starts_at` from `bookings.availability`.
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// Places (classes); default 1.
     seats: Option<i32>,
     /// Customer's name, 1 to 200 characters.
@@ -71,7 +71,7 @@ pub(crate) struct RescheduleBookingInput {
     /// Id of the booking.
     id: Uuid,
     /// The new start, on a 5-minute mark.
-    starts_at: DateTime<Utc>,
+    starts_at: Timestamp,
     /// Another staff member who gives the service; omitted: the same one.
     resource_id: Option<Uuid>,
 }

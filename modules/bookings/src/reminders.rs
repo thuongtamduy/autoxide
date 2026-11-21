@@ -2,6 +2,8 @@
 //! trước giờ bắt đầu. Gửi trước với khoá chống trùng, đánh dấu sau: job chạy lại (hay hai máy cùng
 //! chạy) không gửi lần hai — `notifications` trả lại tin đã có cho cùng khoá.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 
@@ -11,7 +13,6 @@ use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use autoxide_notifications::api::{
     Category, Channel, Notification, NotificationKind, NotificationTemplate, Notifier, Recipient,
 };
-use chrono::{Duration, Utc};
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect};
 use serde_json::json;
@@ -65,16 +66,16 @@ impl Mark {
 }
 
 /// Mốc cần nhắc của lịch `row` lúc này, nếu có. Lịch đặt trong vòng 24 giờ chỉ nhận lần 2 giờ.
-fn due(row: &Booking, at: chrono::DateTime<Utc>) -> Option<Mark> {
+fn due(row: &Booking, at: Timestamp) -> Option<Mark> {
     let left = row.starts_at - at;
-    if left <= Duration::zero() {
+    if left <= SignedDuration::ZERO {
         return None;
     }
-    if left <= Duration::hours(2) {
+    if left <= SignedDuration::from_hours(2) {
         return row.reminded_2h_at.is_none().then_some(Mark::TwoHours);
     }
-    let booked_early = row.starts_at - row.created_at > Duration::hours(24);
-    (left <= Duration::hours(24) && booked_early && row.reminded_24h_at.is_none())
+    let booked_early = row.starts_at - row.created_at > SignedDuration::from_hours(24);
+    (left <= SignedDuration::from_hours(24) && booked_early && row.reminded_24h_at.is_none())
         .then_some(Mark::Day)
 }
 
@@ -104,7 +105,7 @@ impl BookingsService {
             .column(booking::Column::Id)
             .filter(booking::Column::Status.eq(CONFIRMED))
             .filter(booking::Column::StartsAt.gt(at))
-            .filter(booking::Column::StartsAt.lte(at + Duration::hours(24)))
+            .filter(booking::Column::StartsAt.lte(at + SignedDuration::from_hours(24)))
             .limit(500)
             .into_tuple()
             .all(database.read())
@@ -143,7 +144,7 @@ impl BookingsService {
             .map(|found| found.name)
             .unwrap_or_default();
         let zone = self.settings.timezone(tenant, OrgId::from_uuid(row.org_id)).await?;
-        let time = row.starts_at.with_timezone(&zone).format("%H:%M %d/%m/%Y").to_string();
+        let time = row.starts_at.in_zone(&zone).strftime("%H:%M %d/%m/%Y").to_string();
         let path = if row.customer_user_id.is_some() {
             format!("/api/v1/bookings/me/bookings/{id}/calendar.ics")
         } else {
@@ -151,7 +152,7 @@ impl BookingsService {
         };
         // Khoá theo giờ bắt đầu: đổi giờ thì nhắc lại theo giờ mới.
         let dedupe =
-            format!("bookings.reminder:{id}:{}:{}", mark.label(), row.starts_at.timestamp());
+            format!("bookings.reminder:{id}:{}:{}", mark.label(), row.starts_at.as_unix_seconds());
         let mut notification = Notification::new(
             REMINDER.key(),
             recipient,
@@ -169,8 +170,7 @@ impl BookingsService {
         // Giành mốc nhắc bằng câu UPDATE có điều kiện TRƯỚC khi gửi: hai job chạy cùng lúc thì chỉ một
         // bên được 1 dòng. Gửi lỗi thì trả mốc lại để lần sau gửi tiếp (khoá chống trùng của
         // `notifications` chặn tin thứ hai nếu lần trước thật ra đã ghi).
-        let mark_at = |value: Option<chrono::DateTime<Utc>>,
-                       only_if: Option<chrono::DateTime<Utc>>| {
+        let mark_at = |value: Option<Timestamp>, only_if: Option<Timestamp>| {
             let mut update = booking::Entity::update_many()
                 .col_expr(column, Expr::value(value))
                 .filter(booking::Column::Id.eq(id))
@@ -211,8 +211,8 @@ mod tests {
     use super::*;
 
     fn row(starts_in_hours: i64, booked_hours_before: i64) -> Booking {
-        let at = Utc::now();
-        let starts_at = at + Duration::hours(starts_in_hours);
+        let at = Timestamp::now();
+        let starts_at = at + SignedDuration::from_hours(starts_in_hours);
         Booking {
             id: Uuid::nil(),
             tenant_id: Uuid::nil(),
@@ -222,7 +222,7 @@ mod tests {
             session_id: None,
             seats: 1,
             starts_at,
-            ends_at: starts_at + Duration::hours(1),
+            ends_at: starts_at + SignedDuration::from_hours(1),
             status: CONFIRMED.to_owned(),
             customer_user_id: None,
             customer_name: "A".to_owned(),
@@ -242,14 +242,14 @@ mod tests {
             cancelled_at: None,
             cancel_reason: None,
             created_by: None,
-            created_at: starts_at - Duration::hours(booked_hours_before),
+            created_at: starts_at - SignedDuration::from_hours(booked_hours_before),
             updated_at: at,
         }
     }
 
     #[test]
     fn moc_nhac_dung_luc() {
-        let at = Utc::now();
+        let at = Timestamp::now();
         assert_eq!(due(&row(30, 72), at), None);
         assert_eq!(due(&row(20, 72), at), Some(Mark::Day));
         // Đặt trong vòng 24 giờ: bỏ lần 24 giờ.

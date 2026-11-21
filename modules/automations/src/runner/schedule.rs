@@ -7,14 +7,15 @@
 //! - `automations.prune` (mỗi ngày): xoá nhật ký lần chạy đã xong quá
 //!   `AUTOXIDE_AUTOMATIONS_RUN_RETENTION_DAYS` ngày, cùng khoá chống chạy trùng của chúng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::database::Database;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::job::{JobContext, JobHandler};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
-use chrono::{DateTime, Duration, Utc};
-use chrono_tz::Tz;
+use autoxide_kernel::time;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect};
 use serde_json::json;
@@ -78,20 +79,15 @@ impl Automations {
     }
 
     /// Một luật tới hạn: dời mốc, rồi kích hoạt theo loại.
-    async fn fire(
-        &self,
-        tenant: &TenantContext,
-        rule: &Rule,
-        now: DateTime<Utc>,
-    ) -> Result<(), Error> {
+    async fn fire(&self, tenant: &TenantContext, rule: &Rule, now: Timestamp) -> Result<(), Error> {
         let Some(slot) = rule.next_run_at else { return Ok(()) };
         let mut errors = Vec::new();
         let Some((trigger, _)) = Trigger::parse(&parse_json(&rule.trigger), "trigger", &mut errors)
         else {
             return Ok(());
         };
-        let zone = rule.timezone.parse::<Tz>().unwrap_or(Tz::UTC);
-        let next = trigger.next_run(now, zone);
+        let zone = time::zone(&rule.timezone).unwrap_or(jiff::tz::TimeZone::UTC);
+        let next = trigger.next_run(now, &zone);
         // Chỉ một worker dời được mốc này.
         let moved = rule::Entity::update_many()
             .col_expr(rule::Column::NextRunAt, Expr::value(next))
@@ -121,14 +117,14 @@ impl Automations {
                 }
                 Ok(())
             }
-            Trigger::Metric(metric) => self.check_metric(tenant, rule, &metric, slot, zone).await,
+            Trigger::Metric(metric) => self.check_metric(tenant, rule, &metric, slot, &zone).await,
             Trigger::Event { .. } | Trigger::Manual => Ok(()),
         }
     }
 
     /// Xoá nhật ký lần chạy đã xong quá hạn lưu của `database`.
     pub(crate) async fn prune(&self, database: &Database) -> Result<(), Error> {
-        let before = now() - Duration::days(self.config.run_retention_days);
+        let before = now() - SignedDuration::from_hours(24 * self.config.run_retention_days);
         let deleted = run::Entity::delete_many()
             .filter(run::Column::CreatedAt.lt(before))
             .filter(run::Column::Status.is_in([SUCCEEDED, FAILED, SKIPPED]))

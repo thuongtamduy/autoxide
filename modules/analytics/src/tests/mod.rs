@@ -7,6 +7,7 @@ mod ingest;
 mod privacy;
 mod reports;
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
@@ -28,7 +29,6 @@ use autoxide_kernel::tenancy::{
     DEFAULT_TENANT, OrgId, OrgTree, Site, TenantContext, TenantId, root_of,
 };
 use autoxide_testkit::{TestApp, TestDatabase};
-use chrono::{DateTime, TimeZone, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -247,8 +247,8 @@ pub(super) fn browser(ip: &str, agent: &str) -> ClientInfo {
     client
 }
 
-pub(super) fn at(day: u32, hour: u32) -> DateTime<Utc> {
-    Utc.with_ymd_and_hms(2026, 11, day, hour, 0, 0).unwrap()
+pub(super) fn at(day: i8, hour: i8) -> Timestamp {
+    Timestamp::from_utc(2026, 11, day, hour, 0, 0).unwrap()
 }
 
 pub(super) fn page(path: &str) -> Value {
@@ -270,7 +270,7 @@ impl Harness {
         client: &ClientInfo,
         user: Option<Uuid>,
         events: Vec<Value>,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Ingested {
         let site = self.site(org).await;
         let visitor = Visitor { client, host: Some(HOST), user_id: user };

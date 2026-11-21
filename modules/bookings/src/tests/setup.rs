@@ -1,8 +1,9 @@
 //! Cấu hình và giờ trống: dịch vụ, nhân viên, lịch tuần, ngày nghỉ, múi giờ của nút.
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use serde_json::json;
 
 use super::{admin, app, call, next_monday, openings, service, set_setting, staff, utc};
@@ -43,7 +44,7 @@ async fn gio_trong_tru_nghi_va_dem() {
         assert_eq!(starts.len(), 8);
 
         // Ca thêm thứ Ba 14:00–15:00 giờ VN (07:00–08:00 UTC).
-        let tuesday = monday + Duration::days(1);
+        let tuesday = monday.succ().unwrap();
         let extra = json!({
             "resource_id": lan, "kind": "open", "starts_at": utc(tuesday, 7, 0), "ends_at": utc(tuesday, 8, 0),
         });
@@ -155,8 +156,9 @@ async fn cau_hinh_can_quyen_va_bao_moi_loi_mot_lan() {
             StatusCode::OK,
         )
         .await;
-        let from = Utc::now().format("%Y-%m-%dT%H:%M:%SZ");
-        let to = (Utc::now() + Duration::days(3)).format("%Y-%m-%dT%H:%M:%SZ");
+        let from = Timestamp::now().format("%Y-%m-%dT%H:%M:%SZ");
+        let to =
+            (Timestamp::now() + SignedDuration::from_hours(24 * 3)).format("%Y-%m-%dT%H:%M:%SZ");
         let uri = format!("/bookings/public/availability?service_id={haircut}&from={from}&to={to}");
         let (status, problem) = call(&app, "GET", &uri, None, None).await;
         assert_eq!(

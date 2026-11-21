@@ -7,6 +7,8 @@ mod privacy;
 mod stream;
 mod voice;
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::access::{Principal, Scope};
@@ -181,7 +183,7 @@ pub(crate) async fn run_jobs(app: &TestApp) {
 
 /// Đưa mọi job đang hẹn giờ của module về tới hạn ngay (thay cho chờ thật).
 pub(crate) async fn due_now(app: &TestApp) {
-    let past = chrono::Utc::now() - chrono::Duration::minutes(1);
+    let past = Timestamp::now() - SignedDuration::from_mins(1);
     let statement = sea_orm::Statement::from_sql_and_values(
         app.database().write().get_database_backend(),
         match app.database().write().get_database_backend() {

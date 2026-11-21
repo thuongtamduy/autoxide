@@ -1,5 +1,6 @@
 //! Bảng `support_links`: phiếu gắn với bản ghi khác (`<kind>:<id>`, sổ đối tượng D-123).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -12,7 +13,7 @@ pub struct Model {
     pub ticket_id: Uuid,
     #[sea_orm(primary_key, auto_increment = false)]
     pub target: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

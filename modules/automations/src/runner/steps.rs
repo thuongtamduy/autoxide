@@ -4,7 +4,8 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind};
 use autoxide_kernel::idempotency::{Begin, StoredResponse};
 use autoxide_kernel::tenancy::TenantContext;
-use chrono::{DateTime, Duration, Utc};
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use serde_json::{Map, Value, json};
 use sha2::{Digest, Sha256};
 
@@ -25,7 +26,7 @@ pub(super) enum Outcome {
     /// `stop_if` đúng: lần chạy kết thúc thành công.
     Stop(StepLog),
     /// Dừng chờ: `wait` (hẹn giờ) hay bước rủi ro chờ người duyệt.
-    Pause { log: StepLog, status: &'static str, resume_at: Option<DateTime<Utc>> },
+    Pause { log: StepLog, status: &'static str, resume_at: Option<Timestamp> },
     /// Bước hỏng: lần chạy kết thúc `failed` với lỗi này.
     Failed(StepLog, Error),
 }
@@ -56,7 +57,7 @@ impl Automations {
             Action::Wait { minutes } => {
                 log.status = "waiting".to_owned();
                 let minutes = i64::try_from(*minutes).unwrap_or(i64::MAX / 120);
-                let resume_at = started_at + Duration::minutes(minutes);
+                let resume_at = started_at + SignedDuration::from_mins(minutes);
                 log.result = Some(json!({"resume_at": resume_at}));
                 Ok(Outcome::Pause { log, status: WAITING, resume_at: Some(resume_at) })
             }
@@ -196,7 +197,7 @@ impl Automations {
         };
         let scope = format!("automation:{}", principal.user_id());
         let fingerprint = fingerprint(tool.name(), &arguments);
-        let locked_until = now() + Duration::minutes(STEP_LOCK_MINUTES);
+        let locked_until = now() + SignedDuration::from_mins(STEP_LOCK_MINUTES);
         match store.begin(tenant, &scope, key, &fingerprint, locked_until).await? {
             Begin::Replay(stored) => serde_json::from_slice(&stored.body).map_err(Error::internal),
             Begin::Started { id } => {

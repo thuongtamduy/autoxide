@@ -5,9 +5,10 @@
 use autoxide_catalog::api::{Catalog, PriceQuery};
 use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, root_of};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;
-use chrono::Utc;
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -91,7 +92,7 @@ async fn san_pham_co_anh_media_va_gia_doc_qua_api() {
 
         let catalog = runtime.modules.api::<dyn Catalog>().unwrap();
         let tenant = TenantContext::default_on(runtime.database.clone());
-        let at = Utc::now() + chrono::Duration::seconds(1);
+        let at = Timestamp::now() + SignedDuration::from_secs(1);
         let query = PriceQuery::new(root_of(DEFAULT_TENANT), Currency::VND, at, vec![variant]);
         let found = catalog.prices(&tenant, &query).await.unwrap();
         assert_eq!(found[0].amount.minor(), 199_000);

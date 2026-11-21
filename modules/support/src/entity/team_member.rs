@@ -1,5 +1,6 @@
 //! Bảng `support_team_members`: thành viên nhóm, cờ "nhận việc", lần được giao cuối (chia vòng).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -13,8 +14,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub user_id: Uuid,
     pub accepting: bool,
-    pub last_assigned_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub last_assigned_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

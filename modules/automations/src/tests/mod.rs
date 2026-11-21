@@ -8,6 +8,7 @@ mod metrics;
 mod rules;
 mod runs;
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -399,7 +400,7 @@ mod fixtures {
             scope: &str,
             key: &str,
             _: &str,
-            _: chrono::DateTime<chrono::Utc>,
+            _: Timestamp,
         ) -> Result<Begin, Error> {
             let mut keys = self.0.lock().unwrap();
             let entry = format!("{scope}|{key}");

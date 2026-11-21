@@ -3,6 +3,8 @@
 //! Nhân viên bấm gọi: transaction ngắn khoá dòng, `open → calling`, ghi cuộc gọi `queued` → commit →
 //! NGOÀI transaction gọi nhà cung cấp với số hiển thị là hotline của cửa hàng.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration as StdDuration;
 
 use autoxide_kernel::access::Principal;
@@ -15,7 +17,6 @@ use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use autoxide_kernel::throttle::{Outcome, Throttle};
 use autoxide_kernel::voice::{CallStatus, OutboundCall};
-use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::{Condition, Expr, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, QueryFilter};
 use serde_json::json;
@@ -33,15 +34,15 @@ pub(crate) type Callback = callback::Model;
 /// Mục đích mã hoá số điện thoại của yêu cầu gọi lại (`seal`).
 pub(crate) const PHONE_PURPOSE: &str = "conversations.callback_phone";
 /// Yêu cầu mở quá `window_end` chừng này thì hết hạn.
-const EXPIRE_AFTER: Duration = Duration::hours(2);
+const EXPIRE_AFTER: SignedDuration = SignedDuration::from_hours(2);
 pub(crate) const EXPIRE_CALLBACKS: &str = "conversations.expire_callbacks";
 
 /// Yêu cầu gọi lại của người mua.
 #[derive(Debug, Clone)]
 pub(crate) struct NewCallback {
     pub client_id: String,
-    pub window_start: DateTime<Utc>,
-    pub window_end: DateTime<Utc>,
+    pub window_start: Timestamp,
+    pub window_end: Timestamp,
     /// `account`: số đã xác thực của tài khoản.
     pub phone_source: String,
     pub recording_ack: bool,
@@ -52,8 +53,8 @@ pub(crate) struct NewCallback {
 pub(crate) struct CallbackFilter {
     pub status: Option<String>,
     pub org_id: Option<Uuid>,
-    pub from: Option<DateTime<Utc>>,
-    pub to: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
+    pub to: Option<Timestamp>,
 }
 
 impl ConversationsService {
@@ -108,8 +109,8 @@ impl ConversationsService {
         let at = now();
         let days = i64::from(self.config.callback_days_ahead);
         let in_hours = new.window_start < new.window_end
-            && new.window_start >= at - Duration::minutes(5)
-            && new.window_end <= at + Duration::days(days)
+            && new.window_start >= at - SignedDuration::from_mins(5)
+            && new.window_end <= at + SignedDuration::from_hours(24 * days)
             && covers(&hours_of(&line), line.utc_offset_minutes, new.window_start, new.window_end);
         if !in_hours {
             return Err(Error::new(

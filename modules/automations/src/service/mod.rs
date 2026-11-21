@@ -11,6 +11,7 @@ pub(crate) mod rules;
 pub(crate) mod runs;
 pub(crate) mod validate;
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 
 use autoxide_kernel::access::Authenticator;
@@ -20,7 +21,6 @@ use autoxide_kernel::event::{EventCatalog, Outbox};
 use autoxide_kernel::job::JobQueue;
 use autoxide_kernel::template::TemplateEngine;
 use autoxide_kernel::tenancy::DatabaseRegistry;
-use chrono::{DateTime, SubsecRound, Utc};
 use uuid::Uuid;
 
 use crate::config::AutomationsConfig;
@@ -51,8 +51,8 @@ pub(crate) struct Automations {
 }
 
 /// Bây giờ, cắt tới micro giây (hai database lưu cùng một giá trị — dùng làm phiên bản).
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 pub(crate) fn rule_not_found(id: Uuid) -> Error {

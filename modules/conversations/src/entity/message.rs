@@ -1,5 +1,6 @@
 //! Bảng `conversations_messages`: tin nhắn, chỉ thêm (không sửa; thu hồi thì ẩn nội dung, giữ dấu).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,8 +18,8 @@ pub struct Model {
     pub client_id: String,
     pub call_id: Option<Uuid>,
     pub auto_reply: bool,
-    pub recalled_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub recalled_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

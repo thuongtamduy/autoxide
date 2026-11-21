@@ -1,5 +1,6 @@
 //! Bảng `conversations_reports`: báo vi phạm về một cuộc trò chuyện hay một tin.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -17,8 +18,8 @@ pub struct Model {
     pub reason: String,
     pub status: String,
     pub resolved_by: Option<Uuid>,
-    pub resolved_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
+    pub resolved_at: Option<Timestamp>,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

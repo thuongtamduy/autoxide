@@ -109,14 +109,14 @@ fn render(module: &str, jobs: &[JobRecord]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, Utc};
+    use autoxide_kernel::time::Timestamp;
 
     #[test]
     fn in_job_hong() {
-        let job = JobRecord::new(Uuid::nil(), "reports.send", DateTime::<Utc>::UNIX_EPOCH)
+        let job = JobRecord::new(Uuid::nil(), "reports.send", Timestamp::UNIX_EPOCH)
             .attempts(10)
             .max_attempts(10)
-            .failed_at(Some(DateTime::<Utc>::UNIX_EPOCH))
+            .failed_at(Some(Timestamp::UNIX_EPOCH))
             .last_error(Some("internal_error: the mail server is down".to_owned()));
 
         assert_eq!(

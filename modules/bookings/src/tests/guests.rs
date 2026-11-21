@@ -1,6 +1,8 @@
 //! Mục 3: nhắc lịch qua `notifications`, khách vãng lai đặt / huỷ bằng mã một lần, `/me/bookings`,
 //! tệp lịch `.ics`, tool MCP.
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::job::{EnqueueOptions, Job, JobQueue};
@@ -8,7 +10,6 @@ use autoxide_kernel::sms::SmsSender;
 use autoxide_notifications::api::Notifier;
 use autoxide_testkit::{FakeSmsSender, TestApp, TestDatabase, tool};
 use axum::http::StatusCode;
-use chrono::{Duration, Timelike, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -58,9 +59,9 @@ async fn setup(test: &TestDatabase) -> Setup {
 }
 
 /// Giờ trên lưới 5 phút, sau bây giờ `minutes` phút (làm tròn xuống).
-fn in_minutes(minutes: i64) -> chrono::DateTime<Utc> {
-    let at = Utc::now() + Duration::minutes(minutes);
-    at.date_naive().and_hms_opt(at.hour(), at.minute() / 5 * 5, 0).unwrap().and_utc()
+fn in_minutes(minutes: i64) -> Timestamp {
+    let at = Timestamp::now() + SignedDuration::from_mins(minutes);
+    Timestamp::from_unix_seconds(at.as_unix_seconds().div_euclid(300) * 300).unwrap()
 }
 
 fn code_in(sms: &FakeSmsSender, phone: &str) -> String {
@@ -212,8 +213,8 @@ async fn lich_cua_toi_tep_lich_va_tool_mcp() {
 
         // MCP: cùng service với REST.
         let client = shop.mcp("admin").await.unwrap();
-        let from = (start - Duration::hours(1)).to_rfc3339();
-        let to = (start + Duration::hours(1)).to_rfc3339();
+        let from = (start - SignedDuration::from_hours(1)).to_rfc3339();
+        let to = (start + SignedDuration::from_hours(1)).to_rfc3339();
         let found = client
             .call_tool(tool("bookings.availability", json!({"service_id": setup.service, "from": from, "to": to})))
             .await
@@ -230,7 +231,7 @@ async fn lich_cua_toi_tep_lich_va_tool_mcp() {
             .unwrap();
         assert_eq!(taken.is_error, Some(true));
         assert_eq!(taken.structured_content.unwrap()["code"], "bookings.slot_taken");
-        let later = start + Duration::hours(2);
+        let later = start + SignedDuration::from_hours(2);
         let moved = client
             .call_tool(tool("bookings.reschedule_booking", json!({"id": id, "starts_at": later})))
             .await

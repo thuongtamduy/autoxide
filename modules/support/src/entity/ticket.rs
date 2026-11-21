@@ -1,5 +1,6 @@
 //! Bảng `support_tickets`: một phiếu hỗ trợ.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -16,10 +17,10 @@ pub struct Model {
     pub requester_phone: Option<String>,
     pub requester_name: String,
     pub locale: Option<String>,
-    pub verified_at: Option<DateTimeUtc>,
+    pub verified_at: Option<Timestamp>,
     pub token_hash: Option<String>,
     pub otp_hash: Option<String>,
-    pub otp_expires_at: Option<DateTimeUtc>,
+    pub otp_expires_at: Option<Timestamp>,
     pub otp_attempts: i32,
     pub category: String,
     pub priority: String,
@@ -29,13 +30,13 @@ pub struct Model {
     pub channel: String,
     pub assignee_user_id: Option<Uuid>,
     pub team_id: Option<Uuid>,
-    pub first_response_due_at: Option<DateTimeUtc>,
-    pub resolve_due_at: Option<DateTimeUtc>,
-    pub first_responded_at: Option<DateTimeUtc>,
-    pub sla_paused_at: Option<DateTimeUtc>,
+    pub first_response_due_at: Option<Timestamp>,
+    pub resolve_due_at: Option<Timestamp>,
+    pub first_responded_at: Option<Timestamp>,
+    pub sla_paused_at: Option<Timestamp>,
     pub sla_paused_minutes: i64,
-    pub solved_at: Option<DateTimeUtc>,
-    pub closed_at: Option<DateTimeUtc>,
+    pub solved_at: Option<Timestamp>,
+    pub closed_at: Option<Timestamp>,
     pub breached: bool,
     pub case_id: Option<Uuid>,
     pub dispute_id: Option<Uuid>,
@@ -45,11 +46,11 @@ pub struct Model {
     pub satisfaction_note: Option<String>,
     pub auto_reply_paused: bool,
     pub auto_replies_in_row: i32,
-    pub last_message_at: DateTimeUtc,
+    pub last_message_at: Timestamp,
     pub reference: Option<String>,
     pub search_key: String,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

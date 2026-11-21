@@ -10,9 +10,10 @@
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::tenancy::{TenantContext, TenantMoves};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{Duration, Utc};
+use jiff::SignedDuration;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -103,7 +104,7 @@ async fn xoa_tai_khoan_xoa_so_dien_thoai_va_ban_xuat_co_phan_compliance() {
             "INSERT INTO compliance_account_verifications (tenant_id, user_id, phone, phone_key, \
              phone_verified_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
         };
-        let now = Utc::now();
+        let now = Timestamp::now();
         write
             .execute_raw(Statement::from_sql_and_values(
                 backend,
@@ -204,7 +205,7 @@ async fn su_co_qua_moc_gui_mail_toi_nguoi_nhan_canh_bao() {
         assert!(status.is_success(), "{status} {body}");
         let input = json!({
             "title": "Database copy exposed", "severity": "high",
-            "detected_at": (Utc::now() - Duration::hours(25)).to_rfc3339(),
+            "detected_at": (Timestamp::now() - SignedDuration::from_hours(25)).to_rfc3339(),
         });
         let (status, opened) = call(&app, Method::POST, "/compliance/incidents", "staff", Some(input)).await;
         assert_eq!(status, StatusCode::CREATED, "{opened}");

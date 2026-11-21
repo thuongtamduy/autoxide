@@ -7,6 +7,8 @@ mod fakes;
 mod guests;
 mod setup;
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -16,7 +18,6 @@ use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, TenantContext, root_of};
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
-use chrono::{DateTime, Datelike, Duration, NaiveDate, Utc};
 use serde_json::{Value, json};
 
 /// Quyền của người quản trị trong test.
@@ -130,16 +131,16 @@ pub(super) fn set_setting(shop: &Shop, key: &str, value: Value) {
 }
 
 /// Thứ Hai đầu tiên sau ít nhất 7 ngày nữa (giờ trống chỉ chào giờ tương lai).
-pub(super) fn next_monday() -> NaiveDate {
-    let mut day = (Utc::now() + Duration::days(7)).date_naive();
-    while day.weekday().number_from_monday() != 1 {
-        day += Duration::days(1);
+pub(super) fn next_monday() -> Date {
+    let mut day = (Timestamp::now() + SignedDuration::from_hours(24 * 7)).date_utc();
+    while day.weekday() != jiff::civil::Weekday::Monday {
+        day = day.succ().unwrap();
     }
     day
 }
 
-pub(super) fn utc(day: NaiveDate, hour: u32, minute: u32) -> DateTime<Utc> {
-    day.and_hms_opt(hour, minute, 0).unwrap().and_utc()
+pub(super) fn utc(day: Date, hour: i8, minute: i8) -> Timestamp {
+    Timestamp::from_utc(day.year(), day.month(), day.day(), hour, minute, 0).unwrap()
 }
 
 /// Một nhân viên làm thứ Hai 9:00–12:00 giờ địa phương; trả ID.
@@ -183,9 +184,9 @@ pub(super) async fn service(
 }
 
 /// Giờ trống công khai của ngày `day` (theo UTC ± 1 ngày) — danh sách `local_start`.
-pub(super) async fn openings(app: &TestApp, service: &str, day: NaiveDate) -> (Value, Vec<String>) {
-    let from = utc(day, 0, 0) - Duration::days(1);
-    let to = utc(day, 0, 0) + Duration::days(2);
+pub(super) async fn openings(app: &TestApp, service: &str, day: Date) -> (Value, Vec<String>) {
+    let from = utc(day, 0, 0) - SignedDuration::from_hours(24);
+    let to = utc(day, 0, 0) + SignedDuration::from_hours(24 * 2);
     let uri = format!(
         "/bookings/public/availability?service_id={service}&from={}&to={}",
         from.format("%Y-%m-%dT%H:%M:%SZ"),

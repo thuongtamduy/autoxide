@@ -11,8 +11,8 @@ use autoxide_kernel::rows::lock_one;
 use autoxide_kernel::secret::sha256;
 use autoxide_kernel::sms::PhoneNumber;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
+use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::voice::{BrowserSession, BrowserSessionRequest, CallStatus, SessionRole};
-use chrono::{DateTime, Utc};
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, IntoActiveModel, QueryFilter, QueryOrder,
@@ -59,7 +59,7 @@ pub(crate) struct StoredNotification {
     pub call_id: Option<Uuid>,
     pub status: String,
     pub agent_identity: Option<String>,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
     pub duration_seconds: Option<u32>,
     pub provider_recording_id: Option<String>,
 }
@@ -311,7 +311,7 @@ impl ConversationsService {
         agent_identity: Option<String>,
         duration_seconds: Option<u32>,
         provider_recording_id: Option<String>,
-        at: DateTime<Utc>,
+        at: Timestamp,
     ) -> Result<bool, Error> {
         let transaction = tenant.database().begin_write().await?;
         let Some(before) =

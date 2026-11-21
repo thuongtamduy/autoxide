@@ -1,5 +1,6 @@
 //! Bảng `conversations_calls`: một cuộc gọi (người mua gọi tới hay cửa hàng gọi ra).
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -18,17 +19,17 @@ pub struct Model {
     pub provider_call_id: Option<String>,
     pub agent_user_id: Option<Uuid>,
     pub caller_user_id: Option<Uuid>,
-    pub started_at: Option<DateTimeUtc>,
-    pub answered_at: Option<DateTimeUtc>,
-    pub ended_at: Option<DateTimeUtc>,
+    pub started_at: Option<Timestamp>,
+    pub answered_at: Option<Timestamp>,
+    pub ended_at: Option<Timestamp>,
     pub duration_seconds: Option<i32>,
     pub recording_enabled: bool,
-    pub recording_ack_at: Option<DateTimeUtc>,
+    pub recording_ack_at: Option<Timestamp>,
     pub provider_recording_id: Option<String>,
     pub recording_ref: Option<String>,
-    pub recording_expires_at: Option<DateTimeUtc>,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub recording_expires_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

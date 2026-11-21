@@ -3,7 +3,9 @@
 
 use autoxide_kernel::access::ActorKind;
 use autoxide_kernel::event::Delivered;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -259,7 +261,7 @@ async fn wait_hen_gio_roi_chay_tiep() {
             harness.service.get_run(&harness.tenant, &harness.owner, run.id).await.unwrap();
         assert_eq!(waiting.status, WAITING);
         let resume_at = waiting.resume_at.unwrap();
-        assert!(resume_at > chrono::Utc::now() + chrono::Duration::minutes(59));
+        assert!(resume_at > Timestamp::now() + SignedDuration::from_mins(59));
         // Chưa tới giờ: worker không chạy tiếp.
         harness.settle().await;
         assert_eq!(harness.count(|c| &c.tagged), 0);
@@ -343,8 +345,7 @@ async fn lich_chay_dung_moc_mot_lan() {
         let rule = harness.rule(schedule, json!(null), tag_action()).await;
         assert!(rule.next_run_at.is_some());
         // Đưa mốc về quá khứ: lần quét chạy luật một lần và dời mốc sang ngày sau.
-        let past = chrono::Utc::now() - chrono::Duration::minutes(5);
-        let past = chrono::SubsecRound::trunc_subsecs(past, 6);
+        let past = Timestamp::now() - SignedDuration::from_mins(5);
         crate::entity::rule::Entity::update_many()
             .col_expr(crate::entity::rule::Column::NextRunAt, Expr::value(past))
             .filter(crate::entity::rule::Column::Id.eq(rule.id))
@@ -358,7 +359,7 @@ async fn lich_chay_dung_moc_mot_lan() {
         let runs = harness.runs(rule.id).await;
         assert_eq!(runs.len(), 1);
         assert_eq!(runs[0].trigger_key, format!("schedule:{}", past.to_rfc3339()));
-        assert!(harness.reload(rule.id).await.next_run_at.unwrap() > chrono::Utc::now());
+        assert!(harness.reload(rule.id).await.next_run_at.unwrap() > Timestamp::now());
     })
     .await
     .unwrap();

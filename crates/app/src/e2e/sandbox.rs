@@ -5,8 +5,10 @@
 
 use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
+use jiff::SignedDuration;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -216,7 +218,7 @@ async fn lifecycle(dedicated: bool) {
                 write.get_database_backend(),
                 "UPDATE kernel_tenants SET sandbox_expires_at = $1 WHERE id = $2",
                 [
-                    (chrono::Utc::now() - chrono::Duration::hours(1)).into(),
+                    (Timestamp::now() - SignedDuration::from_hours(1)).into(),
                     again.parse::<uuid::Uuid>().unwrap().into(),
                 ],
             ))

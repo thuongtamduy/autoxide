@@ -1,5 +1,6 @@
 //! Liên kết bản ghi, chuyển phiếu, mức hài lòng, câu trả lời mẫu (bước 53 mục 4).
 
+use autoxide_kernel::time::Timestamp;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -10,7 +11,6 @@ use autoxide_kernel::response::{Created, Data, Problem};
 use autoxide_kernel::tenancy::TenantContext;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
@@ -225,10 +225,10 @@ pub(crate) struct MacroResponse {
     #[schema(value_type = Object)]
     questions: BTreeMap<String, Vec<String>>,
     approved_by: Option<Uuid>,
-    approved_at: Option<DateTime<Utc>>,
+    approved_at: Option<Timestamp>,
     /// Automatic use stops after this day unless reviewed again (`YYYY-MM-DD`).
     review_due_on: Option<String>,
-    updated_at: DateTime<Utc>,
+    updated_at: Timestamp,
 }
 
 impl From<SavedReply> for MacroResponse {

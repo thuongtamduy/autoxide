@@ -1,5 +1,6 @@
 //! Bảng `bookings_exceptions`.
 
+use autoxide_kernel::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -11,10 +12,10 @@ pub struct Model {
     pub tenant_id: Uuid,
     pub resource_id: Uuid,
     pub kind: String,
-    pub starts_at: DateTimeUtc,
-    pub ends_at: DateTimeUtc,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub reason: String,
-    pub created_at: DateTimeUtc,
+    pub created_at: Timestamp,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

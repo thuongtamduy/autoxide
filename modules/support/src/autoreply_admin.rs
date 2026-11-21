@@ -1,6 +1,8 @@
 //! Quản lý trả lời tự động (D-230): duyệt câu trả lời mẫu, xem thử, nhật ký, phản hồi "hữu ích /
 //! không đúng" của người mua, nút "gặp nhân viên".
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 
 use autoxide_kernel::access::{OrgTarget, Principal};
@@ -8,7 +10,6 @@ use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
-use chrono::{Duration, NaiveDate, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, IntoActiveModel, PaginatorTrait, QueryFilter, Set};
 use serde_json::json;
 use uuid::Uuid;
@@ -33,9 +34,9 @@ impl SupportService {
         id: Uuid,
         enabled: bool,
         questions: BTreeMap<String, Vec<String>>,
-        review_due_on: Option<NaiveDate>,
+        review_due_on: Option<Date>,
     ) -> Result<SavedReply, Error> {
-        let today = Utc::now().date_naive();
+        let today = Timestamp::now().date_utc();
         if enabled {
             let mut problems = Vec::new();
             let count: usize = questions.values().map(Vec::len).sum();
@@ -53,7 +54,9 @@ impl SupportService {
                 ));
             }
             finish(problems)?;
-            if review_due_on.is_none_or(|day| day < today || day > today + Duration::days(366)) {
+            if review_due_on.is_none_or(|day| {
+                day < today || today.checked_add_days(366).is_some_and(|limit| day > limit)
+            }) {
                 return Err(Error::new(
                     ErrorKind::Validation,
                     "support.macro_not_approved",
@@ -159,7 +162,7 @@ impl SupportService {
         let after =
             auto_reply::Entity::update(row).validate()?.scoped(tenant).exec(&transaction).await?;
         if !helpful && let Some(macro_id) = current.macro_id {
-            let since = Utc::now() - Duration::days(7);
+            let since = Timestamp::now() - SignedDuration::from_hours(24 * 7);
             let wrong = auto_reply::Entity::find()
                 .filter(auto_reply::Column::MacroId.eq(macro_id))
                 .filter(auto_reply::Column::Feedback.eq("wrong"))

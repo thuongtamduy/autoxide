@@ -1,5 +1,7 @@
 //! Bộ giả cho test: sổ cái chỉ có thu và hoàn (đủ cho cọc), bộ gửi thông báo đếm tin.
 
+use autoxide_kernel::time::{Date, Timestamp};
+use jiff::SignedDuration;
 use std::sync::Mutex;
 
 use autoxide_kernel::error::Error;
@@ -13,7 +15,6 @@ use autoxide_ledger::api::{
     NewEntry, NewPayment, NewPayout, NewRefund, NewReversal, NewTransferPayment, OpenAccount,
     Payment, Payout, Refund, Settled, Settlement,
 };
-use chrono::{Duration, NaiveDate, Utc};
 use uuid::Uuid;
 
 fn unused<T>() -> Result<T, Error> {
@@ -73,7 +74,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: AccountKey,
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Money, Error> {
         unused()
     }
@@ -90,7 +91,7 @@ impl Ledger for FakeLedger {
         if let Some(found) = payments.iter().find(|found| found.reference == payment.reference) {
             return Ok(Submitted::Replayed(found.clone()));
         }
-        let now = Utc::now();
+        let now = Timestamp::now();
         let created = Payment {
             id: Uuid::now_v7(),
             org_id: payment.org.as_uuid(),
@@ -106,7 +107,7 @@ impl Ledger for FakeLedger {
             qr_payload: None,
             transfer_code: None,
             bank_account_id: None,
-            expires_at: now + Duration::minutes(15),
+            expires_at: now + SignedDuration::from_mins(15),
             captured_at: None,
             source_module: payment.source_module,
             source_id: payment.source_id,
@@ -127,7 +128,7 @@ impl Ledger for FakeLedger {
         if let Some(found) = refunds.iter().find(|found| found.reference == refund.reference) {
             return Ok(Submitted::Replayed(found.clone()));
         }
-        let now = Utc::now();
+        let now = Timestamp::now();
         let created = Refund {
             id: Uuid::now_v7(),
             payment_id: refund.payment,
@@ -149,7 +150,7 @@ impl Ledger for FakeLedger {
         &self,
         _: &TenantContext,
         _: &[AccountKey],
-        _: Option<NaiveDate>,
+        _: Option<Date>,
     ) -> Result<Vec<Money>, Error> {
         unused()
     }
@@ -193,7 +194,7 @@ impl Ledger for FakeLedger {
         _: &TenantContext,
         _: Currency,
         _: Currency,
-        _: NaiveDate,
+        _: Date,
     ) -> Result<Option<ExchangeRate>, Error> {
         unused()
     }
