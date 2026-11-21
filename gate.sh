@@ -41,8 +41,9 @@
 #
 # Theo thứ tự (dừng ở bước đỏ đầu tiên):
 #   1. định dạng            cargo fmt --check
-#   2. lint                 cargo clippy, cảnh báo tính là lỗi; cùng clippy + test AVIF của `media` với
-#                           `--features avif` (feature không bật mặc định, D-20261121-avif-feature)
+#   2. lint                 cargo clippy, cảnh báo tính là lỗi
+#      avif                 clippy + test AVIF của `media` với `--features avif` (feature không bật mặc
+#                           định, D-20261121-avif-feature); phần riêng `--only avif`, CI chạy job riêng
 #   3. ranh giới workspace  cargo xtask check
 #   4. hợp đồng API         cargo xtask api-diff: không phá vỡ /api/v1 so với tag phát hành gần nhất;
 #                           cargo xtask sdk --check: SDK TypeScript khớp docs/openapi.json
@@ -97,7 +98,7 @@ ONLY=""
 SHARD=()
 ARCHIVE=""
 usage() {
-  echo "usage: ./gate.sh [--quick | --pr] [--only lint|build|sqlite|postgres] [--archive DIR] [--shard k/n]" >&2
+  echo "usage: ./gate.sh [--quick | --pr] [--only lint|avif|build|sqlite|postgres] [--archive DIR] [--shard k/n]" >&2
   exit 2
 }
 while [ $# -gt 0 ]; do
@@ -126,7 +127,7 @@ while [ $# -gt 0 ]; do
 done
 [ "$QUICK" = 1 ] && [ "$PR" = 1 ] && usage
 case "$ONLY" in
-  "" | lint | build | sqlite | postgres) ;;
+  "" | lint | avif | build | sqlite | postgres) ;;
   *) usage ;;
 esac
 # Archive chỉ để chạy test của một database; `build` thì không chia phần.
@@ -194,6 +195,27 @@ if [ "$TARGET_MAX_GB" != 0 ] && [ -d target ] && [ "$(target_gb)" -gt "$TARGET_M
   fi
 fi
 
+# --- AVIF: phần riêng (`--only avif`), không nằm trong lint ------------------------------------------
+# Feature `avif` của `media` không bật mặc định (D-20261121-avif-feature) nên clippy và test thường không
+# biên dịch phần AVIF: lint và chạy riêng test của `media` với feature đó (SQLite), để nó không mục. Tách
+# khỏi lint vì biên dịch bộ mã hoá AV1 (rav1e) làm lint từ ~5 lên ~14 phút trên CI; CI chạy phần này ở job
+# riêng song song. Gate nhanh chỉ chạy khi `media` hay danh sách thư viện đổi so với origin/main.
+avif_needed() {
+  [ "$QUICK" = 1 ] || return 0
+  git rev-parse --verify --quiet "${GATE_BASE:-origin/main}" >/dev/null || return 0
+  git diff --name-only "$(git merge-base "${GATE_BASE:-origin/main}" HEAD)" -- \
+    modules/media Cargo.lock Cargo.toml gate.sh | grep -q .
+}
+if runs avif && avif_needed; then
+  step "AVIF feature of media (cargo clippy + cargo test --features avif)"
+  cargo clippy -p autoxide-media --all-targets --locked --features avif -- -D warnings
+  env -u TEST_DATABASE_URL cargo test -p autoxide-media --locked --features avif --lib -- avif
+fi
+if [ "$ONLY" = avif ]; then
+  printf '\n\033[32mgate --only avif: green — AVIF feature of media\033[0m\n'
+  exit 0
+fi
+
 if runs lint; then
 
 # --- 1-5: kiểm tĩnh, nhanh, không cần database ---------------------------------
@@ -203,12 +225,6 @@ cargo fmt --all --check
 
 step "lint (cargo clippy)"
 cargo clippy --workspace --all-targets --locked -- -D warnings
-
-# Feature `avif` của `media` không bật mặc định (D-20261121-avif-feature) nên bước trên và bước test không
-# biên dịch phần AVIF: lint và chạy riêng test của `media` với feature đó (SQLite), để nó không mục.
-step "AVIF feature of media (cargo clippy + cargo test --features avif)"
-cargo clippy -p autoxide-media --all-targets --locked --features avif -- -D warnings
-env -u TEST_DATABASE_URL cargo test -p autoxide-media --locked --features avif --lib -- avif
 
 step "workspace boundaries (cargo xtask check)"
 cargo xtask check
