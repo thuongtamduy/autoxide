@@ -559,7 +559,8 @@ pub fn is_secret_column(name: &str) -> bool {
 impl TenantTables {
     /// Xuất mọi dòng của khách `tenant` ở `source` thành JSON Lines (`{"table": …, "row": {…}}` mỗi
     /// dòng), gửi từng khúc ~64 KiB qua `sink`. Bỏ hàng đợi job / outbox và cột bí mật
-    /// ([`is_secret_column`]). Byte ghi base64, thời gian RFC 3339 UTC. Trả số dòng mỗi bảng.
+    /// ([`is_secret_column`]). Byte ghi base64, thời điểm RFC 3339 UTC, ngày `YYYY-MM-DD`. Trả số dòng mỗi
+    /// bảng.
     pub async fn export(
         &self,
         source: &Database,
@@ -593,9 +594,14 @@ impl TenantTables {
                         Value::Uuid(value) => {
                             value.map(|id| serde_json::Value::from(id.to_string()))
                         }
-                        // Thời điểm: chuỗi RFC 3339 `+00:00` như trước. (Cột ngày vẫn ra `null` như trước.)
+                        // Thời điểm: chuỗi RFC 3339 `+00:00` như trước. Ngày: `YYYY-MM-DD`, như API trả
+                        // (trước đây cột ngày ra `null` — mất dữ liệu khi khách mang đi).
                         ref value @ Value::Enum(_) => Timestamp::from_sql_value(value)
-                            .map(|at| serde_json::Value::from(at.to_rfc3339())),
+                            .map(|at| serde_json::Value::from(at.to_rfc3339()))
+                            .or_else(|| {
+                                Date::from_sql_value(value)
+                                    .map(|day| serde_json::Value::from(day.to_string()))
+                            }),
                         Value::String(value) => value.map(serde_json::Value::from),
                         Value::SmallInt(value) => value.map(serde_json::Value::from),
                         Value::Int(value) => value.map(serde_json::Value::from),
