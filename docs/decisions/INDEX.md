@@ -96,6 +96,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-admin-password-path](D-20261121-admin-password-path.md)** Nơi ghi mật khẩu tự sinh là một Setting; gate chặn test ghi file vào cây mã nguồn — 2026-11-21
 - **[D-20261121-auto-release](D-20261121-auto-release.md)** Merge PR phát hành là phát hành: GitHub tự tạo tag và chạy Release khi CI của commit đó xanh — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-batch-release-faster](D-20261121-ci-batch-release-faster.md)** PR lô chạy CI đầy đủ; phát hành dùng lại CI xanh của đúng commit; upgrade-test chỉ khi đụng dạng lưu — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-ci-mold-shards](D-20261121-ci-mold-shards.md)** CI: mold làm linker cho job build tests; test Postgres chia 6 phần — 2026-11-21 · **chủ dự án quyết**
