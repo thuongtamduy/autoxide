@@ -351,9 +351,9 @@ const QUICKSTART: &str = "compose.quickstart.yml";
 
 /// Phiên bản trong giá trị mặc định `${AUTOXIDE_IMAGE:-<repo>/autoxide:<phiên bản>}` của dòng `image:`.
 fn quickstart_image_version(text: &str) -> Option<String> {
-    let line = text
-        .lines()
-        .find(|line| line.trim_start().starts_with("image:") && line.contains("AUTOXIDE_IMAGE:-"))?;
+    let line = text.lines().find(|line| {
+        line.trim_start().starts_with("image:") && line.contains("AUTOXIDE_IMAGE:-")
+    })?;
     let default = line.split("AUTOXIDE_IMAGE:-").nth(1)?.split('}').next()?;
     let (_, version) = default.rsplit_once(':')?;
     Some(version.trim().to_owned())
@@ -522,10 +522,12 @@ mod tests {
 
     #[test]
     fn doc_phien_ban_image_cua_quickstart() {
-        let text = "services:\n  autoxide:\n    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:1.2.3}\n";
+        let text =
+            "services:\n  autoxide:\n    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:1.2.3}\n";
         assert_eq!(quickstart_image_version(text).as_deref(), Some("1.2.3"));
         assert_eq!(
-            quickstart_image_version("    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:latest}").as_deref(),
+            quickstart_image_version("    image: ${AUTOXIDE_IMAGE:-ghcr.io/o/autoxide:latest}")
+                .as_deref(),
             Some("latest")
         );
         assert_eq!(quickstart_image_version("    image: postgres:18"), None);
