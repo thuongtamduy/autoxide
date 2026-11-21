@@ -139,6 +139,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
+- **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 
 ## HTTP, REST, OpenAPI
 
@@ -293,7 +294,6 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step38-sandbox-copy](D-20261119-step38-sandbox-copy.md)** Sandbox: sao cấu hình bằng `Module::sandbox_copy`, đẩy về thành bản nháp bằng `Module::promotable`, bảng nối của kernel — 2026-11-19
 - **[D-20261119-step38-sandbox-isolation](D-20261119-step38-sandbox-isolation.md)** Sandbox cách ly: kernel bọc hợp đồng đối tác lúc công bố, hộp thư giả `kernel_sandbox_messages` — 2026-11-19
 - **[D-20261119-step55-store-info](D-20261119-step55-store-info.md)** Bước 55: thông tin cửa hàng công khai — cài đặt `organizations.brand_*`, endpoint `/public/storefront` — 2026-11-19
-- **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 
 ## Hợp đồng cho giao diện
 

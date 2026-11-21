@@ -1,6 +1,6 @@
 ## D-20261121-plans-reconcile-snapshot · Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21 — agent quyết
 
-Chủ đề: Dữ liệu, đồng thời
+Chủ đề: Database, dữ liệu, job, event
 
 Quyết định:
 
