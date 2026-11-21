@@ -33,11 +33,6 @@ validator.workspace = true
 
 [dev-dependencies]
 autoxide-testkit.workspace = true
-rmcp = { workspace = true, features = [
-  "client",
-  "transport-streamable-http-client-reqwest",
-  "reqwest-tls-no-provider",
-] }
 tokio.workspace = true
 
 [lints]

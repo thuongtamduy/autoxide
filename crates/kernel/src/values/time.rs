@@ -22,9 +22,8 @@
 //! Múi giờ, khoảng thời gian, tính lịch (thêm tháng, thứ trong tuần…) dùng thẳng `jiff` (`jiff::tz::TimeZone`,
 //! `jiff::SignedDuration`, `jiff::civil`): không có gì phải lưu hay trả ra nên không cần bọc.
 //!
-//! Cầu nối tạm sang `chrono` (`From` hai chiều) giữ cho các module chuyển dần từng cái một; gỡ cùng `chrono`.
+//! `chrono` / `chrono-tz` đã gỡ hẳn; test so với giá trị `chrono` đã ghi lại ở `time/golden.json`.
 
-mod bridge;
 mod date;
 mod format;
 mod sql;

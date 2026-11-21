@@ -129,10 +129,13 @@ async fn dump(database: &Database) -> Vec<Vec<Value>> {
                     "price_minor" => Value::BigInt(Some(row.try_get("", column).unwrap())),
                     "active" => Value::Bool(Some(row.try_get("", column).unwrap())),
                     "thumbnail" => Value::Bytes(row.try_get("", column).unwrap()),
-                    "created_at" => {
-                        Value::ChronoDateTimeUtc(Some(row.try_get("", column).unwrap()))
-                    }
-                    "deleted_at" => Value::ChronoDateTimeUtc(row.try_get("", column).unwrap()),
+                    "created_at" => Value::from(
+                        row.try_get::<autoxide_kernel::time::Timestamp>("", column).unwrap(),
+                    ),
+                    "deleted_at" => Value::from(
+                        row.try_get::<Option<autoxide_kernel::time::Timestamp>>("", column)
+                            .unwrap(),
+                    ),
                     other => panic!("unknown column {other}"),
                 });
             }

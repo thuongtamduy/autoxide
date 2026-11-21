@@ -118,7 +118,8 @@ fn api_diff(base: Option<&str>) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match api_diff::run(&root, base, chrono::Utc::now().date_naive()) {
+    let today = jiff::tz::Offset::UTC.to_datetime(jiff::Timestamp::now()).date();
+    match api_diff::run(&root, base, today) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
         Err(error) => {
