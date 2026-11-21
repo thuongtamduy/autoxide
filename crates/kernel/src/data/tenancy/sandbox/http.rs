@@ -61,7 +61,8 @@ async fn list_sandboxes(
 
 /// Create a sandbox of a tenant.
 ///
-/// Requires `kernel.sandboxes.manage`. A sandbox is a test copy with the configuration of the
+/// Requires `kernel.sandboxes.manage`, called inside the tenant `{id}` (platform staff enter it
+/// first under a support access grant in force). A sandbox is a test copy with the configuration of the
 /// tenant and no personal data (no users, buyers, orders, ledger, documents, notifications,
 /// secrets or domains). Partners are always simulated in it, mail only reaches staff who may enter
 /// it, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.
@@ -80,7 +81,7 @@ async fn list_sandboxes(
     responses(
         (status = 201, description = "Created; the configuration is being copied.", body = Data<SandboxCreated>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), or the platform tenant (`tenancy.sandbox_forbidden`).", body = Problem),
+        (status = 403, description = "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), the platform tenant (`tenancy.sandbox_forbidden`), or platform staff naming a tenant they have not entered (`tenancy.sandbox_needs_tenant_access`).", body = Problem),
         (status = 404, description = "Not your tenant; code `tenant_not_found`.", body = Problem),
         (status = 422, description = "A value is invalid (`validation_failed`, see `errors`), or the tenant is itself a sandbox (`tenancy.sandbox_nested`).", body = Problem),
     )

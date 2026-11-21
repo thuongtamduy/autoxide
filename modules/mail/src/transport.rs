@@ -3,13 +3,27 @@
 use std::path::PathBuf;
 
 use autoxide_kernel::error::Error;
+use autoxide_kernel::net;
+use lettre::transport::smtp::authentication::Credentials;
+use lettre::transport::smtp::client::{Tls, TlsParameters};
+use lettre::transport::smtp::extension::ClientId;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Message, Tokio1Executor};
 use uuid::Uuid;
+
+/// Scheme nhận cho máy chủ SMTP.
+pub(crate) const SCHEMES: [&str; 2] = ["smtp", "smtps"];
 
 pub(crate) enum Transport {
     Smtp(AsyncSmtpTransport<Tokio1Executor>),
     /// Thư mục chứa file `.eml`: mở bằng ứng dụng mail nào cũng đọc được.
     File(PathBuf),
+}
+
+/// Gửi không được: `error` đầy đủ (log, job queue thử lại), `public` là câu chung cho người dùng.
+#[derive(Debug)]
+pub(crate) struct Failed {
+    pub(crate) error: Box<Error>,
+    pub(crate) public: String,
 }
 
 /// Kết quả gửi một mail. Lỗi tạm thời (mạng, 4xx) là `Err`: job queue thử lại sau.
@@ -40,7 +54,54 @@ impl Transport {
         ))
     }
 
-    pub(crate) async fn deliver(&self, message: Message) -> Result<Delivery, Error> {
+    /// Đường gửi qua máy chủ SMTP RIÊNG CỦA KHÁCH ở `raw` (D-20261121-ssrf-targets): scheme
+    /// `smtp`/`smtps`, host phân giải NGAY BÂY GIỜ và chỉ giữ IP public (trừ khi `allow_private`),
+    /// rồi kết nối vào đúng IP đó — lettre không tự phân giải lại, nên tên miền không đổi sang IP
+    /// nội bộ được giữa lúc kiểm và lúc gửi. TLS vẫn kiểm chứng chỉ theo TÊN MIỀN trong URL. Lỗi trả
+    /// câu chung (không nhắc URL, mật khẩu hay lỗi mạng chi tiết).
+    pub(crate) async fn tenant_smtp(raw: &str, allow_private: bool) -> Result<Self, String> {
+        let url = net::check_target_url(raw, &SCHEMES, allow_private)
+            .map_err(|_| NOT_ALLOWED.to_owned())?;
+        let host = url.host_str().unwrap_or_default().to_owned();
+        let tls =
+            url.query_pairs().find(|(key, _)| key == "tls").map(|(_, value)| value.into_owned());
+        let name = host.trim_start_matches('[').trim_end_matches(']').to_owned();
+        let parameters = || TlsParameters::new(name.clone()).map_err(|_| INVALID.to_owned());
+        // Cổng mặc định như lettre: 25 (smtp), 587 (STARTTLS), 465 (TLS ngay từ đầu).
+        let (port, tls) = match (url.scheme(), tls.as_deref()) {
+            ("smtp", None) => (25, Tls::None),
+            ("smtp", Some("required")) => (587, Tls::Required(parameters()?)),
+            ("smtp", Some("opportunistic")) => (587, Tls::Opportunistic(parameters()?)),
+            ("smtps", _) => (465, Tls::Wrapper(parameters()?)),
+            _ => return Err(INVALID.to_owned()),
+        };
+        let port = url.port().unwrap_or(port);
+        let addresses = net::resolve_target(&host, port, allow_private).await.map_err(|error| {
+            match error.get_ref() {
+                Some(inner) if inner.is::<net::PrivateAddress>() => NOT_ALLOWED.to_owned(),
+                _ => UNREACHABLE.to_owned(),
+            }
+        })?;
+        let address = addresses.first().ok_or_else(|| UNREACHABLE.to_owned())?;
+        let mut builder =
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(address.ip().to_string())
+                .port(address.port())
+                .tls(tls);
+        if let Some(password) = url.password() {
+            let user = percent_decode(url.username()).ok_or_else(|| INVALID.to_owned())?;
+            let password = percent_decode(password).ok_or_else(|| INVALID.to_owned())?;
+            builder = builder.credentials(Credentials::new(user, password));
+        }
+        let hello = url.path().trim_matches('/');
+        if !hello.is_empty() {
+            builder = builder.hello_name(ClientId::Domain(hello.to_owned()));
+        }
+        Ok(Transport::Smtp(builder.build()))
+    }
+
+    /// Gửi `message`. Lỗi mang hai mặt: lỗi đầy đủ cho log / job queue, và câu chung cho quản trị
+    /// viên của khách (`last_error` của kết nối).
+    pub(crate) async fn deliver(&self, message: Message) -> Result<Delivery, Failed> {
         match self {
             Transport::Smtp(smtp) => match smtp.send(message).await {
                 Ok(_) => {}
@@ -53,7 +114,12 @@ impl Transport {
                 // 5.4.5, nội dung bị chặn…) là lỗi của BÊN GỬI: thử lại theo job queue rồi vào
                 // dead-letter queue — không báo người nhận hỏng, không để bản tin chặn cả danh
                 // sách khi SMTP cấu hình sai (D-158).
-                Err(error) => return Err(Error::internal(format!("smtp: {error}"))),
+                Err(error) => {
+                    return Err(Failed {
+                        public: describe(&error),
+                        error: Box::new(Error::internal(format!("smtp: {error}"))),
+                    });
+                }
             },
             Transport::File(directory) => {
                 let directory = directory.clone();
@@ -65,12 +131,55 @@ impl Transport {
                     std::fs::write(directory.join(name), bytes)
                 })
                 .await
-                .map_err(Error::internal)?
-                .map_err(|error| Error::internal(format!("cannot write mail file: {error}")))?;
+                .map_err(Error::internal)
+                .and_then(|written| {
+                    written.map_err(|error| {
+                        Error::internal(format!("cannot write mail file: {error}"))
+                    })
+                })
+                .map_err(|error| Failed {
+                    public: "cannot write the mail file".to_owned(),
+                    error: Box::new(error),
+                })?;
             }
         }
         Ok(Delivery::Sent)
     }
+}
+
+/// Câu chung khi địa chỉ SMTP của khách không được phép (mạng riêng / nội bộ).
+pub(crate) const NOT_ALLOWED: &str =
+    "the SMTP server must be on the public Internet, not in a private or local network";
+/// Câu chung khi URL SMTP của khách đọc không được.
+pub(crate) const INVALID: &str = "the SMTP address is not a valid `smtp://` or `smtps://` URL";
+/// Câu chung khi không kết nối được (không nói lỗi mạng cụ thể: không biến thành công cụ dò cổng).
+pub(crate) const UNREACHABLE: &str = "cannot connect to the SMTP server";
+
+/// Mô tả lỗi SMTP cho quản trị viên của khách (thử kết nối, `last_error`): chỉ mã trạng thái máy
+/// chủ trả, không kèm câu trả lời hay lỗi mạng chi tiết.
+pub(crate) fn describe(error: &lettre::transport::smtp::Error) -> String {
+    match error.status() {
+        Some(code) => format!("the SMTP server answered with status {code}"),
+        None => UNREACHABLE.to_owned(),
+    }
+}
+
+/// Giải `%xx` trong user / mật khẩu của URL (như lettre làm với URL của máy chủ).
+fn percent_decode(raw: &str) -> Option<String> {
+    let bytes = raw.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' {
+            let hex = raw.get(index + 1..index + 3)?;
+            out.push(u8::from_str_radix(hex, 16).ok()?);
+            index += 3;
+        } else {
+            out.push(bytes[index]);
+            index += 1;
+        }
+    }
+    String::from_utf8(out).ok()
 }
 
 /// Lỗi SMTP vĩnh viễn (`text` là câu trả lời của máy chủ) có phải do địa chỉ người nhận không:
@@ -94,7 +203,32 @@ fn is_enhanced_code(word: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::blames_recipient;
+    use super::{Transport, blames_recipient, percent_decode};
+
+    #[test]
+    fn giai_ma_phan_tram_trong_user_va_mat_khau() {
+        assert_eq!(percent_decode("a%40b%2Fc").as_deref(), Some("a@b/c"));
+        assert_eq!(percent_decode("plain").as_deref(), Some("plain"));
+        assert_eq!(percent_decode("bad%4"), None);
+        assert_eq!(percent_decode("bad%zz"), None);
+    }
+
+    #[tokio::test]
+    async fn smtp_cua_khach_khong_toi_mang_noi_bo() {
+        for raw in [
+            "smtp://127.0.0.1:6379",
+            "smtp://localhost:25",
+            "smtps://[::1]:465",
+            "smtp://169.254.169.254:80",
+            "http://smtp.example.com",
+        ] {
+            let error = Transport::tenant_smtp(raw, false).await.err().unwrap();
+            assert!(!error.contains("6379"), "{raw}: {error}");
+            assert!(error == super::NOT_ALLOWED || error == super::INVALID, "{raw}: {error}");
+        }
+        // Người vận hành cho phép mạng riêng: dựng được (chưa kết nối).
+        assert!(Transport::tenant_smtp("smtp://u:p%40ss@127.0.0.1:2525", true).await.is_ok());
+    }
 
     #[test]
     fn chi_loi_ve_dia_chi_nguoi_nhan_moi_do_cho_nguoi_nhan() {

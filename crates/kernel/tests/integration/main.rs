@@ -66,6 +66,7 @@ mod tenancy_scope;
 mod tenant_access;
 mod tenant_admin;
 mod tenant_domains;
+mod tenant_exports;
 mod tenant_logs;
 mod tenant_move;
 mod tenant_settings;

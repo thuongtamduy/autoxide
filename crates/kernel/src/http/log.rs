@@ -3,8 +3,9 @@
 //! Mọi log phát ra TRONG lúc xử lý request (từ handler, service) tự mang request id
 //! nhờ span `request` — tra một request id là ra toàn bộ dấu vết của request đó.
 //!
-//! Chỉ ghi đường dẫn, KHÔNG ghi query string hay thân request: chúng có thể chứa
-//! token hoặc dữ liệu cá nhân.
+//! Chỉ ghi MẪU route đã khớp (vd `/api/v1/notes/{id}`), KHÔNG ghi đường dẫn thô, query string hay
+//! thân request: chúng có thể chứa token (link tải file số, trạng thái thanh toán, webhook của đối
+//! tác có khoá trong đường dẫn) hoặc dữ liệu cá nhân. Request không khớp route nào ghi `unmatched`.
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -19,6 +20,9 @@ use super::request_id::REQUEST_ID_HEADER;
 use crate::error::Error;
 use crate::ops::request_log::{CallerSlot, Finished, RequestLog, header_text};
 use opentelemetry::trace::TraceContextExt;
+
+/// Giá trị `http.route` của request không khớp route nào.
+const UNMATCHED: &str = "unmatched";
 
 pub(super) async fn log_requests(
     request_log: Option<RequestLog>,
@@ -37,11 +41,13 @@ pub(super) async fn log_requests(
         .get(&crate::ops::approvals::APPROVAL_HEADER)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.trim().parse::<uuid::Uuid>().ok());
-    let path = request.uri().path().to_owned();
     // Mẫu route đã khớp (vd `/api/v1/notes/{id}`); không có khi request không khớp
-    // route nào.
-    let route =
-        request.extensions().get::<MatchedPath>().map(|matched| matched.as_str().to_owned());
+    // route nào. Đường dẫn thô không bao giờ vào span, log hay số đo (xem đầu file).
+    let route = request
+        .extensions()
+        .get::<MatchedPath>()
+        .map_or_else(|| UNMATCHED.to_owned(), |matched| matched.as_str().to_owned());
+    let health = request.uri().path().starts_with("/health/");
     let request_id = request
         .headers()
         .get(&REQUEST_ID_HEADER)
@@ -53,11 +59,10 @@ pub(super) async fn log_requests(
         "request",
         request_id,
         %method,
-        path,
-        // Ba trường dưới dành cho trace OpenTelemetry (tên theo quy ước của nó);
-        // hai trường sau chỉ biết khi request đã xong nên để trống trước.
+        "http.route" = route.as_str(),
+        // `http.route` ở trên và hai trường dưới dành cho trace OpenTelemetry (tên theo quy ước
+        // của nó); mã trạng thái chỉ biết khi request đã xong nên để trống trước.
         "otel.kind" = "server",
-        "http.route" = tracing::field::Empty,
         "http.response.status_code" = tracing::field::Empty,
         // Khách của request (bước 39 B7, D-190): biết khi extractor tìm ra khách / người gọi, ghi
         // qua `RequestSpan`. Để tra một khách bằng log và trace — KHÔNG làm nhãn số đo.
@@ -74,7 +79,7 @@ pub(super) async fn log_requests(
     let status = response.status().as_u16();
     let elapsed = started.elapsed();
     let elapsed_ms = elapsed.as_millis() as u64;
-    let route = route.as_deref().unwrap_or("unmatched");
+    let route = route.as_str();
     super::metrics::record_request(method.as_str(), route, status, elapsed.as_secs_f64());
     // Lệnh MCP ghi một dòng mỗi tool ở lớp MCP; request bao ngoài không ghi thêm.
     if let Some(request_log) = &request_log
@@ -103,7 +108,6 @@ pub(super) async fn log_requests(
             },
         );
     }
-    span.record("http.route", route);
     span.record("http.response.status_code", status);
     span.in_scope(|| match response.extensions().get::<Arc<Error>>() {
         // Lỗi phía máy chủ: ghi cả nguyên nhân gốc — thứ client không được thấy.
@@ -112,7 +116,7 @@ pub(super) async fn log_requests(
         }
         _ if status >= 500 => tracing::error!(status, elapsed_ms, route, "request failed"),
         // Health check bị gọi vài giây một lần: ghi ở mức debug để không lấp log.
-        _ if path.starts_with("/health/") => {
+        _ if health => {
             tracing::debug!(status, elapsed_ms, route, "request completed");
         }
         _ => tracing::info!(status, elapsed_ms, route, "request completed"),

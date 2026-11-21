@@ -11,6 +11,7 @@ pub(crate) mod bookings;
 pub(crate) mod cases;
 pub(crate) mod catalog;
 pub(crate) mod child_context;
+pub(crate) mod connections;
 pub(crate) mod conversations;
 pub(crate) mod guides;
 pub(crate) mod inventory;

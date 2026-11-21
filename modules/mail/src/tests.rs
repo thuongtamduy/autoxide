@@ -290,6 +290,8 @@ async fn smtp_va_nguoi_gui_rieng_cua_khach() {
         let (port, received) = fake_smtp().await;
         let app = autoxide_testkit::TestApp::builder(test)
             .setting("AUTOXIDE_MAIL_FILE_DIR", &path)
+            // Máy chủ SMTP giả chạy ở 127.0.0.1: người vận hành cho phép mạng riêng.
+            .setting("AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS", "true")
             .tenant("shop")
             .user_in("shop", "owner", 1, &["kernel.settings.manage"])
             .module(crate::module())
