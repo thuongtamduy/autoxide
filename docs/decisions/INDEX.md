@@ -20,6 +20,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-175** Công khai repo; bật lại CI và phát hành tự động trên GitHub — 2026-11-13 · **chủ dự án quyết** · *thay một phần bởi D-199*
 - **D-185** Nền cho kinh doanh đa mô hình: khách hàng, tổ chức, gói, tiền, tuân thủ — 2026-11-13 · **chủ dự án quyết**
 - **D-199** Repo tạm giữ riêng tư; phần cần repo công khai tách thành bước 50 — 2026-11-13 · **chủ dự án quyết**
+- **[D-20261121-community-first](D-20261121-community-first.md)** Core cho cộng đồng trước: tạm dừng module mới, bật/tắt module, module viết ngoài repo, hai hạng module — 2026-11-21 · **chủ dự án quyết**
 
 ## Quy trình, gate, lộ trình
 
@@ -55,7 +56,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-198** Đặc tả từng bước trong `docs/steps/`, luật chung giữa các bước; giữ nguyên lịch sử git — 2026-11-13 · **chủ dự án quyết**
 - **D-205** Phân quyền chuẩn hàng đầu: bước 54 mới, hợp đồng quyền và test độ phủ ở bước 31 — 2026-11-13 · **chủ dự án quyết**
 - **D-221** Đưa tám mảng "để sau" lên lộ trình: bước 59–66 — 2026-11-14 · **chủ dự án quyết**
-- **D-228** Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 · **chủ dự án quyết**
+- **D-228** Lộ trình xếp theo thứ tự làm; bước đã xong tách file; đặc tả một phiên bản — 2026-11-14 · **chủ dự án quyết** · *thay một phần bởi D-20261121-community-first*
 - **D-232** Đưa 11 mục "để sau / chờ quyết" vào các bước có sẵn — 2026-11-14 · **chủ dự án quyết**
 - **D-233** Viết đặc tả cho 6 việc "để sau" còn rải trong đặc tả; dọn câu "để sau" đã cũ — 2026-11-14 · **chủ dự án quyết**
 - **D-237** Rà lộ trình lần hai trước bước 31: tỉ giá về `ledger`, một chỗ cho thông tin cửa hàng, nhãn và ghi chú của `customers`, báo có hàng lại không trùng, sửa bảng phụ thuộc — 2026-11-14

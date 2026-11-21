@@ -56,6 +56,8 @@ Hệ quả cho agent:
   (đơn hàng, kho, bệnh nhân…) vào core. Thứ đó thuộc về module.
 - Người lạ phải tự cài và dùng được: cấu hình có giá trị mặc định hợp lý, thông báo
   lỗi rõ, tài liệu cài đặt đủ để làm theo mà không cần hỏi ai.
+- **Không dựng module mới trước bản 1.0** (D-20261121-community-first): bước 70 của lộ trình (bật/tắt module, module
+  viết ngoài repo, hai hạng module, cam kết 1.0) đi trước; ngoại lệ duy nhất là bộ nối nhà cung cấp thật.
 - Chỉ dựng module nghiệp vụ chủ dự án đã giao: `media` (D-091), `content` (D-096, D-098),
   `forms`, `newsletter`, `comments` (D-112), `menus` (menu của website, bước 68, D-238), module mẫu
   `notes`, module nền `address` (đơn vị hành chính, D-193) và `notifications` (D-194), và module thương mại của bước 41–49: `catalog`,
