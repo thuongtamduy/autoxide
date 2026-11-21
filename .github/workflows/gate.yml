@@ -29,6 +29,9 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # Thử nghiệm sccache (đo trước khi giữ).
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v7
         with:
@@ -37,6 +40,7 @@ jobs:
           fetch-depth: 0
       # Toolchain theo rust-toolchain.toml: không đối số thì rustup cài đúng bản ghim.
       - run: rustup toolchain install
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: lint
@@ -45,6 +49,8 @@ jobs:
         with:
           tool: cargo-deny
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only lint
+      - run: sccache --show-stats
+        if: always()
 
   # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
   # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
@@ -56,12 +62,16 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # Thử nghiệm sccache (đo trước khi giữ).
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
     steps:
       - uses: actions/checkout@v7
         with:
           # Pull request so với origin/main để biết crate nào bị sửa (`--pr`).
           fetch-depth: 0
       - run: rustup toolchain install
+      - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: test
@@ -70,6 +80,8 @@ jobs:
         with:
           tool: cargo-nextest
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
+      - run: sccache --show-stats
+        if: always()
       - uses: actions/upload-artifact@v7
         with:
           name: test-archive
