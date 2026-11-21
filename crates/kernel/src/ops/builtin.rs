@@ -309,6 +309,8 @@ impl Module for KernelModule {
             Box::new(crate::tenancy::sandbox::AddSandbox),
             // Hộp thư giả của sandbox (bước 38, D-232): cấp khách hàng, mọi database dữ liệu.
             Box::new(crate::tenancy::sandbox::CreateSandboxMessages),
+            // Mỗi lúc một lượt migrate placement: unique `active_key` (rà đồng thời mục 31).
+            Box::new(crate::tenancy::migration_runs::AddMigrationRunActiveKey),
         ]
     }
 
