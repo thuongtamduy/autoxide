@@ -35,7 +35,8 @@ không còn xung đột ở `CHANGELOG.md`; xem `changelog.d/README.md`.
 
 ## Các bước phát hành
 
-Agent chỉ chuẩn bị bản phát hành và đẩy tag; workflow `Release` (`.github/workflows/release.yml`,
+Agent chuẩn bị bản phát hành và merge PR phát hành; khi CI trên `main` của commit đó xanh, workflow `Auto release`
+(`.github/workflows/auto-release.yml`, D-20261121-auto-release) tự gắn tag `vX.Y.Z` và gọi workflow `Release`. Workflow `Release` (`.github/workflows/release.yml`,
 D-175, D-197) chạy lại gate (chia nhiều máy như CI, chung `gate.yml`, D-20261120-release-gate-sharded) — **trừ khi** workflow CI trên `main` của đúng SHA của tag đã `success` (gate SQLite + Postgres 16 và 18, upgrade-test, quét secret): khi đó job `ci-result` cho bỏ qua gate (D-20261121-ci-batch-release-faster); chưa có lần chạy, đang chạy hay đỏ thì gate chạy như cũ —, build và đăng image Docker (`linux/amd64` và `linux/arm64`) lên
 `ghcr.io/<owner>/autoxide:X.Y.Z` và `:X.Y` bằng `GITHUB_TOKEN`, đính kèm chứng thực nguồn gốc build
 và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú từ `CHANGELOG.md`. Workflow chỉ chạy khi
@@ -71,25 +72,28 @@ bước 7.**
    gh pr merge <số PR> --rebase --delete-branch
    ```
 
-6. Gắn tag lên **đúng commit `release: vX.Y.Z`** của `main` — không phải commit mới nhất: người
-   khác có thể vừa merge thêm sau commit release (v0.11.0 từng bị gắn nhầm như vậy). Kiểm commit
-   tìm được đúng là commit release rồi mới đẩy:
+6. **Tag tự gắn** (D-20261121-auto-release): khi workflow CI của push vào `main` trên commit chứa bản phát hành
+   (merge commit của PR, có `version = "X.Y.Z"` mới và mục `## [X.Y.Z]` trong `CHANGELOG.md`) kết thúc `success`,
+   workflow `Auto release` tạo tag có chú thích `vX.Y.Z` trên **đúng commit đó** rồi gọi `Release` trên tag. Không
+   đẩy tag tay, không nhờ chủ dự án bấm Publish. Tag `vX.Y.Z` đã có thì `Auto release` không làm gì, nên các lần
+   push sau (cùng phiên bản) không phát hành lại. CI của commit đó đỏ thì không có tag: sửa, merge bản sửa — CI của
+   commit mới xanh thì tag gắn lên commit mới (vẫn cùng `version`).
+
+   Vẫn đẩy tag tay được khi cần (vd `Auto release` bị tắt): gắn lên đúng commit phát hành của `main` (commit merge của
+   PR phát hành, hay commit `release: vX.Y.Z` nếu merge kiểu rebase), không phải commit mới nhất:
 
    ```bash
    git fetch origin && git switch main && git merge --ff-only origin/main
-   release=$(git log origin/main --format=%H --grep='^release: vX.Y.Z$' -n 1)
-   git log -1 --format='%h %s' "$release"        # phải in ra "… release: vX.Y.Z"
+   release=$(git log origin/main --format=%H --grep='release: vX.Y.Z' -n 1)
+   git log -1 --format='%h %s' "$release"        # phải là commit phát hành vX.Y.Z
    git tag -a vX.Y.Z -m "Autoxide vX.Y.Z" "$release"
    git push origin vX.Y.Z
    ```
 
-   Môi trường của agent không đẩy được tag (chỉ được đẩy nhánh làm việc) thì nhờ chủ dự án tạo trên
-   GitHub: Releases → Draft a new release → tag `vX.Y.Z` (Create new tag), **Target** là commit
-   release ở trên (hay commit merge của nó, cùng nội dung) → Publish. Workflow `Release` chạy theo tag
-   đó; thấy trang Release đã có thì cập nhật ghi chú và đính kèm file chứ không báo lỗi. Ghi chú quá
+   Workflow `Release` thấy trang Release đã có thì cập nhật ghi chú và đính kèm file chứ không báo lỗi. Ghi chú quá
    giới hạn của GitHub (125 000 ký tự) thì workflow thay bằng đoạn ngắn dẫn tới `CHANGELOG.md`.
 
-7. Theo dõi workflow `Release` của tag (Actions → Release) tới khi xanh, rồi kiểm image đã đăng:
+7. Theo dõi workflow `Auto release` rồi `Release` của tag (Actions) tới khi xanh, rồi kiểm image đã đăng:
 
    ```bash
    gh attestation verify oci://ghcr.io/<owner>/autoxide:X.Y.Z --owner <owner>

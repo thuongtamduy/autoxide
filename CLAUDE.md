@@ -197,7 +197,8 @@ sẵn lệnh.
   ghép lô: gộp PR, sinh lại file tự động, chạy `cargo xtask check` + `cargo xtask sdk --check`, push PR lô (tiêu đề
   không cần đặc biệt, CI chạy đủ) rồi **chờ CI xanh mới merge** (D-20261121-ci-batch-release-faster, thay phần "kiểm
   trên máy" của D-20261119-merge-batches và D-20261120-batch-postgres); PR chỉ xung đột ở file sinh tự động thì không
-  cần gộp `main` lại (D-20261119-merge-batches). Phát hành dùng lại CI xanh của đúng commit trên `main`.
+  cần gộp `main` lại (D-20261119-merge-batches). Phát hành dùng lại CI xanh của đúng commit trên `main`; merge PR phát hành là đủ, tag và Release tự chạy
+  (D-20261121-auto-release).
 - Xong một mục: đánh dấu trong `docs/ROADMAP.md`, rồi `git commit` cục bộ. Xong trọn một
   bước (mọi mục `[x]`, gate nhanh xanh) thì merge vào `main`, **không** phát hành: gom nhiều
   bước thành một bản lớn, phát hành khi xong một giai đoạn của lộ trình hay khi chủ dự án bảo
