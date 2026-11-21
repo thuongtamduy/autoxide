@@ -25709,7 +25709,7 @@
               },
               "version": {
                 "description": "Version of the server.",
-                "example": "0.17.0",
+                "example": "0.16.0",
                 "type": "string"
               }
             },
@@ -51918,7 +51918,7 @@
           },
           "version": {
             "description": "Version of the server.",
-            "example": "0.17.0",
+            "example": "0.16.0",
             "type": "string"
           }
         },
