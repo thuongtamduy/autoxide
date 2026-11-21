@@ -39,6 +39,7 @@ impl MigrationTrait for Migration {
                 Index::create()
                     .name("auth_scim_tokens_hash_unique")
                     .table("auth_scim_tokens")
+                    .col("tenant_id")
                     .col("token_hash")
                     .unique()
                     .to_owned(),
