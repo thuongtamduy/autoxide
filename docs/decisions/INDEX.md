@@ -175,6 +175,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-379** Tải thẳng lên S3: link ký sẵn, xác nhận đọc lại, khung chung trong kernel (bước 40 P4, D-066, D-086, D-259) — 2026-11-18
 - **[D-20261119-step69-sync](D-20261119-step69-sync.md)** Đồng bộ khi mất mạng: luồng thay đổi `<module>_changes` theo con trỏ, `412` kèm bản hiện tại, lô ghi chạy từng lệnh như request REST — 2026-11-19
 - **[D-20261119-step69-ws](D-20261119-step69-ws.md)** WebSocket `GET /api/v1/kernel/events/ws`: dùng chung hub SSE, một vé kết nối cho cả phiên, lệnh điều khiển JSON, tín hiệu tạm trong tiến trình — 2026-11-19
+- **[D-20261121-stability-marks](D-20261121-stability-marks.md)** Hạng module trong hợp đồng: `x-stability` chỉ gắn cho thử nghiệm — 2026-11-21
 
 ## MCP, AI, agent dùng API
 

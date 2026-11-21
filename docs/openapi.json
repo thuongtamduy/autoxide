@@ -100231,7 +100231,7 @@
     },
     "/api/v1/analytics/campaigns": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. `utm_campaign` values (lowercased) by page\nviews that started outside the website.",
+        "description": "Requires `analytics.read` at the website's unit. `utm_campaign` values (lowercased) by page\nviews that started outside the website.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_campaigns",
         "parameters": [
           {
@@ -100362,12 +100362,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/event-types": {
       "get": {
-        "description": "No sign-in needed. Every event type the installed modules declare: what pages may send and\nwhich props each type takes.",
+        "description": "No sign-in needed. Every event type the installed modules declare: what pages may send and\nwhich props each type takes.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_event_types",
         "parameters": [
           {
@@ -100425,12 +100426,13 @@
         "tags": [
           "analytics"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/funnels": {
       "get": {
-        "description": "Requires `analytics.read`. Funnels are declared by the installed modules.",
+        "description": "Requires `analytics.read`. Funnels are declared by the installed modules.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_funnels",
         "parameters": [
           {
@@ -100499,12 +100501,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/funnels/{key}": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. For each step, the sessions with its event,\nsummed over the days. Cookieless sessions cannot be linked to what the server records (e.g. a\npaid order), so each step is counted on its own: a later step may exceed an earlier one.",
+        "description": "Requires `analytics.read` at the website's unit. For each step, the sessions with its event,\nsummed over the days. Cookieless sessions cannot be linked to what the server records (e.g. a\npaid order), so each step is counted on its own: a later step may exceed an earlier one.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_get_analytics_funnel",
         "parameters": [
           {
@@ -100632,12 +100635,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/objects": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. Objects (`<kind>:<id>`) by the events about\nthem, most first.",
+        "description": "Requires `analytics.read` at the website's unit. Objects (`<kind>:<id>`) by the events about\nthem, most first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_objects",
         "parameters": [
           {
@@ -100778,12 +100782,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/overview": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. Visitors, page views, events, bounce rate, the\ntop sources and one entry per day, from the hourly daily totals (today's numbers lag by up to\nan hour).",
+        "description": "Requires `analytics.read` at the website's unit. Visitors, page views, events, bounce rate, the\ntop sources and one entry per day, from the hourly daily totals (today's numbers lag by up to\nan hour).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_get_analytics_overview",
         "parameters": [
           {
@@ -100902,12 +100907,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/pages": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. Page paths by page views, most first.",
+        "description": "Requires `analytics.read` at the website's unit. Page paths by page views, most first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_pages",
         "parameters": [
           {
@@ -101038,12 +101044,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/public/events": {
       "post": {
-        "description": "No sign-in needed; call it from the pages of the website, e.g. with `fetch(url, {method:\n\"POST\", keepalive: true, headers: {\"content-type\": \"application/json\"}, body})`, which still\ngoes out while the page closes. No cookie is set or read. The website is the one of the domain\ncalled (or `?site=`). Batches from known bots, from pages whose `Origin` (or `Referer`) is not\na domain of this website, or over the per-network limit are dropped silently. Signed-in users\nwho consented to `analytics.personal` have their events linked to their account; nobody else.",
+        "description": "No sign-in needed; call it from the pages of the website, e.g. with `fetch(url, {method:\n\"POST\", keepalive: true, headers: {\"content-type\": \"application/json\"}, body})`, which still\ngoes out while the page closes. No cookie is set or read. The website is the one of the domain\ncalled (or `?site=`). Batches from known bots, from pages whose `Origin` (or `Referer`) is not\na domain of this website, or over the per-network limit are dropped silently. Signed-in users\nwho consented to `analytics.personal` have their events linked to their account; nobody else.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_collect_analytics_events",
         "parameters": [
           {
@@ -101174,12 +101181,13 @@
         "tags": [
           "analytics"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/sources": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. Where visits came from, by page views that\nstarted outside the website: the `utm_source`, else the referring site (without `www.`), else\n`direct`.",
+        "description": "Requires `analytics.read` at the website's unit. Where visits came from, by page views that\nstarted outside the website: the `utm_source`, else the referring site (without `www.`), else\n`direct`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_sources",
         "parameters": [
           {
@@ -101310,12 +101318,13 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/analytics/types": {
       "get": {
-        "description": "Requires `analytics.read` at the website's unit. Every event type seen, most events first.",
+        "description": "Requires `analytics.read` at the website's unit. Every event type seen, most events first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "analytics_list_analytics_type_counts",
         "parameters": [
           {
@@ -101446,7 +101455,8 @@
         ],
         "x-permissions": [
           "analytics.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/antispam/token": {
@@ -115671,7 +115681,7 @@
     },
     "/api/v1/automations/catalog": {
       "get": {
-        "description": "Requires `automations.read`. Events of modules in your plan, metrics for `metric` triggers,\nand the MCP tools you have the permission for (with their input schemas).",
+        "description": "Requires `automations.read`. Events of modules in your plan, metrics for `metric` triggers,\nand the MCP tools you have the permission for (with their input schemas).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_get_automation_catalog",
         "parameters": [
           {
@@ -115740,12 +115750,13 @@
         ],
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules": {
       "get": {
-        "description": "Requires `automations.read`; its scope decides which rules you see. Newest first unless\n`order=asc`.",
+        "description": "Requires `automations.read`; its scope decides which rules you see. Newest first unless\n`order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_list_automation_rules",
         "parameters": [
           {
@@ -115909,10 +115920,11 @@
         "x-autoxide-list": "automations.list_automation_rules",
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `automations.manage` covering the unit of the rule, and the permission of every tool\nin its actions: the rule runs with your permissions. Made by an AI agent (API key of kind\n`agent`), the rule waits in `pending_approval` until a person enables it. Retry safely with an\n`Idempotency-Key` header.",
+        "description": "Requires `automations.manage` covering the unit of the rule, and the permission of every tool\nin its actions: the rule runs with your permissions. Made by an AI agent (API key of kind\n`agent`), the rule waits in `pending_approval` until a person enables it. Retry safely with an\n`Idempotency-Key` header.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_create_automation_rule",
         "parameters": [
           {
@@ -116022,12 +116034,13 @@
         ],
         "x-permissions": [
           "automations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules/{id}": {
       "delete": {
-        "description": "Requires `automations.manage` covering the rule. The log of its runs stays until it expires.",
+        "description": "Requires `automations.manage` covering the rule. The log of its runs stays until it expires.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_delete_automation_rule",
         "parameters": [
           {
@@ -116144,10 +116157,11 @@
         ],
         "x-permissions": [
           "automations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `automations.read` covering the rule; a rule outside your scope answers 404.",
+        "description": "Requires `automations.read` covering the rule; a rule outside your scope answers 404.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_get_automation_rule",
         "parameters": [
           {
@@ -116244,10 +116258,11 @@
         ],
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `automations.manage` covering the rule, the `If-Match` header with the `ETag` you\nread, and — when the trigger, conditions or actions change — the permission of every tool in\nthe rule (it then runs as you). Changed by an AI agent, the rule waits for a person again.",
+        "description": "Requires `automations.manage` covering the rule, the `If-Match` header with the `ETag` you\nread, and — when the trigger, conditions or actions change — the permission of every tool in\nthe rule (it then runs as you). Changed by an AI agent, the rule waits for a person again.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_update_automation_rule",
         "parameters": [
           {
@@ -116406,12 +116421,13 @@
         ],
         "x-permissions": [
           "automations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules/{id}/disable": {
       "post": {
-        "description": "Requires `automations.manage` covering the rule. Runs already started finish.",
+        "description": "Requires `automations.manage` covering the rule. Runs already started finish.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_disable_automation_rule",
         "parameters": [
           {
@@ -116543,12 +116559,13 @@
         ],
         "x-permissions": [
           "automations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules/{id}/enable": {
       "post": {
-        "description": "Requires `automations.manage` covering the rule and the permission of every tool in it. The\nrule is checked again and from now on runs as you. A person must do this: an AI agent cannot\nenable rules (`automations.human_required`), so rules made by agents need a person's approval.",
+        "description": "Requires `automations.manage` covering the rule and the permission of every tool in it. The\nrule is checked again and from now on runs as you. A person must do this: an AI agent cannot\nenable rules (`automations.human_required`), so rules made by agents need a person's approval.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_enable_automation_rule",
         "parameters": [
           {
@@ -116690,12 +116707,13 @@
         ],
         "x-permissions": [
           "automations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules/{id}/run": {
       "post": {
-        "description": "Requires `automations.run` covering the rule. The rule must be `active`; its actions run with\nthe permissions of the rule's `run_as`, in the background — follow the run with `GET\n/runs/{id}`.",
+        "description": "Requires `automations.run` covering the rule. The rule must be `active`; its actions run with\nthe permissions of the rule's `run_as`, in the background — follow the run with `GET\n/runs/{id}`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_run_automation_rule",
         "parameters": [
           {
@@ -116817,12 +116835,13 @@
         ],
         "x-permissions": [
           "automations.run"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/rules/{id}/test": {
       "post": {
-        "description": "Requires `automations.read` covering the rule. Evaluates the conditions on the sample, fills\nthe templates and checks the tools and the permissions of the rule's `run_as` — without\ncalling any tool.",
+        "description": "Requires `automations.read` covering the rule. Evaluates the conditions on the sample, fills\nthe templates and checks the tools and the permissions of the rule's `run_as` — without\ncalling any tool.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_test_automation_rule",
         "parameters": [
           {
@@ -116934,12 +116953,13 @@
         ],
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/runs": {
       "get": {
-        "description": "Requires `automations.read`. Newest first unless `order=asc`.",
+        "description": "Requires `automations.read`. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_list_automation_runs",
         "parameters": [
           {
@@ -117104,12 +117124,13 @@
         "x-autoxide-list": "automations.list_automation_runs",
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/runs/{id}": {
       "get": {
-        "description": "Requires `automations.read` covering the rule's unit.",
+        "description": "Requires `automations.read` covering the rule's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_get_automation_run",
         "parameters": [
           {
@@ -117198,12 +117219,13 @@
         ],
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/runs/{id}/approve": {
       "post": {
-        "description": "Requires `automations.run` covering the rule and the permission of the step's tool. A person\nmust decide: AI agents get `automations.human_required`. The step then runs once.",
+        "description": "Requires `automations.run` covering the rule and the permission of the step's tool. A person\nmust decide: AI agents get `automations.human_required`. The step then runs once.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_approve_automation_run",
         "parameters": [
           {
@@ -117315,12 +117337,13 @@
         ],
         "x-permissions": [
           "automations.run"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/runs/{id}/reject": {
       "post": {
-        "description": "Requires `automations.run` covering the rule and the permission of the step's tool; a person\nmust decide.",
+        "description": "Requires `automations.run` covering the rule and the permission of the step's tool; a person\nmust decide.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_reject_automation_run",
         "parameters": [
           {
@@ -117432,12 +117455,13 @@
         ],
         "x-permissions": [
           "automations.run"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/runs/{id}/retry": {
       "post": {
-        "description": "Requires `automations.run` covering the rule. Steps that already succeeded are not done again\n(each step has its own idempotency key).",
+        "description": "Requires `automations.run` covering the rule. Steps that already succeeded are not done again\n(each step has its own idempotency key).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_retry_automation_run",
         "parameters": [
           {
@@ -117549,12 +117573,13 @@
         ],
         "x-permissions": [
           "automations.run"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/automations/templates": {
       "get": {
-        "description": "Requires `automations.read`. Modules declare templates; only those you could save now (their\nevents, metrics and tools are available to you) are listed. Send a template's `rule` with a\n`name` to `POST /rules`.",
+        "description": "Requires `automations.read`. Modules declare templates; only those you could save now (their\nevents, metrics and tools are available to you) are listed. Send a template's `rule` with a\n`name` to `POST /rules`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "automations_list_automation_templates",
         "parameters": [
           {
@@ -117623,12 +117648,13 @@
         ],
         "x-permissions": [
           "automations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings": {
       "get": {
-        "description": "Requires `bookings.manage` or `bookings.read` (every booking of your units), or `bookings.staff`\n(only the bookings of the resources linked to your account). Newest first by default.",
+        "description": "Requires `bookings.manage` or `bookings.read` (every booking of your units), or `bookings.staff`\n(only the bookings of the resources linked to your account). Newest first by default.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_bookings",
         "parameters": [
           {
@@ -117827,10 +117853,11 @@
           "bookings.manage",
           "bookings.read",
           "bookings.staff"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `bookings.manage` at the staff member's unit. For phone calls and walk-ins: the booking\nis confirmed at once and asks for no deposit. The time must be inside working hours\n(`bookings.outside_hours`) and free (`bookings.slot_taken`).",
+        "description": "Requires `bookings.manage` at the staff member's unit. For phone calls and walk-ins: the booking\nis confirmed at once and asks for no deposit. The time must be inside working hours\n(`bookings.outside_hours`) and free (`bookings.slot_taken`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_create_booking",
         "parameters": [
           {
@@ -117960,12 +117987,13 @@
         ],
         "x-permissions": [
           "bookings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}": {
       "get": {
-        "description": "Any signed-in user may ask; the answer is the booking only for the shop (`bookings.manage`,\n`bookings.read`), the staff member of the booking (`bookings.staff`) or the customer who made it.",
+        "description": "Any signed-in user may ask; the answer is the booking only for the shop (`bookings.manage`,\n`bookings.read`), the staff member of the booking (`bookings.staff`) or the customer who made it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking",
         "parameters": [
           {
@@ -118052,12 +118080,13 @@
         "tags": [
           "bookings"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/calendar.ics": {
       "get": {
-        "description": "iCalendar (`.ics`). The shop (`bookings.manage`), the staff member of the booking\n(`bookings.staff`) or the customer.",
+        "description": "iCalendar (`.ics`). The shop (`bookings.manage`), the staff member of the booking\n(`bookings.staff`) or the customer.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking_calendar",
         "parameters": [
           {
@@ -118144,12 +118173,13 @@
         "tags": [
           "bookings"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/cancel": {
       "post": {
-        "description": "The shop (`bookings.manage`) at any time, with the whole deposit refunded; the customer until the\nstart: within the free window (`bookings.free_cancel_hours`) the whole deposit is refunded, later\nthe unit keeps `bookings.late_cancel_retain_percent` of it. Refunds go through the payment partner.",
+        "description": "The shop (`bookings.manage`) at any time, with the whole deposit refunded; the customer until the\nstart: within the free window (`bookings.free_cancel_hours`) the whole deposit is refunded, later\nthe unit keeps `bookings.late_cancel_retain_percent` of it. Refunds go through the payment partner.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_cancel_booking",
         "parameters": [
           {
@@ -118279,12 +118309,13 @@
         "tags": [
           "bookings"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/check-in": {
       "post": {
-        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments.",
+        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_check_in_booking",
         "parameters": [
           {
@@ -118397,12 +118428,13 @@
         "x-permissions": [
           "bookings.manage",
           "bookings.staff"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/complete": {
       "post": {
-        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments.",
+        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_complete_booking",
         "parameters": [
           {
@@ -118515,12 +118547,13 @@
         "x-permissions": [
           "bookings.manage",
           "bookings.staff"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/confirm": {
       "post": {
-        "description": "Requires `bookings.manage`. For shops that approve bookings without a deposit\n(setting `bookings.require_approval`).",
+        "description": "Requires `bookings.manage`. For shops that approve bookings without a deposit\n(setting `bookings.require_approval`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_confirm_booking",
         "parameters": [
           {
@@ -118632,12 +118665,13 @@
         ],
         "x-permissions": [
           "bookings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/no-show": {
       "post": {
-        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments. Only after the start\ntime. The deposit is kept by the unit's policy (`bookings.no_show_retain_percent`); the rest is\nrefunded through the payment partner.",
+        "description": "Requires `bookings.manage`, or `bookings.staff` for your own appointments. Only after the start\ntime. The deposit is kept by the unit's policy (`bookings.no_show_retain_percent`); the rest is\nrefunded through the payment partner.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_no_show_booking",
         "parameters": [
           {
@@ -118750,12 +118784,13 @@
         "x-permissions": [
           "bookings.manage",
           "bookings.staff"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/bookings/{id}/reschedule": {
       "post": {
-        "description": "The shop (`bookings.manage`) at any time; the customer within the free cancellation window. The\nnew time must be inside working hours and free; if it was just taken (`bookings.slot_taken`)\nthe booking keeps its old time.",
+        "description": "The shop (`bookings.manage`) at any time; the customer within the free cancellation window. The\nnew time must be inside working hours and free; if it was just taken (`bookings.slot_taken`)\nthe booking keeps its old time.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_reschedule_booking",
         "parameters": [
           {
@@ -118885,12 +118920,13 @@
         "tags": [
           "bookings"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/exceptions": {
       "get": {
-        "description": "Requires `bookings.services.manage` at its unit. Exceptions that touch the range, oldest first.",
+        "description": "Requires `bookings.services.manage` at its unit. Exceptions that touch the range, oldest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_booking_exceptions",
         "parameters": [
           {
@@ -118999,10 +119035,11 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `bookings.services.manage` at the resource's unit. Bookings already made in the time\noff stay; cancel or move them if needed.",
+        "description": "Requires `bookings.services.manage` at the resource's unit. Bookings already made in the time\noff stay; cancel or move them if needed.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_create_booking_exception",
         "parameters": [
           {
@@ -119122,12 +119159,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/exceptions/{id}": {
       "delete": {
-        "description": "Requires `bookings.services.manage` at the resource's unit.",
+        "description": "Requires `bookings.services.manage` at the resource's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_delete_booking_exception",
         "parameters": [
           {
@@ -119222,12 +119260,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/me/bookings": {
       "get": {
-        "description": "Any signed-in customer: the bookings made with this account, newest first.",
+        "description": "Any signed-in customer: the bookings made with this account, newest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_my_bookings",
         "parameters": [
           {
@@ -119422,12 +119461,13 @@
           }
         ],
         "x-autoxide-list": "bookings.list_my_bookings",
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/me/bookings/{id}/calendar.ics": {
       "get": {
-        "description": "iCalendar (`.ics`) for adding the booking to a calendar app. Only the customer who made it.",
+        "description": "iCalendar (`.ics`) for adding the booking to a calendar app. Only the customer who made it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_my_booking_calendar",
         "parameters": [
           {
@@ -119514,12 +119554,13 @@
         "tags": [
           "bookings"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/public/availability": {
       "get": {
-        "description": "Free start times of a service between `from` and `to`, every 15 minutes of local time: the\nweekly schedule of each staff member, plus extra hours, minus time off, minus what is already\nbooked (with the service's preparation and cleaning time). The answer also gives the price,\ndeposit and cancellation terms to show before booking. Cached for 15 seconds: a time shown can\nstill be taken when you book (`bookings.slot_taken`).",
+        "description": "Free start times of a service between `from` and `to`, every 15 minutes of local time: the\nweekly schedule of each staff member, plus extra hours, minus time off, minus what is already\nbooked (with the service's preparation and cleaning time). The answer also gives the price,\ndeposit and cancellation terms to show before booking. Cached for 15 seconds: a time shown can\nstill be taken when you book (`bookings.slot_taken`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking_availability",
         "parameters": [
           {
@@ -119655,12 +119696,13 @@
         "tags": [
           "bookings"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/public/bookings": {
       "post": {
-        "description": "Signed-in customers book with their account; guests send a `phone_code` instead. Book a free time from `GET /api/v1/bookings/public/availability`. Read the terms\nthere first: price, deposit, cancellation. Without a deposit the booking is `confirmed` (or\n`pending` when the shop approves bookings); with a deposit it is `held` for a few minutes and the\nanswer has a `checkout` to pay through the shop's licensed payment partner — unpaid holds are\nreleased. Two people booking the same time: one gets it, the other `bookings.slot_taken`.",
+        "description": "Signed-in customers book with their account; guests send a `phone_code` instead. Book a free time from `GET /api/v1/bookings/public/availability`. Read the terms\nthere first: price, deposit, cancellation. Without a deposit the booking is `confirmed` (or\n`pending` when the shop approves bookings); with a deposit it is `held` for a few minutes and the\nanswer has a `checkout` to pay through the shop's licensed payment partner — unpaid holds are\nreleased. Two people booking the same time: one gets it, the other `bookings.slot_taken`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_book_service",
         "parameters": [
           {
@@ -119789,12 +119831,13 @@
         "tags": [
           "bookings"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/public/bookings/{id}/cancel": {
       "post": {
-        "description": "Guests cancel with a fresh code sent to the phone number of the booking. Same rules as for\ncustomers: until the start; within the free window the whole deposit is refunded, later the unit\nkeeps its share.",
+        "description": "Guests cancel with a fresh code sent to the phone number of the booking. Same rules as for\ncustomers: until the start; within the free window the whole deposit is refunded, later the unit\nkeeps its share.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_cancel_guest_booking",
         "parameters": [
           {
@@ -119915,12 +119958,13 @@
         "tags": [
           "bookings"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/public/phone-codes": {
       "post": {
-        "description": "Guests book and cancel with a code sent to their phone number. A code works once, for 10\nminutes, and allows 5 tries; a number gets at most 5 codes an hour.",
+        "description": "Guests book and cancel with a code sent to their phone number. A code works once, for 10\nminutes, and allows 5 tries; a number gets at most 5 codes an hour.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_send_booking_phone_code",
         "parameters": [
           {
@@ -120031,12 +120075,13 @@
         "tags": [
           "bookings"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/public/services": {
       "get": {
-        "description": "Active services, by name. No sign-in needed.",
+        "description": "Active services, by name. No sign-in needed.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_public_booking_services",
         "parameters": [
           {
@@ -120104,12 +120149,13 @@
         "tags": [
           "bookings"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/resources": {
       "get": {
-        "description": "Requires `bookings.services.manage`.",
+        "description": "Requires `bookings.services.manage`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_booking_resources",
         "parameters": [
           {
@@ -120243,10 +120289,11 @@
         "x-autoxide-list": "bookings.list_booking_resources",
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `bookings.services.manage` at the unit.",
+        "description": "Requires `bookings.services.manage` at the unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_create_booking_resource",
         "parameters": [
           {
@@ -120356,12 +120403,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/resources/{id}": {
       "get": {
-        "description": "Requires `bookings.services.manage` at its unit.",
+        "description": "Requires `bookings.services.manage` at its unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking_resource",
         "parameters": [
           {
@@ -120450,10 +120498,11 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `bookings.services.manage` at its unit.",
+        "description": "Requires `bookings.services.manage` at its unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_update_booking_resource",
         "parameters": [
           {
@@ -120575,12 +120624,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/resources/{id}/schedule": {
       "get": {
-        "description": "Requires `bookings.services.manage` at its unit. Times are local to the unit.",
+        "description": "Requires `bookings.services.manage` at its unit. Times are local to the unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking_schedule",
         "parameters": [
           {
@@ -120669,10 +120719,11 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `bookings.services.manage` at its unit. Times are local to the unit (setting\n`organizations.timezone`), so a change of time zone keeps \"9:00 to 17:00\" at 9:00 local time.\nBookings already made keep their time.",
+        "description": "Requires `bookings.services.manage` at its unit. Times are local to the unit (setting\n`organizations.timezone`), so a change of time zone keeps \"9:00 to 17:00\" at 9:00 local time.\nBookings already made keep their time.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_replace_booking_schedule",
         "parameters": [
           {
@@ -120794,12 +120845,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/services": {
       "get": {
-        "description": "Requires `bookings.services.manage`. Every service in your units, active or not.",
+        "description": "Requires `bookings.services.manage`. Every service in your units, active or not.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_list_booking_services",
         "parameters": [
           {
@@ -120933,10 +120985,11 @@
         "x-autoxide-list": "bookings.list_booking_services",
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `bookings.services.manage` at the unit. Every problem with the input is reported at once.",
+        "description": "Requires `bookings.services.manage` at the unit. Every problem with the input is reported at once.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_create_booking_service",
         "parameters": [
           {
@@ -121046,12 +121099,13 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/bookings/services/{id}": {
       "get": {
-        "description": "Requires `bookings.services.manage` at the service's unit.",
+        "description": "Requires `bookings.services.manage` at the service's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_get_booking_service",
         "parameters": [
           {
@@ -121140,10 +121194,11 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `bookings.services.manage` at the service's unit. Bookings already made keep their\ntime, price and deposit.",
+        "description": "Requires `bookings.services.manage` at the service's unit. Bookings already made keep their\ntime, price and deposit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "bookings_update_booking_service",
         "parameters": [
           {
@@ -121265,7 +121320,8 @@
         ],
         "x-permissions": [
           "bookings.services.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/catalog/attributes": {
@@ -133282,7 +133338,7 @@
     },
     "/api/v1/comments": {
       "get": {
-        "description": "Requires `comments.read`. By default the comments waiting for approval, newest first; filter\nby status, target and text, or list unanswered questions (`status=published&unanswered=true`). Follow `pagination.next_cursor` with the same filters for more.",
+        "description": "Requires `comments.read`. By default the comments waiting for approval, newest first; filter\nby status, target and text, or list unanswered questions (`status=published&unanswered=true`). Follow `pagination.next_cursor` with the same filters for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comments",
         "parameters": [
           {
@@ -133506,12 +133562,13 @@
         "x-autoxide-list": "comments.list_comments",
         "x-permissions": [
           "comments.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/bans": {
       "get": {
-        "description": "Requires `comments.manage`. Newest first.",
+        "description": "Requires `comments.manage`. Newest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comment_bans",
         "parameters": [
           {
@@ -133675,10 +133732,11 @@
         "x-autoxide-list": "comments.list_comment_bans",
         "x-permissions": [
           "comments.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `comments.manage`. Their new comments (and changes) are refused with\n`comments.banned` until `until`. Recorded as `comments.ban_created` (without the value).",
+        "description": "Requires `comments.manage`. Their new comments (and changes) are refused with\n`comments.banned` until `until`. Recorded as `comments.ban_created` (without the value).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_create_comment_ban",
         "parameters": [
           {
@@ -133788,12 +133846,13 @@
         ],
         "x-permissions": [
           "comments.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/bans/{id}": {
       "delete": {
-        "description": "Requires `comments.manage`. Recorded as `comments.ban_deleted`.",
+        "description": "Requires `comments.manage`. Recorded as `comments.ban_deleted`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_delete_comment_ban",
         "parameters": [
           {
@@ -133888,12 +133947,13 @@
         ],
         "x-permissions": [
           "comments.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/data": {
       "delete": {
-        "description": "Requires `comments.export`. Every comment written with this address loses its text, name,\nemail and network fingerprint (its place in the thread stays), and reply mails to it stop.\nBans of the address are kept. Recorded as `comments.comments_erased`, without the address.",
+        "description": "Requires `comments.export`. Every comment written with this address loses its text, name,\nemail and network fingerprint (its place in the thread stays), and reply mails to it stop.\nBans of the address are kept. Recorded as `comments.comments_erased`, without the address.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_erase_comments_email_data",
         "parameters": [
           {
@@ -133995,10 +134055,11 @@
         ],
         "x-permissions": [
           "comments.export"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `comments.export`. For a request of the person the data is about: every comment\nwritten with this address, the comments it follows, and bans of it.",
+        "description": "Requires `comments.export`. For a request of the person the data is about: every comment\nwritten with this address, the comments it follows, and bans of it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_export_comments_email_data",
         "parameters": [
           {
@@ -134087,12 +134148,13 @@
         ],
         "x-permissions": [
           "comments.export"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/profile": {
       "get": {
-        "description": "Requires `comments.post`. The name shown on one's comments; `null` until chosen.",
+        "description": "Requires `comments.post`. The name shown on one's comments; `null` until chosen.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_comment_profile",
         "parameters": [
           {
@@ -134161,10 +134223,11 @@
         ],
         "x-permissions": [
           "comments.post"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `comments.post`. Needed before commenting while signed in; shown on all one's\ncomments, also the earlier ones.",
+        "description": "Requires `comments.post`. Needed before commenting while signed in; shown on all one's\ncomments, also the earlier ones.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_set_comment_profile",
         "parameters": [
           {
@@ -134276,12 +134339,13 @@
         ],
         "x-permissions": [
           "comments.post"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/comments": {
       "post": {
-        "description": "Guests need no sign-in (unless the server or the target kind asks for it); signed-in users\nneed `comments.post` and a display name (`PUT /api/v1/comments/profile`). Checks run in a\nfixed order: target open, length, content, duplicate, bans, banned words (refused) and\nsuspect words or too many links (held), anti-spam, approval mode. Every input problem is\nreported at once. The answer says `published` or `pending` (waiting for approval — held\nor dropped comments look the same). Guests get an `edit_token`, shown only here. Sending the\nsame `form_token` again returns the same comment (with a new `edit_token`).",
+        "description": "Guests need no sign-in (unless the server or the target kind asks for it); signed-in users\nneed `comments.post` and a display name (`PUT /api/v1/comments/profile`). Checks run in a\nfixed order: target open, length, content, duplicate, bans, banned words (refused) and\nsuspect words or too many links (held), anti-spam, approval mode. Every input problem is\nreported at once. The answer says `published` or `pending` (waiting for approval — held\nor dropped comments look the same). Guests get an `edit_token`, shown only here. Sending the\nsame `form_token` again returns the same comment (with a new `edit_token`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_create_comment",
         "parameters": [
           {
@@ -134440,12 +134504,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/comments/{id}": {
       "get": {
-        "description": "No sign-in needed. Only shown comments (and deleted top-level comments that still have\nreplies).",
+        "description": "No sign-in needed. Only shown comments (and deleted top-level comments that still have\nreplies).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_public_comment",
         "parameters": [
           {
@@ -134523,10 +134588,11 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "The author only — signed in as the same user (with `comments.post`), or a guest sending\n`edit_token` — within `edit_minutes` of posting. The text is checked again. A shown comment\nwaits for approval again (`status: pending`) when it now has suspect words or too many links,\nor when a new comment of the same author on the same target would wait (approval mode `pre`,\nor `first_time` without a shown comment).",
+        "description": "The author only — signed in as the same user (with `comments.post`), or a guest sending\n`edit_token` — within `edit_minutes` of posting. The text is checked again. A shown comment\nwaits for approval again (`status: pending`) when it now has suspect words or too many links,\nor when a new comment of the same author on the same target would wait (approval mode `pre`,\nor `first_time` without a shown comment).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_edit_comment",
         "parameters": [
           {
@@ -134657,12 +134723,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/comments/{id}/delete": {
       "post": {
-        "description": "The author only (signed in as the same user, or a guest sending `edit_token`), at any time.\nThe text, name and email are removed; the comment keeps its place in the thread so replies\nstay. A body is used (not `DELETE`) because the token must not travel in the address. An id\nthat does not exist (deleted for good, or a comment dropped by the anti-spam checks) also\nanswers `200`, so the answer tells nothing about what happened to a comment.",
+        "description": "The author only (signed in as the same user, or a guest sending `edit_token`), at any time.\nThe text, name and email are removed; the comment keeps its place in the thread so replies\nstay. A body is used (not `DELETE`) because the token must not travel in the address. An id\nthat does not exist (deleted for good, or a comment dropped by the anti-spam checks) also\nanswers `200`, so the answer tells nothing about what happened to a comment.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_delete_own_comment",
         "parameters": [
           {
@@ -134763,12 +134830,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/comments/{id}/replies": {
       "get": {
-        "description": "No sign-in needed. Shown replies of the thread the comment starts, oldest first\n(`order=desc`: newest first). Follow `pagination.next_cursor` for more.",
+        "description": "No sign-in needed. Shown replies of the thread the comment starts, oldest first\n(`order=desc`: newest first). Follow `pagination.next_cursor` for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comment_replies",
         "parameters": [
           {
@@ -134911,12 +134979,13 @@
           }
         ],
         "x-autoxide-list": "comments.list_comment_replies",
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/comments/{id}/reports": {
       "post": {
-        "description": "No sign-in needed. One report per person per comment (signed-in user, or network block for\nguests); reporting again answers the same. When `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`\nreports are reached the comment waits for a moderator again (once).",
+        "description": "No sign-in needed. One report per person per comment (signed-in user, or network block for\nguests); reporting again answers the same. When `AUTOXIDE_COMMENTS_REPORT_THRESHOLD`\nreports are reached the comment waits for a moderator again (once).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_report_comment",
         "parameters": [
           {
@@ -135027,12 +135096,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/counts": {
       "get": {
-        "description": "No sign-in needed. Shown comments (all, and top-level only) of up to 100 targets of one kind,\nin the order asked; unknown and hidden targets count 0.",
+        "description": "No sign-in needed. Shown comments (all, and top-level only) of up to 100 targets of one kind,\nin the order asked; unknown and hidden targets count 0.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_count_comments",
         "parameters": [
           {
@@ -135129,12 +135199,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/settings": {
       "get": {
-        "description": "No sign-in needed. Limits and switches a website needs to show the comment box, for the\ntenant of the request (its own `comments.max_links` when it set one).",
+        "description": "No sign-in needed. Limits and switches a website needs to show the comment box, for the\ntenant of the request (its own `comments.max_links` when it set one).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_comment_settings",
         "parameters": [
           {
@@ -135202,12 +135273,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/targets/{target_type}/{target_id}": {
       "get": {
-        "description": "No sign-in needed. Whether it takes comments now, when it closes, how many are shown.",
+        "description": "No sign-in needed. Whether it takes comments now, when it closes, how many are shown.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_public_comment_target",
         "parameters": [
           {
@@ -135303,12 +135375,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/threads": {
       "get": {
-        "description": "No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each\nwith its first replies (oldest first) and `reply_count`. A top-level comment deleted by its\nauthor stays (with `deleted: true`, no text) while it has replies. With `q`, only matching\ntop-level comments, exact-accent matches first (questions and answers on a product use the\nsame thread: a question is a top-level comment, answers are its replies). Follow\n`pagination.next_cursor` with the same parameters for more.",
+        "description": "No sign-in needed. Shown top-level comments, newest first (`order=asc`: oldest first), each\nwith its first replies (oldest first) and `reply_count`. A top-level comment deleted by its\nauthor stays (with `deleted: true`, no text) while it has replies. With `q`, only matching\ntop-level comments, exact-accent matches first (questions and answers on a product use the\nsame thread: a question is a top-level comment, answers are its replies). Follow\n`pagination.next_cursor` with the same parameters for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comment_thread",
         "parameters": [
           {
@@ -135506,12 +135579,13 @@
           }
         ],
         "x-autoxide-list": "comments.list_comment_thread",
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/unsubscribe": {
       "post": {
-        "description": "The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail\nhere. Takes effect at once. The token tells the tenant: the call works on any host of the\nAPI, without `Autoxide-Tenant`.",
+        "description": "The page at `AUTOXIDE_COMMENTS_UNSUBSCRIBE_URL` sends the token of the link in a reply mail\nhere. Takes effect at once. The token tells the tenant: the call works on any host of the\nAPI, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_unsubscribe_comment_replies",
         "parameters": [
           {
@@ -135592,12 +135666,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/public/verify": {
       "post": {
-        "description": "The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,\nso mail scanners opening the link change nothing). From then on, the address gets a mail\nwhen that comment receives a shown reply. The token tells the tenant: the call works on any\nhost of the API, without `Autoxide-Tenant`.",
+        "description": "The page at `AUTOXIDE_COMMENTS_VERIFY_URL` sends the token of the mail link here (a `POST`,\nso mail scanners opening the link change nothing). From then on, the address gets a mail\nwhen that comment receives a shown reply. The token tells the tenant: the call works on any\nhost of the API, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_verify_comment_email",
         "parameters": [
           {
@@ -135688,12 +135763,13 @@
         "tags": [
           "comments"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/targets": {
       "get": {
-        "description": "Requires `comments.read`. Each target (a post, a product…) that got a comment or had its state\nset, newest first, with its counts and — when public — its title and path. Filter by kind,\nstate, or targets waiting for moderation (`pending=true`). Follow `pagination.next_cursor` with\nthe same filters for more.",
+        "description": "Requires `comments.read`. Each target (a post, a product…) that got a comment or had its state\nset, newest first, with its counts and — when public — its title and path. Filter by kind,\nstate, or targets waiting for moderation (`pending=true`). Follow `pagination.next_cursor` with\nthe same filters for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comment_targets",
         "parameters": [
           {
@@ -135881,12 +135957,13 @@
         "x-autoxide-list": "comments.list_comment_targets",
         "x-permissions": [
           "comments.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/targets/{target_type}/{target_id}": {
       "get": {
-        "description": "Requires `comments.read`.",
+        "description": "Requires `comments.read`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_comment_target",
         "parameters": [
           {
@@ -136001,10 +136078,11 @@
         ],
         "x-permissions": [
           "comments.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `comments.manage`. `If-Match` is optional (send the `ETag` you read to make sure\nnobody changed it since). Recorded as `comments.target_opened` / `comments.target_closed`.",
+        "description": "Requires `comments.manage`. `If-Match` is optional (send the `ETag` you read to make sure\nnobody changed it since). Recorded as `comments.target_opened` / `comments.target_closed`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_set_comment_target",
         "parameters": [
           {
@@ -136164,12 +136242,13 @@
         ],
         "x-permissions": [
           "comments.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/{id}": {
       "delete": {
-        "description": "Requires `comments.moderate`. Deleting a top-level comment deletes its whole thread. Use it\nfor takedown requests; the decision is recorded (`comments.comment_deleted`, `hard: true`).",
+        "description": "Requires `comments.moderate`. Deleting a top-level comment deletes its whole thread. Use it\nfor takedown requests; the decision is recorded (`comments.comment_deleted`, `hard: true`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_delete_comment",
         "parameters": [
           {
@@ -136271,10 +136350,11 @@
         ],
         "x-permissions": [
           "comments.moderate"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `comments.read`. Any status; includes the author's email and network fingerprint.",
+        "description": "Requires `comments.read`. Any status; includes the author's email and network fingerprint.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_get_comment",
         "parameters": [
           {
@@ -136371,10 +136451,11 @@
         ],
         "x-permissions": [
           "comments.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `comments.moderate`. `If-Match` is required. Approving sends reply mails to people\nfollowing the comment answered (`comments.comment_published`). Every decision is recorded\n(`comments.comment_status_changed`, in the audit log).",
+        "description": "Requires `comments.moderate`. `If-Match` is required. Approving sends reply mails to people\nfollowing the comment answered (`comments.comment_published`). Every decision is recorded\n(`comments.comment_status_changed`, in the audit log).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_update_comment",
         "parameters": [
           {
@@ -136543,12 +136624,13 @@
         ],
         "x-permissions": [
           "comments.moderate"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/comments/{id}/reports": {
       "get": {
-        "description": "Requires `comments.read`. Newest first.",
+        "description": "Requires `comments.read`. Newest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "comments_list_comment_reports",
         "parameters": [
           {
@@ -136702,7 +136784,8 @@
         "x-autoxide-list": "comments.list_comment_reports",
         "x-permissions": [
           "comments.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/compliance/cases": {
@@ -157696,7 +157779,7 @@
     },
     "/api/v1/conversations/callbacks": {
       "get": {
-        "description": "Requires `conversations.call`. Phone numbers are masked. Newest first unless `order=asc`.",
+        "description": "Requires `conversations.call`. Phone numbers are masked. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_conversation_callbacks",
         "parameters": [
           {
@@ -157893,12 +157976,13 @@
         "x-autoxide-list": "conversations.list_conversation_callbacks",
         "x-permissions": [
           "conversations.call"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/callbacks/{id}/call": {
       "post": {
-        "description": "Requires `conversations.call` at the unit of the request, and an `Idempotency-Key` header. The\ncustomer sees the shop's hotline; the agent answers on their WebRTC session. Two agents pressing\nat once make one call; the other gets `conversations.callback_taken`.",
+        "description": "Requires `conversations.call` at the unit of the request, and an `Idempotency-Key` header. The\ncustomer sees the shop's hotline; the agent answers on their WebRTC session. Two agents pressing\nat once make one call; the other gets `conversations.callback_taken`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_call_conversation_callback",
         "parameters": [
           {
@@ -158025,12 +158109,13 @@
         "x-idempotency": "required",
         "x-permissions": [
           "conversations.call"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/callbacks/{id}/close": {
       "post": {
-        "description": "Requires `conversations.call`. Use it when the customer was reached another way.",
+        "description": "Requires `conversations.call`. Use it when the customer was reached another way.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_close_conversation_callback",
         "parameters": [
           {
@@ -158142,12 +158227,13 @@
         ],
         "x-permissions": [
           "conversations.call"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/calls/{id}/recording": {
       "delete": {
-        "description": "Requires `conversations.voice.manage` at the unit of the call — for example when the customer\nasks. Deleting again changes nothing.",
+        "description": "Requires `conversations.voice.manage` at the unit of the call — for example when the customer\nasks. Deleting again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_delete_conversation_call_recording",
         "parameters": [
           {
@@ -158249,10 +158335,11 @@
         ],
         "x-permissions": [
           "conversations.voice.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `conversations.recordings.read` at the unit of the call. Every listen is recorded\n(event `conversations.recording_opened`).",
+        "description": "Requires `conversations.recordings.read` at the unit of the call. Every listen is recorded\n(event `conversations.recording_opened`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_conversation_call_recording",
         "parameters": [
           {
@@ -158346,12 +158433,13 @@
         ],
         "x-permissions": [
           "conversations.recordings.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads": {
       "get": {
-        "description": "Any signed-in account. Latest activity first unless `order=asc`.",
+        "description": "Any signed-in account. Latest activity first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_my_conversations",
         "parameters": [
           {
@@ -158483,10 +158571,11 @@
           }
         ],
         "x-autoxide-list": "conversations.list_my_conversations",
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Any signed-in account. When you already have an open conversation with the same unit about the\nsame record, the message goes there (200) instead of starting another. The shop may ask for a\nverified account first (`conversations.verification_required`, Decree 147/2024) or may have\nblocked you (`conversations.blocked`).",
+        "description": "Any signed-in account. When you already have an open conversation with the same unit about the\nsame record, the message goes there (200) instead of starting another. The shop may ask for a\nverified account first (`conversations.verification_required`, Decree 147/2024) or may have\nblocked you (`conversations.blocked`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_start_my_conversation",
         "parameters": [
           {
@@ -158614,12 +158703,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}": {
       "get": {
-        "description": "Any signed-in account; a conversation of someone else answers 404. Includes how far each person\nhas read.",
+        "description": "Any signed-in account; a conversation of someone else answers 404. Includes how far each person\nhas read.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_my_conversation",
         "parameters": [
           {
@@ -158706,12 +158796,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/callbacks": {
       "post": {
-        "description": "Any signed-in account with a verified phone number. One open request per conversation; sending\nagain with the same `client_id` returns it (200). The full number is never shown to staff.",
+        "description": "Any signed-in account with a verified phone number. One open request per conversation; sending\nagain with the same `client_id` returns it (200). The full number is never shown to staff.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_request_my_conversation_callback",
         "parameters": [
           {
@@ -158869,12 +158960,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/callbacks/{callback_id}": {
       "delete": {
-        "description": "Any signed-in account. A request the shop is calling right now cannot be cancelled.",
+        "description": "Any signed-in account. A request the shop is calling right now cannot be cancelled.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_cancel_my_conversation_callback",
         "parameters": [
           {
@@ -158994,12 +159086,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/calls": {
       "post": {
-        "description": "Any signed-in account, on one of your conversations. Returns a short-lived token for the voice\nprovider's WebRTC SDK; the call goes to the shop's hotline and shows in the conversation when it\nends. Counts towards `AUTOXIDE_CONVERSATIONS_CALLS_PER_DAY`.",
+        "description": "Any signed-in account, on one of your conversations. Returns a short-lived token for the voice\nprovider's WebRTC SDK; the call goes to the shop's hotline and shows in the conversation when it\nends. Counts towards `AUTOXIDE_CONVERSATIONS_CALLS_PER_DAY`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_start_my_conversation_call",
         "parameters": [
           {
@@ -159157,12 +159250,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/close": {
       "post": {
-        "description": "Any signed-in account. Writing again later starts a new conversation.",
+        "description": "Any signed-in account. Writing again later starts a new conversation.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_close_my_conversation",
         "parameters": [
           {
@@ -159262,12 +159356,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/handoff": {
       "post": {
-        "description": "Any signed-in account. Stops automatic answers in this conversation and marks it as waiting for\nstaff (`needs_agent`). Calling again changes nothing.",
+        "description": "Any signed-in account. Stops automatic answers in this conversation and marks it as waiting for\nstaff (`needs_agent`). Calling again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_hand_off_my_conversation",
         "parameters": [
           {
@@ -159377,12 +159472,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/messages": {
       "get": {
-        "description": "Any signed-in account. Newest first unless `order=asc`.",
+        "description": "Any signed-in account. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_my_conversation_messages",
         "parameters": [
           {
@@ -159534,10 +159630,11 @@
           }
         ],
         "x-autoxide-list": "conversations.list_my_conversation_messages",
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Any signed-in account. Sending again with the same `client_id` returns the first message (200)\ninstead of adding another. Simple questions may get an automatic answer (marked `auto_reply`).",
+        "description": "Any signed-in account. Sending again with the same `client_id` returns the first message (200)\ninstead of adding another. Simple questions may get an automatic answer (marked `auto_reply`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_add_my_conversation_message",
         "parameters": [
           {
@@ -159695,12 +159792,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/messages/{message_id}/recall": {
       "post": {
-        "description": "Any signed-in account; only your own message, within 2 minutes of sending it. Its text and images\nare removed, its place stays marked as recalled.",
+        "description": "Any signed-in account; only your own message, within 2 minutes of sending it. Its text and images\nare removed, its place stays marked as recalled.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_recall_my_conversation_message",
         "parameters": [
           {
@@ -159820,12 +159918,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/read": {
       "post": {
-        "description": "Any signed-in account. Moves your read cursor up to `message_id` (default: the newest message);\nthe shop sees how far you have read.",
+        "description": "Any signed-in account. Moves your read cursor up to `message_id` (default: the newest message);\nthe shop sees how far you have read.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_read_my_conversation",
         "parameters": [
           {
@@ -159945,12 +160044,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/reports": {
       "post": {
-        "description": "Any signed-in account. The shop's managers review it.",
+        "description": "Any signed-in account. The shop's managers review it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_report_my_conversation",
         "parameters": [
           {
@@ -160078,12 +160178,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/typing": {
       "post": {
-        "description": "Any signed-in account. Sends the event `conversations.typing`; more than one call per 3 seconds\nis ignored. Nothing is stored.",
+        "description": "Any signed-in account. Sends the event `conversations.typing`; more than one call per 3 seconds\nis ignored. Nothing is stored.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_type_in_my_conversation",
         "parameters": [
           {
@@ -160186,12 +160287,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/me/threads/{id}/voice": {
       "get": {
-        "description": "Any signed-in account, on one of your conversations. When `available` is false, hide every call\nbutton.",
+        "description": "Any signed-in account, on one of your conversations. When `available` is false, hide every call\nbutton.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_my_conversation_voice",
         "parameters": [
           {
@@ -160278,12 +160380,13 @@
         "tags": [
           "conversations"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/reports": {
       "get": {
-        "description": "Requires `conversations.manage`. Newest first unless `order=asc`.",
+        "description": "Requires `conversations.manage`. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_conversation_reports",
         "parameters": [
           {
@@ -160432,12 +160535,13 @@
         "x-autoxide-list": "conversations.list_conversation_reports",
         "x-permissions": [
           "conversations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/reports/{id}/resolve": {
       "post": {
-        "description": "Requires `conversations.manage` at the unit of the report. Calling again changes nothing.",
+        "description": "Requires `conversations.manage` at the unit of the report. Calling again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_resolve_conversation_report",
         "parameters": [
           {
@@ -160539,12 +160643,13 @@
         ],
         "x-permissions": [
           "conversations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads": {
       "get": {
-        "description": "Requires `conversations.read`; its scope decides which units' conversations you see (`unit`,\n`subtree`, `tenant`; `own`: conversations assigned to you). Latest activity first unless\n`order=asc`.",
+        "description": "Requires `conversations.read`; its scope decides which units' conversations you see (`unit`,\n`subtree`, `tenant`; `own`: conversations assigned to you). Latest activity first unless\n`order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_conversations",
         "parameters": [
           {
@@ -160769,12 +160874,13 @@
         "x-autoxide-list": "conversations.list_conversations",
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}": {
       "get": {
-        "description": "Requires `conversations.read` at the unit of the conversation. Includes how far each person has\nread; messages come from `GET /threads/{id}/messages`.",
+        "description": "Requires `conversations.read` at the unit of the conversation. Includes how far each person has\nread; messages come from `GET /threads/{id}/messages`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_conversation",
         "parameters": [
           {
@@ -160863,12 +160969,13 @@
         ],
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/assign": {
       "post": {
-        "description": "Taking it yourself (or letting go of your own) requires `conversations.reply`; assigning a\ncolleague requires `conversations.manage` — the colleague needs `conversations.reply` at the\nunit of the conversation.",
+        "description": "Taking it yourself (or letting go of your own) requires `conversations.reply`; assigning a\ncolleague requires `conversations.manage` — the colleague needs `conversations.reply` at the\nunit of the conversation.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_assign_conversation",
         "parameters": [
           {
@@ -160991,12 +161098,13 @@
         "x-permissions": [
           "conversations.reply",
           "conversations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/block": {
       "delete": {
-        "description": "Requires `conversations.manage`. Lifting again changes nothing.",
+        "description": "Requires `conversations.manage`. Lifting again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_unblock_conversation_customer",
         "parameters": [
           {
@@ -161098,10 +161206,11 @@
         ],
         "x-permissions": [
           "conversations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `conversations.manage`. The customer can no longer write to the unit of this\nconversation (`conversations.blocked`). Blocking again changes nothing.",
+        "description": "Requires `conversations.manage`. The customer can no longer write to the unit of this\nconversation (`conversations.blocked`). Blocking again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_block_conversation_customer",
         "parameters": [
           {
@@ -161223,12 +161332,13 @@
         ],
         "x-permissions": [
           "conversations.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/calls": {
       "get": {
-        "description": "Requires `conversations.call` at the unit of the conversation. Newest first; no phone numbers.",
+        "description": "Requires `conversations.call` at the unit of the conversation. Newest first; no phone numbers.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_conversation_calls",
         "parameters": [
           {
@@ -161317,12 +161427,13 @@
         ],
         "x-permissions": [
           "conversations.call"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/close": {
       "post": {
-        "description": "Requires `conversations.reply`. A closed conversation takes no more messages; when the customer\nwrites again, a new conversation starts. Closing again changes nothing.",
+        "description": "Requires `conversations.reply`. A closed conversation takes no more messages; when the customer\nwrites again, a new conversation starts. Closing again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_close_conversation",
         "parameters": [
           {
@@ -161424,12 +161535,13 @@
         ],
         "x-permissions": [
           "conversations.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/escalate": {
       "post": {
-        "description": "Requires `conversations.reply`. Opens a support ticket for the customer with the latest\nmessages and a link back to the conversation (module `support`). Calling again returns the same\nticket.",
+        "description": "Requires `conversations.reply`. Opens a support ticket for the customer with the latest\nmessages and a link back to the conversation (module `support`). Calling again returns the same\nticket.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_escalate_conversation",
         "parameters": [
           {
@@ -161551,12 +161663,13 @@
         ],
         "x-permissions": [
           "conversations.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/messages": {
       "get": {
-        "description": "Requires `conversations.read`. Newest first unless `order=asc`.",
+        "description": "Requires `conversations.read`. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_list_conversation_messages",
         "parameters": [
           {
@@ -161710,10 +161823,11 @@
         "x-autoxide-list": "conversations.list_conversation_messages",
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `conversations.reply` at the unit of the conversation. Sending again with the same\n`client_id` returns the first message (200) instead of adding another. The customer gets the\nmessage in real time, or a notice when they do not read it within a few minutes.",
+        "description": "Requires `conversations.reply` at the unit of the conversation. Sending again with the same\n`client_id` returns the first message (200) instead of adding another. The customer gets the\nmessage in real time, or a notice when they do not read it within a few minutes.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_reply_conversation",
         "parameters": [
           {
@@ -161873,12 +161987,13 @@
         ],
         "x-permissions": [
           "conversations.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/messages/{message_id}/recall": {
       "post": {
-        "description": "Requires `conversations.reply`. Only your own message, within 2 minutes of sending it: its text\nand images are removed, its place stays marked as recalled. Recalling again changes nothing.",
+        "description": "Requires `conversations.reply`. Only your own message, within 2 minutes of sending it: its text\nand images are removed, its place stays marked as recalled. Recalling again changes nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_recall_conversation_message",
         "parameters": [
           {
@@ -162000,12 +162115,13 @@
         ],
         "x-permissions": [
           "conversations.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/read": {
       "post": {
-        "description": "Requires `conversations.read`. Moves your read cursor up to `message_id` (default: the newest\nmessage; it never moves back) and clears the unread count of staff when you reach the newest\nmessage. The customer sees how far staff have read.",
+        "description": "Requires `conversations.read`. Moves your read cursor up to `message_id` (default: the newest\nmessage; it never moves back) and clears the unread count of staff when you reach the newest\nmessage. The customer sees how far staff have read.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_read_conversation",
         "parameters": [
           {
@@ -162127,12 +162243,13 @@
         ],
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/reports": {
       "post": {
-        "description": "Requires `conversations.read`. Colleagues with `conversations.manage` review reports at\n`GET /reports`.",
+        "description": "Requires `conversations.read`. Colleagues with `conversations.manage` review reports at\n`GET /reports`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_report_conversation",
         "parameters": [
           {
@@ -162262,12 +162379,13 @@
         ],
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/suggest-reply": {
       "post": {
-        "description": "Requires `conversations.reply`. The draft is stored on the conversation (`draft_reply`) for you\nto edit and send; nothing is sent to the customer.",
+        "description": "Requires `conversations.reply`. The draft is stored on the conversation (`draft_reply`) for you\nto edit and send; nothing is sent to the customer.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_suggest_conversation_reply",
         "parameters": [
           {
@@ -162379,12 +162497,13 @@
         ],
         "x-permissions": [
           "conversations.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/threads/{id}/typing": {
       "post": {
-        "description": "Requires `conversations.read`. Sends the event `conversations.typing` on the event stream; more\nthan one call per 3 seconds is ignored. Nothing is stored.",
+        "description": "Requires `conversations.read`. Sends the event `conversations.typing` on the event stream; more\nthan one call per 3 seconds is ignored. Nothing is stored.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_type_in_conversation",
         "parameters": [
           {
@@ -162489,12 +162608,13 @@
         ],
         "x-permissions": [
           "conversations.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/voice/agent-session": {
       "get": {
-        "description": "Requires `conversations.call` at the unit. Returns a short-lived token for the voice provider's\nSDK; calls to the hotline ring on it.",
+        "description": "Requires `conversations.call` at the unit. Returns a short-lived token for the voice provider's\nSDK; calls to the hotline ring on it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_conversation_agent_session",
         "parameters": [
           {
@@ -162593,12 +162713,13 @@
         ],
         "x-permissions": [
           "conversations.call"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/voice/lines/{org_id}": {
       "get": {
-        "description": "Requires `conversations.voice.manage` at the unit.",
+        "description": "Requires `conversations.voice.manage` at the unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_get_conversation_voice_line",
         "parameters": [
           {
@@ -162687,10 +162808,11 @@
         ],
         "x-permissions": [
           "conversations.voice.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `conversations.voice.manage` at the unit. The first time (and with `rotate_token`) the\nresponse carries `webhook_path` to give the voice provider — it is not shown again.",
+        "description": "Requires `conversations.voice.manage` at the unit. The first time (and with `rotate_token`) the\nresponse carries `webhook_path` to give the voice provider — it is not shown again.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_set_conversation_voice_line",
         "parameters": [
           {
@@ -162802,12 +162924,13 @@
         ],
         "x-permissions": [
           "conversations.voice.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/conversations/voice/webhooks/{provider}/{line_token}": {
       "post": {
-        "description": "Public: the provider calls the `webhook_path` given when the line was set up. The signature is\nchecked on the raw body; a wrong signature stores nothing. Repeated or late notifications are\napplied once and never move a call backwards.",
+        "description": "Public: the provider calls the `webhook_path` given when the line was set up. The signature is\nchecked on the raw body; a wrong signature stores nothing. Repeated or late notifications are\napplied once and never move a call backwards.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "conversations_receive_conversation_voice_webhook",
         "parameters": [
           {
@@ -162934,7 +163057,8 @@
         "tags": [
           "conversations"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/customers": {
@@ -187869,7 +187993,7 @@
                 }
               }
             },
-            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken` or `tenant_placement_behind`. A dry run lists every reason."
+            "description": "It cannot run now; code `tenancy.relocation_conflict` (see the plan of the run), `tenancy.relocation_in_progress`, `tenancy.relocation_not_active`, `tenancy.relocation_org_invalid`, `tenancy.relocation_same_database`, `tenancy.relocation_tenant_exists`, `tenancy.relocation_platform`, `tenancy.relocation_cycle`, `tenancy.relocation_schema_differs`, `tenant_slug_taken`, `tenant_move_modules_off` or `tenant_placement_behind`. A dry run lists every reason."
           },
           "422": {
             "content": {
@@ -191771,7 +191895,7 @@
                 }
               }
             },
-            "description": "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database` or `tenant_placement_behind`. A dry run lists every reason."
+            "description": "The move cannot run now; code `tenant_move_platform`, `tenant_move_same_placement`, `tenant_move_not_active`, `tenant_move_running`, `tenant_move_unfinished`, `tenant_move_schema_differs`, `tenant_move_same_database`, `tenant_move_modules_off` or `tenant_placement_behind`. A dry run lists every reason."
           },
           "422": {
             "content": {
@@ -205235,7 +205359,7 @@
     },
     "/api/v1/newsletter/bounces": {
       "post": {
-        "description": "Requires `newsletter.manage` (give a mail service an API key with it). `hard` and\n`complaint` suppress the address at once; `soft` suppresses it after\n`AUTOXIDE_NEWSLETTER_SOFT_BOUNCE_LIMIT` reports. Permanent SMTP failures of mails sent by\nthis server are counted as hard bounces without calling this endpoint.",
+        "description": "Requires `newsletter.manage` (give a mail service an API key with it). `hard` and\n`complaint` suppress the address at once; `soft` suppresses it after\n`AUTOXIDE_NEWSLETTER_SOFT_BOUNCE_LIMIT` reports. Permanent SMTP failures of mails sent by\nthis server are counted as hard bounces without calling this endpoint.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_report_newsletter_bounce",
         "parameters": [
           {
@@ -205337,12 +205461,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns": {
       "get": {
-        "description": "Requires `newsletter.read`. Newest first, with progress; follow `pagination.next_cursor`\nwith the same filters for more.",
+        "description": "Requires `newsletter.read`. Newest first, with progress; follow `pagination.next_cursor`\nwith the same filters for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_list_newsletter_campaigns",
         "parameters": [
           {
@@ -205520,10 +205645,11 @@
         "x-autoxide-list": "newsletter.list_newsletter_campaigns",
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `newsletter.manage`. Nothing is sent until `send` or `schedule` (which need\n`newsletter.send`). Every problem is reported at once in `errors`. Retry safely with an\n`Idempotency-Key` header.",
+        "description": "Requires `newsletter.manage`. Nothing is sent until `send` or `schedule` (which need\n`newsletter.send`). Every problem is reported at once in `errors`. Retry safely with an\n`Idempotency-Key` header.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_create_newsletter_campaign",
         "parameters": [
           {
@@ -205633,12 +205759,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a campaign that never sent (a\ndraft, a scheduled one, or one cancelled before sending) can be deleted.",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a campaign that never sent (a\ndraft, a scheduled one, or one cancelled before sending) can be deleted.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_campaign",
         "parameters": [
           {
@@ -205772,10 +205899,11 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `newsletter.read`.",
+        "description": "Requires `newsletter.read`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_campaign",
         "parameters": [
           {
@@ -205872,10 +206000,11 @@
         ],
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign\ncan be changed. Changing a scheduled campaign moves it back to `draft` and drops its\nschedule: someone with `newsletter.send` must schedule or send it again, so nobody can\nchange a reviewed campaign behind their back. A request that changes nothing keeps it\nscheduled.",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Only a draft or scheduled campaign\ncan be changed. Changing a scheduled campaign moves it back to `draft` and drops its\nschedule: someone with `newsletter.send` must schedule or send it again, so nobody can\nchange a reviewed campaign behind their back. A request that changes nothing keeps it\nscheduled.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_update_newsletter_campaign",
         "parameters": [
           {
@@ -206044,12 +206173,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/cancel": {
       "post": {
-        "description": "Requires `newsletter.send`. Stops a scheduled, sending or paused campaign for good; mails\nnot sent yet are skipped. `If-Match` is checked when sent.",
+        "description": "Requires `newsletter.send`. Stops a scheduled, sending or paused campaign for good; mails\nnot sent yet are skipped. `If-Match` is checked when sent.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_cancel_newsletter_campaign",
         "parameters": [
           {
@@ -206188,12 +206318,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/pause": {
       "post": {
-        "description": "Requires `newsletter.send`. Stops after the batch being sent; `resume` sends to the\nrecipients left. `If-Match` is checked when sent.",
+        "description": "Requires `newsletter.send`. Stops after the batch being sent; `resume` sends to the\nrecipients left. `If-Match` is checked when sent.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_pause_newsletter_campaign",
         "parameters": [
           {
@@ -206332,12 +206463,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/preview": {
       "get": {
-        "description": "Requires `newsletter.read`. The mail as it will be sent — subject label, footer, HTML\nwrapping — with a placeholder token in its links (they do nothing). Needs the same settings\nas sending; see `GET /api/v1/newsletter/settings`.",
+        "description": "Requires `newsletter.read`. The mail as it will be sent — subject label, footer, HTML\nwrapping — with a placeholder token in its links (they do nothing). Needs the same settings\nas sending; see `GET /api/v1/newsletter/settings`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_preview_newsletter_campaign",
         "parameters": [
           {
@@ -206436,12 +206568,13 @@
         ],
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/resume": {
       "post": {
-        "description": "Requires `newsletter.send`. Sends to the recipients not handled yet — nobody gets the mail\ntwice. `If-Match` is checked when sent.",
+        "description": "Requires `newsletter.send`. Sends to the recipients not handled yet — nobody gets the mail\ntwice. `If-Match` is checked when sent.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_resume_newsletter_campaign",
         "parameters": [
           {
@@ -206590,12 +206723,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/schedule": {
       "post": {
-        "description": "Requires `newsletter.send`. `If-Match` is required. The campaign starts sending at `at`\n(scheduling again moves the time). It can still be changed, sent at once or cancelled\nuntil then. Needs the same settings as sending.",
+        "description": "Requires `newsletter.send`. `If-Match` is required. The campaign starts sending at `at`\n(scheduling again moves the time). It can still be changed, sent at once or cancelled\nuntil then. Needs the same settings as sending.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_schedule_newsletter_campaign",
         "parameters": [
           {
@@ -206774,12 +206908,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/send": {
       "post": {
-        "description": "Requires `newsletter.send`. `If-Match` is required, so that exactly the version you read\nis sent. Takes every confirmed subscriber of the list at that moment, then hands the mails\nto the mail queue in batches at `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`. Suppressed,\nblocked and unsubscribed people are skipped. Needs `AUTOXIDE_HTTP_PUBLIC_URL` and\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL` (and `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` for\nadvertising). Follow the progress with `GET /campaigns/{id}`.",
+        "description": "Requires `newsletter.send`. `If-Match` is required, so that exactly the version you read\nis sent. Takes every confirmed subscriber of the list at that moment, then hands the mails\nto the mail queue in batches at `AUTOXIDE_NEWSLETTER_SEND_RATE_PER_MINUTE`. Suppressed,\nblocked and unsubscribed people are skipped. Needs `AUTOXIDE_HTTP_PUBLIC_URL` and\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL` (and `AUTOXIDE_NEWSLETTER_POSTAL_ADDRESS` for\nadvertising). Follow the progress with `GET /campaigns/{id}`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_send_newsletter_campaign",
         "parameters": [
           {
@@ -206938,12 +207073,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/campaigns/{id}/test": {
       "post": {
-        "description": "Requires `newsletter.send`. Sends the campaign, as subscribers would get it, to one\naddress. Nothing is recorded; the unsubscribe link of a test mail does nothing.",
+        "description": "Requires `newsletter.send`. Sends the campaign, as subscribers would get it, to one\naddress. Nothing is recorded; the unsubscribe link of a test mail does nothing.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_test_newsletter_campaign",
         "parameters": [
           {
@@ -207068,12 +207204,13 @@
         ],
         "x-permissions": [
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/data": {
       "delete": {
-        "description": "Requires `newsletter.export`. Deletes for good the subscriber with this address, their\nsubscriptions, consent records, delivery history and confirmation links (a request of the\nperson the data is about). A suppression of the address is kept, so that it never gets\nmail again after a bounce or complaint; delete it with `DELETE /suppressions/{id}` if the\nperson asks. The event `newsletter.subscriber_erased` does not carry the address.",
+        "description": "Requires `newsletter.export`. Deletes for good the subscriber with this address, their\nsubscriptions, consent records, delivery history and confirmation links (a request of the\nperson the data is about). A suppression of the address is kept, so that it never gets\nmail again after a bounce or complaint; delete it with `DELETE /suppressions/{id}` if the\nperson asks. The event `newsletter.subscriber_erased` does not carry the address.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_erase_newsletter_email_data",
         "parameters": [
           {
@@ -207175,10 +207312,11 @@
         ],
         "x-permissions": [
           "newsletter.export"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `newsletter.export`. For a request of the person the data is about: the\nsubscriber, their subscriptions with consent records, the campaign mails sent to them and\na suppression of the address.",
+        "description": "Requires `newsletter.export`. For a request of the person the data is about: the\nsubscriber, their subscriptions with consent records, the campaign mails sent to them and\na suppression of the address.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_export_newsletter_email_data",
         "parameters": [
           {
@@ -207267,12 +207405,13 @@
         ],
         "x-permissions": [
           "newsletter.export"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/lists": {
       "get": {
-        "description": "Requires `newsletter.read`. Newest first, with subscription counts; follow\n`pagination.next_cursor` for more.",
+        "description": "Requires `newsletter.read`. Newest first, with subscription counts; follow\n`pagination.next_cursor` for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_list_newsletter_lists",
         "parameters": [
           {
@@ -207406,10 +207545,11 @@
         "x-autoxide-list": "newsletter.list_newsletter_lists",
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `newsletter.manage`, and also `newsletter.send` for `new_posts: send` (new posts\nare then sent without review). Every problem is reported at once in `errors`. Retry safely\nwith an `Idempotency-Key` header.",
+        "description": "Requires `newsletter.manage`, and also `newsletter.send` for `new_posts: send` (new posts\nare then sent without review). Every problem is reported at once in `errors`. Retry safely\nwith an `Idempotency-Key` header.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_create_newsletter_list",
         "parameters": [
           {
@@ -207530,12 +207670,13 @@
         "x-permissions": [
           "newsletter.manage",
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/lists/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Deletes every subscription to the\nlist. Refused while the list has a draft, scheduled, sending or paused campaign.",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Deletes every subscription to the\nlist. Refused while the list has a draft, scheduled, sending or paused campaign.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_list",
         "parameters": [
           {
@@ -207669,10 +207810,11 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `newsletter.read`.",
+        "description": "Requires `newsletter.read`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_list",
         "parameters": [
           {
@@ -207769,10 +207911,11 @@
         ],
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `newsletter.manage`, and also `newsletter.send` to set `new_posts: send` (new\nposts are then sent without review). `If-Match` is required.",
+        "description": "Requires `newsletter.manage`, and also `newsletter.send` to set `new_posts: send` (new\nposts are then sent without review). `If-Match` is required.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_update_newsletter_list",
         "parameters": [
           {
@@ -207942,12 +208085,13 @@
         "x-permissions": [
           "newsletter.manage",
           "newsletter.send"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/public/confirm": {
       "post": {
-        "description": "No sign-in needed. The confirmation mail links to the website's page\n(`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); the page sends the token here with `POST` — opening the\nlink alone (as mail scanners do) changes nothing. A link works once, within\n`AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`. The token tells the tenant: the call works on any host of\nthe API, without `Autoxide-Tenant`.",
+        "description": "No sign-in needed. The confirmation mail links to the website's page\n(`AUTOXIDE_NEWSLETTER_CONFIRM_URL`); the page sends the token here with `POST` — opening the\nlink alone (as mail scanners do) changes nothing. A link works once, within\n`AUTOXIDE_NEWSLETTER_CONFIRM_HOURS`. The token tells the tenant: the call works on any host of\nthe API, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_confirm_newsletter_subscription",
         "parameters": [
           {
@@ -208038,12 +208182,13 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/public/lists": {
       "get": {
-        "description": "No sign-in needed. The lists marked `public`, by key, with their texts in one language,\nand the token scope of the sign-up form.",
+        "description": "No sign-in needed. The lists marked `public`, by key, with their texts in one language,\nand the token scope of the sign-up form.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_list_public_newsletter_lists",
         "parameters": [
           {
@@ -208125,12 +208270,13 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/public/preferences": {
       "get": {
-        "description": "No sign-in needed: the token comes from a campaign mail (the footer links to\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing. The token tells the tenant:\nthe call works on any host of the API, without `Autoxide-Tenant`.",
+        "description": "No sign-in needed: the token comes from a campaign mail (the footer links to\n`AUTOXIDE_NEWSLETTER_PREFERENCES_URL`). Reading changes nothing. The token tells the tenant:\nthe call works on any host of the API, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_preferences",
         "parameters": [
           {
@@ -208217,10 +208363,11 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "No sign-in needed: the token comes from a campaign mail. Unsubscribing takes effect at\nonce. Subscribing to a public list confirms it at once (the token proves the inbox), with\nthe source `preferences` as proof of consent. The token tells the tenant: the call works on\nany host of the API, without `Autoxide-Tenant`.",
+        "description": "No sign-in needed: the token comes from a campaign mail. Unsubscribing takes effect at\nonce. Subscribing to a public list confirms it at once (the token proves the inbox), with\nthe source `preferences` as proof of consent. The token tells the tenant: the call works on\nany host of the API, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_update_newsletter_preferences",
         "parameters": [
           {
@@ -208330,12 +208477,13 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/public/subscribe": {
       "post": {
-        "description": "No sign-in needed. The answer is the same `202` whether the address is new, waiting for\nconfirmation, already subscribed, blocked, or dropped by the anti-spam checks: nobody can\nlearn which addresses are on a list. A confirmation mail links to\n`AUTOXIDE_NEWSLETTER_CONFIRM_URL` for lists with double opt-in, for sign-ups held by the\nanti-spam checks, and — on any list — for an address that unsubscribed from it or is still\nwaiting for confirmation (nobody can sign someone else back up); at most\n`AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` sign-up requests a day for one address may send\none. Send `form_token` (and `challenge` when the server uses one); only a caller with the\npermission `newsletter.subscribe` (a website server with its own API key) may omit them —\nother signed-in callers go through the same checks as anonymous visitors. Sending the same\n`form_token` again stores nothing new. The sign-up is stored, and the confirmation mail\nsent, by a background job shortly after the answer, so the answer takes the same time\nwhatever the address.",
+        "description": "No sign-in needed. The answer is the same `202` whether the address is new, waiting for\nconfirmation, already subscribed, blocked, or dropped by the anti-spam checks: nobody can\nlearn which addresses are on a list. A confirmation mail links to\n`AUTOXIDE_NEWSLETTER_CONFIRM_URL` for lists with double opt-in, for sign-ups held by the\nanti-spam checks, and — on any list — for an address that unsubscribed from it or is still\nwaiting for confirmation (nobody can sign someone else back up); at most\n`AUTOXIDE_NEWSLETTER_CONFIRM_MAILS_PER_DAY` sign-up requests a day for one address may send\none. Send `form_token` (and `challenge` when the server uses one); only a caller with the\npermission `newsletter.subscribe` (a website server with its own API key) may omit them —\nother signed-in callers go through the same checks as anonymous visitors. Sending the same\n`form_token` again stores nothing new. The sign-up is stored, and the confirmation mail\nsent, by a background job shortly after the answer, so the answer takes the same time\nwhatever the address.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_subscribe_newsletter",
         "parameters": [
           {
@@ -208456,12 +208604,13 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/public/unsubscribe": {
       "post": {
-        "description": "No sign-in needed. The `List-Unsubscribe` header of every campaign mail points here; mail\napps send `POST` with the form body `List-Unsubscribe=One-Click` (RFC 8058). Unsubscribes\nthe address from the list of that mail at once. The answer is the same for any token. The\ntoken tells the tenant: the link works on any host of the API, without `Autoxide-Tenant`.",
+        "description": "No sign-in needed. The `List-Unsubscribe` header of every campaign mail points here; mail\napps send `POST` with the form body `List-Unsubscribe=One-Click` (RFC 8058). Unsubscribes\nthe address from the list of that mail at once. The answer is the same for any token. The\ntoken tells the tenant: the link works on any host of the API, without `Autoxide-Tenant`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_unsubscribe_newsletter",
         "parameters": [
           {
@@ -208552,12 +208701,13 @@
         "tags": [
           "newsletter"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/settings": {
       "get": {
-        "description": "Requires `newsletter.read`. The advertising label and daily limit, the sender's postal\naddress, and whether the addresses campaign mails need are set — so an interface can say\nwhat to set before sending. The operator changes them in the server's environment.",
+        "description": "Requires `newsletter.read`. The advertising label and daily limit, the sender's postal\naddress, and whether the addresses campaign mails need are set — so an interface can say\nwhat to set before sending. The operator changes them in the server's environment.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_settings",
         "parameters": [
           {
@@ -208626,12 +208776,13 @@
         ],
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/subscribers": {
       "get": {
-        "description": "Requires `newsletter.read`. Newest first, with their subscriptions; follow\n`pagination.next_cursor` with the same filters for more.",
+        "description": "Requires `newsletter.read`. Newest first, with their subscriptions; follow\n`pagination.next_cursor` with the same filters for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_list_newsletter_subscribers",
         "parameters": [
           {
@@ -208852,12 +209003,13 @@
         "x-autoxide-list": "newsletter.list_newsletter_subscribers",
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/subscribers/import": {
       "post": {
-        "description": "Requires `newsletter.manage`. Puts up to 1000 people into the lists as `confirmed`, with\n`consent_source` kept as proof of consent. Known addresses are updated; someone who\nunsubscribed from a list stays unsubscribed there. Suppressed addresses are imported but\nget no mail. Every problem is reported at once (paths like `subscribers[3].email`). Retry\nsafely with an `Idempotency-Key` header.",
+        "description": "Requires `newsletter.manage`. Puts up to 1000 people into the lists as `confirmed`, with\n`consent_source` kept as proof of consent. Known addresses are updated; someone who\nunsubscribed from a list stays unsubscribed there. Suppressed addresses are imported but\nget no mail. Every problem is reported at once (paths like `subscribers[3].email`). Retry\nsafely with an `Idempotency-Key` header.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_import_newsletter_subscribers",
         "parameters": [
           {
@@ -208959,12 +209111,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/subscribers/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. Deletes the subscriber for good, with their subscriptions,\ndelivery history and pending confirmation links. A suppression of the address is kept.",
+        "description": "Requires `newsletter.manage`. Deletes the subscriber for good, with their subscriptions,\ndelivery history and pending confirmation links. A suppression of the address is kept.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_subscriber",
         "parameters": [
           {
@@ -209059,10 +209212,11 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `newsletter.read`.",
+        "description": "Requires `newsletter.read`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_get_newsletter_subscriber",
         "parameters": [
           {
@@ -209159,10 +209313,11 @@
         ],
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `newsletter.manage`. `If-Match` is required. Block someone with\n`{\"status\": \"blocked\"}`; unsubscribe them from lists with `unsubscribe_list_ids`.",
+        "description": "Requires `newsletter.manage`. `If-Match` is required. Block someone with\n`{\"status\": \"blocked\"}`; unsubscribe them from lists with `unsubscribe_list_ids`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_update_newsletter_subscriber",
         "parameters": [
           {
@@ -209321,12 +209476,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/suppressions": {
       "get": {
-        "description": "Requires `newsletter.read`. Newest first; follow `pagination.next_cursor` for more.",
+        "description": "Requires `newsletter.read`. Newest first; follow `pagination.next_cursor` for more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_list_newsletter_suppressions",
         "parameters": [
           {
@@ -209475,10 +209631,11 @@
         "x-autoxide-list": "newsletter.list_newsletter_suppressions",
         "x-permissions": [
           "newsletter.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `newsletter.manage`. The address gets no campaign mail from now on, whatever its\nsubscriptions. Suppressing an address already suppressed returns the existing entry.",
+        "description": "Requires `newsletter.manage`. The address gets no campaign mail from now on, whatever its\nsubscriptions. Suppressing an address already suppressed returns the existing entry.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_create_newsletter_suppression",
         "parameters": [
           {
@@ -209588,12 +209745,13 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/newsletter/suppressions/{id}": {
       "delete": {
-        "description": "Requires `newsletter.manage`. Its soft-bounce count starts again from zero.",
+        "description": "Requires `newsletter.manage`. Its soft-bounce count starts again from zero.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "newsletter_delete_newsletter_suppression",
         "parameters": [
           {
@@ -209688,7 +209846,8 @@
         ],
         "x-permissions": [
           "newsletter.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/notifications/branding": {
@@ -236371,7 +236530,7 @@
     },
     "/api/v1/reporting/facts": {
       "get": {
-        "description": "Requires `reporting.read`, with the same visibility as the summary. Newest first unless\n`order=asc`.",
+        "description": "Requires `reporting.read`, with the same visibility as the summary. Newest first unless\n`order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "reporting_list_report_facts",
         "parameters": [
           {
@@ -236633,12 +236792,13 @@
         "x-autoxide-list": "reporting.list_report_facts",
         "x-permissions": [
           "reporting.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/reporting/kinds": {
       "get": {
-        "description": "Requires `reporting.read`. Each module declares the figures its events produce.",
+        "description": "Requires `reporting.read`. Each module declares the figures its events produce.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "reporting_list_report_kinds",
         "parameters": [
           {
@@ -236707,12 +236867,13 @@
         ],
         "x-permissions": [
           "reporting.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/reporting/lag": {
       "get": {
-        "description": "Requires `reporting.manage`. One line for your tenant and each tenant below it.",
+        "description": "Requires `reporting.manage`. One line for your tenant and each tenant below it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "reporting_report_lag",
         "parameters": [
           {
@@ -236781,12 +236942,13 @@
         ],
         "x-permissions": [
           "reporting.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/reporting/rebuild": {
       "post": {
-        "description": "Requires `reporting.manage`. Marks the facts the tenant still keeps (see\n`AUTOXIDE_REPORTING_LOCAL_RETENTION_DAYS`) as not pushed; the store never counts a fact twice.\nSafe to call again.",
+        "description": "Requires `reporting.manage`. Marks the facts the tenant still keeps (see\n`AUTOXIDE_REPORTING_LOCAL_RETENTION_DAYS`) as not pushed; the store never counts a fact twice.\nSafe to call again.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "reporting_report_rebuild",
         "parameters": [
           {
@@ -236898,12 +237060,13 @@
         ],
         "x-permissions": [
           "reporting.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/reporting/summary": {
       "get": {
-        "description": "Requires `reporting.read`. With scope `tenant` you see your tenant and every tenant below it\n(on any database); with a narrower scope only the facts of your units. Reads the daily totals of\nthe store at the root tenant of your customer tree; facts arrive a few seconds after the change.",
+        "description": "Requires `reporting.read`. With scope `tenant` you see your tenant and every tenant below it\n(on any database); with a narrower scope only the facts of your units. Reads the daily totals of\nthe store at the root tenant of your customer tree; facts arrive a few seconds after the change.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "reporting_report_summary",
         "parameters": [
           {
@@ -237088,7 +237251,8 @@
         ],
         "x-permissions": [
           "reporting.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/shipping/buyers/{buyer_id}/addresses": {
@@ -243111,7 +243275,7 @@
     },
     "/api/v1/support/auto-replies": {
       "get": {
-        "description": "Requires `support.auto_reply.manage`. Newest first unless `order=asc`.",
+        "description": "Requires `support.auto_reply.manage`. Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_auto_replies",
         "parameters": [
           {
@@ -243245,12 +243409,13 @@
         "x-autoxide-list": "support.list_support_auto_replies",
         "x-permissions": [
           "support.auto_reply.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/auto-reply/preview": {
       "post": {
-        "description": "Requires `support.auto_reply.manage` at the unit. Runs the classifier and every rule on `text`\nas if a customer asked it at the unit, and tells what would happen.",
+        "description": "Requires `support.auto_reply.manage` at the unit. Runs the classifier and every rule on `text`\nas if a customer asked it at the unit, and tells what would happen.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_preview_support_auto_reply",
         "parameters": [
           {
@@ -243352,12 +243517,13 @@
         ],
         "x-permissions": [
           "support.auto_reply.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/macros": {
       "get": {
-        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.",
+        "description": "Requires `support.tickets.read` at the unit; includes the saved replies of the units above it.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_macros",
         "parameters": [
           {
@@ -243435,10 +243601,11 @@
         ],
         "x-permissions": [
           "support.tickets.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `support.settings.manage` at the unit.",
+        "description": "Requires `support.settings.manage` at the unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_create_support_macro",
         "parameters": [
           {
@@ -243548,12 +243715,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/macros/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at its unit.",
+        "description": "Requires `support.settings.manage` at its unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_macro",
         "parameters": [
           {
@@ -243648,10 +243816,11 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `support.settings.manage` at its unit. Changing the text withdraws its approval for\nautomatic answers.",
+        "description": "Requires `support.settings.manage` at its unit. Changing the text withdraws its approval for\nautomatic answers.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_update_support_macro",
         "parameters": [
           {
@@ -243773,12 +243942,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/macros/{id}/auto-reply": {
       "put": {
-        "description": "Requires `support.auto_reply.manage` at the saved reply's unit. Enabling it means you approve\nthe exact text: it is sent word for word (variables filled in) when the classifier is confident\nand no rule blocks it. Changing the text later withdraws the approval.",
+        "description": "Requires `support.auto_reply.manage` at the saved reply's unit. Enabling it means you approve\nthe exact text: it is sent word for word (variables filled in) when the classifier is confident\nand no rule blocks it. Changing the text later withdraws the approval.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_approve_support_macro",
         "parameters": [
           {
@@ -243900,12 +244070,13 @@
         ],
         "x-permissions": [
           "support.auto_reply.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/claim": {
       "post": {
-        "description": "Any signed-in account. Attaches verified guest tickets with the phone number your account\nverified, and — when you send a verified guest ticket and its token — every verified guest\nticket with the same email or phone number. Calling again changes nothing more.",
+        "description": "Any signed-in account. Attaches verified guest tickets with the phone number your account\nverified, and — when you send a verified guest ticket and its token — every verified guest\nticket with the same email or phone number. Calling again changes nothing more.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_claim_support_tickets",
         "parameters": [
           {
@@ -244005,12 +244176,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets": {
       "get": {
-        "description": "Any signed-in account (customer accounts too). Newest first unless `order=asc`. Internal notes\nare never shown.",
+        "description": "Any signed-in account (customer accounts too). Newest first unless `order=asc`. Internal notes\nare never shown.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_my_support_tickets",
         "parameters": [
           {
@@ -244142,12 +244314,13 @@
           }
         ],
         "x-autoxide-list": "support.list_my_support_tickets",
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets/{id}": {
       "get": {
-        "description": "Any signed-in account; a ticket of someone else answers 404.",
+        "description": "Any signed-in account; a ticket of someone else answers 404.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_get_my_support_ticket",
         "parameters": [
           {
@@ -244234,12 +244407,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets/{id}/auto-replies/{reply_id}/feedback": {
       "post": {
-        "description": "Any signed-in account, for its own ticket. A saved reply reported wrong too often stops being\nused automatically.",
+        "description": "Any signed-in account, for its own ticket. A saved reply reported wrong too often stops being\nused automatically.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_feedback_my_support_auto_reply",
         "parameters": [
           {
@@ -244359,12 +244533,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets/{id}/handoff": {
       "post": {
-        "description": "Any signed-in account, for its own ticket. Automatic answers stop on this ticket and it waits\nfor staff.",
+        "description": "Any signed-in account, for its own ticket. Automatic answers stop on this ticket and it waits\nfor staff.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_handoff_my_support_ticket",
         "parameters": [
           {
@@ -244484,12 +244659,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets/{id}/messages": {
       "post": {
-        "description": "Any signed-in account. A solved ticket opens again (`pending_agent`); a closed ticket cannot\ntake messages — open a new ticket with `follow_up_of`. Retry safely with an `Idempotency-Key`.",
+        "description": "Any signed-in account. A solved ticket opens again (`pending_agent`); a closed ticket cannot\ntake messages — open a new ticket with `follow_up_of`. Retry safely with an `Idempotency-Key`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_add_my_support_message",
         "parameters": [
           {
@@ -244627,12 +244803,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/me/tickets/{id}/satisfaction": {
       "post": {
-        "description": "Any signed-in account, for its own ticket. Only once the ticket is solved or closed; rating again\nreplaces the rating.",
+        "description": "Any signed-in account, for its own ticket. Only once the ticket is solved or closed; rating again\nreplaces the rating.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_rate_my_support_ticket",
         "parameters": [
           {
@@ -244762,12 +244939,13 @@
         "tags": [
           "support"
         ],
-        "x-permissions": []
+        "x-permissions": [],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/policies/{org_id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units\nabove (or the defaults).",
+        "description": "Requires `support.settings.manage` at the unit. The unit then inherits the policy of the units\nabove (or the defaults).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_reset_support_policy",
         "parameters": [
           {
@@ -244859,10 +245037,11 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `support.tickets.reply` or `support.settings.manage` (staff need the categories and\nresponse-time targets). Units without their own policy show the inherited one (`defined_at`).",
+        "description": "Requires `support.tickets.reply` or `support.settings.manage` (staff need the categories and\nresponse-time targets). Units without their own policy show the inherited one (`defined_at`).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_get_support_policy",
         "parameters": [
           {
@@ -244941,10 +245120,11 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `support.settings.manage` at the unit. Every error of the policy is reported at once.\nNew tickets use it at once; open tickets keep their deadlines until their priority changes.",
+        "description": "Requires `support.settings.manage` at the unit. Every error of the policy is reported at once.\nNew tickets use it at once; open tickets keep their deadlines until their priority changes.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_set_support_policy",
         "parameters": [
           {
@@ -245056,12 +245236,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets": {
       "post": {
-        "description": "Public. Signed in: the ticket belongs to your account (see `/me/tickets`). Guest: give `email`\nor `phone`; the answer carries `access_token` once — keep it to see and answer the ticket — and\na code is sent to confirm your contact, needed before your second message. Guests are limited\nper network address, email and phone number. Sending the same `form_token` again returns the\nsame ticket.",
+        "description": "Public. Signed in: the ticket belongs to your account (see `/me/tickets`). Guest: give `email`\nor `phone`; the answer carries `access_token` once — keep it to see and answer the ticket — and\na code is sent to confirm your contact, needed before your second message. Guests are limited\nper network address, email and phone number. Sending the same `form_token` again returns the\nsame ticket.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_open_support_ticket",
         "parameters": [
           {
@@ -245180,12 +245361,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}": {
       "get": {
-        "description": "Public, with the ticket token. Internal notes are never shown; the token opens this ticket\nonly, and stops working some days after the ticket is closed.",
+        "description": "Public, with the ticket token. Internal notes are never shown; the token opens this ticket\nonly, and stops working some days after the ticket is closed.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_get_public_support_ticket",
         "parameters": [
           {
@@ -245269,12 +245451,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}/auto-replies/{reply_id}/feedback": {
       "post": {
-        "description": "Public, with the ticket token.",
+        "description": "Public, with the ticket token.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_feedback_public_support_auto_reply",
         "parameters": [
           {
@@ -245382,12 +245565,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}/handoff": {
       "post": {
-        "description": "Public, with the ticket token. Automatic answers stop on this ticket and it waits for staff.",
+        "description": "Public, with the ticket token. Automatic answers stop on this ticket and it waits for staff.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_handoff_public_support_ticket",
         "parameters": [
           {
@@ -245495,12 +245679,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}/messages": {
       "post": {
-        "description": "Public, with the ticket token. Confirm your contact first (`/verify`), otherwise\n`support.verification_required`. A solved ticket opens again; a closed ticket cannot take\nmessages.",
+        "description": "Public, with the ticket token. Confirm your contact first (`/verify`), otherwise\n`support.verification_required`. A solved ticket opens again; a closed ticket cannot take\nmessages.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_add_public_support_message",
         "parameters": [
           {
@@ -245626,12 +245811,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}/satisfaction": {
       "post": {
-        "description": "Public, with the ticket token. Only once the ticket is solved or closed.",
+        "description": "Public, with the ticket token. Only once the ticket is solved or closed.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_rate_public_support_ticket",
         "parameters": [
           {
@@ -245749,12 +245935,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/public/tickets/{id}/verify": {
       "post": {
-        "description": "Public, with the ticket token. Without `code`: sends a new code (a few times per hour). With\n`code`: checks it (5 tries per code, valid 15 minutes); the answer shows `requester.verified`.",
+        "description": "Public, with the ticket token. Without `code`: sends a new code (a few times per hour). With\n`code`: checks it (5 tries per code, valid 15 minutes); the answer shows `requester.verified`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_verify_support_ticket",
         "parameters": [
           {
@@ -245882,12 +246069,13 @@
         "tags": [
           "support"
         ],
-        "x-public": true
+        "x-public": true,
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/reports/summary": {
       "get": {
-        "description": "Requires `support.tickets.read`; counts the tickets in your scope created in the period: how\nmany, how many solved and late, median minutes to the first answer and to solved, and the\naverage customer rating.",
+        "description": "Requires `support.tickets.read`; counts the tickets in your scope created in the period: how\nmany, how many solved and late, median minutes to the first answer and to solved, and the\naverage customer rating.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_support_report_summary",
         "parameters": [
           {
@@ -245996,12 +246184,13 @@
         ],
         "x-permissions": [
           "support.tickets.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/routing-rules": {
       "get": {
-        "description": "Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of\nthe unit's own rules match.",
+        "description": "Requires `support.settings.manage` at the unit. Rules of the units above apply too when none of\nthe unit's own rules match.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_routing_rules",
         "parameters": [
           {
@@ -246079,10 +246268,11 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `support.settings.manage` at the unit. A new ticket goes to the team of the first\nmatching rule, and round-robin to a team member who takes tickets and can answer them.",
+        "description": "Requires `support.settings.manage` at the unit. A new ticket goes to the team of the first\nmatching rule, and round-robin to a team member who takes tickets and can answer them.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_create_support_routing_rule",
         "parameters": [
           {
@@ -246192,12 +246382,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/routing-rules/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the rule's unit.",
+        "description": "Requires `support.settings.manage` at the rule's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_routing_rule",
         "parameters": [
           {
@@ -246292,12 +246483,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/teams": {
       "get": {
-        "description": "Requires `support.settings.manage` or `support.tickets.reply`; you see the teams of the units in\nyour scope.",
+        "description": "Requires `support.settings.manage` or `support.tickets.reply`; you see the teams of the units in\nyour scope.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_teams",
         "parameters": [
           {
@@ -246431,10 +246623,11 @@
         "x-autoxide-list": "support.list_support_teams",
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `support.settings.manage` at the unit.",
+        "description": "Requires `support.settings.manage` at the unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_create_support_team",
         "parameters": [
           {
@@ -246554,12 +246747,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/teams/{id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;\ntickets of the team keep their assignee but lose the team.",
+        "description": "Requires `support.settings.manage` at the team's unit. Its members and routing rules go too;\ntickets of the team keep their assignee but lose the team.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_delete_support_team",
         "parameters": [
           {
@@ -246654,10 +246848,11 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "get": {
-        "description": "Requires `support.settings.manage` or `support.tickets.reply` covering the team's unit.",
+        "description": "Requires `support.settings.manage` or `support.tickets.reply` covering the team's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_get_support_team",
         "parameters": [
           {
@@ -246746,12 +246941,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/teams/{id}/members/{user_id}": {
       "delete": {
-        "description": "Requires `support.settings.manage` at the team's unit.",
+        "description": "Requires `support.settings.manage` at the team's unit.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_remove_support_team_member",
         "parameters": [
           {
@@ -246856,10 +247052,11 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "put": {
-        "description": "Requires `support.settings.manage` at the team's unit; a member may also switch `accepting` for\nthemselves. A new member must be able to answer tickets of the unit\n(`support.assignee_out_of_scope` otherwise).",
+        "description": "Requires `support.settings.manage` at the team's unit; a member may also switch `accepting` for\nthemselves. A new member must be able to answer tickets of the unit\n(`support.assignee_out_of_scope` otherwise).\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_set_support_team_member",
         "parameters": [
           {
@@ -246991,12 +247188,13 @@
         ],
         "x-permissions": [
           "support.settings.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets": {
       "get": {
-        "description": "Requires `support.tickets.read`; its scope decides which units' tickets you see (`unit`,\n`subtree`, `tenant`; `own`: tickets assigned to you). Newest first unless `order=asc`.",
+        "description": "Requires `support.tickets.read`; its scope decides which units' tickets you see (`unit`,\n`subtree`, `tenant`; `own`: tickets assigned to you). Newest first unless `order=asc`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_tickets",
         "parameters": [
           {
@@ -247272,10 +247470,11 @@
         "x-autoxide-list": "support.list_support_tickets",
         "x-permissions": [
           "support.tickets.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "post": {
-        "description": "Requires `support.tickets.reply` at the unit of the ticket. The contact counts as verified.\nRetry safely with an `Idempotency-Key` header.",
+        "description": "Requires `support.tickets.reply` at the unit of the ticket. The contact counts as verified.\nRetry safely with an `Idempotency-Key` header.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_create_support_ticket",
         "parameters": [
           {
@@ -247385,12 +247584,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}": {
       "get": {
-        "description": "Requires `support.tickets.read` covering the ticket's unit; a ticket outside your scope answers\n404.",
+        "description": "Requires `support.tickets.read` covering the ticket's unit; a ticket outside your scope answers\n404.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_get_support_ticket",
         "parameters": [
           {
@@ -247487,10 +247687,11 @@
         ],
         "x-permissions": [
           "support.tickets.read"
-        ]
+        ],
+        "x-stability": "experimental"
       },
       "patch": {
-        "description": "Requires `support.tickets.reply` covering the ticket; its unit must be active. Send the `ETag`\nyou read in `If-Match`: when two people change the ticket at once, exactly one wins and the\nother gets 412.",
+        "description": "Requires `support.tickets.reply` covering the ticket; its unit must be active. Send the `ETag`\nyou read in `If-Match`: when two people change the ticket at once, exactly one wins and the\nother gets 412.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_update_support_ticket",
         "parameters": [
           {
@@ -247652,12 +247853,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/escalate": {
       "post": {
-        "description": "Requires `support.tickets.manage` covering the ticket. `consumer_complaint`: module `compliance`\nopens a complaint case with legal deadlines; the ticket keeps `case_id` and closes as\n`escalated`. Calling again (or with the same `Idempotency-Key`) never opens a second case.\n`platform`: the marketplace operator's staff take it over; the ticket stays open.",
+        "description": "Requires `support.tickets.manage` covering the ticket. `consumer_complaint`: module `compliance`\nopens a complaint case with legal deadlines; the ticket keeps `case_id` and closes as\n`escalated`. Calling again (or with the same `Idempotency-Key`) never opens a second case.\n`platform`: the marketplace operator's staff take it over; the ticket stays open.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_escalate_support_ticket",
         "parameters": [
           {
@@ -247799,12 +248001,13 @@
         ],
         "x-permissions": [
           "support.tickets.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/links": {
       "post": {
-        "description": "Requires `support.tickets.reply` covering the ticket. The record must exist (module registry of\nrecords). Linking again changes nothing. List tickets of a record with `GET /tickets?link=…`.",
+        "description": "Requires `support.tickets.reply` covering the ticket. The record must exist (module registry of\nrecords). Linking again changes nothing. List tickets of a record with `GET /tickets?link=…`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_add_support_link",
         "parameters": [
           {
@@ -247926,12 +248129,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/links/{target}": {
       "delete": {
-        "description": "Requires `support.tickets.reply` covering the ticket.",
+        "description": "Requires `support.tickets.reply` covering the ticket.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_remove_support_link",
         "parameters": [
           {
@@ -248042,12 +248246,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/macros/{macro_id}/render": {
       "post": {
-        "description": "Requires `support.tickets.read` covering the ticket. Nothing is sent.",
+        "description": "Requires `support.tickets.read` covering the ticket. Nothing is sent.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_render_support_macro",
         "parameters": [
           {
@@ -248159,12 +248364,13 @@
         ],
         "x-permissions": [
           "support.tickets.read"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/messages": {
       "post": {
-        "description": "Requires `support.tickets.reply` covering the ticket. A public answer moves the ticket to\n`pending_customer` (the response-time clock stops) and notifies the customer; an internal note\n(`internal: true`) notifies the mentioned colleagues. Retry safely with an `Idempotency-Key`.",
+        "description": "Requires `support.tickets.reply` covering the ticket. A public answer moves the ticket to\n`pending_customer` (the response-time clock stops) and notifies the customer; an internal note\n(`internal: true`) notifies the mentioned colleagues. Retry safely with an `Idempotency-Key`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_add_support_message",
         "parameters": [
           {
@@ -248304,12 +248510,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/messages/{message_id}/hide": {
       "post": {
-        "description": "Requires `support.tickets.manage` covering the ticket. Messages are never edited or deleted: a\nmistaken message is hidden with a reason; the customer sees that a message was hidden.",
+        "description": "Requires `support.tickets.manage` covering the ticket. Messages are never edited or deleted: a\nmistaken message is hidden with a reason; the customer sees that a message was hidden.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_hide_support_message",
         "parameters": [
           {
@@ -248441,12 +248648,13 @@
         ],
         "x-permissions": [
           "support.tickets.manage"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/reply-drafts": {
       "get": {
-        "description": "Requires `support.tickets.reply` covering the ticket. Newest first.",
+        "description": "Requires `support.tickets.reply` covering the ticket. Newest first.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_list_support_reply_drafts",
         "parameters": [
           {
@@ -248535,12 +248743,13 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/support/tickets/{id}/reply-suggestions": {
       "post": {
-        "description": "Requires `support.tickets.reply` covering the ticket. The model reads the ticket's messages\n(emails and phone numbers removed) and the saved replies of the unit; the result is only a\ndraft — edit it, then send it as a message with `ai_assisted: true`.",
+        "description": "Requires `support.tickets.reply` covering the ticket. The model reads the ticket's messages\n(emails and phone numbers removed) and the saved replies of the unit; the result is only a\ndraft — edit it, then send it as a message with `ai_assisted: true`.\n\n**Experimental**: this belongs to an experimental module; it may change between releases, breaking changes included (see the changelog).",
         "operationId": "support_suggest_support_reply",
         "parameters": [
           {
@@ -248662,7 +248871,8 @@
         ],
         "x-permissions": [
           "support.tickets.reply"
-        ]
+        ],
+        "x-stability": "experimental"
       }
     },
     "/api/v1/tax/categories": {

@@ -114,7 +114,8 @@
       },
       "name": "address.list_communes",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -145,7 +146,8 @@
       },
       "name": "address.list_provinces",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -206,7 +208,8 @@
       },
       "name": "address.search_units",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -244,7 +247,8 @@
       },
       "name": "address.validate_address",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -264,7 +268,8 @@
       "output_schema": null,
       "permissions": [
         "ai.view"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -314,7 +319,8 @@
       "output_schema": null,
       "permissions": [
         "analytics.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -360,7 +366,8 @@
       "output_schema": null,
       "permissions": [
         "analytics.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -419,7 +426,8 @@
       "output_schema": null,
       "permissions": [
         "analytics.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -478,7 +486,8 @@
       "output_schema": null,
       "permissions": [
         "analytics.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -508,7 +517,8 @@
       "output_schema": null,
       "permissions": [
         "audit.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -583,7 +593,8 @@
       "output_schema": null,
       "permissions": [
         "audit.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -603,7 +614,8 @@
       "output_schema": null,
       "permissions": [
         "auth.users.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -623,7 +635,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -729,7 +742,8 @@
       },
       "name": "auth.create_api_key",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -789,7 +803,8 @@
       "output_schema": null,
       "permissions": [
         "auth.invitations.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -915,7 +930,8 @@
       "output_schema": null,
       "permissions": [
         "auth.oidc.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -999,7 +1015,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1029,7 +1046,8 @@
       "output_schema": null,
       "permissions": [
         "auth.oidc.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1059,7 +1077,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1089,7 +1108,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1119,7 +1139,8 @@
       "output_schema": null,
       "permissions": [
         "auth.users.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1170,7 +1191,8 @@
       },
       "name": "auth.list_api_keys",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1222,7 +1244,8 @@
       "output_schema": null,
       "permissions": [
         "auth.invitations.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1295,7 +1318,8 @@
       "output_schema": null,
       "permissions": [
         "auth.users.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1313,7 +1337,8 @@
       },
       "name": "auth.list_my_identities",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1333,7 +1358,8 @@
       "output_schema": null,
       "permissions": [
         "auth.oidc.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1353,7 +1379,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1406,7 +1433,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1459,7 +1487,8 @@
       "output_schema": null,
       "permissions": [
         "auth.users.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1545,7 +1574,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1573,7 +1603,8 @@
       },
       "name": "auth.revoke_api_key",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1603,7 +1634,8 @@
       "output_schema": null,
       "permissions": [
         "auth.invitations.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1666,7 +1698,8 @@
       },
       "name": "auth.rotate_api_key",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1725,7 +1758,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1764,7 +1798,8 @@
       "output_schema": null,
       "permissions": [
         "auth.roles.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1873,7 +1908,8 @@
       "output_schema": null,
       "permissions": [
         "auth.oidc.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1917,7 +1953,8 @@
       "output_schema": null,
       "permissions": [
         "auth.users.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -1935,7 +1972,8 @@
       },
       "name": "auth.whoami",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2004,7 +2042,8 @@
       "output_schema": null,
       "permissions": [
         "automations.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2034,7 +2073,8 @@
       "output_schema": null,
       "permissions": [
         "automations.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2087,7 +2127,8 @@
       "output_schema": null,
       "permissions": [
         "automations.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2124,7 +2165,8 @@
       "output_schema": null,
       "permissions": [
         "automations.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2192,7 +2234,8 @@
       "output_schema": null,
       "permissions": [
         "automations.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2247,7 +2290,8 @@
       },
       "name": "bookings.availability",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2284,7 +2328,8 @@
       "output_schema": null,
       "permissions": [
         "bookings.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2358,7 +2403,8 @@
       "output_schema": null,
       "permissions": [
         "bookings.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2435,7 +2481,8 @@
       "permissions": [
         "bookings.read",
         "bookings.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2479,7 +2526,8 @@
       "output_schema": null,
       "permissions": [
         "bookings.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -2559,7 +2607,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.prices.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2832,7 +2881,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2862,7 +2912,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2892,7 +2943,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2922,7 +2974,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.import"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2942,7 +2995,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -2987,7 +3041,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3086,7 +3141,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3139,7 +3195,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.prices.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3256,7 +3313,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.collections.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3296,7 +3354,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.publish"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3333,7 +3392,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.import"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3368,7 +3428,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3429,7 +3490,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3789,7 +3851,8 @@
       "output_schema": null,
       "permissions": [
         "catalog.products.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -3831,7 +3894,8 @@
       "output_schema": null,
       "permissions": [
         "comments.post"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -3861,7 +3925,8 @@
       "output_schema": null,
       "permissions": [
         "comments.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -3901,7 +3966,8 @@
       "output_schema": null,
       "permissions": [
         "comments.moderate"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -3975,7 +4041,8 @@
       "output_schema": null,
       "permissions": [
         "comments.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -4014,7 +4081,8 @@
       "output_schema": null,
       "permissions": [
         "comments.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -4081,7 +4149,8 @@
       "output_schema": null,
       "permissions": [
         "comments.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -4099,7 +4168,8 @@
       },
       "name": "compliance.account_verification",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4133,7 +4203,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.cases.handle"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4166,7 +4237,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.incidents.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4186,7 +4258,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.documents.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4215,7 +4288,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.cases.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4256,7 +4330,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.incidents.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4305,7 +4380,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.incidents.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4350,7 +4426,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.kyc.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4388,7 +4465,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4451,7 +4529,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.cases.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4508,7 +4587,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.incidents.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4526,7 +4606,8 @@
       },
       "name": "compliance.pending_acceptances",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4546,7 +4627,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4601,7 +4683,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.documents.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4621,7 +4704,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4674,7 +4758,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4708,7 +4793,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.cases.handle"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4728,7 +4814,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4783,7 +4870,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4832,7 +4920,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.privacy.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4878,7 +4967,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.tracking.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4896,7 +4986,8 @@
       },
       "name": "compliance.verification_status",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4925,7 +5016,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4954,7 +5046,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -4992,7 +5085,8 @@
       "output_schema": null,
       "permissions": [
         "compliance.legal.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5085,7 +5179,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5137,7 +5232,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5167,7 +5263,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5198,7 +5295,8 @@
       "permissions": [
         "content.read",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5218,7 +5316,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5315,7 +5414,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5391,7 +5491,8 @@
       "permissions": [
         "content.banners",
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5438,7 +5539,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5481,7 +5583,8 @@
       "output_schema": null,
       "permissions": [
         "content.banners"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5517,7 +5620,8 @@
       "permissions": [
         "content.publish",
         "content.publish_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5553,7 +5657,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5595,7 +5700,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5637,7 +5743,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5824,7 +5931,8 @@
       "output_schema": null,
       "permissions": [
         "content.banners"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5869,7 +5977,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5899,7 +6008,8 @@
       "output_schema": null,
       "permissions": [
         "content.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5930,7 +6040,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -5966,7 +6077,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6002,7 +6114,8 @@
       "permissions": [
         "content.publish",
         "content.publish_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6113,7 +6226,8 @@
       "permissions": [
         "content.write",
         "content.write_own"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6143,7 +6257,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6188,7 +6303,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.call"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6218,7 +6334,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.call"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6281,7 +6398,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6321,7 +6439,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6351,7 +6470,8 @@
       "output_schema": null,
       "permissions": [
         "conversations.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -6381,7 +6501,8 @@
       "output_schema": null,
       "permissions": [
         "customers.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6420,7 +6541,8 @@
       "permissions": [
         "customers.read",
         "customers.segments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6451,7 +6573,8 @@
       "permissions": [
         "customers.read",
         "customers.segments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6488,7 +6611,8 @@
       "output_schema": null,
       "permissions": [
         "customers.contact.reveal"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6548,7 +6672,8 @@
       "output_schema": null,
       "permissions": [
         "customers.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6620,7 +6745,8 @@
       "output_schema": null,
       "permissions": [
         "customers.segments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6651,7 +6777,8 @@
       "permissions": [
         "files.upload",
         "files.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6700,7 +6827,8 @@
       "output_schema": null,
       "permissions": [
         "files.upload"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6731,7 +6859,8 @@
       "permissions": [
         "files.upload",
         "files.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6762,7 +6891,8 @@
       "permissions": [
         "files.upload",
         "files.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6815,7 +6945,8 @@
       "output_schema": null,
       "permissions": [
         "files.upload"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6846,7 +6977,8 @@
       "permissions": [
         "files.upload",
         "files.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -6887,7 +7019,8 @@
       "output_schema": null,
       "permissions": [
         "files.upload"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7005,7 +7138,8 @@
       "output_schema": null,
       "permissions": [
         "forms.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7035,7 +7169,8 @@
       "output_schema": null,
       "permissions": [
         "forms.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7065,7 +7200,8 @@
       "output_schema": null,
       "permissions": [
         "forms.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7111,7 +7247,8 @@
       "output_schema": null,
       "permissions": [
         "forms.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7179,7 +7316,8 @@
       "output_schema": null,
       "permissions": [
         "forms.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7219,7 +7357,8 @@
       "output_schema": null,
       "permissions": [
         "forms.review"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7338,7 +7477,8 @@
       "output_schema": null,
       "permissions": [
         "forms.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7445,7 +7585,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.adjust"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7547,7 +7688,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.receive"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7624,7 +7766,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.transfer"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7678,7 +7821,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7732,7 +7876,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7822,7 +7967,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7876,7 +8022,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.transfer"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -7906,7 +8053,8 @@
       "output_schema": null,
       "permissions": [
         "inventory.adjust"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8026,7 +8174,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8080,7 +8229,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.export"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8109,7 +8259,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8179,7 +8330,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8208,7 +8360,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.export"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8237,7 +8390,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.issue"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8273,7 +8427,8 @@
       "output_schema": null,
       "permissions": [
         "invoices.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8303,7 +8458,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.domains.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8349,7 +8505,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8367,7 +8524,8 @@
       },
       "name": "kernel.current_tenant",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8408,7 +8566,8 @@
       },
       "name": "kernel.decide_approval",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8436,7 +8595,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.data.export"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8466,7 +8626,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8496,7 +8657,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.operate"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8525,7 +8687,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8554,7 +8717,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8590,7 +8754,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.data.export"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8625,7 +8790,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8652,7 +8818,8 @@
       },
       "name": "kernel.list_approvals",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8679,7 +8846,8 @@
       },
       "name": "kernel.list_custom_fields",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8732,7 +8900,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.domains.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8752,7 +8921,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.modules.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8772,7 +8942,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8824,7 +8995,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8869,7 +9041,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8899,7 +9072,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.settings.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8952,7 +9126,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -8986,7 +9161,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.operate"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9029,7 +9205,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.tenants.move"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9064,7 +9241,8 @@
       },
       "name": "kernel.navigation",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9084,7 +9262,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.ops.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9122,7 +9301,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.sandboxes.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9214,7 +9394,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.devtools.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9253,7 +9434,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.domains.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9283,7 +9465,8 @@
       "output_schema": null,
       "permissions": [
         "kernel.domains.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9321,7 +9504,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9371,7 +9555,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.payouts_create"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9433,7 +9618,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.payments_create"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9509,7 +9695,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9554,7 +9741,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9594,7 +9782,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9624,7 +9813,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9691,7 +9881,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9721,7 +9912,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9774,7 +9966,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9858,7 +10051,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.post"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9903,7 +10097,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.settings_manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9933,7 +10128,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.holds_release"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -9983,7 +10179,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.reconcile"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10027,7 +10224,8 @@
       "output_schema": null,
       "permissions": [
         "ledger.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10057,7 +10255,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10129,7 +10328,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10159,7 +10359,8 @@
       "output_schema": null,
       "permissions": [
         "media.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10261,7 +10462,8 @@
       "output_schema": null,
       "permissions": [
         "media.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10307,7 +10509,8 @@
       "output_schema": null,
       "permissions": [
         "media.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10355,7 +10558,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10397,7 +10601,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10427,7 +10632,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10530,7 +10736,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10597,7 +10804,8 @@
       "output_schema": null,
       "permissions": [
         "media.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10648,7 +10856,8 @@
       "output_schema": null,
       "permissions": [
         "menus.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10678,7 +10887,8 @@
       "output_schema": null,
       "permissions": [
         "menus.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10708,7 +10918,8 @@
       "output_schema": null,
       "permissions": [
         "menus.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10761,7 +10972,8 @@
       "output_schema": null,
       "permissions": [
         "menus.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10804,7 +11016,8 @@
       "output_schema": null,
       "permissions": [
         "menus.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -10879,7 +11092,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -10947,7 +11161,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -10977,7 +11192,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -11016,7 +11232,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -11057,7 +11274,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.send"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -11092,7 +11310,8 @@
       "output_schema": null,
       "permissions": [
         "newsletter.send"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -11119,7 +11338,8 @@
       },
       "name": "notifications.get_template_schema",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11137,7 +11357,8 @@
       },
       "name": "notifications.list_kinds",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11202,7 +11423,8 @@
       "output_schema": null,
       "permissions": [
         "notifications.messages.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11220,7 +11442,8 @@
       },
       "name": "notifications.list_my_devices",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11260,7 +11483,8 @@
       },
       "name": "notifications.list_my_inbox",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11288,7 +11512,8 @@
       },
       "name": "notifications.mark_inbox_read",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11349,7 +11574,8 @@
       "permissions": [
         "notifications.templates.read",
         "notifications.templates.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11427,7 +11653,8 @@
       "output_schema": null,
       "permissions": [
         "notifications.send"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11490,7 +11717,8 @@
       "output_schema": null,
       "permissions": [
         "notifications.templates.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11571,7 +11799,8 @@
       "output_schema": null,
       "permissions": [
         "orders.returns.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11600,7 +11829,8 @@
       "output_schema": null,
       "permissions": [
         "orders.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11660,7 +11890,8 @@
       "output_schema": null,
       "permissions": [
         "orders.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11719,7 +11950,8 @@
       "output_schema": null,
       "permissions": [
         "orders.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11755,7 +11987,8 @@
       "output_schema": null,
       "permissions": [
         "orders.warranty.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11804,7 +12037,8 @@
       "output_schema": null,
       "permissions": [
         "orders.refund"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11840,7 +12074,8 @@
       "output_schema": null,
       "permissions": [
         "orders.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11881,7 +12116,8 @@
       "output_schema": null,
       "permissions": [
         "orders.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11922,7 +12158,8 @@
       "output_schema": null,
       "permissions": [
         "orders.warranty.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -11961,7 +12198,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.groups.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12003,7 +12241,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12040,7 +12279,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.groups.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12089,7 +12329,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12119,7 +12360,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12149,7 +12391,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12201,7 +12444,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12275,7 +12519,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12311,7 +12556,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12347,7 +12593,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.groups.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12385,7 +12632,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.settings.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12429,7 +12677,8 @@
       "output_schema": null,
       "permissions": [
         "organizations.units.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12490,7 +12739,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12539,7 +12789,8 @@
       "output_schema": null,
       "permissions": [
         "plans.billing.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12659,7 +12910,8 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12677,7 +12929,8 @@
       },
       "name": "plans.get_entitlements",
       "output_schema": null,
-      "permissions": []
+      "permissions": [],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12706,7 +12959,8 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12735,7 +12989,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12764,7 +13019,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12808,7 +13064,8 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12859,7 +13116,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12888,7 +13146,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -12977,7 +13236,8 @@
       "output_schema": null,
       "permissions": [
         "plans.provision"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13006,7 +13266,8 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13073,7 +13334,8 @@
       "output_schema": null,
       "permissions": [
         "plans.subscriptions.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13196,7 +13458,8 @@
       "output_schema": null,
       "permissions": [
         "plans.plans.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13226,7 +13489,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.publish"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13255,7 +13519,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.write"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13285,7 +13550,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.publish"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13314,7 +13580,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13344,7 +13611,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13408,7 +13676,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.codes.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13438,7 +13707,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13485,7 +13755,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.vouchers.grant"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13578,7 +13849,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13625,7 +13897,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13663,7 +13936,8 @@
       "output_schema": null,
       "permissions": [
         "promotions.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13757,7 +14031,8 @@
       "output_schema": null,
       "permissions": [
         "reporting.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -13777,7 +14052,8 @@
       "output_schema": null,
       "permissions": [
         "reporting.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -13855,7 +14131,8 @@
       "output_schema": null,
       "permissions": [
         "reporting.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -13885,7 +14162,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.shipments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13915,7 +14193,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.shipments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13945,7 +14224,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.shipments.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -13989,7 +14269,8 @@
       "permissions": [
         "shipping.cod.read",
         "shipping.cod.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14075,7 +14356,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.shipments.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14247,7 +14529,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14300,7 +14583,8 @@
       "output_schema": null,
       "permissions": [
         "shipping.shipments.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14343,7 +14627,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14373,7 +14658,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14407,7 +14693,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14470,7 +14757,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.read"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14511,7 +14799,8 @@
       "output_schema": null,
       "permissions": [
         "support.auto_reply.manage"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14554,7 +14843,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14584,7 +14874,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14648,7 +14939,8 @@
       "output_schema": null,
       "permissions": [
         "support.tickets.reply"
-      ]
+      ],
+      "stability": "experimental"
     },
     {
       "annotations": {
@@ -14737,7 +15029,8 @@
       "output_schema": null,
       "permissions": [
         "tax.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14774,7 +15067,8 @@
       "output_schema": null,
       "permissions": [
         "tax.read"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14827,7 +15121,8 @@
       "output_schema": null,
       "permissions": [
         "webhooks.manage"
-      ]
+      ],
+      "stability": "official"
     },
     {
       "annotations": {
@@ -14857,7 +15152,8 @@
       "output_schema": null,
       "permissions": [
         "webhooks.manage"
-      ]
+      ],
+      "stability": "official"
     }
   ]
 }
