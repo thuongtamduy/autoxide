@@ -101,7 +101,7 @@ fn line(name: &str, finding: Option<Finding>) -> Line {
 
 /// Chạy mọi bước sau khi cấu hình đã hợp lệ.
 async fn diagnose(settings: Settings) -> Vec<Line> {
-    let Settings { config, mut modules, values } = settings;
+    let Settings { config, mut modules, values, .. } = settings;
     let mut lines = vec![line("configuration", Some(Finding::ok("The configuration is valid.")))];
     if let Some(finding) = probe_hsts(&values, &config.http) {
         lines.push(line("hsts", Some(finding)));
