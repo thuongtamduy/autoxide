@@ -145,3 +145,33 @@ fn ngay_giong_het_chrono() {
     assert_eq!("2026-1-21".parse::<Date>().ok(), None);
     assert_eq!("2026-11-21".parse::<Date>().unwrap(), Date::new(2026, 11, 21).unwrap());
 }
+
+#[test]
+fn openapi_giong_het_chrono() {
+    use utoipa::PartialSchema as _;
+
+    // Trường trong struct: `utoipa` nhận kiểu theo tên, phải ra đúng schema như kiểu `chrono` cũ.
+    #[derive(utoipa::ToSchema)]
+    #[allow(dead_code)]
+    struct New {
+        at: Timestamp,
+        maybe_at: Option<Timestamp>,
+        day: Date,
+        days: Vec<Date>,
+    }
+
+    #[derive(utoipa::ToSchema)]
+    #[allow(dead_code)]
+    struct Old {
+        at: DateTime<Utc>,
+        maybe_at: Option<DateTime<Utc>>,
+        day: NaiveDate,
+        days: Vec<NaiveDate>,
+    }
+
+    let new = serde_json::to_value(New::schema()).unwrap();
+    let old = serde_json::to_value(Old::schema()).unwrap();
+    assert_eq!(new, old);
+    assert_eq!(new["properties"]["at"]["format"], "date-time");
+    assert_eq!(new["properties"]["day"]["format"], "date");
+}
