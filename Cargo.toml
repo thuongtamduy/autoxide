@@ -84,10 +84,10 @@ tower-http = { version = "0.7", features = [
   "request-id",
 ] }
 # Khai rõ từng feature đang dựa vào thay vì nhận bộ mặc định. Không bật
-# `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng chrono
-# (CLAUDE.md, "Luật dữ liệu") — hai thư viện đó vẫn có trong cây phụ thuộc vì
-# sea-orm-migration bật lại bộ mặc định của sea-orm, nhưng code Autoxide không
-# dùng. TLS dùng rustls để binary không phụ thuộc OpenSSL của hệ điều hành.
+# `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng `autoxide_kernel::time`
+# (CLAUDE.md, "Luật dữ liệu"). Migration do kernel tự chạy (D-20261121-own-migrations), không qua
+# `sea-orm-migration` — thư viện đó bật lại bộ feature mặc định của sea-orm (kéo `chrono`, `time`,
+# `rust_decimal`). TLS dùng rustls để binary không phụ thuộc OpenSSL của hệ điều hành.
 sea-orm = { version = "2.0", default-features = false, features = [
   "macros",
   "runtime-tokio-rustls",
@@ -95,15 +95,6 @@ sea-orm = { version = "2.0", default-features = false, features = [
   "sqlx-postgres",
   "sqlx-sqlite",
   "stream",
-  "with-chrono",
-  "with-json",
-  "with-uuid",
-] }
-# Bỏ feature mặc định `cli`: lệnh migrate nằm trong CLI của Autoxide.
-sea-orm-migration = { version = "2.0", default-features = false, features = [
-  "runtime-tokio-rustls",
-  "sqlx-postgres",
-  "sqlx-sqlite",
   "with-chrono",
   "with-json",
   "with-uuid",

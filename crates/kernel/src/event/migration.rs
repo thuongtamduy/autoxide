@@ -1,7 +1,7 @@
 //! Migration tạo bảng event của một module.
 
-use sea_orm_migration::prelude::*;
-use sea_orm_migration::schema;
+use crate::migration::prelude::*;
+use crate::migration::schema;
 
 /// Migration tạo bảng `<module>_events`. Module phát event thêm nó vào danh sách
 /// migration của mình, ở vị trí cố định như mọi migration khác:

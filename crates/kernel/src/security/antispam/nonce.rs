@@ -3,13 +3,13 @@
 //! mạng di động gửi lại): module trả lại kết quả cũ thay vì tạo bản ghi thứ hai — idempotency
 //! cho người lạ, vì `Idempotency-Key` chỉ áp cho request đã xác thực.
 
+use crate::migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
+use crate::migration::schema;
 use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
-use sea_orm_migration::prelude::{
-    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
-};
-use sea_orm_migration::schema;
 
 use crate::error::Error;
 use crate::secret::sha256;

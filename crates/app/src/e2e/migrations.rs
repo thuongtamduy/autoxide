@@ -24,7 +24,7 @@ async fn connect(url: &str) -> Database {
     Database::connect(&settings.config.database).await.unwrap()
 }
 
-/// Bảng còn lại sau khi gỡ hết: chỉ bảng lịch sử `<module>_migrations` (sea-orm-migration không xoá
+/// Bảng còn lại sau khi gỡ hết: chỉ bảng lịch sử `<module>_migrations` (bộ chạy migration không xoá
 /// bảng lịch sử của chính nó).
 async fn tables_after_full_down(database: &Database) -> Vec<String> {
     let snapshot = schema_snapshot(database.write()).await.unwrap();
