@@ -576,22 +576,15 @@ impl autoxide_promotions::api::Promotions for FakePromotions {
 
 /// Đẩy mốc hết hạn của mọi lô điểm và chỗ giữ về quá khứ (giả lập thời gian trôi).
 pub(crate) async fn age_points(app: &TestApp) {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
     let write = app.database().write();
     let past = Timestamp::now() - SignedDuration::from_hours(24);
     for table in ["customers_points_lots", "customers_point_holds"] {
-        let sql = match write.get_database_backend() {
-            sea_orm::DatabaseBackend::Postgres => format!("UPDATE {table} SET expires_at = $1"),
-            _ => format!("UPDATE {table} SET expires_at = ?"),
-        };
-        write
-            .execute_raw(Statement::from_sql_and_values(
-                write.get_database_backend(),
-                sql,
-                [past.into()],
-            ))
-            .await
-            .unwrap();
+        let statement = sea_orm::sea_query::Query::update()
+            .table(sea_orm::sea_query::Alias::new(table))
+            .value(sea_orm::sea_query::Alias::new("expires_at"), sea_orm::Value::from(past))
+            .to_owned();
+        write.execute(&statement).await.unwrap();
     }
 }
 
@@ -762,21 +755,16 @@ impl autoxide_compliance::api::ConsentLedger for FakeConsents {
 
 /// Cho mọi job đang chờ của `customers` tới hạn ngay (giả lập thời gian trôi).
 pub(crate) async fn jobs_due_now(app: &TestApp) {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
+    use sea_orm::sea_query::ExprTrait as _;
     let write = app.database().write();
     let past = Timestamp::now() - SignedDuration::from_mins(1);
-    let sql = match write.get_database_backend() {
-        sea_orm::DatabaseBackend::Postgres => {
-            "UPDATE customers_jobs SET run_at = $1 WHERE completed_at IS NULL"
-        }
-        _ => "UPDATE customers_jobs SET run_at = ? WHERE completed_at IS NULL",
-    };
-    write
-        .execute_raw(Statement::from_sql_and_values(
-            write.get_database_backend(),
-            sql,
-            [past.into()],
-        ))
-        .await
-        .unwrap();
+    let statement = sea_orm::sea_query::Query::update()
+        .table(sea_orm::sea_query::Alias::new("customers_jobs"))
+        .value(sea_orm::sea_query::Alias::new("run_at"), sea_orm::Value::from(past))
+        .and_where(
+            sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("completed_at")).is_null(),
+        )
+        .to_owned();
+    write.execute(&statement).await.unwrap();
 }

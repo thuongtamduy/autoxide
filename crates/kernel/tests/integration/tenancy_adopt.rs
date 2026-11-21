@@ -173,12 +173,14 @@ async fn seeded(test: &TestDatabase) -> (Database, Uuid, autoxide_testkit::Schem
         vec![parent.into(), "Ada".into()],
     )
     .await;
-    run(
-        &database,
-        "INSERT INTO demo_child (id, parent_id, code, created_at) VALUES (?, ?, ?, ?)",
-        vec![Uuid::now_v7().into(), parent.into(), "x".into(), Timestamp::now().into()],
-    )
-    .await;
+    // Có cột thời gian: dùng builder, nó thêm kiểu `timestamptz` cho tham số trên Postgres (câu viết tay
+    // gửi giá trị như chuỗi và Postgres từ chối).
+    let child = sea_orm::sea_query::Query::insert()
+        .into_table(sea_orm::sea_query::Alias::new("demo_child"))
+        .columns(["id", "parent_id", "code", "created_at"].map(sea_orm::sea_query::Alias::new))
+        .values_panic([Uuid::now_v7().into(), parent.into(), "x".into(), Timestamp::now().into()])
+        .to_owned();
+    database.write().execute(&child).await.unwrap();
     run(&database, "INSERT INTO demo_kv (key, value) VALUES (?, ?)", vec!["k".into(), "v".into()])
         .await;
     let before = schema_snapshot(database.write()).await.unwrap();

@@ -16,7 +16,8 @@ use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, SmsSender};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use autoxide_testkit::{FakePaymentGateway, FakeSmsSender, TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
+use sea_orm::sea_query::ExprTrait as _;
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse battery staple";
@@ -82,14 +83,15 @@ async fn owner(app: &TestApp, shop: &TenantContext) -> String {
     };
     app.api::<dyn Accounts>().unwrap().create(shop, account).await.unwrap();
     let write = shop.database().write();
-    write
-        .execute_raw(Statement::from_sql_and_values(
-            write.get_database_backend(),
-            "UPDATE auth_user SET email_verified_at = $1 WHERE email = $2",
-            [Timestamp::now().into(), email.into()],
-        ))
-        .await
-        .unwrap();
+    let verified = sea_orm::sea_query::Query::update()
+        .table(sea_orm::sea_query::Alias::new("auth_user"))
+        .value(
+            sea_orm::sea_query::Alias::new("email_verified_at"),
+            sea_orm::Value::from(Timestamp::now()),
+        )
+        .and_where(sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("email")).eq(email))
+        .to_owned();
+    write.execute(&verified).await.unwrap();
     let body = json!({"email": email, "password": PASSWORD});
     let (status, answer) = call(app, Method::POST, "/auth/login", "", "shop", Some(body)).await;
     assert_eq!(status, StatusCode::OK, "{answer}");

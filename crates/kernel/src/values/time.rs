@@ -14,6 +14,11 @@
 //! - **Hai database như nhau**: [`Timestamp::now`] cắt về micro giây — độ chính xác của Postgres — nên giá trị
 //!   vừa tạo trong bộ nhớ bằng đúng giá trị đọc lại từ database nào cũng vậy.
 //!
+//! **SQL viết tay:** giá trị ghi đi dưới dạng chuỗi kèm gợi ý kiểu `timestamptz` / `date` mà chỉ builder của
+//! SeaORM / sea-query chèn vào câu lệnh (`$1::"timestamptz"`). Câu viết tay (`Statement::from_sql_and_values`)
+//! không có gợi ý đó nên Postgres từ chối (lỗi 42804); đừng thêm `CAST(? AS timestamptz)` (SQLite đọc thành số).
+//! Ghi cột thời gian thì dùng builder (`Query::update().value(…)`, `Entity::update_many()`…).
+//!
 //! Múi giờ, khoảng thời gian, tính lịch (thêm tháng, thứ trong tuần…) dùng thẳng `jiff` (`jiff::tz::TimeZone`,
 //! `jiff::SignedDuration`, `jiff::civil`): không có gì phải lưu hay trả ra nên không cần bọc.
 //!

@@ -97,29 +97,23 @@ async fn xoa_tai_khoan_xoa_so_dien_thoai_va_ban_xuat_co_phan_compliance() {
         // Số đã xác thực (đường mã SMS có bài riêng ở `posting_verification`).
         let write = platform.database().write();
         let backend = write.get_database_backend();
-        let sql = if backend == sea_orm::DbBackend::Postgres {
-            "INSERT INTO compliance_account_verifications (tenant_id, user_id, phone, phone_key, \
-             phone_verified_at, updated_at) VALUES ($1, $2, $3, $4, $5, $6)"
-        } else {
-            "INSERT INTO compliance_account_verifications (tenant_id, user_id, phone, phone_key, \
-             phone_verified_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)"
-        };
         let now = Timestamp::now();
-        write
-            .execute_raw(Statement::from_sql_and_values(
-                backend,
-                sql,
-                [
-                    platform.id().as_uuid().into(),
-                    user.into(),
-                    "+84912345678".into(),
-                    "k".into(),
-                    now.into(),
-                    now.into(),
-                ],
-            ))
-            .await
-            .unwrap();
+        let insert = sea_orm::sea_query::Query::insert()
+            .into_table(sea_orm::sea_query::Alias::new("compliance_account_verifications"))
+            .columns(
+                ["tenant_id", "user_id", "phone", "phone_key", "phone_verified_at", "updated_at"]
+                    .map(sea_orm::sea_query::Alias::new),
+            )
+            .values_panic([
+                platform.id().as_uuid().into(),
+                user.into(),
+                "+84912345678".into(),
+                "k".into(),
+                now.into(),
+                now.into(),
+            ])
+            .to_owned();
+        write.execute(&insert).await.unwrap();
 
         let data = app.modules().personal_data().export(&platform, user).await.unwrap();
         assert_eq!(data["compliance"]["phone_verification"]["phone"], "+84912345678", "{data:?}");

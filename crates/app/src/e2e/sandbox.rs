@@ -9,6 +9,7 @@ use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use jiff::SignedDuration;
+use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use std::time::Duration;
@@ -213,17 +214,19 @@ async fn lifecycle(dedicated: bool) {
         // sandbox_het_han_bi_xoa: hạn đã qua → lịch mỗi giờ xoá.
         let again = create(&app, &token, &shop).await;
         let write = app.registry().control().write();
-        write
-            .execute_raw(Statement::from_sql_and_values(
-                write.get_database_backend(),
-                "UPDATE kernel_tenants SET sandbox_expires_at = $1 WHERE id = $2",
-                [
-                    (Timestamp::now() - SignedDuration::from_hours(1)).into(),
-                    again.parse::<uuid::Uuid>().unwrap().into(),
-                ],
-            ))
-            .await
-            .unwrap();
+        // Builder thay câu viết tay: giá trị thời gian cần kiểu `timestamptz` trên Postgres, builder tự thêm.
+        let expired = sea_orm::sea_query::Query::update()
+            .table(sea_orm::sea_query::Alias::new("kernel_tenants"))
+            .value(
+                sea_orm::sea_query::Alias::new("sandbox_expires_at"),
+                sea_orm::Value::from(Timestamp::now() - SignedDuration::from_hours(1)),
+            )
+            .and_where(
+                sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("id"))
+                    .eq(again.parse::<uuid::Uuid>().unwrap()),
+            )
+            .to_owned();
+        write.execute(&expired).await.unwrap();
         app.registry().invalidate(TenantId::from_uuid(again.parse().unwrap()));
         // Lịch mỗi giờ đã chạy ở lượt đầu: gọi thẳng bộ chạy của nó.
         let sandboxes = app.api::<autoxide_kernel::tenancy::TenantSandboxes>().unwrap();

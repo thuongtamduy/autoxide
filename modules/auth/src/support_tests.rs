@@ -10,6 +10,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
+use sea_orm::sea_query::ExprTrait as _;
 use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 
@@ -207,14 +208,19 @@ async fn ho_tro_het_han_thi_mat_quyen() {
             .app
             .database()
             .write()
-            .execute_raw(Statement::from_sql_and_values(
-                setup.app.database().write().get_database_backend(),
-                "UPDATE auth_support_grant SET expires_at = $1 WHERE id = $2",
-                [
-                    (Timestamp::now() - SignedDuration::from_mins(1)).into(),
-                    uuid::Uuid::parse_str(&id).unwrap().into(),
-                ],
-            ))
+            .execute(
+                &sea_orm::sea_query::Query::update()
+                    .table(sea_orm::sea_query::Alias::new("auth_support_grant"))
+                    .value(
+                        sea_orm::sea_query::Alias::new("expires_at"),
+                        sea_orm::Value::from(Timestamp::now() - SignedDuration::from_mins(1)),
+                    )
+                    .and_where(
+                        sea_orm::sea_query::Expr::col(sea_orm::sea_query::Alias::new("id"))
+                            .eq(uuid::Uuid::parse_str(&id).unwrap()),
+                    )
+                    .to_owned(),
+            )
             .await
             .unwrap();
         let (status, _) = call(&setup, "GET", "/customers", &setup.agent, Some("shop"), None).await;
