@@ -756,3 +756,26 @@ req/s (so với gốc) / p50 ms / p95 ms):
 | GET /auth/me | Postgres | 2548 / 12.2 / 17.1 | 2968 (+16%) / 10.5 / 14.9 | 3086 (+21%) / 10.0 / 14.3 |
 
 Đăng nhập (Argon2id) không so được: 16 kết nối vào một email bị login throttling chặn 2–15% request.
+
+## sccache cho job build tests của CI (D-20261121-ci-sccache-build) — 21/11/2026
+
+Đo trên GitHub Actions (máy `ubuntu-24.04`), bước `./gate.sh --only build` của job `build tests` (build mọi chương trình test thành
+archive nextest); `rust-cache` luôn bật, cache ấm; chạy bằng `workflow_dispatch` trên nhánh đo, cùng mã nguồn ngoài phần ghi chú. Giây:
+
+| Cấu hình | Lượt | Đổi gì so với lượt trước | Build tests | Lint |
+| --- | --- | --- | ---: | ---: |
+| baseline (chỉ `rust-cache`) | 1 | — | 586 | 301 |
+| baseline | 2 | chạy lại cùng commit | 628 | 305 |
+| baseline | 3 | thêm một hằng ở module `notes` | 601 | — |
+| + sccache | 1 | — (cache sccache lạnh) | 739 | 439 |
+| + sccache | 2 | chạy lại cùng commit (thiên lệch: trúng cả crate đã build) | 399 | 398 |
+| + sccache | 3 | thêm một hằng ở module `notes` (đổi thật, sát PR thật) | 379 | — |
+
+- Build tests, cache ấm, đổi code thật: 379 s so với trung bình baseline 605 s → **nhanh hơn 37%** (ngưỡng giữ: 15%). Lượt đầu cache
+  lạnh chậm hơn 26% (739 s so với 586 s) và chỉ xảy ra một lần cho mỗi khoá cache.
+- Lint (clippy): sccache **chậm hơn** (398 s so với 305 s; clippy chạy qua `clippy-driver` nên không lấy được từ cache nhưng vẫn gánh
+  phần ghi cache), nên chỉ bật cho job build tests.
+- Chưa đo: PR đổi kernel (gần như mọi crate phải biên dịch lại, sccache trúng ít, chậm hơn baseline tối đa phần cache lạnh); số liệu
+  trên cho đổi ở crate lá. Cache ghi bởi lần chạy trên nhánh PR chỉ nhánh đó và PR từ nó đọc được; PR mới đọc cache của `main`, nên hiệu
+  quả thật phụ thuộc lần chạy trên `main` ghi đủ cache — theo dõi vài lượt đầu sau khi merge.
+- Rust 1.99 trên Linux đã dùng `rust-lld` mặc định: không thêm mold (không đo được lợi gì thêm).
