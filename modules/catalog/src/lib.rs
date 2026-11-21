@@ -17,6 +17,7 @@ mod errors;
 mod events;
 mod facets;
 mod floors;
+mod from_images;
 mod http;
 mod listeners;
 mod media_alts;
@@ -211,6 +212,10 @@ impl Module for CatalogModule {
                 JobRegistration::new(
                     transfers::EXPORT,
                     Arc::new(transfers::Transfers(service.clone())),
+                ),
+                JobRegistration::new(
+                    from_images::DRAFT_FROM_IMAGES,
+                    Arc::new(from_images::Drafter(service.clone())),
                 ),
                 JobRegistration::new(transfers::CLEANUP, Arc::new(transfers::Cleanup(service))),
             ]

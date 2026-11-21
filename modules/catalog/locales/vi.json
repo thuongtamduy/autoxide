@@ -189,5 +189,10 @@
   "field:must not be empty": "không được để trống",
   "catalog.product_media_not_found": "Ảnh `{media_id}` không phải ảnh của sản phẩm này.",
   "field:is not a configured language": "không phải ngôn ngữ đã cấu hình",
-  "field:only text attributes have translations": "chỉ thuộc tính kiểu chữ mới có bản dịch"
+  "field:only text attributes have translations": "chỉ thuộc tính kiểu chữ mới có bản dịch",
+  "catalog.image_draft_not_found": "Không có lần tạo nháp từ ảnh `{id}` nào của bạn.",
+  "catalog.ai_images_unavailable": "Tạo sản phẩm nháp từ ảnh cần mô hình AI đọc được ảnh; mô hình cấu hình trên máy chủ này không đọc được (hoặc chưa cài module `ai`).",
+  "catalog.ai_images_unreadable": "Không đọc được ảnh nào: dùng ảnh JPEG, PNG, GIF hay WebP trong thư viện media.",
+  "field:must have 1 to 8 images": "phải có từ 1 tới 8 ảnh",
+  "field:is not in the media library": "không có trong thư viện media"
 }

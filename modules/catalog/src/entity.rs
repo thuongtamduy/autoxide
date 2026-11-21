@@ -769,3 +769,7 @@ pub(crate) use recommend::{co_purchase, embedding, product_stat, similar_product
 // Nhập / xuất CSV (m0014).
 mod transfer_entity;
 pub(crate) use transfer_entity::{media_alt, suggestion, transfer, variant_attribute};
+
+// Tạo sản phẩm nháp từ ảnh (m0020).
+mod image_draft_entity;
+pub(crate) use image_draft_entity::image_draft;

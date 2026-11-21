@@ -8,6 +8,7 @@ use autoxide_kernel::migration::prelude::*;
 
 mod collection_ai;
 mod collections;
+mod image_drafts;
 mod media_alts;
 mod net_content;
 mod recommend;
@@ -51,6 +52,8 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(media_alts::CreateMediaAlts),
         // Thuộc tính theo biến thể cho trang sản phẩm.
         Box::new(variant_attributes::CreateVariantAttributes),
+        // Tạo sản phẩm nháp từ ảnh bằng AI (D-229).
+        Box::new(image_drafts::CreateImageDrafts),
     ]
 }
 

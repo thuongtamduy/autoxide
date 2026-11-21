@@ -81,14 +81,7 @@ impl MediaService {
         if !variants::SOURCES.contains(&item.content_type.as_str()) {
             return Err(unsupported_image());
         }
-        if Visibility::of(&item) == Visibility::Private && !self.config.ai_send_private {
-            return Err(Error::forbidden(
-                "media.ai_private_not_allowed",
-                "This image is private, and this server does not send private images to the AI \
-                 provider (AUTOXIDE_MEDIA_AI_SEND_PRIVATE). Make the image public first, or ask \
-                 the operator.",
-            ));
-        }
+        self.check_private_for_ai(&item)?;
         let (bytes, media_type) = self.image_for_ai(tenant, &item).await?;
         let instructions = format!(
             "Write the alternative text (alt text) of one image for people who cannot see it, in \
@@ -124,6 +117,38 @@ impl MediaService {
             text.trim().chars().take(ALT_MAX).collect()
         };
         Ok(AltSuggestion { alt, decorative, model: answer.model })
+    }
+
+    /// Ảnh riêng tư chỉ gửi cho nhà cung cấp AI khi máy chủ cho phép (`AUTOXIDE_MEDIA_AI_SEND_PRIVATE`).
+    fn check_private_for_ai(&self, item: &Item) -> Result<(), Error> {
+        if Visibility::of(item) == Visibility::Private && !self.config.ai_send_private {
+            return Err(Error::forbidden(
+                "media.ai_private_not_allowed",
+                "This image is private, and this server does not send private images to the AI \
+                 provider (AUTOXIDE_MEDIA_AI_SEND_PRIVATE). Make the image public first, or ask \
+                 the operator.",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Ảnh `id` cho module khác gửi cho mô hình (`Media::ai_image`): cùng luật với gợi ý alt text.
+    pub(crate) async fn ai_image_of(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<crate::api::AiImage>, Error> {
+        let item =
+            item::Entity::find_by_id(id).scoped(tenant).one(tenant.database().read()).await?;
+        let Some(item) = item.filter(|item| item.trashed_at.is_none()) else {
+            return Ok(None);
+        };
+        if !variants::SOURCES.contains(&item.content_type.as_str()) {
+            return Err(unsupported_image());
+        }
+        self.check_private_for_ai(&item)?;
+        let (bytes, media_type) = self.image_for_ai(tenant, &item).await?;
+        Ok(Some(crate::api::AiImage::new(media_type, bytes)))
     }
 
     /// Ảnh gửi cho mô hình: ảnh thu nhỏ lớn nhất vừa [`AI_MAX_SIDE`]; không có thì thu nhỏ
