@@ -18580,11 +18580,18 @@ export type LedgerRefundRequest = {
 
 /** How to resolve an item. */
 export type LedgerResolveRequest = {
-  /** `match` (record the money for `payment_id`), `ignore`, or `refunded_outside`. */
+  /**
+   * `match` (record the money for `payment_id` when the partner collected exactly the amount
+   * due), `accept_received` (record the amount the partner collected for `payment_id`, even
+   * when it differs from the amount due), `ignore`, or `refunded_outside`.
+   */
   action: string;
   /** Up to 500 characters. */
   note?: string | null;
-  /** With `match`. */
+  /**
+   * With `match` and `accept_received`: the payment the item is about (the one it names, if
+   * any), still waiting for its money and in the same currency.
+   */
   payment_id?: string | null;
 };
 
@@ -42957,6 +42964,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };

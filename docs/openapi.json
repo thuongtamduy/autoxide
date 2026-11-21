@@ -57513,7 +57513,7 @@
         "description": "How to resolve an item.",
         "properties": {
           "action": {
-            "description": "`match` (record the money for `payment_id`), `ignore`, or `refunded_outside`.",
+            "description": "`match` (record the money for `payment_id` when the partner collected exactly the amount\ndue), `accept_received` (record the amount the partner collected for `payment_id`, even\nwhen it differs from the amount due), `ignore`, or `refunded_outside`.",
             "type": "string"
           },
           "note": {
@@ -57524,7 +57524,7 @@
             ]
           },
           "payment_id": {
-            "description": "With `match`.",
+            "description": "With `match` and `accept_received`: the payment the item is about (the one it names, if\nany), still waiting for its money and in the same currency.",
             "format": "uuid",
             "type": [
               "string",
@@ -191148,7 +191148,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191185,7 +191185,7 @@
         ]
       },
       "post": {
-        "description": "Platform staff with `kernel.tenants.operate`, or an administrator of the tenant itself with\n`kernel.data.export`. The export runs in the background into one JSON Lines file (one line per\nrecord, `{\"table\": …, \"row\": {…}}`; password hashes and secrets left out; uploaded file contents\nare not included). Poll `GET …/exports/{export_id}` until it is `ready`. If an export is already\nrunning it is returned instead of starting another.",
+        "description": "An administrator of the tenant itself with `kernel.data.export`, or platform staff with\n`kernel.tenants.operate` who entered the tenant under a support access grant in force (header\n`Autoxide-Tenant`). The request and every download are recorded in the tenant's own audit\nevents (`kernel.tenant_export_requested`, `kernel.tenant_export_accessed`). The export runs in the background into one JSON Lines file (one line per\nrecord, `{\"table\": …, \"row\": {…}}`; password hashes and secrets left out; uploaded file contents\nare not included). Poll `GET …/exports/{export_id}` until it is `ready`. If an export is already\nrunning it is returned instead of starting another.",
         "operationId": "kernel_request_tenant_export",
         "parameters": [
           {
@@ -191260,7 +191260,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191363,7 +191363,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191466,7 +191466,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191592,7 +191592,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -192065,7 +192065,7 @@
         ]
       },
       "post": {
-        "description": "Requires `kernel.sandboxes.manage`. A sandbox is a test copy with the configuration of the\ntenant and no personal data (no users, buyers, orders, ledger, documents, notifications,\nsecrets or domains). Partners are always simulated in it, mail only reaches staff who may enter\nit, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.\nIt is `provisioning` until the copy job (`job_id`) is done, then holders of `role_id` (the\n`admin` role by default) enter it with the header `Autoxide-Tenant: <sandbox id>`. It is\ndeleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days unless extended. Send an `Idempotency-Key`\nto retry safely.",
+        "description": "Requires `kernel.sandboxes.manage`, called inside the tenant `{id}` (platform staff enter it\nfirst under a support access grant in force). A sandbox is a test copy with the configuration of the\ntenant and no personal data (no users, buyers, orders, ledger, documents, notifications,\nsecrets or domains). Partners are always simulated in it, mail only reaches staff who may enter\nit, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.\nIt is `provisioning` until the copy job (`job_id`) is done, then holders of `role_id` (the\n`admin` role by default) enter it with the header `Autoxide-Tenant: <sandbox id>`. It is\ndeleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days unless extended. Send an `Idempotency-Key`\nto retry safely.",
         "operationId": "kernel_create_tenant_sandbox",
         "parameters": [
           {
@@ -192151,7 +192151,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), or the platform tenant (`tenancy.sandbox_forbidden`)."
+            "description": "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), the platform tenant (`tenancy.sandbox_forbidden`), or platform staff naming a tenant they have not entered (`tenancy.sandbox_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -195946,7 +195946,7 @@
     },
     "/api/v1/ledger/exceptions/{id}/resolve": {
       "post": {
-        "description": "Requires `ledger.reconcile`. `match` records the money the partner collected for the payment\n(same path as a partner notification). Resolving a resolved item returns it unchanged.",
+        "description": "Requires `ledger.reconcile`. `match` records the money the partner collected for the payment\n(same path as a partner notification) and is refused when that amount differs from the amount\ndue; `accept_received` records the amount collected anyway, after a person checked it.\nResolving a resolved item returns it unchanged.",
         "operationId": "ledger_resolve_ledger_exception",
         "parameters": [
           {
@@ -196035,6 +196035,16 @@
               }
             },
             "description": "No such item (`ledger.exception_not_found`) or payment (`ledger.payment_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The amount collected differs from the amount due and the action is `match` (`ledger.amount_differs`), or the payment is no longer waiting for its money (`ledger.payment_state`)."
           },
           "422": {
             "content": {

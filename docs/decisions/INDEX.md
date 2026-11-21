@@ -216,7 +216,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-064** Tự đổi mật khẩu và mật khẩu đầu tiên do quản trị viên đặt — 2026-11-11
 - **D-076** Đo tải qua API thật; bật TCP_NODELAY; một câu query lấy quyền — 2026-11-11
 - **D-077** Passkey (WebAuthn) bằng `webauthn_rp`; hai ngoại lệ `cargo deny` — 2026-11-11 · **chủ dự án quyết**
-- **D-079** Rà soát bảo mật bước 13: đếm lượt trước khi kiểm, xác nhận lại mật khẩu, không tác động lên người quyền cao hơn — 2026-11-12
+- **D-079** Rà soát bảo mật bước 13: đếm lượt trước khi kiểm, xác nhận lại mật khẩu, không tác động lên người quyền cao hơn — 2026-11-12 · *thay một phần bởi D-20261121-login-throttle-pair*
 - **D-080** Tài khoản: quản lý phiên, xoá tài khoản + xuất dữ liệu xuyên module, tìm người dùng — 2026-11-12
 - **D-113** Khoá ký của kernel: `AUTOXIDE_SECRET_KEY`, không đặt thì sinh một lần và lưu database; module nội bộ `kernel` — 2026-11-12
 - **D-114** Địa chỉ client: đếm proxy tin cậy (`AUTOXIDE_HTTP_TRUSTED_PROXY_COUNT`), `ClientInfo` dùng chung — 2026-11-12
@@ -261,12 +261,17 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-export-entry](D-20261121-export-entry.md)** Xuất dữ liệu và tạo sandbox của khách khác cần vào khách đó — 2026-11-21
 - **[D-20261121-grant-scope-check](D-20261121-grant-scope-check.md)** Cấp role: so cả phạm vi của permission, kiểm lại người mời lúc nhận lời mời — 2026-11-21
+- **[D-20261121-login-link-claims](D-20261121-login-link-claims.md)** Link đăng nhập trên tài khoản chưa xác minh email: xác minh và gỡ mọi cửa đặt trước — 2026-11-21
+- **[D-20261121-login-throttle-pair](D-20261121-login-throttle-pair.md)** Khoá đăng nhập theo cặp email + địa chỉ IP, trần rộng hơn cho cả email; lần sai của tài khoản đã biết đếm theo ID — 2026-11-21
 - **[D-20261121-oidc-browser-binding](D-20261121-oidc-browser-binding.md)** Lượt đăng nhập OIDC gắn trình duyệt bằng `browser_secret` (tuỳ chọn) — 2026-11-21
 - **[D-20261121-oidc-link-covers](D-20261121-oidc-link-covers.md)** OIDC tự liên kết theo email chỉ khi người cấu hình nhà cung cấp bao trùm quyền tài khoản — 2026-11-21
+- **[D-20261121-registration-uniform](D-20261121-registration-uniform.md)** `POST /registrations` trả lời như nhau dù email đã có tài khoản; `/register` deprecated — 2026-11-21
 - **[D-20261121-scim-claim-covers](D-20261121-scim-claim-covers.md)** SCIM chỉ tác động lên tài khoản mà người tạo token bao trùm quyền — 2026-11-21
 - **[D-20261121-scim-groups](D-20261121-scim-groups.md)** Bước 66: nhóm SCIM → role ở nút qua luật ánh xạ; chỉ membership do SCIM tạo bị SCIM gỡ; đồng bộ từng người sau khi ghi nhóm — 2026-11-21
 - **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21 · *thay một phần bởi D-20261121-scim-claim-covers*
+- **[D-20261121-ssrf-targets](D-20261121-ssrf-targets.md)** Địa chỉ máy chủ do khách chọn: kiểm lúc lưu, lọc IP lúc kết nối, lỗi chung — 2026-11-21
 
 ## Đa khách, tổ chức, gói
 
@@ -467,6 +472,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-353** Mẫu in chứng từ: HTML từ mẫu của khách, PDF bố cục cố định bằng `krilla`; in qua `dyn Invoices::render` (bước 36 mục 11) — 2026-11-17
 - **D-354** Xuất dữ liệu kế toán: ba hồ sơ, CSV tự viết + `rust_xlsxwriter`, chưa có hồ sơ riêng của hãng (bước 36 mục 12) — 2026-11-17
 - **[D-20261119-step69-store](D-20261119-step69-store.md)** Mua trong ứng dụng: trait `StorePurchases` của kernel, `plans` nối giao dịch của cửa hàng vào thuê bao, cửa hàng thu tiền — 2026-11-19
+- **[D-20261121-reconcile-accept](D-20261121-reconcile-accept.md)** Đối soát: `match` chỉ khi đúng số, số lệch cần `accept_received`; event mang số thực thu — 2026-11-21
 
 ## Pháp luật và tuân thủ
 
