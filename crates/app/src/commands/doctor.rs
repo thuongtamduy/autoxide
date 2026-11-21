@@ -103,6 +103,7 @@ fn line(name: &str, finding: Option<Finding>) -> Line {
 async fn diagnose(settings: Settings) -> Vec<Line> {
     let Settings { config, mut modules, values, .. } = settings;
     let mut lines = vec![line("configuration", Some(Finding::ok("The configuration is valid.")))];
+    lines.push(line("modules", Some(Finding::ok(crate::modules::summary(&modules)))));
     if let Some(finding) = probe_hsts(&values, &config.http) {
         lines.push(line("hsts", Some(finding)));
     }
@@ -129,6 +130,9 @@ async fn diagnose(settings: Settings) -> Vec<Line> {
     let migrations = if usable { Some(probe_migrations(&modules, &database).await) } else { None };
     let migrated = migrations.as_ref().is_some_and(passes);
     lines.push(line("migrations", migrations));
+    if usable && let Some(finding) = probe_dormant(&modules, &database).await {
+        lines.push(line("modules_turned_off", Some(finding)));
+    }
     // Module chạy trên bảng chưa có thì mọi bước sau chỉ báo lỗi kéo theo.
     if migrated && let Err(error) = modules.start(&database) {
         lines.push(line(
@@ -188,6 +192,27 @@ async fn probe_migrations(modules: &Modules, database: &Database) -> Finding {
                 .with_hint("Run `autoxide migrate up`.")
         }
         Err(error) => Finding::failed(error),
+    }
+}
+
+/// Module đang tắt mà database còn dữ liệu của nó (bước 70 P3): người nâng cấp từ bản mà mọi
+/// module đều chạy phải thấy điều này. Tự đặt `AUTOXIDE_MODULES` thì chỉ là thông tin; đang theo
+/// mặc định thì là cảnh báo. Không có module nào như vậy thì không có bước này.
+async fn probe_dormant(modules: &Modules, database: &Database) -> Option<Finding> {
+    match crate::modules::dormant_with_data(modules, database).await {
+        Ok(dormant) if dormant.is_empty() => None,
+        Ok(dormant) => {
+            let (message, hint) = crate::modules::dormant_notice(modules, &dormant);
+            let finding = if modules.selection_is_explicit() {
+                Finding::ok(message)
+            } else {
+                Finding::warning(message)
+            };
+            Some(finding.with_hint(hint))
+        }
+        Err(error) => Some(Finding::warning(format!(
+            "cannot check for data of modules that are turned off: {error}"
+        ))),
     }
 }
 
@@ -335,13 +360,17 @@ mod tests {
                 statuses(&lines),
                 [
                     ("configuration", "ok"),
+                    ("modules", "ok"),
                     ("database", "ok"),
                     ("migrations", "failed"),
                     ("secret_key", "skipped")
                 ]
             );
-            assert_eq!(lines[2].hint.as_deref(), Some("Run `autoxide migrate up`."));
-            assert!(lines[2].message.contains(" more"), "{}", lines[2].message);
+            // Module đang chạy và đang tắt (bước 70 P1); test đọc cấu hình với mọi module.
+            assert!(lines[1].message.contains("modules run: mail, ai,"), "{}", lines[1].message);
+            assert!(lines[1].message.ends_with("No module is turned off."), "{}", lines[1].message);
+            assert_eq!(lines[3].hint.as_deref(), Some("Run `autoxide migrate up`."));
+            assert!(lines[3].message.contains(" more"), "{}", lines[3].message);
 
             let setup = settings(test.url(), &dir);
             autoxide_testkit::prepare_from_template(

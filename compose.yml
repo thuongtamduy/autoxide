@@ -17,6 +17,9 @@ x-autoxide: &autoxide
     # Bắt buộc ở bản chạy thật: thiếu thì khoá gốc nằm trong database, bản sao lưu database mở được
     # mọi secret đã mã hoá. (Bản chạy thử `compose.quickstart.yml` không bắt buộc.)
     AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:?set AUTOXIDE_SECRET_KEY in .env}
+    # Module nào chạy (docs/MODULES.md): mặc định module chính thức; module thử nghiệm phải nêu tên,
+    # vd AUTOXIDE_MODULES=official,newsletter trong .env. Bản cài từ 0.17 trở về trước: xem mục nâng cấp.
+    AUTOXIDE_MODULES: ${AUTOXIDE_MODULES:-official}
     AUTOXIDE_MAIL_SMTP_URL: ${AUTOXIDE_MAIL_SMTP_URL:-}
     AUTOXIDE_MAIL_FROM: ${AUTOXIDE_MAIL_FROM:-Autoxide <noreply@localhost>}
   volumes:

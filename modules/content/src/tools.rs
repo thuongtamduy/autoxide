@@ -634,6 +634,7 @@ fn entry_tools(service: &Arc<ContentService>) -> Vec<Tool> {
         )
         .requires(CONTENT_READ)
         .read_only(),
+        // mcp-principal: tra địa chỉ công khai như website (chỉ bản đã đăng); REST `/public/resolve` không cần đăng nhập.
         Tool::new(
             "resolve",
             "Look up a public address in a language, as the website does: the published entry \

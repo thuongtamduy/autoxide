@@ -135,6 +135,17 @@ impl Module for AuthModule {
         "auth"
     }
 
+    // Core không chạy được nếu thiếu module này: `AUTOXIDE_MODULES` không tắt được nó (bước 70 P1).
+    fn essential(&self) -> bool {
+        true
+    }
+
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["mail"]
+    }
+
     fn description(&self) -> &'static str {
         "User accounts, sign-in with passwords, passkeys and TOTP, access and refresh tokens, \
          API keys, roles and permissions."

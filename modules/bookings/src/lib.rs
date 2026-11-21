@@ -65,6 +65,11 @@ impl Module for BookingsModule {
         "bookings"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn description(&self) -> &'static str {
         "Bookable services with staff, rooms and equipment, weekly schedules, public availability, \
          bookings that never overlap, deposits through a licensed partner, cancellation policies \

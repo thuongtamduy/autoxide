@@ -41,6 +41,23 @@ pub(crate) struct LedgerService {
     pub tax: Option<Arc<dyn autoxide_tax::api::TaxEngine>>,
     pub jobs: autoxide_kernel::job::JobQueue,
     pub config: crate::config::LedgerConfig,
+    /// Định tuyến webhook về đúng khách theo định danh trong URL (bước 70 P7).
+    pub accounts: Option<autoxide_kernel::provider::ProviderAccounts>,
+}
+
+impl LedgerService {
+    /// Khách của webhook tới `/api/v1/ledger/{kind}/{provider}/{hook}`: tìm từ định danh `hook`
+    /// trước khi kiểm chữ ký. Định danh sai → `provider.webhook_unknown`.
+    pub(crate) async fn webhook_tenant(
+        &self,
+        kind: &str,
+        provider: &str,
+        hook: &str,
+    ) -> Result<autoxide_kernel::tenancy::TenantContext, Error> {
+        let accounts =
+            self.accounts.as_ref().ok_or_else(autoxide_kernel::provider::webhook_unknown)?;
+        accounts.resolve_webhook(&format!("/api/v1/ledger/{kind}/{provider}"), hook).await
+    }
 }
 
 // ---- Lỗi ----------------------------------------------------------------------------------------

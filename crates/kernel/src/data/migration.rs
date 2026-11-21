@@ -36,6 +36,7 @@ mod lock;
 mod manager;
 pub mod schema;
 pub use lock::MigrationLock;
+pub(crate) use manager::has_table as table_exists;
 
 /// Một upgrade dữ liệu của module. Xem đầu file.
 //

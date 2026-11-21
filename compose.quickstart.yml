@@ -35,6 +35,11 @@ services:
       # Optional (empty = unset): without it the root key is kept in the database and the server warns.
       AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:-}
       AUTOXIDE_MIGRATE_ON_START: "true"
+      # Which modules run. `official` (the default) is every official module; experimental ones
+      # (bookings, newsletter, comments, support…) must be named, e.g. `official,newsletter`.
+      # A smaller set also works (e.g. `content,forms,menus` for a website backend), but then
+      # remove from AUTOXIDE_STARTUP_TASKS below the tasks of modules you left out. docs/MODULES.md
+      AUTOXIDE_MODULES: ${AUTOXIDE_MODULES:-official}
       AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL: ${AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD: ${AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTOXIDE_STARTUP_TASKS: address.import,tax.import_pack,promotions.load_legal_data

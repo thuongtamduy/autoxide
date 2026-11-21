@@ -33,6 +33,11 @@ impl Module for IdempotencyModule {
         "idempotency"
     }
 
+    // Core không chạy được nếu thiếu module này: `AUTOXIDE_MODULES` không tắt được nó (bước 70 P1).
+    fn essential(&self) -> bool {
+        true
+    }
+
     // Tách / gộp khách (bước 38, D-20261118-step38-relocation).
     fn relocation(&self) -> autoxide_kernel::tenancy::Relocation {
         use autoxide_kernel::tenancy::Relocation;

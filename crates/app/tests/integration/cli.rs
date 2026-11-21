@@ -188,12 +188,13 @@ fn migrate_voi_cau_hinh_mac_dinh_tu_tao_file_sqlite() {
 fn migrate_down_module_khong_ton_tai_thoat_ma_1() {
     let directory = WorkDir::new("migrate-unknown");
 
+    // Không đặt `AUTOXIDE_MODULES`: chỉ module chính thức được đăng ký (bước 70 P3).
     let output = autoxide(directory.path(), &["migrate", "down", "nope"], &[]);
 
     assert_eq!(output.status.code(), Some(1));
     assert_eq!(
         stderr(&output),
-        "autoxide: migration: unknown module `nope`; registered modules: kernel, antispam, mail, ai, files, address, organizations, auth, audit, idempotency, webhooks, tax, ledger, invoices, compliance, notifications, bookings, plans, media, content, forms, newsletter, comments, support, conversations, analytics, menus, catalog, inventory, shipping, promotions, orders, customers, reporting, automations\n"
+        "autoxide: migration: unknown module `nope`; registered modules: kernel, antispam, mail, ai, files, address, organizations, auth, audit, idempotency, webhooks, tax, ledger, invoices, compliance, notifications, plans, media, content, forms, menus, catalog, inventory, shipping, promotions, orders, customers\n"
     );
 }
 

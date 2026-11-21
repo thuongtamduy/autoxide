@@ -52,6 +52,7 @@ async fn prepare(settings: Settings) -> Result<(Runtime, TcpListener), String> {
             return Err(error);
         }
     };
+    crate::modules::log_at_start(&runtime.modules, &runtime.database).await;
     if let Err(error) = startup::after_start(&runtime, &startup, prepared).await {
         let _ = runtime.database.close().await;
         return Err(error);

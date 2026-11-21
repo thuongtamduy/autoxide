@@ -69,24 +69,27 @@ quickstart needs a release made after 0.16.0; for PostgreSQL, several servers an
 
 ### What the quickstart contains
 
-The released image registers every module of the `autoxide` binary (all of `modules/` except the
-sample `notes`); `GET /api/v1/kernel/modules` lists them on your server. Each answers under
+The released image contains every module of the `autoxide` binary (all of `modules/` except the
+sample `notes`). The server runs the core and official ones by default; the experimental ones
+(marked \* below) are off until you name them in `AUTOXIDE_MODULES` — see
+[`docs/MODULES.md`](docs/MODULES.md) for the tiers and how to choose.
+`GET /api/v1/kernel/modules` lists what runs on your server. Each module answers under
 `/api/v1/<module>`.
 
 | Area | Modules |
 | --- | --- |
 | Accounts and access | `auth` (sign-in, roles, API keys, two-step sign-in, passkeys), `organizations` (tenants, units, stores), `audit`, `idempotency` |
-| Platform | `files`, `mail`, `notifications`, `webhooks`, `ai` (off until you configure a provider), `address` (Vietnamese administrative units), `compliance`, `plans` (plans and subscriptions), `reporting`, `automations` |
-| Website | `content` (posts, pages), `media`, `menus`, `forms`, `newsletter`, `comments`, `analytics` |
+| Platform | `files`, `mail`, `notifications`, `webhooks`, `ai` (off until you configure a provider), `address` (Vietnamese administrative units), `compliance`, `plans` (plans and subscriptions), `reporting`\*, `automations`\* |
+| Website | `content` (posts, pages), `media`, `menus`, `forms`, `newsletter`\*, `comments`\*, `analytics`\* |
 | Commerce | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers`, `tax`, `ledger` (money), `invoices` |
-| Service | `bookings`, `support`, `conversations` |
+| Service | `bookings`\*, `support`\*, `conversations`\* |
 
-Nothing has to be turned on to try them, and a module whose data you never write costs nothing.
-Modules that talk to outside services (an AI provider, payment or shipping partners, SMTP) send
-nothing out until you configure them. Which modules each tenant may use is set by its plan
-([`docs/PLANS.md`](docs/PLANS.md)); the set the server runs is fixed when the binary is built
-([`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md)), and listing it needs the `kernel.modules.read`
-permission (the administrator has it).
+Nothing has to be turned on to try the core and official modules, and a module whose data you
+never write costs nothing. Modules that talk to outside services (an AI provider, payment or
+shipping partners, SMTP) send nothing out until you configure them. Which modules each tenant may
+use is set by its plan ([`docs/PLANS.md`](docs/PLANS.md)); the set the server runs is chosen with
+`AUTOXIDE_MODULES` ([`docs/MODULES.md`](docs/MODULES.md)), and listing it needs the
+`kernel.modules.read` permission (the administrator has it).
 
 ### Changing a record: `If-Match`
 

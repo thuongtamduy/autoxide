@@ -8412,6 +8412,36 @@
     },
     {
       "annotations": {
+        "destructive": true,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Remove a setting of the current tenant; the module then works as when it was never set (a partner connection stops working until it is set again).",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Input of `kernel.delete_setting`.",
+        "properties": {
+          "name": {
+            "description": "Name of the setting.",
+            "example": "kernel.public_url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.delete_setting",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
+      ]
+    },
+    {
+      "annotations": {
         "destructive": false,
         "read_only": false,
         "requires_approval_for_agent": false,
@@ -8653,6 +8683,26 @@
       "name": "kernel.list_approvals",
       "output_schema": null,
       "permissions": []
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": true,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "List the webhook addresses of the current tenant: one per webhook an installed partner connection receives (bank transactions, payment results, delivery updates…), to paste into the partner's settings page.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "No input.",
+        "type": "object"
+      },
+      "name": "kernel.list_connection_webhooks",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
+      ]
     },
     {
       "annotations": {
@@ -9214,6 +9264,72 @@
       "output_schema": null,
       "permissions": [
         "kernel.devtools.read"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Set a setting of the current tenant that is not secret, e.g. a plain field of its account at a partner (`<module>.connection.<kind>.<field>`). Secret settings (API keys, passwords) are refused with `kernel.setting_secret_rest_only`: a person sets them with `PUT /api/v1/kernel/settings/{name}`, so the value never passes through an agent.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Input of `kernel.set_setting`.",
+        "properties": {
+          "name": {
+            "description": "Name of the setting, `<module>.<key>`.",
+            "example": "kernel.public_url",
+            "type": "string"
+          },
+          "value": {
+            "description": "The value.",
+            "example": "https://shop.example",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "value"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.set_setting",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
+      ]
+    },
+    {
+      "annotations": {
+        "destructive": false,
+        "read_only": false,
+        "requires_approval_for_agent": false,
+        "returns_secret": false
+      },
+      "deprecation": null,
+      "description": "Test the partner connection a setting belongs to (e.g. `mail.connection.smtp.url` tests the mail server) with the current tenant's settings, and record the result. Answers `ok` and, when it failed, why. Gives up after 15 seconds.",
+      "input_schema": {
+        "additionalProperties": false,
+        "description": "Input of `kernel.test_connection`.",
+        "properties": {
+          "name": {
+            "description": "A setting of the connection, e.g. `mail.connection.smtp.url`.",
+            "example": "mail.connection.smtp.url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
+      "name": "kernel.test_connection",
+      "output_schema": null,
+      "permissions": [
+        "kernel.settings.manage"
       ]
     },
     {

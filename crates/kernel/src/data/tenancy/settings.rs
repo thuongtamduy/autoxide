@@ -714,6 +714,25 @@ impl SettingsService {
 
     /// Bỏ cấu hình `name` của khách `tenant` (về cấu hình chung), kể cả giá trị đặt dưới tên cũ.
     /// Không có thì không đổi gì.
+    /// Như [`put`](Self::put) nhưng từ chối cấu hình bí mật (tool MCP): secret chỉ đặt qua REST.
+    pub(crate) async fn put_plain(
+        &self,
+        tenant: &TenantContext,
+        principal: &Principal,
+        name: &str,
+        value: &str,
+    ) -> Result<SettingState, Error> {
+        if self.catalog.find(name)?.secret {
+            return Err(Error::forbidden(
+                "kernel.setting_secret_rest_only",
+                "Setting `{name}` is secret: set it with `PUT /api/v1/kernel/settings/{name}`, \
+                 not through a tool.",
+            )
+            .with_param("name", name));
+        }
+        self.put(tenant, principal, name, value).await
+    }
+
     pub(crate) async fn delete(
         &self,
         tenant: &TenantContext,
@@ -1034,9 +1053,68 @@ pub(crate) struct ListSettings {
     group: Option<String>,
 }
 
-/// Tool MCP — chỉ đọc; không có tool ghi secret (đặc tả 33).
+// Tool MCP: liệt kê, đặt cấu hình KHÔNG bí mật, bỏ cấu hình. Không có tool ghi secret (đặc tả 33,
+// D-258): giá trị bí mật không đi qua ngữ cảnh của agent — đặt bằng REST.
+/// Input of `kernel.set_setting`.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct SetSetting {
+    /// Name of the setting, `<module>.<key>`.
+    #[schema(example = "kernel.public_url")]
+    name: String,
+    /// The value.
+    #[schema(example = "https://shop.example")]
+    value: String,
+}
+
+/// Input of `kernel.delete_setting`.
+#[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DeleteSetting {
+    /// Name of the setting.
+    #[schema(example = "kernel.public_url")]
+    name: String,
+}
+
+/// The answer of `kernel.delete_setting`.
+#[derive(Debug, Serialize, ToSchema)]
+pub(crate) struct SettingDeleted {
+    name: String,
+    deleted: bool,
+}
+
 pub(crate) fn tools(service: Arc<SettingsService>) -> Vec<Tool> {
+    let (setter, remover) = (service.clone(), service.clone());
     vec![
+        Tool::new(
+            "set_setting",
+            "Set a setting of the current tenant that is not secret, e.g. a plain field of its \
+             account at a partner (`<module>.connection.<kind>.<field>`). Secret settings (API \
+             keys, passwords) are refused with `kernel.setting_secret_rest_only`: a person sets \
+             them with `PUT /api/v1/kernel/settings/{name}`, so the value never passes through \
+             an agent.",
+            move |tenant: TenantContext, principal: Principal, input: SetSetting| {
+                let service = setter.clone();
+                async move {
+                    service.put_plain(&tenant, &principal, &input.name, &input.value).await
+                }
+            },
+        )
+        .requires(SETTINGS_MANAGE),
+        Tool::new(
+            "delete_setting",
+            "Remove a setting of the current tenant; the module then works as when it was never \
+             set (a partner connection stops working until it is set again).",
+            move |tenant: TenantContext, principal: Principal, input: DeleteSetting| {
+                let service = remover.clone();
+                async move {
+                    service.delete(&tenant, &principal, &input.name).await?;
+                    Ok(SettingDeleted { name: input.name, deleted: true })
+                }
+            },
+        )
+        .requires(SETTINGS_MANAGE)
+        .destructive(),
         Tool::new(
             "list_settings",
             "List the settings of the current tenant: every setting the installed modules take \

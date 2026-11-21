@@ -89,6 +89,12 @@ impl Module for OrdersModule {
         "orders"
     }
 
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["catalog"]
+    }
+
     fn description(&self) -> &'static str {
         "Orders: carts for buyers and guests, checkout with time-limited holds of stock and \
          promotions, orders with sequential numbers and a lifecycle, payments through licensed \
