@@ -65,6 +65,8 @@ mới nhất ngày 11/11/2026; **`Cargo.lock` là nguồn sự thật** sau khi 
 
 Kết nối database dùng TLS của `rustls` (feature `runtime-tokio-rustls` của SeaORM):
 binary không phụ thuộc OpenSSL của hệ điều hành.
+`sqlx` (nền của SeaORM, phụ thuộc gián tiếp) ≥ 0.9.1: SQLite đóng gói kèm từ `libsqlite3-sys` 0.40,
+đã vá RUSTSEC-2026-0459 (D-20261121-sqlx-091).
 
 ### Bảo mật
 
