@@ -74,7 +74,14 @@ impl MigrationTrait for CreateDigital {
             true,
         )
         .await?;
-        index(manager, name, "catalog_download_grants_token_uq", &["token_hash"], true).await?;
+        index(
+            manager,
+            name,
+            "catalog_download_grants_token_uq",
+            &["tenant_id", "token_hash"],
+            true,
+        )
+        .await?;
         index(
             manager,
             name,

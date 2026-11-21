@@ -113,6 +113,7 @@ impl CatalogService {
         variant_id: Uuid,
         input: NewAsset,
     ) -> Result<digital_asset::Model, Error> {
+        principal.require(&PRODUCTS_WRITE)?;
         self.require_feature(tenant, &DIGITAL_FEATURE).await?;
         let mut problems = Vec::new();
         let limit = input.download_limit.unwrap_or(self.config.default_download_limit);
@@ -187,6 +188,7 @@ impl CatalogService {
         principal: &Principal,
         variant_id: Uuid,
     ) -> Result<Vec<digital_asset::Model>, Error> {
+        principal.require(&PRODUCTS_READ)?;
         let read = tenant.database().read();
         let (_, product) = self.variant_and_product(read, tenant, variant_id).await?;
         readable(principal, read, &PRODUCTS_READ, product.org_id, || {
@@ -209,6 +211,7 @@ impl CatalogService {
         principal: &Principal,
         id: Uuid,
     ) -> Result<(), Error> {
+        principal.require(&PRODUCTS_WRITE)?;
         let transaction = tenant.database().begin_write().await?;
         let asset = digital_asset::Entity::find_by_id(id)
             .scoped(tenant)
