@@ -523,32 +523,37 @@ mod tests {
     /// Dịch vụ metadata giả (IMDSv2) trên cổng cục bộ: đòi token phiên, trả một role và credential của nó.
     #[tokio::test]
     async fn credential_tam_tu_imds_va_giu_toi_gan_han() {
-        use axum::routing::{get, put};
         let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let counter = Arc::clone(&calls);
-        let app = axum::Router::new()
-            .route("/latest/api/token", put(|| async { "session-token" }))
-            .route(
-                "/latest/meta-data/iam/security-credentials/",
-                get(|headers: axum::http::HeaderMap| async move {
-                    if headers.get("x-aws-ec2-metadata-token").is_some() { "app-role\n" } else { "" }
-                }),
-            )
-            .route(
-                "/latest/meta-data/iam/security-credentials/app-role",
-                get(move || {
-                    counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-                    async {
-                        let expiration = jiff::Timestamp::now() + jiff::SignedDuration::from_hours(6);
+        // Một handler cho mọi đường dẫn (máy chủ giả, không phải route của module).
+        let app = move |request: axum::extract::Request| {
+            let counter = Arc::clone(&counter);
+            async move {
+                let token = request.headers().get("x-aws-ec2-metadata-token").is_some();
+                match (request.method().as_str(), request.uri().path()) {
+                    ("PUT", "/latest/api/token") => "session-token".to_owned(),
+                    ("GET", "/latest/meta-data/iam/security-credentials/") if token => {
+                        "app-role\n".to_owned()
+                    }
+                    ("GET", "/latest/meta-data/iam/security-credentials/app-role") if token => {
+                        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let expiration =
+                            jiff::Timestamp::now() + jiff::SignedDuration::from_hours(6);
                         format!(
                             r#"{{"Code":"Success","AccessKeyId":"AKIA","SecretAccessKey":"secret","Token":"tok","Expiration":"{expiration}"}}"#
                         )
                     }
-                }),
-            );
+                    _ => String::new(),
+                }
+            }
+        };
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
-        tokio::spawn(async move { axum::serve(listener, app).await });
+        // `into_make_service`: phục vụ thẳng một handler, không cần router.
+        tokio::spawn(async move {
+            axum::serve(listener, axum::handler::HandlerWithoutStateExt::into_make_service(app))
+                .await
+        });
         autoxide_kernel::tls::install_crypto_provider();
         let http = reqwest::Client::new();
         let instance = InstanceCredentials::new(&format!("http://{address}"));
