@@ -9,6 +9,7 @@ Vietnamese: [`README.vi.md`](README.vi.md).
 - [Building a shop's home page from the API](storefront.md): placements and banners, collections, brand and contact details, cache
 - [Signing in and staying signed in](authentication.md): access and refresh tokens, signing out
 - [Signing in with Google, Microsoft, GitHub or OpenID Connect](oidc.md): providers per tenant, linking accounts safely
+- [Syncing staff from your identity provider (SCIM 2.0)](scim.md): Entra ID, Okta and Google Workspace create, change and disable staff accounts
 - [API keys for programs and AI agents](api-keys.md): least permissions, rate limit, revoking
 - [Retrying safely](retries.md): `Idempotency-Key`
 - [Reading long lists](pagination.md): `limit`, `cursor`, `order`

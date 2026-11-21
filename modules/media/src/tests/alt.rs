@@ -146,3 +146,32 @@ async fn ai_tat_hay_khong_doc_anh() {
     .await
     .unwrap();
 }
+
+/// `Media::ai_image` cho module khác: ảnh thu nhỏ (không phải ảnh gốc), cùng luật ảnh riêng tư;
+/// item không có hay trong thùng rác → `None`.
+#[tokio::test]
+async fn anh_cho_ai_qua_hop_dong() {
+    TestDatabase::run(async |test| {
+        use crate::api::Media as _;
+        let ai = Arc::new(FakeTextModel::new(|_| Ok(json!({}))));
+        let (media, _, database) = service_with_ai(test, limits(), ai, false).await;
+        let tenant = autoxide_kernel::tenancy::TenantContext::default_on(database.clone());
+        let ada = editor();
+        let big = encoded(2000, 1000, ImageFormat::Png, false);
+        let item = media
+            .upload(&tenant, &ada, upload("shoe.png", "image/png"), body(&big))
+            .await
+            .unwrap()
+            .item;
+        let error = media.ai_image(&tenant, item.id).await.unwrap_err();
+        assert_eq!(error.code(), "media.ai_private_not_allowed");
+        let changes = ItemChanges { visibility: Some(Visibility::Public), ..Default::default() };
+        media.update(&tenant, &ada, item.id, changes, None).await.unwrap();
+        let image = media.ai_image(&tenant, item.id).await.unwrap().unwrap();
+        let sent = image::load_from_memory(&image.bytes).unwrap();
+        assert_eq!((image.media_type.as_str(), sent.width()), ("image/jpeg", 1280));
+        assert!(media.ai_image(&tenant, uuid::Uuid::now_v7()).await.unwrap().is_none());
+    })
+    .await
+    .unwrap();
+}

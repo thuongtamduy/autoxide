@@ -5,8 +5,10 @@ mod card;
 mod categories;
 mod changes;
 mod collections;
+mod digital;
 mod display_price;
 mod extensions;
+mod from_images;
 mod media_alts;
 mod pricing;
 mod products;
@@ -27,7 +29,7 @@ use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-pub(crate) const ALL: [&str; 11] = [
+pub(crate) const ALL: [&str; 12] = [
     "catalog.products.read",
     "catalog.products.write",
     "catalog.products.publish",
@@ -39,6 +41,7 @@ pub(crate) const ALL: [&str; 11] = [
     "catalog.collections.manage",
     "catalog.import",
     "catalog.export",
+    "catalog.downloads.manage",
 ];
 
 /// Cây gốc → chuỗi; chuỗi → cửa hàng A, B. ID biết trước để khai người dùng, dựng cây sau.

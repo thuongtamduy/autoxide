@@ -20,7 +20,9 @@ use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext, TenantId};
 use chrono::{DateTime, Duration, Utc};
 use sea_orm::sea_query::OnConflict;
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, Set};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -137,6 +139,7 @@ impl ComplianceService {
             reason_code: Set(None),
             reviewed_by: Set(None),
             review_note: Set(None),
+            verified_document_hash: Set(None),
             created_at: Set(at),
             updated_at: Set(at),
         })
@@ -339,6 +342,31 @@ impl ComplianceService {
             .unwrap_or(730);
         let database = tenant.database();
         let (outbox, outcome) = (&self.outbox, &outcome);
+        // Hai hồ sơ cùng một giấy tờ xác thực cùng lúc: bên sau vướng unique của
+        // `verified_document_hash` (Postgres chờ bên trước commit rồi báo trùng) → chạy lại, lần này
+        // thấy bên kia đã `verified` và chuyển hồ sơ sang chờ người duyệt (D-181).
+        for _ in 0..3 {
+            let applied =
+                Self::apply_outcome_once(database, outbox, tenant, provider, outcome, valid_days)
+                    .await?;
+            if applied {
+                return Ok(());
+            }
+        }
+        Err(Error::internal(
+            "a KYC outcome kept clashing with another profile of the same document",
+        ))
+    }
+
+    /// Một lượt của [`Self::apply_outcome`]. `false`: vướng unique của giấy tờ, cần chạy lại.
+    async fn apply_outcome_once(
+        database: &autoxide_kernel::database::Database,
+        outbox: &autoxide_kernel::event::Outbox,
+        tenant: &TenantContext,
+        provider: &str,
+        outcome: &VerificationOutcome,
+        valid_days: i64,
+    ) -> Result<bool, Error> {
         database
             .write_with_retry(move || async move {
                 let transaction = database.begin_write().await?;
@@ -352,10 +380,10 @@ impl ComplianceService {
                     .one(&transaction)
                     .await?
                 else {
-                    return Ok(());
+                    return Ok(true);
                 };
                 if attempt.status != "pending" {
-                    return Ok(());
+                    return Ok(true);
                 }
                 let profile = rows::lock_one(
                     &transaction,
@@ -372,9 +400,34 @@ impl ComplianceService {
                     .await?
                     .is_some_and(|row| row.status == "pending");
                 if !still_pending {
-                    return Ok(());
+                    return Ok(true);
                 }
                 let at = now();
+                // Kết quả muộn của lượt cũ: hồ sơ không còn chờ lượt này (đã duyệt tay, bị thu hồi,
+                // từ chối, hay đã mở lượt mới) thì chỉ ghi lượt là `superseded`, không đụng hồ sơ —
+                // trước đây nó xác thực lại hồ sơ vừa bị thu hồi (cả hai DB).
+                let latest = kyc_attempt::Entity::find()
+                    .scoped(tenant)
+                    .filter(kyc_attempt::Column::ProfileId.eq(profile.id))
+                    .order_by_desc(kyc_attempt::Column::Id)
+                    .one(&transaction)
+                    .await?
+                    .map(|row| row.id);
+                if profile.status != "pending" || latest != Some(attempt.id) {
+                    let result_code = match &outcome.status {
+                        OutcomeStatus::Rejected { reason_code } => Some(reason_code.clone()),
+                        _ => None,
+                    };
+                    kyc_attempt::Entity::update_many()
+                        .col_expr(kyc_attempt::Column::Status, "superseded".into())
+                        .col_expr(kyc_attempt::Column::ResultCode, result_code.into())
+                        .col_expr(kyc_attempt::Column::CompletedAt, Some(at).into())
+                        .filter(kyc_attempt::Column::Id.eq(attempt.id))
+                        .exec(&transaction)
+                        .await?;
+                    transaction.commit().await?;
+                    return Ok(true);
+                }
                 let mut active: kyc_profile::ActiveModel = profile.clone().into();
                 let (attempt_status, result_code) = match &outcome.status {
                     OutcomeStatus::Verified => {
@@ -394,8 +447,9 @@ impl ComplianceService {
                         };
                         active.verified_name = Set(outcome.verified_name.clone());
                         active.document_kind = Set(outcome.document_kind.clone());
-                        active.document_hash =
-                            Set(fingerprint.as_ref().map(|(hash, _)| hash.clone()));
+                        let hash = fingerprint.as_ref().map(|(hash, _)| hash.clone());
+                        active.document_hash = Set(hash.clone());
+                        active.verified_document_hash = Set(if duplicate { None } else { hash });
                         active.document_last4 = Set(fingerprint.map(|(_, last4)| last4));
                         active.assurance = Set(outcome.assurance.clone());
                         if duplicate {
@@ -416,10 +470,21 @@ impl ComplianceService {
                         active.reason_code = Set(Some(reason_code.clone()));
                         ("rejected", Some(reason_code.clone()))
                     }
-                    OutcomeStatus::Pending => return Ok(()),
+                    OutcomeStatus::Pending => return Ok(true),
                 };
                 active.updated_at = Set(at);
-                let saved = kyc_profile::Entity::update(active).exec(&transaction).await?;
+                let saved = match kyc_profile::Entity::update(active).exec(&transaction).await {
+                    Ok(saved) => saved,
+                    Err(error)
+                        if matches!(
+                            error.sql_err(),
+                            Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+                        ) =>
+                    {
+                        return Ok(false);
+                    }
+                    Err(error) => return Err(error.into()),
+                };
                 kyc_attempt::Entity::update_many()
                     .col_expr(kyc_attempt::Column::Status, attempt_status.into())
                     .col_expr(kyc_attempt::Column::ResultCode, result_code.into())
@@ -455,7 +520,7 @@ impl ComplianceService {
                     _ => {}
                 }
                 transaction.commit().await?;
-                Ok(())
+                Ok(true)
             })
             .await
     }
@@ -556,6 +621,8 @@ impl ComplianceService {
                 }
                 match decision {
                     Decision::Approve => {
+                        // Duyệt tay không nhận khoá giấy tờ (`verified_document_hash`): người duyệt
+                        // được quyết cả hồ sơ trùng giấy tờ (`duplicate_document`).
                         active.status = Set("verified".to_owned());
                         active.reason_code = Set(None);
                         active.review_note = Set(None);
@@ -572,6 +639,7 @@ impl ComplianceService {
                     }
                     Decision::Revoke(reason, note) => {
                         active.status = Set("revoked".to_owned());
+                        active.verified_document_hash = Set(None);
                         active.reason_code = Set(Some(reason.clone()));
                         active.review_note = Set(note.clone());
                     }
@@ -852,6 +920,7 @@ impl ComplianceService {
             }
             let mut active: kyc_profile::ActiveModel = row.into();
             active.status = Set("expired".to_owned());
+            active.verified_document_hash = Set(None);
             active.updated_at = Set(now());
             let saved = kyc_profile::Entity::update(active).exec(&transaction).await?;
             let event = events::KycExpired(profile_payload(&saved));

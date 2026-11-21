@@ -246,6 +246,39 @@ async fn an_dich_roi_khoi_phuc_khi_bac() {
 }
 
 #[tokio::test]
+async fn hai_vu_cung_an_mot_dich_bac_cung_luc_van_hien_lai() {
+    TestDatabase::run(async |test| {
+        let app = app(test).await;
+        let (status, _) = call(&app, "PUT", "/policies/cases.auto_restrict", "admin", Some(json!({"value": true}))).await;
+        assert_eq!(status, StatusCode::OK);
+        let decision = json!({"decision": "rejected", "reason": "The seller showed an invoice from the brand."});
+        for round in 1..=4 {
+            let mut ids = Vec::new();
+            for _ in 0..2 {
+                let (status, opened) =
+                    call(&app, "POST", "/cases", "admin", Some(staff_case("counterfeit", "shop.item:2"))).await;
+                assert_eq!(status, StatusCode::CREATED, "{opened}");
+                assert_eq!(opened["data"]["restricted"], true);
+                ids.push(opened["data"]["id"].as_str().unwrap().to_owned());
+            }
+            // Bác cả hai vụ cùng lúc. Postgres từng cho mỗi bên thấy vụ kia còn ẩn: không bên nào
+            // phát `target_restored`, đích bị ẩn vĩnh viễn.
+            let (first, second) =
+                (format!("/cases/{}/decision", ids[0]), format!("/cases/{}/decision", ids[1]));
+            let (one, two) = tokio::join!(
+                call(&app, "POST", &first, "admin", Some(decision.clone())),
+                call(&app, "POST", &second, "admin", Some(decision.clone())),
+            );
+            assert_eq!(one.0, StatusCode::OK, "{}", one.1);
+            assert_eq!(two.0, StatusCode::OK, "{}", two.1);
+            assert_eq!(events(app.database(), "compliance.target_restored").await.len(), round);
+        }
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn phan_hoi_sau_han_bi_tu_choi() {
     TestDatabase::run(async |test| {
         let app = app(test).await;

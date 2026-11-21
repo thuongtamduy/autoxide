@@ -21,8 +21,6 @@
 mod protocol;
 mod transport;
 
-pub(super) use self::transport::JsonRpcBody;
-
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 

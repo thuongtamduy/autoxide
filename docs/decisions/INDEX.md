@@ -29,12 +29,12 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-018** Được chia agent và subagent — 2026-11-11 · **chủ dự án quyết**
 - **D-021** License: MIT hoặc Apache-2.0 — 2026-11-11 · **chủ dự án quyết**
 - **D-023** Ngôn ngữ tài liệu: tách cho người ngoài và nội bộ — 2026-11-11 · **chủ dự án quyết**
-- **D-032** Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11
+- **D-032** Ngoại lệ cho lỗ hổng của SQLite đóng gói kèm (RUSTSEC-2026-0459) — 2026-11-11 · *thay bởi D-20261121-sqlx-091*
 - **D-033** Database cho test: mỗi test một database, qua `TestDatabase::run` — 2026-11-11
 - **D-041** OpenAPI: sinh từ code, nằm trong repo, kiểm trong gate — 2026-11-11
 - **D-072** Docker: build multi-stage, chạy Debian slim không root; compose có bước migrate — 2026-11-11
 - **D-074** CI trên GitHub Actions: gate đầy đủ trên PostgreSQL 16 và 18, quét secret bằng gitleaks — 2026-11-11 · *thay một phần bởi D-107, D-108*
-- **D-075** Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11
+- **D-075** Thử gỡ ngoại lệ RUSTSEC-2026-0459: chưa gỡ được — 2026-11-11 · *thay bởi D-20261121-sqlx-091*
 - **D-078** Phát hành: SemVer một số cho cả workspace, CHANGELOG, image trên GHCR, Dependabot — 2026-11-11 · *thay một phần bởi D-107*
 - **D-082** Gate kiểm tài liệu OpenAPI hợp lệ và mô tả gửi ra ngoài là tiếng Anh — 2026-11-12
 - **D-092** Dependabot bỏ qua `p256` ≥ 0.14 cho tới khi `webauthn_rp` nâng theo — 2026-11-12 · **chủ dự án quyết**
@@ -95,6 +95,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
 
@@ -139,6 +140,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
+- **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 - **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
 
 ## HTTP, REST, OpenAPI
@@ -248,6 +250,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-step54-key-approval](D-20261119-step54-key-approval.md)** Bước 54: quản trị duyệt API key — 2026-11-19
 - **[D-20261119-step54-step-up](D-20261119-step54-step-up.md)** Bước 54: xác nhận lại cho việc nhạy cảm ("sudo mode") — 2026-11-19 · *thay một phần bởi D-20261119-step-up-writes*
 - **[D-20261120-phone-accounts](D-20261120-phone-accounts.md)** Người mua đăng nhập / tạo tài khoản bằng số điện thoại + mã SMS; tài khoản không bắt buộc email (bước 47, việc tồn đọng sau v0.15.0) — 2026-11-20
+- **[D-20261121-scim-groups](D-20261121-scim-groups.md)** Bước 66: nhóm SCIM → role ở nút qua luật ánh xạ; chỉ membership do SCIM tạo bị SCIM gỡ; đồng bộ từng người sau khi ghi nhóm — 2026-11-21
+- **[D-20261121-scim](D-20261121-scim.md)** Bước 66: SCIM 2.0 trong `auth` — token riêng của khách, endpoint theo chuẩn SCIM thay cho envelope chung, mức lọc và PATCH, không Bulk — 2026-11-21
 
 ## Đa khách, tổ chức, gói
 
@@ -526,6 +530,8 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-step47-stored-value](D-20261120-step47-stored-value.md)** Thẻ quà tặng và số dư cửa hàng của `customers` (bước 47 mục 4): tắt hai lớp, khép kín trong khách phát hành, không đường rút tiền, chỉ đếm mã sai — 2026-11-20
 - **[D-20261120-step47-wishlist-alerts](D-20261120-step47-wishlist-alerts.md)** Báo khi sản phẩm yêu thích có hàng lại hay giảm giá (bước 47, D-233): tự bật kèm đồng ý riêng, chỉ giảm thật so với mốc, gom lô theo khung giờ — 2026-11-20
 - **[D-20261120-step55-close](D-20261120-step55-close.md)** Bước 55: đóng các mục còn lại — số bán dùng nguồn của D-201, khối `content.placement` sang bước 67, banner gian hàng chờ bước 46 — 2026-11-20
+- **[D-20261121-catalog-digital-downloads](D-20261121-catalog-digital-downloads.md)** Hàng số của `catalog`: file chép từ `files`, quyền tải phát theo event của `orders`, địa chỉ ký theo khách — 2026-11-21
+- **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
 
 ## Vận hành và hiệu năng
 

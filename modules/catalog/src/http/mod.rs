@@ -10,7 +10,9 @@ use crate::service::CatalogService;
 pub(crate) mod attributes;
 pub(crate) mod changes;
 pub(crate) mod collections;
+pub(crate) mod digital;
 pub(crate) mod dto;
+pub(crate) mod from_images;
 pub(crate) mod media_alts;
 pub(crate) mod pricing;
 pub(crate) mod products;
@@ -36,5 +38,7 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
         .merge(search::routes(service.clone()))
         .merge(transfers::routes(service.clone()))
         .merge(suggestions::routes(service.clone()))
+        .merge(digital::routes(service.clone()))
+        .merge(from_images::routes(service.clone()))
         .merge(stores::routes(service))
 }

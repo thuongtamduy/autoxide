@@ -546,3 +546,51 @@ async fn dong_ca_co_chenh_lech_can_ly_do_ghi_so_va_duyet_khi_vuot_nguong() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn dong_ca_va_ban_cung_luc_tien_ky_vong_du_luot_ban() {
+    TestDatabase::run(async |test| {
+        let world = world(test).await;
+        let shop = &world.shop;
+        let tea = shop.catalog.add(shop.tree.a, 45_000);
+        shop.inventory.stock(shop.tree.a, tea, 100);
+        for round in 0..3 {
+            let shift = open_shift(shop, "boss").await;
+            let cashier = Call::as_user(shop, "cashier_a");
+            let boss = Call::as_user(shop, "boss");
+            let sales = (0..4).map(|index| {
+                let sale = json!({"shift_id": shift, "reference": format!("R-{round}-{index}"),
+                    "lines": [{"variant_id": tea, "quantity": 1}],
+                    "payments": [{"method": "cash", "amount": vnd_json(45_000)}]});
+                cashier.send("POST", "/pos/sales", Some(sale))
+            });
+            // Đóng ca trong lúc thu ngân đang bán. Tiền kỳ vọng từng tính ngoài transaction và lượt
+            // bán không kiểm lại ca còn mở: lượt bán ghi sau khi đã cộng tiền → két lệch, đơn nằm
+            // trong ca đã đóng.
+            let close_uri = format!("/pos/shifts/{shift}/close");
+            let close = boss.send(
+                "POST",
+                &close_uri,
+                Some(json!({"counted_cash": vnd_json(500_000), "variance_reason": "wrong_change",
+                    "variance_note": "Đóng ca giữa giờ"})),
+            );
+            let (sold, closed) = tokio::join!(join_all(sales), close);
+            assert_eq!(closed.0, StatusCode::OK, "{}", closed.1);
+            let created = sold.iter().filter(|(status, _)| *status == StatusCode::CREATED).count();
+            for (status, answer) in &sold {
+                assert!(
+                    *status == StatusCode::CREATED || answer["code"] == "orders.shift_not_open",
+                    "{status} {answer}"
+                );
+            }
+            assert_eq!(
+                minor(&closed.1["data"]["expected_cash"]),
+                500_000 + 45_000 * created as i64,
+                "{}",
+                closed.1
+            );
+        }
+    })
+    .await
+    .unwrap();
+}

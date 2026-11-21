@@ -365,6 +365,8 @@ impl UserService {
             .await?;
         // Liên kết đăng nhập ngoài (bước 40 P3): không có foreign key, xoá cùng transaction.
         crate::oidc::identity::delete_for_user(&transaction, tenant, id).await?;
+        // Liên kết SCIM (bước 66): không có foreign key, xoá cùng transaction.
+        crate::scim::forget_user(&transaction, tenant, id).await?;
         // Chỉ ghi id: audit log không giữ lại email hay tên của người đã xin xoá.
         let event =
             events::UserDeleted { before: Some(serde_json::json!({"id": id})), after: None };

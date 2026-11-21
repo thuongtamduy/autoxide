@@ -66,11 +66,20 @@ pub(crate) async fn for_user(
     tenant: &TenantContext,
     user_id: Uuid,
 ) -> Result<Vec<Identity>, Error> {
+    for_user_in(tenant.database().read(), tenant, user_id).await
+}
+
+/// Như [`for_user`], đọc qua `connection` của bên gọi (vd transaction đã khoá dòng người dùng).
+pub(crate) async fn for_user_in<C: ConnectionTrait>(
+    connection: &C,
+    tenant: &TenantContext,
+    user_id: Uuid,
+) -> Result<Vec<Identity>, Error> {
     Ok(entity::Entity::find()
         .filter(entity::Column::UserId.eq(user_id))
         .scoped(tenant)
         .order_by_asc(entity::Column::Id)
-        .all(tenant.database().read())
+        .all(connection)
         .await?)
 }
 

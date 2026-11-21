@@ -1129,6 +1129,22 @@ export type CatalogAddedPrices = {
   warnings: CatalogPriceWarning[];
 };
 
+/** Attach a file to a digital variant. */
+export type CatalogAttachDigitalAsset = {
+  /** Downloads each buyer gets, 1 to 1000; omitted: `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT`. */
+  download_limit?: number | null;
+  /**
+   * A file you uploaded with `POST /api/v1/files` (or `/api/v1/files/uploads`). Its content is
+   * copied: deleting the uploaded file later does not affect buyers.
+   */
+  file_id: string;
+  /**
+   * Days a buyer can download after paying, 1 to 3650; omitted:
+   * `AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS`.
+   */
+  grant_days?: number | null;
+};
+
 /** An attribute products can have (origin, material, size of the box…). */
 export type CatalogAttribute = {
   code: string;
@@ -1530,6 +1546,64 @@ export type CatalogCreateRoundingRule = {
   step_minor: number;
 };
 
+/** A file of a digital product variant. */
+export type CatalogDigitalAsset = {
+  content_type: string;
+  created_at: string;
+  /** Downloads each buyer gets for each order line. */
+  download_limit: number;
+  /** Name the buyer's download is saved as. */
+  file_name: string;
+  /** Days a buyer can download after paying. */
+  grant_days: number;
+  id: string;
+  product_id: string;
+  /** SHA-256 of the content, lower-case hex. */
+  sha256: string;
+  /** Size in bytes. */
+  size: number;
+  variant_id: string;
+};
+
+/** The right of a buyer to download one file of one order line. */
+export type CatalogDownloadGrant = {
+  asset_id: string;
+  created_at: string;
+  expires_at: string;
+  file_name: string;
+  id: string;
+  order_id: string;
+  order_line_id: string;
+  /** Downloads left. */
+  remaining: number;
+  /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+  revoked_at?: string | null;
+  /**
+   * Only right after the token was issued: the path to `POST` to spend one download, without
+   * signing in. It cannot be read again later; send it to the buyer.
+   */
+  token_path?: string | null;
+  variant_id: string;
+};
+
+/** A short-lived address of the file, after one download was spent. */
+export type CatalogDownloadLink = {
+  expires_at: string;
+  file_name: string;
+  /** Downloads left after this one. */
+  remaining: number;
+  /**
+   * Path (under the same host) to `GET` the file; works without signing in until `expires_at`,
+   * accepts `Range`, and does not spend more downloads.
+   */
+  url: string;
+};
+
+/** How many rights were revoked. */
+export type CatalogDownloadsRevoked = {
+  revoked: number;
+};
+
 /** What to export. */
 export type CatalogExportRequest = {
   /** Only products of this unit and the units below it; leave out for everything you can read. */
@@ -1556,6 +1630,43 @@ export type CatalogFacets = {
 
 /** What to do with a price below the floor: `warn` (saved, with a warning) or `block`. */
 export type CatalogFloorAction = "warn" | "block";
+
+/** A request to draft a product from photos. */
+export type CatalogImageDraft = {
+  category_id?: string | null;
+  created_at: string;
+  /** Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`. */
+  error_code?: string | null;
+  finished_at?: string | null;
+  id: string;
+  locale: string;
+  media_ids: string[];
+  org_id: string;
+  /**
+   * The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,
+   * SKU and stock, then put it on sale yourself.
+   */
+  product_id?: string | null;
+  /** `queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`). */
+  status: string;
+};
+
+/** Draft a product from photos. */
+export type CatalogImageDraftRequest = {
+  /** Category to use; omitted: the AI picks one of your category tree (or none). */
+  category_id?: string | null;
+  /** Language of the texts, one of `AUTOXIDE_CATALOG_LOCALES`. */
+  locale: string;
+  /**
+   * 1 to 8 images of the media library (JPEG, PNG, GIF or WebP). Public ones become the
+   * product's images.
+   */
+  media_ids: string[];
+  /** Unit owning the new product; leave out when you work in one unit only. */
+  org_id?: string | null;
+  /** Tax category of the new product, e.g. `vat.standard` (the AI never chooses it). */
+  tax_category: string;
+};
 
 /**
  * Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not
@@ -4972,6 +5083,22 @@ export type CreateRuleRequest = {
   trigger: Record<string, unknown>;
 };
 
+/** A new mapping rule. */
+export type CreateScimGroupMappingRequest = {
+  /** A SCIM group of the tenant (`GET /api/v1/auth/scim/groups`). */
+  group_id: string;
+  /** The unit where members get the role; the tenant's id for the root unit. */
+  org_id: string;
+  /** The role members get there. */
+  role_id: string;
+};
+
+/** A new SCIM token. */
+export type CreateScimTokenRequest = {
+  /** 1–100 characters, e.g. the identity provider it is for. */
+  name: string;
+};
+
 /** A new menu. */
 export type CreateSiteMenuRequest = {
   items?: SiteMenuItemInput[];
@@ -5099,6 +5226,20 @@ export type CreatedEndpointResponse = EndpointResponse & {
    * Webhooks). Store it now: it cannot be shown again, only replaced.
    */
   secret: string;
+};
+
+/** A SCIM token just created: the only time its secret is shown. */
+export type CreatedScimTokenResponse = ScimTokenResponse & {
+  /**
+   * Path of the SCIM endpoint on this server; put the server's public address in front of it
+   * for the identity provider's "tenant URL" / "base URL".
+   */
+  scim_base_path: string;
+  /**
+   * The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /
+   * API token; it is not shown again.
+   */
+  token_secret: string;
 };
 
 /** ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted. */
@@ -6033,6 +6174,52 @@ export type Data_CatalogCollectionItems = {
 };
 
 /** Envelope of a single result. */
+export type Data_CatalogDigitalAsset = {
+  /** A file of a digital product variant. */
+  data: {
+    content_type: string;
+    created_at: string;
+    /** Downloads each buyer gets for each order line. */
+    download_limit: number;
+    /** Name the buyer's download is saved as. */
+    file_name: string;
+    /** Days a buyer can download after paying. */
+    grant_days: number;
+    id: string;
+    product_id: string;
+    /** SHA-256 of the content, lower-case hex. */
+    sha256: string;
+    /** Size in bytes. */
+    size: number;
+    variant_id: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogDownloadLink = {
+  /** A short-lived address of the file, after one download was spent. */
+  data: {
+    expires_at: string;
+    file_name: string;
+    /** Downloads left after this one. */
+    remaining: number;
+    /**
+     * Path (under the same host) to `GET` the file; works without signing in until `expires_at`,
+     * accepts `Range`, and does not spend more downloads.
+     */
+    url: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogDownloadsRevoked = {
+  /** How many rights were revoked. */
+  data: {
+    revoked: number;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_CatalogFacets = {
   /** Filter counts of a public product list. */
   data: {
@@ -6042,6 +6229,29 @@ export type Data_CatalogFacets = {
     sellers: CatalogFacetValue[];
     /** Products matching every filter. */
     total: number;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CatalogImageDraft = {
+  /** A request to draft a product from photos. */
+  data: {
+    category_id?: string | null;
+    created_at: string;
+    /** Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`. */
+    error_code?: string | null;
+    finished_at?: string | null;
+    id: string;
+    locale: string;
+    media_ids: string[];
+    org_id: string;
+    /**
+     * The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,
+     * SKU and stock, then put it on sale yourself.
+     */
+    product_id?: string | null;
+    /** `queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`). */
+    status: string;
   };
 };
 
@@ -7669,6 +7879,23 @@ export type Data_CreatedEndpointResponse = {
      * Webhooks). Store it now: it cannot be shown again, only replaced.
      */
     secret: string;
+  };
+};
+
+/** Envelope of a single result. */
+export type Data_CreatedScimTokenResponse = {
+  /** A SCIM token just created: the only time its secret is shown. */
+  data: ScimTokenResponse & {
+    /**
+     * Path of the SCIM endpoint on this server; put the server's public address in front of it
+     * for the identity provider's "tenant URL" / "base URL".
+     */
+    scim_base_path: string;
+    /**
+     * The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /
+     * API token; it is not shown again.
+     */
+    token_secret: string;
   };
 };
 
@@ -11764,6 +11991,20 @@ export type Data_ScheduleResponse = {
 };
 
 /** Envelope of a single result. */
+export type Data_ScimGroupMappingResponse = {
+  /** A mapping rule: members of the group hold the role at the unit. */
+  data: {
+    created_at: string;
+    created_by: string;
+    group_id: string;
+    id: string;
+    /** Organization unit; the tenant's id is the root unit. */
+    org_id: string;
+    role_id: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_SecretResponse = {
   /** A new signing secret, shown only once. */
   data: {
@@ -13368,6 +13609,50 @@ export type Data_Vec_CatalogComponent = {
   data: {
     /** Units of the component in one bundle, 1 to 10000. */
     quantity: number;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogDigitalAsset = {
+  data: {
+    content_type: string;
+    created_at: string;
+    /** Downloads each buyer gets for each order line. */
+    download_limit: number;
+    /** Name the buyer's download is saved as. */
+    file_name: string;
+    /** Days a buyer can download after paying. */
+    grant_days: number;
+    id: string;
+    product_id: string;
+    /** SHA-256 of the content, lower-case hex. */
+    sha256: string;
+    /** Size in bytes. */
+    size: number;
+    variant_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_CatalogDownloadGrant = {
+  data: {
+    asset_id: string;
+    created_at: string;
+    expires_at: string;
+    file_name: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    /** Downloads left. */
+    remaining: number;
+    /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+    revoked_at?: string | null;
+    /**
+     * Only right after the token was issued: the path to `POST` to spend one download, without
+     * signing in. It cannot be read again later; send it to the buyer.
+     */
+    token_path?: string | null;
     variant_id: string;
   }[];
 };
@@ -15142,6 +15427,35 @@ export type Data_Vec_ScheduleResponse = {
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
     updated_at: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ScimGroupMappingResponse = {
+  data: {
+    created_at: string;
+    created_by: string;
+    group_id: string;
+    id: string;
+    /** Organization unit; the tenant's id is the root unit. */
+    org_id: string;
+    role_id: string;
+  }[];
+};
+
+/** Envelope of a single result. */
+export type Data_Vec_ScimTokenResponse = {
+  data: {
+    created_at: string;
+    /** The user who created it. */
+    created_by: string;
+    id: string;
+    /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
+    last_used_at?: string | null;
+    /** Name to recognise the token, e.g. the identity provider it is set up in. */
+    name: string;
+    /** Start and end of the token, to recognise it; never the whole token. */
+    prefix: string;
   }[];
 };
 
@@ -21393,6 +21707,31 @@ export type Page_CatalogCollection = {
 };
 
 /** One page of a list. */
+export type Page_CatalogDownloadGrant = {
+  /** The items of this page, in the requested order. */
+  data: {
+    asset_id: string;
+    created_at: string;
+    expires_at: string;
+    file_name: string;
+    id: string;
+    order_id: string;
+    order_line_id: string;
+    /** Downloads left. */
+    remaining: number;
+    /** Set when the right was revoked (order cancelled or refunded, or by staff). */
+    revoked_at?: string | null;
+    /**
+     * Only right after the token was issued: the path to `POST` to spend one download, without
+     * signing in. It cannot be read again later; send it to the buyer.
+     */
+    token_path?: string | null;
+    variant_id: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
 export type Page_CatalogPrice = {
   /** The items of this page, in the requested order. */
   data: {
@@ -24284,6 +24623,25 @@ export type Page_ScheduleResponse = {
     run_at: string;
     /** `scheduled`, `succeeded`, `failed` or `canceled`. */
     status: string;
+    updated_at: string;
+  }[];
+  pagination: Pagination;
+};
+
+/** One page of a list. */
+export type Page_ScimGroupSummaryResponse = {
+  /** The items of this page, in the requested order. */
+  data: {
+    display_name: string;
+    external_id?: string | null;
+    id: string;
+    /**
+     * How many mapping rules it has; `0`: its members get no roles from it (also listed in the
+     * work inbox as `auth.scim_unmapped_groups`).
+     */
+    mappings: number;
+    /** How many people are in it. */
+    members: number;
     updated_at: string;
   }[];
   pagination: Pagination;
@@ -28382,6 +28740,125 @@ export type ScheduleResponse = {
   /** `scheduled`, `succeeded`, `failed` or `canceled`. */
   status: string;
   updated_at: string;
+};
+
+/** A SCIM error (`urn:ietf:params:scim:api:messages:2.0:Error`, RFC 7644 §3.12). */
+export type ScimErrorBody = {
+  /** What went wrong, for people. */
+  detail: string;
+  schemas: string[];
+  /**
+   * `invalidFilter`, `uniqueness`, `mutability`, `invalidSyntax`, `invalidPath`, `noTarget`
+   * or `invalidValue`, when one applies.
+   */
+  scimType?: string | null;
+  /** The HTTP status, as a string. */
+  status: string;
+};
+
+/**
+ * A SCIM Group (RFC 7643 §4.2): a group of the identity provider. Mapping rules of the tenant
+ * (`/api/v1/auth/scim/group-mappings`) turn its members into holders of roles at units.
+ */
+export type ScimGroup = {
+  /** Name of the group, unique in the tenant (compared without case). Required. */
+  displayName: string;
+  /** Id of the group at the identity provider; unique in the tenant. */
+  externalId?: string | null;
+  /** Id given by Autoxide; read-only. */
+  id?: string | null;
+  /** Members: `value` is the id of a SCIM User of the tenant. */
+  members?: unknown[] | null;
+  schemas?: string[] | null;
+};
+
+/** A mapping rule: members of the group hold the role at the unit. */
+export type ScimGroupMappingResponse = {
+  created_at: string;
+  created_by: string;
+  group_id: string;
+  id: string;
+  /** Organization unit; the tenant's id is the root unit. */
+  org_id: string;
+  role_id: string;
+};
+
+/** A group pushed by the identity provider, for administrators. */
+export type ScimGroupSummaryResponse = {
+  display_name: string;
+  external_id?: string | null;
+  id: string;
+  /**
+   * How many mapping rules it has; `0`: its members get no roles from it (also listed in the
+   * work inbox as `auth.scim_unmapped_groups`).
+   */
+  mappings: number;
+  /** How many people are in it. */
+  members: number;
+  updated_at: string;
+};
+
+/** A SCIM list (`urn:ietf:params:scim:api:messages:2.0:ListResponse`, RFC 7644 §3.4.2). */
+export type ScimListResponse = {
+  /** The resources of this page. */
+  Resources: unknown[];
+  /** How many resources this page holds. */
+  itemsPerPage: number;
+  schemas: string[];
+  /** 1-based index of the first resource of this page. */
+  startIndex: number;
+  /** How many resources match the filter, on every page. */
+  totalResults: number;
+};
+
+/** A SCIM PATCH request (`urn:ietf:params:scim:api:messages:2.0:PatchOp`, RFC 7644 §3.5.2). */
+export type ScimPatch = {
+  /**
+   * `op` (`add`, `replace`, `remove`, any case), `path` (`attr`, `attr.sub`,
+   * `attr[filter]`, `attr[filter].sub`) and `value`. Without `path`, `value` is an object of
+   * attributes.
+   */
+  Operations: unknown[];
+  schemas: string[];
+};
+
+/** A SCIM token of the tenant, without its secret. */
+export type ScimTokenResponse = {
+  created_at: string;
+  /** The user who created it. */
+  created_by: string;
+  id: string;
+  /** Last time the identity provider used it (to within 5 minutes); `null`: never. */
+  last_used_at?: string | null;
+  /** Name to recognise the token, e.g. the identity provider it is set up in. */
+  name: string;
+  /** Start and end of the token, to recognise it; never the whole token. */
+  prefix: string;
+};
+
+/** A SCIM User (RFC 7643 §4.1), as Autoxide stores it: the staff account of the tenant. */
+export type ScimUser = {
+  /**
+   * `false` disables the account at once: its sessions, refresh tokens and API keys are
+   * revoked in the same transaction. `"True"` / `"False"` strings are accepted.
+   */
+  active?: boolean | null;
+  /** Name shown in Autoxide; else `name.formatted`, else given and family name, else `userName`. */
+  displayName?: string | null;
+  /** Work email: the `primary` one, else the first; when absent, `userName` must be an email. */
+  emails?: unknown[] | null;
+  /** Id of the person at the identity provider; unique in the tenant, compared with case. */
+  externalId?: string | null;
+  /** Groups the user is in (read-only; change them through `/Groups`). */
+  groups?: unknown[] | null;
+  /** Id given by Autoxide (the account id); read-only. */
+  id?: string | null;
+  /** `givenName`, `familyName`, `formatted`. */
+  name?: unknown;
+  /** `urn:ietf:params:scim:schemas:core:2.0:User`. */
+  schemas?: string[] | null;
+  /** Unique sign-in name at the identity provider, compared without case. Required. */
+  userName: string;
 };
 
 /** A search result. */
@@ -32938,6 +33415,285 @@ export interface paths {
       };
     };
   };
+  "/api/v1/auth/scim/group-mappings": {
+    /** List the mapping rules from SCIM groups to roles. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ScimGroupMappingResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Map a SCIM group to a role at a unit. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateScimGroupMappingRequest;
+      responses: {
+        201: Data_ScimGroupMappingResponse;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/group-mappings/{id}": {
+    /** Remove a mapping rule. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/groups": {
+    /** List the groups the identity provider pushed. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_ScimGroupSummaryResponse;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/tokens": {
+    /** List the SCIM tokens of the tenant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Data_Vec_ScimTokenResponse;
+        401: Problem;
+        403: Problem;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM token for the tenant's identity provider. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CreateScimTokenRequest;
+      responses: {
+        201: Data_CreatedScimTokenResponse;
+        401: Problem;
+        403: Problem;
+        409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/tokens/{id}": {
+    /** Revoke a SCIM token. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Groups": {
+    /** List or find SCIM Groups. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimListResponse;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM Group. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ScimGroup;
+      responses: {
+        201: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Groups/{id}": {
+    /** Get a SCIM Group. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimGroup;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Replace a SCIM Group. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimGroup;
+      responses: {
+        200: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Change a SCIM Group with PATCH operations. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimPatch;
+      responses: {
+        200: ScimGroup;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Delete a SCIM Group. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/ResourceTypes": {
+    /** List the SCIM resource types (`User`, `Group`). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: ScimListResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Schemas": {
+    /** List the SCIM schemas, with the attributes Autoxide keeps. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: ScimListResponse;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/ServiceProviderConfig": {
+    /** Describe what this SCIM server supports. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      responses: {
+        200: Record<string, unknown>;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Users": {
+    /** List or find SCIM Users. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { filter?: string; startIndex?: number; count?: number; attributes?: string; excludedAttributes?: string }; };
+      responses: {
+        200: ScimListResponse;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Create a SCIM User (provision a staff account). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: ScimUser;
+      responses: {
+        201: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/scim/v2/Users/{id}": {
+    /** Get a SCIM User. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: ScimUser;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Replace a SCIM User. */
+    put: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimUser;
+      responses: {
+        200: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Change a SCIM User with PATCH operations. */
+    patch: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: ScimPatch;
+      responses: {
+        200: ScimUser;
+        400: ScimErrorBody;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+    /** Delete a SCIM User. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: ScimErrorBody;
+        403: ScimErrorBody;
+        404: ScimErrorBody;
+        409: ScimErrorBody;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/auth/support-access": {
     /** List platform staff access to this tenant's data. */
     get: {
@@ -34115,6 +34871,47 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/digital-assets/{id}": {
+    /** Remove a file from a digital variant. */
+    delete: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        204: void;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/downloads": {
+    /** List your download rights. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; query: { limit?: number; cursor?: string; order?: "asc" | "desc"; count?: boolean }; };
+      responses: {
+        200: Page_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/downloads/{id}": {
+    /** Spend one download of one of your rights. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogDownloadLink;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/exports": {
     /** Export products to a CSV file. */
     post: {
@@ -34178,6 +34975,45 @@ export interface paths {
       parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
       responses: {
         200: Data_CatalogTransfer;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads": {
+    /** List the download rights of an order. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads/reissue": {
+    /** Give new download tokens for an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDownloadGrant;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/orders/{id}/downloads/revoke": {
+    /** Revoke the download rights of an order. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogDownloadsRevoked;
         401: Problem;
         403: Problem;
         404: Problem;
@@ -34386,6 +35222,34 @@ export interface paths {
         401: Problem;
         403: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/from-images": {
+    /** Draft a product from photos with AI. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; };
+      requestBody: CatalogImageDraftRequest;
+      responses: {
+        201: Data_CatalogImageDraft;
+        401: Problem;
+        403: Problem;
+        422: Problem;
+        503: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/products/from-images/{id}": {
+    /** Get a request to draft a product from photos. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_CatalogImageDraft;
+        401: Problem;
+        403: Problem;
+        404: Problem;
         default: Problem;
       };
     };
@@ -34684,6 +35548,33 @@ export interface paths {
       };
     };
   };
+  "/api/v1/catalog/public/downloads/{id}/file": {
+    /** Download the file of a signed address (public). */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; query: { exp: number; sig: string }; };
+      responses: {
+        200: Blob;
+        206: Blob;
+        403: Problem;
+        404: Problem;
+        416: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/public/downloads/{token}": {
+    /** Spend one download with a token (public). */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { token: string }; };
+      responses: {
+        200: Data_CatalogDownloadLink;
+        403: Problem;
+        404: Problem;
+        409: Problem;
+        default: Problem;
+      };
+    };
+  };
   "/api/v1/catalog/public/products": {
     /** List products on sale (public). */
     get: {
@@ -34955,6 +35846,33 @@ export interface paths {
         403: Problem;
         404: Problem;
         422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/catalog/variants/{id}/digital-assets": {
+    /** List the files of a digital variant. */
+    get: {
+      parameters: { header: { "Accept-Language"?: string }; path: { id: string }; };
+      responses: {
+        200: Data_Vec_CatalogDigitalAsset;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        default: Problem;
+      };
+    };
+    /** Attach a file to a variant of a digital product. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string; "Idempotency-Key"?: string }; path: { id: string }; };
+      requestBody: CatalogAttachDigitalAsset;
+      responses: {
+        201: Data_CatalogDigitalAsset;
+        401: Problem;
+        403: Problem;
+        404: Problem;
+        422: Problem;
+        503: Problem;
         default: Problem;
       };
     };

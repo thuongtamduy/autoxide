@@ -123,6 +123,20 @@ async fn migrate_placement_bang_api() {
         )
         .await;
         assert_eq!(dry["data"]["pending"][0]["migrations"], json!([]));
+
+        // Lượt trước đã xong (khoá đã nhả); nhiều yêu cầu cùng lúc: đúng một lượt được xếp. Trước
+        // đây bước "chưa có lượt nào đang chạy" đọc không khoá: Postgres xếp nhiều lượt song song.
+        let tries = (0..6)
+            .map(|_| call(&app, Method::POST, "/placements/migrations", "ops", Some(json!({}))));
+        let outcomes = futures_util::future::join_all(tries).await;
+        let created = outcomes.iter().filter(|(status, _)| *status == StatusCode::CREATED).count();
+        assert_eq!(created, 1, "{outcomes:?}");
+        for (status, answer) in &outcomes {
+            assert!(
+                *status == StatusCode::CREATED || answer["code"] == "kernel.migration_run_busy",
+                "{status} {answer}"
+            );
+        }
     })
     .await
     .unwrap();

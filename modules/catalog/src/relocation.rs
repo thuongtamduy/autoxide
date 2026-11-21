@@ -16,7 +16,7 @@ pub(crate) fn relocation() -> Relocation {
             "catalog_collections",
         ])
         // Lần nhập / xuất: việc tạm (file ghi theo khách, xoá sau 7 ngày) — không đi đâu cả.
-        .ephemeral(&["catalog_transfers"])
+        .ephemeral(&["catalog_transfers", "catalog_image_drafts"])
         // Bảng dẫn xuất: dựng lại sau khi tách / gộp (`autoxide task catalog.rebuild_storefront`).
         .follow("catalog_storefront_entries", "product_id", "catalog_products")
         .follow("catalog_product_translations", "product_id", "catalog_products")
@@ -41,6 +41,10 @@ pub(crate) fn relocation() -> Relocation {
         .follow("catalog_suggestions", "product_id", "catalog_products")
         .follow("catalog_product_media_alts", "product_id", "catalog_products")
         .follow("catalog_variant_attributes", "product_id", "catalog_products")
+        // Hàng số: file đi theo sản phẩm (nội dung ở `catalog/<id>/file`, kernel chép theo `<id>`),
+        // quyền tải đi theo file.
+        .follow("catalog_digital_assets", "product_id", "catalog_products")
+        .follow("catalog_download_grants", "asset_id", "catalog_digital_assets")
         .copy_on_split(&[
             "catalog_categories",
             "catalog_rounding_rules",

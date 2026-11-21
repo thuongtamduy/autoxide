@@ -3159,6 +3159,36 @@
         ],
         "type": "object"
       },
+      "CatalogAttachDigitalAsset": {
+        "description": "Attach a file to a digital variant.",
+        "properties": {
+          "download_limit": {
+            "description": "Downloads each buyer gets, 1 to 1000; omitted: `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "file_id": {
+            "description": "A file you uploaded with `POST /api/v1/files` (or `/api/v1/files/uploads`). Its content is\ncopied: deleting the uploaded file later does not affect buyers.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "grant_days": {
+            "description": "Days a buyer can download after paying, 1 to 3650; omitted:\n`AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS`.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "file_id"
+        ],
+        "type": "object"
+      },
       "CatalogAttribute": {
         "description": "An attribute products can have (origin, material, size of the box…).",
         "properties": {
@@ -4321,6 +4351,176 @@
         ],
         "type": "object"
       },
+      "CatalogDigitalAsset": {
+        "description": "A file of a digital product variant.",
+        "properties": {
+          "content_type": {
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "download_limit": {
+            "description": "Downloads each buyer gets for each order line.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "file_name": {
+            "description": "Name the buyer's download is saved as.",
+            "type": "string"
+          },
+          "grant_days": {
+            "description": "Days a buyer can download after paying.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "product_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "sha256": {
+            "description": "SHA-256 of the content, lower-case hex.",
+            "type": "string"
+          },
+          "size": {
+            "description": "Size in bytes.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "product_id",
+          "variant_id",
+          "file_name",
+          "content_type",
+          "size",
+          "sha256",
+          "download_limit",
+          "grant_days",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "CatalogDownloadGrant": {
+        "description": "The right of a buyer to download one file of one order line.",
+        "properties": {
+          "asset_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "order_line_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "remaining": {
+            "description": "Downloads left.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "revoked_at": {
+            "description": "Set when the right was revoked (order cancelled or refunded, or by staff).",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "token_path": {
+            "description": "Only right after the token was issued: the path to `POST` to spend one download, without\nsigning in. It cannot be read again later; send it to the buyer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "variant_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "order_id",
+          "order_line_id",
+          "asset_id",
+          "variant_id",
+          "file_name",
+          "remaining",
+          "expires_at",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "CatalogDownloadLink": {
+        "description": "A short-lived address of the file, after one download was spent.",
+        "properties": {
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "file_name": {
+            "type": "string"
+          },
+          "remaining": {
+            "description": "Downloads left after this one.",
+            "format": "int64",
+            "type": "integer"
+          },
+          "url": {
+            "description": "Path (under the same host) to `GET` the file; works without signing in until `expires_at`,\naccepts `Range`, and does not spend more downloads.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "expires_at",
+          "remaining",
+          "file_name"
+        ],
+        "type": "object"
+      },
+      "CatalogDownloadsRevoked": {
+        "description": "How many rights were revoked.",
+        "properties": {
+          "revoked": {
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "type": "object"
+      },
       "CatalogExportRequest": {
         "description": "What to export.",
         "properties": {
@@ -4396,6 +4596,118 @@
           "block"
         ],
         "type": "string"
+      },
+      "CatalogImageDraft": {
+        "description": "A request to draft a product from photos.",
+        "properties": {
+          "category_id": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "error_code": {
+            "description": "Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "finished_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "locale": {
+            "type": "string"
+          },
+          "media_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "product_id": {
+            "description": "The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,\nSKU and stock, then put it on sale yourself.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "org_id",
+          "media_ids",
+          "locale",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "CatalogImageDraftRequest": {
+        "description": "Draft a product from photos.",
+        "properties": {
+          "category_id": {
+            "description": "Category to use; omitted: the AI picks one of your category tree (or none).",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "locale": {
+            "description": "Language of the texts, one of `AUTOXIDE_CATALOG_LOCALES`.",
+            "type": "string"
+          },
+          "media_ids": {
+            "description": "1 to 8 images of the media library (JPEG, PNG, GIF or WebP). Public ones become the\nproduct's images.",
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "org_id": {
+            "description": "Unit owning the new product; leave out when you work in one unit only.",
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tax_category": {
+            "description": "Tax category of the new product, e.g. `vat.standard` (the AI never chooses it).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "media_ids",
+          "locale",
+          "tax_category"
+        ],
+        "type": "object"
       },
       "CatalogKind": {
         "description": "Kind of product: `physical` (shipped, stocked), `digital` (downloaded), `service` (not\nshipped), `bundle` (takes stock from each component).",
@@ -14719,6 +15031,46 @@
         ],
         "type": "object"
       },
+      "CreateScimGroupMappingRequest": {
+        "description": "A new mapping rule.",
+        "properties": {
+          "group_id": {
+            "description": "A SCIM group of the tenant (`GET /api/v1/auth/scim/groups`).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "The unit where members get the role; the tenant's id for the root unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "role_id": {
+            "description": "The role members get there.",
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "group_id",
+          "org_id",
+          "role_id"
+        ],
+        "type": "object"
+      },
+      "CreateScimTokenRequest": {
+        "description": "A new SCIM token.",
+        "properties": {
+          "name": {
+            "description": "1–100 characters, e.g. the identity provider it is for.",
+            "example": "Microsoft Entra ID",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "type": "object"
+      },
       "CreateSiteMenuRequest": {
         "additionalProperties": false,
         "description": "A new menu.",
@@ -15075,6 +15427,32 @@
           }
         ],
         "description": "A new endpoint and its signing secret, shown only once."
+      },
+      "CreatedScimTokenResponse": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ScimTokenResponse"
+          },
+          {
+            "properties": {
+              "scim_base_path": {
+                "description": "Path of the SCIM endpoint on this server; put the server's public address in front of it\nfor the identity provider's \"tenant URL\" / \"base URL\".",
+                "example": "/api/v1/auth/scim/v2",
+                "type": "string"
+              },
+              "token_secret": {
+                "description": "The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /\nAPI token; it is not shown again.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "token_secret",
+              "scim_base_path"
+            ],
+            "type": "object"
+          }
+        ],
+        "description": "A SCIM token just created: the only time its secret is shown."
       },
       "Currency": {
         "description": "ISO 4217 currency code in upper case, e.g. `USD`, `EUR`, `VND`. Only codes in circulation that have minor units are accepted.",
@@ -17933,6 +18311,135 @@
         ],
         "type": "object"
       },
+      "Data_CatalogDigitalAsset": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A file of a digital product variant.",
+            "properties": {
+              "content_type": {
+                "type": "string"
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "download_limit": {
+                "description": "Downloads each buyer gets for each order line.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "file_name": {
+                "description": "Name the buyer's download is saved as.",
+                "type": "string"
+              },
+              "grant_days": {
+                "description": "Days a buyer can download after paying.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "product_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "sha256": {
+                "description": "SHA-256 of the content, lower-case hex.",
+                "type": "string"
+              },
+              "size": {
+                "description": "Size in bytes.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "variant_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "product_id",
+              "variant_id",
+              "file_name",
+              "content_type",
+              "size",
+              "sha256",
+              "download_limit",
+              "grant_days",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogDownloadLink": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A short-lived address of the file, after one download was spent.",
+            "properties": {
+              "expires_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "file_name": {
+                "type": "string"
+              },
+              "remaining": {
+                "description": "Downloads left after this one.",
+                "format": "int64",
+                "type": "integer"
+              },
+              "url": {
+                "description": "Path (under the same host) to `GET` the file; works without signing in until `expires_at`,\naccepts `Range`, and does not spend more downloads.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "url",
+              "expires_at",
+              "remaining",
+              "file_name"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogDownloadsRevoked": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "How many rights were revoked.",
+            "properties": {
+              "revoked": {
+                "format": "int64",
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "revoked"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_CatalogFacets": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -17964,6 +18471,84 @@
               "total",
               "attributes",
               "sellers"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CatalogImageDraft": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A request to draft a product from photos.",
+            "properties": {
+              "category_id": {
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "error_code": {
+                "description": "Why it failed, e.g. `catalog.ai_images_unreadable`, `ai.disabled`.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "finished_at": {
+                "format": "date-time",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "locale": {
+                "type": "string"
+              },
+              "media_ids": {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "org_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "product_id": {
+                "description": "The new **draft** product (marked `ai_assisted`), once `succeeded`. Check it, set prices,\nSKU and stock, then put it on sale yourself.",
+                "format": "uuid",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "description": "`queued`, `running`, `succeeded` (see `product_id`) or `failed` (see `error_code`).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "org_id",
+              "media_ids",
+              "locale",
+              "created_at"
             ],
             "type": "object"
           }
@@ -23096,6 +23681,41 @@
               }
             ],
             "description": "A new endpoint and its signing secret, shown only once."
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_CreatedScimTokenResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ScimTokenResponse"
+              },
+              {
+                "properties": {
+                  "scim_base_path": {
+                    "description": "Path of the SCIM endpoint on this server; put the server's public address in front of it\nfor the identity provider's \"tenant URL\" / \"base URL\".",
+                    "example": "/api/v1/auth/scim/v2",
+                    "type": "string"
+                  },
+                  "token_secret": {
+                    "description": "The token itself (`axscim1_…`). Paste it into the identity provider as the secret token /\nAPI token; it is not shown again.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "token_secret",
+                  "scim_base_path"
+                ],
+                "type": "object"
+              }
+            ],
+            "description": "A SCIM token just created: the only time its secret is shown."
           }
         },
         "required": [
@@ -35935,6 +36555,54 @@
         ],
         "type": "object"
       },
+      "Data_ScimGroupMappingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "A mapping rule: members of the group hold the role at the unit.",
+            "properties": {
+              "created_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "created_by": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "group_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "org_id": {
+                "description": "Organization unit; the tenant's id is the root unit.",
+                "format": "uuid",
+                "type": "string"
+              },
+              "role_id": {
+                "format": "uuid",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "group_id",
+              "org_id",
+              "role_id",
+              "created_by",
+              "created_at"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_SecretResponse": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -40945,6 +41613,158 @@
               "required": [
                 "variant_id",
                 "quantity"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogDigitalAsset": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A file of a digital product variant.",
+              "properties": {
+                "content_type": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "download_limit": {
+                  "description": "Downloads each buyer gets for each order line.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "file_name": {
+                  "description": "Name the buyer's download is saved as.",
+                  "type": "string"
+                },
+                "grant_days": {
+                  "description": "Days a buyer can download after paying.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "product_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "sha256": {
+                  "description": "SHA-256 of the content, lower-case hex.",
+                  "type": "string"
+                },
+                "size": {
+                  "description": "Size in bytes.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "product_id",
+                "variant_id",
+                "file_name",
+                "content_type",
+                "size",
+                "sha256",
+                "download_limit",
+                "grant_days",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_CatalogDownloadGrant": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "The right of a buyer to download one file of one order line.",
+              "properties": {
+                "asset_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "file_name": {
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_line_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "remaining": {
+                  "description": "Downloads left.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "revoked_at": {
+                  "description": "Set when the right was revoked (order cancelled or refunded, or by staff).",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "token_path": {
+                  "description": "Only right after the token was issued: the path to `POST` to spend one download, without\nsigning in. It cannot be read again later; send it to the buyer.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "order_line_id",
+                "asset_id",
+                "variant_id",
+                "file_name",
+                "remaining",
+                "expires_at",
+                "created_at"
               ],
               "type": "object"
             },
@@ -46883,6 +47703,113 @@
                 "ai_reviewed",
                 "created_at",
                 "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ScimGroupMappingResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A mapping rule: members of the group hold the role at the unit.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "group_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "org_id": {
+                  "description": "Organization unit; the tenant's id is the root unit.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "role_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "group_id",
+                "org_id",
+                "role_id",
+                "created_by",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "Data_Vec_ScimTokenResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "items": {
+              "description": "A SCIM token of the tenant, without its secret.",
+              "properties": {
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "created_by": {
+                  "description": "The user who created it.",
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "last_used_at": {
+                  "description": "Last time the identity provider used it (to within 5 minutes); `null`: never.",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "description": "Name to recognise the token, e.g. the identity provider it is set up in.",
+                  "example": "Microsoft Entra ID",
+                  "type": "string"
+                },
+                "prefix": {
+                  "description": "Start and end of the token, to recognise it; never the whole token.",
+                  "example": "axscim1_…k3Fq",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "prefix",
+                "created_by",
+                "created_at"
               ],
               "type": "object"
             },
@@ -65843,6 +66770,91 @@
         ],
         "type": "object"
       },
+      "Page_CatalogDownloadGrant": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "The right of a buyer to download one file of one order line.",
+              "properties": {
+                "asset_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "created_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "expires_at": {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "file_name": {
+                  "type": "string"
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "order_line_id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "remaining": {
+                  "description": "Downloads left.",
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "revoked_at": {
+                  "description": "Set when the right was revoked (order cancelled or refunded, or by staff).",
+                  "format": "date-time",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "token_path": {
+                  "description": "Only right after the token was issued: the path to `POST` to spend one download, without\nsigning in. It cannot be read again later; send it to the buyer.",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "variant_id": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "order_id",
+                "order_line_id",
+                "asset_id",
+                "variant_id",
+                "file_name",
+                "remaining",
+                "expires_at",
+                "created_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
       "Page_CatalogPrice": {
         "description": "One page of a list.",
         "properties": {
@@ -75753,6 +76765,66 @@
                 "status",
                 "ai_reviewed",
                 "created_at",
+                "updated_at"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "data",
+          "pagination"
+        ],
+        "type": "object"
+      },
+      "Page_ScimGroupSummaryResponse": {
+        "description": "One page of a list.",
+        "properties": {
+          "data": {
+            "description": "The items of this page, in the requested order.",
+            "items": {
+              "description": "A group pushed by the identity provider, for administrators.",
+              "properties": {
+                "display_name": {
+                  "example": "Sales",
+                  "type": "string"
+                },
+                "external_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "id": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "mappings": {
+                  "description": "How many mapping rules it has; `0`: its members get no roles from it (also listed in the\nwork inbox as `auth.scim_unmapped_groups`).",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "members": {
+                  "description": "How many people are in it.",
+                  "format": "int64",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "updated_at": {
+                  "format": "date-time",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "display_name",
+                "members",
+                "mappings",
                 "updated_at"
               ],
               "type": "object"
@@ -88175,6 +89247,392 @@
           "ai_reviewed",
           "created_at",
           "updated_at"
+        ],
+        "type": "object"
+      },
+      "ScimErrorBody": {
+        "description": "A SCIM error (`urn:ietf:params:scim:api:messages:2.0:Error`, RFC 7644 §3.12).",
+        "example": {
+          "detail": "userName `ada@example.com` is already used by another User.",
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:Error"
+          ],
+          "scimType": "uniqueness",
+          "status": "409"
+        },
+        "properties": {
+          "detail": {
+            "description": "What went wrong, for people.",
+            "type": "string"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "scimType": {
+            "description": "`invalidFilter`, `uniqueness`, `mutability`, `invalidSyntax`, `invalidPath`, `noTarget`\nor `invalidValue`, when one applies.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "The HTTP status, as a string.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemas",
+          "status",
+          "detail"
+        ],
+        "type": "object"
+      },
+      "ScimGroup": {
+        "description": "A SCIM Group (RFC 7643 §4.2): a group of the identity provider. Mapping rules of the tenant\n(`/api/v1/auth/scim/group-mappings`) turn its members into holders of roles at units.",
+        "example": {
+          "displayName": "Sales",
+          "externalId": "9b1f…",
+          "members": [
+            {
+              "value": "0190f2c4-6a1e-7c3b-9d2e-1f4a5b6c7d8e"
+            }
+          ],
+          "schemas": [
+            "urn:ietf:params:scim:schemas:core:2.0:Group"
+          ]
+        },
+        "properties": {
+          "displayName": {
+            "description": "Name of the group, unique in the tenant (compared without case). Required.",
+            "type": "string"
+          },
+          "externalId": {
+            "description": "Id of the group at the identity provider; unique in the tenant.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id given by Autoxide; read-only.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "members": {
+            "description": "Members: `value` is the id of a SCIM User of the tenant.",
+            "items": {},
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "displayName"
+        ],
+        "type": "object"
+      },
+      "ScimGroupMappingResponse": {
+        "description": "A mapping rule: members of the group hold the role at the unit.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "group_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "org_id": {
+            "description": "Organization unit; the tenant's id is the root unit.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "role_id": {
+            "format": "uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "org_id",
+          "role_id",
+          "created_by",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ScimGroupSummaryResponse": {
+        "description": "A group pushed by the identity provider, for administrators.",
+        "properties": {
+          "display_name": {
+            "example": "Sales",
+            "type": "string"
+          },
+          "external_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "mappings": {
+            "description": "How many mapping rules it has; `0`: its members get no roles from it (also listed in the\nwork inbox as `auth.scim_unmapped_groups`).",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "members": {
+            "description": "How many people are in it.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "display_name",
+          "members",
+          "mappings",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "ScimListResponse": {
+        "description": "A SCIM list (`urn:ietf:params:scim:api:messages:2.0:ListResponse`, RFC 7644 §3.4.2).",
+        "properties": {
+          "Resources": {
+            "description": "The resources of this page.",
+            "items": {},
+            "type": "array"
+          },
+          "itemsPerPage": {
+            "description": "How many resources this page holds.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "startIndex": {
+            "description": "1-based index of the first resource of this page.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "totalResults": {
+            "description": "How many resources match the filter, on every page.",
+            "format": "int64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "schemas",
+          "totalResults",
+          "startIndex",
+          "itemsPerPage",
+          "Resources"
+        ],
+        "type": "object"
+      },
+      "ScimPatch": {
+        "description": "A SCIM PATCH request (`urn:ietf:params:scim:api:messages:2.0:PatchOp`, RFC 7644 §3.5.2).",
+        "example": {
+          "Operations": [
+            {
+              "op": "replace",
+              "path": "active",
+              "value": false
+            }
+          ],
+          "schemas": [
+            "urn:ietf:params:scim:api:messages:2.0:PatchOp"
+          ]
+        },
+        "properties": {
+          "Operations": {
+            "description": "`op` (`add`, `replace`, `remove`, any case), `path` (`attr`, `attr.sub`,\n`attr[filter]`, `attr[filter].sub`) and `value`. Without `path`, `value` is an object of\nattributes.",
+            "items": {},
+            "type": "array"
+          },
+          "schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "schemas",
+          "Operations"
+        ],
+        "type": "object"
+      },
+      "ScimTokenResponse": {
+        "description": "A SCIM token of the tenant, without its secret.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "description": "The user who created it.",
+            "format": "uuid",
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "last_used_at": {
+            "description": "Last time the identity provider used it (to within 5 minutes); `null`: never.",
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "Name to recognise the token, e.g. the identity provider it is set up in.",
+            "example": "Microsoft Entra ID",
+            "type": "string"
+          },
+          "prefix": {
+            "description": "Start and end of the token, to recognise it; never the whole token.",
+            "example": "axscim1_…k3Fq",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "prefix",
+          "created_by",
+          "created_at"
+        ],
+        "type": "object"
+      },
+      "ScimUser": {
+        "description": "A SCIM User (RFC 7643 §4.1), as Autoxide stores it: the staff account of the tenant.",
+        "example": {
+          "active": true,
+          "emails": [
+            {
+              "primary": true,
+              "type": "work",
+              "value": "ada@example.com"
+            }
+          ],
+          "externalId": "00u1abcd",
+          "name": {
+            "familyName": "Lovelace",
+            "givenName": "Ada"
+          },
+          "schemas": [
+            "urn:ietf:params:scim:schemas:core:2.0:User"
+          ],
+          "userName": "ada@example.com"
+        },
+        "properties": {
+          "active": {
+            "description": "`false` disables the account at once: its sessions, refresh tokens and API keys are\nrevoked in the same transaction. `\"True\"` / `\"False\"` strings are accepted.",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "displayName": {
+            "description": "Name shown in Autoxide; else `name.formatted`, else given and family name, else `userName`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "emails": {
+            "description": "Work email: the `primary` one, else the first; when absent, `userName` must be an email.",
+            "items": {},
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "externalId": {
+            "description": "Id of the person at the identity provider; unique in the tenant, compared with case.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "groups": {
+            "description": "Groups the user is in (read-only; change them through `/Groups`).",
+            "items": {},
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "Id given by Autoxide (the account id); read-only.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "`givenName`, `familyName`, `formatted`."
+          },
+          "schemas": {
+            "description": "`urn:ietf:params:scim:schemas:core:2.0:User`.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "userName": {
+            "description": "Unique sign-in name at the identity provider, compared without case. Required.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "userName"
         ],
         "type": "object"
       },
@@ -108975,6 +110433,2368 @@
         ]
       }
     },
+    "/api/v1/auth/scim/group-mappings": {
+      "get": {
+        "description": "Requires `auth.scim.manage`. Oldest first.",
+        "operationId": "auth_list_scim_group_mappings",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ScimGroupMappingResponse"
+                }
+              }
+            },
+            "description": "Every mapping rule of the tenant."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the mapping rules from SCIM groups to roles.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `auth.scim.manage`, and you must be able to give that role at that unit yourself (the\nunit is in your scope, you hold every permission of the role; `admin` only at the root). Every\ncurrent member of the group gets the role at once; later members get it when they join.",
+        "operationId": "auth_create_scim_group_mapping",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScimGroupMappingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_ScimGroupMappingResponse"
+                }
+              }
+            },
+            "description": "The rule was created and applied to the group's members.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan's staff limit is reached."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No SCIM group has this id; code `auth.scim_group_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The same rule exists (code `auth.scim_mapping_taken`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The unit or role is unknown, out of your scope, or the role has permissions you do not have; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Map a SCIM group to a role at a unit.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/scim/group-mappings/{id}": {
+      "delete": {
+        "description": "Requires `auth.scim.manage`. Members of the group lose the role at once, unless another group or\na hand-made membership gives it too.",
+        "operationId": "auth_delete_scim_group_mapping",
+        "parameters": [
+          {
+            "description": "Id of the rule.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The rule was removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No rule has this id; code `auth.scim_mapping_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Removing it would leave the tenant without an active administrator; code `auth.last_admin`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a mapping rule.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/scim/groups": {
+      "get": {
+        "description": "Requires `auth.scim.manage`. With member and mapping-rule counts, oldest first unless\n`order=desc`.",
+        "operationId": "auth_list_scim_groups",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ScimGroupSummaryResponse"
+                }
+              }
+            },
+            "description": "One page of groups."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the groups the identity provider pushed.",
+        "tags": [
+          "auth"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "auth.list_scim_groups",
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/scim/tokens": {
+      "get": {
+        "description": "Requires `auth.scim.manage`. Newest first; secrets are never listed.",
+        "operationId": "auth_list_scim_tokens",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_ScimTokenResponse"
+                }
+              }
+            },
+            "description": "Every SCIM token of the tenant."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the SCIM tokens of the tenant.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      },
+      "post": {
+        "description": "Requires `auth.scim.manage` and the plan feature `auth.scim`. The identity provider (Entra ID,\nOkta, Google Workspace) calls the SCIM endpoint (`scim_base_path`) with it to create, change\nand disable staff accounts and groups. The secret is in the response only. Rotate by creating a\nnew token, switching the provider to it, then revoking the old one; a tenant has at most 5.",
+        "operationId": "auth_create_scim_token",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateScimTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CreatedScimTokenResponse"
+                }
+              }
+            },
+            "description": "The token was created; `token_secret` holds it.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage` (code `permission_denied`), or the plan does not include `auth.scim` (code `feature_not_enabled`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant already has 5 SCIM tokens; code `auth.scim_token_limit`."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "`name` is empty or longer than 100 characters; code `validation_failed`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a SCIM token for the tenant's identity provider.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/scim/tokens/{id}": {
+      "delete": {
+        "description": "Requires `auth.scim.manage`. The identity provider using it is refused at once.",
+        "operationId": "auth_revoke_scim_token",
+        "parameters": [
+          {
+            "description": "Id of the token.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The token was revoked."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing permission `auth.scim.manage`; code `permission_denied`."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No SCIM token of the tenant has this id; code `auth.scim_token_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke a SCIM token.",
+        "tags": [
+          "auth"
+        ],
+        "x-permissions": [
+          "auth.scim.manage"
+        ]
+      }
+    },
+    "/api/v1/auth/scim/v2/Groups": {
+      "get": {
+        "description": "Filter by `displayName`, `externalId`, `id` or `members` (`eq` only). `excludedAttributes=members`\nleaves the members out, as Entra ID asks.",
+        "operationId": "auth_scim_list_groups",
+        "parameters": [
+          {
+            "description": "SCIM filter: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, joined with `and` / `or` and\nparentheses. Users: `userName`, `externalId`, `emails`, `active`, `id`; Groups:\n`displayName`, `externalId`, `id`, `members` (`eq`).",
+            "example": "userName eq \"ada@example.com\"",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1-based index of the first result; default 1.",
+            "in": "query",
+            "name": "startIndex",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Results per page; default and most 200. `0` returns only `totalResults`.",
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Ignored: every attribute is returned.",
+            "in": "query",
+            "name": "attributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ignored, except `groups` on Users and `members` on Groups.",
+            "in": "query",
+            "name": "excludedAttributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            },
+            "description": "One page of Groups."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The filter cannot be read or is not supported; `scimType` `invalidFilter`."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List or find SCIM Groups.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "post": {
+        "description": "Members must be SCIM Users of the tenant. Members get the roles the tenant's mapping rules give\nfor this group.",
+        "operationId": "auth_scim_create_group",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimGroup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimGroup"
+                }
+              }
+            },
+            "description": "The Group was created; `Location` is its address.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The body is not JSON (`invalidSyntax`) or a value is wrong, e.g. no `displayName` or an unknown member (`invalidValue`)."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "`displayName` or `externalId` is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a SCIM Group.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/Groups/{id}": {
+      "delete": {
+        "description": "Its mapping rules go with it; its members lose the roles it gave them.",
+        "operationId": "auth_scim_delete_group",
+        "parameters": [
+          {
+            "description": "Id of the Group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The Group was deleted."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No Group of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "Removing the roles would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a SCIM Group.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "get": {
+        "operationId": "auth_scim_get_group",
+        "parameters": [
+          {
+            "description": "Id of the Group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "SCIM filter: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, joined with `and` / `or` and\nparentheses. Users: `userName`, `externalId`, `emails`, `active`, `id`; Groups:\n`displayName`, `externalId`, `id`, `members` (`eq`).",
+            "example": "userName eq \"ada@example.com\"",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1-based index of the first result; default 1.",
+            "in": "query",
+            "name": "startIndex",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Results per page; default and most 200. `0` returns only `totalResults`.",
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Ignored: every attribute is returned.",
+            "in": "query",
+            "name": "attributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ignored, except `groups` on Users and `members` on Groups.",
+            "in": "query",
+            "name": "excludedAttributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimGroup"
+                }
+              }
+            },
+            "description": "The Group."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No Group of this tenant has this id."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a SCIM Group.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "patch": {
+        "description": "RFC 7644 §3.5.2, e.g. `add` / `remove` `members`, `remove` `members[value eq \"…\"]`, `replace`\n`displayName`. Membership changes reach the members' roles at once.",
+        "operationId": "auth_scim_patch_group",
+        "parameters": [
+          {
+            "description": "Id of the Group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimGroup"
+                }
+              }
+            },
+            "description": "The Group after the change."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The operations cannot be applied: `invalidSyntax`, `invalidPath`, `noTarget`, `mutability` or `invalidValue`."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No Group of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "A value is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a SCIM Group with PATCH operations.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "put": {
+        "description": "The name, `externalId` and the whole member list are replaced; members who leave lose the\nroles the group gave them.",
+        "operationId": "auth_scim_replace_group",
+        "parameters": [
+          {
+            "description": "Id of the Group.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimGroup"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimGroup"
+                }
+              }
+            },
+            "description": "The Group after the change."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The body is not JSON (`invalidSyntax`) or a value is wrong (`invalidValue`)."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`), or giving the roles would exceed the plan's staff limit."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No Group of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "A value is used by another Group (`uniqueness`), or a change would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a SCIM Group.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/ResourceTypes": {
+      "get": {
+        "description": "No token needed.",
+        "operationId": "auth_scim_resource_types",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            },
+            "description": "The resource types."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List the SCIM resource types (`User`, `Group`).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/Schemas": {
+      "get": {
+        "description": "No token needed.",
+        "operationId": "auth_scim_schemas",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            },
+            "description": "The schemas of `User` and `Group`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "List the SCIM schemas, with the attributes Autoxide keeps.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/ServiceProviderConfig": {
+      "get": {
+        "description": "RFC 7644 §4: PATCH and filters yes; bulk, sort, ETags and password change no. No token needed.",
+        "operationId": "auth_scim_service_provider_config",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The service provider configuration."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Describe what this SCIM server supports.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/Users": {
+      "get": {
+        "description": "For the identity provider of the tenant, with a SCIM token (`Authorization: Bearer axscim1_…`).\nEntra ID and Okta look a person up with `filter=userName eq \"…\"` before creating them.",
+        "operationId": "auth_scim_list_users",
+        "parameters": [
+          {
+            "description": "SCIM filter: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, joined with `and` / `or` and\nparentheses. Users: `userName`, `externalId`, `emails`, `active`, `id`; Groups:\n`displayName`, `externalId`, `id`, `members` (`eq`).",
+            "example": "userName eq \"ada@example.com\"",
+            "in": "query",
+            "name": "filter",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "1-based index of the first result; default 1.",
+            "in": "query",
+            "name": "startIndex",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Results per page; default and most 200. `0` returns only `totalResults`.",
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Ignored: every attribute is returned.",
+            "in": "query",
+            "name": "attributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Ignored, except `groups` on Users and `members` on Groups.",
+            "in": "query",
+            "name": "excludedAttributes",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimListResponse"
+                }
+              }
+            },
+            "description": "One page of Users."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The filter cannot be read or uses an attribute or operator that is not supported; `scimType` `invalidFilter`."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List or find SCIM Users.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "post": {
+        "description": "Creates the staff account without a password (the person signs in through the tenant's sign-in\nprovider, or sets a password by reset). An existing staff account with the same email and no\nSCIM link is taken over instead of duplicated. Unknown attributes are ignored.",
+        "operationId": "auth_scim_create_user",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimUser"
+                }
+              }
+            },
+            "description": "The User was created; `Location` is its address.",
+            "headers": {
+              "Location": {
+                "description": "Where the new record is, e.g. `/api/v1/auth/users/<id>`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The body is not JSON (`invalidSyntax`) or a value is wrong, e.g. no `userName` or no valid email (`invalidValue`)."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "`userName`, `externalId` or the email is used by another User; `scimType` `uniqueness`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a SCIM User (provision a staff account).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/auth/scim/v2/Users/{id}": {
+      "delete": {
+        "description": "Deletes the account the same way as any account deletion: other modules are told to delete\nwhat they keep about the person. To only block access, PATCH `active` to `false` instead.",
+        "operationId": "auth_scim_delete_user",
+        "parameters": [
+          {
+            "description": "Id of the User (the account id).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The User and its account were deleted."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No User of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The account is the last active administrator of the tenant."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete a SCIM User.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "get": {
+        "operationId": "auth_scim_get_user",
+        "parameters": [
+          {
+            "description": "Id of the User (the account id).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimUser"
+                }
+              }
+            },
+            "description": "The User."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No User of this tenant has this id."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a SCIM User.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "patch": {
+        "description": "RFC 7644 §3.5.2: `add`, `replace`, `remove`, with or without `path`. `replace` of `active`\nwith `false` (how Entra ID and Okta deprovision) disables the account and revokes its sessions\nand API keys at once.",
+        "operationId": "auth_scim_patch_user",
+        "parameters": [
+          {
+            "description": "Id of the User (the account id).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimPatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimUser"
+                }
+              }
+            },
+            "description": "The User after the change."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The operations cannot be applied: `invalidSyntax`, `invalidPath`, `noTarget`, `mutability` (e.g. `id`) or `invalidValue`."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No User of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "A value is used by another User (`uniqueness`), or disabling would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Change a SCIM User with PATCH operations.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      },
+      "put": {
+        "description": "Every attribute is replaced; one left out is cleared (e.g. `externalId`). `active: false`\ndisables the account and revokes its sessions and API keys at once.",
+        "operationId": "auth_scim_replace_user",
+        "parameters": [
+          {
+            "description": "Id of the User (the account id).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/scim+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScimUser"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimUser"
+                }
+              }
+            },
+            "description": "The User after the change."
+          },
+          "400": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The body is not JSON (`invalidSyntax`) or a value is wrong (`invalidValue`)."
+          },
+          "401": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No SCIM token, or it is unknown or revoked."
+          },
+          "403": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include SCIM (`auth.scim`)."
+          },
+          "404": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "No User of this tenant has this id."
+          },
+          "409": {
+            "content": {
+              "application/scim+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScimErrorBody"
+                }
+              }
+            },
+            "description": "A value is used by another User (`uniqueness`), or disabling would leave the tenant without an active administrator."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Replace a SCIM User.",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/auth/support-access": {
       "get": {
         "description": "Requires `auth.support_access.read`. Every grant, newest first, with when it was first used\nand whether it was revoked. Changes made under a grant are in the audit log with\n`access.kind = support`.",
@@ -119493,6 +123313,368 @@
         ]
       }
     },
+    "/api/v1/catalog/digital-assets/{id}": {
+      "delete": {
+        "description": "Requires `catalog.products.write` on the unit owning the product. Refused while buyers can\nstill download it, and for the last file of a product on sale.",
+        "operationId": "catalog_remove_catalog_digital_asset",
+        "parameters": [
+          {
+            "description": "Id of the file.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such file in your scope; code `catalog.digital_asset_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Buyers can still download it (code `catalog.digital_asset_in_use`: revoke or wait), or it is the last file of a product on sale (code `catalog.digital_asset_missing`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Remove a file from a digital variant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/downloads": {
+      "get": {
+        "description": "Any signed-in buyer; only the rights of your own paid orders, newest first.",
+        "operationId": "catalog_list_my_catalog_downloads",
+        "parameters": [
+          {
+            "description": "Maximum number of items to return, 1 to 200. Defaults to 50.",
+            "example": 50,
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "format": "int32",
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Where to continue: the `next_cursor` of the previous page. Omit for the\nfirst page. Treat the value as opaque.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`desc` (newest first, the default) or `asc` (oldest first). Keep the same\norder (and `sort`, where offered) while following `next_cursor`.",
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "description": "Sort direction of a list. Lists are ordered by creation time, unless the endpoint offers\na `sort` parameter to order by something else.",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "example": true,
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_CatalogDownloadGrant"
+                }
+              }
+            },
+            "description": "One page of rights."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A paging parameter is invalid; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List your download rights.",
+        "tags": [
+          "catalog"
+        ],
+        "x-autoxide-filters": [
+          {
+            "description": "`true` to also get `pagination.total`, the number of items matching the filters, on the\nfirst page (without `cursor`). Costs one more query; leave it out when not needed.",
+            "kind": "boolean",
+            "name": "count",
+            "operator": "eq"
+          }
+        ],
+        "x-autoxide-list": "catalog.list_my_catalog_downloads",
+        "x-permissions": []
+      }
+    },
+    "/api/v1/catalog/downloads/{id}": {
+      "post": {
+        "description": "Any signed-in buyer, for a right of their own order. Answers a short-lived address of the file.",
+        "operationId": "catalog_use_my_catalog_download",
+        "parameters": [
+          {
+            "description": "Id of the download right.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogDownloadLink"
+                }
+              }
+            },
+            "description": "One download spent; `url` serves the file."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No usable right of yours with this id (expired or revoked); code `catalog.download_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Every download was used; code `catalog.download_limit_reached`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Spend one download of one of your rights.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": []
+      }
+    },
     "/api/v1/catalog/exports": {
       "post": {
         "description": "Requires `catalog.export` and `catalog.products.read`. Every variant of the products you can\nread, one row each, with the columns of an import (so the file can be edited and imported\nback). Cells that a spreadsheet would run as a formula start with `'`. Runs in the background:\nfollow `Location` until `status` is `succeeded`, then download `content_path`.",
@@ -120053,6 +124235,314 @@
         ],
         "x-permissions": [
           "catalog.import"
+        ]
+      }
+    },
+    "/api/v1/catalog/orders/{id}/downloads": {
+      "get": {
+        "description": "Requires `catalog.downloads.manage` on the unit owning the products; only the rights you\nmanage are listed. Tokens are never shown here: use the reissue endpoint to send new ones.",
+        "operationId": "catalog_list_catalog_order_downloads",
+        "parameters": [
+          {
+            "description": "Id of the order (module `orders`).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogDownloadGrant"
+                }
+              }
+            },
+            "description": "The rights."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.downloads.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order has no download right you manage; code `catalog.download_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the download rights of an order.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.downloads.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/orders/{id}/downloads/reissue": {
+      "post": {
+        "description": "Requires `catalog.downloads.manage` on the unit owning the products. For rights still usable\n(not revoked, not expired): a new token replaces the old one, downloads left and expiry stay.\nThe answer is the only time the new `token_path` is shown — send it to the buyer (e.g. a\nbuyer without an account who lost the link).",
+        "operationId": "catalog_reissue_catalog_order_downloads",
+        "parameters": [
+          {
+            "description": "Id of the order (module `orders`).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogDownloadGrant"
+                }
+              }
+            },
+            "description": "The rights with their new `token_path`."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.downloads.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order has no download right you manage; code `catalog.download_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Give new download tokens for an order.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.downloads.manage"
+        ]
+      }
+    },
+    "/api/v1/catalog/orders/{id}/downloads/revoke": {
+      "post": {
+        "description": "Requires `catalog.downloads.manage` on the unit owning the products. Tokens and file\naddresses already handed out stop working at once. Cancelling or refunding the order in module\n`orders` does this by itself.",
+        "operationId": "catalog_revoke_catalog_order_downloads",
+        "parameters": [
+          {
+            "description": "Id of the order (module `orders`).",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogDownloadsRevoked"
+                }
+              }
+            },
+            "description": "Revoked; `revoked` is 0 when they already were."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.downloads.manage`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The order has no download right you manage; code `catalog.download_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Revoke the download rights of an order.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.downloads.manage"
         ]
       }
     },
@@ -122134,6 +126624,225 @@
         ],
         "x-permissions": [
           "catalog.products.read"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/from-images": {
+      "post": {
+        "description": "Requires `catalog.products.write` and plan feature `catalog.ai`. Runs in the background: an AI\nmodel looks at the photos and writes the name, descriptions, SEO texts, a category of your tree\nand the attribute values it is sure of. The result is always a **draft** product marked\n`ai_assisted`, never put on sale; prices, stock and barcode are left for you, and the SKU is a\ntemporary `AI-…` code to replace. Follow `Location` until `status` is `succeeded`.",
+        "operationId": "catalog_draft_catalog_product_from_images",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogImageDraftRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogImageDraft"
+                }
+              }
+            },
+            "description": "Queued.",
+            "headers": {
+              "Location": {
+                "description": "Path of the request.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write` (code `permission_denied`), or the plan lacks `catalog.ai` (code `feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid (an image not in the media library, too many images, unknown language or category, bad tax category); see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "AI is off (code `ai.disabled`), or the model cannot read images (code `catalog.ai_images_unavailable`)."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Draft a product from photos with AI.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/products/from-images/{id}": {
+      "get": {
+        "description": "Requires `catalog.products.write`. Only requests you made are visible.",
+        "operationId": "catalog_get_catalog_image_draft",
+        "parameters": [
+          {
+            "description": "Id of the request.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogImageDraft"
+                }
+              }
+            },
+            "description": "The request."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No request of yours has this id; code `catalog.image_draft_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get a request to draft a product from photos.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
         ]
       }
     },
@@ -124904,6 +129613,235 @@
         "x-public": true
       }
     },
+    "/api/v1/catalog/public/downloads/{id}/file": {
+      "get": {
+        "description": "No sign-in needed; the address comes from spending a download and is valid until `exp`. Send\n`Range: bytes=…` to resume (one range). Does not spend a download.",
+        "operationId": "catalog_download_catalog_digital_file",
+        "parameters": [
+          {
+            "description": "Id of the download right.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Expiry, Unix seconds.",
+            "in": "query",
+            "name": "exp",
+            "required": true,
+            "schema": {
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Signature.",
+            "in": "query",
+            "name": "sig",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/octet-stream": {}
+            },
+            "description": "The whole file.",
+            "headers": {
+              "Content-Disposition": {
+                "description": "`attachment` with the file name.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "content": {
+              "application/octet-stream": {}
+            },
+            "description": "The range asked for.",
+            "headers": {
+              "Content-Range": {
+                "description": "`bytes start-end/size`.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The address is wrong or expired, or the right was revoked; code `catalog.download_not_found`."
+          },
+          "416": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The range is outside the file; code `catalog.range_not_satisfiable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Download the file of a signed address (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
+    "/api/v1/catalog/public/downloads/{token}": {
+      "post": {
+        "description": "No sign-in needed: the token of the download link the buyer received is the proof. Answers a\nshort-lived address of the file (`AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS`).",
+        "operationId": "catalog_use_catalog_download_token",
+        "parameters": [
+          {
+            "description": "Token of the download link.",
+            "in": "path",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogDownloadLink"
+                }
+              }
+            },
+            "description": "One download spent; `url` serves the file."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The token is wrong, expired or revoked; code `catalog.download_not_found`."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Every download was used; code `catalog.download_limit_reached`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "summary": "Spend one download with a token (public).",
+        "tags": [
+          "catalog"
+        ],
+        "x-public": true
+      }
+    },
     "/api/v1/catalog/public/products": {
       "get": {
         "description": "No sign-in needed. Products on sale and shown on the website asking (its own, those of the\nunits above it, and those of sellers below it), with a text in `locale`. Filter by category,\nattributes (`attr.<code>=<value>`), price range, text, seller and rating; prices are the\ncurrent prices of the website's price list, without customer group.",
@@ -127636,6 +132574,243 @@
           }
         ],
         "summary": "Replace the components of a bundle variant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.write"
+        ]
+      }
+    },
+    "/api/v1/catalog/variants/{id}/digital-assets": {
+      "get": {
+        "description": "Requires `catalog.products.read` on the unit owning the product.",
+        "operationId": "catalog_list_catalog_digital_assets",
+        "parameters": [
+          {
+            "description": "Id of the variant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_Vec_CatalogDigitalAsset"
+                }
+              }
+            },
+            "description": "The files, oldest first."
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.read`; code `permission_denied`. The tenant's plan does not include this module (`module_not_enabled`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No variant with this id in your scope; code `catalog.variant_not_found`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "List the files of a digital variant.",
+        "tags": [
+          "catalog"
+        ],
+        "x-permissions": [
+          "catalog.products.read"
+        ]
+      },
+      "post": {
+        "description": "Requires `catalog.products.write` on the unit owning the product, plan feature\n`catalog.digital`, and the right to see the uploaded file (you uploaded it, or you have\n`files.manage`). Upload the file first with `POST /api/v1/files`; its content is copied, so the\nproduct keeps working if the uploaded file is deleted. A digital product needs at least one\nfile before it can be put on sale.",
+        "operationId": "catalog_attach_catalog_digital_asset",
+        "parameters": [
+          {
+            "description": "Id of the variant.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "A random UUID that makes this request safe to retry: a repeat with the same key within 24 hours returns the first result (with `Idempotent-Replayed: true`) instead of doing it twice.",
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "examples": [
+                "0193e3a4-7b1c-7f00-9a51-6f2b8c0d4e11"
+              ],
+              "maxLength": 255,
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogAttachDigitalAsset"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_CatalogDigitalAsset"
+                }
+              }
+            },
+            "description": "Attached.",
+            "headers": {
+              "Location": {
+                "description": "Path of the variant's files.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Not signed in; see `GET /api/v1/auth/me` for the codes."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Missing `catalog.products.write` (code `permission_denied`), or the plan lacks `catalog.digital` (code `feature_not_enabled`). The tenant's plan does not include this module (`module_not_enabled`), or the subscription is suspended or canceled and data can only be read (`tenant_read_only`)."
+          },
+          "404": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No variant with this id in your scope (code `catalog.variant_not_found`), or no file `file_id` you may see (code `files.file_not_found`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The product is not of kind `digital` (code `catalog.not_digital`), or a value is out of range; see `errors`."
+          },
+          "503": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Module `files` is not installed; code `catalog.files_unavailable` or `catalog.storage_unavailable`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Attach a file to a variant of a digital product.",
         "tags": [
           "catalog"
         ],

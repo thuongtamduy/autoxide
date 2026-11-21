@@ -152,6 +152,33 @@ pub(crate) fn is_unique_violation(error: &DbErr) -> bool {
 
 /// Tăng số phiên bản bộ chương trình của khách, cùng transaction với thay đổi: máy chủ nào cũng
 /// biết phải nạp lại `CompiledPromotions`.
+/// Khoá dòng phiên bản bộ luật đã biên dịch của khách tới hết `transaction` ghi (tạo dòng nếu chưa
+/// có). Dùng làm khoá chung của khách khi phải xét nhiều chương trình cùng lúc (vd tổng số ngày
+/// giảm giá trong năm khi bật — D-181): hai lần bật nối đuôi nhau, bên sau thấy bên trước đã bật.
+/// Khoá SAU dòng chương trình (cùng thứ tự với [`bump_revision`] ở cuối mọi lệnh ghi) để không
+/// deadlock.
+pub(crate) async fn lock_revision(
+    transaction: &sea_orm::DatabaseTransaction,
+    tenant: &TenantContext,
+) -> Result<(), Error> {
+    use crate::entity::revision;
+    use sea_orm::sea_query::OnConflict;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+    revision::Entity::insert(revision::ActiveModel {
+        tenant_id: Set(tenant.id().as_uuid()),
+        revision: Set(0),
+    })
+    .on_conflict(OnConflict::column(revision::Column::TenantId).do_nothing().to_owned())
+    .exec_without_returning(transaction)
+    .await?;
+    autoxide_kernel::rows::lock_one(
+        transaction,
+        revision::Entity::find().filter(revision::Column::TenantId.eq(tenant.id().as_uuid())),
+    )
+    .await?;
+    Ok(())
+}
+
 pub(crate) async fn bump_revision<C: ConnectionTrait>(
     transaction: &C,
     tenant: &TenantContext,

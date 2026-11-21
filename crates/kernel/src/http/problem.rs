@@ -19,12 +19,21 @@ use crate::response::{PROBLEM_CONTENT_TYPE, Problem};
 /// Thân lỗi dạng chữ dài hơn mức này thì không chép vào `detail`.
 const MAX_DETAIL_BYTES: usize = 4096;
 
+/// Marker for an error response whose body follows another standard on purpose (e.g. SCIM
+/// errors, RFC 7644 §3.12): put it in the response extensions and the error is passed through
+/// unchanged instead of being turned into Problem Details.
+//
+// Endpoint theo chuẩn ngành khác (SCIM) tự định dạng lỗi; lớp này chỉ chuẩn hoá lỗi do thư viện
+// trả. Cộng thêm, không phá vỡ: response không mang marker vẫn như cũ (D-20261121-scim).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct StandardErrorBody;
+
 /// Đổi response lỗi chưa phải Problem Details thành Problem Details.
 pub(super) async fn normalize(response: Response) -> Response {
     let status = response.status();
-    // Lỗi JSON-RPC của endpoint MCP giữ nguyên thân: đặc tả MCP đòi (client đọc mã lỗi trong thân).
-    let json_rpc = response.extensions().get::<super::mcp::JsonRpcBody>().is_some();
-    if !(status.is_client_error() || status.is_server_error()) || is_problem(&response) || json_rpc
+    if !(status.is_client_error() || status.is_server_error())
+        || is_problem(&response)
+        || response.extensions().get::<StandardErrorBody>().is_some()
     {
         return response;
     }
@@ -163,5 +172,29 @@ impl ResponseForPanic for PanicToProblem {
         // Handler chết giữa chừng: việc có thể đã xong (D-157).
         response.extensions_mut().insert(super::idempotency::OutcomeUnknown);
         response
+    }
+}
+
+#[cfg(test)]
+mod standard_error_body_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn loi_mang_marker_giu_nguyen_than() {
+        // Lỗi theo chuẩn khác (SCIM): giữ nguyên thân và content-type.
+        let mut response = (StatusCode::BAD_REQUEST, "{\"status\":\"400\"}").into_response();
+        response
+            .headers_mut()
+            .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/scim+json"));
+        response.extensions_mut().insert(StandardErrorBody);
+        let kept = normalize(response).await;
+        assert_eq!(kept.headers()[header::CONTENT_TYPE], "application/scim+json");
+        let body = axum::body::to_bytes(kept.into_body(), 1024).await.unwrap();
+        assert_eq!(&body[..], b"{\"status\":\"400\"}");
+
+        // Không marker: vẫn đổi thành Problem như trước.
+        let plain = (StatusCode::BAD_REQUEST, "oops").into_response();
+        let changed = normalize(plain).await;
+        assert!(is_problem(&changed));
     }
 }

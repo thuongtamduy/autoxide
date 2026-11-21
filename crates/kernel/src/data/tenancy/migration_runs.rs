@@ -16,7 +16,9 @@ use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
-use sea_orm_migration::prelude::{DbErr, MigrationName, MigrationTrait, SchemaManager, Table};
+use sea_orm_migration::prelude::{
+    DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
+};
 use sea_orm_migration::schema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -55,6 +57,9 @@ mod entity {
         pub error: Option<String>,
         pub created_at: DateTimeUtc,
         pub updated_at: DateTimeUtc,
+        /// `active` khi lượt chưa xong (`pending` / `running`), trống khi đã xong; unique — mỗi
+        /// lúc chỉ một lượt chạy (m0039).
+        pub active_key: Option<String>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -93,6 +98,63 @@ impl MigrationTrait for CreateMigrationRuns {
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager.drop_table(Table::drop().table("kernel_migration_runs").to_owned()).await
+    }
+}
+
+/// Giá trị của `active_key` khi lượt chưa xong.
+const ACTIVE: &str = "active";
+const ACTIVE_INDEX: &str = "kernel_migration_runs_active_key_idx";
+
+/// Cột `active_key` (unique) của `kernel_migration_runs`: chặn hai lượt chạy cùng lúc bằng index
+/// thay vì "đọc — chưa có lượt nào — chèn" (hai request cùng lúc từng cùng thấy trống trên Postgres
+/// và xếp hai lượt migrate song song). Dữ liệu cũ: lượt chưa xong mới nhất nhận khoá.
+pub(crate) struct AddMigrationRunActiveKey;
+
+impl MigrationName for AddMigrationRunActiveKey {
+    fn name(&self) -> &str {
+        "m0039_migration_run_active_key"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for AddMigrationRunActiveKey {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .alter_table(
+                Table::alter()
+                    .table("kernel_migration_runs")
+                    .add_column(schema::string_len_null("active_key", 16))
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .get_connection()
+            .execute_unprepared(
+                "UPDATE kernel_migration_runs SET active_key = 'active' WHERE id = (SELECT id FROM \
+                 kernel_migration_runs WHERE status IN ('pending', 'running') ORDER BY id DESC LIMIT 1)",
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name(ACTIVE_INDEX)
+                    .table("kernel_migration_runs")
+                    .col("active_key")
+                    .unique()
+                    .to_owned(),
+            )
+            .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(Index::drop().name(ACTIVE_INDEX).table("kernel_migration_runs").to_owned())
+            .await?;
+        manager
+            .alter_table(
+                Table::alter().table("kernel_migration_runs").drop_column("active_key").to_owned(),
+            )
+            .await
     }
 }
 
@@ -198,19 +260,10 @@ impl MigrationRuns {
         // Placement phải có (báo ngay thay vì để job hỏng).
         self.setup.placements()?.pending(placement.as_deref()).await?;
         let transaction = self.control().begin_write().await?;
-        let busy = Entity::find()
-            .filter(Column::Status.is_in(["pending", "running"]))
-            .one(&transaction)
-            .await?;
-        if let Some(busy) = busy {
-            return Err(Error::conflict(
-                "kernel.migration_run_busy",
-                "A migration run is already in progress (`{run}`); wait for it to finish.",
-            )
-            .with_param("run", busy.id));
-        }
         let at = now();
-        let row = entity::ActiveModel {
+        // Chèn kèm `active_key`: lượt chưa xong khác (kể cả lượt đang được chèn song song) giữ khoá
+        // đó → vướng unique → 409. Postgres chờ bên kia commit rồi mới báo trùng.
+        let inserted = entity::ActiveModel {
             id: Set(Uuid::now_v7()),
             placement: Set(placement),
             status: Set("pending".to_owned()),
@@ -219,9 +272,35 @@ impl MigrationRuns {
             error: Set(None),
             created_at: Set(at),
             updated_at: Set(at),
+            active_key: Set(Some(ACTIVE.to_owned())),
         }
         .insert(&transaction)
-        .await?;
+        .await;
+        let row = match inserted {
+            Ok(row) => row,
+            Err(error)
+                if matches!(
+                    error.sql_err(),
+                    Some(sea_orm::SqlErr::UniqueConstraintViolation(_))
+                ) =>
+            {
+                drop(transaction);
+                let busy = Entity::find()
+                    .filter(Column::ActiveKey.eq(ACTIVE))
+                    .one(self.control().write())
+                    .await?;
+                let mut conflict = Error::conflict(
+                    "kernel.migration_run_busy",
+                    "A migration run is already in progress (`{run}`); wait for it to finish.",
+                );
+                conflict = conflict.with_param(
+                    "run",
+                    busy.map_or_else(|| "unknown".to_owned(), |found| found.id.to_string()),
+                );
+                return Err(conflict);
+            }
+            Err(error) => return Err(error.into()),
+        };
         // Một lần: migration hỏng thì sửa rồi chạy lượt mới, không tự thử lại.
         let options = EnqueueOptions { max_attempts: Some(1), ..EnqueueOptions::default() };
         self.jobs
@@ -295,6 +374,10 @@ impl MigrationRuns {
         }
         if error.is_some() {
             active.error = Set(error);
+        }
+        if matches!(status, "done" | "failed") {
+            // Lượt xong: nhả khoá cho lượt sau.
+            active.active_key = Set(None);
         }
         active.update(self.control().write()).await?;
         Ok(())

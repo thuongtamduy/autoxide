@@ -328,17 +328,13 @@ fn is_json(headers: &HeaderMap) -> bool {
     })
 }
 
-/// Dấu trong extensions của response mang lỗi JSON-RPC: lớp Problem của kernel (`problem.rs`) giữ nguyên
-/// thân. Đặc tả MCP đòi lỗi 400 / 404 của bản mới mang lỗi JSON-RPC: client hai thế hệ đọc nó để biết máy
-/// chủ nói bản mới (không có thì nó lùi về `initialize`).
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct JsonRpcBody;
-
 fn json_response(status: StatusCode, message: &Value) -> Response {
     let body = serde_json::to_vec(message).unwrap_or_else(|_| b"{}".to_vec());
     let mut response = Response::new(Body::from(body));
     *response.status_mut() = status;
-    response.extensions_mut().insert(JsonRpcBody);
+    // Lỗi JSON-RPC giữ nguyên thân qua lớp Problem của kernel: đặc tả MCP đòi lỗi 400 / 404 của bản mới mang
+    // lỗi JSON-RPC — client hai thế hệ đọc nó để biết máy chủ nói bản mới (không có thì lùi về `initialize`).
+    response.extensions_mut().insert(crate::http::StandardErrorBody);
     response
         .headers_mut()
         .insert(header::CONTENT_TYPE, HeaderValue::from_static("application/json"));

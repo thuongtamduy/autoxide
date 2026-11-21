@@ -18,7 +18,8 @@ nhật ký / deprecated / `no-store` như cũ (D-068, D-374). Phục vụ **hai 
   header `MCP-Protocol-Version` lạ → 400; thiếu → coi là `2025-03-26`; lỗi JSON-RPC trả HTTP 200 như trước.
 - Chung: `Origin` có mặt mà không thuộc `AUTOXIDE_HTTP_CORS_ORIGINS` → 403; `GET` / `DELETE` → 405; `Accept` thiếu
   `application/json` hay `text/event-stream` → 406; `Content-Type` khác JSON → 415; thông báo → 202; thân > 4 MiB → 413.
-- Lỗi JSON-RPC giữ nguyên thân qua lớp Problem của kernel (dấu `JsonRpcBody` trong extensions, `http/problem.rs`): đặc tả
+- Lỗi JSON-RPC giữ nguyên thân qua lớp Problem của kernel (dấu `StandardErrorBody` trong extensions — cùng dấu SCIM dùng,
+  D-20261121-scim): đặc tả
   đòi 400 / 404 của bản mới mang lỗi JSON-RPC — client hai thế hệ đọc nó để biết máy chủ nói bản mới. (Trước đây lớp
   Problem thay thân đó, nên client hai thế hệ lùi về `initialize`.)
 - Client cho test `autoxide_testkit::mcp::McpClient` (gửi thẳng vào router): mặc định nói bản mới; `McpClient::legacy`

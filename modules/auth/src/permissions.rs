@@ -112,6 +112,14 @@ pub(crate) const OIDC_MANAGE: Permission = Permission::new(
 )
 .with_risk(Risk::Destructive);
 
+pub(crate) const SCIM_MANAGE: Permission = Permission::new(
+    "auth.scim.manage",
+    "Create and revoke the SCIM tokens the company's identity provider (Entra ID, Okta, Google \
+     Workspace) uses to create, change and disable staff accounts, and map its groups to roles. \
+     Whoever holds this lets an outside system manage who works here.",
+)
+.with_risk(Risk::Destructive);
+
 /// Mọi permission module `auth` khai.
 pub(crate) fn all() -> Vec<Permission> {
     vec![
@@ -133,5 +141,6 @@ pub(crate) fn all() -> Vec<Permission> {
         SUPPORT_GRANT,
         OIDC_READ,
         OIDC_MANAGE,
+        SCIM_MANAGE,
     ]
 }
