@@ -422,9 +422,9 @@ Làm trọn trên máy của bạn, từ một thư mục trống tới một tr
 ```bash
 API=http://127.0.0.1:8080
 TOKEN=$(curl -sS "$API/api/v1/auth/login" \
-  --json '{"email":"admin@example.com","password":"<mật khẩu trong log>"}' | jq -r .data.access_token)
+  --json '{"email":"admin@example.com","password":"<password from the log>"}' | jq -r .data.access_token)
 curl -sS "$API/api/v1/auth/api-keys" -H "Authorization: Bearer $TOKEN" \
-  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<mật khẩu trong log>"}' \
+  --json '{"name":"Desk assistant","permissions":["inventory.read","catalog.products.read","catalog.prices.read","reporting.read","analytics.read","invoices.write"],"current_password":"<password from the log>"}' \
   | jq -r .data.key
 ```
 
