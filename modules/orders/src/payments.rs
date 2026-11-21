@@ -217,6 +217,7 @@ impl OrdersService {
                 let transaction = database.begin_write().await?;
                 let current = lifecycle::lock(&transaction, tenant, row.order_id).await?;
                 let stored = payment::Entity::find_by_id(payment_id)
+                    .scoped(tenant)
                     .one(&transaction)
                     .await?
                     .ok_or_else(errors::order_not_found)?;

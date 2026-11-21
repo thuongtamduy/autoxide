@@ -146,6 +146,24 @@ impl PromotionsService {
         Ok(())
     }
 
+    /// Tính khuyến mãi của giỏ cho nhân viên (REST `POST /evaluate` và tool MCP `evaluate_cart`):
+    /// `promotions.read` phải phủ nút bán của giỏ — không xem được chương trình của nhánh khác.
+    pub(crate) async fn evaluate_for(
+        &self,
+        tenant: &TenantContext,
+        principal: &autoxide_kernel::access::Principal,
+        cart: &Cart,
+    ) -> Result<Outcome, Error> {
+        principal
+            .require_at(
+                tenant.database().read(),
+                &crate::permissions::READ,
+                crate::service::at(cart.org_id.as_uuid()),
+            )
+            .await?;
+        self.evaluate_cart(tenant, cart, &Options::default()).await
+    }
+
     /// Tính khuyến mại cho giỏ.
     pub(crate) async fn evaluate_cart(
         &self,

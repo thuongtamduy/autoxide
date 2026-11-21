@@ -373,6 +373,7 @@ impl CustomersService {
         let base = Ord::max(fact.net_minor - fact.refunded_minor, 0);
         let mut points = (base / rule.earn_per_minor).saturating_mul(rule.points_per_unit);
         let tier_code = profile::Entity::find_by_id(fact.profile_id)
+            .scoped(tenant)
             .one(connection)
             .await?
             .and_then(|row| row.tier_code);

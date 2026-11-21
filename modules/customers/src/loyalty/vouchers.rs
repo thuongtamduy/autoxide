@@ -81,6 +81,7 @@ impl CustomersService {
         fact: &order_fact::Model,
     ) -> Result<(), Error> {
         let Some(user) = profile::Entity::find_by_id(fact.profile_id)
+            .scoped(tenant)
             .one(tenant.database().read())
             .await?
             .and_then(|row| row.user_id)
