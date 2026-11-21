@@ -96,6 +96,7 @@ pub(crate) use mcp::{
 pub use metrics::metrics_routes;
 pub(crate) use openapi::untranslated_text;
 pub use openapi::{BEARER_AUTH, DOCS_PATH, OPENAPI_PATH, lint};
+pub use problem::StandardErrorBody;
 pub use request_id::REQUEST_ID_HEADER;
 pub use security_headers::{API_CSP, DOCS_CSP};
 pub use server::{Shutdown, serve, shutdown_signal};

@@ -406,8 +406,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 
 Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
 
-- [ ] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
-- [ ] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
+- [x] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
+- [x] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
       cả hai database
 
 ## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)
@@ -487,8 +487,9 @@ bước 35.
 - [x] Danh mục trong menu của website (D-238): `catalog.category` trong sổ đối tượng (`resolve_many` theo ngôn ngữ,
       `children` theo thứ tự hiển thị, chỉ danh mục đang hiện), `catalog.product` có `image`; khối "Bán chạy" của
       bảng xổ là danh sách sản phẩm công khai lọc theo danh mục, sắp `best_selling`
-- [ ] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229);
-      khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối (bước 67)
+- [x] Tạo sản phẩm nháp từ ảnh bằng AI (tên, mô tả, danh mục trong cây của khách, thuộc tính, SEO — D-229)
+- [ ] Khối `catalog.product_grid`, `product_card`, `collection` cho trang dựng từ khối — **chờ sổ khối của
+      bước 67** (`Module::blocks()`, `BlockData` chưa có trong kernel)
 - [x] Website bán hàng (web-build-api-gaps, 16/11/2026): thông tin hiển thị theo biến thể trong `by-slug`, theo
       ngôn ngữ (vd số người dùng, trong hộp có gì, cách dùng / chăm sóc, dùng được máy rửa bát) — thuộc tính khai
       theo loại sản phẩm, không viết cứng ngành nào; catalog công khai lọc theo người bán và đường dẫn trang sản

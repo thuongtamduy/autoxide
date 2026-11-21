@@ -9,6 +9,7 @@ Tiếng Anh: [`README.md`](README.md).
 - [Dựng trang chủ của cửa hàng từ API](storefront.vi.md): vị trí và banner, bộ sưu tập, thương hiệu và liên hệ, cache
 - [Đăng nhập và giữ phiên đăng nhập](authentication.vi.md): access token và refresh token, đăng xuất
 - [Đăng nhập bằng Google, Microsoft, GitHub hay OpenID Connect](oidc.vi.md): nhà cung cấp theo khách, liên kết tài khoản an toàn
+- [Đồng bộ nhân viên từ hệ thống danh tính (SCIM 2.0)](scim.vi.md): Entra ID, Okta và Google Workspace tạo, sửa, khoá tài khoản nhân viên
 - [API key cho chương trình và AI agent](api-keys.vi.md): ít permission nhất, giới hạn tốc độ, thu hồi
 - [Gọi lại an toàn](retries.vi.md): `Idempotency-Key`
 - [Đọc danh sách dài](pagination.vi.md): `limit`, `cursor`, `order`

@@ -57,6 +57,21 @@ pub struct MediaVariant {
     pub avif_url: Option<String>,
 }
 
+/// Ảnh chuẩn bị để gửi cho mô hình AI ([`Media::ai_image`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct AiImage {
+    /// `image/jpeg` hay `image/png`.
+    pub media_type: String,
+    pub bytes: Vec<u8>,
+}
+
+impl AiImage {
+    pub fn new(media_type: impl Into<String>, bytes: Vec<u8>) -> Self {
+        AiImage { media_type: media_type.into(), bytes }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait Media: Send + Sync {
     /// Các item có ID trong `ids` và không trong thùng rác, theo thứ tự của `ids` (ID không
@@ -92,5 +107,17 @@ pub trait Media: Send + Sync {
         ids: &[Uuid],
     ) -> Result<Vec<(Uuid, Option<Uuid>)>, Error> {
         Ok(self.find_many(tenant, ids).await?.into_iter().map(|item| (item.id, None)).collect())
+    }
+
+    /// Ảnh `id` để module khác gửi cho mô hình AI (D-109, vd `catalog` tạo sản phẩm nháp từ ảnh —
+    /// D-229): ảnh thu nhỏ do máy chủ làm, cạnh dài tối đa 1280 px, đã bỏ metadata (EXIF) — không
+    /// bao giờ là file gốc. `None` khi không có hay đang trong thùng rác. Không phải ảnh đọc được:
+    /// lỗi `media.ai_unsupported_image`; ảnh riêng tư khi máy chủ không cho gửi ảnh riêng tư:
+    /// `media.ai_private_not_allowed`. Đọc nơi lưu: gọi NGOÀI transaction ghi.
+    ///
+    /// Cài đặt mặc định trả `None` (bản giả trong test của module khác không phải cài).
+    async fn ai_image(&self, tenant: &TenantContext, id: Uuid) -> Result<Option<AiImage>, Error> {
+        let _ = (tenant, id);
+        Ok(None)
     }
 }

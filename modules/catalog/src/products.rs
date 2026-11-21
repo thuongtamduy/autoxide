@@ -168,13 +168,16 @@ pub(crate) fn tracks_inventory(kind: ProductKind) -> bool {
 }
 
 /// Mã nhóm thuế dạng `vat.standard`: chữ thường, số, `.`, `_`, 1–64 ký tự.
-fn check_tax_category(problems: &mut Vec<FieldError>, code: &str) {
-    let valid = !code.is_empty()
+pub(crate) fn tax_category_valid(code: &str) -> bool {
+    !code.is_empty()
         && code.len() <= 64
         && code
             .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'_');
-    if !valid {
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'_')
+}
+
+fn check_tax_category(problems: &mut Vec<FieldError>, code: &str) {
+    if !tax_category_valid(code) {
         problems.push(FieldError::new(
             "tax_category",
             "format",

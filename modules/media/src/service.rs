@@ -897,6 +897,14 @@ pub(crate) fn too_large(max: u64) -> Error {
 
 #[async_trait::async_trait]
 impl crate::api::Media for MediaService {
+    async fn ai_image(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Option<crate::api::AiImage>, Error> {
+        self.ai_image_of(tenant, id).await
+    }
+
     async fn uploaders(
         &self,
         tenant: &TenantContext,

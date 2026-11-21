@@ -48,6 +48,7 @@ mod reset;
 mod resource;
 mod role;
 mod sandbox;
+mod scim;
 mod session;
 mod settings;
 mod step_up;
@@ -138,7 +139,7 @@ impl Module for AuthModule {
 
     // Module nền: không gói nào tắt được (bước 35, D-323).
     fn features(&self) -> Vec<autoxide_kernel::entitlement::Feature> {
-        vec![api_key::API_KEYS_FEATURE]
+        vec![api_key::API_KEYS_FEATURE, scim::SCIM_FEATURE]
     }
 
     fn limits(&self) -> Vec<autoxide_kernel::entitlement::Limit> {
@@ -412,7 +413,18 @@ impl Module for AuthModule {
         });
         context.provide::<dyn api::Invitations>(invitations.clone())?;
         self.invitations = Some(invitations.clone());
+        // Đồng bộ nhân viên qua SCIM (bước 66): khách lấy từ token SCIM qua sổ database.
+        let scim = Arc::new(scim::ScimService {
+            databases: databases.clone(),
+            outbox: outbox.clone(),
+            entitlements: context.entitlements(),
+            users: users.clone(),
+            roles: roles.clone(),
+        });
+        // Nhóm SCIM chưa có luật ánh xạ vào hộp việc (bước 51 P2).
+        context.work_source(Arc::new(scim::UnmappedGroups))?;
         self.state = Some(http::HttpState {
+            scim,
             phone,
             oidc,
             support,

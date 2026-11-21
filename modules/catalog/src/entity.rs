@@ -773,3 +773,6 @@ pub(crate) use transfer_entity::{media_alt, suggestion, transfer, variant_attrib
 // Hàng số (m0019).
 mod digital;
 pub(crate) use digital::{digital_asset, download_grant};
+// Tạo sản phẩm nháp từ ảnh (m0020).
+mod image_draft_entity;
+pub(crate) use image_draft_entity::image_draft;
