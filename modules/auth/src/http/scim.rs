@@ -131,9 +131,10 @@ pub(crate) struct ScimPatch {
 #[into_params(parameter_in = Query)]
 pub(crate) struct ScimListQuery {
     /// SCIM filter: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, joined with `and` / `or` and
-    /// parentheses. Users: `userName`, `externalId`, `emails`, `active`, `id`.
+    /// parentheses. Users: `userName`, `externalId`, `emails`, `active`, `id`; Groups:
+    /// `displayName`, `externalId`, `id`, `members` (`eq`).
     #[param(example = "userName eq \"ada@example.com\"")]
-    filter: Option<String>,
+    pub(super) filter: Option<String>,
     /// 1-based index of the first result; default 1.
     #[serde(rename = "startIndex")]
     #[param(rename = "startIndex")]
@@ -151,7 +152,7 @@ pub(crate) struct ScimListQuery {
 
 impl ScimListQuery {
     /// `startIndex` < 1 là 1; `count` < 0 là 0, quá trần thì bằng trần (RFC 7644 §3.4.2.4).
-    fn page(&self) -> (u64, u64) {
+    pub(super) fn page(&self) -> (u64, u64) {
         let start = u64::try_from(self.start_index.unwrap_or(1).max(1)).unwrap_or(1);
         let count = u64::try_from(self.count.unwrap_or(MAX_RESULTS as i64).max(0)).unwrap_or(0);
         (start, count.min(MAX_RESULTS))

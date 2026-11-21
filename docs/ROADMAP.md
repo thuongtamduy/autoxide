@@ -406,8 +406,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 
 Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
 
-- [ ] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
-- [ ] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
+- [x] Endpoint SCIM 2.0 trong `auth` (Users, Groups, bộ lọc, PATCH theo RFC 7644) với token SCIM riêng mỗi khách
+- [x] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
       cả hai database
 
 ## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)

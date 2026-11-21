@@ -503,6 +503,7 @@ mod tests {
                 outbox: autoxide_kernel::event::Outbox::standalone("auth"),
                 entitlements: Default::default(),
                 users: services.users.clone(),
+                roles: services.roles.clone(),
             }),
             sessions: services.sessions.clone(),
             users: services.users.clone(),

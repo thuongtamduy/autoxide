@@ -419,7 +419,10 @@ impl Module for AuthModule {
             outbox: outbox.clone(),
             entitlements: context.entitlements(),
             users: users.clone(),
+            roles: roles.clone(),
         });
+        // Nhóm SCIM chưa có luật ánh xạ vào hộp việc (bước 51 P2).
+        context.work_source(Arc::new(scim::UnmappedGroups))?;
         self.state = Some(http::HttpState {
             scim,
             phone,

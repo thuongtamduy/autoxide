@@ -73,7 +73,17 @@ curl -sS -X PATCH "$API/api/v1/auth/scim/v2/Users/$USER" -H "Authorization: Bear
 
 Every change is in the audit log with the actor kind `scim`.
 
-## 4. What is supported
+## 4. Groups and roles
+
+The provider can also push its groups (`/Groups`; Okta: *Push Groups*, Entra ID: assign groups to the app). A group gives nothing by itself: the tenant decides what it means with **mapping rules** — "members of group X hold role R at unit N".
+
+1. Let the provider push the group, then find its id with `GET /api/v1/auth/scim/groups` (member count, rule count). Groups without a rule also show up in the work inbox (`auth.scim_unmapped_groups`).
+2. Add a rule with `POST /api/v1/auth/scim/group-mappings` and `{"group_id": "…", "org_id": "…", "role_id": "…"}` (`org_id` is the tenant id for the root unit). You must be able to give that role at that unit yourself. Current members get the role at once.
+3. From then on, people added to or removed from the group gain or lose the role at once. A role someone was given by hand is never removed by SCIM, and a role two groups give stays while the person is in either.
+
+Remove a rule with `DELETE /api/v1/auth/scim/group-mappings/{id}`; deleting the group in the provider removes its rules and the roles it gave.
+
+## 5. What is supported
 
 - Filters: `eq`, `ne`, `co`, `sw`, `ew`, `pr`, joined with `and` / `or` and parentheses. Users by `userName`, `externalId`, `emails`, `active`, `id`. Anything else answers `400` with `scimType` `invalidFilter`.
 - `PATCH` (RFC 7644 §3.5.2): `add`, `replace`, `remove`, with paths such as `active`, `name.givenName`, `emails[type eq "work"].value`, or without a path. Attributes Autoxide does not keep (enterprise extension, phone numbers, title…) are ignored.
