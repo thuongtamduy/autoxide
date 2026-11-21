@@ -9,6 +9,135 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-21
+
+### Added
+
+- `compose.quickstart.yml`: run Autoxide in one command (SQLite in a volume, migrations applied, a
+  first administrator, reference data loaded, API reference on), shown first in the README.
+- The MCP guide walks from the quickstart to a working assistant in Claude Desktop or Cursor: a
+  least-privilege API key, the client configuration, and real requests (stock, draft invoices,
+  reports).
+- The Docker image carries OCI labels (description, source, documentation, licenses).
+- `autoxide serve` can prepare itself on start, all off by default: `AUTOXIDE_MIGRATE_ON_START=true`
+  applies pending migrations, `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` (with
+  `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD` or `…_PASSWORD_FILE`, else a generated password logged once)
+  creates the first administrator while there is none, and `AUTOXIDE_STARTUP_TASKS` runs maintenance
+  tasks such as `address.import,tax.import_pack,promotions.load_legal_data`. Servers starting
+  together take turns through a migration lock (a Postgres advisory lock, a lock file next to the
+  SQLite file), which `autoxide migrate up` takes too.
+- `GET /` answers with the server's name, version and links to the OpenAPI document, the API
+  reference (when on), the MCP endpoint, `/llms.txt` and `/health/ready`.
+- Module `catalog`: draft a product from 1 to 8 photos of the media library with AI
+  (`POST /products/from-images`, runs in the background). The result is always a draft product
+  marked `ai_assisted`, with texts, a category of your own tree and the attribute values the model
+  was sure of; prices, stock and the SKU are left for you.
+- Module `media`: other modules can get an image prepared for AI (`Media::ai_image`: a thumbnail
+  without metadata, never the original).
+- Module `catalog`: digital products are delivered as download links. Attach a file uploaded through
+  `files` to a digital variant (`POST /variants/{id}/digital-assets`); a paid order gives each line a
+  download right with a limit and an expiry, revoked when the order is cancelled or refunded. Buyers
+  spend a download with `POST /public/downloads/{token}` (or `POST /downloads/{id}` when signed in)
+  and get a short-lived signed file address that accepts `Range`. Staff list, revoke and reissue the
+  rights of an order. New settings `AUTOXIDE_CATALOG_DOWNLOAD_LINK_SECONDS`,
+  `AUTOXIDE_CATALOG_DEFAULT_DOWNLOAD_LIMIT`, `AUTOXIDE_CATALOG_DEFAULT_GRANT_DAYS`.
+- Module `files`: other modules can read an uploaded file through the new `Files` trait, with the
+  same viewing rules as `/api/v1/files`.
+- Module `auth`: SCIM `Groups` (filters, PATCH of `members` as Entra ID and Okta send it) and mapping
+  rules from a group to a role at an organization unit (`/api/v1/auth/scim/group-mappings`,
+  `GET /api/v1/auth/scim/groups`). Joining or leaving a group grants or removes the role at once;
+  roles given by hand are never removed by SCIM. Groups without a rule appear in the work inbox
+  (`auth.scim_unmapped_groups`).
+- Module `auth`: SCIM 2.0 endpoint at `/api/v1/auth/scim/v2` (`Users`, `ServiceProviderConfig`,
+  `ResourceTypes`, `Schemas`; filters `eq`/`ne`/`co`/`sw`/`ew`/`pr`, PATCH per RFC 7644) so Microsoft
+  Entra ID, Okta and Google Workspace can create, change and disable staff accounts. `active: false`
+  disables the account and revokes its sessions, refresh tokens and API keys in the same transaction.
+  Tenant SCIM tokens are managed at `/api/v1/auth/scim/tokens` (permission `auth.scim.manage`, plan
+  feature `auth.scim`). Guide: `docs/guides/scim.md`.
+- Kernel: `autoxide_kernel::http::StandardErrorBody` keeps an error body that follows another
+  standard (e.g. SCIM errors) instead of turning it into Problem Details.
+
+### Changed
+
+- Module `media`: the AVIF encoder is now an opt-in build feature (`cargo build --release
+  --features avif`), because it depends on an unmaintained build-time library. The default build
+  and the Docker image have no AVIF encoder; with `AUTOXIDE_MEDIA_AVIF=true` such a build refuses
+  to start and explains how to build with AVIF. AVIF copies already stored are still served.
+- MCP endpoint (`/mcp`, `/mcp/<module>`): served by Autoxide's own implementation of the MCP
+  specification instead of the `rmcp` library. It speaks protocol version `2026-07-28` (no
+  handshake, `server/discover`, per-request `_meta`, `Mcp-Method` / `Mcp-Name` headers) and every
+  earlier version that starts with `initialize`. Tools, resources, prompts and permissions behave
+  as before.
+- Module `files`: S3 storage now uses the small `rusty-s3` signing library over the existing HTTP
+  client, and local disk storage is built in, instead of `object_store` (which pulled in an
+  unmaintained crate). Settings, stored files and behaviour are unchanged, including the server's
+  IAM role on AWS when no access key is set.
+- Kernel: new time types `autoxide_kernel::time::{Timestamp, Date}` built on `jiff` 1.0, replacing
+  the unmaintained `chrono` step by step. Stored values, JSON and OpenAPI stay exactly as before;
+  modules keep working while they move over.
+
+### Removed
+
+- Mobile SDKs (Swift, Kotlin, Dart) removed; the TypeScript SDK stays. For a native or Flutter app, generate a client
+  from `docs/openapi.json` with your platform's OpenAPI generator, or call the REST API directly.
+
+### Fixed
+
+- Module `compliance`: a late result of an old identity check no longer verifies a profile again
+  after it was revoked, approved by hand, or moved on to a newer check; that attempt is kept as
+  `superseded`.
+- Module `compliance`: two profiles with the same identity document verified at the same time no
+  longer both become `verified`; the later one waits for a reviewer (`duplicate_document`). New
+  migration `m0020_kyc_verified_document`.
+- Module `compliance`: when two cases that hid the same target are closed at the same time, the
+  target is shown again (`compliance.target_restored`) instead of staying hidden.
+- Kernel: starting placement migration runs at the same time can no longer queue two runs that
+  migrate in parallel; the others get `kernel.migration_run_busy` (409). New kernel migration
+  `m0039_migration_run_active_key`.
+- Module `bookings`: several people who are the first to book the same class at the same time all
+  get a seat while the class has room, instead of `bookings.slot_taken`.
+- Module `conversations`: an automatic reply is no longer added to a conversation that was just
+  closed or handed to a person; marking as read from two devices at once never moves the read
+  cursor back.
+- Module `automations`: runs started at the same time can no longer go over
+  `AUTOXIDE_AUTOMATIONS_MAX_RUNS_PER_HOUR`.
+- Module `content`: banners created at the same time can no longer go over the placement's
+  `max_items` or share a position.
+- Module `newsletter`: confirming and unsubscribing at the same time always ends unsubscribed.
+- Module `tax`: two changes of a tax profile with the same `If-Match` no longer both pass; the
+  later one gets `412`.
+- Module `orders`: two checkouts of the same cart with different `Idempotency-Key`s no longer
+  create two orders; the later one gets `orders.cart_closed` (409) and its holds are released.
+- Module `orders`: closing a POS shift waits for sales being written and counts them in the expected
+  cash; a sale can no longer be recorded in a shift that was just closed (`orders.shift_not_open`).
+- Module `plans`: voiding a billing period while its invoice is being issued now also cancels that
+  invoice; a voided period never keeps a live VAT invoice.
+- Module `plans`: the daily usage reconciliation no longer overwrites limit holds and releases made
+  while it counts, so a tenant cannot go over a limit because of it; holds that have expired but
+  are not yet released stay counted until the release job returns them.
+- Module `promotions`: approving and rejecting a seller's application at the same time no longer
+  leaves flash-sale slots for a rejected application; a seller cannot edit an application while it
+  is being reviewed.
+- Module `promotions`: two promotions activated at the same time can no longer both pass the legal
+  limit on discount days per year; a promotion changed while it was being checked is refused with
+  `promotions.changed_while_activating` (409) instead of being turned on unchecked.
+- MCP endpoint: protocol errors answered with HTTP 400 or 404 now carry the JSON-RPC error body the
+  MCP specification requires, instead of a Problem Details body, so clients that support several
+  protocol versions recognize the server as a `2026-07-28` server.
+- Tenant data export (`/api/v1/kernel/tenants/{id}/exports`) writes date columns as `YYYY-MM-DD`; they were
+  exported as `null`, so the dates were missing from the file.
+- Module `auth`: removing two sign-in links of an account at the same time can no longer remove
+  both and lock the owner out; the "last way to sign in" check now runs inside the transaction,
+  after locking the account row.
+
+### Security
+
+- The unmaintained `chrono` and `chrono-tz` crates (RUSTSEC-2026-0543, RUSTSEC-2026-0555) are no longer
+  dependencies: every time value uses `jiff` through `autoxide_kernel::time`. Stored values, JSON and the
+  OpenAPI document are unchanged.
+- The bundled SQLite is now built from `libsqlite3-sys` 0.40 (through `sqlx` 0.9.1), which fixes
+  RUSTSEC-2026-0459; the exception for it is gone from `deny.toml`.
+
 ## [0.16.0] - 2026-11-20
 
 ### Added
@@ -2162,7 +2291,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/thuongtamduy/autoxide/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/thuongtamduy/autoxide/compare/v0.13.0...v0.14.0
