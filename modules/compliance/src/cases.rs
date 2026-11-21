@@ -906,6 +906,24 @@ impl JobHandler for DeadlinesJob {
     }
 }
 
+/// Khoá mọi vụ của đích `target` tới hết `transaction` ghi, theo ID tăng dần (không deadlock).
+async fn lock_target(
+    transaction: &sea_orm::DatabaseTransaction,
+    tenant: &TenantContext,
+    target: &str,
+) -> Result<(), Error> {
+    if target.is_empty() {
+        return Ok(());
+    }
+    autoxide_kernel::rows::lock(
+        transaction,
+        case::Entity::find().scoped(tenant).filter(case::Column::Target.eq(target)),
+        case::Column::Id,
+    )
+    .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -955,22 +973,4 @@ mod tests {
         assert_eq!(parse_target("content.entry:"), None);
         assert_eq!(parse_target("content.entry:a b"), None);
     }
-}
-
-/// Khoá mọi vụ của đích `target` tới hết `transaction` ghi, theo ID tăng dần (không deadlock).
-async fn lock_target(
-    transaction: &sea_orm::DatabaseTransaction,
-    tenant: &TenantContext,
-    target: &str,
-) -> Result<(), Error> {
-    if target.is_empty() {
-        return Ok(());
-    }
-    autoxide_kernel::rows::lock(
-        transaction,
-        case::Entity::find().scoped(tenant).filter(case::Column::Target.eq(target)),
-        case::Column::Id,
-    )
-    .await?;
-    Ok(())
 }
