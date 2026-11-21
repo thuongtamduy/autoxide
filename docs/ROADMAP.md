@@ -110,7 +110,7 @@ thật (P7).
       của bên thứ ba
 - [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam (D-20261121-vn-providers), mỗi bộ nối một module nhỏ sau trait của core,
       viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
-  - [ ] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
+  - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
   - [ ] Thanh toán: SePay
   - [ ] Thanh toán: MoMo
