@@ -155,7 +155,7 @@ async fn ton_dong_dem_job_cho_tuoi_va_dead_letter() {
 async fn ton_dong_khong_dem_job_hen_gio_chua_toi() {
     TestDatabase::run(async |test| {
         let (database, _modules, _outbox) = setup(test).await;
-        let tomorrow = Timestamp::now() + SignedDuration::from_hours(24 * 1);
+        let tomorrow = Timestamp::now() + SignedDuration::from_hours(24);
         enqueue(&database, EnqueueOptions::default().run_at(tomorrow)).await;
 
         let found = reports(&database, Timestamp::now()).await;

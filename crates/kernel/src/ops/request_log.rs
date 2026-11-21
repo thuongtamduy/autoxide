@@ -672,9 +672,7 @@ mod tests {
                 .unwrap();
             let tenant = TenantContext::default_on(database);
             // Một dòng đã quá hạn (hạn lưu âm), một dòng còn hạn.
-            write(&tenant, vec![entry(&tenant)], SignedDuration::from_hours(24 * (-1)))
-                .await
-                .unwrap();
+            write(&tenant, vec![entry(&tenant)], SignedDuration::from_hours(-24)).await.unwrap();
             write(&tenant, vec![entry(&tenant)], SignedDuration::from_hours(24 * 14))
                 .await
                 .unwrap();

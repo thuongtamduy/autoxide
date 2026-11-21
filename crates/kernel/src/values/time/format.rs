@@ -48,6 +48,23 @@ pub(super) fn write_timestamp_with(
     out
 }
 
+/// RFC 3339 theo giờ địa phương của `zone`, kèm độ lệch: `2026-11-23T09:00:00+07:00` — đúng chuỗi
+/// `chrono::DateTime<Tz>::to_rfc3339()` (UTC cũng viết `+00:00`; độ lệch làm tròn tới phút như `chrono`).
+pub(super) fn write_zoned(timestamp: jiff::Timestamp, zone: &TimeZone) -> String {
+    let offset = zone.to_offset(timestamp);
+    let datetime = offset.to_datetime(timestamp);
+    let mut out = String::with_capacity(32);
+    write_date_parts(&mut out, datetime.year(), datetime.month(), datetime.day());
+    let _ =
+        write!(out, "T{:02}:{:02}:{:02}", datetime.hour(), datetime.minute(), datetime.second());
+    write_fraction(&mut out, datetime.subsec_nanosecond(), Precision::Auto);
+    let seconds = offset.seconds();
+    let minutes = (seconds.abs() + 30) / 60;
+    let sign = if seconds < 0 { '-' } else { '+' };
+    let _ = write!(out, "{sign}{:02}:{:02}", minutes / 60, minutes % 60);
+    out
+}
+
 /// Phần lẻ của giây: `Auto` như `chrono` (`SecondsFormat::AutoSi`) — không có, hay 3, 6, 9 chữ số.
 fn write_fraction(out: &mut String, nanos: i32, precision: Precision) {
     match precision {

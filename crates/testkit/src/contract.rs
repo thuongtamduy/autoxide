@@ -296,7 +296,7 @@ fn limit(
 fn format_ok(format: &str, text: &str) -> bool {
     match format {
         "uuid" => uuid::Uuid::parse_str(text).is_ok(),
-        "date-time" => chrono::DateTime::parse_from_rfc3339(text).is_ok(),
+        "date-time" => autoxide_kernel::time::Timestamp::parse_rfc3339(text).is_ok(),
         "date" => Date::parse_from_str(text, "%Y-%m-%d").is_ok(),
         _ => true,
     }

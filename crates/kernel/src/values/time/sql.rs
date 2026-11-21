@@ -342,3 +342,17 @@ fn unsupported_row() -> TryGetError {
         "time values are only read from SQLite or Postgres rows".to_owned(),
     ))
 }
+
+// SeaORM đòi kiểu của cột khoá chính cài `TryFromU64` (để đọc ID tự tăng sau INSERT). Ngày / thời điểm
+// không bao giờ là ID tự tăng: luôn báo lỗi, như cài đặt sẵn của SeaORM cho kiểu `chrono`.
+impl sea_orm::TryFromU64 for Timestamp {
+    fn try_from_u64(_: u64) -> Result<Self, DbErr> {
+        Err(DbErr::ConvertFromU64("Timestamp"))
+    }
+}
+
+impl sea_orm::TryFromU64 for Date {
+    fn try_from_u64(_: u64) -> Result<Self, DbErr> {
+        Err(DbErr::ConvertFromU64("Date"))
+    }
+}

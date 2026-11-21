@@ -12,7 +12,6 @@ async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
 bytes.workspace = true
-chrono.workspace = true
 rust_decimal.workspace = true
 futures-util.workspace = true
 jiff.workspace = true

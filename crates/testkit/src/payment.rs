@@ -468,7 +468,7 @@ impl BankFeed for FakeBankFeed {
             };
             let at = item["booked_at"]
                 .as_i64()
-                .and_then(|at| Timestamp::from_unix_seconds(at))
+                .and_then(Timestamp::from_unix_seconds)
                 .unwrap_or_else(Timestamp::now);
             found.push(BankTransaction::new(
                 text(item, "id")?,

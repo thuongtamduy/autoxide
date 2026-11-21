@@ -119,6 +119,13 @@ impl Date {
     }
 }
 
+/// Mặc định 1970-01-01, như `chrono::NaiveDate`.
+impl Default for Date {
+    fn default() -> Self {
+        Date(civil::Date::constant(1970, 1, 1))
+    }
+}
+
 impl From<civil::Date> for Date {
     fn from(value: civil::Date) -> Self {
         Date(value)

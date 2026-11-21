@@ -124,7 +124,7 @@ async fn bam_ip_theo_ngay_va_co_dinh() {
         );
         assert_ne!(
             a,
-            bucket(&key, "forms:contact", address, today + SignedDuration::from_hours(24 * 1))
+            bucket(&key, "forms:contact", address, today + SignedDuration::from_hours(24))
                 .await
                 .unwrap()
         );
@@ -154,7 +154,7 @@ async fn dau_ip_rieng_theo_pham_vi() {
         let now = Timestamp::now();
         let today = bucket(&key, "forms:contact", visitor, now).await.unwrap();
         assert_ne!(today, bucket(&key, "comments:post", visitor, now).await.unwrap());
-        let tomorrow = now + SignedDuration::from_hours(24 * 1);
+        let tomorrow = now + SignedDuration::from_hours(24);
         assert_ne!(today, bucket(&key, "forms:contact", visitor, tomorrow).await.unwrap());
     })
     .await

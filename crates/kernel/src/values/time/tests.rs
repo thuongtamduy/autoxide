@@ -287,3 +287,114 @@ fn doc_rfc3339_chat_nhu_chrono_va_ngay_theo_mau() {
         );
     }
 }
+
+#[test]
+fn gio_trong_ngay_doc_nhu_chrono() {
+    for raw in [
+        "09:00", "9:00", "9:5", "23:59", " 09:00", "09:0", "24:00", "23:60", "09:00:00", "09:00 ",
+        "0900",
+    ] {
+        let ours = super::parse_clock(raw).map(|time| (time.hour(), time.minute()));
+        let theirs = chrono::NaiveTime::parse_from_str(raw, "%H:%M").ok().map(|time| {
+            (
+                i8::try_from(chrono::Timelike::hour(&time)).unwrap(),
+                i8::try_from(chrono::Timelike::minute(&time)).unwrap(),
+            )
+        });
+        assert_eq!(ours, theirs, "{raw}");
+    }
+}
+
+#[test]
+fn mui_gio_theo_ten_phan_biet_hoa_thuong_nhu_chrono_tz() {
+    for name in ["Asia/Ho_Chi_Minh", "UTC", "Asia/Saigon", "Etc/GMT+7", "US/Pacific"] {
+        assert_eq!(
+            super::zone(name).and_then(|zone| zone.iana_name().map(str::to_owned)).as_deref(),
+            Some(name)
+        );
+    }
+    for name in ["asia/ho_chi_minh", "utc", "Local", "", "Asia/Nowhere"] {
+        assert!(super::zone(name).is_none(), "{name}");
+    }
+}
+
+#[test]
+fn thoi_diem_theo_lich_utc() {
+    let at = Timestamp::from_utc(2026, 11, 16, 18, 30, 5).unwrap();
+    assert_eq!(at.to_json_string(), "2026-11-16T18:30:05Z");
+    assert!(Timestamp::from_utc(2026, 2, 30, 0, 0, 0).is_none());
+    assert!(Timestamp::from_utc(2026, 1, 1, 24, 0, 0).is_none());
+}
+
+#[test]
+fn gio_dia_phuong_doi_ra_thoi_diem_nhu_chrono_earliest() {
+    // Số đối chiếu lấy từ `chrono-tz` `from_local_datetime(…).earliest()`.
+    let new_york = super::zone("America/New_York").unwrap();
+    let local = |text: &str| text.parse::<jiff::civil::DateTime>().unwrap();
+    let utc = |text: &str| Some(text.parse::<Timestamp>().unwrap());
+    assert_eq!(super::from_local(&new_york, local("2026-03-08T02:30")), None, "nhảy giờ: không có");
+    assert_eq!(
+        super::from_local(&new_york, local("2026-03-08T03:00")),
+        utc("2026-03-08T07:00:00Z")
+    );
+    assert_eq!(
+        super::from_local(&new_york, local("2026-11-01T01:30")),
+        utc("2026-11-01T05:30:00Z"),
+        "lùi giờ: lần sớm"
+    );
+    assert_eq!(
+        super::from_local(&new_york, local("2026-11-01T00:30")),
+        utc("2026-11-01T04:30:00Z")
+    );
+    let vietnam = super::zone("Asia/Ho_Chi_Minh").unwrap();
+    assert_eq!(super::from_local(&vietnam, local("2026-11-16T08:00")), utc("2026-11-16T01:00:00Z"));
+}
+
+#[test]
+fn rfc3339_theo_gio_dia_phuong_nhu_chrono() {
+    let vietnam = super::zone("Asia/Ho_Chi_Minh").unwrap();
+    let new_york = super::zone("America/New_York").unwrap();
+    for micros in [1_795_405_200_000_000_i64, 1_795_405_200_120_000, 1_795_405_200_123_456, 0, -1] {
+        let ours = Timestamp::from_unix_micros(micros).unwrap();
+        let theirs = DateTime::<Utc>::from_timestamp_micros(micros).unwrap();
+        let offset = |hours: i32| chrono::FixedOffset::east_opt(hours * 3600).unwrap();
+        assert_eq!(ours.to_rfc3339_in(&vietnam), theirs.with_timezone(&offset(7)).to_rfc3339());
+        assert_eq!(ours.to_rfc3339_in(&jiff::tz::TimeZone::UTC), theirs.to_rfc3339());
+        let new_york_hours =
+            if new_york.to_offset(ours.to_jiff()).seconds() == -4 * 3600 { -4 } else { -5 };
+        assert_eq!(
+            ours.to_rfc3339_in(&new_york),
+            theirs.with_timezone(&offset(new_york_hours)).to_rfc3339()
+        );
+    }
+}
+
+#[test]
+fn cong_thang_nhu_chrono() {
+    for (from, months) in [
+        ("2026-01-31T10:20:30.123456Z", 1),
+        ("2028-01-31T00:00:00Z", 1),
+        ("2026-03-31T23:59:59Z", -1),
+        ("2026-11-21T08:00:00Z", 12),
+        ("2026-08-31T01:00:00Z", 18),
+    ] {
+        let ours = Timestamp::parse_rfc3339(from).unwrap().checked_add_months(months).unwrap();
+        let start = DateTime::parse_from_rfc3339(from).unwrap().to_utc();
+        let theirs = if months >= 0 {
+            start.checked_add_months(chrono::Months::new(months.unsigned_abs())).unwrap()
+        } else {
+            start.checked_sub_months(chrono::Months::new(months.unsigned_abs())).unwrap()
+        };
+        assert_eq!(ours.to_rfc3339(), theirs.to_rfc3339(), "{from} {months}");
+    }
+}
+
+#[test]
+fn so_giay_truoc_1970_lam_tron_xuong_nhu_chrono() {
+    let ours = Timestamp::from_unix(-1, 500_000_000).unwrap();
+    let theirs = DateTime::<Utc>::from_timestamp(-1, 500_000_000).unwrap();
+    assert_eq!(ours.as_unix_seconds(), theirs.timestamp());
+    assert_eq!(ours.as_unix_millis(), theirs.timestamp_millis());
+    assert_eq!(ours.as_unix_micros(), theirs.timestamp_micros());
+    assert_eq!(ours.to_json_string(), theirs.to_rfc3339_opts(SecondsFormat::AutoSi, true));
+}
