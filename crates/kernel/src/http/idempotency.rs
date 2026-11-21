@@ -1,5 +1,7 @@
 //! Lớp HTTP của idempotency key (xem `crate::idempotency`).
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -177,12 +179,10 @@ async fn run(
         if_match,
         &content,
     ]);
-    let lock = chrono::Duration::from_std(settings.request_timeout + Duration::from_secs(30))
+    let lock = SignedDuration::try_from(settings.request_timeout + Duration::from_secs(30))
         .map_err(Error::internal)?;
-    let begin = settings
-        .store
-        .begin(&tenant, &scope, &key, &fingerprint, chrono::Utc::now() + lock)
-        .await?;
+    let begin =
+        settings.store.begin(&tenant, &scope, &key, &fingerprint, Timestamp::now() + lock).await?;
     let id = match begin {
         Begin::Started { id } => id,
         Begin::Replay(stored) => return Ok(replay(stored)),

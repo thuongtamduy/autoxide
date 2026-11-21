@@ -6,8 +6,7 @@
 //! bằng `context.contribute::<dyn PaymentGateway>(…)` — nhiều đối tác cùng chạy được. Mọi hàm nhận
 //! khách (`TenantId`): bộ nối tự đọc thông tin kết nối của khách đó (kho secret theo khách), không
 //! đọc biến môi trường cho thứ thuộc về khách. Test dùng `FakePaymentGateway` của testkit.
-
-use chrono::{DateTime, NaiveDate, Utc};
+use crate::time::{Date, Timestamp};
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
@@ -85,7 +84,7 @@ pub struct PaymentIntent {
     pub description: String,
     /// Trang người mua quay về sau khi trả.
     pub return_url: Option<String>,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     pub splits: Vec<Split>,
 }
 
@@ -95,7 +94,7 @@ impl PaymentIntent {
         amount: Money,
         method: impl Into<String>,
         description: impl Into<String>,
-        expires_at: DateTime<Utc>,
+        expires_at: Timestamp,
     ) -> Self {
         PaymentIntent {
             payment_id,
@@ -231,7 +230,7 @@ pub struct GatewayNotification {
     /// ID thanh toán trong sổ (mã đơn của merchant), nếu đối tác gửi kèm.
     pub payment_id: Option<Uuid>,
     pub amount: Money,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
 }
 
 impl GatewayNotification {
@@ -240,7 +239,7 @@ impl GatewayNotification {
         kind: NotificationKind,
         provider_ref: impl Into<String>,
         amount: Money,
-        occurred_at: DateTime<Utc>,
+        occurred_at: Timestamp,
     ) -> Self {
         GatewayNotification {
             event_id: event_id.into(),
@@ -292,7 +291,7 @@ pub struct StatementLine {
     pub amount: Money,
     /// Phí đối tác thu trên dòng này (0 nếu không có).
     pub fee: Money,
-    pub booked_on: NaiveDate,
+    pub booked_on: Date,
 }
 
 impl StatementLine {
@@ -301,7 +300,7 @@ impl StatementLine {
         provider_ref: impl Into<String>,
         kind: StatementKind,
         amount: Money,
-        booked_on: NaiveDate,
+        booked_on: Date,
     ) -> Self {
         StatementLine {
             line_id: line_id.into(),
@@ -374,8 +373,8 @@ pub trait PaymentGateway: Send + Sync {
     async fn statement(
         &self,
         tenant: TenantId,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
         cursor: Option<String>,
     ) -> Result<StatementPage, Error>;
 }
@@ -485,7 +484,7 @@ pub struct BankTransaction {
     pub amount: Money,
     /// Nội dung chuyển khoản như ngân hàng ghi (có thể bị bỏ dấu, cắt ngắn, chèn khoảng trắng).
     pub memo: String,
-    pub booked_at: DateTime<Utc>,
+    pub booked_at: Timestamp,
 }
 
 impl BankTransaction {
@@ -495,7 +494,7 @@ impl BankTransaction {
         direction: BankDirection,
         amount: Money,
         memo: impl Into<String>,
-        booked_at: DateTime<Utc>,
+        booked_at: Timestamp,
     ) -> Self {
         BankTransaction {
             provider_txn_id: provider_txn_id.into(),
@@ -582,16 +581,11 @@ pub struct QuotedRate {
     /// Số đơn vị chính của `quote` cho 1 đơn vị chính của `base` (vd 1 USD = 25345.5 VND). Không bao giờ
     /// là số thực: đọc từ chữ, giữ dạng thập phân chính xác.
     pub rate: rust_decimal::Decimal,
-    pub on: NaiveDate,
+    pub on: Date,
 }
 
 impl QuotedRate {
-    pub fn new(
-        base: Currency,
-        quote: Currency,
-        rate: rust_decimal::Decimal,
-        on: NaiveDate,
-    ) -> Self {
+    pub fn new(base: Currency, quote: Currency, rate: rust_decimal::Decimal, on: Date) -> Self {
         QuotedRate { base, quote, rate, on }
     }
 }
@@ -611,7 +605,7 @@ pub trait ExchangeRateSource: Send + Sync {
         &self,
         tenant: TenantId,
         base: Currency,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Vec<QuotedRate>, Error>;
 }
 

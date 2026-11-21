@@ -1,6 +1,5 @@
 //! Đưa job vào hàng đợi, và các thao tác cho người vận hành (xem, chạy lại job hỏng).
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Order, Query};
 use uuid::Uuid;
@@ -15,7 +14,7 @@ use crate::tenancy::{NO_TENANT, TenantContext, TenantId};
 #[non_exhaustive]
 pub struct EnqueueOptions {
     /// Chạy từ lúc này; `None`: ngay.
-    pub run_at: Option<DateTime<Utc>>,
+    pub run_at: Option<Timestamp>,
     /// Số lần chạy tối đa; `None`: [`DEFAULT_MAX_ATTEMPTS`](super::DEFAULT_MAX_ATTEMPTS).
     pub max_attempts: Option<i32>,
     /// Khoá chống trùng: đã có job mang khoá này thì không thêm job mới.
@@ -24,7 +23,7 @@ pub struct EnqueueOptions {
 
 impl EnqueueOptions {
     /// Runs the job no earlier than `run_at`.
-    pub const fn run_at(mut self, run_at: DateTime<Utc>) -> Self {
+    pub const fn run_at(mut self, run_at: Timestamp) -> Self {
         self.run_at = Some(run_at);
         self
     }
@@ -174,15 +173,15 @@ pub struct JobRecord {
     pub kind: String,
     pub attempts: i32,
     pub max_attempts: i32,
-    pub run_at: DateTime<Utc>,
-    pub failed_at: Option<DateTime<Utc>>,
+    pub run_at: Timestamp,
+    pub failed_at: Option<Timestamp>,
     pub last_error: Option<String>,
 }
 
 impl JobRecord {
     /// Job `id` of kind `kind` due at `run_at`, not tried yet, with
     /// [`DEFAULT_MAX_ATTEMPTS`](super::DEFAULT_MAX_ATTEMPTS).
-    pub fn new(id: Uuid, kind: impl Into<String>, run_at: DateTime<Utc>) -> Self {
+    pub fn new(id: Uuid, kind: impl Into<String>, run_at: Timestamp) -> Self {
         JobRecord {
             id,
             kind: kind.into(),
@@ -207,7 +206,7 @@ impl JobRecord {
     }
 
     /// Sets when the job failed for good.
-    pub const fn failed_at(mut self, failed_at: Option<DateTime<Utc>>) -> Self {
+    pub const fn failed_at(mut self, failed_at: Option<Timestamp>) -> Self {
         self.failed_at = failed_at;
         self
     }
@@ -267,16 +266,16 @@ pub(crate) async fn retry<C: ConnectionTrait>(
     let mut update = Query::update();
     update
         .table(Alias::new(table_name(module)))
-        .value(Alias::new("failed_at"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("failed_at"), Option::<Timestamp>::None)
         .value(Alias::new("attempts"), 0i32)
         .value(Alias::new("run_at"), now())
         .value(Alias::new("claimed_by"), Option::<String>::None)
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("id")).eq(id))
         .and_where(Expr::col(Alias::new("failed_at")).is_not_null());
     Ok(connection.execute(&update).await?.rows_affected() == 1)
 }
 
-pub(crate) fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+pub(crate) fn now() -> Timestamp {
+    Timestamp::now()
 }

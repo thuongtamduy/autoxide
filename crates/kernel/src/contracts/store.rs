@@ -8,9 +8,8 @@
 //!
 //! Tiền do Apple / Google thu và giữ (đối tác có giấy phép) — đúng D-187: core không giữ tiền.
 
-use chrono::{DateTime, Utc};
-
 use crate::error::Error;
+use crate::time::Timestamp;
 
 /// Cửa hàng ứng dụng.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -64,7 +63,7 @@ pub struct StorePurchase {
     pub transaction_id: String,
     pub state: PurchaseState,
     /// Hết hiệu lực lúc này (thuê bao); `None` với mua một lần.
-    pub expires_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<Timestamp>,
     /// `true`: môi trường thử của cửa hàng (sandbox / license testing).
     pub sandbox: bool,
 }
@@ -76,7 +75,7 @@ impl StorePurchase {
         original_transaction_id: impl Into<String>,
         transaction_id: impl Into<String>,
         state: PurchaseState,
-        expires_at: Option<DateTime<Utc>>,
+        expires_at: Option<Timestamp>,
     ) -> Self {
         StorePurchase {
             store,

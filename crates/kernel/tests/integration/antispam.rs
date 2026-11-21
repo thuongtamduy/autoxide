@@ -6,6 +6,7 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -85,7 +86,7 @@ async fn bay_token_va_qua_nhanh() {
         // Bộ công bố bởi module nội bộ `antispam`: mặc định giữ lại bài gửi trong 3 giây đầu.
         let default = modules.api::<SpamGuard>().unwrap();
         let issued = default.issue(&tenant, "demo:contact").await.unwrap();
-        assert!(issued.submit_after > chrono::Utc::now());
+        assert!(issued.submit_after > Timestamp::now());
         let checked = default
             .check(&tenant, &submission(&visitor, Some(&issued.token)), &limits)
             .await

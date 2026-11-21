@@ -28,15 +28,15 @@
 mod dns;
 mod http;
 
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::Expr;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -192,6 +192,7 @@ pub(crate) fn host_of_url(url: &str) -> Option<String> {
 
 pub(super) mod entity {
     //! Bảng `kernel_tenant_domains` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -205,13 +206,13 @@ pub(super) mod entity {
         pub domain: String,
         pub status: String,
         pub verification_token: String,
-        pub verified_at: Option<DateTimeUtc>,
-        pub last_checked_at: Option<DateTimeUtc>,
+        pub verified_at: Option<Timestamp>,
+        pub last_checked_at: Option<Timestamp>,
         pub check_error: Option<String>,
         /// Số lần kiểm lại liên tiếp không thấy bản ghi (tên miền `verified`).
         pub check_failures: i32,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -257,17 +258,17 @@ pub struct TenantDomain {
     /// Node of the tenant's organization tree the domain belongs to (e.g. one store's own
     /// site); `null`: the tenant as a whole. Set it with `PATCH /domains/{id}`.
     pub org_id: Option<Uuid>,
-    pub verified_at: Option<DateTime<Utc>>,
+    pub verified_at: Option<Timestamp>,
     /// Last time the DNS record was looked up.
-    pub last_checked_at: Option<DateTime<Utc>>,
+    pub last_checked_at: Option<Timestamp>,
     /// Why the last lookup did not verify the domain.
     pub check_error: Option<String>,
     /// Daily checks in a row of the verified domain that did not find the DNS record; at 3 the
     /// domain becomes `failed`. Keep the record in place: one successful check resets it to 0.
     pub failed_checks: u32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// When the status last changed; a `pending` domain fails 7 days after it.
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 /// Payload of `kernel.domain_added`, `kernel.domain_verified`, `kernel.domain_revoked` and
@@ -327,8 +328,8 @@ impl Event for DomainUpdated {
     const NAME: &'static str = "kernel.domain_updated";
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn describe(row: Model) -> TenantDomain {
@@ -480,8 +481,8 @@ impl TenantDomains {
                     .col_expr(Column::OrgId, Expr::value(Option::<Uuid>::None))
                     .col_expr(Column::Status, Expr::value(PENDING))
                     .col_expr(Column::VerificationToken, Expr::value(token))
-                    .col_expr(Column::VerifiedAt, Expr::value(Option::<DateTime<Utc>>::None))
-                    .col_expr(Column::LastCheckedAt, Expr::value(Option::<DateTime<Utc>>::None))
+                    .col_expr(Column::VerifiedAt, Expr::value(Option::<Timestamp>::None))
+                    .col_expr(Column::LastCheckedAt, Expr::value(Option::<Timestamp>::None))
                     .col_expr(Column::CheckError, Expr::value(Option::<String>::None))
                     .col_expr(Column::CheckFailures, Expr::value(0))
                     .col_expr(Column::CreatedAt, Expr::value(now))
@@ -655,7 +656,7 @@ impl TenantDomains {
             .limit(SWEEP_BATCH)
             .all(database.read())
             .await?;
-        let deadline = Utc::now() - chrono::Duration::days(PENDING_DAYS);
+        let deadline = Timestamp::now() - SignedDuration::from_hours(24 * PENDING_DAYS);
         let count = rows.len();
         for row in rows {
             if row.updated_at <= deadline {
@@ -698,7 +699,7 @@ impl TenantDomains {
     /// trước (job `kernel.verify_domains`): thấy bản ghi → đếm lại từ 0; không thấy lần thứ
     /// [`MAX_CHECK_FAILURES`] liên tiếp → `failed`. Trả số tên miền đã xét.
     pub async fn recheck_verified(&self, database: &Database) -> Result<usize, Error> {
-        let due = Utc::now() - chrono::Duration::hours(RECHECK_HOURS);
+        let due = Timestamp::now() - SignedDuration::from_hours(RECHECK_HOURS);
         let rows = Entity::find()
             .filter(Column::Status.eq(VERIFIED))
             .filter(

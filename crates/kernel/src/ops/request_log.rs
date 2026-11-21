@@ -16,12 +16,13 @@
 //! - Hạn lưu `AUTOXIDE_REQUEST_LOG_DAYS` (mặc định 14, `0` tắt): mỗi dòng mang `expires_at`;
 //!   tác vụ ghi xoá dòng hết hạn của từng database tối đa mỗi giờ một lần (D-370).
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration as StdDuration, Instant};
 
 use axum::extract::{Query, State};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -62,6 +63,7 @@ pub(crate) const MCP_METHOD: &str = "MCP";
 
 mod entity {
     //! Bảng `kernel_request_log`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -71,8 +73,8 @@ mod entity {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: Uuid,
         pub tenant_id: Uuid,
-        pub at: DateTimeUtc,
-        pub expires_at: DateTimeUtc,
+        pub at: Timestamp,
+        pub expires_at: Timestamp,
         pub actor_kind: String,
         pub user_id: Option<Uuid>,
         pub api_key_id: Option<Uuid>,
@@ -138,7 +140,7 @@ impl CallerSlot {
 pub(crate) struct Entry {
     tenant: Option<TenantContext>,
     tenant_id: TenantId,
-    at: DateTime<Utc>,
+    at: Timestamp,
     actor_kind: ActorKind,
     user_id: Uuid,
     api_key_id: Option<Uuid>,
@@ -179,7 +181,11 @@ impl RequestLog {
             return None;
         }
         let (sender, receiver) = mpsc::channel(QUEUE);
-        tokio::spawn(write_loop(registry, receiver, Duration::days(i64::from(days))));
+        tokio::spawn(write_loop(
+            registry,
+            receiver,
+            SignedDuration::from_hours(24 * (i64::from(days))),
+        ));
         Some(RequestLog { sender })
     }
 
@@ -193,7 +199,7 @@ impl RequestLog {
                     .as_ref()
                     .map(TenantContext::id)
                     .or(caller.tenant_of_user)?,
-                at: Utc::now().trunc_subsecs(6),
+                at: Timestamp::now(),
                 actor_kind: caller.actor_kind?,
                 user_id: caller.user_id?,
                 api_key_id: caller.api_key_id,
@@ -255,7 +261,7 @@ pub(crate) fn header_text(value: Option<&axum::http::HeaderValue>, max: usize) -
 async fn write_loop(
     registry: DatabaseRegistry,
     mut receiver: mpsc::Receiver<Entry>,
-    keep: Duration,
+    keep: SignedDuration,
 ) {
     let mut pruned: HashMap<TenantId, Instant> = HashMap::new();
     let mut batch = Vec::with_capacity(BATCH);
@@ -282,7 +288,7 @@ async fn write_loop(
             let due = pruned.get(&tenant_id).is_none_or(|last| last.elapsed() >= PRUNE_EVERY);
             if due {
                 pruned.insert(tenant_id, Instant::now());
-                if let Err(error) = prune(&tenant, Utc::now()).await {
+                if let Err(error) = prune(&tenant, Timestamp::now()).await {
                     tracing::warn!(tenant_id = %tenant_id, error = %error, "request log not pruned");
                 }
             }
@@ -290,7 +296,11 @@ async fn write_loop(
     }
 }
 
-async fn write(tenant: &TenantContext, entries: Vec<Entry>, keep: Duration) -> Result<(), Error> {
+async fn write(
+    tenant: &TenantContext,
+    entries: Vec<Entry>,
+    keep: SignedDuration,
+) -> Result<(), Error> {
     let rows = entries.into_iter().map(|entry| entity::ActiveModel {
         id: sea_orm::Set(Uuid::now_v7()),
         tenant_id: sea_orm::Set(tenant.id().as_uuid()),
@@ -316,7 +326,7 @@ async fn write(tenant: &TenantContext, entries: Vec<Entry>, keep: Duration) -> R
 }
 
 /// Xoá dòng hết hạn của database của `tenant` (mọi khách trên database đó).
-pub(crate) async fn prune(tenant: &TenantContext, now: DateTime<Utc>) -> Result<u64, Error> {
+pub(crate) async fn prune(tenant: &TenantContext, now: Timestamp) -> Result<u64, Error> {
     let deleted = Entity::delete_many()
         .filter(Column::ExpiresAt.lt(now))
         .exec(tenant.database().write())
@@ -330,7 +340,7 @@ pub(crate) async fn prune(tenant: &TenantContext, now: DateTime<Utc>) -> Result<
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub(crate) struct LoggedRequest {
     pub id: Uuid,
-    pub at: DateTime<Utc>,
+    pub at: Timestamp,
     /// `user`, `agent`, `service`, `system`, `support`, `app` or `scim`.
     #[schema(example = "agent")]
     pub actor_kind: String,
@@ -397,9 +407,9 @@ pub(crate) struct RequestFilter {
     #[param(example = "5xx")]
     pub status_class: Option<String>,
     /// Only calls at or after this time (RFC 3339).
-    pub from: Option<DateTime<Utc>>,
+    pub from: Option<Timestamp>,
     /// Only calls before this time (RFC 3339).
-    pub to: Option<DateTime<Utc>>,
+    pub to: Option<Timestamp>,
 }
 
 /// Danh sách theo bộ lọc, mới trước (hay theo `order`).
@@ -513,9 +523,9 @@ pub(crate) struct RequestLogInput {
     /// Only calls whose status is in this class: `2xx`, `3xx`, `4xx` or `5xx`.
     status_class: Option<String>,
     /// At or after this time (RFC 3339).
-    from: Option<DateTime<Utc>>,
+    from: Option<Timestamp>,
     /// Before this time (RFC 3339).
-    to: Option<DateTime<Utc>>,
+    to: Option<Timestamp>,
     /// 1 to 200; 50 by default.
     limit: Option<u32>,
     /// `next_cursor` of the previous page.
@@ -627,7 +637,7 @@ mod tests {
         Entry {
             tenant: Some(tenant.clone()),
             tenant_id: tenant.id(),
-            at: Utc::now().trunc_subsecs(6),
+            at: Timestamp::now(),
             actor_kind: ActorKind::Agent,
             user_id: Uuid::now_v7(),
             api_key_id: None,
@@ -662,9 +672,13 @@ mod tests {
                 .unwrap();
             let tenant = TenantContext::default_on(database);
             // Một dòng đã quá hạn (hạn lưu âm), một dòng còn hạn.
-            write(&tenant, vec![entry(&tenant)], Duration::days(-1)).await.unwrap();
-            write(&tenant, vec![entry(&tenant)], Duration::days(14)).await.unwrap();
-            assert_eq!(prune(&tenant, Utc::now()).await.unwrap(), 1);
+            write(&tenant, vec![entry(&tenant)], SignedDuration::from_hours(24 * (-1)))
+                .await
+                .unwrap();
+            write(&tenant, vec![entry(&tenant)], SignedDuration::from_hours(24 * 14))
+                .await
+                .unwrap();
+            assert_eq!(prune(&tenant, Timestamp::now()).await.unwrap(), 1);
             let left =
                 Entity::find().scoped(&tenant).count(tenant.database().read()).await.unwrap();
             assert_eq!(left, 1);

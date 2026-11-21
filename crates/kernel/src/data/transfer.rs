@@ -17,12 +17,11 @@
 //! cùng cách đọc / ghi theo kiểu cột, nhưng chỉ dòng `tenant_id = X` của bảng cấp khách hàng (bỏ
 //! bảng mặt điều khiển), và bên gọi tự mở transaction ở đích.
 
-use std::collections::HashMap;
-
-use chrono::{DateTime, Utc};
+use crate::time::{Date, Timestamp};
 use futures_util::TryStreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SimpleExpr, Value};
 use sea_orm::{ConnectionTrait, DatabaseBackend, QueryResult, Statement, StreamTrait};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::database::Database;
@@ -302,10 +301,8 @@ fn read(row: &QueryResult, column: &Column) -> Result<Value, TransferError> {
     let name = column.name.as_str();
     Ok(match column.kind {
         Kind::Uuid => Value::Uuid(row.try_get::<Option<Uuid>>("", name)?),
-        Kind::Timestamp => {
-            Value::ChronoDateTimeUtc(row.try_get::<Option<DateTime<Utc>>>("", name)?)
-        }
-        Kind::Date => Value::ChronoDate(row.try_get::<Option<chrono::NaiveDate>>("", name)?),
+        Kind::Timestamp => Value::from(row.try_get::<Option<Timestamp>>("", name)?),
+        Kind::Date => Value::from(row.try_get::<Option<Date>>("", name)?),
         Kind::Text => Value::String(row.try_get::<Option<String>>("", name)?),
         Kind::SmallInt => Value::SmallInt(row.try_get::<Option<i16>>("", name)?),
         Kind::Int => Value::Int(row.try_get::<Option<i32>>("", name)?),
@@ -596,9 +593,9 @@ impl TenantTables {
                         Value::Uuid(value) => {
                             value.map(|id| serde_json::Value::from(id.to_string()))
                         }
-                        Value::ChronoDateTimeUtc(value) => {
-                            value.map(|at| serde_json::Value::from(at.to_rfc3339()))
-                        }
+                        // Thời điểm: chuỗi RFC 3339 `+00:00` như trước. (Cột ngày vẫn ra `null` như trước.)
+                        ref value @ Value::Enum(_) => Timestamp::from_sql_value(value)
+                            .map(|at| serde_json::Value::from(at.to_rfc3339())),
                         Value::String(value) => value.map(serde_json::Value::from),
                         Value::SmallInt(value) => value.map(serde_json::Value::from),
                         Value::Int(value) => value.map(serde_json::Value::from),

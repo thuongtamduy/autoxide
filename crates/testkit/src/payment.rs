@@ -1,6 +1,7 @@
 //! Cổng thanh toán giả cho test (như `FakeTextModel`): giữ mọi thứ trong bộ nhớ, ký webhook bằng
 //! một khoá cố định, cho giả lập đối tác không trả lời và dựng sao kê.
 
+use autoxide_kernel::time::{Date, Timestamp};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -16,7 +17,6 @@ use autoxide_kernel::payment::{
 };
 use autoxide_kernel::tenancy::TenantId;
 use axum::http::HeaderMap;
-use chrono::{DateTime, NaiveDate, Utc};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
@@ -97,7 +97,7 @@ impl FakePaymentGateway {
     /// `provider_ref`, `payment_id`, `amount` (đơn vị nhỏ nhất), `currency`, `reason`,
     /// `refund_provider_ref`).
     pub fn webhook(&self, body: &Value) -> (Vec<(String, String)>, Vec<u8>) {
-        Self::signed(body, Utc::now().timestamp())
+        Self::signed(body, Timestamp::now().as_unix_seconds())
     }
 
     /// Như [`webhook`](Self::webhook) với mốc thời gian tự chọn (thử chống phát lại).
@@ -201,7 +201,7 @@ impl PaymentGateway for FakePaymentGateway {
             return Err(signature_invalid());
         };
         let timestamp: i64 = timestamp.parse().map_err(|_| signature_invalid())?;
-        if (Utc::now().timestamp() - timestamp).abs() > WINDOW {
+        if (Timestamp::now().as_unix_seconds() - timestamp).abs() > WINDOW {
             return Err(signature_invalid());
         }
         if Self::sign(timestamp, body) != signature {
@@ -224,7 +224,7 @@ impl PaymentGateway for FakePaymentGateway {
             }
             _ => return Err(signature_invalid()),
         };
-        let at = DateTime::<Utc>::from_timestamp(timestamp, 0).unwrap_or_else(Utc::now);
+        let at = Timestamp::from_unix_seconds(timestamp).unwrap_or_else(Timestamp::now);
         let mut notification = GatewayNotification::new(
             text(&body, "event_id")?,
             kind,
@@ -241,8 +241,8 @@ impl PaymentGateway for FakePaymentGateway {
     async fn statement(
         &self,
         _tenant: TenantId,
-        from: NaiveDate,
-        to: NaiveDate,
+        from: Date,
+        to: Date,
         _cursor: Option<String>,
     ) -> Result<StatementPage, Error> {
         let lines = self
@@ -411,7 +411,7 @@ impl FakeBankFeed {
             BankDirection::Credit,
             amount,
             memo,
-            Utc::now(),
+            Timestamp::now(),
         )
     }
 
@@ -424,7 +424,7 @@ impl FakeBankFeed {
                     "id": txn.provider_txn_id, "account": txn.account_number,
                     "direction": txn.direction.as_str(), "amount": txn.amount.minor(),
                     "currency": txn.amount.currency().code(), "memo": txn.memo,
-                    "booked_at": txn.booked_at.timestamp(),
+                    "booked_at": txn.booked_at.as_unix_seconds(),
                 })
             })
             .collect();
@@ -468,8 +468,8 @@ impl BankFeed for FakeBankFeed {
             };
             let at = item["booked_at"]
                 .as_i64()
-                .and_then(|at| DateTime::<Utc>::from_timestamp(at, 0))
-                .unwrap_or_else(Utc::now);
+                .and_then(|at| Timestamp::from_unix_seconds(at))
+                .unwrap_or_else(Timestamp::now);
             found.push(BankTransaction::new(
                 text(item, "id")?,
                 text(item, "account")?,
@@ -549,7 +549,7 @@ impl autoxide_kernel::payment::ExchangeRateSource for FakeExchangeRateSource {
         &self,
         _tenant: TenantId,
         base: Currency,
-        on: NaiveDate,
+        on: Date,
     ) -> Result<Vec<autoxide_kernel::payment::QuotedRate>, Error> {
         self.calls.fetch_add(1, Ordering::SeqCst);
         if self.failing.load(Ordering::SeqCst) {

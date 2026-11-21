@@ -15,13 +15,14 @@
 //! - Theo khách (bước 33): mỗi hàm nhận khách; số đếm nằm ở database của khách, khoá chính
 //!   `(tenant_id, key)` — một khách bị dồn không làm khoá người dùng của khách khác.
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::time::Duration;
 
 use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Condition, Expr, ExprTrait as _, OnConflict, Query};
 
@@ -51,8 +52,8 @@ impl Outcome {
 pub struct Throttle {
     table: String,
     limit: i32,
-    window: chrono::Duration,
-    lock: chrono::Duration,
+    window: SignedDuration,
+    lock: SignedDuration,
 }
 
 impl std::fmt::Debug for Throttle {
@@ -68,7 +69,7 @@ impl Throttle {
     /// Cho phép `limit` lần mỗi `window` trên bảng `<module>_throttle`.
     pub fn new(module: &str, limit: u32, window: Duration) -> Result<Self, Error> {
         let limit = <i32 as TryFrom<u32>>::try_from(limit).map_err(Error::internal)?;
-        let window = chrono::Duration::from_std(window).map_err(Error::internal)?;
+        let window = SignedDuration::try_from(window).map_err(Error::internal)?;
         Ok(Throttle { table: table_name(module), limit, window, lock: window })
     }
 
@@ -79,7 +80,7 @@ impl Throttle {
 
     /// Vượt giới hạn thì chặn trong `lock` (thay vì `window`).
     pub fn with_lock(mut self, lock: Duration) -> Result<Self, Error> {
-        self.lock = chrono::Duration::from_std(lock).map_err(Error::internal)?;
+        self.lock = SignedDuration::try_from(lock).map_err(Error::internal)?;
         Ok(self)
     }
 
@@ -94,7 +95,7 @@ impl Throttle {
             .to_owned();
         let row = tenant.database().write().query_one(&select).await?;
         let until = match row {
-            Some(row) => row.try_get::<Option<DateTime<Utc>>>("", "locked_until")?,
+            Some(row) => row.try_get::<Option<Timestamp>>("", "locked_until")?,
             None => None,
         };
         Ok(match until {
@@ -147,7 +148,7 @@ impl Throttle {
         &self,
         tenant: &TenantContext,
         hashed: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<Counted, Error> {
         let table = Alias::new(&self.table);
         // Cột của dòng đang có, ghi kèm tên bảng cho rõ (không lẫn với `excluded`).
@@ -176,7 +177,7 @@ impl Throttle {
         })?;
         Ok(Counted {
             count: i64::from(row.try_get::<i32>("", "count")?),
-            locked_until: row.try_get::<Option<DateTime<Utc>>>("", "locked_until")?,
+            locked_until: row.try_get::<Option<Timestamp>>("", "locked_until")?,
         })
     }
 
@@ -219,13 +220,13 @@ impl Throttle {
             Error::internal(format!("taking from `{}` returned no row", self.table))
         })?;
         let count = i64::from(row.try_get::<i32>("", "count")?);
-        let started = row.try_get::<DateTime<Utc>>("", "window_started_at")?;
+        let started = row.try_get::<Timestamp>("", "window_started_at")?;
         let before = count - i64::from(wanted);
         let granted = (i64::from(self.limit) - before).clamp(0, i64::from(wanted));
         let ends = started + self.window;
         Ok(Taken {
             granted: <u32 as TryFrom<i64>>::try_from(granted).unwrap_or(0),
-            window_left: (ends - now).to_std().unwrap_or_default(),
+            window_left: std::time::Duration::try_from(ends - now).unwrap_or_default(),
         })
     }
 
@@ -255,7 +256,7 @@ impl Throttle {
 
     /// Xoá các dòng (mọi khách) của `database` có cửa sổ đã qua trước `before` và không còn bị
     /// chặn. Module gọi trong job dọn dẹp định kỳ của mình. Trả số dòng đã xoá.
-    pub async fn purge(&self, database: &Database, before: DateTime<Utc>) -> Result<u64, Error> {
+    pub async fn purge(&self, database: &Database, before: Timestamp) -> Result<u64, Error> {
         let now = now();
         let delete = Query::delete()
             .from_table(Alias::new(&self.table))
@@ -276,7 +277,7 @@ impl Throttle {
         &self,
         tenant: &TenantContext,
         hashed: &str,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Result<(), Error> {
         let update = Query::update()
             .table(Alias::new(&self.table))
@@ -311,17 +312,17 @@ pub struct Taken {
 /// Kết quả của câu "chèn hoặc cộng": số đếm của chính lượt này và hạn khoá của dòng (nếu có).
 struct Counted {
     count: i64,
-    locked_until: Option<DateTime<Utc>>,
+    locked_until: Option<Timestamp>,
 }
 
 /// Số giây (làm tròn lên, ít nhất 1) của `duration`.
-fn seconds_up(duration: chrono::Duration) -> u64 {
-    let millis = Ord::max(duration.num_milliseconds(), 0);
+fn seconds_up(duration: SignedDuration) -> u64 {
+    let millis = Ord::max(i64::try_from(duration.as_millis()).unwrap_or(i64::MAX), 0);
     Ord::max(<u64 as TryFrom<i64>>::try_from((millis + 999) / 1000).unwrap_or(1), 1)
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn table_name(module: &str) -> String {

@@ -1,6 +1,7 @@
 //! `kernel_tenants` nhìn từ phía sandbox: cột chung cùng bốn cột của sandbox (`m0037_tenant_sandbox`).
 //! Cột khác của bảng (`read_only`, `data_residency`) có mặc định / NULL nên không cần khai ở đây.
 
+use crate::time::Timestamp;
 use sea_orm::entity::prelude::*;
 
 #[sea_orm::model]
@@ -14,14 +15,14 @@ pub struct Model {
     pub status: String,
     pub parent_id: Option<Uuid>,
     pub placement_id: Uuid,
-    pub created_at: DateTimeUtc,
-    pub updated_at: DateTimeUtc,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     pub read_only: bool,
     /// `production` / `sandbox`.
     pub kind: String,
     /// Khách gốc của sandbox; không foreign key.
     pub sandbox_of: Option<Uuid>,
-    pub sandbox_expires_at: Option<DateTimeUtc>,
+    pub sandbox_expires_at: Option<Timestamp>,
     /// JSON `SandboxOptions` (`products`, `role_id`).
     pub sandbox_options: Option<String>,
 }

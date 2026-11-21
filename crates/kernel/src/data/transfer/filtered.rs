@@ -10,14 +10,13 @@
 //! Kèm đọc cấu trúc bảng ở database (khoá chính, unique index, foreign key) để kế hoạch tìm xung
 //! đột trước khi chép, không phải giữa lúc chép.
 
+use crate::time::{Date, Precision, Timestamp};
 use sea_orm::sea_query::{Condition, OnConflict};
 
 use super::{
     BATCH_ROWS, Column, Kind, TENANT_COLUMN, TenantTables, TransferError, convert, fresh, read,
 };
 use crate::database::Database;
-
-use chrono::SecondsFormat;
 use futures_util::TryStreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query, SimpleExpr, Value};
 use sea_orm::{ConnectionTrait, DatabaseBackend, Statement, StreamTrait};
@@ -61,10 +60,9 @@ pub(crate) type Rewrite<'a> = &'a (dyn Fn(&mut Row) -> Result<(), TransferError>
 pub(crate) fn canonical(value: &Value) -> Option<String> {
     match value {
         Value::Uuid(value) => value.map(|id| id.to_string()),
-        Value::ChronoDateTimeUtc(value) => {
-            value.map(|at| at.to_rfc3339_opts(SecondsFormat::Micros, true))
-        }
-        Value::ChronoDate(value) => value.map(|day| day.to_string()),
+        Value::Enum(_) => Timestamp::from_sql_value(value)
+            .map(|at| at.to_rfc3339_opts(Precision::Micros, true))
+            .or_else(|| Date::from_sql_value(value).map(|day| day.to_string())),
         Value::String(value) => value.clone(),
         Value::SmallInt(value) => value.map(|number| number.to_string()),
         Value::Int(value) => value.map(|number| number.to_string()),

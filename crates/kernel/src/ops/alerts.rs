@@ -5,11 +5,11 @@
 //! Bước kiểm có thể gọi mạng (máy chủ mail, nơi lưu file) nên kết quả giữ trong bộ nhớ 60 giây;
 //! `refresh=true` kiểm lại ngay. Các bước chạy song song, mỗi bước có hạn giờ của doctor.
 
+use crate::time::Timestamp;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use axum::extract::{Query, State};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -44,7 +44,7 @@ pub(crate) struct Alert {
 #[derive(Debug, Clone, Serialize, ToSchema)]
 pub(crate) struct AlertsResponse {
     /// When the checks ran (up to a minute ago; `refresh=true` runs them now).
-    pub checked_at: DateTime<Utc>,
+    pub checked_at: Timestamp,
     /// How many checks ran.
     pub checks: usize,
     /// Failed ones first, then warnings; empty when everything is fine.
@@ -107,7 +107,8 @@ impl Alerts {
         alerts.sort_by(|a, b| {
             (a.severity != "failed", &a.name).cmp(&(b.severity != "failed", &b.name))
         });
-        let response = AlertsResponse { checked_at: Utc::now(), checks: checks.len(), alerts };
+        let response =
+            AlertsResponse { checked_at: Timestamp::now(), checks: checks.len(), alerts };
         *self.last.lock().unwrap_or_else(PoisonError::into_inner) =
             Some((Instant::now(), response.clone()));
         response

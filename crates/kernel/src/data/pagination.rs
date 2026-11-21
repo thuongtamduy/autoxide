@@ -26,6 +26,7 @@
 //! cần đọc bằng index `(cột, id)` — cùng hai ưu điểm trên. Endpoint tự khai tham số
 //! `sort` của mình (vd `sort=name`), kernel lo con trỏ.
 
+use crate::time::Timestamp;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use sea_orm::IdenStatic;
@@ -126,7 +127,7 @@ pub enum SortValue {
     #[serde(rename = "s")]
     Text(String),
     #[serde(rename = "t")]
-    Time(chrono::DateTime<chrono::Utc>),
+    Time(Timestamp),
 }
 
 impl From<SortValue> for sea_orm::Value {
@@ -626,7 +627,7 @@ mod tests {
         let number =
             KeyCursor { column: "size".to_owned(), value: SortValue::Integer(-5), id: Uuid::nil() };
         assert_eq!(KeyCursor::decode(&number.encode()), Some(number));
-        let time = chrono::DateTime::from_timestamp_micros(1_700_000_000_123_456).unwrap();
+        let time = Timestamp::from_unix_micros(1_700_000_000_123_456).unwrap();
         let time =
             KeyCursor { column: "at".to_owned(), value: SortValue::Time(time), id: Uuid::nil() };
         assert_eq!(KeyCursor::decode(&time.encode()), Some(time));
@@ -717,7 +718,7 @@ mod tests {
             any::<i64>().prop_map(SortValue::Integer),
             "[^\\x00]{0,40}".prop_map(SortValue::Text),
             (0i64..4_102_444_800_000_000).prop_map(|micros| {
-                SortValue::Time(chrono::DateTime::from_timestamp_micros(micros).unwrap())
+                SortValue::Time(Timestamp::from_unix_micros(micros).unwrap())
             }),
         ]
     }

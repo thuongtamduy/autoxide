@@ -65,6 +65,33 @@ fn text_of(value: &Value, type_name: &str) -> Option<String> {
     }
 }
 
+/// Chuỗi trong `Value::Enum` mang đúng tên kiểu `type_name` (không nhận `Value::String`): để code chung (chép dữ
+/// liệu giữa hai database) phân biệt cột thời gian với cột chữ.
+fn enum_text<'v>(value: &'v Value, type_name: &str) -> Option<&'v str> {
+    match value {
+        Value::Enum(OptionEnum::Some(inner)) if &*inner.type_name == type_name => {
+            Some(&inner.value)
+        }
+        _ => None,
+    }
+}
+
+impl Timestamp {
+    /// Thời điểm trong một `Value` do [`Timestamp`] tạo (`None`: NULL hay không phải thời điểm).
+    pub fn from_sql_value(value: &Value) -> Option<Timestamp> {
+        enum_text(value, TIMESTAMPTZ)
+            .and_then(format::parse_lenient_timestamp)
+            .map(Timestamp::exact)
+    }
+}
+
+impl Date {
+    /// Ngày trong một `Value` do [`Date`] tạo (`None`: NULL hay không phải ngày).
+    pub fn from_sql_value(value: &Value) -> Option<Date> {
+        enum_text(value, DATE).and_then(format::parse_date).map(Date::from)
+    }
+}
+
 // --- Timestamp -----------------------------------------------------------------------------------------
 
 impl From<Timestamp> for Value {

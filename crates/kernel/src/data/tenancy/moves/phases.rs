@@ -2,6 +2,7 @@
 
 use super::files::{copy_files, delete_files, tenant_prefix, verify};
 use super::*;
+use jiff::SignedDuration;
 
 impl TenantMoves {
     /// `copying` → `copied`.
@@ -14,9 +15,9 @@ impl TenantMoves {
         );
         // Máy chủ khác thấy `moving` sau tối đa TTL cache; request đã bắt đầu trước đó chạy xong
         // trong thời gian tối đa của một request.
-        let ready_at = moving.moving_since
-            + chrono::Duration::from_std(self.settle).map_err(Error::internal)?;
-        if let Ok(wait) = (ready_at - now()).to_std() {
+        let ready_at =
+            moving.moving_since + SignedDuration::try_from(self.settle).map_err(Error::internal)?;
+        if let Ok(wait) = std::time::Duration::try_from(ready_at - now()) {
             tracing::info!(move_id = %moving.id, seconds = wait.as_secs(), "waiting for other servers to see the move");
             tokio::time::sleep(wait).await;
         }

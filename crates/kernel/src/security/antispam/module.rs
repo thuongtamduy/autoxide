@@ -2,12 +2,12 @@
 //! [`SpamGuard`] cho module khác, và phục vụ endpoint công khai lấy token form
 //! `GET /api/v1/antispam/token`.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use axum::extract::{Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use utoipa_axum::router::OpenApiRouter;
@@ -76,9 +76,9 @@ pub(crate) struct TokenQuery {
 pub(crate) struct FormTokenResponse {
     /// Send it with the form (the receiving endpoint says in which field). Valid once.
     token: String,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
     /// Submissions sent before this moment are held for review: people take longer than bots.
-    submit_after: DateTime<Utc>,
+    submit_after: Timestamp,
     /// Parameters of the challenge the browser must solve, when the server uses one; `null`
     /// otherwise.
     #[schema(value_type = Option<Object>)]

@@ -17,12 +17,11 @@
 
 pub mod scheduled;
 
-use std::path::{Path, PathBuf};
-use std::sync::Arc;
-
-use chrono::{DateTime, Utc};
+use crate::time::Timestamp;
 use futures_util::StreamExt as _;
 use serde::{Deserialize, Serialize};
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio::io::AsyncReadExt as _;
 
 use crate::config::{ConfigReader, ConfigSource, DatabaseConfig};
@@ -50,7 +49,7 @@ pub struct BackupManifest {
     pub format: u64,
     /// Phiên bản Autoxide đã tạo bản backup.
     pub autoxide: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// Loại database nguồn: `sqlite` hay `postgres`.
     pub source: String,
     pub tables: Vec<BackupTable>,
@@ -166,7 +165,7 @@ pub async fn write_backup(
         let manifest = BackupManifest {
             format: FORMAT,
             autoxide: env!("CARGO_PKG_VERSION").to_owned(),
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             source: format!("{:?}", database.backend()).to_lowercase(),
             tables: tables
                 .iter()

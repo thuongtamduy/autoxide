@@ -26,6 +26,10 @@ pub struct Timestamp(jiff::Timestamp);
 impl Timestamp {
     /// 1970-01-01T00:00:00Z.
     pub const UNIX_EPOCH: Timestamp = Timestamp(jiff::Timestamp::UNIX_EPOCH);
+    /// Thời điểm sớm nhất biểu diễn được (năm −9999).
+    pub const MIN: Timestamp = Timestamp(jiff::Timestamp::MIN);
+    /// Thời điểm muộn nhất biểu diễn được (năm 9999).
+    pub const MAX: Timestamp = Timestamp(jiff::Timestamp::MAX);
 
     /// Bây giờ, cắt về micro giây.
     pub fn now() -> Self {
@@ -45,6 +49,22 @@ impl Timestamp {
     /// Từ số micro giây kể từ 1970-01-01T00:00:00Z. `None` khi ngoài khoảng `jiff` biểu diễn được (năm ±9999).
     pub fn from_unix_micros(micros: i64) -> Option<Self> {
         jiff::Timestamp::from_microsecond(micros).ok().map(Timestamp)
+    }
+
+    /// Từ giây và nano giây kể từ 1970-01-01T00:00:00Z, giữ nguyên độ chính xác (vd thời điểm trong UUIDv7).
+    pub fn from_unix(seconds: i64, nanos: u32) -> Option<Self> {
+        let nanos = i32::try_from(nanos).ok()?;
+        jiff::Timestamp::new(seconds, nanos).ok().map(Timestamp)
+    }
+
+    /// Đọc RFC 3339 đúng như `chrono::DateTime::parse_from_rfc3339`: `YYYY-MM-DDTHH:MM:SS[.f]` rồi `Z` hay
+    /// `±HH:MM` (chấp nhận `t`, `z` và dấu cách thay `T`). Chặt hơn [`FromStr`] — dùng ở chỗ trước đây kiểm
+    /// bằng `parse_from_rfc3339`.
+    pub fn parse_rfc3339(input: &str) -> Result<Self, ParseError> {
+        if !format::is_rfc3339(input) {
+            return Err(ParseError::new(input, "an RFC 3339 date-time"));
+        }
+        input.parse()
     }
 
     /// Từ số giây kể từ 1970-01-01T00:00:00Z.

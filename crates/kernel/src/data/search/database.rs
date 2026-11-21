@@ -11,11 +11,10 @@
 //! nội dung không dấu; trong mỗi tầng theo ID. "Chứa" là `LIKE` như mọi ô tìm: chạy như nhau trên
 //! SQLite và Postgres, quét các dòng còn lại sau bộ lọc khách / loại / phạm vi.
 
-use std::collections::BTreeMap;
-
-use chrono::{SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Expr, ExprTrait as _, Query};
 use sea_orm::{ColumnTrait, Condition, ConnectionTrait, EntityTrait, QueryFilter, Set};
+use std::collections::BTreeMap;
 use uuid::Uuid;
 
 use super::backend::{SearchBackend, SearchDoc, SearchHit, SearchHits, SearchKind, SearchRequest};
@@ -26,6 +25,7 @@ use crate::pagination::{Page, fetch_page_tiers};
 use crate::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext};
 
 pub(crate) mod doc {
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -46,7 +46,7 @@ pub(crate) mod doc {
         pub fold_key: String,
         /// JSON: trường gốc (tên → giá trị), trả lại trong kết quả.
         pub fields: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -135,7 +135,7 @@ impl SearchBackend for DatabaseSearch {
         if docs.is_empty() {
             return Ok(());
         }
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let mut rows = Vec::new();
         let mut filters = Vec::new();
         for item in docs {

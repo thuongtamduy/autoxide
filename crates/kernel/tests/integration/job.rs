@@ -4,6 +4,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -21,7 +23,6 @@ use autoxide_kernel::module::{Module, Modules};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_kernel::tenancy::migration::adopt;
 use autoxide_testkit::TestDatabase;
-use chrono::Utc;
 use sea_orm::{ConnectionTrait, Statement};
 use serde::Serialize;
 use uuid::Uuid;
@@ -162,7 +163,7 @@ async fn job_trong_transaction_bi_huy_thi_khong_ton_tai() {
 async fn hen_gio_va_chong_trung() {
     TestDatabase::run(async |test| {
         let (database, modules, recorder) = setup(test, Vec::new()).await;
-        let later = Utc::now() + chrono::Duration::hours(1);
+        let later = Timestamp::now() + SignedDuration::from_hours(1);
         enqueue(&database, "later", EnqueueOptions::default().run_at(later)).await;
         let unique = || EnqueueOptions::default().unique_key("daily");
 
@@ -272,8 +273,8 @@ async fn claim_dong_thoi_tra_ve_cac_tap_roi_nhau() {
             .map(|worker| {
                 let (claim, database) = (claim.clone(), database.clone());
                 tokio::spawn(async move {
-                    let now = Utc::now();
-                    let until = now + chrono::Duration::minutes(5);
+                    let now = Timestamp::now();
+                    let until = now + SignedDuration::from_mins(5);
                     let name = format!("w{worker}");
                     claim
                         .claim(
@@ -429,7 +430,7 @@ async fn panic_va_tien_trinh_chet_vao_dead_letter_queue() {
             .table(Alias::new("reports_jobs"))
             .value(Alias::new("attempts"), 1)
             .value(Alias::new("claimed_by"), "dead")
-            .value(Alias::new("claimed_until"), Utc::now() - chrono::Duration::minutes(1))
+            .value(Alias::new("claimed_until"), Timestamp::now() - SignedDuration::from_mins(1))
             .and_where(Expr::col(Alias::new("id")).eq(stuck))
             .to_owned();
         assert_eq!(database.write().execute(&crashed).await.unwrap().rows_affected(), 1);

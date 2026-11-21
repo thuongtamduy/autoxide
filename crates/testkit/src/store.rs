@@ -6,7 +6,7 @@ use autoxide_kernel::secret::sha256;
 use autoxide_kernel::store::{
     AppStore, PurchaseState, StoreNotification, StorePurchase, StorePurchases,
 };
-use chrono::{DateTime, Utc};
+use autoxide_kernel::time::Timestamp;
 use serde_json::{Value, json};
 
 /// Cửa hàng giả: `proof` / `notification_body` tạo dữ liệu đã ký; `verify` / `notification` kiểm.
@@ -51,7 +51,7 @@ impl FakeStorePurchases {
             _ => return None,
         };
         let expires_at = match value["expires_at"].as_str() {
-            Some(text) => Some(DateTime::parse_from_rfc3339(text).ok()?.with_timezone(&Utc)),
+            Some(text) => Some(Timestamp::parse_rfc3339(text).ok()?),
             None => None,
         };
         Some(StorePurchase::new(

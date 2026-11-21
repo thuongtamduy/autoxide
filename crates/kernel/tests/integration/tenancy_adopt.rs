@@ -10,6 +10,7 @@ use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
 use autoxide_kernel::tenancy::DEFAULT_TENANT;
 use autoxide_kernel::tenancy::migration::{TenantTable, adopt};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, schema_snapshot};
 use sea_orm::{ConnectionTrait, Statement};
 use uuid::Uuid;
@@ -175,7 +176,7 @@ async fn seeded(test: &TestDatabase) -> (Database, Uuid, autoxide_testkit::Schem
     run(
         &database,
         "INSERT INTO demo_child (id, parent_id, code, created_at) VALUES (?, ?, ?, ?)",
-        vec![Uuid::now_v7().into(), parent.into(), "x".into(), chrono::Utc::now().into()],
+        vec![Uuid::now_v7().into(), parent.into(), "x".into(), Timestamp::now().into()],
     )
     .await;
     run(&database, "INSERT INTO demo_kv (key, value) VALUES (?, ?)", vec!["k".into(), "v".into()])

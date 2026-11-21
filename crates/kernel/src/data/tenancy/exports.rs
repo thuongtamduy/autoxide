@@ -13,6 +13,8 @@
 //! - File giữ `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` ngày (mặc định 30), rồi job dọn xoá.
 //! - Module `plans` tự xin một lượt xuất khi thuê bao bị huỷ.
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use crate::migration::prelude::{
@@ -23,7 +25,6 @@ use axum::body::Body;
 use axum::extract::{Path, Query, State};
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -65,6 +66,7 @@ pub const DATA_EXPORT: Permission = Permission::new(
 
 mod entity {
     //! Bảng `kernel_tenant_exports` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -85,10 +87,10 @@ mod entity {
         pub error: Option<String>,
         /// Bản băm của token trong link tải đang có hiệu lực.
         pub link_hash: Option<String>,
-        pub link_expires_at: Option<DateTimeUtc>,
-        pub expires_at: Option<DateTimeUtc>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub link_expires_at: Option<Timestamp>,
+        pub expires_at: Option<Timestamp>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -165,9 +167,9 @@ pub struct TenantExport {
     pub size: Option<i64>,
     pub error: Option<String>,
     /// The file is deleted after this time.
-    pub expires_at: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub expires_at: Option<Timestamp>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Model> for TenantExport {
@@ -194,7 +196,7 @@ pub struct TenantExportLink {
     /// Path to open, relative to the API, e.g. `/api/v1/kernel/exports/download?token=…`. Anyone
     /// with it can download until `expires_at`; a new link replaces the previous one.
     pub url: String,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -206,8 +208,8 @@ impl Job for ExportTenant {
     const KIND: &'static str = EXPORT_TENANT;
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Xuất dữ liệu khách. Module `kernel` công bố (`context.require::<TenantExports>()`).
@@ -215,7 +217,7 @@ pub struct TenantExports {
     registry: DatabaseRegistry,
     setup: super::moves::MoveSetup,
     jobs: JobQueue,
-    retention: Duration,
+    retention: SignedDuration,
 }
 
 impl std::fmt::Debug for TenantExports {
@@ -231,7 +233,12 @@ impl TenantExports {
         jobs: JobQueue,
         retention_days: i64,
     ) -> Self {
-        TenantExports { registry, setup, jobs, retention: Duration::days(retention_days) }
+        TenantExports {
+            registry,
+            setup,
+            jobs,
+            retention: SignedDuration::from_hours(24 * retention_days),
+        }
     }
 
     fn control(&self) -> &crate::database::Database {
@@ -425,7 +432,7 @@ impl TenantExports {
             return Err(export_not_ready(&row.status));
         }
         let raw = crate::secret::random_token(32)?;
-        let expires_at = now() + Duration::hours(LINK_HOURS);
+        let expires_at = now() + SignedDuration::from_hours(LINK_HOURS);
         let hash = crate::secret::sha256(&raw);
         self.set(id, |active| {
             active.link_hash = Set(Some(hash));
@@ -482,7 +489,7 @@ impl TenantExports {
     }
 
     /// Xoá file của các lượt xuất đã quá hạn giữ; trả số lượt đã dọn.
-    pub(crate) async fn clean(&self, at: DateTime<Utc>) -> Result<usize, Error> {
+    pub(crate) async fn clean(&self, at: Timestamp) -> Result<usize, Error> {
         let due = Entity::find()
             .filter(Column::Status.eq("ready"))
             .filter(Column::ExpiresAt.lte(at))

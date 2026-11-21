@@ -22,14 +22,14 @@
 
 mod migration;
 
-use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::sync::Arc;
-
-use chrono::{DateTime, Duration, SubsecRound, Utc};
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait, Order, Query};
 use sea_orm::{ConnectionTrait, Value};
 use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet};
+use std::future::Future;
+use std::sync::Arc;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
@@ -51,10 +51,10 @@ pub const RETENTION_DAYS: Setting = Setting::new(
 .with_default("30");
 
 /// Đọc [`RETENTION_DAYS`].
-pub(crate) fn read_retention(reader: &mut ConfigReader<'_>) -> Result<Duration, Invalid> {
+pub(crate) fn read_retention(reader: &mut ConfigReader<'_>) -> Result<SignedDuration, Invalid> {
     reader
         .get_with(&RETENTION_DAYS, |raw| crate::config::parse_in_range(raw, 1i64, 365))
-        .map(Duration::days)
+        .map(|days| SignedDuration::from_hours(24 * days))
 }
 
 /// Mặc định của [`RETENTION_DAYS`], cho [`SyncLog::standalone`].
@@ -64,7 +64,7 @@ const DEFAULT_RETENTION_DAYS: i64 = 30;
 /// nhiều transaction ghi cùng lúc, ID sinh trước khi commit): con trỏ trả cho client không vượt quá
 /// mốc này, để lần hỏi sau đọc lại khúc cuối — không bỏ sót dòng commit muộn. Đọc lại một bản ghi
 /// không sao: mỗi mục là bản hiện tại, áp lại cho cùng kết quả.
-const SETTLE: Duration = Duration::seconds(10);
+const SETTLE: SignedDuration = SignedDuration::from_secs(10);
 
 /// Số mục mặc định và tối đa của một trang thay đổi.
 const DEFAULT_LIMIT: u32 = 100;
@@ -170,7 +170,10 @@ pub(crate) fn declared(
 }
 
 /// Luồng thay đổi của các module có khai `sync_resources`, để worker dọn dòng quá hạn.
-pub(crate) fn logs(modules: &[Box<dyn crate::module::Module>], keep: Duration) -> Vec<SyncLog> {
+pub(crate) fn logs(
+    modules: &[Box<dyn crate::module::Module>],
+    keep: SignedDuration,
+) -> Vec<SyncLog> {
     modules
         .iter()
         .filter(|module| !module.sync_resources().is_empty())
@@ -227,24 +230,24 @@ impl<T> SyncChange<T> {
 }
 
 /// Bản ghi module tải lại cho luồng thay đổi: ID, phiên bản (`updated_at`) và dạng trả cho client.
-pub type Loaded<T> = Vec<(Uuid, DateTime<Utc>, T)>;
+pub type Loaded<T> = Vec<(Uuid, Timestamp, T)>;
 
 /// Nơi một module ghi và đọc luồng thay đổi của mình. Lấy bằng `StartContext::sync_log` lúc khởi
 /// động; clone rẻ.
 #[derive(Debug, Clone)]
 pub struct SyncLog {
     table: Arc<str>,
-    keep: Duration,
+    keep: SignedDuration,
 }
 
 impl SyncLog {
-    pub(crate) fn new(module: &str, keep: Duration) -> Self {
+    pub(crate) fn new(module: &str, keep: SignedDuration) -> Self {
         SyncLog { table: table_name(module).into(), keep }
     }
 
     /// `SyncLog` đứng riêng (giữ mặc định 30 ngày) — cho test của module.
     pub fn standalone(module: &str) -> Self {
-        SyncLog::new(module, Duration::days(DEFAULT_RETENTION_DAYS))
+        SyncLog::new(module, SignedDuration::from_hours(24 * DEFAULT_RETENTION_DAYS))
     }
 
     /// Bản ghi `id` (loại `resource`, ở nút / người sở hữu `target`) vừa được tạo hay sửa. Gọi với
@@ -305,7 +308,7 @@ impl SyncLog {
                 Some(target.org.as_uuid()).into(),
                 target.owner.into(),
                 deleted.into(),
-                Utc::now().trunc_subsecs(6).into(),
+                Timestamp::now().into(),
             ])
             .map_err(|error| Error::internal(format!("sync change insert: {error}")))?;
         connection.execute(&insert).await?;
@@ -373,7 +376,7 @@ impl SyncLog {
             .filter(|(index, (_, record, deleted))| !deleted && last.get(record) == Some(index))
             .map(|(_, (_, record, _))| *record)
             .collect();
-        let mut loaded: HashMap<Uuid, (DateTime<Utc>, T)> = if alive.is_empty() {
+        let mut loaded: HashMap<Uuid, (Timestamp, T)> = if alive.is_empty() {
             HashMap::new()
         } else {
             load(alive)
@@ -382,7 +385,7 @@ impl SyncLog {
                 .map(|(id, version, data)| (id, (version, data)))
                 .collect()
         };
-        let settled = settled_cursor(Utc::now() - SETTLE);
+        let settled = settled_cursor(Timestamp::now() - SETTLE);
         let mut items = Vec::with_capacity(last.len());
         for (index, (change_id, record, _)) in rows.iter().enumerate() {
             if last.get(record) != Some(&index) {
@@ -422,7 +425,7 @@ impl SyncLog {
             Some(raw) => {
                 match Uuid::parse_str(raw).ok().and_then(|id| Some((id, cursor_time(id)?))) {
                     Some((id, at)) => {
-                        if problems.is_empty() && at < Utc::now() - self.keep {
+                        if problems.is_empty() && at < Timestamp::now() - self.keep {
                             return Err(expired());
                         }
                         Some(id)
@@ -446,7 +449,7 @@ impl SyncLog {
 
     /// Xoá dòng thay đổi (mọi khách) cũ hơn thời hạn giữ trên `database`. Worker gọi định kỳ.
     pub(crate) async fn purge(&self, database: &Database) -> Result<u64, Error> {
-        let before = Utc::now() - self.keep;
+        let before = Timestamp::now() - self.keep;
         let mut delete = Query::delete();
         delete
             .from_table(Alias::new(&*self.table))
@@ -471,17 +474,17 @@ fn expired() -> Error {
 }
 
 /// Thời điểm của con trỏ (UUIDv7); `None` khi không phải UUIDv7.
-fn cursor_time(id: Uuid) -> Option<DateTime<Utc>> {
+fn cursor_time(id: Uuid) -> Option<Timestamp> {
     if id.get_version_num() != 7 {
         return None;
     }
     let (seconds, nanos) = id.get_timestamp()?.to_unix();
-    DateTime::from_timestamp(i64::try_from(seconds).ok()?, nanos)
+    Timestamp::from_unix(i64::try_from(seconds).ok()?, nanos)
 }
 
 /// UUIDv7 nhỏ nhất của mili giây `at`: mọi dòng từ mili giây đó trở đi lớn hơn nó.
-fn settled_cursor(at: DateTime<Utc>) -> Uuid {
-    let millis = u64::try_from(at.timestamp_millis()).unwrap_or_default();
+fn settled_cursor(at: Timestamp) -> Uuid {
+    let millis = u64::try_from(at.as_unix_millis()).unwrap_or_default();
     let mut bytes = [0u8; 16];
     bytes[..6].copy_from_slice(&millis.to_be_bytes()[2..]);
     bytes[6] = 0x70;
@@ -517,13 +520,13 @@ mod tests {
 
     #[test]
     fn con_tro_on_dinh_nho_hon_moi_dong_cung_mili_giay() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let cursor = settled_cursor(now);
         assert_eq!(cursor.get_version_num(), 7);
         let later = Uuid::now_v7();
         assert!(cursor <= later);
         let at = cursor_time(cursor).unwrap();
-        assert_eq!(at.timestamp_millis(), now.timestamp_millis());
+        assert_eq!(at.as_unix_millis(), now.as_unix_millis());
     }
 
     #[test]
@@ -532,7 +535,7 @@ mod tests {
         let bad = ChangesQuery { cursor: Some("abc".into()), limit: Some(0) };
         let error = log.check(&bad).unwrap_err();
         assert_eq!(error.fields().len(), 2);
-        let old = settled_cursor(Utc::now() - Duration::days(31));
+        let old = settled_cursor(Timestamp::now() - SignedDuration::from_hours(24 * 31));
         let error =
             log.check(&ChangesQuery { cursor: Some(old.to_string()), limit: None }).unwrap_err();
         assert_eq!((error.kind(), error.code()), (ErrorKind::Gone, "sync_cursor_expired"));

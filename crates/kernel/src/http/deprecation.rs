@@ -5,6 +5,7 @@
 //! Tool MCP deprecated khai cùng chỗ, bằng [`Deprecation::tool`] (D-240): lớp HTTP bỏ qua chúng;
 //! `Modules::tools` gắn chúng vào tool, `tools/list` và kết quả của tool báo cho agent.
 
+use crate::time::Date;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -12,7 +13,6 @@ use axum::extract::{MatchedPath, Request};
 use axum::http::{HeaderName, HeaderValue, Method};
 use axum::middleware::Next;
 use axum::response::Response;
-use chrono::{NaiveDate, NaiveTime};
 use utoipa::openapi::OpenApi;
 use utoipa::openapi::path::Operation;
 
@@ -114,8 +114,8 @@ impl Deprecation {
     }
 }
 
-fn parse_date(text: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(text, "%Y-%m-%d").ok()
+fn parse_date(text: &str) -> Option<Date> {
+    Date::parse_from_str(text, "%Y-%m-%d").ok()
 }
 
 /// Header của một endpoint deprecated, dựng sẵn một lần.
@@ -171,9 +171,9 @@ pub(super) fn apply(openapi: &mut OpenApi, deprecations: &[(&'static str, Deprec
                 .insert("x-sunset".to_owned(), serde_json::Value::String(sunset.to_string()));
         }
 
-        let midnight = |date: NaiveDate| date.and_time(NaiveTime::MIN).and_utc();
+        let midnight = |date: Date| date.start_of_day_utc();
         let headers = Headers {
-            deprecation: header(&format!("@{}", midnight(since).timestamp())),
+            deprecation: header(&format!("@{}", midnight(since).as_unix_seconds())),
             sunset: sunset.map(|date| {
                 header(&midnight(date).format("%a, %d %b %Y %H:%M:%S GMT").to_string())
             }),

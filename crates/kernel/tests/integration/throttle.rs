@@ -5,6 +5,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -106,7 +108,7 @@ async fn het_cua_so_thi_dem_lai_va_don_dep() {
         let old = "UPDATE demo_throttle SET window_started_at = '2000-01-01 00:00:00+00:00'";
         database.write().execute_raw(Statement::from_string(backend, old)).await.unwrap();
         throttle.record(&tenant, "fresh").await.unwrap();
-        let removed = throttle.purge(&database, chrono::Utc::now() - chrono::Duration::days(1)).await.unwrap();
+        let removed = throttle.purge(&database, Timestamp::now() - SignedDuration::from_hours(24 * 1)).await.unwrap();
         assert_eq!(removed, 2);
         assert_eq!(sql(&database, "SELECT COUNT(*) FROM demo_throttle").await, 1);
     })

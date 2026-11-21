@@ -163,7 +163,7 @@ impl TenantRelocations {
             if waiting == 0 {
                 break;
             }
-            let waited = (now() - started).to_std().unwrap_or_default();
+            let waited = std::time::Duration::try_from(now() - started).unwrap_or_default();
             if waited > self.drain {
                 return self.fail(row, runner, &spec.kind, errors::drain_timeout(waiting)).await;
             }

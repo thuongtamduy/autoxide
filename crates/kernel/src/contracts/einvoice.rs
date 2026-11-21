@@ -4,8 +4,7 @@
 //! Bộ nối của một nhà cung cấp là một module riêng, chỉ phụ thuộc kernel, đăng ký TRƯỚC `invoices`,
 //! góp bằng `context.contribute::<dyn EInvoiceProvider>(…)`. Mọi hàm nhận khách (`TenantId`): bộ nối
 //! tự đọc thông tin kết nối của khách đó. Test dùng `FakeEInvoiceProvider` của testkit.
-
-use chrono::NaiveDate;
+use crate::time::Date;
 use uuid::Uuid;
 
 use crate::error::{Error, ErrorKind};
@@ -190,7 +189,7 @@ pub struct RelatedInvoice {
     pub provider_ref: Option<String>,
     pub series: String,
     pub number: i64,
-    pub issue_date: NaiveDate,
+    pub issue_date: Date,
 }
 
 impl RelatedInvoice {
@@ -198,7 +197,7 @@ impl RelatedInvoice {
         relation: Relation,
         series: impl Into<String>,
         number: i64,
-        issue_date: NaiveDate,
+        issue_date: Date,
     ) -> Self {
         RelatedInvoice { relation, provider_ref: None, series: series.into(), number, issue_date }
     }
@@ -225,7 +224,7 @@ pub struct EInvoice {
     pub series: String,
     /// Số nội bộ; nhà cung cấp tự cấp số thì có thể bỏ qua.
     pub number: Option<i64>,
-    pub issue_date: NaiveDate,
+    pub issue_date: Date,
     pub currency: Currency,
     /// Tỉ giá sang đồng Việt Nam (chữ thập phân), khi khác VND.
     pub exchange_rate: Option<String>,
@@ -242,7 +241,7 @@ impl EInvoice {
         kind: EInvoiceKind,
         seller: Party,
         buyer: Party,
-        issue_date: NaiveDate,
+        issue_date: Date,
         currency: Currency,
     ) -> Self {
         EInvoice {

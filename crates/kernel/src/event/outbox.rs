@@ -1,10 +1,9 @@
 //! Ghi event vào bảng event của module, trong transaction của bên gọi.
 
-use std::sync::Arc;
-
-use chrono::{SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Query};
+use std::sync::Arc;
 use tokio::sync::Notify;
 use uuid::Uuid;
 
@@ -58,7 +57,7 @@ impl Outbox {
             )));
         }
         let payload = serde_json::to_string(event).map_err(Error::internal)?;
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let mut insert = Query::insert();
         insert
             .into_table(Alias::new(&*self.table))

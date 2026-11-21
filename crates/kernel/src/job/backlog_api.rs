@@ -2,10 +2,10 @@
 //! và agent không có Prometheus. Chỉ nhân sự của khách nền tảng (`require_platform`), với
 //! permission `kernel.ops.read`: số liệu là của cả database, gồm mọi khách trên đó.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use axum::extract::State;
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use utoipa_axum::router::OpenApiRouter;
@@ -27,7 +27,7 @@ pub(crate) const OPS_READ: Permission = Permission::new(
 /// Backlogs of every database this server handles.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub(crate) struct OpsBacklog {
-    pub checked_at: DateTime<Utc>,
+    pub checked_at: Timestamp,
     pub databases: Vec<DatabaseBacklog>,
 }
 
@@ -42,7 +42,7 @@ pub(crate) struct DatabaseBacklog {
     /// The `read` and `write` connection pools.
     pub pools: Vec<Pool>,
     /// When the newest successful scheduled backup of this database finished; `null` when none.
-    pub last_backup_at: Option<DateTime<Utc>>,
+    pub last_backup_at: Option<Timestamp>,
 }
 
 /// Jobs and events of one module on one database.
@@ -77,7 +77,7 @@ pub(crate) struct Pool {
 impl DatabaseBacklog {
     pub(crate) fn from_snapshot(
         snapshot: BacklogSnapshot,
-        last_backup_at: Option<DateTime<Utc>>,
+        last_backup_at: Option<Timestamp>,
     ) -> Self {
         DatabaseBacklog {
             database: snapshot.database,

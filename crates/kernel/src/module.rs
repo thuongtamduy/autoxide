@@ -16,6 +16,7 @@
 //! có gì" — module cũ không phải sửa khi hợp đồng thêm hàm mới.
 
 pub use crate::ops::client_config::{ClientSection, TenantClientSection};
+use jiff::SignedDuration;
 use std::any::{Any, TypeId};
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -415,7 +416,7 @@ pub struct StartContext<'a> {
     facts: &'a crate::report::FactCatalog,
     analytics: &'a crate::analytics::AnalyticsCatalog,
     automations: &'a crate::automation::AutomationDirectory,
-    sync_keep: chrono::Duration,
+    sync_keep: SignedDuration,
     /// Bọc hợp đồng đối tác để sandbox luôn dùng bộ giả (bước 38, D-232).
     partners: &'a crate::tenancy::sandbox::PartnerGuard,
     /// Sổ sao / đẩy sandbox của mọi module, điền sau khi mọi module khởi động.

@@ -18,12 +18,12 @@
 // Trong `src/` thì KHÔNG được khai dòng này (`cargo xtask check` chặn).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, StatusCode, header};
 use axum::{Json, Router};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::{ActiveModelTrait, DatabaseConnection, EntityTrait, QueryOrder, Set, SqlErr};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt;
@@ -108,6 +108,7 @@ mod migration {
 
 /// Entity của bảng `stack_probe`.
 mod probe {
+    use autoxide_kernel::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -120,7 +121,7 @@ mod probe {
         #[sea_orm(unique)]
         pub name: String,
         pub amount_minor: i64,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -130,7 +131,7 @@ async fn insert_probe(
     db: &DatabaseConnection,
     name: &str,
     amount_minor: i64,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 ) -> Result<probe::Model, sea_orm::DbErr> {
     probe::ActiveModel {
         id: Set(Uuid::now_v7()),
@@ -143,8 +144,8 @@ async fn insert_probe(
 }
 
 /// Postgres lưu thời gian tới micro giây; cắt bớt để so sánh được sau một vòng.
-fn now_in_database_precision() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now_in_database_precision() -> Timestamp {
+    Timestamp::now()
 }
 
 #[tokio::test]
@@ -199,7 +200,7 @@ struct ProbeBody {
     id: Uuid,
     name: String,
     amount_minor: i64,
-    created_at: DateTime<Utc>,
+    created_at: Timestamp,
 }
 
 /// Create a probe row.

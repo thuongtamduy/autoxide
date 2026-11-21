@@ -10,13 +10,14 @@
 //! Không có "Đã xử lý": việc tự hết khi dữ liệu không còn khớp (D-212). Dòng hoãn đã hết hạn của
 //! khách được dọn mỗi lần có người hoãn việc (không cần job riêng).
 
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use axum::Extension;
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, Duration, SubsecRound, Utc};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, OnConflict, Query as SqlQuery};
 use serde::{Deserialize, Serialize};
@@ -41,12 +42,12 @@ const MAX_SNOOZE_DAYS: i64 = 365;
 /// Trạng thái của một việc với người gọi.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct ItemState {
-    pub snoozed_until: Option<DateTime<Utc>>,
+    pub snoozed_until: Option<Timestamp>,
     pub assignee_id: Option<Uuid>,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Trạng thái của các việc `keys` với `user_id`: hoãn của chính người đó, giao của ai cũng thấy.
@@ -87,7 +88,7 @@ async fn upsert<C: ConnectionTrait>(
     tenant: &TenantContext,
     key: &str,
     user_id: Uuid,
-    snoozed_until: Option<DateTime<Utc>>,
+    snoozed_until: Option<Timestamp>,
     assignee_id: Option<Uuid>,
 ) -> Result<(), Error> {
     let insert = SqlQuery::insert()
@@ -144,7 +145,7 @@ async fn remove(tenant: &TenantContext, key: &str, user_id: Uuid) -> Result<(), 
 #[schema(as = WorkSnoozeRequest)]
 pub(crate) struct SnoozeRequest {
     /// A time in the future, at most a year away.
-    pub until: DateTime<Utc>,
+    pub until: Timestamp,
 }
 
 /// Who should do the work.
@@ -160,7 +161,7 @@ pub(crate) struct AssignRequest {
 pub(crate) struct WorkStateView {
     pub key: String,
     /// Hidden from your inbox until then.
-    pub snoozed_until: Option<DateTime<Utc>>,
+    pub snoozed_until: Option<Timestamp>,
     /// Who it is assigned to.
     pub assignee_id: Option<Uuid>,
 }
@@ -243,7 +244,7 @@ async fn snooze_work(
 ) -> Result<Data<WorkStateView>, Error> {
     state.check_key(&tenant, &principal, &key).await?;
     let now = now();
-    if input.until <= now || input.until > now + Duration::days(MAX_SNOOZE_DAYS) {
+    if input.until <= now || input.until > now + SignedDuration::from_hours(24 * MAX_SNOOZE_DAYS) {
         return Err(Error::validation(vec![FieldError::new(
             "until",
             "invalid",
@@ -257,15 +258,8 @@ async fn snooze_work(
         .and_where(Expr::col(Alias::new("assignee_id")).is_null())
         .to_owned();
     tenant.database().write().execute(&expired).await?;
-    upsert(
-        tenant.database().write(),
-        &tenant,
-        &key,
-        principal.user_id(),
-        Some(input.until.trunc_subsecs(6)),
-        None,
-    )
-    .await?;
+    upsert(tenant.database().write(), &tenant, &key, principal.user_id(), Some(input.until), None)
+        .await?;
     Ok(Data { data: state.view(&tenant, &principal, &key).await? })
 }
 

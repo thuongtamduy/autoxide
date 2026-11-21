@@ -129,3 +129,48 @@ pub(super) fn parse_date(input: &str) -> Option<civil::Date> {
     }
     PARSER.parse_date(input).ok()
 }
+
+/// Đúng dạng `chrono::DateTime::parse_from_rfc3339` nhận: `YYYY-MM-DD` + `T`/`t`/dấu cách + `HH:MM:SS`, phần lẻ
+/// tuỳ chọn (ít nhất 1 chữ số), rồi `Z`/`z` hay `±HH:MM`.
+pub(super) fn is_rfc3339(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    let digits = |range: std::ops::Range<usize>| {
+        bytes.get(range).is_some_and(|part| part.iter().all(u8::is_ascii_digit))
+    };
+    let at = |index: usize, wanted: &[u8]| bytes.get(index).is_some_and(|b| wanted.contains(b));
+    let head = digits(0..4)
+        && at(4, b"-")
+        && digits(5..7)
+        && at(7, b"-")
+        && digits(8..10)
+        && at(10, b"Tt ")
+        && digits(11..13)
+        && at(13, b":")
+        && digits(14..16)
+        && at(16, b":")
+        && digits(17..19);
+    if !head {
+        return false;
+    }
+    let mut index = 19;
+    if at(index, b".") {
+        let start = index + 1;
+        index = start;
+        while bytes.get(index).is_some_and(u8::is_ascii_digit) {
+            index += 1;
+        }
+        if index == start {
+            return false;
+        }
+    }
+    match bytes.get(index) {
+        Some(b'Z' | b'z') => index + 1 == bytes.len(),
+        Some(b'+' | b'-') => {
+            index + 6 == bytes.len()
+                && digits(index + 1..index + 3)
+                && at(index + 3, b":")
+                && digits(index + 4..index + 6)
+        }
+        _ => false,
+    }
+}

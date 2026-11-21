@@ -9,7 +9,9 @@ use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::module::Modules;
 use autoxide_kernel::secret::SecretKey;
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
+use jiff::SignedDuration;
 
 /// Database đã migrate, cùng khoá mà module `kernel` công bố với cấu hình `pairs`.
 async fn start(test: &TestDatabase, pairs: &[(&str, &str)]) -> (Database, SecretKey) {
@@ -111,11 +113,10 @@ fn ten_kernel_danh_rieng() {
 #[tokio::test]
 async fn bam_ip_theo_ngay_va_co_dinh() {
     use autoxide_kernel::ip_hash::{bucket, fingerprint};
-    use chrono::{Duration, Utc};
     TestDatabase::run(async |test| {
         let (_, key) = start(test, &[]).await;
         let address: std::net::IpAddr = "203.0.113.9".parse().unwrap();
-        let today = Utc::now();
+        let today = Timestamp::now();
         let a = bucket(&key, "forms:contact", address, today).await.unwrap();
         assert_eq!(
             a,
@@ -123,7 +124,9 @@ async fn bam_ip_theo_ngay_va_co_dinh() {
         );
         assert_ne!(
             a,
-            bucket(&key, "forms:contact", address, today + Duration::days(1)).await.unwrap()
+            bucket(&key, "forms:contact", address, today + SignedDuration::from_hours(24 * 1))
+                .await
+                .unwrap()
         );
         let fixed = fingerprint(&key, "forms", address).await.unwrap();
         assert_ne!(fixed, a);
@@ -148,10 +151,10 @@ async fn dau_ip_rieng_theo_pham_vi() {
         // Cùng phạm vi, cùng khối /24: cùng dấu.
         let neighbour = "203.0.113.200".parse().unwrap();
         assert_eq!(forms, fingerprint(&key, "forms", neighbour).await.unwrap());
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let today = bucket(&key, "forms:contact", visitor, now).await.unwrap();
         assert_ne!(today, bucket(&key, "comments:post", visitor, now).await.unwrap());
-        let tomorrow = now + chrono::Duration::days(1);
+        let tomorrow = now + SignedDuration::from_hours(24 * 1);
         assert_ne!(today, bucket(&key, "forms:contact", visitor, tomorrow).await.unwrap());
     })
     .await

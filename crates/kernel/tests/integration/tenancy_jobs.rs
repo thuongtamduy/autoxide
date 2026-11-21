@@ -6,6 +6,7 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -214,7 +215,7 @@ async fn setup(test: &TestDatabase, schedules: Vec<Schedule>, placement: bool) -
         let url = test.extra_database().await.unwrap();
         let (other, _) = connect(&url).await;
         prepare(&modules, &other, "p1").await;
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         let insert = Query::insert()
             .into_table(Alias::new("kernel_placements"))
             .columns(
@@ -265,7 +266,7 @@ async fn tenant(setup: &Setup, slug: &str, placement: Option<&str>) -> TenantCon
         }
     };
     let id = Uuid::now_v7();
-    let now = chrono::Utc::now();
+    let now = Timestamp::now();
     let insert = Query::insert()
         .into_table(Alias::new("kernel_tenants"))
         .columns(

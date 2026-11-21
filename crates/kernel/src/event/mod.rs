@@ -19,11 +19,10 @@ mod outbox;
 pub(crate) mod signals;
 pub(crate) mod stream;
 
+use crate::time::Timestamp;
+use serde::Serialize;
 use std::collections::BTreeSet;
 use std::sync::Arc;
-
-use chrono::{DateTime, Utc};
-use serde::Serialize;
 use uuid::Uuid;
 
 use crate::error::Error;
@@ -229,7 +228,7 @@ pub struct Delivered {
     /// Bản ghi bị thay đổi, dạng `<loại>:<id>` (vd `auth.user:0190…`), nếu có.
     pub subject: Option<String>,
     pub payload: serde_json::Value,
-    pub occurred_at: DateTime<Utc>,
+    pub occurred_at: Timestamp,
 }
 
 impl Delivered {
@@ -249,7 +248,7 @@ impl Delivered {
             actor: Actor::system(),
             subject: None,
             payload,
-            occurred_at: Utc::now(),
+            occurred_at: Timestamp::now(),
         }
     }
 
@@ -272,7 +271,7 @@ impl Delivered {
     }
 
     /// Sets when the change happened.
-    pub const fn occurred_at(mut self, occurred_at: DateTime<Utc>) -> Self {
+    pub const fn occurred_at(mut self, occurred_at: Timestamp) -> Self {
         self.occurred_at = occurred_at;
         self
     }

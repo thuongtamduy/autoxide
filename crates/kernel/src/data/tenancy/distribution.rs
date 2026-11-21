@@ -18,11 +18,11 @@
 //! sau khi con đã ghi mà trước khi cha cập nhật dòng đích thì lần chạy lại gặp bản đã có ở con →
 //! [`Applied::Unchanged`] → đích thành `applied`.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use crate::migration::prelude::*;
 use crate::migration::schema;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Order, Query};
 use sea_orm::{ConnectionTrait, QueryResult};
 use serde::{Deserialize, Serialize};
@@ -121,7 +121,7 @@ pub struct TargetStatus {
     pub applied_record_id: Option<Uuid>,
     pub attempts: i32,
     pub last_error: Option<String>,
-    pub applied_at: Option<DateTime<Utc>>,
+    pub applied_at: Option<Timestamp>,
 }
 
 /// Một bản phân phối và tình trạng ở từng khách con.
@@ -132,7 +132,7 @@ pub struct DistributionStatus {
     pub record_kind: String,
     pub record_id: Uuid,
     pub version: i64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     pub targets: Vec<TargetStatus>,
 }
 
@@ -157,8 +157,8 @@ impl std::fmt::Debug for Distributor {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 fn col(name: &str) -> Alias {
@@ -409,7 +409,7 @@ impl Distributor {
             .to_owned();
         let failed = transaction.query_all(&select).await?;
         let queue = JobQueue::new(self.module);
-        let round = Utc::now().timestamp_millis();
+        let round = Timestamp::now().as_unix_millis();
         for row in &failed {
             let child = TenantId::from_uuid(row.try_get("", "target_tenant_id")?);
             let update = Query::update()

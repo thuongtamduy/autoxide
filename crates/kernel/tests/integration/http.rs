@@ -6,6 +6,7 @@
 // Trong `src/` thì KHÔNG được khai dòng này (`cargo xtask check` chặn).
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use std::time::{Duration, Instant};
 
 use autoxide_kernel::config::{
@@ -85,7 +86,7 @@ async fn echo(body: Bytes) -> Bytes {
 }
 
 async fn tagged() -> autoxide_kernel::version::Tagged<u32> {
-    let version = chrono::DateTime::from_timestamp_micros(1_700_000_000_000_001).unwrap();
+    let version = Timestamp::from_unix_micros(1_700_000_000_000_001).unwrap();
     autoxide_kernel::version::Tagged { version, data: 7 }
 }
 

@@ -9,9 +9,10 @@ use autoxide_kernel::config::{ConfigReader, ConfigSource, DatabaseConfig};
 use autoxide_kernel::database::Database;
 use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::migration::{Migrator, ModuleMigrations};
+use autoxide_kernel::time::Timestamp;
 use autoxide_kernel::transfer::{CopiedTable, copy_modules};
 use autoxide_testkit::TestDatabase;
-use chrono::{SubsecRound, Utc};
+use jiff::SignedDuration;
 use sea_orm::sea_query::{Alias, Query};
 use sea_orm::{ConnectionTrait, Value};
 use uuid::Uuid;
@@ -142,7 +143,7 @@ async fn dump(database: &Database) -> Vec<Vec<Value>> {
 }
 
 async fn fill(database: &Database) {
-    let now = Utc::now().trunc_subsecs(6);
+    let now = Timestamp::now();
     for index in 0..250i64 {
         let id = Uuid::now_v7();
         let mut insert = Query::insert();
@@ -175,7 +176,7 @@ async fn fill(database: &Database) {
                         vec![0u8, 255, 7, <u8 as TryFrom<i64>>::try_from(index % 256).unwrap()]
                     })
                     .into(),
-                (now - chrono::Duration::seconds(index)).into(),
+                (now - SignedDuration::from_secs(index)).into(),
                 (index % 7 == 0).then_some(now).into(),
                 (index % 4 == 0).then(Uuid::now_v7).into(),
             ]);

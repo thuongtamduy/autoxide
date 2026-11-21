@@ -15,13 +15,13 @@
 //!
 //! ID của lượt cũng là ID của bản ghi sẽ tạo: khoá lưu đặt đúng chỗ cuối cùng, không phải chép.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use crate::migration::prelude::{
     DbErr, Index, MigrationName, MigrationTrait, SchemaManager, Table,
 };
 use crate::migration::schema;
-use chrono::{DateTime, SubsecRound, Utc};
 use futures_util::StreamExt as _;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Order, Query, SelectStatement};
 use sea_orm::{ConnectionTrait, QueryResult};
@@ -71,9 +71,9 @@ pub struct DirectUpload {
     /// Dữ liệu riêng của module (vd thư mục, nhãn), JSON.
     pub details: serde_json::Value,
     pub status: UploadStatus,
-    pub created_at: DateTime<Utc>,
-    pub expires_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub expires_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
 }
 
 /// Lượt tải lên mới.
@@ -93,7 +93,7 @@ pub struct NewDirectUpload {
     pub sha256: String,
     /// Dữ liệu riêng của module, đọc lại lúc xác nhận.
     pub details: serde_json::Value,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 /// Bảng lượt tải lên của một module. Lấy bằng [`DirectUploads::new`]; clone rẻ.
@@ -133,8 +133,8 @@ impl DirectUploads {
         new: NewDirectUpload,
     ) -> Result<DirectUpload, Error> {
         let size = i64::try_from(new.size).map_err(Error::internal)?;
-        let now = Utc::now().trunc_subsecs(6);
-        let expires_at = new.expires_at.trunc_subsecs(6);
+        let now = Timestamp::now();
+        let expires_at = new.expires_at;
         let details = serde_json::to_string(&new.details).map_err(Error::internal)?;
         let mut insert = Query::insert();
         insert
@@ -154,7 +154,7 @@ impl DirectUploads {
                 UploadStatus::Pending.as_str().into(),
                 now.into(),
                 expires_at.into(),
-                Option::<DateTime<Utc>>::None.into(),
+                Option::<Timestamp>::None.into(),
             ])
             .map_err(|error| Error::internal(format!("upload insert: {error}")))?;
         connection.execute(&insert).await?;
@@ -209,7 +209,7 @@ impl DirectUploads {
         tenant: &TenantContext,
         id: Uuid,
     ) -> Result<bool, Error> {
-        let now = Utc::now().trunc_subsecs(6);
+        let now = Timestamp::now();
         let mut update = Query::update();
         update
             .table(Alias::new(&*self.table))
@@ -242,7 +242,7 @@ impl DirectUploads {
     pub async fn expired<C: ConnectionTrait>(
         &self,
         connection: &C,
-        before: DateTime<Utc>,
+        before: Timestamp,
         limit: u64,
     ) -> Result<Vec<DirectUpload>, Error> {
         let mut select = Query::select();
@@ -262,7 +262,7 @@ impl DirectUploads {
     pub async fn forget_completed<C: ConnectionTrait>(
         &self,
         connection: &C,
-        before: DateTime<Utc>,
+        before: Timestamp,
     ) -> Result<u64, Error> {
         let mut delete = Query::delete();
         delete
@@ -326,7 +326,7 @@ pub struct UploadLink {
     #[schema(example = json!({"content-type": "video/mp4", "content-length": "734003200"}))]
     pub headers: std::collections::BTreeMap<String, String>,
     /// The URL stops working at this time.
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl UploadLink {

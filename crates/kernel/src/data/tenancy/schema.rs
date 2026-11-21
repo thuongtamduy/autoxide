@@ -6,9 +6,8 @@
 //! Migration gieo placement `main` (database điều khiển) và khách mặc định — dữ liệu của bản cài cũ
 //! thuộc về khách này.
 
-use chrono::Utc;
-
 use crate::migration::prelude::*;
+use crate::time::Timestamp;
 
 use super::{DEFAULT_TENANT, MAIN_PLACEMENT};
 
@@ -132,7 +131,7 @@ impl MigrationTrait for CreateTenancy {
         .await?;
 
         // Gieo placement `main` và khách mặc định (ID cố định, D-253).
-        let now = Utc::now();
+        let now = Timestamp::now();
         let placement = Query::insert()
             .into_table(Alias::new("kernel_placements"))
             .columns(

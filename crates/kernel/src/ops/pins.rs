@@ -11,12 +11,12 @@
 //!   người dùng (D-207), đây là giới hạn giao diện, không phải số tiền.
 //! - Là dữ liệu cá nhân: có trong bản xuất, xoá khi tài khoản bị xoá (cùng chỗ với cờ).
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -43,6 +43,7 @@ const TABLE: &str = "kernel_pins";
 
 mod entity {
     //! Bảng `kernel_pins`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -57,7 +58,7 @@ mod entity {
         pub target: String,
         pub label: Option<String>,
         pub position: i32,
-        pub created_at: DateTimeUtc,
+        pub created_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -87,7 +88,7 @@ pub(crate) struct Pin {
     pub label: String,
     /// Display order, smallest first.
     pub position: i32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// What to pin.
@@ -120,8 +121,8 @@ pub(crate) struct PinsState {
     pub translations: Translations,
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Khoá dạng `a-z0-9._-`, 1–100 ký tự (loại bản ghi, như ở nhãn và ghi chú bản ghi).

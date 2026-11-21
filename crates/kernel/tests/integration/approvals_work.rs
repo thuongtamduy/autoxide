@@ -4,8 +4,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use autoxide_kernel::access::{ActorKind, Principal};
+use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::StatusCode;
+use jiff::SignedDuration;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -57,8 +59,8 @@ async fn yeu_cau_duyet_vao_hop_viec_va_tool_mcp() {
                 "h".into(),
                 "[\"kernel.views.share\"]".into(),
                 "pending".into(),
-                (chrono::Utc::now() + chrono::Duration::hours(1)).into(),
-                chrono::Utc::now().into(),
+                (Timestamp::now() + SignedDuration::from_hours(1)).into(),
+                Timestamp::now().into(),
             ])
             .to_owned();
         database.execute_raw(backend.build(&insert)).await.unwrap();

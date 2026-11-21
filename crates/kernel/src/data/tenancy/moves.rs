@@ -35,13 +35,12 @@
 mod claims;
 mod http;
 
-use std::sync::{Arc, OnceLock};
-use std::time::Duration;
-
-use chrono::{DateTime, SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Condition, Expr};
 use sea_orm::{ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
+use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
@@ -101,12 +100,13 @@ const LEASE: Duration = Duration::from_secs(120);
 /// Bảng outbox của `kernel`: có thêm event `kernel.tenant_moved` ở đích.
 const KERNEL_EVENTS: &str = "kernel_events";
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 mod entity {
     //! Bảng `kernel_tenant_moves` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -124,13 +124,13 @@ mod entity {
         pub tables: String,
         pub error: Option<String>,
         pub runner: Option<String>,
-        pub runner_until: Option<DateTimeUtc>,
+        pub runner_until: Option<Timestamp>,
         /// Lúc khách thành `moving`: chờ cache của máy chủ khác tính từ đây.
-        pub moving_since: DateTimeUtc,
+        pub moving_since: Timestamp,
         pub requested_by: Option<Uuid>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
-        pub finished_at: Option<DateTimeUtc>,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
+        pub finished_at: Option<Timestamp>,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -214,9 +214,9 @@ pub struct TenantMove {
     pub rows: u64,
     /// Why the last run stopped, when it did; running the move again resumes it.
     pub error: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub finished_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub finished_at: Option<Timestamp>,
 }
 
 #[derive(Debug, Serialize)]

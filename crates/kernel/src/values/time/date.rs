@@ -38,6 +38,13 @@ impl Date {
         self.0.day()
     }
 
+    /// Đọc theo mẫu `strptime` (`%Y-%m-%d`, `%d/%m/%Y`…) như `chrono::NaiveDate::parse_from_str`.
+    pub fn parse_from_str(input: &str, pattern: &str) -> Result<Self, ParseError> {
+        civil::Date::strptime(pattern, input)
+            .map(Date)
+            .map_err(|_| ParseError::new(input, "a date in the expected format"))
+    }
+
     /// Hôm nay theo UTC.
     pub fn today_utc() -> Self {
         super::Timestamp::now().date_utc()

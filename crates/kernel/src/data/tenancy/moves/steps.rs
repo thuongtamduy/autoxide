@@ -1,6 +1,8 @@
 //! Bắt đầu, chạy từng bước, lease và ghi trạng thái của một lượt dời.
 
 use super::*;
+use crate::time::Timestamp;
+use jiff::SignedDuration;
 
 impl TenantMoves {
     /// Bắt đầu dời khách `tenant` sang `to` (khách thành `moving`), hay trả lượt dời sang `to` đã
@@ -137,7 +139,7 @@ impl TenantMoves {
     /// `tenant_move_running`.
     pub(super) async fn acquire(&self, id: Uuid, runner: &str) -> Result<Option<Model>, Error> {
         let at = now();
-        let until = at + chrono::Duration::from_std(LEASE).map_err(Error::internal)?;
+        let until = at + SignedDuration::try_from(LEASE).map_err(Error::internal)?;
         let taken = Entity::update_many()
             .col_expr(Column::Runner, Expr::value(runner))
             .col_expr(Column::RunnerUntil, Expr::value(until))
@@ -168,7 +170,7 @@ impl TenantMoves {
 
     pub(super) async fn release(&self, id: Uuid, runner: &str) -> Result<(), Error> {
         Entity::update_many()
-            .col_expr(Column::RunnerUntil, Expr::value(Option::<DateTime<Utc>>::None))
+            .col_expr(Column::RunnerUntil, Expr::value(Option::<Timestamp>::None))
             .filter(Column::Id.eq(id))
             .filter(Column::Runner.eq(runner))
             .exec(self.control().write())
@@ -193,7 +195,7 @@ impl TenantMoves {
             loop {
                 ticker.tick().await;
                 let until = now()
-                    + chrono::Duration::seconds(
+                    + SignedDuration::from_secs(
                         <i64 as TryFrom<u64>>::try_from(LEASE.as_secs()).unwrap_or(120),
                     );
                 let renewed = Entity::update_many()
@@ -266,7 +268,7 @@ impl TenantMoves {
         if state == DONE || state == ABORTED {
             update = update
                 .col_expr(Column::FinishedAt, Expr::value(at))
-                .col_expr(Column::RunnerUntil, Expr::value(Option::<DateTime<Utc>>::None));
+                .col_expr(Column::RunnerUntil, Expr::value(Option::<Timestamp>::None));
         }
         if update.exec(connection).await?.rows_affected != 1 {
             // Bên này mất lease (giữ quá lâu mà không gia hạn được) và bên khác đã nhận lượt dời.

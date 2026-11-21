@@ -11,11 +11,11 @@
 //! - Cờ là dữ liệu cá nhân: có trong bản xuất dữ liệu (`PersonalData`), bị xoá khi tài khoản bị
 //!   xoá (`privacy::USER_DELETED`).
 
+use crate::time::Timestamp;
 use std::sync::{Arc, OnceLock};
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::sea_query::{LikeExpr, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set};
 use serde::{Deserialize, Serialize};
@@ -55,6 +55,7 @@ pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<u64, Invalid
 
 mod entity {
     //! Bảng `kernel_user_flags`.
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -67,7 +68,7 @@ mod entity {
         pub user_id: Uuid,
         pub key: String,
         pub value: String,
-        pub updated_at: DateTimeUtc,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -92,7 +93,7 @@ pub(crate) struct Flag {
     /// Up to 200 characters, e.g. `dismissed` or the last version whose news were seen.
     #[schema(example = "dismissed")]
     pub value: String,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl From<entity::Model> for Flag {
@@ -123,8 +124,8 @@ impl Handle {
     }
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Khoá đúng dạng: 1–100 ký tự `a-z`, `0-9`, `.`, `_`, `-`.

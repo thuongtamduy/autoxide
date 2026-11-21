@@ -7,17 +7,17 @@
 //! hạn chia đều số chỗ trống (ít nhất một mỗi khách, điểm bắt đầu xoay vòng giữa các lượt); chỗ
 //! còn thừa đi cho job tới hạn sớm nhất của bất kỳ khách nào.
 
+use crate::time::Timestamp;
+use futures_util::FutureExt as _;
+use jiff::SignedDuration;
+use sea_orm::ConnectionTrait;
+use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
 use std::collections::HashMap;
 use std::future::Future;
 use std::panic::AssertUnwindSafe;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
-
-use chrono::{DateTime, Utc};
-use futures_util::FutureExt as _;
-use sea_orm::ConnectionTrait;
-use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, Query};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio::task::JoinSet;
 use uuid::Uuid;
@@ -39,7 +39,7 @@ const LEASE: Duration = Duration::from_secs(300);
 /// Không có job thì hỏi lại sau chừng này.
 const IDLE_POLL: Duration = Duration::from_secs(1);
 /// Giữ job đã xong chừng này rồi xoá.
-const KEEP_COMPLETED: chrono::Duration = chrono::Duration::days(7);
+const KEEP_COMPLETED: SignedDuration = SignedDuration::from_hours(24 * 7);
 /// Dọn job đã xong mỗi chừng này.
 const CLEANUP_EVERY: Duration = Duration::from_secs(3600);
 /// Độ dài tối đa của lỗi lưu lại.
@@ -83,7 +83,7 @@ pub struct Worker {
 pub(crate) struct Gate {
     pub entitlements: crate::entitlement::EntitlementsHandle,
     /// Hoãn job bị chặn chừng này (không tính lượt thử).
-    pub delay: Option<chrono::Duration>,
+    pub delay: Option<SignedDuration>,
 }
 
 impl Gate {
@@ -159,7 +159,7 @@ impl Worker {
 
     /// Hoãn job bị gói chặn `delay` (mặc định một giờ, `AUTOXIDE_JOBS_BLOCKED_DELAY_SECONDS`).
     pub fn blocked_delay(mut self, delay: Duration) -> Self {
-        self.gate.delay = chrono::Duration::from_std(delay).ok();
+        self.gate.delay = SignedDuration::try_from(delay).ok();
         self
     }
 
@@ -266,7 +266,7 @@ impl Worker {
         limit: u64,
     ) -> Result<Vec<ClaimedJob>, Error> {
         let now = now();
-        let until = now + chrono::Duration::from_std(self.lease).map_err(Error::internal)?;
+        let until = now + SignedDuration::try_from(self.lease).map_err(Error::internal)?;
         let table = table_name(module);
         let claim = claim_for(database.write().get_database_backend());
         let connection = database.write();
@@ -400,7 +400,7 @@ impl Worker {
                 }
                 let every =
                     i64::try_from(std::cmp::max(schedule.every.as_secs(), 1)).unwrap_or(i64::MAX);
-                let slot = now.timestamp().div_euclid(every);
+                let slot = now.as_unix_seconds().div_euclid(every);
                 let key = (*placement, schedule.name);
                 {
                     let last =
@@ -417,7 +417,7 @@ impl Worker {
                         || Error::internal(format!("module `{module}` has no job queue")),
                     )?;
                 let options = EnqueueOptions {
-                    run_at: DateTime::from_timestamp(slot * every, 0),
+                    run_at: Timestamp::from_unix_seconds(slot * every),
                     max_attempts: None,
                     unique_key: Some(format!("schedule:{}:{slot}", schedule.name)),
                 };
@@ -464,7 +464,7 @@ impl Worker {
 async fn due_tenants(
     database: &Database,
     table: &str,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> Result<Vec<TenantId>, Error> {
     let select = Query::select()
         .distinct()
@@ -504,7 +504,7 @@ async fn cleanup_table(database: &Database, module: &str) -> Result<(), Error> {
             "the worker stopped during the last attempt (crash or restart)",
         )
         .value(Alias::new("claimed_by"), Option::<String>::None)
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("completed_at")).is_null())
         .and_where(Expr::col(Alias::new("failed_at")).is_null())
         .and_where(Expr::col(Alias::new("attempts")).gte(Expr::col(Alias::new("max_attempts"))))
@@ -641,7 +641,7 @@ async fn run_job(
     update
         .table(Alias::new(table))
         .value(Alias::new("claimed_by"), Option::<String>::None)
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .and_where(Expr::col(Alias::new("id")).eq(job.id))
         // Chỉ ghi khi job còn là của worker này (chưa hết hạn giữ và bị worker khác lấy).
         .and_where(Expr::col(Alias::new("claimed_by")).eq(worker));
@@ -714,7 +714,7 @@ async fn keep_claim(
     lease: Duration,
 ) -> String {
     let every = std::cmp::max(lease / 3, Duration::from_millis(200));
-    let Ok(length) = chrono::Duration::from_std(lease) else {
+    let Ok(length) = SignedDuration::try_from(lease) else {
         return "the lease is too long".to_owned();
     };
     loop {
@@ -741,10 +741,10 @@ async fn keep_claim(
 }
 
 /// Khách đang dời: chờ sau chừng này rồi mới nhận lại job của khách.
-const MOVING_DELAY: chrono::Duration = chrono::Duration::seconds(30);
+const MOVING_DELAY: SignedDuration = SignedDuration::from_secs(30);
 
 /// Job bị gói chặn: chờ sau chừng này (khi chương trình không đặt khác).
-const BLOCKED_DELAY: chrono::Duration = chrono::Duration::seconds(3600);
+const BLOCKED_DELAY: SignedDuration = SignedDuration::from_secs(3600);
 
 /// Trả job vừa claim về hàng đợi (khách đang dời), không tính lần chạy này.
 async fn put_back(
@@ -762,13 +762,13 @@ async fn put_back_after(
     table: &str,
     worker: &str,
     job: &ClaimedJob,
-    delay: chrono::Duration,
+    delay: SignedDuration,
 ) -> Result<(), Error> {
     let mut update = Query::update();
     update
         .table(Alias::new(table))
         .value(Alias::new("claimed_by"), Option::<String>::None)
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .value(Alias::new("attempts"), Expr::col(Alias::new("attempts")).sub(1))
         .value(Alias::new("run_at"), now() + delay)
         .and_where(Expr::col(Alias::new("id")).eq(job.id))
@@ -794,7 +794,7 @@ async fn left_over(
     update
         .table(Alias::new(table))
         .value(Alias::new("claimed_by"), Option::<String>::None)
-        .value(Alias::new("claimed_until"), Option::<DateTime<Utc>>::None)
+        .value(Alias::new("claimed_until"), Option::<Timestamp>::None)
         .value(Alias::new("failed_at"), now())
         .value(Alias::new("last_error"), message)
         .and_where(Expr::col(Alias::new("id")).eq(job.id))
@@ -805,9 +805,9 @@ async fn left_over(
 }
 
 /// Chờ trước lần chạy thứ `attempts + 1`: 2, 4, 8… giây, tối đa một giờ.
-fn backoff(attempts: i32) -> chrono::Duration {
+fn backoff(attempts: i32) -> SignedDuration {
     let exponent = u32::try_from(attempts.clamp(1, 12)).unwrap_or(12);
-    chrono::Duration::seconds(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
+    SignedDuration::from_secs(std::cmp::min(i64::from(2u32.pow(exponent)), 3600))
 }
 
 /// Lỗi kèm nguyên nhân gốc, để người vận hành biết sửa gì.

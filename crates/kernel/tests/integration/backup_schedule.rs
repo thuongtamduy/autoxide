@@ -4,6 +4,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::backup::scheduled::{BackupOutcome, ScheduledBackups, latest_successes};
@@ -130,7 +132,7 @@ async fn backup_dang_running_ma_tien_trinh_chet_thi_danh_failed() {
         // Nhịp cuối cách đây một giờ (quá 15 phút): lượt kia đã chết, lượt mới chạy được ngay.
         let old = Query::update()
             .table(Alias::new("kernel_backups"))
-            .value(Alias::new("heartbeat_at"), chrono::Utc::now() - chrono::Duration::hours(1))
+            .value(Alias::new("heartbeat_at"), Timestamp::now() - SignedDuration::from_hours(1))
             .to_owned();
         app.database().write().execute(&old).await.unwrap();
 

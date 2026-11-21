@@ -14,11 +14,11 @@
 //!
 //! Lời giải trình duyệt gửi là base64 (chuẩn) của JSON `{"challenge": …, "solution": …}`.
 
+use crate::time::Timestamp;
 use std::collections::BTreeMap;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -76,7 +76,7 @@ impl ChallengeVerifier for Altcha {
             "algorithm": ALGORITHM,
             "cost": self.cost,
             "data": {"binding": binding, "scope": scope},
-            "expiresAt": Utc::now().timestamp() + TTL_SECONDS,
+            "expiresAt": Timestamp::now().as_unix_seconds() + TTL_SECONDS,
             "keyLength": KEY_LENGTH,
             "keyPrefix": hex(&derived[..KEY_LENGTH / 2]),
             "nonce": hex(nonce),
@@ -95,7 +95,7 @@ impl ChallengeVerifier for Altcha {
         let Some(solution) = solution.filter(|solution| !solution.trim().is_empty()) else {
             return Ok(ChallengeOutcome::Missing);
         };
-        let (key, cost, now) = (self.key().await?, self.cost, Utc::now().timestamp());
+        let (key, cost, now) = (self.key().await?, self.cost, Timestamp::now().as_unix_seconds());
         let (solution, scope, binding) =
             (solution.to_owned(), scope.to_owned(), binding.to_owned());
         // Kiểm lời giải cũng tính `cost` vòng SHA-256: thread cho việc chặn.

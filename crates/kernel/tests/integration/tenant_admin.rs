@@ -5,6 +5,7 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
@@ -301,11 +302,9 @@ async fn khach_bi_khoa_nhan_403() {
                 header::IF_MATCH,
                 format!(
                     "\"{}\"",
-                    chrono::DateTime::parse_from_rfc3339(
-                        read["data"]["updated_at"].as_str().unwrap()
-                    )
-                    .unwrap()
-                    .timestamp_micros()
+                    Timestamp::parse_rfc3339(read["data"]["updated_at"].as_str().unwrap())
+                        .unwrap()
+                        .as_unix_micros()
                 ),
             )
             .body(Body::from(changes.to_string()))

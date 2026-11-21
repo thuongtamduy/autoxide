@@ -6,6 +6,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -400,7 +402,7 @@ async fn event_commit_muon_van_toi() {
         // Như một transaction ghi từ 2 giây trước, chỉ vừa commit.
         let late = Uuid::new_v7(uuid::Timestamp::from_unix(
             uuid::NoContext,
-            u64::try_from(chrono::Utc::now().timestamp() - 2).unwrap(),
+            u64::try_from(Timestamp::now().as_unix_seconds() - 2).unwrap(),
             0,
         ));
         insert_late(&server, late, "late").await;
@@ -416,7 +418,7 @@ async fn insert_late(server: &Server, id: Uuid, title: &str) {
     use sea_orm::ConnectionTrait as _;
     use sea_orm::sea_query::{Alias, Query};
     let tenant = server.app.default_tenant();
-    let at = chrono::Utc::now() - chrono::Duration::seconds(2);
+    let at = Timestamp::now() - SignedDuration::from_secs(2);
     let payload = serde_json::json!({ "title": title }).to_string();
     let mut insert = Query::insert();
     insert

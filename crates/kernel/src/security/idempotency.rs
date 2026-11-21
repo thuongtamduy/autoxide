@@ -10,10 +10,9 @@
 //! Lưu trữ nằm sau trait [`IdempotencyStore`], do một module cung cấp (kernel không có
 //! bảng); lớp HTTP ở `http::idempotency`.
 
-use chrono::{DateTime, Utc};
-
 use crate::error::Error;
 use crate::tenancy::TenantContext;
+use crate::time::Timestamp;
 
 /// Response đã lưu của một lệnh ghi.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,7 +56,7 @@ pub trait IdempotencyStore: Send + Sync {
         scope: &str,
         key: &str,
         fingerprint: &str,
-        locked_until: DateTime<Utc>,
+        locked_until: Timestamp,
     ) -> Result<Begin, Error>;
 
     /// Lưu response của lần chạy `id`.

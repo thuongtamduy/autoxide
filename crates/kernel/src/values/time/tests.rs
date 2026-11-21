@@ -250,3 +250,40 @@ fn tinh_ngay_giong_chrono() {
     let vietnam = jiff::tz::TimeZone::get("Asia/Ho_Chi_Minh").unwrap();
     assert_eq!(a.start_of_day_in(&vietnam).unwrap().to_json_string(), "2026-02-28T17:00:00Z");
 }
+
+#[test]
+fn doc_rfc3339_chat_nhu_chrono_va_ngay_theo_mau() {
+    for input in [
+        "2026-11-21T10:00:00Z",
+        "2026-11-21t10:00:00.5z",
+        "2026-11-21 10:00:00+07:00",
+        "2026-11-21T10:00:00.123456789-03:30",
+        "2026-11-21T10:00Z",
+        "2026-11-21T10:00:00",
+        "2026-11-21",
+        "20261121T100000Z",
+        "2026-11-21T10:00:00+07",
+        "2026-11-21T10:00:00.Z",
+    ] {
+        let chrono_ok = DateTime::parse_from_rfc3339(input).is_ok();
+        assert_eq!(Timestamp::parse_rfc3339(input).is_ok(), chrono_ok, "{input}");
+        if chrono_ok {
+            let theirs = DateTime::parse_from_rfc3339(input).unwrap().with_timezone(&Utc);
+            assert_eq!(DateTime::<Utc>::from(Timestamp::parse_rfc3339(input).unwrap()), theirs);
+        }
+    }
+    for (input, pattern) in [
+        ("2026-11-21", "%Y-%m-%d"),
+        ("2026-1-5", "%Y-%m-%d"),
+        ("21/11/2026", "%d/%m/%Y"),
+        ("2026-13-01", "%Y-%m-%d"),
+        ("x", "%Y-%m-%d"),
+    ] {
+        let theirs = NaiveDate::parse_from_str(input, pattern).ok();
+        assert_eq!(
+            Date::parse_from_str(input, pattern).ok().map(NaiveDate::from),
+            theirs,
+            "{input}"
+        );
+    }
+}

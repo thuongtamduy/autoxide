@@ -7,6 +7,8 @@
 // File trong `tests/` toàn là code test: hỏng thì phải dừng ngay và báo rõ chỗ.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::sync::Arc;
 
 use autoxide_kernel::error::Error;
@@ -334,7 +336,7 @@ async fn job_xac_minh_va_het_han() {
         let stale_id = stale["data"]["id"].as_str().unwrap();
         // `ExprTrait` chỉ ở đây: `is_null` của nó trùng tên với `Value::is_null`.
         use sea_orm::sea_query::ExprTrait as _;
-        let old = chrono::Utc::now() - chrono::Duration::days(8);
+        let old = Timestamp::now() - SignedDuration::from_hours(24 * 8);
         let backdate = Query::update()
             .table(Alias::new("kernel_tenant_domains"))
             .value(Alias::new("updated_at"), old)
@@ -379,7 +381,7 @@ async fn job_xac_minh_va_het_han() {
 /// Lùi `last_checked_at` của `domain` về 25 giờ trước: lần kiểm lại hằng ngày tới hạn.
 async fn backdate_check(app: &TestApp, domain: &str) {
     use sea_orm::sea_query::ExprTrait as _;
-    let old = chrono::Utc::now() - chrono::Duration::hours(25);
+    let old = Timestamp::now() - SignedDuration::from_hours(25);
     let update = Query::update()
         .table(Alias::new("kernel_tenant_domains"))
         .value(Alias::new("last_checked_at"), old)

@@ -10,11 +10,10 @@
 //!   [`PromoteApply::promote`] trong ngữ cảnh khách thật, với quyền của chính người gọi. Bên khách
 //!   thật luôn nhận BẢN NHÁP (không tự đăng, không tự bật), không bao giờ ghi đè bản đang chạy.
 
-use std::sync::{Arc, OnceLock};
-
-use chrono::{SubsecRound, Utc};
+use crate::time::Timestamp;
 use sea_orm::sea_query::{Expr, OnConflict};
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set};
+use std::sync::{Arc, OnceLock};
 use uuid::Uuid;
 
 use crate::access::Principal;
@@ -23,6 +22,7 @@ use crate::tenancy::{ScopeExt, TenantContext, TenantScoped};
 
 pub(crate) mod entity {
     //! Bảng `kernel_sandbox_links` (migration `m0038_create_sandbox_tables`).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -43,8 +43,8 @@ pub(crate) mod entity {
         pub promoted_id: Option<Uuid>,
         /// Dấu vân tay nội dung lần đẩy gần nhất (đẩy lại cùng nội dung → `unchanged`).
         pub promoted_fingerprint: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
     }
 
     impl ActiveModelBehavior for ActiveModel {}
@@ -178,8 +178,8 @@ impl SandboxCatalog {
     }
 }
 
-fn now() -> chrono::DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Ghi bản ghi `record_id` của sandbox là bản sao của `source_id` (loại `kind`). Gọi lại không thêm

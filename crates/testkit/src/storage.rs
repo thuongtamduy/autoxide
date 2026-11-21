@@ -1,6 +1,8 @@
 //! Nơi lưu file trong bộ nhớ cho test của module (đặc tả 32 B3): cài `dyn Storage` của kernel
 //! mà không cần ổ đĩa hay S3 (nơi lưu thật được thử ở test đầu-cuối của `crates/app`).
 
+use autoxide_kernel::time::Timestamp;
+use jiff::SignedDuration;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -103,8 +105,8 @@ impl Storage for MemoryStorage {
             ("content-length".to_owned(), constraints.size.to_string()),
             ("content-type".to_owned(), constraints.content_type.clone()),
         ];
-        let ttl = chrono::Duration::from_std(ttl).map_err(Error::internal)?;
-        let expires_at = chrono::Utc::now() + ttl;
+        let ttl = SignedDuration::try_from(ttl).map_err(Error::internal)?;
+        let expires_at = Timestamp::now() + ttl;
         Ok(Some(PresignedUpload::new("PUT", format!("memory://{key}"), headers, expires_at)))
     }
 }

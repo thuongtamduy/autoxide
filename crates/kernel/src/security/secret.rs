@@ -16,11 +16,11 @@
 //!
 //! Module lấy khoá lúc khởi động: `let key = context.require::<SecretKey>()?;`.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::Utc;
 use hmac::{Hmac, KeyInit, Mac};
 use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::{Alias, Expr, ExprTrait as _, OnConflict, Query};
@@ -290,7 +290,7 @@ async fn stored_key(database: &Database) -> Result<Vec<u8>, Error> {
     let insert = Query::insert()
         .into_table(Alias::new("kernel_secrets"))
         .columns([Alias::new("name"), Alias::new("value"), Alias::new("created_at")])
-        .values_panic([SIGNING_KEY.into(), fresh.into(), Utc::now().into()])
+        .values_panic([SIGNING_KEY.into(), fresh.into(), Timestamp::now().into()])
         .on_conflict(OnConflict::column(Alias::new("name")).do_nothing().to_owned())
         .to_owned();
     let connection = database.write();

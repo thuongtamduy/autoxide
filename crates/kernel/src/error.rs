@@ -24,6 +24,7 @@
 //! assert_eq!(error.message(), "Note 7 does not exist.");
 //! ```
 
+use crate::time::Timestamp;
 use std::borrow::Cow;
 use std::fmt;
 use std::num::NonZeroU32;
@@ -197,7 +198,7 @@ struct Extra {
     reason: Option<&'static str>,
     /// Bản ghi hiện tại trên máy chủ, kèm phiên bản (lỗi 412 của ghi có điều kiện, bước 69 P2):
     /// trường mở rộng `current` của Problem và header `ETag`.
-    current: Option<(serde_json::Value, chrono::DateTime<chrono::Utc>)>,
+    current: Option<(serde_json::Value, Timestamp)>,
     /// Giá trị header `WWW-Authenticate` của 401 thay cho `Bearer` trần (vd lời mời xác thực lại
     /// của RFC 9470).
     challenge: Option<String>,
@@ -331,11 +332,7 @@ impl Error {
     /// Gắn bản ghi hiện tại `record` (dạng như khi đọc nó) và phiên bản `version` của nó: client
     /// thấy ngay bản trên máy chủ để tự gộp, không phải đọc lại.
     #[must_use]
-    pub fn with_current(
-        mut self,
-        record: serde_json::Value,
-        version: chrono::DateTime<chrono::Utc>,
-    ) -> Self {
+    pub fn with_current(mut self, record: serde_json::Value, version: Timestamp) -> Self {
         self.extra.get_or_insert_default().current = Some((record, version));
         self
     }
@@ -354,7 +351,7 @@ impl Error {
     }
 
     /// Bản ghi hiện tại gắn bằng [`with_current`](Self::with_current), nếu có.
-    pub fn current(&self) -> Option<&(serde_json::Value, chrono::DateTime<chrono::Utc>)> {
+    pub fn current(&self) -> Option<&(serde_json::Value, Timestamp)> {
         self.extra.as_ref().and_then(|extra| extra.current.as_ref())
     }
 

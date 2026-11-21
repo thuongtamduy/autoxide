@@ -4,9 +4,9 @@
 //! Dạng: `base64url(độ dài phạm vi 1 byte ‖ phạm vi ‖ lúc phát i64 ‖ nonce 16 byte) .
 //! base64url(HMAC-SHA256)`, ký bằng khoá dẫn từ khoá của kernel (nhãn [`PURPOSE`]).
 
+use crate::time::Timestamp;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use chrono::{DateTime, Utc};
 use hmac::{Hmac, KeyInit, Mac};
 use sha2::Sha256;
 
@@ -19,7 +19,7 @@ pub(crate) const PURPOSE: &str = "autoxide/antispam/form-token/v1";
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FormToken {
     pub scope: String,
-    pub issued_at: DateTime<Utc>,
+    pub issued_at: Timestamp,
     /// Nonce (base64url) — khoá idempotency của bài gửi.
     pub nonce: String,
 }
@@ -27,13 +27,13 @@ pub(crate) struct FormToken {
 pub(crate) fn sign(
     key: &[u8; 32],
     scope: &str,
-    issued_at: DateTime<Utc>,
+    issued_at: Timestamp,
     nonce: &[u8; 16],
 ) -> Result<String, Error> {
     let scope_len = u8::try_from(scope.len()).map_err(|_| Error::internal("scope too long"))?;
     let mut payload = vec![scope_len];
     payload.extend(scope.as_bytes());
-    payload.extend(issued_at.timestamp().to_be_bytes());
+    payload.extend(issued_at.as_unix_seconds().to_be_bytes());
     payload.extend(nonce);
     let signature = mac(key, &payload)?.finalize().into_bytes();
     Ok(format!("{}.{}", URL_SAFE_NO_PAD.encode(&payload), URL_SAFE_NO_PAD.encode(signature)))
@@ -52,7 +52,7 @@ pub(crate) fn open(key: &[u8; 32], token: &str) -> Option<FormToken> {
     if nonce.len() != 16 {
         return None;
     }
-    let issued_at = DateTime::from_timestamp(i64::from_be_bytes(issued.try_into().ok()?), 0)?;
+    let issued_at = Timestamp::from_unix_seconds(i64::from_be_bytes(issued.try_into().ok()?))?;
     Some(FormToken {
         scope: String::from_utf8(scope.to_vec()).ok()?,
         issued_at,
@@ -79,7 +79,7 @@ mod tests {
     #[test]
     fn ky_va_doc_lai() {
         let key = [3u8; 32];
-        let at = DateTime::from_timestamp(1_800_000_000, 0).unwrap();
+        let at = Timestamp::from_unix_seconds(1_800_000_000).unwrap();
         let token = sign(&key, "forms:contact", at, &[9u8; 16]).unwrap();
         let opened = open(&key, &token).unwrap();
         assert_eq!((opened.scope.as_str(), opened.issued_at), ("forms:contact", at));

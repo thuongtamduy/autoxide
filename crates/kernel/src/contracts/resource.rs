@@ -19,6 +19,7 @@
 //!   (`context.badge_source(…)`), vd `seller` cho người quản lý sản phẩm, `verified_buyer` cho
 //!   người đã nhận hàng. Bên hỏi nhận mã nhãn ổn định, không biết module nào tính ra.
 
+use crate::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -679,7 +680,7 @@ mod tests {
 #[non_exhaustive]
 pub struct HistoryLine {
     pub id: Uuid,
-    pub at: chrono::DateTime<chrono::Utc>,
+    pub at: Timestamp,
     /// Tên event, vd `content.entry_published`.
     pub action: String,
     pub actor_user_id: Option<Uuid>,
@@ -690,7 +691,7 @@ pub struct HistoryLine {
 }
 
 impl HistoryLine {
-    pub fn new(id: Uuid, at: chrono::DateTime<chrono::Utc>, action: impl Into<String>) -> Self {
+    pub fn new(id: Uuid, at: Timestamp, action: impl Into<String>) -> Self {
         HistoryLine {
             id,
             at,

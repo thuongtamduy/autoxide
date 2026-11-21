@@ -8,6 +8,7 @@
 //! - Database điều khiển (`main`) không migrate qua API: `serve` không chạy khi `main` còn migration
 //!   chờ, nên máy chủ đang trả lời API thì `main` đã xong.
 
+use crate::time::Timestamp;
 use std::sync::Arc;
 
 use crate::migration::prelude::{
@@ -15,7 +16,6 @@ use crate::migration::prelude::{
 };
 use crate::migration::schema;
 use axum::extract::{Path, State};
-use chrono::{DateTime, SubsecRound, Utc};
 use sea_orm::entity::prelude::*;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Set,
@@ -39,6 +39,7 @@ pub(crate) const MIGRATE_PLACEMENTS: &str = "kernel.migrate_placements";
 
 mod entity {
     //! Bảng `kernel_migration_runs` (mặt điều khiển).
+    use crate::time::Timestamp;
     use sea_orm::entity::prelude::*;
 
     #[sea_orm::model]
@@ -55,8 +56,8 @@ mod entity {
         /// JSON `[{"placement": …, "applied": ["module/m0001_…", …]}]`.
         pub result: String,
         pub error: Option<String>,
-        pub created_at: DateTimeUtc,
-        pub updated_at: DateTimeUtc,
+        pub created_at: Timestamp,
+        pub updated_at: Timestamp,
         /// `active` khi lượt chưa xong (`pending` / `running`), trống khi đã xong; unique — mỗi
         /// lúc chỉ một lượt chạy (m0039).
         pub active_key: Option<String>,
@@ -197,8 +198,8 @@ pub struct MigrationRun {
     /// Why it failed: the placement and its error. Fix it and start a new run; what is already
     /// applied is skipped.
     pub error: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 impl From<Model> for MigrationRun {
@@ -225,8 +226,8 @@ impl Job for MigratePlacements {
     const KIND: &'static str = MIGRATE_PLACEMENTS;
 }
 
-fn now() -> DateTime<Utc> {
-    Utc::now().trunc_subsecs(6)
+fn now() -> Timestamp {
+    Timestamp::now()
 }
 
 /// Migrate placement bằng API.

@@ -15,25 +15,25 @@
 //!   trả `304 Not Modified` không kèm thân (xem [`if_none_match`]) — mọi `GET` có `ETag`
 //!   đều được, không phải viết gì thêm.
 
+use crate::time::Timestamp;
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse, Response};
-use chrono::{DateTime, Utc};
 use serde::Serialize;
 
 use crate::error::{Error, ErrorKind};
 use crate::response::Data;
 
 /// Giá trị `ETag` của phiên bản `version`: `"<số micro giây Unix>"`.
-pub fn etag(version: DateTime<Utc>) -> String {
-    format!("\"{}\"", version.timestamp_micros())
+pub fn etag(version: Timestamp) -> String {
+    format!("\"{}\"", version.as_unix_micros())
 }
 
 /// Kết quả `{"data": …}` kèm header `ETag` của bản ghi.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Tagged<T> {
-    pub version: DateTime<Utc>,
+    pub version: Timestamp,
     pub data: T,
 }
 
@@ -56,7 +56,7 @@ pub enum IfMatch {
     /// Gửi `*`: sửa không cần kiểm phiên bản.
     Any,
     /// Chỉ sửa khi bản ghi còn đúng phiên bản này.
-    Version(DateTime<Utc>),
+    Version(Timestamp),
     /// Giá trị không phải `ETag` máy chủ này cấp (sai dạng, `ETag` yếu `W/…`, nhiều giá trị):
     /// không bao giờ khớp.
     Never,
@@ -64,7 +64,7 @@ pub enum IfMatch {
 
 impl IfMatch {
     /// Phiên bản service phải khớp (`None`: không kiểm); lỗi 412 nếu không thể khớp.
-    pub fn expected(self) -> Result<Option<DateTime<Utc>>, Error> {
+    pub fn expected(self) -> Result<Option<Timestamp>, Error> {
         match self {
             IfMatch::Missing | IfMatch::Any => Ok(None),
             IfMatch::Version(version) => Ok(Some(version)),
@@ -74,7 +74,7 @@ impl IfMatch {
 
     /// Như [`expected`](Self::expected), nhưng bắt buộc gửi header: thiếu thì 428.
     /// `*` vẫn được nhận — người gọi nói rõ là muốn ghi đè.
-    pub fn required(self) -> Result<Option<DateTime<Utc>>, Error> {
+    pub fn required(self) -> Result<Option<Timestamp>, Error> {
         match self {
             IfMatch::Missing => Err(Error::new(
                 ErrorKind::PreconditionRequired,
@@ -103,7 +103,7 @@ impl IfMatch {
             .strip_prefix('"')
             .and_then(|rest| rest.strip_suffix('"'))
             .and_then(|micros| micros.parse::<i64>().ok())
-            .and_then(DateTime::from_timestamp_micros)
+            .and_then(Timestamp::from_unix_micros)
             .map_or(IfMatch::Never, IfMatch::Version)
     }
 }
@@ -154,7 +154,7 @@ pub fn changed() -> Error {
 /// `version` của nó (bước 69 P2): app ngoại tuyến tự gộp thay đổi của mình vào bản trên máy chủ
 /// rồi gửi lại với `ETag` mới, không phải đọc lại. Không đổi được `current` thành JSON thì vẫn trả
 /// 412, không kèm bản.
-pub fn changed_with<T: Serialize>(current: &T, version: DateTime<Utc>) -> Error {
+pub fn changed_with<T: Serialize>(current: &T, version: Timestamp) -> Error {
     match serde_json::to_value(current) {
         Ok(record) => changed().with_current(record, version),
         Err(_) => changed(),
@@ -163,13 +163,12 @@ pub fn changed_with<T: Serialize>(current: &T, version: DateTime<Utc>) -> Error 
 
 #[cfg(test)]
 mod tests {
-    use chrono::SubsecRound;
 
     use super::*;
 
     #[test]
     fn etag_doc_lai_dung_phien_ban() {
-        let version = Utc::now().trunc_subsecs(6);
+        let version = Timestamp::now();
         assert_eq!(IfMatch::parse(Some(&etag(version))), IfMatch::Version(version));
         assert_eq!(IfMatch::parse(None), IfMatch::Missing);
         assert_eq!(IfMatch::Missing.expected().unwrap(), None);
@@ -199,7 +198,7 @@ mod tests {
 
     #[tokio::test]
     async fn ket_qua_kem_etag() {
-        let version = DateTime::from_timestamp_micros(1_700_000_000_123_456).unwrap();
+        let version = Timestamp::from_unix_micros(1_700_000_000_123_456).unwrap();
         let response = Tagged { version, data: 1 }.into_response();
         assert_eq!(response.headers()[header::ETAG], "\"1700000000123456\"");
     }

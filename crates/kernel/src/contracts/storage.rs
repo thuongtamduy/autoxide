@@ -5,6 +5,7 @@
 //! `context.require::<dyn Storage>()` (đăng ký SAU module `files`). Nội dung đi dưới
 //! dạng luồng byte ([`ByteStream`]): file lớn không bao giờ nằm trọn trong bộ nhớ.
 
+use crate::time::Timestamp;
 use std::ops::Range;
 use std::pin::Pin;
 
@@ -63,7 +64,7 @@ pub struct PresignedUpload {
     pub method: String,
     pub url: String,
     pub headers: Vec<(String, String)>,
-    pub expires_at: chrono::DateTime<chrono::Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl PresignedUpload {
@@ -71,7 +72,7 @@ impl PresignedUpload {
         method: impl Into<String>,
         url: impl Into<String>,
         headers: Vec<(String, String)>,
-        expires_at: chrono::DateTime<chrono::Utc>,
+        expires_at: Timestamp,
     ) -> Self {
         PresignedUpload { method: method.into(), url: url.into(), headers, expires_at }
     }
