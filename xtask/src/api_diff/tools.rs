@@ -4,7 +4,7 @@ use super::*;
 
 /// So hai manifest tool MCP (`docs/mcp-tools.json`, D-233). Tool ghép theo tên; schema đầu vào so
 /// theo chiều request, schema kết quả theo chiều response, bằng cùng bộ so của OpenAPI.
-pub fn diff_tools(old: &Value, new: &Value, today: NaiveDate) -> Report {
+pub fn diff_tools(old: &Value, new: &Value, today: Date) -> Report {
     let mut report = Report::default();
     let index = |manifest: &Value| -> BTreeMap<String, Value> {
         manifest
@@ -21,7 +21,7 @@ pub fn diff_tools(old: &Value, new: &Value, today: NaiveDate) -> Report {
             let sunset = old_tool
                 .pointer("/deprecation/sunset")
                 .and_then(Value::as_str)
-                .and_then(|date| NaiveDate::parse_from_str(date, "%Y-%m-%d").ok());
+                .and_then(|date| Date::strptime("%Y-%m-%d", date).ok());
             match sunset {
                 Some(sunset) if sunset <= today => report.push(
                     Level::Note,

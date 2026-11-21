@@ -84,7 +84,7 @@ tower-http = { version = "0.7", features = [
   "request-id",
 ] }
 # Khai rõ từng feature đang dựa vào thay vì nhận bộ mặc định. Không bật
-# `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng `autoxide_kernel::time`
+# `with-chrono`, `with-rust_decimal` và `with-time`: tiền là số nguyên, thời gian dùng `autoxide_kernel::time`
 # (CLAUDE.md, "Luật dữ liệu"). Migration do kernel tự chạy (D-20261121-own-migrations), không qua
 # `sea-orm-migration` — thư viện đó bật lại bộ feature mặc định của sea-orm (kéo `chrono`, `time`,
 # `rust_decimal`). TLS dùng rustls để binary không phụ thuộc OpenSSL của hệ điều hành.
@@ -95,20 +95,18 @@ sea-orm = { version = "2.0", default-features = false, features = [
   "sqlx-postgres",
   "sqlx-sqlite",
   "stream",
-  "with-chrono",
   "with-json",
   "with-uuid",
 ] }
 # `jiff_0_2`: `utoipa` nhận kiểu theo TÊN lúc biên dịch (`Timestamp` → `date-time`, `Date` → `date`), không kéo crate
 # `jiff` 0.2 nào — để kiểu của `autoxide_kernel::time` cho cùng OpenAPI như `chrono` (D-20261121-time-library).
-utoipa = { version = "6.0", features = ["axum_extras", "chrono", "jiff_0_2", "uuid"] }
+utoipa = { version = "6.0", features = ["axum_extras", "jiff_0_2", "uuid"] }
 utoipa-axum = "0.3"
 utoipa-scalar = { version = "0.4", features = ["axum"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 validator = { version = "0.21", features = ["derive"] }
 uuid = { version = "1.29", features = ["serde", "v7"] }
-chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 # Số thập phân cho TÍNH tiền, thuế, tỉ giá (D-322); tiền LƯU vẫn là số nguyên `Money`.
 rust_decimal = { version = "1.43", default-features = false, features = ["std"] }
 # Bộ dựng mẫu cho mẫu do khách tự soạn (mẫu in, mail, thông báo — D-351): cú pháp Jinja, hộp cát,
@@ -127,7 +125,7 @@ krilla = { version = "0.8.2", default-features = false }
 skrifa = "0.50"
 # File Excel (.xlsx) của bản xuất kế toán (D-354). Không bật feature nào (không serde, không polars).
 rust_xlsxwriter = { version = "0.102.0", default-features = false }
-# Thời gian thay `chrono` / `chrono-tz` (đã ngừng bảo trì; D-20261121-time-library): lớp `autoxide_kernel::time`
+# Thời gian thay `chrono` / `chrono-tz` (đã ngừng bảo trì, đã gỡ; D-20261121-time-library): lớp `autoxide_kernel::time`
 # dựng trên `jiff`. Bỏ `tz-system` / `tzdb-zoneinfo` (đọc `/usr/share/zoneinfo` của máy): cơ sở dữ liệu múi giờ
 # luôn nhúng vào binary (`tzdb-bundle-always`) như `chrono-tz`, để mọi máy (kể cả image không có zoneinfo) tính
 # giờ địa phương giống nhau.
@@ -176,14 +174,6 @@ url = "2"
 reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider", "stream"] }
 # Để kernel cài provider `ring` cho rustls (reqwest không tự chọn khi không kèm provider).
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
-# MCP endpoint (SDK chính thức của Model Context Protocol): server Streamable HTTP ở
-# kernel. Bỏ feature mặc định (macro tool — tool khai bằng hợp đồng module, không bằng
-# macro). Client (`client`, `transport-streamable-http-client-reqwest`,
-# `reqwest-tls-no-provider`) chỉ bật trong [dev-dependencies] cho test.
-rmcp = { version = "3.9", default-features = false, features = [
-  "server",
-  "transport-streamable-http-server",
-] }
 # Gửi mail qua SMTP. Bỏ bộ feature mặc định (native-tls kéo OpenSSL); TLS dùng rustls với
 # `ring` — cùng thư viện mật mã sqlx đang dùng, tránh xung đột ở D-043.
 lettre = { version = "0.11", default-features = false, features = [

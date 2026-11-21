@@ -19,7 +19,7 @@ use std::fmt;
 use std::path::Path;
 use std::process::Command;
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use serde_json::Value;
 
 mod schema;
@@ -194,7 +194,7 @@ enum Direction {
 }
 
 /// So hai tài liệu OpenAPI. `today`: ngày (UTC) để xét sunset.
-pub fn diff(old: &Value, new: &Value, today: NaiveDate) -> Report {
+pub fn diff(old: &Value, new: &Value, today: Date) -> Report {
     let mut report = Report::default();
     let old_ops = operations(old);
     let new_ops = operations(new);
@@ -287,16 +287,16 @@ fn normalize_path(path: &str) -> String {
 
 /// Ngày sunset của operation deprecated: `x-sunset`, hay câu "It will be removed on YYYY-MM-DD."
 /// trong `description` (bản cũ chưa có extension).
-fn sunset_of(operation: &Value) -> Option<NaiveDate> {
+fn sunset_of(operation: &Value) -> Option<Date> {
     if operation.get("deprecated").and_then(Value::as_bool) != Some(true) {
         return None;
     }
     if let Some(date) = operation.get("x-sunset").and_then(Value::as_str) {
-        return NaiveDate::parse_from_str(date, "%Y-%m-%d").ok();
+        return Date::strptime("%Y-%m-%d", date).ok();
     }
     let description = operation.get("description").and_then(Value::as_str)?;
     let (_, rest) = description.split_once("removed on ")?;
-    NaiveDate::parse_from_str(rest.get(..10)?, "%Y-%m-%d").ok()
+    Date::strptime("%Y-%m-%d", rest.get(..10)?).ok()
 }
 
 /// Một ngoại lệ có chủ đích (`xtask/api-breaking-allow.json`).
@@ -334,7 +334,7 @@ pub fn apply_allowlist(
 }
 
 /// Lệnh `cargo xtask api-diff`.
-pub fn run(root: &Path, base: Option<&str>, today: NaiveDate) -> Result<bool, String> {
+pub fn run(root: &Path, base: Option<&str>, today: Date) -> Result<bool, String> {
     let base = match base {
         Some(base) => base.to_owned(),
         None => match last_release_tag(root)? {

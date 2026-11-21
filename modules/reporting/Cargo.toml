@@ -29,11 +29,6 @@ autoxide-testkit.workspace = true
 futures-util.workspace = true
 tokio.workspace = true
 # MCP client thật cho test tool của module.
-rmcp = { workspace = true, features = [
-  "client",
-  "transport-streamable-http-client-reqwest",
-  "reqwest-tls-no-provider",
-] }
 
 [lints]
 workspace = true

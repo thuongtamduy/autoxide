@@ -1,10 +1,9 @@
 //! Kiểu thời gian mới (`autoxide_kernel::time`, D-20261121-time-library) trên database đang chọn: đi một vòng
-//! không lệch, đọc được dòng `chrono` đã ghi (và ngược lại), sắp xếp và lọc đúng khi dòng cũ và mới trộn nhau.
+//! không lệch, đọc được dòng `chrono` đã ghi (dữ liệu cũ), sắp xếp và lọc đúng khi dòng cũ và mới trộn nhau.
 
 use autoxide_kernel::migration::prelude::*;
 use autoxide_kernel::time::{Date, Timestamp};
 use autoxide_testkit::TestDatabase;
-use chrono::{DateTime, NaiveDate, Utc};
 use jiff::SignedDuration;
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseBackend, DatabaseConnection,
@@ -24,27 +23,6 @@ mod probe {
         pub id: Uuid,
         pub at: Timestamp,
         pub maybe_at: Option<Timestamp>,
-        pub day: Date,
-        pub maybe_day: Option<Date>,
-    }
-
-    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
-    pub enum Relation {}
-
-    impl ActiveModelBehavior for ActiveModel {}
-}
-
-/// Cùng bảng, đọc / ghi bằng `chrono` như code cũ.
-mod legacy {
-    use sea_orm::entity::prelude::*;
-
-    #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-    #[sea_orm(table_name = "time_probe")]
-    pub struct Model {
-        #[sea_orm(primary_key, auto_increment = false)]
-        pub id: Uuid,
-        pub at: DateTimeUtc,
-        pub maybe_at: Option<DateTimeUtc>,
         pub day: Date,
         pub maybe_day: Option<Date>,
     }
@@ -99,18 +77,22 @@ async fn insert(
     id
 }
 
-async fn insert_legacy(db: &DatabaseConnection, at: DateTime<Utc>, day: NaiveDate) -> Uuid {
+/// Ghi một dòng y như `chrono` (qua `sqlx`) đã ghi trước khi đổi thư viện — dữ liệu cũ đang nằm trên đĩa.
+/// `at_text` viết RFC 3339 đuôi `Z` với 0/3/6 chữ số lẻ; `chrono` lưu SQLite cùng chuỗi đó nhưng đuôi `+00:00`
+/// (`to_rfc3339_opts(AutoSi, false)`), ngày dạng `%F`. Postgres nhận chuỗi và tự đổi sang `timestamptz` / `date`.
+async fn insert_legacy(db: &DatabaseConnection, at_text: &str, day_text: &str) -> Uuid {
     let id = Uuid::now_v7();
-    legacy::ActiveModel {
-        id: Set(id),
-        at: Set(at),
-        maybe_at: Set(Some(at)),
-        day: Set(day),
-        maybe_day: Set(Some(day)),
-    }
-    .insert(db)
-    .await
-    .unwrap();
+    let backend = db.get_database_backend();
+    let at = at_text.replace('Z', "+00:00");
+    let sql = match backend {
+        DatabaseBackend::Postgres => {
+            "INSERT INTO time_probe (id, at, maybe_at, day, maybe_day) \
+             VALUES ($1, $2::timestamptz, $3::timestamptz, $4::date, $5::date)"
+        }
+        _ => "INSERT INTO time_probe (id, at, maybe_at, day, maybe_day) VALUES (?, ?, ?, ?, ?)",
+    };
+    let values = [id.into(), at.clone().into(), at.into(), day_text.into(), day_text.into()];
+    db.execute_raw(autoxide_kernel::database::statement(backend, sql, values)).await.unwrap();
     id
 }
 
@@ -181,25 +163,17 @@ async fn dong_chrono_va_dong_moi_doc_cheo_va_luu_giong_nhau() {
             ["2026-11-21T10:00:00Z", "2026-11-21T10:00:00.120Z", "2026-11-21T10:00:00.123456Z"]
         {
             let ours = ts(text);
-            let theirs: DateTime<Utc> = ours.into();
-            let chrono_day = NaiveDate::from_ymd_opt(2026, 11, 21).unwrap();
-
-            let new_id = insert(&db, ours, Some(ours), Date::from(chrono_day)).await;
-            let old_id = insert_legacy(&db, theirs, chrono_day).await;
+            let new_id = insert(&db, ours, Some(ours), day("2026-11-21")).await;
+            let old_id = insert_legacy(&db, text, "2026-11-21").await;
 
             // Hai cách ghi để lại cùng một chuỗi (SQLite) / cùng một giá trị (Postgres).
             assert_eq!(stored_text(&db, new_id).await, stored_text(&db, old_id).await, "{text}");
 
-            // Kiểu mới đọc dòng `chrono` đã ghi; `chrono` đọc dòng kiểu mới đã ghi.
+            // Kiểu mới đọc dòng cũ đúng giá trị.
             let old_row = probe::Entity::find_by_id(old_id).one(&db).await.unwrap().unwrap();
             assert_eq!(
-                (old_row.at, old_row.maybe_at, old_row.day),
-                (ours, Some(ours), Date::from(chrono_day))
-            );
-            let new_row = legacy::Entity::find_by_id(new_id).one(&db).await.unwrap().unwrap();
-            assert_eq!(
-                (new_row.at, new_row.maybe_at, new_row.day),
-                (theirs, Some(theirs), chrono_day)
+                (old_row.at, old_row.maybe_at, old_row.day, old_row.maybe_day),
+                (ours, Some(ours), day("2026-11-21"), Some(day("2026-11-21")))
             );
         }
     })
@@ -228,8 +202,7 @@ async fn sap_xep_va_loc_dung_khi_tron_dong_cu_dong_moi() {
             if index % 2 == 0 {
                 insert(&db, value, None, day("2026-11-21")).await;
             } else {
-                insert_legacy(&db, value.into(), NaiveDate::from_ymd_opt(2026, 11, 21).unwrap())
-                    .await;
+                insert_legacy(&db, text, "2026-11-21").await;
             }
         }
         let mut expected: Vec<Timestamp> = texts.iter().map(|text| ts(text)).collect();
