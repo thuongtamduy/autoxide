@@ -29,7 +29,6 @@ metrics-exporter-prometheus.workspace = true
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
-rmcp.workspace = true
 rustls.workspace = true
 sea-orm.workspace = true
 sea-orm-migration.workspace = true
@@ -53,12 +52,6 @@ zeroize.workspace = true
 
 [dev-dependencies]
 proptest.workspace = true
-# MCP client thật cho test của endpoint MCP.
-rmcp = { workspace = true, features = [
-  "client",
-  "transport-streamable-http-client-reqwest",
-  "reqwest-tls-no-provider",
-] }
 # tests/stack.rs xác nhận các thư viện nền hợp nhau trên cả hai database. Thư viện
 # nào kernel bắt đầu dùng thì chuyển lên [dependencies].
 autoxide-testkit.workspace = true

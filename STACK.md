@@ -102,7 +102,7 @@ binary không phụ thuộc OpenSSL của hệ điều hành.
 | Excel | `rust_xlsxwriter` 0.102 (MIT / Apache-2.0; không bật feature nào; kéo `zip` có `deflate`) — file `.xlsx` của bản xuất kế toán; CSV tự viết (D-354) |
 | i18n    | Tự viết: `locales/<ngôn ngữ>.json` mỗi crate, dịch theo `code` lỗi ở lớp HTTP, chọn theo `Accept-Language`; không dùng `rust-i18n` (D-057) |
 | Idempotency    | Tự viết: key do client gửi, lưu kết quả lệnh ghi để gửi lại không tạo trùng |
-| MCP endpoint   | `rmcp` 3.9 (SDK chính thức của Model Context Protocol) — module khai báo tool, gắn permission |
+| MCP endpoint   | Tự viết trong kernel theo đặc tả công khai (`http/mcp/`: JSON-RPC 2.0 + Streamable HTTP, bản `2026-07-28` và các bản cũ còn `initialize`); thay `rmcp`, vốn bắt buộc `chrono` (D-20261121-mcp-server) — module khai báo tool, gắn permission. Client cho test: `autoxide_testkit::mcp` |
 | Email          | `lettre` 0.11 (rustls + ring, không native-tls) — SMTP sau trait `Mailer` của kernel, gửi qua job queue; chưa cấu hình SMTP thì ghi file `.eml` (D-061) |
 | Tra DNS (TXT) | `hickory-resolver` 0.26 (MIT / Apache-2.0; tắt feature mặc định, chỉ bật `tokio` và `system-config`; không DNS-over-TLS / HTTPS / QUIC, không DNSSEC) — tra bản ghi TXT `_autoxide-challenge.<domain>` khi xác minh tên miền riêng của khách, sau trait `DnsTxtLookup` của kernel; đọc cấu hình DNS của hệ điều hành (`/etc/resolv.conf`); test dùng `FakeDns` của testkit. Thư viện chuẩn của Rust không tra được TXT (D-190) |
 | Webhook        | Module `webhooks`: chữ ký theo chuẩn Standard Webhooks (`hmac` + `sha2` + `base64` sẵn có), gửi bằng `reqwest` 0.13 sẵn có qua job queue; không thêm thư viện (D-081) |

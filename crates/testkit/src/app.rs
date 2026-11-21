@@ -40,6 +40,7 @@ use std::sync::Arc;
 
 use crate::statements::StatementLog;
 
+use crate::mcp::{CallToolRequestParams, McpClient};
 use autoxide_kernel::access::{Authenticator, Grant, Principal};
 use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
 use autoxide_kernel::database::Database;
@@ -54,11 +55,6 @@ use autoxide_kernel::tenancy::{
 use axum::Router;
 use axum::body::Body;
 use axum::http::{HeaderMap, HeaderName, HeaderValue, Method, Request, StatusCode, header};
-use rmcp::ServiceExt as _;
-use rmcp::model::CallToolRequestParams;
-use rmcp::service::{RoleClient, RunningService};
-use rmcp::transport::StreamableHttpClientTransport;
-use rmcp::transport::streamable_http_client::StreamableHttpClientTransportConfig;
 use serde_json::Value;
 use tower::ServiceExt as _;
 use utoipa::openapi::OpenApi;
@@ -282,32 +278,21 @@ impl TestApp {
         self.request(Method::DELETE, uri)
     }
 
-    /// Client MCP thật nối tới `/mcp` của app, xác thực bằng `token` (như [`TestRequest::token`]).
-    ///
-    /// Mở một cổng TCP cục bộ: transport Streamable HTTP của client cần máy chủ thật.
-    pub async fn mcp(&self, token: &str) -> Result<RunningService<RoleClient, ()>, TestAppError> {
+    /// Client MCP nối tới `/mcp` của app, xác thực bằng `token` (như [`TestRequest::token`]). Nói bản mới
+    /// của đặc tả (`2026-07-28`); bản cũ (`initialize`) dùng [`McpClient::legacy`] với [`TestApp::router`].
+    pub async fn mcp(&self, token: &str) -> Result<McpClient, TestAppError> {
         self.mcp_at(token, "/mcp").await
     }
 
     /// Như [`TestApp::mcp`], tới endpoint MCP ở `path` — vd `/mcp/notes`, endpoint riêng của một
     /// module.
-    pub async fn mcp_at(
-        &self,
-        token: &str,
-        path: &str,
-    ) -> Result<RunningService<RoleClient, ()>, TestAppError> {
-        let listener =
-            tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| fail("mcp", e))?;
-        let address = listener.local_addr().map_err(|e| fail("mcp", e))?;
-        let router = self.router.clone();
-        tokio::spawn(async move { axum::serve(listener, router).await });
-        autoxide_kernel::tls::install_crypto_provider();
-        let config =
-            StreamableHttpClientTransportConfig::with_uri(format!("http://{address}{path}"))
-                .auth_header(token.to_owned());
-        ().serve(StreamableHttpClientTransport::from_config(config))
-            .await
-            .map_err(|e| fail("mcp client", e))
+    ///
+    /// Nối xong thì gọi `server/discover` (như client bắt tay lúc nối): người gọi không vào được endpoint
+    /// (sai token, khách bị khoá…) thì lỗi ngay ở đây.
+    pub async fn mcp_at(&self, token: &str, path: &str) -> Result<McpClient, TestAppError> {
+        let client = McpClient::new(self.router.clone(), path, Some(token));
+        client.discover().await.map_err(|e| fail("mcp", e))?;
+        Ok(client)
     }
 }
 
