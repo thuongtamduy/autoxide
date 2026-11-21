@@ -204,15 +204,18 @@ async fn sai_so_tien_va_khong_ma_vao_hang_cho_roi_xu_ly_tay() {
         );
         assert_eq!(open.len(), 2);
         assert_eq!(bank_balance(&app, &account).await, 0);
-        // Người xem xét, ghi khoản không mã cho thanh toán (số tiền thực nhận).
+        // Người xem xét, ghi khoản không mã cho thanh toán: số khác số phải thu nên `match` bị từ
+        // chối, phải xác nhận riêng (`accept_received`) mới ghi số tiền thực nhận.
         let unmatched = open.iter().find(|row| row["kind"] == "unmatched_credit").unwrap();
-        let (code_status, resolved) = call(
-            &app,
-            "POST",
-            &format!("/exceptions/{}/resolve", unmatched["id"].as_str().unwrap()),
-            Some(json!({"action": "match", "payment_id": id})),
-        )
-        .await;
+        let uri = format!("/exceptions/{}/resolve", unmatched["id"].as_str().unwrap());
+        let (code_status, refused) =
+            call(&app, "POST", &uri, Some(json!({"action": "match", "payment_id": id}))).await;
+        assert_eq!(code_status, StatusCode::CONFLICT, "{refused}");
+        assert_eq!(refused["code"], "ledger.amount_differs");
+        assert_eq!(status(&app, &id).await, "needs_review");
+        let (code_status, resolved) =
+            call(&app, "POST", &uri, Some(json!({"action": "accept_received", "payment_id": id})))
+                .await;
         assert_eq!(code_status, StatusCode::OK, "{resolved}");
         assert_eq!(status(&app, &id).await, "succeeded");
         assert_eq!(bank_balance(&app, &account).await, 50_000);

@@ -6,7 +6,9 @@
 //! `mail.from` vẫn được nhận), không thì qua cấu hình chung của máy chủ.
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Event, Outbox};
@@ -64,7 +66,32 @@ pub(crate) const TENANT_SMTP_URL: TenantSetting = TenantSetting::new(
 )
 .secret()
 .group(CONNECTION_GROUP)
-.formerly("mail.smtp_url");
+.formerly("mail.smtp_url")
+.checked(check_smtp_url);
+
+/// `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS` cho bộ kiểm LÚC LƯU: bộ kiểm cấu hình của khách là con trỏ
+/// hàm (không mang trạng thái) nên đọc cờ ở đây, đặt lúc module khởi động. Chỉ bật, không tắt lại
+/// (một process chạy một module `mail`; test chạy song song không giẫm nhau). Lúc KẾT NỐI dùng cờ
+/// của chính [`Sender`].
+static ALLOW_PRIVATE_NETWORKS: AtomicBool = AtomicBool::new(false);
+
+pub(crate) fn allow_private_networks(allow: bool) {
+    ALLOW_PRIVATE_NETWORKS.fetch_or(allow, Ordering::Relaxed);
+}
+
+fn private_allowed() -> bool {
+    ALLOW_PRIVATE_NETWORKS.load(Ordering::Relaxed)
+}
+
+/// Kiểm lúc khách lưu (D-20261121-ssrf-targets): `smtp://` / `smtps://`, host không bị biết trước là
+/// nội bộ. Tên miền được kiểm lại lúc kết nối ([`Transport::tenant_smtp`]).
+fn check_smtp_url(raw: &str) -> Result<(), FieldError> {
+    autoxide_kernel::net::check_target_url(raw, &crate::transport::SCHEMES, private_allowed())
+        .map(|_| ())
+}
+
+/// Kết nối SMTP riêng của khách được dùng lại chừng này rồi phân giải lại (IP của máy chủ có thể đổi).
+const TENANT_TRANSPORT_TTL: Duration = Duration::from_secs(600);
 
 /// Người gửi riêng của khách. Cùng nhóm kết nối: địa chỉ gửi đi kèm tài khoản SMTP (tên miền của
 /// nó phải được máy chủ SMTP cho gửi).
@@ -138,8 +165,11 @@ pub(crate) struct Sender {
     from: Mailbox,
     outbox: Outbox,
     settings: Arc<dyn TenantSettings>,
-    /// Kết nối SMTP riêng của khách, theo URL: dựng một lần, dùng lại (pool của lettre).
-    tenant_transports: Mutex<HashMap<String, Arc<Transport>>>,
+    /// `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS`.
+    allow_private_networks: bool,
+    /// Kết nối SMTP riêng của khách, theo URL: dựng một lần (đã phân giải IP), dùng lại (pool của
+    /// lettre) tới hết [`TENANT_TRANSPORT_TTL`].
+    tenant_transports: Mutex<HashMap<String, (Instant, Arc<Transport>)>>,
 }
 
 impl Sender {
@@ -148,8 +178,16 @@ impl Sender {
         from: Mailbox,
         outbox: Outbox,
         settings: Arc<dyn TenantSettings>,
+        allow_private_networks: bool,
     ) -> Self {
-        Sender { transport, from, outbox, settings, tenant_transports: Mutex::new(HashMap::new()) }
+        Sender {
+            transport,
+            from,
+            outbox,
+            settings,
+            allow_private_networks,
+            tenant_transports: Mutex::new(HashMap::new()),
+        }
     }
 
     /// Đường gửi và người gửi của `tenant`: của riêng khách khi đã đặt, không thì của máy chủ.
@@ -172,13 +210,17 @@ impl Sender {
         // Khoá chỉ giữ trong lúc tra / thêm vào bảng (không qua `await`); lỗi khoá (một thread
         // khác đã panic) thì dựng kết nối mới, không dùng bảng.
         if let Ok(cache) = self.tenant_transports.lock()
-            && let Some(found) = cache.get(url.as_str())
+            && let Some((built, found)) = cache.get(url.as_str())
+            && built.elapsed() < TENANT_TRANSPORT_TTL
         {
             return Ok((found.clone(), from));
         }
-        let transport = Arc::new(Transport::smtp(url.as_str())?);
+        let transport = Transport::tenant_smtp(url.as_str(), self.allow_private_networks)
+            .await
+            .map_err(smtp_unreachable)?;
+        let transport = Arc::new(transport);
         if let Ok(mut cache) = self.tenant_transports.lock() {
-            cache.insert(url.as_str().to_owned(), transport.clone());
+            cache.insert(url.as_str().to_owned(), (Instant::now(), transport.clone()));
         }
         Ok((transport, from))
     }
@@ -216,11 +258,11 @@ impl JobHandler for Sender {
         .map_err(|error| Error::internal(format!("cannot build the mail: {error}")))?;
         // Ghi lần dùng của kết nối SMTP (bước 51): người quản trị thấy lỗi cuối mà không đọc log.
         let delivered = transport.deliver(message).await;
-        let error = delivered.as_ref().err().map(ToString::to_string);
+        let error = delivered.as_ref().err().map(|failed| failed.public.clone());
         autoxide_kernel::connections::ConnectionStatus
             .record(tenant, CONNECTION, error.as_deref())
             .await;
-        match delivered? {
+        match delivered.map_err(|failed| *failed.error)? {
             Delivery::Sent => {
                 tracing::info!(job_id = %job.id, "mail sent");
             }
@@ -238,6 +280,11 @@ impl JobHandler for Sender {
     }
 }
 
+fn smtp_unreachable(reason: String) -> Error {
+    Error::unavailable("mail.smtp_unreachable", "Cannot use the SMTP server: {reason}.")
+        .with_param("reason", reason)
+}
+
 /// Thử kết nối SMTP của khách (bước 51): mở kết nối và gửi NOOP, không gửi thư nào.
 #[async_trait::async_trait]
 impl autoxide_kernel::connections::ConnectionProbe for Sender {
@@ -247,18 +294,15 @@ impl autoxide_kernel::connections::ConnectionProbe for Sender {
 
     async fn test(&self, tenant: &TenantContext) -> Result<(), Error> {
         let (transport, _) = self.delivery_for(tenant).await?;
-        let unreachable = |reason: String| {
-            Error::unavailable("mail.smtp_unreachable", "Cannot use the SMTP server: {reason}.")
-                .with_param("reason", reason)
-        };
         match transport.as_ref() {
             crate::transport::Transport::File(_) => {
-                Err(unreachable("no SMTP server is set; mail is written to files".to_owned()))
+                Err(smtp_unreachable("no SMTP server is set; mail is written to files".to_owned()))
             }
             crate::transport::Transport::Smtp(smtp) => match smtp.test_connection().await {
                 Ok(true) => Ok(()),
-                Ok(false) => Err(unreachable("it did not answer a NOOP command".to_owned())),
-                Err(error) => Err(unreachable(error.to_string())),
+                Ok(false) => Err(smtp_unreachable("it did not answer a NOOP command".to_owned())),
+                // Câu chung: không trả lỗi mạng chi tiết (D-20261121-ssrf-targets).
+                Err(error) => Err(smtp_unreachable(crate::transport::describe(&error))),
             },
         }
     }

@@ -7,8 +7,9 @@
 //! người dùng tải lên KHÔNG nằm trong bản xuất (bản xuất có dòng `files_file` / `media_*` trỏ tới
 //! chúng; tải từng file qua API của module).
 //!
-//! - Nhà vận hành (khách nền tảng, `kernel.tenants.operate`) và quản trị của chính khách
-//!   (`kernel.data.export`) đều xin xuất được.
+//! - Quản trị của chính khách (`kernel.data.export`) xin xuất được; nhân sự nền tảng
+//!   (`kernel.tenants.operate`) chỉ xuất khách khác khi đã VÀO khách đó bằng lần cấp quyền vào hỗ trợ
+//!   còn hạn (D-313, D-20261121-export-entry). Xin, tải, tạo link đều ghi event vào chính khách.
 //! - Tải về bằng request đã đăng nhập, hay bằng link có hạn (24 giờ) để mở trong trình duyệt.
 //! - File giữ `AUTOXIDE_TENANCY_EXPORT_RETENTION_DAYS` ngày (mặc định 30), rồi job dọn xoá.
 //! - Module `plans` tự xin một lượt xuất khi thuê bao bị huỷ.
@@ -39,7 +40,7 @@ use super::{DatabaseRegistry, TenantContext, TenantId, errors};
 use crate::access::{Permission, Principal, Risk};
 use crate::config::Setting;
 use crate::error::Error;
-use crate::event::Actor;
+use crate::event::{Actor, Event, EventInfo, Outbox};
 use crate::job::{EnqueueOptions, Job, JobContext, JobHandler, JobQueue};
 use crate::response::{Created, Data, Problem};
 use crate::storage::{Storage, TenantStorage};
@@ -56,6 +57,38 @@ pub const EXPORT_RETENTION_DAYS: Setting = Setting::new(
     "Days a tenant data export is kept for download before it is deleted (1 to 365).",
 )
 .with_default("30");
+
+/// Event ghi vào CHÍNH khách bị xuất (audit của khách thấy ai xuất, qua đường vào nào — kể cả lần
+/// cấp quyền vào hỗ trợ của nhân sự nền tảng; D-20261121-export-entry).
+pub(crate) const TENANT_EXPORT_REQUESTED: EventInfo = EventInfo::new(
+    "kernel.tenant_export_requested",
+    "An export of all the data of the tenant was requested (`export_id`, `reason`).",
+);
+pub(crate) const TENANT_EXPORT_ACCESSED: EventInfo = EventInfo::new(
+    "kernel.tenant_export_accessed",
+    "A data export of the tenant was downloaded or got a download link (`export_id`, `via`: \
+     `download`, `link_created` or `link`).",
+);
+
+#[derive(Debug, Serialize)]
+struct ExportRequested<'a> {
+    export_id: Uuid,
+    reason: &'a str,
+}
+
+impl Event for ExportRequested<'_> {
+    const NAME: &'static str = "kernel.tenant_export_requested";
+}
+
+#[derive(Debug, Serialize)]
+struct ExportAccessed {
+    export_id: Uuid,
+    via: &'static str,
+}
+
+impl Event for ExportAccessed {
+    const NAME: &'static str = "kernel.tenant_export_accessed";
+}
 
 /// Permission của quản trị viên một khách: xuất toàn bộ dữ liệu của khách mình.
 pub const DATA_EXPORT: Permission = Permission::new(
@@ -217,6 +250,7 @@ pub struct TenantExports {
     registry: DatabaseRegistry,
     setup: super::moves::MoveSetup,
     jobs: JobQueue,
+    outbox: Outbox,
     retention: SignedDuration,
 }
 
@@ -231,12 +265,14 @@ impl TenantExports {
         registry: DatabaseRegistry,
         setup: super::moves::MoveSetup,
         jobs: JobQueue,
+        outbox: Outbox,
         retention_days: i64,
     ) -> Self {
         TenantExports {
             registry,
             setup,
             jobs,
+            outbox,
             retention: SignedDuration::from_hours(24 * retention_days),
         }
     }
@@ -291,7 +327,23 @@ impl TenantExports {
             .await?;
         transaction.commit().await?;
         tracing::info!(tenant_id = %tenant, export_id = %row.id, reason, "tenant export requested");
+        let event = ExportRequested { export_id: row.id, reason };
+        self.record(tenant, actor, row.id, &event).await?;
         Ok(row.into())
+    }
+
+    /// Ghi event vào outbox của chính khách `tenant` (database của khách có thể khác database điều
+    /// khiển nên là transaction riêng, sau khi dòng của lượt xuất đã commit).
+    async fn record<E: Event + Sync>(
+        &self,
+        tenant: TenantId,
+        actor: Actor,
+        export_id: Uuid,
+        event: &E,
+    ) -> Result<(), Error> {
+        let context = self.registry.tenant(tenant).await?;
+        let subject = Some(format!("kernel.tenant_export:{export_id}"));
+        self.outbox.record(context.database().write(), &context, actor, subject, event).await
     }
 
     /// Lượt xuất `id` của khách `tenant`.
@@ -425,8 +477,14 @@ impl TenantExports {
         Ok(())
     }
 
-    /// Link tải không cần đăng nhập cho lượt xuất `id` (24 giờ, thay link cũ).
-    pub async fn link(&self, tenant: TenantId, id: Uuid) -> Result<TenantExportLink, Error> {
+    /// Link tải không cần đăng nhập cho lượt xuất `id` (24 giờ, thay link cũ); `actor` ghi vào audit
+    /// của khách.
+    pub async fn link(
+        &self,
+        actor: Actor,
+        tenant: TenantId,
+        id: Uuid,
+    ) -> Result<TenantExportLink, Error> {
         let row = self.find(tenant, id).await?;
         if row.status != "ready" {
             return Err(export_not_ready(&row.status));
@@ -439,16 +497,26 @@ impl TenantExports {
             active.link_expires_at = Set(Some(expires_at));
         })
         .await?;
+        self.record(tenant, actor, id, &ExportAccessed { export_id: id, via: "link_created" })
+            .await?;
         Ok(TenantExportLink {
             url: format!("{}/kernel/exports/download?token={id}.{raw}", crate::http::API_PREFIX),
             expires_at,
         })
     }
 
-    /// Nội dung lượt xuất `id` của khách `tenant` (người gọi đã được kiểm quyền).
-    pub async fn content(&self, tenant: TenantId, id: Uuid) -> Result<Response, Error> {
+    /// Nội dung lượt xuất `id` của khách `tenant` (người gọi đã được kiểm quyền); `actor` ghi vào
+    /// audit của khách.
+    pub async fn content(
+        &self,
+        actor: Actor,
+        tenant: TenantId,
+        id: Uuid,
+    ) -> Result<Response, Error> {
         let row = self.find(tenant, id).await?;
-        self.stream(row).await
+        let response = self.stream(&row).await?;
+        self.record(tenant, actor, id, &ExportAccessed { export_id: id, via: "download" }).await?;
+        Ok(response)
     }
 
     /// Nội dung theo token của link (`<id>.<phần thô>`). Sai, hết hạn hay đã thay: 404 như không có.
@@ -462,10 +530,14 @@ impl TenantExports {
         if !valid {
             return Err(missing());
         }
-        self.stream(row).await
+        let response = self.stream(&row).await?;
+        // Link không mang người dùng: bên tạo link đã ghi ở `link_created`.
+        let event = ExportAccessed { export_id: row.id, via: "link" };
+        self.record(TenantId::from_uuid(row.tenant_id), Actor::system(), row.id, &event).await?;
+        Ok(response)
     }
 
-    async fn stream(&self, row: Model) -> Result<Response, Error> {
+    async fn stream(&self, row: &Model) -> Result<Response, Error> {
         if row.status != "ready" {
             return Err(export_not_ready(&row.status));
         }
@@ -567,17 +639,27 @@ pub(crate) fn schedule() -> crate::job::Schedule {
 
 // ---- REST ----------------------------------------------------------------------------------------
 
-/// Khách của đường dẫn `{id}` (ID hay slug) mà người gọi được xuất: nhân sự nền tảng có
-/// `kernel.tenants.operate`, hay quản trị viên của chính khách đó có `kernel.data.export`.
+/// Khách của đường dẫn `{id}` (ID hay slug) mà người gọi được xuất (D-313, D-20261121-export-entry):
+///
+/// - quản trị viên của chính khách đó có `kernel.data.export`;
+/// - nhân sự nền tảng đã VÀO khách đó (header `Autoxide-Tenant`, qua lần cấp quyền vào hỗ trợ còn
+///   hạn — căn cứ `support` hay `legal_request` có số văn bản) có `kernel.tenants.operate` hay
+///   `kernel.data.export`;
+/// - nhân sự nền tảng ở khách nền tảng chỉ xuất được chính khách nền tảng. Nhắm khách khác mà chưa
+///   vào thì 403 `kernel.export_needs_tenant_access` — không có lối tắt "`kernel.tenants.operate` xuất
+///   mọi khách" (dữ liệu cá nhân của khách chỉ ra ngoài khi có căn cứ và để lại vết).
 async fn allowed(
     exports: &TenantExports,
     principal: &Principal,
     id: &str,
 ) -> Result<TenantId, Error> {
-    let platform = super::require_platform(principal).is_ok()
-        && principal.require(&crate::builtin::TENANTS_OPERATE).is_ok();
+    let operate = principal.has(&crate::builtin::TENANTS_OPERATE);
+    // Ở khách nền tảng, chưa vào khách nào.
+    let platform_staff = operate && super::require_platform(principal).is_ok();
+    // Nhân sự nền tảng đang ở trong khách khác (đường vào đã do bộ xác thực quyết ở request.rs).
+    let entered_staff = operate && principal.operator_from() == Some(super::DEFAULT_TENANT);
     // Không có permission nào thì báo 403 trước khi tra khách, như mọi endpoint khác.
-    if !platform {
+    if !platform_staff && !entered_staff {
         principal.require(&DATA_EXPORT)?;
     }
     let tenant = match Uuid::parse_str(id) {
@@ -585,11 +667,23 @@ async fn allowed(
         Err(_) => exports.registry.tenant_by_slug(id).await?,
     };
     let tenant = tenant.id();
-    if platform || principal.tenant_id() == tenant {
+    if principal.tenant_id() == tenant {
         return Ok(tenant);
+    }
+    if platform_staff {
+        return Err(export_needs_tenant_access(tenant));
     }
     // Khách khác: như không có (không lộ khách nào tồn tại).
     Err(errors::tenant_not_found(id))
+}
+
+fn export_needs_tenant_access(tenant: TenantId) -> Error {
+    Error::forbidden(
+        "kernel.export_needs_tenant_access",
+        "Exporting the data of another tenant needs access to that tenant: get a support access \
+         grant in force for it, then call with the header `Autoxide-Tenant: {tenant}`.",
+    )
+    .with_param("tenant", tenant.as_uuid())
 }
 
 pub(crate) fn routes(exports: Arc<TenantExports>) -> OpenApiRouter {
@@ -604,8 +698,10 @@ pub(crate) fn routes(exports: Arc<TenantExports>) -> OpenApiRouter {
 
 /// Export all the data of a tenant.
 ///
-/// Platform staff with `kernel.tenants.operate`, or an administrator of the tenant itself with
-/// `kernel.data.export`. The export runs in the background into one JSON Lines file (one line per
+/// An administrator of the tenant itself with `kernel.data.export`, or platform staff with
+/// `kernel.tenants.operate` who entered the tenant under a support access grant in force (header
+/// `Autoxide-Tenant`). The request and every download are recorded in the tenant's own audit
+/// events (`kernel.tenant_export_requested`, `kernel.tenant_export_accessed`). The export runs in the background into one JSON Lines file (one line per
 /// record, `{"table": …, "row": {…}}`; password hashes and secrets left out; uploaded file contents
 /// are not included). Poll `GET …/exports/{export_id}` until it is `ready`. If an export is already
 /// running it is returned instead of starting another.
@@ -619,7 +715,7 @@ pub(crate) fn routes(exports: Arc<TenantExports>) -> OpenApiRouter {
     responses(
         (status = 201, description = "The export, `pending`; `Location` is its status.", body = Data<TenantExport>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant you may export; code `tenant_not_found`.", body = Problem),
     )
 )]
@@ -646,7 +742,7 @@ async fn request_export(
     responses(
         (status = 200, description = "The exports, newest first.", body = Data<Vec<TenantExport>>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant you may export; code `tenant_not_found`.", body = Problem),
     )
 )]
@@ -672,7 +768,7 @@ async fn list_exports(
     responses(
         (status = 200, description = "The export.", body = Data<TenantExport>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
     )
 )]
@@ -699,7 +795,7 @@ async fn get_export(
     responses(
         (status = 200, description = "The file.", body = String, content_type = "application/x-ndjson"),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
         (status = 409, description = "The export is not `ready`; code `kernel.export_not_ready`.", body = Problem),
     )
@@ -710,7 +806,7 @@ async fn download_export(
     Path((id, export_id)): Path<(String, Uuid)>,
 ) -> Result<Response, Error> {
     let tenant = allowed(&exports, &principal, &id).await?;
-    exports.content(tenant, export_id).await
+    exports.content(Actor::from(&principal), tenant, export_id).await
 }
 
 /// Create a download link for a data export.
@@ -727,7 +823,7 @@ async fn download_export(
     responses(
         (status = 200, description = "The link.", body = Data<TenantExportLink>),
         (status = 401, description = "Not signed in; code `unauthorized` or the code of the authentication module.", body = Problem),
-        (status = 403, description = "Missing permission `kernel.data.export`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`).", body = Problem),
         (status = 404, description = "No such tenant or export; code `tenant_not_found` or `kernel.export_not_found`.", body = Problem),
         (status = 409, description = "The export is not `ready`; code `kernel.export_not_ready`.", body = Problem),
     )
@@ -738,7 +834,7 @@ async fn export_link(
     Path((id, export_id)): Path<(String, Uuid)>,
 ) -> Result<Data<TenantExportLink>, Error> {
     let tenant = allowed(&exports, &principal, &id).await?;
-    Ok(Data { data: exports.link(tenant, export_id).await? })
+    Ok(Data { data: exports.link(Actor::from(&principal), tenant, export_id).await? })
 }
 
 /// The download link of a data export.

@@ -21,6 +21,7 @@ impl UserService {
     /// Như [`check_credentials`](Self::check_credentials), kèm hash mật khẩu đang lưu lúc
     /// kiểm (hash mới nếu vừa hash lại). Bên cấp phiên / API key đưa hash này vào
     /// [`SessionService::lock_grant`]: mật khẩu đổi giữa lúc kiểm và lúc cấp thì không cấp.
+    #[cfg(test)]
     pub(crate) async fn verify_credentials(
         &self,
         tenant: &TenantContext,

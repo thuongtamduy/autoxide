@@ -11677,6 +11677,21 @@ export type Data_ReferralRule = {
 };
 
 /** Envelope of a single result. */
+export type Data_RegistrationResponse = {
+  /**
+   * What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an
+   * account or not.
+   */
+  data: {
+    /**
+     * The email, normalized. A mail went to it: either a link to confirm the new account, or,
+     * when it already had one, a notice to sign in or reset the password.
+     */
+    email: string;
+  };
+};
+
+/** Envelope of a single result. */
 export type Data_RelocationPlan = {
   /** What a split or merge would do (dry run). Nothing is changed. */
   data: {
@@ -18565,11 +18580,18 @@ export type LedgerRefundRequest = {
 
 /** How to resolve an item. */
 export type LedgerResolveRequest = {
-  /** `match` (record the money for `payment_id`), `ignore`, or `refunded_outside`. */
+  /**
+   * `match` (record the money for `payment_id` when the partner collected exactly the amount
+   * due), `accept_received` (record the amount the partner collected for `payment_id`, even
+   * when it differs from the amount due), `ignore`, or `refunded_outside`.
+   */
   action: string;
   /** Up to 500 characters. */
   note?: string | null;
-  /** With `match`. */
+  /**
+   * With `match` and `accept_received`: the payment the item is about (the one it names, if
+   * any), still waiting for its money and in the same currency.
+   */
   payment_id?: string | null;
 };
 
@@ -28072,6 +28094,18 @@ export type RegisterRequest = {
   realm?: Realm;
 };
 
+/**
+ * What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an
+ * account or not.
+ */
+export type RegistrationResponse = {
+  /**
+   * The email, normalized. A mail went to it: either a link to confirm the new account, or,
+   * when it already had one, a notice to sign in or reset the password.
+   */
+  email: string;
+};
+
 /** Why a request is rejected. */
 export type RejectRequest = {
   /** 1 to 500 characters, shown to the agent. */
@@ -33393,7 +33427,7 @@ export interface paths {
     };
   };
   "/api/v1/auth/register": {
-    /** Create your own account. */
+    /** Create your own account (deprecated: use `POST /api/v1/auth/registrations`). */
     post: {
       parameters: { header: { "Accept-Language"?: string }; };
       requestBody: RegisterRequest;
@@ -33401,6 +33435,19 @@ export interface paths {
         201: Data_UserResponse;
         403: Problem;
         409: Problem;
+        422: Problem;
+        default: Problem;
+      };
+    };
+  };
+  "/api/v1/auth/registrations": {
+    /** Create your own account, without telling whether the email already has one. */
+    post: {
+      parameters: { header: { "Accept-Language"?: string }; };
+      requestBody: RegisterRequest;
+      responses: {
+        202: Data_RegistrationResponse;
+        403: Problem;
         422: Problem;
         default: Problem;
       };
@@ -42917,6 +42964,7 @@ export interface paths {
         401: Problem;
         403: Problem;
         404: Problem;
+        409: Problem;
         422: Problem;
         default: Problem;
       };

@@ -131,9 +131,11 @@ pub(crate) struct ExceptionsInput {
 pub(crate) struct ResolveInput {
     /// Id of the item.
     exception_id: Uuid,
-    /// `match` (record the money for `payment_id`), `ignore` or `refunded_outside`.
+    /// `match` (record the money for `payment_id` when it is exactly the amount due),
+    /// `accept_received` (record the amount collected even when it differs), `ignore` or
+    /// `refunded_outside`.
     action: String,
-    /// With `match`.
+    /// With `match` and `accept_received`.
     payment_id: Option<Uuid>,
     /// Up to 500 characters.
     note: Option<String>,
@@ -201,21 +203,26 @@ pub(crate) fn all(service: &Arc<LedgerService>) -> Vec<Tool> {
         .read_only(),
         Tool::new(
             "resolve_exception",
-            "Resolve a difference: `match` records the money the partner collected for a payment, \
-             `ignore` closes it, `refunded_outside` notes it was refunded outside Autoxide.",
+            "Resolve a difference: `match` records the money the partner collected for a payment \
+             when it is exactly the amount due, `accept_received` records the amount collected even \
+             when it differs, `ignore` closes it, `refunded_outside` notes it was refunded outside \
+             Autoxide.",
             move |tenant: TenantContext, principal: Principal, input: ResolveInput| {
                 let service = resolve.clone();
                 async move {
                     use crate::reconcile::Resolution;
                     let resolution = match (input.action.as_str(), input.payment_id) {
                         ("match", Some(payment)) => Resolution::Match(payment),
+                        ("accept_received", Some(payment)) => {
+                            Resolution::AcceptReceived(payment)
+                        }
                         ("ignore", _) => Resolution::Ignore,
                         ("refunded_outside", _) => Resolution::RefundedOutside,
                         _ => {
                             return Err(Error::validation(vec![FieldError::new(
                                 "action",
                                 "invalid",
-                                "must be `match` (with `payment_id`), `ignore` or `refunded_outside`",
+                                "must be `match` or `accept_received` (with `payment_id`), `ignore` or `refunded_outside`",
                             )]));
                         }
                     };

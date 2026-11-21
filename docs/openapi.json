@@ -35664,6 +35664,29 @@
         ],
         "type": "object"
       },
+      "Data_RegistrationResponse": {
+        "description": "Envelope of a single result.",
+        "properties": {
+          "data": {
+            "description": "What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an\naccount or not.",
+            "properties": {
+              "email": {
+                "description": "The email, normalized. A mail went to it: either a link to confirm the new account, or,\nwhen it already had one, a notice to sign in or reset the password.",
+                "example": "ada@example.com",
+                "type": "string"
+              }
+            },
+            "required": [
+              "email"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
       "Data_RelocationPlan": {
         "description": "Envelope of a single result.",
         "properties": {
@@ -57490,7 +57513,7 @@
         "description": "How to resolve an item.",
         "properties": {
           "action": {
-            "description": "`match` (record the money for `payment_id`), `ignore`, or `refunded_outside`.",
+            "description": "`match` (record the money for `payment_id` when the partner collected exactly the amount\ndue), `accept_received` (record the amount the partner collected for `payment_id`, even\nwhen it differs from the amount due), `ignore`, or `refunded_outside`.",
             "type": "string"
           },
           "note": {
@@ -57501,7 +57524,7 @@
             ]
           },
           "payment_id": {
-            "description": "With `match`.",
+            "description": "With `match` and `accept_received`: the payment the item is about (the one it names, if\nany), still waiting for its money and in the same currency.",
             "format": "uuid",
             "type": [
               "string",
@@ -87577,6 +87600,20 @@
         ],
         "type": "object"
       },
+      "RegistrationResponse": {
+        "description": "What `POST /api/v1/auth/registrations` accepted. The same whether the email already had an\naccount or not.",
+        "properties": {
+          "email": {
+            "description": "The email, normalized. A mail went to it: either a link to confirm the new account, or,\nwhen it already had one, a notice to sign in or reset the password.",
+            "example": "ada@example.com",
+            "type": "string"
+          }
+        },
+        "required": [
+          "email"
+        ],
+        "type": "object"
+      },
       "RejectRequest": {
         "description": "Why a request is rejected.",
         "properties": {
@@ -104869,7 +104906,7 @@
                 }
               }
             },
-            "description": "Too many failed sign-ins for this email; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header."
+            "description": "Too many failed sign-ins for this email from this address, or for this email overall; code `auth.login_throttled`. Wait the number of seconds in the `Retry-After` header."
           },
           "default": {
             "content": {
@@ -105075,7 +105112,7 @@
     },
     "/api/v1/auth/login/mfa": {
       "post": {
-        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the email. Needs no tenant header: the `mfa_token`\nnames its tenant.",
+        "description": "Send the `mfa_token` from `POST /api/v1/auth/login` within its `expires_in`\nseconds. Each `mfa_token` allows five wrong codes; wrong codes also count\ntowards the sign-in lock of the account. Needs no tenant header: the `mfa_token`\nnames its tenant.",
         "operationId": "auth_login_mfa",
         "parameters": [
           {
@@ -105752,7 +105789,7 @@
         "x-permissions": []
       },
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the email. Once the change is confirmed, the OLD address gets\na mail saying so, with a token to report the change if the owner did not make it\n(`POST /api/v1/auth/email-change/report`, valid 7 days).",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). A verification mail goes to the NEW address; the email changes\nonly when its token is confirmed with `POST /api/v1/auth/email-verification/confirm`,\nwithin 24 hours. Until then the old address stays in use. Wrong passwords count\ntowards the sign-in lock of the account. Once the change is confirmed, the OLD address gets\na mail saying so, with a token to report the change if the owner did not make it\n(`POST /api/v1/auth/email-change/report`, valid 7 days).",
         "operationId": "auth_change_email",
         "parameters": [
           {
@@ -107570,7 +107607,7 @@
     },
     "/api/v1/auth/me/password": {
       "post": {
-        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the email.",
+        "description": "Needs the current password and a session signed in with a password (an API key\ncannot do this). Every session of the account ends, including this one; the\nresponse carries the tokens of a new session, so this client stays signed in.\nWrong current passwords count towards the sign-in lock of the account.",
         "operationId": "auth_change_password",
         "parameters": [
           {
@@ -109822,7 +109859,8 @@
     },
     "/api/v1/auth/register": {
       "post": {
-        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.",
+        "deprecated": true,
+        "description": "Open only when the server enables self-registration; otherwise answers 403. The\nnew account has no role. A mail asking to confirm the address goes to the email,\nin the language of `Accept-Language`. Then sign in with `POST /api/v1/auth/login`.\n\n**Deprecated** since 2026-11-21. It will be removed on 2027-05-21. Use `/api/v1/auth/registrations` instead.",
         "operationId": "auth_register",
         "parameters": [
           {
@@ -109908,7 +109946,85 @@
             "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
           }
         },
-        "summary": "Create your own account.",
+        "summary": "Create your own account (deprecated: use `POST /api/v1/auth/registrations`).",
+        "tags": [
+          "auth"
+        ],
+        "x-public": true,
+        "x-sunset": "2027-05-21"
+      }
+    },
+    "/api/v1/auth/registrations": {
+      "post": {
+        "description": "Open only when the server enables self-registration (or, for `customer`, when the tenant\nlets customers create accounts); otherwise answers 403. Always answers 202 with the same\nbody for a valid request: a new account (without any role) gets a mail to confirm the\naddress; an email that already has an account gets a notice instead, and nothing changes.\nThen sign in with `POST /api/v1/auth/login`. Replaces `POST /api/v1/auth/register`, which\ntells with 409 that an email is taken.",
+        "operationId": "auth_request_registration",
+        "parameters": [
+          {
+            "description": "Language of the `detail` of errors: `en` (the default) or `vi`. Codes never change with the language.",
+            "in": "header",
+            "name": "Accept-Language",
+            "required": false,
+            "schema": {
+              "examples": [
+                "vi"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Data_RegistrationResponse"
+                }
+              }
+            },
+            "description": "Accepted; a mail went to the email (confirm the new account, or a notice when it already had one)."
+          },
+          "403": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Self-registration of staff is turned off (code `auth.registration_disabled`), or the shop does not let customers create accounts (code `auth.customer_registration_closed`)."
+          },
+          "422": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "A value is invalid, e.g. a password shorter than 12 characters; see `errors`."
+          },
+          "default": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "Any error, as RFC 9457 Problem Details. The `code` field identifies the problem."
+          }
+        },
+        "summary": "Create your own account, without telling whether the email already has one.",
         "tags": [
           "auth"
         ],
@@ -191032,7 +191148,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191069,7 +191185,7 @@
         ]
       },
       "post": {
-        "description": "Platform staff with `kernel.tenants.operate`, or an administrator of the tenant itself with\n`kernel.data.export`. The export runs in the background into one JSON Lines file (one line per\nrecord, `{\"table\": …, \"row\": {…}}`; password hashes and secrets left out; uploaded file contents\nare not included). Poll `GET …/exports/{export_id}` until it is `ready`. If an export is already\nrunning it is returned instead of starting another.",
+        "description": "An administrator of the tenant itself with `kernel.data.export`, or platform staff with\n`kernel.tenants.operate` who entered the tenant under a support access grant in force (header\n`Autoxide-Tenant`). The request and every download are recorded in the tenant's own audit\nevents (`kernel.tenant_export_requested`, `kernel.tenant_export_accessed`). The export runs in the background into one JSON Lines file (one line per\nrecord, `{\"table\": …, \"row\": {…}}`; password hashes and secrets left out; uploaded file contents\nare not included). Poll `GET …/exports/{export_id}` until it is `ready`. If an export is already\nrunning it is returned instead of starting another.",
         "operationId": "kernel_request_tenant_export",
         "parameters": [
           {
@@ -191144,7 +191260,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191247,7 +191363,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191350,7 +191466,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191476,7 +191592,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.data.export`; code `permission_denied`."
+            "description": "Missing permission `kernel.data.export` (`permission_denied`), or platform staff targeting another tenant without having entered it under a support access grant (`kernel.export_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -191949,7 +192065,7 @@
         ]
       },
       "post": {
-        "description": "Requires `kernel.sandboxes.manage`. A sandbox is a test copy with the configuration of the\ntenant and no personal data (no users, buyers, orders, ledger, documents, notifications,\nsecrets or domains). Partners are always simulated in it, mail only reaches staff who may enter\nit, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.\nIt is `provisioning` until the copy job (`job_id`) is done, then holders of `role_id` (the\n`admin` role by default) enter it with the header `Autoxide-Tenant: <sandbox id>`. It is\ndeleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days unless extended. Send an `Idempotency-Key`\nto retry safely.",
+        "description": "Requires `kernel.sandboxes.manage`, called inside the tenant `{id}` (platform staff enter it\nfirst under a support access grant in force). A sandbox is a test copy with the configuration of the\ntenant and no personal data (no users, buyers, orders, ledger, documents, notifications,\nsecrets or domains). Partners are always simulated in it, mail only reaches staff who may enter\nit, and every response carries `Autoxide-Sandbox: true` and `X-Robots-Tag: noindex, nofollow`.\nIt is `provisioning` until the copy job (`job_id`) is done, then holders of `role_id` (the\n`admin` role by default) enter it with the header `Autoxide-Tenant: <sandbox id>`. It is\ndeleted after `AUTOXIDE_TENANCY_SANDBOX_DAYS` days unless extended. Send an `Idempotency-Key`\nto retry safely.",
         "operationId": "kernel_create_tenant_sandbox",
         "parameters": [
           {
@@ -192035,7 +192151,7 @@
                 }
               }
             },
-            "description": "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), or the platform tenant (`tenancy.sandbox_forbidden`)."
+            "description": "Missing permission `kernel.sandboxes.manage` (`permission_denied`), the tenant already keeps as many sandboxes as its plan allows (`limit_exceeded`, 1 when the plan does not say), the platform tenant (`tenancy.sandbox_forbidden`), or platform staff naming a tenant they have not entered (`tenancy.sandbox_needs_tenant_access`)."
           },
           "404": {
             "content": {
@@ -195830,7 +195946,7 @@
     },
     "/api/v1/ledger/exceptions/{id}/resolve": {
       "post": {
-        "description": "Requires `ledger.reconcile`. `match` records the money the partner collected for the payment\n(same path as a partner notification). Resolving a resolved item returns it unchanged.",
+        "description": "Requires `ledger.reconcile`. `match` records the money the partner collected for the payment\n(same path as a partner notification) and is refused when that amount differs from the amount\ndue; `accept_received` records the amount collected anyway, after a person checked it.\nResolving a resolved item returns it unchanged.",
         "operationId": "ledger_resolve_ledger_exception",
         "parameters": [
           {
@@ -195919,6 +196035,16 @@
               }
             },
             "description": "No such item (`ledger.exception_not_found`) or payment (`ledger.payment_not_found`)."
+          },
+          "409": {
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The amount collected differs from the amount due and the action is `match` (`ledger.amount_differs`), or the payment is no longer waiting for its money (`ledger.payment_state`)."
           },
           "422": {
             "content": {

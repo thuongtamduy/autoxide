@@ -30,12 +30,23 @@ pub(crate) const FILE_DIR: Setting = Setting::new(
 )
 .with_default("data/mail");
 
+pub(crate) const ALLOW_PRIVATE_NETWORKS: Setting = Setting::new(
+    "AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS",
+    "Allow a tenant's own SMTP server (tenant setting `mail.connection.smtp.url`) in private or \
+     local networks (`localhost`, `10.x`, `192.168.x`, …). Off by default: tenants could otherwise \
+     make this server connect to internal services. Turn it on only when every tenant is trusted. \
+     AUTOXIDE_MAIL_SMTP_URL (set by the operator) is never restricted.",
+)
+.with_default("false");
+
 #[derive(Debug, Clone)]
 pub(crate) struct MailConfig {
     /// `None`: ghi mail ra file.
     pub smtp_url: Option<String>,
     pub from: Mailbox,
     pub file_dir: PathBuf,
+    /// `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS`.
+    pub allow_private_networks: bool,
 }
 
 impl MailConfig {
@@ -55,7 +66,13 @@ impl MailConfig {
                 .map_err(|_| "must be a mail address, like `Name <noreply@example.com>`".to_owned())
         });
         let file_dir = reader.get_with(&FILE_DIR, |raw| Ok(PathBuf::from(raw)));
-        Ok(MailConfig { smtp_url: smtp_url?, from: from?, file_dir: file_dir? })
+        let allow_private_networks = reader.get::<bool>(&ALLOW_PRIVATE_NETWORKS);
+        Ok(MailConfig {
+            smtp_url: smtp_url?,
+            from: from?,
+            file_dir: file_dir?,
+            allow_private_networks: allow_private_networks?,
+        })
     }
 }
 
@@ -78,6 +95,7 @@ mod tests {
         assert_eq!(config.smtp_url, None);
         assert_eq!(config.from.to_string(), "Autoxide <noreply@localhost>");
         assert_eq!(config.file_dir, PathBuf::from("data/mail"));
+        assert!(!config.allow_private_networks);
     }
 
     #[test]

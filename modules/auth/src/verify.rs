@@ -42,6 +42,15 @@ fn tokens() -> OneTimeTokens {
     OneTimeTokens::new("auth")
 }
 
+/// Mail tới chủ email đã có tài khoản khi ai đó đăng ký lại bằng email này
+/// (D-20261121-registration-uniform): `POST /registrations` trả lời như nhau dù email đã có hay chưa.
+const REGISTRATION_EXISTING: MailTemplate = MailTemplate::new(
+    "auth.mail.registration_existing",
+    "Someone tried to create an account with your email",
+    "Someone tried to create a new account with {email}, which already has one. If it was you, \
+     sign in, or reset your password if you forgot it. If not, ignore this mail: nothing changed.",
+);
+
 const VERIFY_LINK: MailTemplate = MailTemplate::new(
     "auth.mail.verify_email_link",
     "Confirm your email address",
@@ -87,6 +96,32 @@ impl EmailVerifications {
     ) {
         if let Err(error) = self.send(tenant, actor, user, &user.email, language).await {
             tracing::warn!(user_id = %user.id, error = %error, "cannot send the verification mail");
+        }
+    }
+
+    /// Báo chủ tài khoản `user` rằng có người vừa đăng ký bằng email của họ. Mỗi tài khoản nhiều
+    /// nhất một mail mỗi `COOLDOWN_SECONDS` (không dùng được để spam). Hỏng thì chỉ ghi log.
+    pub(crate) async fn notify_existing_registration(
+        &self,
+        tenant: &TenantContext,
+        user: &User,
+        language: Language,
+    ) {
+        let sent = async {
+            let cooldown = std::time::Duration::from_secs(COOLDOWN_SECONDS.unsigned_abs());
+            let throttle = autoxide_kernel::throttle::Throttle::new("auth", 1, cooldown)?;
+            let key = format!("registration-notice:{}", user.id);
+            if !throttle.hit(tenant, &key).await?.is_allowed() {
+                return Ok(());
+            }
+            let language = self.users.mail_language(tenant, user.id, language).await?;
+            let params = [("email", user.email.as_str())];
+            let mail =
+                REGISTRATION_EXISTING.mail(&user.email, &self.translations, language, &params);
+            self.mailer.send(tenant, mail).await
+        };
+        if let Err(error) = sent.await {
+            tracing::warn!(user_id = %user.id, %error, "cannot send the registration notice");
         }
     }
 
