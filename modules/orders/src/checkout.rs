@@ -374,6 +374,15 @@ impl OrdersService {
             }
         };
 
+        // Số liên hệ của lượt đặt cũng là một khoá người mua cho hạn mức khuyến mãi (không đổi
+        // kết quả tính giảm, chỉ thêm bộ đếm): vãng lai và người bỏ đăng nhập vẫn bị đếm.
+        if let Some(key) = &buyer_key {
+            let key = format!("phone:{key}");
+            if !price_input.buyer_keys.contains(&key) {
+                price_input.buyer_keys.push(key);
+            }
+        }
+
         // 4–5. Giữ chỗ ngoài transaction.
         let org = OrgId::from_uuid(row.org_id);
         let hold_until = now + SignedDuration::from_mins(self.config.hold_minutes);

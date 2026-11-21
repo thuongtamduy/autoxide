@@ -130,6 +130,27 @@ async fn moi_nguoi_mot_luot_gui_dong_thoi_va_cung_so_dien_thoai_hai_tai_khoan() 
 }
 
 #[tokio::test]
+async fn gioi_han_moi_nguoi_ma_khong_co_khoa_nguoi_mua_thi_tu_choi() {
+    TestDatabase::run(async |test| {
+        let setup = Arc::new(setup(test, true).await);
+        let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
+        let id = running(&setup, body(setup.tree.a, json!({"per_customer_limit": 1}))).await;
+        // Không khoá nào: không đếm được theo người → từ chối, không giữ lượt nào.
+        let cart = setup.cart(&[(variant, 1)]);
+        let error = setup.promotions().reserve(&setup.tenant(), &hold(cart)).await.unwrap_err();
+        assert_eq!(error.code(), "promotions.buyer_unidentified");
+        assert_eq!(promotion(&setup, id).await["usage_count"], 0);
+        // Có khoá thì giữ được như thường.
+        let mut cart = setup.cart(&[(variant, 1)]);
+        cart.buyer_keys = vec!["phone:abc".into()];
+        setup.promotions().reserve(&setup.tenant(), &hold(cart)).await.unwrap();
+        assert_eq!(promotion(&setup, id).await["usage_count"], 1);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn giu_lai_cung_order_id_va_tra_lai_dung_bo_dem() {
     TestDatabase::run(async |test| {
         let setup = Arc::new(setup(test, true).await);

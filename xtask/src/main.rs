@@ -10,7 +10,8 @@
 //!   hành trước bằng image Docker của nó; chạy trong CI và lúc phát hành (xem `upgrade.rs`).
 //! - `check` — kiểm luật ranh giới của workspace (xem `boundaries.rs`), bản dịch i18n
 //!   (`i18n.rs`), tài liệu EN / VI (`docs.rs`), mục lục quyết định (`decisions.rs`), mảnh thay đổi
-//!   (`changelog.rs`) và độ dài
+//!   (`changelog.rs`), lọc theo khách (`tenant_scope.rs`), tool MCP theo phạm vi
+//!   (`mcp_principal.rs`; chỗ cũ chờ sửa ở `baseline.rs`) và độ dài
 //!   file `.rs` (`lengths.rs`: quá 800 dòng thì cảnh báo, quá 1200 thì chặn trừ file miễn).
 //!   `./gate.sh` gọi lệnh này; vi phạm thì gate đỏ.
 //! - `changelog` — gộp các mảnh trong `changelog.d/` vào `## [Unreleased]` của `CHANGELOG.md` rồi
@@ -33,6 +34,7 @@
 
 mod affected;
 mod api_diff;
+mod baseline;
 mod boundaries;
 mod changelog;
 mod decisions;
@@ -40,11 +42,14 @@ mod deploy_metrics;
 mod docs;
 mod i18n;
 mod lengths;
+mod mcp_principal;
 mod metric_labels;
 mod scaffold;
 mod sdk;
 mod semver;
+mod source;
 mod tenancy;
+mod tenant_scope;
 mod upgrade;
 mod workspace;
 
@@ -218,6 +223,14 @@ fn check() -> ExitCode {
         violations.extend(i18n::check_translations(&workspace)?);
         violations.extend(docs::check_docs(&workspace.root)?);
         violations.extend(tenancy::check_entities(&workspace)?);
+        // Hai luật bảo mật có danh sách chỗ cũ chờ sửa (D-20261121-security-lints).
+        let mut security = tenant_scope::check(&workspace)?;
+        security.extend(mcp_principal::check(&workspace)?);
+        let security = baseline::apply(&workspace.root, security)?;
+        for warning in &security.warnings {
+            eprintln!("{warning}");
+        }
+        violations.extend(security.violations);
         violations.extend(decisions::check(&workspace.root)?);
         violations.extend(changelog::check(&workspace.root)?);
         violations.extend(metric_labels::check(&workspace.root)?);

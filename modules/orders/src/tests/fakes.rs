@@ -217,6 +217,9 @@ pub(crate) struct FakePromotions {
     redemptions: Mutex<HashMap<Uuid, &'static str>>,
     /// Số lời gọi `reserve` kế tiếp lỗi như hết lượt.
     pub fail_reserve: AtomicUsize,
+    /// Giỏ của lời gọi `evaluate` gần nhất và của mọi lời gọi `reserve` (kiểm khoá người mua).
+    pub last_evaluated: Mutex<Option<Cart>>,
+    pub reserved: Mutex<Vec<Cart>>,
 }
 
 impl FakePromotions {
@@ -294,6 +297,7 @@ impl FakePromotions {
 #[async_trait::async_trait]
 impl Promotions for FakePromotions {
     async fn evaluate(&self, _tenant: &TenantContext, cart: &Cart) -> Result<Evaluation, Error> {
+        *self.last_evaluated.lock().unwrap() = Some(cart.clone());
         Ok(self.compute(cart))
     }
 
@@ -313,6 +317,7 @@ impl Promotions for FakePromotions {
             self.fail_reserve.fetch_sub(1, Ordering::SeqCst);
             return Err(foreign(ErrorKind::Conflict, EXHAUSTED));
         }
+        self.reserved.lock().unwrap().push(request.cart.clone());
         let evaluation = self.compute(&request.cart);
         if let Some(expected) = &request.expected_fingerprint
             && *expected != evaluation.fingerprint

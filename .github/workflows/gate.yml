@@ -115,6 +115,10 @@ jobs:
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-nextest
+      # mold thay linker mặc định (ld) của máy CI: job này link hàng chục chương trình test lớn, mold
+      # link nhanh hơn nhiều. Chỉ đổi linker hệ thống (không đổi RUSTFLAGS) nên cache sccache /
+      # rust-cache giữ nguyên khoá; file chạy ra vẫn là ELF thường cho máy test (D-20261121-ci-mold-shards).
+      - uses: rui314/setup-mold@v1
       - run: ./gate.sh ${{ github.event_name == 'pull_request' && '--pr' || '' }} --only build
       - run: sccache --show-stats
         if: always()
@@ -137,6 +141,8 @@ jobs:
       matrix:
         # `part`: phần của `./gate.sh --only`; `shard`: phần của `./gate.sh --shard` (nextest
         # `--partition count:k/n`). Không build nên chia thêm máy rẻ: mỗi máy chỉ tải archive rồi chạy.
+        # Postgres chậm hơn SQLite (mỗi test một database thật) nên chia 6 phần, SQLite 4: hai nhóm xong
+        # gần cùng lúc (D-20261121-ci-mold-shards).
         # Postgres thấp nhất được hỗ trợ (STACK.md) và mới nhất: `postgres-18` tắt thì chỉ chạy bản thấp
         # nhất (dễ hỏng nhất) để có kết quả sớm — pull request và phát hành; push lên main và chạy tay
         # thì chạy cả hai (D-20261118-public-ci-openapi-dup).
@@ -146,23 +152,29 @@ jobs:
             {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
             {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
             {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
-            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
-            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
-            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
-            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"},
-            {"name": "postgres 18 1/4", "part": "postgres", "shard": "1/4", "postgres": "18"},
-            {"name": "postgres 18 2/4", "part": "postgres", "shard": "2/4", "postgres": "18"},
-            {"name": "postgres 18 3/4", "part": "postgres", "shard": "3/4", "postgres": "18"},
-            {"name": "postgres 18 4/4", "part": "postgres", "shard": "4/4", "postgres": "18"}
+            {"name": "postgres 16 1/6", "part": "postgres", "shard": "1/6", "postgres": "16"},
+            {"name": "postgres 16 2/6", "part": "postgres", "shard": "2/6", "postgres": "16"},
+            {"name": "postgres 16 3/6", "part": "postgres", "shard": "3/6", "postgres": "16"},
+            {"name": "postgres 16 4/6", "part": "postgres", "shard": "4/6", "postgres": "16"},
+            {"name": "postgres 16 5/6", "part": "postgres", "shard": "5/6", "postgres": "16"},
+            {"name": "postgres 16 6/6", "part": "postgres", "shard": "6/6", "postgres": "16"},
+            {"name": "postgres 18 1/6", "part": "postgres", "shard": "1/6", "postgres": "18"},
+            {"name": "postgres 18 2/6", "part": "postgres", "shard": "2/6", "postgres": "18"},
+            {"name": "postgres 18 3/6", "part": "postgres", "shard": "3/6", "postgres": "18"},
+            {"name": "postgres 18 4/6", "part": "postgres", "shard": "4/6", "postgres": "18"},
+            {"name": "postgres 18 5/6", "part": "postgres", "shard": "5/6", "postgres": "18"},
+            {"name": "postgres 18 6/6", "part": "postgres", "shard": "6/6", "postgres": "18"}
           ]' || '[
             {"name": "sqlite 1/4", "part": "sqlite", "shard": "1/4", "postgres": "16"},
             {"name": "sqlite 2/4", "part": "sqlite", "shard": "2/4", "postgres": "16"},
             {"name": "sqlite 3/4", "part": "sqlite", "shard": "3/4", "postgres": "16"},
             {"name": "sqlite 4/4", "part": "sqlite", "shard": "4/4", "postgres": "16"},
-            {"name": "postgres 16 1/4", "part": "postgres", "shard": "1/4", "postgres": "16"},
-            {"name": "postgres 16 2/4", "part": "postgres", "shard": "2/4", "postgres": "16"},
-            {"name": "postgres 16 3/4", "part": "postgres", "shard": "3/4", "postgres": "16"},
-            {"name": "postgres 16 4/4", "part": "postgres", "shard": "4/4", "postgres": "16"}
+            {"name": "postgres 16 1/6", "part": "postgres", "shard": "1/6", "postgres": "16"},
+            {"name": "postgres 16 2/6", "part": "postgres", "shard": "2/6", "postgres": "16"},
+            {"name": "postgres 16 3/6", "part": "postgres", "shard": "3/6", "postgres": "16"},
+            {"name": "postgres 16 4/6", "part": "postgres", "shard": "4/6", "postgres": "16"},
+            {"name": "postgres 16 5/6", "part": "postgres", "shard": "5/6", "postgres": "16"},
+            {"name": "postgres 16 6/6", "part": "postgres", "shard": "6/6", "postgres": "16"}
           ]') }}
     services:
       # Job SQLite cũng có service Postgres (khởi động song song với checkout, không tốn thời gian)
