@@ -57,6 +57,7 @@
   "promotions.activation_failed": "Chưa bật được chương trình: xem `errors`.",
   "promotions.budget_exhausted": "Chương trình `{title}` đã hết ngân sách.",
   "promotions.changed": "Khuyến mại của giỏ đã thay đổi; hãy xem lại trước khi đặt.",
+  "promotions.changed_while_activating": "Chương trình `{id}` vừa thay đổi trong lúc kiểm trước khi bật. Hãy bật lại.",
   "promotions.claim_limit_reached": "Bạn đã nhận đủ số voucher cho phép của chương trình `{title}`.",
   "promotions.claim_requires_verified_phone": "Cần xác thực số điện thoại để nhận voucher này.",
   "promotions.code_invalid": "Mã `{code}` không tồn tại.",

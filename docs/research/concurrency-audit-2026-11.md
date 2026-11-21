@@ -64,7 +64,7 @@ rồi xác nhận xanh trên cả hai database.
 | 3 | `modules/bookings/src/jobs.rs` `deposit_paid` ↔ `booking.rs` `expire` | Đọc lịch `held` không khoá, ghi cả dòng; điều kiện chỉ có `deposit_status` | Lịch đã hết hạn và slot đã nhả cho người khác bị ghi lại thành `confirmed` | Đã sửa (#265) — test qua job/event không tái hiện được thứ tự đua; sửa theo phân tích |
 | 4 | `modules/shipping/src/cod.rs` `resolve_discrepancy` | Đọc `status != resolved` không khoá, update không điều kiện | Hai người xử lý cùng lúc: job xoá nợ đã xếp nhưng hồ sơ ghi cách xử lý khác; event trùng | Đã sửa (#263) — đỏ 3/3 trên Postgres |
 | 5 | `modules/ledger/src/posting.rs` `write` ↔ `service.rs` `update_account` | Ghi bút toán đọc `floor_minor` / `status` của tài khoản không khoá | Số dư xuống dưới sàn mới vừa đặt; ghi lọt vào tài khoản vừa đóng | Đã sửa (#270) — đỏ 2/3 trên Postgres |
-| 6 | `modules/promotions/src/participations.rs` `review_participation`, `participate` | Đọc `status` không khoá rồi ghi | Duyệt và từ chối đua nhau: giá flash có hiệu lực nhưng hồ sơ `rejected` | Chưa sửa |
+| 6 | `modules/promotions/src/participations.rs` `review_participation`, `participate` | Đọc `status` không khoá rồi ghi | Duyệt và từ chối đua nhau: giá flash có hiệu lực nhưng hồ sơ `rejected` | Đã sửa (lượt 2, `promotions`): khoá dòng chương trình khi đăng ký và duyệt — đỏ 1/3 trên Postgres |
 | 7 | `modules/plans/src/usage.rs` `reconcile_one` | Ghi `used = target` tuyệt đối | `reserve` / `release` chen giữa bị ghi đè, khách vượt hạn mức | Chưa sửa (cả hai DB): `real` và chỗ giữ đọc trước, không có cách vá nhỏ đúng; cần thiết kế lại đối soát |
 | 8 | `modules/plans/src/billing.rs` `invoice_period` ↔ `lifecycle.rs` `void_period` | Kiểm `status != void` ngoài transaction, gán `invoice_id` không điều kiện | Kỳ đã huỷ vẫn có hoá đơn GTGT không bị huỷ | Chưa sửa (cả hai DB) |
 | 9 | `modules/orders/src/checkout.rs` chuyển giỏ sang `converted` | Không điều kiện status | Hai lần đặt hàng khác idempotency key trên cùng giỏ ra hai đơn | Chưa sửa (cả hai DB) |
@@ -86,7 +86,7 @@ rồi xác nhận xanh trên cả hai database.
 | 15 | `modules/compliance/src/tracking.rs` `refresh_banner` | Đọc `cookie_setting` không khoá, ghi `policy_version + 1` tuyệt đối | Hai lần thêm tag chỉ tăng version một lần: người dùng không bị hỏi đồng ý lại cookie (NĐ 13/2023) | Đã sửa (#266) — đỏ 1/9 trên Postgres |
 | 16 | `modules/compliance/src/cases.rs` `save_case` / `restricted_elsewhere` | Quyết phát `TargetRestored` theo "còn vụ khác đang ẩn" mà không khoá các vụ đó | Hai vụ cùng ẩn một đích khôi phục cùng lúc: nội dung bị ẩn vĩnh viễn | Chưa sửa |
 | 17 | `modules/catalog/src/products.rs` `set_status` (Active) ↔ `restrictions.rs` `delete_document` | `product_for_write` đọc không khoá | Sản phẩm ngành hạn chế mở bán khi giấy tờ bắt buộc vừa bị xoá | Một phần (#273): mọi lệnh sửa sản phẩm / giấy tờ khoá dòng sản phẩm. Đổi hạn chế của danh mục (nhiều sản phẩm) chưa khoá |
-| 18 | `modules/promotions/src/compliance.rs` (kiểm khi kích hoạt) | Chạy ngoài transaction | Hai lần kích hoạt cùng lúc cùng vượt trần khuyến mại pháp lý | Chưa sửa (cả hai DB) |
+| 18 | `modules/promotions/src/compliance.rs` (kiểm khi kích hoạt) | Chạy ngoài transaction | Hai lần kích hoạt cùng lúc cùng vượt trần khuyến mại pháp lý | Đã sửa (lượt 2, `promotions`): khi ghi kích hoạt khoá dòng phiên bản của khách rồi kiểm lại tổng số ngày giảm giá; chương trình đổi giữa lúc kiểm và lúc ghi thì 409 — đỏ 3/3 trên Postgres và trên SQLite |
 
 ### Bảo mật
 
