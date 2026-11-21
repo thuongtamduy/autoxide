@@ -98,3 +98,68 @@ async fn dang_ky_tra_loi_nhu_nhau() {
     .await
     .unwrap();
 }
+
+/// Access token của phiên đã kết thúc bị từ chối ngay, không chờ hết hạn
+/// (D-20261121-access-token-revocation): đăng xuất chỉ kết thúc đúng phiên đó; đổi mật khẩu kết thúc
+/// mọi phiên cũ, chỉ cặp token mới trả về dùng được. Đổi refresh token vẫn ở trong cùng phiên.
+#[tokio::test]
+async fn access_token_cua_phien_da_ket_thuc_bi_tu_choi_ngay() {
+    TestDatabase::run(async |test| {
+        let (app, _services) = app_with(test, false).await;
+        let login = async || {
+            let body = json!({"email": "ada@example.com", "password": PASSWORD});
+            let (status, _, answer) = call(&app, "POST", "/login", None, Some(body)).await;
+            assert_eq!(status, StatusCode::OK, "{answer}");
+            answer["data"].clone()
+        };
+        let me = async |tokens: &serde_json::Value| {
+            let bearer = format!("Bearer {}", tokens["access_token"].as_str().unwrap());
+            let (status, _, answer) = call(&app, "GET", "/me", Some(&bearer), None).await;
+            (status, answer["code"].as_str().unwrap_or_default().to_owned())
+        };
+        let first = login().await;
+        let second = login().await;
+        assert_eq!(me(&first).await.0, StatusCode::OK);
+
+        let out = json!({"refresh_token": first["refresh_token"]});
+        let (status, _, _) = call(&app, "POST", "/logout", None, Some(out)).await;
+        assert_eq!(status, StatusCode::NO_CONTENT);
+        assert_eq!(me(&first).await, (StatusCode::UNAUTHORIZED, "auth.session_ended".to_owned()));
+        assert_eq!(me(&second).await.0, StatusCode::OK, "phiên khác không bị ảnh hưởng");
+
+        // Đổi refresh token: phiên vẫn sống, token cũ và mới của nó đều dùng được tới khi hết hạn.
+        let body = json!({"refresh_token": second["refresh_token"]});
+        let (status, _, renewed) = call(&app, "POST", "/refresh", None, Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{renewed}");
+        let renewed = renewed["data"].clone();
+        assert_eq!(me(&second).await.0, StatusCode::OK);
+        assert_eq!(me(&renewed).await.0, StatusCode::OK);
+
+        let bearer = format!("Bearer {}", renewed["access_token"].as_str().unwrap());
+        let body =
+            json!({"current_password": PASSWORD, "new_password": "a brand new long password"});
+        let (status, _, changed) =
+            call(&app, "POST", "/me/password", Some(&bearer), Some(body)).await;
+        assert_eq!(status, StatusCode::OK, "{changed}");
+        assert_eq!(me(&renewed).await, (StatusCode::UNAUTHORIZED, "auth.session_ended".to_owned()));
+        assert_eq!(me(&changed["data"]).await.0, StatusCode::OK);
+    })
+    .await
+    .unwrap();
+}
+
+/// Trường lạ (gõ sai tên) trong thân request bị từ chối 422 `invalid_body`, nêu tên trường, thay vì
+/// bị lặng lẽ bỏ qua (D-20261121-api-shape).
+#[tokio::test]
+async fn truong_la_trong_than_request_bi_tu_choi() {
+    TestDatabase::run(async |test| {
+        let (app, _services) = app_with(test, false).await;
+        let body = json!({"email": "ada@example.com", "pasword": PASSWORD});
+        let (status, _, answer) = call(&app, "POST", "/login", None, Some(body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{answer}");
+        assert_eq!(answer["code"], "invalid_body");
+        assert!(answer["detail"].as_str().unwrap().contains("pasword"), "{answer}");
+    })
+    .await
+    .unwrap();
+}

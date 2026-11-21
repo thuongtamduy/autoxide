@@ -47,6 +47,7 @@ pub(crate) struct CanCheck {
 
 /// The questions.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CanRequest {
     /// 1 to 50 questions.
     pub checks: Vec<CanCheck>,

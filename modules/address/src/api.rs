@@ -31,6 +31,7 @@ pub struct Address {
 /// An address to check: codes only; names are filled in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[non_exhaustive]
+#[serde(deny_unknown_fields)]
 pub struct AddressInput {
     #[schema(example = "VN")]
     pub country: String,

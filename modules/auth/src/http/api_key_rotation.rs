@@ -29,6 +29,7 @@ pub(super) fn routes() -> OpenApiRouter<Arc<HttpState>> {
 
 /// How to replace a key.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct RotateApiKeyRequest {
     /// Hours the old key keeps working, 0 to 72 (24 by default): time to switch every program
     /// to the new key. 0 stops the old key at once.

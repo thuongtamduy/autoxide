@@ -412,6 +412,7 @@ pub(crate) struct NewCustomField {
 
 /// The changeable settings of a field; omitted fields stay (or take their default).
 #[derive(Debug, Clone, Default, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct FieldSettings {
     pub labels: Option<BTreeMap<String, String>>,
     pub help: Option<BTreeMap<String, String>>,

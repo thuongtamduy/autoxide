@@ -247,6 +247,7 @@ pub(crate) struct CreatedApiKeyResponse {
 
 /// A key to create.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct CreateApiKeyRequest {
     /// What the key is for, 1 to 100 characters.
     #[schema(example = "nightly report agent")]

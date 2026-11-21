@@ -69,7 +69,7 @@ curl -sS "$API/api/v1/auth/refresh" --json '{"refresh_token":"'"$NEW_REFRESH"'"}
 
 ## Sign out
 
-Ending a session takes its refresh token; the access token stops working when it expires.
+Ending a session takes its refresh token. Its access tokens stop working at once (code `auth.session_ended`), without waiting for them to expire; the same happens when you end a session from the list below, change your password, or an administrator signs you out or disables the account.
 
 <!-- example: sign-in-again -->
 ```bash
@@ -83,6 +83,12 @@ curl -sS "$API/api/v1/auth/login" \
 ```bash
 curl -sS "$API/api/v1/auth/logout" --json '{"refresh_token":"'"$REFRESH"'"}'
 # expect: 204
+```
+
+<!-- example: signed-out-token -->
+```bash
+curl -sS "$API/api/v1/auth/me" -H "Authorization: Bearer $TOKEN"
+# expect: 401
 ```
 
 ## Your sessions

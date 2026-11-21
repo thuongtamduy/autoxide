@@ -635,6 +635,7 @@
       "deprecation": null,
       "description": "Create an API key that acts as you, limited to the listed permissions. Needs your current password and a password session: an API key cannot create keys. The result carries the key, shown only once.",
       "input_schema": {
+        "additionalProperties": false,
         "description": "A key to create.",
         "properties": {
           "allowed_ips": {
@@ -927,6 +928,7 @@
       "deprecation": null,
       "description": "Create a role that grants the listed permissions (see `list_permissions`).",
       "input_schema": {
+        "additionalProperties": false,
         "description": "The full content of a role.",
         "properties": {
           "denies": {

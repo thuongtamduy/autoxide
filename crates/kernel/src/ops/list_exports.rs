@@ -268,6 +268,7 @@ impl Job for ExportJob {
 
 /// A list to export.
 #[derive(Debug, Clone, Deserialize, ToSchema, validator::Validate)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct NewExport {
     /// The list, as `x-autoxide-list` of its endpoint, e.g. `content.list_content_entries`.
     pub resource: String,
