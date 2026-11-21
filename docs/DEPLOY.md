@@ -316,10 +316,16 @@ For trying Autoxide or a small installation on one machine, without building any
 steps to the first run are in the README, [Try it with Docker](../README.md#try-it-with-docker-no-build).
 The rules that matter after that, with `IMAGE` and `RUN` as defined there:
 
-- The server never applies migrations by itself. Starting `serve` on an empty or older
+- By default the server does not apply migrations by itself. Starting `serve` on an empty or older
   database stops at once with `N migration(s) have not been applied to the database (first: …); run
   autoxide migrate up first` (the count and the first few names, not the whole list; `autoxide
   migrate status` lists them all; error code `kernel.migrations_pending`): run `$RUN $IMAGE migrate up`, then start it.
+  On a single server you may set `AUTOXIDE_MIGRATE_ON_START=true` instead: `serve` then applies
+  them on start, under a lock so that two servers starting together never both migrate. With
+  `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL` it also creates the first administrator, and with
+  `AUTOXIDE_STARTUP_TASKS` it loads reference data — what `compose.quickstart.yml` does. For
+  several servers, keep running `migrate up` once per deployment: you see what changes, and a
+  failed migration stops the deployment before the new version takes requests.
 - Everything the server writes is in the volume `autoxide-data` (`/var/lib/autoxide/data`):
   the database, uploaded files, and mail until SMTP is configured. A container started without
   that volume keeps its data only until it is removed.

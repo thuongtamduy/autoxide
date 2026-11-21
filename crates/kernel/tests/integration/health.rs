@@ -132,3 +132,59 @@ async fn dang_tat_thi_chua_san_sang_nhung_van_song() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn trang_chu_tra_ten_phien_ban_va_duong_dan() {
+    TestDatabase::run(async |database| {
+        let (api, _db) = start(database).await;
+
+        let (status, content_type, body) = get(&api, "/").await;
+
+        assert_eq!((status, content_type.as_str()), (StatusCode::OK, "application/json"));
+        assert_eq!(
+            body,
+            serde_json::json!({"data": {
+                "name": "Autoxide",
+                "version": env!("CARGO_PKG_VERSION"),
+                "openapi": "/api/v1/openapi.json",
+                // Trang xem API tắt mặc định; không có module xác thực thì không có MCP.
+                "docs": null,
+                "mcp": null,
+                "llms": "/llms.txt",
+                "health": "/health/ready",
+            }})
+        );
+        let document = serde_json::to_value(&api.openapi).unwrap();
+        assert_eq!(document["paths"]["/"]["get"]["operationId"], "home");
+        assert_eq!(http::lint(&api.openapi), Vec::<String>::new());
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn trang_chu_co_link_trang_xem_api_khi_bat() {
+    TestDatabase::run(async |database| {
+        let source = ConfigSource::from_pairs([
+            ("DATABASE_URL", database.url()),
+            ("AUTOXIDE_HTTP_API_DOCS", "true"),
+        ]);
+        let mut reader = ConfigReader::new(&source);
+        let config = Config::read(&mut reader);
+        let config = reader.finish(config).unwrap().0;
+        let db = Database::connect(&config.database).await.unwrap();
+        let api = http::build(
+            &config.http,
+            http::health_routes(db.clone(), http::Draining::default()),
+            Vec::new(),
+            http::Extras::default(),
+        );
+
+        let (status, _, body) = get(&api, "/").await;
+
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body["data"]["docs"], "/api/docs");
+    })
+    .await
+    .unwrap();
+}

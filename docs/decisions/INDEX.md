@@ -86,7 +86,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261119-ci-faster](D-20261119-ci-faster.md)** CI chia gate thành nhiều job song song (theo phần và shard), main lưu cache, Postgres chia suất có sàn — 2026-11-19
 - **[D-20261119-merge-batches](D-20261119-merge-batches.md)** Merge theo lô do phiên điều phối ghép; mỗi phiên một PR lớn cho một cụm việc; file sinh tự động không gộp tay — 2026-11-19
 - **[D-20261119-step69-multiplatform](D-20261119-step69-multiplatform.md)** Bước 69: nền cho ứng dụng đa nền tảng (SDK di động, đồng bộ ngoại tuyến, WebSocket, mua trong ứng dụng) — 2026-11-19 · **chủ dự án quyết**
-- **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19
+- **[D-20261119-step69-sdk](D-20261119-step69-sdk.md)** SDK Swift, Kotlin, Dart: công cụ chuẩn ghim phiên bản, gate kiểm cấu hình, CI sinh và biên dịch — 2026-11-19 · *thay một phần bởi D-20261121-mobile-sdk-on-demand*
 - **[D-20261120-batch-postgres](D-20261120-batch-postgres.md)** Ghép lô chạy test của crate bị sửa trên cả Postgres — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-build-faster](D-20261120-build-faster.md)** Build nhanh hơn: archive test của CI dùng opt-level 0 cho thư viện ngoài; không dùng cargo-hakari; đề xuất tách kernel — 2026-11-20
 - **[D-20261120-ci-nextest-archive](D-20261120-ci-nextest-archive.md)** CI build test một lần thành archive của nextest, các máy test chỉ tải về và chạy — 2026-11-20
@@ -95,6 +95,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261120-session-tiers](D-20261120-session-tiers.md)** Phiên làm việc chọn model và mức nỗ lực theo loại việc — 2026-11-20 · **chủ dự án quyết**
 - **[D-20261120-test-db-template](D-20261120-test-db-template.md)** Test chép database mẫu đã migrate thay vì migrate mọi module ở mỗi bài — 2026-11-20
 - **[D-20261120-upgrade-image](D-20261120-upgrade-image.md)** Workflow chạy tay đăng image cho tag phát hành đã có; job upgrade dùng image đó thay vì build lại bản cũ — 2026-11-20
+- **[D-20261121-mobile-sdk-on-demand](D-20261121-mobile-sdk-on-demand.md)** Build SDK di động (Swift, Kotlin, Dart) chỉ khi chạy tay, trước mỗi lần phát hành — 2026-11-21 · **chủ dự án quyết**
 - **[D-20261121-sqlx-091](D-20261121-sqlx-091.md)** Nâng sqlx 0.9.1, gỡ ngoại lệ RUSTSEC-2026-0459 — 2026-11-21
 
 ## Kiến trúc module và kernel
@@ -122,7 +123,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-029** SeaORM mặc định, SQL trực tiếp chỉ khi đã đo — 2026-11-11
 - **D-030** Phiên bản database tối thiểu — 2026-11-11
 - **D-035** Chi tiết kết nối database tách đọc / ghi — 2026-11-11
-- **D-036** Migration theo module — 2026-11-11
+- **D-036** Migration theo module — 2026-11-11 · *thay một phần bởi D-20261121-migrate-on-start*
 - **D-037** Kiểm luật sở hữu bảng bằng cách hỏi chính database — 2026-11-11
 - **D-054** Event: transactional outbox — 2026-11-11
 - **D-055** Audit log là một module nhận mọi event — 2026-11-11
@@ -140,6 +141,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-378** Stream event bằng SSE là event module khai, không phải "realtime theo bảng" (bước 40 P5, D-189, D-054) — 2026-11-18
 - **D-381** Bộ máy tìm kiếm thay được: `SearchIndex` + `DatabaseSearch`, đồng bộ bằng job cùng transaction (bước 40 P7, D-202, D-220, D-054) — 2026-11-18
 - **[D-20261118-step39-long-jobs](D-20261118-step39-long-jobs.md)** Lõi backup dời vào kernel; job chạy lâu được gia hạn giữ — 2026-11-18
+- **[D-20261121-migrate-on-start](D-20261121-migrate-on-start.md)** Tuỳ chọn tự migrate, tạo quản trị viên đầu tiên và chạy task khi `serve` khởi động — 2026-11-21
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 - **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
 
@@ -341,7 +343,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **D-062** Mẫu mail theo i18n key — 2026-11-11
 - **D-063** Đặt lại mật khẩu bằng token một lần qua mail — 2026-11-11
 - **D-065** Xác minh email và đổi email qua mail — 2026-11-11
-- **D-066** Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11
+- **D-066** Lưu file: trait `Storage` của kernel, module `files` trên `object_store` — 2026-11-11 · *thay một phần bởi D-20261121-s3-client*
 - **D-067** API file: thân request là nội dung thô, metadata trong `files_file` — 2026-11-11
 - **D-073** Backup là một thư mục trung lập: SQLite + file — 2026-11-11
 - **D-081** Webhook: module `webhooks`, chuẩn Standard Webhooks, gửi qua job queue — 2026-11-12
@@ -427,6 +429,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261118-step57-analytics](D-20261118-step57-analytics.md)** Phân tích truy cập không cookie: hợp đồng khai báo, khoá phiên, gộp, đồng ý — 2026-11-18
 - **[D-20261119-step39-avif](D-20261119-step39-avif.md)** Làm bản AVIF của ảnh thu nhỏ (job nền, tắt mặc định), mã hoá bằng `ravif` Rust thuần — 2026-11-19
 - **[D-20261119-step55-banners](D-20261119-step55-banners.md)** Bước 55: banner trỏ tới đối tượng qua sổ đối tượng, permission `content.banners`, phiên bản bằng `updated_at` — 2026-11-19
+- **[D-20261121-s3-client](D-20261121-s3-client.md)** Lưu file: `rusty-s3` + `reqwest` cho S3, ổ đĩa tự viết, thay `object_store` — 2026-11-21
 
 ## Tiền, thuế, chứng từ
 

@@ -1,8 +1,10 @@
 //! Lệnh `autoxide serve`: chạy máy chủ HTTP tới khi nhận tín hiệu dừng.
 //!
-//! Lệnh này KHÔNG tự áp dụng migration: còn migration chưa áp dụng thì nó từ chối
-//! chạy và nói phải chạy `autoxide migrate up`. Tách hai việc ra để lúc deploy
-//! nhiều bản cùng lúc, không có hai tiến trình tranh nhau sửa schema.
+//! Mặc định lệnh này KHÔNG tự áp dụng migration: còn migration chưa áp dụng thì nó từ chối
+//! chạy và nói phải chạy `autoxide migrate up` — production chạy lệnh đó một lần mỗi lần deploy.
+//! `AUTOXIDE_MIGRATE_ON_START=true` (cho một máy chủ, chạy thử) thì tự migrate trước, dưới khoá
+//! migration để nhiều bản khởi động cùng lúc không chạy chồng (`startup.rs`,
+//! D-20261121-migrate-on-start).
 
 use std::future::Future;
 use std::process::ExitCode;
@@ -14,6 +16,7 @@ use tokio::net::TcpListener;
 use super::{report_failure, report_invalid_configuration, run_with_observability};
 use crate::runtime::{self, Migrations, Runtime};
 use crate::settings::{self, Settings};
+use crate::startup;
 
 pub fn run() -> ExitCode {
     let settings = match settings::load() {
@@ -39,7 +42,19 @@ where
 /// Khởi động mọi thứ và mở port, nhưng chưa nhận request. Tách riêng để test biết
 /// port thật (khi cấu hình port `0`, hệ điều hành chọn một port trống).
 async fn prepare(settings: Settings) -> Result<(Runtime, TcpListener), String> {
-    let runtime = runtime::start(settings, Migrations::RequireApplied).await?;
+    let startup = settings.startup.clone();
+    let prepared = startup::before_start(&settings).await?;
+    let runtime = match runtime::start(settings, Migrations::RequireApplied).await {
+        Ok(runtime) => runtime,
+        Err(error) => {
+            startup::release(prepared).await;
+            return Err(error);
+        }
+    };
+    if let Err(error) = startup::after_start(&runtime, &startup, prepared).await {
+        let _ = runtime.database.close().await;
+        return Err(error);
+    }
     let address = runtime.config.http.address;
     match TcpListener::bind(address).await {
         Ok(listener) => Ok((runtime, listener)),

@@ -33,5 +33,6 @@ pub(crate) mod sandbox;
 pub(crate) mod sandbox_copy;
 pub(crate) mod sandbox_isolation;
 pub(crate) mod signup;
+pub(crate) mod startup;
 pub(crate) mod support;
 pub(crate) mod tenant_move;

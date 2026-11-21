@@ -59,7 +59,9 @@ bước 7.**
    mất vài phút và vài GB đĩa — `rm -rf target/semver-checks` sau đó): nó in mục `### Breaking (Rust)`
    gồm thay đổi phá vỡ của `autoxide-kernel` và `autoxide-testkit` so với tag trước; chép vào mục
    `## [X.Y.Z]`. Không in gì thì không thêm mục. Còn `0.x` thì chỉ báo cáo, không chặn (D-167, D-242).
-4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Rồi
+4. Commit `release: vX.Y.Z`, chạy gate (`./gate.sh`, cả SQLite lẫn Postgres) trên bản này. Chạy CI bằng tay trên
+   nhánh release (Actions → CI → Run workflow) để build ba SDK di động Swift, Kotlin, Dart — PR và push thường không
+   build chúng (D-20261121-mobile-sdk-on-demand); đỏ thì sửa trước khi phát hành. Rồi
    chạy test nâng cấp: `cargo xtask upgrade-test` — bản phát hành trước (image Docker của nó; tải
    không được thì build từ tag, lâu) ghi dữ liệu, bản này đọc lại trên cùng database, cả SQLite lẫn
    Postgres (D-246). Cần Docker; đỏ thì không phát hành. Job `upgrade` của CI chạy cùng lệnh.

@@ -166,10 +166,10 @@ async fn route_cua_module_nam_duoi_api_v1_ten_module() {
     // Tài liệu OpenAPI ghi đúng đường dẫn mà router phục vụ.
     let api = api_with(&default_config());
     let paths: Vec<&str> = api.openapi.paths.paths.keys().map(String::as_str).collect();
-    // `/llms.txt` (bước 40 P2) và tài liệu theo module (D-20261118-module-contracts) luôn có.
+    // `/` (trang chủ), `/llms.txt` (bước 40 P2) và tài liệu theo module (D-20261118-module-contracts) luôn có.
     assert_eq!(
         paths,
-        ["/api/v1/notes", "/api/v1/notes/{id}", "/api/v1/openapi/{file}", "/llms.txt"]
+        ["/", "/api/v1/notes", "/api/v1/notes/{id}", "/api/v1/openapi/{file}", "/llms.txt"]
     );
     assert_eq!(api.openapi.info.title, "Autoxide API");
 }
@@ -185,7 +185,8 @@ async fn loi_cua_handler_la_problem_details() {
 
 #[tokio::test]
 async fn khong_co_route_va_sai_method_cung_la_problem_details() {
-    for path in ["/api/v1/nope", "/api/v1/notes/1/extra", "/nowhere", "/"] {
+    // `/` có route (trang chủ JSON, D-20261121-migrate-on-start), không còn là 404.
+    for path in ["/api/v1/nope", "/api/v1/notes/1/extra", "/nowhere"] {
         let found = problem(send(app(), get(path)).await, 404, "not_found").await;
         assert!(found.detail.contains("No such endpoint"), "{path}: {found:?}");
     }

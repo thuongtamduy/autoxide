@@ -302,7 +302,7 @@ fn read_password(mut input: impl BufRead) -> Result<String, String> {
 }
 
 /// 18 byte ngẫu nhiên (144 bit) thành 24 ký tự base64url.
-fn generate_password() -> Result<String, String> {
+pub(crate) fn generate_password() -> Result<String, String> {
     let mut bytes = [0u8; 18];
     getrandom::fill(&mut bytes).map_err(|error| format!("cannot generate a password: {error}"))?;
     Ok(URL_SAFE_NO_PAD.encode(bytes))

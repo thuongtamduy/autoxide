@@ -94,7 +94,9 @@ jobs:
     runs-on: ubuntu-24.04
     # Swift: ở PR chỉ kiểm manifest và phụ thuộc (nhẹ); biên dịch đầy đủ (dựng cả swift-syntax của plugin
     # sinh mã) chỉ khi push vào main, có cache — không chặn hàng đợi merge.
-    timeout-minutes: ${{ (matrix.sdk == 'swift' && github.event_name != 'pull_request') && 30 || 15 }}
+    # Swift build đầy đủ trên main: hợp đồng API lớn dần (SCIM, tạo nháp từ ảnh…) làm mã sinh ra biên dịch
+    # lâu hơn 30 phút (lượt sau #309 bị huỷ vì hết giờ). Job không chặn merge nên cho 60 phút.
+    timeout-minutes: ${{ (matrix.sdk == 'swift' && github.event_name != 'pull_request') && 60 || 15 }}
     strategy:
       fail-fast: false
       matrix:
@@ -104,29 +106,16 @@ jobs:
       - name: changed
         id: changed
         run: |
-          # PR: so với nhánh đích. Push vào main: so với commit trước lần push (`before`) — phần lớn lần
-          # merge không đổi hợp đồng API nên khỏi build SDK (Swift trên Linux ~15 phút). Không lấy được
-          # commit trước (push đầu, force push) hay chạy tay thì build cho chắc.
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            base="${{ github.base_ref }}"
-          elif [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.event.before }}" ] \
-            && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
-            base="${{ github.event.before }}"
-          else
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if ! git fetch --quiet --depth=1 origin "$base"; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          if git diff --name-only FETCH_HEAD HEAD \
-            | grep -qE '^(docs/openapi\.json|sdk/|Package\.swift|xtask/src/sdk_mobile\.rs|\.github/workflows/ci\.yml)'; then
-            echo "run=true" >> "$GITHUB_OUTPUT"
-          else
+          # D-20261121-mobile-sdk-on-demand: chỉ build SDK di động khi chạy tay (Actions → CI → Run
+          # workflow), trước mỗi lần phát hành — hợp đồng API còn đổi liên tục, build mỗi lần merge (Swift
+          # 30–60 phút) tốn mà chưa ai dùng. Gate vẫn kiểm cấu hình SDK (`cargo xtask sdk --check`).
+          # Job vẫn chạy và báo xong ở PR / push để không chặn check bắt buộc.
+          if [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
             echo "run=false" >> "$GITHUB_OUTPUT"
-            echo "Neither the API contract nor the SDKs changed: nothing to build."
+            echo "Mobile SDKs are built on demand (workflow_dispatch) before a release."
+            exit 0
           fi
+          echo "run=true" >> "$GITHUB_OUTPUT"
       # Swift: plugin swift-openapi-generator sinh mã lúc build từ sdk/swift/Sources/Autoxide/openapi.json.
       - name: swift package resolve (pull request)
         if: steps.changed.outputs.run == 'true' && matrix.sdk == 'swift' && github.event_name == 'pull_request'
