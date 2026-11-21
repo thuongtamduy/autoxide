@@ -244,7 +244,7 @@ pulldown-cmark = { version = "0.13", default-features = false }
 # ghi đồng bộ của kernel (bước 69 P2: chạy từng lệnh qua router con).
 tower = { version = "0.5", features = ["util"] }
 # Client WebSocket cho test của `GET /api/v1/kernel/events/ws` (cùng bản axum dùng, bước 69 P3).
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 # Property test cho bộ kiểm đầu vào (đặc tả 31 B3): sinh đầu vào ngẫu nhiên, thu gọn ca hỏng.
 # Bỏ `fork` / `timeout` (chạy mỗi ca trong tiến trình con): không cần.
 proptest = { version = "1.12", default-features = false, features = ["std"] }
