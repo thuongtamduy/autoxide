@@ -10,10 +10,17 @@ to be used by AI agents as well as by people.
 It is a foundation for new products. It is not tied to any company or industry:
 the core contains no business concepts — those belong to modules.
 
+**A commerce-ready backend for the Vietnamese market.** Taxes (a dated tax data pack), accounting
+documents and invoices, the official list of administrative units for addresses and the legal rules
+(e-commerce, personal data, record keeping) come built in. AI agents use it through MCP and the
+OpenAPI contract, with the same permissions as people. The core stays neutral and modules plug in.
+Payment, SMS, shipping and e-invoice providers sit behind interfaces that ship today with
+simulated providers only: connecting a real provider is still to be done.
+
 ## Quickstart
 
 One command, nothing to compile: SQLite in a Docker volume, the tables created, a first
-administrator, the reference data loaded and the API reference turned on. You need
+administrator and the reference data loaded. You need
 [Docker](https://docs.docker.com/get-docker/) (with Compose) and `openssl`.
 
 ```bash
@@ -24,25 +31,80 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > .env
 
 docker compose -f compose.quickstart.yml up -d
-# The administrator admin@example.com gets a generated password, written once to a file in the
-# data volume that only the server's user can read (never to the log)
+# The administrator's generated password (see below)
 docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 ```
 
-Then open <http://127.0.0.1:8080/> (name, version and links) and sign in (delete the file once you
-have changed the password). The API reference page (`/api/docs`, it loads its script from a CDN) is
-off in the quickstart: add `AUTOXIDE_HTTP_API_DOCS=true` to `.env` to turn it on.
+**The first administrator's password.** On its first start the server creates the administrator
+`admin@example.com` with a generated password. The password never goes to the log (logs are often
+collected elsewhere): it is written once to the file `data/initial-admin-password`, which only the
+server's user can read. Inside the container that is `/var/lib/autoxide/data/initial-admin-password`,
+in the Docker volume `data` (named `<directory>_data` by Compose), so it survives restarts. The
+command above prints its two lines: the email, then the password. The log only says where the file
+is (`docker compose -f compose.quickstart.yml logs autoxide | grep "first administrator"`). If `cat`
+answers "No such file", an administrator existed already (the volume was used before), or you set
+`AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD` yourself. Once you have signed in and changed the password,
+delete the file:
+`docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password`.
+
+Then open <http://127.0.0.1:8080/> (name, version and links) and sign in. The API reference page
+(`/api/docs`, it loads its script from a CDN) is off in the quickstart: add
+`AUTOXIDE_HTTP_API_DOCS=true` to `.env` and run `docker compose -f compose.quickstart.yml up -d`
+again to turn it on.
 
 ```bash
-curl -sS http://127.0.0.1:8080/api/v1/auth/login \
-  --json '{"email":"admin@example.com","password":"<the password from the file>"}'
+curl -sS http://127.0.0.1:8080/api/v1/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"admin@example.com","password":"<the password from the file>"}'
 ```
+
+The guides in [`docs/guides/`](docs/guides/README.md) write the same request shorter with
+`--json '…'`, which needs curl 7.82 or newer (`curl --version`); with an older curl, write
+`-H 'Content-Type: application/json' -d '…'` instead.
 
 To choose them yourself, add `AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL=…` and
 `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD=…` to `.env` before the first start. Next: connect an AI agent
 over MCP ([`docs/guides/mcp.md`](docs/guides/mcp.md#6-from-the-quickstart-to-a-working-agent)). The
 quickstart needs a release made after 0.16.0; for PostgreSQL, several servers and HTTPS, see
 [`docs/DEPLOY.md`](docs/DEPLOY.md).
+
+### What the quickstart contains
+
+The released image registers every module of the `autoxide` binary (all of `modules/` except the
+sample `notes`); `GET /api/v1/kernel/modules` lists them on your server. Each answers under
+`/api/v1/<module>`.
+
+| Area | Modules |
+| --- | --- |
+| Accounts and access | `auth` (sign-in, roles, API keys, two-step sign-in, passkeys), `organizations` (tenants, units, stores), `audit`, `idempotency` |
+| Platform | `files`, `mail`, `notifications`, `webhooks`, `ai` (off until you configure a provider), `address` (Vietnamese administrative units), `compliance`, `plans` (plans and subscriptions), `reporting`, `automations` |
+| Website | `content` (posts, pages), `media`, `menus`, `forms`, `newsletter`, `comments`, `analytics` |
+| Commerce | `catalog`, `inventory`, `promotions`, `shipping`, `orders`, `customers`, `tax`, `ledger` (money), `invoices` |
+| Service | `bookings`, `support`, `conversations` |
+
+Nothing has to be turned on to try them, and a module whose data you never write costs nothing.
+Modules that talk to outside services (an AI provider, payment or shipping partners, SMTP) send
+nothing out until you configure them. Which modules each tenant may use is set by its plan
+([`docs/PLANS.md`](docs/PLANS.md)); the set the server runs is fixed when the binary is built
+([`docs/MODULE_GUIDE.md`](docs/MODULE_GUIDE.md)), and listing it needs the `kernel.modules.read`
+permission (the administrator has it).
+
+### Changing a record: `If-Match`
+
+Reading one record returns its version in the `ETag` header. Send it back in `If-Match` when you
+change the record, so two people never overwrite each other: a stale version gets `412`, and
+endpoints that require the header answer `428` without it.
+
+```bash
+# Read the post and keep its ETag header (a quoted number, such as "1763700000000000")
+curl -sS -i http://127.0.0.1:8080/api/v1/content/entries/<id> -H 'Authorization: Bearer <access token>'
+# Change it with that ETag
+curl -sS -X PATCH http://127.0.0.1:8080/api/v1/content/entries/<id> \
+  -H 'Authorization: Bearer <access token>' -H 'If-Match: <the ETag>' \
+  -H 'Content-Type: application/json' -d '{"title":"A new title"}'
+```
+
+[`docs/guides/errors.md`](docs/guides/errors.md) shows each answer (`428`, `412`) as a run
+example.
 
 ## Status
 
@@ -172,6 +234,24 @@ These are only needed to build from source (to run a released image, see above).
 - To run the full quality gate: [Docker](https://docs.docker.com/get-docker/) and
   [`cargo-deny`](https://github.com/EmbarkStudios/cargo-deny)
   (`cargo install cargo-deny --locked`)
+
+**Building takes a while.** The first build (`cargo build --release`, or `docker build`) compiles
+several hundred crates: count on roughly 20 minutes to well over an hour, depending on the number
+of CPU cores and the memory (at least 4 GB of RAM, 8 GB is comfortable; raise Docker Desktop's
+memory limit if a build is killed). Later builds reuse what was compiled. To run Autoxide rather
+than change it, use the released image above: nothing to compile.
+
+**Behind a company proxy.** `cargo` and `rustup` read `HTTPS_PROXY` (and `HTTP_PROXY`, `NO_PROXY`)
+from the environment. `docker build` does not pass your shell's variables into the build: give them
+as build arguments, which Docker knows already and does not keep in the image —
+
+```bash
+docker build --build-arg HTTPS_PROXY=http://proxy.example.com:3128   --build-arg HTTP_PROXY=http://proxy.example.com:3128 --build-arg NO_PROXY=localhost,127.0.0.1   -t autoxide .
+```
+
+— or set them once under `proxies` in `~/.docker/config.json`, which Docker passes to every build,
+`docker compose build` included. A proxy that inspects HTTPS with its own certificate makes the
+downloads fail with certificate errors inside the build; use the released image then.
 
 ## Getting started
 
