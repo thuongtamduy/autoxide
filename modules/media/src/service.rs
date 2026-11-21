@@ -164,6 +164,9 @@ pub(crate) struct MediaService {
     pub(crate) settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
     /// Lượt tải thẳng lên S3 (bước 40 P4), bảng `media_uploads`.
     pub(crate) uploads: autoxide_kernel::upload::DirectUploads,
+    /// Chỗ giải mã ảnh (`AUTOXIDE_MEDIA_IMAGE_JOBS`): mỗi lần giải mã giữ một chỗ, để nhiều job
+    /// ảnh lớn chạy cùng lúc không làm hết bộ nhớ.
+    pub(crate) image_slots: Arc<tokio::sync::Semaphore>,
 }
 
 impl MediaService {
@@ -176,7 +179,35 @@ impl MediaService {
     ) -> Self {
         let resources = autoxide_kernel::resource::ResourceDirectory::default();
         let uploads = autoxide_kernel::upload::DirectUploads::new("media");
-        MediaService { storage, outbox, jobs, ai, config, resources, settings: None, uploads }
+        let image_slots = Arc::new(tokio::sync::Semaphore::new(config.image_jobs.max(1)));
+        MediaService {
+            storage,
+            outbox,
+            jobs,
+            ai,
+            config,
+            resources,
+            settings: None,
+            uploads,
+            image_slots,
+        }
+    }
+
+    /// Chạy việc giải mã / đổi cỡ ảnh `work` trên thread cho việc chặn, khi có chỗ trống (xem
+    /// [`image_slots`](Self::image_slots)).
+    pub(crate) async fn decode_image<T: Send + 'static>(
+        &self,
+        work: impl FnOnce() -> T + Send + 'static,
+    ) -> Result<T, Error> {
+        // Giữ chỗ tới khi thread chặn xong (permit sống trong closure, nhả khi closure kết thúc).
+        let permit = self.image_slots.clone().acquire_owned().await.map_err(Error::internal)?;
+        tokio::task::spawn_blocking(move || {
+            let result = work();
+            drop(permit);
+            result
+        })
+        .await
+        .map_err(Error::internal)
     }
 
     /// Đọc cấu hình theo khách từ `settings` của kernel.
@@ -247,7 +278,10 @@ impl MediaService {
         };
         if let Some(pattern) = &filter.content_type {
             select = match pattern.strip_suffix("/*") {
-                Some(kind) => select.filter(Column::ContentType.starts_with(format!("{kind}/"))),
+                Some(kind) => select.filter(autoxide_kernel::search::starts_with(
+                    Column::ContentType,
+                    &format!("{kind}/"),
+                )),
                 None => select.filter(Column::ContentType.eq(pattern.as_str())),
             };
         }

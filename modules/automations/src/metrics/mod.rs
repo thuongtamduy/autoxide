@@ -274,8 +274,7 @@ impl Automations {
         zone: &TimeZone,
     ) -> Result<Option<Reading>, Error> {
         let Some(metric) = self.metrics.summary(id) else { return Ok(None) };
-        let Some(authenticator) = &self.authenticator else { return Ok(None) };
-        let Some(principal) = authenticator.principal_of(tenant, rule.run_as).await? else {
+        let Some(principal) = self.rule_principal(tenant, rule).await? else {
             return Ok(None);
         };
         if !principal.has(&metric.permission()) {

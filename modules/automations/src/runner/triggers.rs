@@ -23,6 +23,9 @@ use crate::entity::{rule, run};
 use crate::service::Automations;
 use crate::service::rules::{ACTIVE, parse_json};
 
+/// Event của module `auth` khi một API key bị thu hồi (chủ đề `auth.api_key:<id>`).
+const API_KEY_REVOKED: &str = "auth.api_key_revoked";
+
 /// Bộ nhận mọi event.
 pub(crate) struct EventTrigger(pub Arc<Automations>);
 
@@ -30,6 +33,16 @@ pub(crate) struct EventTrigger(pub Arc<Automations>);
 impl EventHandler for EventTrigger {
     async fn handle(&self, event: &Delivered) -> Result<(), Error> {
         let tenant = &event.tenant;
+        // API key bị thu hồi: luật nó đã tạo / bật tạm dừng (D-20261121-automation-credential).
+        if event.name == API_KEY_REVOKED
+            && let Some(key) = event
+                .subject
+                .as_deref()
+                .and_then(|subject| subject.strip_prefix("auth.api_key:"))
+                .and_then(|id| id.parse::<uuid::Uuid>().ok())
+        {
+            self.0.credential_revoked(tenant, key).await?;
+        }
         let rules = rule::Entity::find()
             .filter(rule::Column::TriggerType.eq("event"))
             .filter(rule::Column::TriggerRef.eq(event.name.as_str()))

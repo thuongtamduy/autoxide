@@ -72,6 +72,28 @@ use utoipa::openapi::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_scalar::{Scalar, Servable};
 
+/// Trang tài liệu API: như mẫu của `utoipa-scalar` nhưng script của Scalar ghim phiên bản và có
+/// Subresource Integrity — CDN (hay ai chen giữa) đổi file thì trình duyệt không chạy nó. Nâng phiên
+/// bản: đổi cả URL và `integrity` (`openssl dgst -sha384 -binary standalone.js | base64`).
+const DOCS_HTML: &str = r#"<!doctype html>
+<html>
+<head>
+    <title>$title</title>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+</head>
+<body>
+<script id="api-reference" type="application/json">
+    $spec
+</script>
+<script
+    src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js"
+    integrity="sha384-hwB9WroDTpZaI38gr+u9CXA6ksz5gUYgD2GxXazKl/agT1L2GWUiRFWGJYNiFu4Q"
+    crossorigin="anonymous"></script>
+</body>
+</html>
+"#;
+
 use crate::access::Authenticator;
 use crate::config::{CorsOrigins, HttpConfig};
 use crate::error::Error;
@@ -346,7 +368,7 @@ pub fn build(
         }),
     );
     if config.api_docs {
-        router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()));
+        router = router.merge(Scalar::with_url(DOCS_PATH, openapi.clone()).custom_html(DOCS_HTML));
     }
 
     // REST và MCP xác thực qua bộ có giới hạn theo API key; lớp idempotency giữ bộ gốc (nó chỉ
@@ -409,6 +431,20 @@ pub fn build(
         idempotency.clone(),
     ));
     let limiter = rate_limit::RateLimiter::new(config.rate_limit).map(Arc::new);
+    if let Some(header) = &config.client_ip_header
+        && config.trusted_proxies.is_empty()
+    {
+        // Chỉ đếm số proxy: client nào tới thẳng API (không qua proxy) cũng tự chọn được địa chỉ
+        // của mình bằng header — rate limiting và login throttling theo IP bị vượt.
+        tracing::warn!(
+            header = %header,
+            proxies = config.trusted_proxy_count,
+            "AUTOXIDE_HTTP_CLIENT_IP_HEADER is set without AUTOXIDE_HTTP_TRUSTED_PROXIES: the \
+             client address is taken from the header by counting proxies, so a client that can \
+             reach this server directly chooses its own address. List your proxies in \
+             AUTOXIDE_HTTP_TRUSTED_PROXIES, or make sure only they can reach this port."
+        );
+    }
     let client_address = Arc::new(client::ClientAddress::new(
         config.client_ip_header.clone(),
         config.trusted_proxy_count,

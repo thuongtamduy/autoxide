@@ -303,6 +303,22 @@ impl Tool {
             || self.alternative.is_some_and(|permission| principal.has(&permission))
     }
 
+    /// Như [`allows`](Self::allows) nhưng đủ như REST: kiểm cả xác nhận lại (step-up) của
+    /// permission nhạy cảm qua [`Principal::require`]. Bên chạy tool gọi trước khi chạy — `allows`
+    /// chỉ để lọc danh sách tool.
+    pub fn authorize(&self, principal: &Principal) -> Result<(), Error> {
+        let Some(permission) = self.permission else { return Ok(()) };
+        if principal.has(&permission) {
+            return principal.require(&permission);
+        }
+        if let Some(alternative) = self.alternative
+            && principal.has(&alternative)
+        {
+            return principal.require(&alternative);
+        }
+        principal.require(&permission)
+    }
+
     /// Gọi tool (không kiểm permission — bên gọi kiểm bằng [`allows`](Self::allows)).
     pub async fn call(
         &self,
@@ -398,5 +414,47 @@ where
         input.validate()?;
         let output = (self.handler)(tenant, principal, input).await?;
         serde_json::to_value(output).map_err(Error::internal)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::access::{Risk, StepUp};
+
+    const DROP: Permission =
+        Permission::new("demo.drop", "Drop things.").with_risk(Risk::Destructive);
+
+    #[derive(Debug, Deserialize, Validate, ToSchema)]
+    struct Nothing {}
+
+    fn tool() -> Tool {
+        Tool::new("drop", "Drop.", |_: TenantContext, _: Principal, _: Nothing| async {
+            Ok::<_, Error>(())
+        })
+        .requires(DROP)
+    }
+
+    /// Tool gọi qua MCP (hay luật tự động hoá) cũng đòi xác nhận lại như REST: có permission mà lần
+    /// xác thực đã cũ thì `step_up_required`.
+    #[test]
+    fn tool_nhay_cam_doi_xac_nhan_lai_nhu_rest() {
+        let stale = StepUp {
+            authenticated_at: Some(
+                crate::time::Timestamp::now() - jiff::SignedDuration::from_hours(2),
+            ),
+            window: jiff::SignedDuration::from_mins(10),
+        };
+        let person = Principal::new(uuid::Uuid::nil(), ["demo.drop".to_owned()]);
+        let tool = tool();
+        assert!(tool.allows(&person.clone().with_step_up(stale)));
+        let error = tool.authorize(&person.clone().with_step_up(stale)).unwrap_err();
+        assert_eq!(error.code(), "step_up_required");
+        let fresh = StepUp { authenticated_at: Some(crate::time::Timestamp::now()), ..stale };
+        tool.authorize(&person.clone().with_step_up(fresh)).unwrap();
+        // Không gắn step-up (API key, job): như trước.
+        tool.authorize(&person).unwrap();
+        let other = Principal::new(uuid::Uuid::nil(), Vec::<String>::new());
+        assert_eq!(tool.authorize(&other).unwrap_err().code(), "permission_denied");
     }
 }

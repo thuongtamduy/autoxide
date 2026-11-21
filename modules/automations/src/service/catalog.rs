@@ -230,10 +230,7 @@ impl Automations {
         let mut context = json!({"event": event, "trigger": trigger, "steps": []});
         let matched = Self::matches(body.conditions.as_ref(), &context);
         // Quyền của người luật chạy thay (không phải người chạy thử).
-        let runner = match &self.authenticator {
-            Some(authenticator) => authenticator.principal_of(tenant, rule.run_as).await?,
-            None => None,
-        };
+        let runner = self.rule_principal(tenant, &rule).await?;
         let mut steps = Vec::new();
         for (index, action) in body.actions.iter().enumerate() {
             let mut step = DryStep {

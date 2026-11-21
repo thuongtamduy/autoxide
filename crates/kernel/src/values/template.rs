@@ -294,6 +294,23 @@ impl TemplateEngine {
         Ok(())
     }
 
+    /// Mẫu của khách không được tắt thoát HTML: minijinja không cho bỏ thẻ `{% autoescape %}` khỏi
+    /// cú pháp, nên chặn mọi khối mở bằng nó (kể cả `{%-` / `{%+`), lúc kiểm và lúc dựng.
+    fn check_autoescape(field: &str, source: &str) -> Result<(), Error> {
+        let Some(offset) = autoescape_block(source) else { return Ok(()) };
+        let (line, column) = position(source, offset);
+        Err(Error::validation(vec![
+            FieldError::new(
+                field,
+                "template.autoescape_forbidden",
+                "uses `autoescape` at line {line}, column {column}: templates cannot turn off \
+                 HTML escaping",
+            )
+            .with_param("line", line)
+            .with_param("column", column),
+        ]))
+    }
+
     /// Kiểm mẫu `source` (của trường `field`) với `schema`: độ dài, cú pháp, biến lạ, biến bắt buộc.
     /// Mọi lỗi gom vào một `validation_failed`; mỗi lỗi có `code` `template.syntax_error`,
     /// `template.unknown_variable` hay `template.required_variable_missing` và vị trí dòng, cột.
@@ -304,6 +321,7 @@ impl TemplateEngine {
         schema: &TemplateSchema,
     ) -> Result<(), Error> {
         self.check_size(source)?;
+        Self::check_autoescape(field, source)?;
         let env = Self::environment(Output::Html, "en");
         let template = match env.template_from_str(source) {
             Ok(template) => template,
@@ -373,6 +391,7 @@ impl TemplateEngine {
         context: &serde_json::Value,
     ) -> Result<String, Error> {
         self.check_size(source)?;
+        Self::check_autoescape("template", source)?;
         let env = Self::environment(output, locale);
         let template = env.template_from_str(source).map_err(|error| render_failed(&error))?;
         let mut sink = Capped { out: Vec::new(), over: false };
@@ -391,6 +410,15 @@ impl TemplateEngine {
         }
         String::from_utf8(sink.out).map_err(Error::internal)
     }
+}
+
+/// Vị trí (byte) của khối `{% autoescape … %}` đầu tiên trong `source`, nếu có.
+fn autoescape_block(source: &str) -> Option<usize> {
+    source.match_indices("{%").find_map(|(start, _)| {
+        let rest = source[start + 2..].trim_start_matches(['-', '+']).trim_start();
+        let word: String = rest.chars().take_while(char::is_ascii_alphanumeric).collect();
+        (word == "autoescape").then_some(start)
+    })
 }
 
 /// Mẫu không chạy được (sai kiểu, bộ lọc lạ…): 422, kèm dòng và lý do.
@@ -435,6 +463,24 @@ mod tests {
         assert_eq!(error.code(), "template.render_failed");
         let text = engine.render("{{ buyer.name }}", Output::Text, "en", &data).unwrap();
         assert_eq!(text, "<script>alert(1)</script>");
+    }
+
+    #[test]
+    fn khong_tat_duoc_thoat_html() {
+        let engine = TemplateEngine::default();
+        let data = json!({"buyer": {"name": "<script>alert(1)</script>"}});
+        for source in [
+            "{% autoescape false %}{{ buyer.name }}{% endautoescape %}",
+            "{%- autoescape 'none' -%}{{ buyer.name }}{% endautoescape %}",
+            "{{ document.number }}\n  {%+   autoescape false %}x{% endautoescape %}",
+        ] {
+            let error = engine.render(source, Output::Html, "en", &data).unwrap_err();
+            assert_eq!(error.fields()[0].code, "template.autoescape_forbidden", "{source}");
+            let error = engine.validate("body", source, &schema()).unwrap_err();
+            assert_eq!(error.fields()[0].code, "template.autoescape_forbidden", "{source}");
+        }
+        assert_eq!(autoescape_block("{{ x }}\n{% autoescape true %}"), Some(8));
+        assert_eq!(autoescape_block("{% if autoescape %}{% endif %}"), None);
     }
 
     #[test]

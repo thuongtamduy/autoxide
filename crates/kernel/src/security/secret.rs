@@ -78,10 +78,17 @@ pub(crate) fn read_previous(reader: &mut ConfigReader<'_>) -> Result<Vec<Vec<u8>
     Ok(raw.unwrap_or_default())
 }
 
+/// Giá trị mẫu của `.env.example` (và mọi giá trị bắt đầu như nó): chép nguyên mẫu là chưa đặt
+/// khoá thật — ai đọc repo cũng biết nó.
+const PLACEHOLDER_PREFIX: &str = "change-me";
+
 /// Đọc `AUTOXIDE_SECRET_KEY` (không bắt buộc).
 pub(crate) fn read_setting(reader: &mut ConfigReader<'_>) -> Result<Option<Vec<u8>>, Invalid> {
     reader.optional_with(&SECRET_KEY, |raw| {
-        if raw.len() < MIN_LENGTH {
+        if raw.trim().to_ascii_lowercase().starts_with(PLACEHOLDER_PREFIX) {
+            Err("is still the example value; generate a key with `openssl rand -base64 48`"
+                .to_owned())
+        } else if raw.len() < MIN_LENGTH {
             Err(format!(
                 "must be at least {MIN_LENGTH} characters long; generate one with `openssl rand -base64 48`"
             ))
@@ -329,4 +336,27 @@ pub fn random_token(bytes: usize) -> Result<String, Error> {
 /// không đoán thử được như mật khẩu.
 pub fn sha256(text: &str) -> String {
     URL_SAFE_NO_PAD.encode(Sha256::digest(text.as_bytes()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ConfigSource;
+
+    fn read(value: &str) -> Result<Option<Vec<u8>>, String> {
+        let source = ConfigSource::from_pairs([("AUTOXIDE_SECRET_KEY", value)]);
+        let mut reader = ConfigReader::new(&source);
+        let key = read_setting(&mut reader);
+        reader.finish(key).map(|(key, _)| key).map_err(|errors| errors.to_string())
+    }
+
+    #[test]
+    fn tu_choi_gia_tri_mau_cua_env_example() {
+        let error = read("change-me-to-a-long-random-value-from-openssl-rand").unwrap_err();
+        assert!(error.contains("example value"), "{error}");
+        assert!(read("Change-Me-please-0123456789abcdef0123456789").is_err());
+        assert!(read("too-short").unwrap_err().contains("at least 32"));
+        let good = "q8Vt0m3nYc2Lw9Rk5Jx1Hb7Df4Gs6Pa0Ze2Ui8Oy";
+        assert_eq!(read(good).unwrap(), Some(good.as_bytes().to_vec()));
+    }
 }
