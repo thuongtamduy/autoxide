@@ -16,7 +16,7 @@ use autoxide_kernel::tenancy::{
 use autoxide_testkit::{FakeEInvoiceProvider, TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode};
 use futures_util::TryStreamExt as _;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -425,7 +425,7 @@ async fn set_retention(tenant: &TenantContext, id: uuid::Uuid, until: Date) {
     let backend = write.get_database_backend();
     let sql = "UPDATE invoices_documents SET retention_until = $1 WHERE id = $2";
     write
-        .execute_raw(Statement::from_sql_and_values(backend, sql, [until.into(), id.into()]))
+        .execute_raw(autoxide_kernel::database::statement(backend, sql, [until.into(), id.into()]))
         .await
         .unwrap();
     write.commit().await.unwrap();
@@ -436,7 +436,7 @@ async fn rows_of(tenant: &TenantContext, table: &str) -> i64 {
     let read = tenant.database().read();
     let backend = read.get_database_backend();
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             backend,
             format!("SELECT COUNT(*) AS n FROM {table} WHERE tenant_id = $1"),
             [tenant.id().as_uuid().into()],
@@ -566,7 +566,7 @@ async fn lap_lai_ban_xuat_bi_loi() {
                    WHERE id = $1";
         let uuid: uuid::Uuid = id.parse().unwrap();
         write
-            .execute_raw(Statement::from_sql_and_values(backend, sql, [uuid.into()]))
+            .execute_raw(autoxide_kernel::database::statement(backend, sql, [uuid.into()]))
             .await
             .unwrap();
         write.commit().await.unwrap();

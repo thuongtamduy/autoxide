@@ -442,7 +442,7 @@ async fn api_key_dinh_tuyen_dung_database() {
         let legacy = format!("axk_{}", crate::token::random_token(32).unwrap());
         let database = default.database().write();
         let backend = database.get_database_backend();
-        let update = Statement::from_sql_and_values(
+        let update = autoxide_kernel::database::statement(
             backend,
             match backend {
                 sea_orm::DatabaseBackend::Postgres => {

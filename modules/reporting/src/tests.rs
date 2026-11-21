@@ -13,7 +13,7 @@ use autoxide_kernel::report::Fact;
 use autoxide_kernel::tenancy::{OrgId, TenantContext};
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
 use autoxide_testkit::{TestApp, TestDatabase};
-use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter, Statement};
+use sea_orm::{ColumnTrait, ConnectionTrait, EntityTrait, PaginatorTrait, QueryFilter};
 use serde_json::json;
 
 use crate::config::ReportingConfig;
@@ -118,7 +118,7 @@ async fn forward_survives_root_maintenance() {
                 let backend = control.write().get_database_backend();
                 control
                     .write()
-                    .execute_raw(Statement::from_sql_and_values(
+                    .execute_raw(autoxide_kernel::database::statement(
                         backend,
                         "UPDATE kernel_tenants SET status = $1 WHERE id = $2",
                         [status.into(), id.as_uuid().into()],

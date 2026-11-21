@@ -19,8 +19,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use sea_orm::{
-    ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, Statement,
-    TransactionTrait,
+    ConnectionTrait, DatabaseConnection, DatabaseTransaction, DbBackend, TransactionTrait,
 };
 
 use super::MigrationError;
@@ -120,7 +119,7 @@ async fn acquire_postgres(config: &DatabaseConfig, wait: Duration) -> Result<Hel
     let started = Instant::now();
     let mut logged = started;
     loop {
-        let statement = Statement::from_sql_and_values(
+        let statement = crate::database::statement(
             DbBackend::Postgres,
             "SELECT pg_try_advisory_xact_lock($1) AS locked",
             [POSTGRES_KEY.into()],

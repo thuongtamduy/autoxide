@@ -6,7 +6,7 @@
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -84,7 +84,7 @@ async fn entry_text(tenant: &TenantContext, id: &str, column: &str) -> String {
     let read = tenant.database().read();
     let sql = format!("SELECT {column} AS v FROM content_entries WHERE id = $1");
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             read.get_database_backend(),
             &sql,
             [id.parse::<uuid::Uuid>().unwrap().into()],
@@ -98,7 +98,7 @@ async fn entry_text(tenant: &TenantContext, id: &str, column: &str) -> String {
 /// ID trang slug `slug` ở khách `tenant`.
 async fn entry_by_slug(tenant: &TenantContext, slug: &str) -> Option<String> {
     let read = tenant.database().read();
-    read.query_one_raw(Statement::from_sql_and_values(
+    read.query_one_raw(autoxide_kernel::database::statement(
         read.get_database_backend(),
         "SELECT id FROM content_entries WHERE tenant_id = $1 AND slug = $2",
         [tenant.id().as_uuid().into(), slug.into()],
@@ -111,7 +111,7 @@ async fn entry_by_slug(tenant: &TenantContext, slug: &str) -> Option<String> {
 async fn count(tenant: &TenantContext, sql: &str) -> i64 {
     let read = tenant.database().read();
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             read.get_database_backend(),
             sql,
             [tenant.id().as_uuid().into()],
@@ -176,7 +176,7 @@ async fn sao_cau_hinh_vao_sandbox_va_day_trang_thanh_ban_nhap() {
         let parent = sandbox
             .database()
             .read()
-            .query_one_raw(Statement::from_sql_and_values(
+            .query_one_raw(autoxide_kernel::database::statement(
                 sandbox.database().read().get_database_backend(),
                 "SELECT parent_id FROM content_entries WHERE id = $1",
                 [copied_team.parse::<uuid::Uuid>().unwrap().into()],
@@ -201,7 +201,7 @@ async fn sao_cau_hinh_vao_sandbox_va_day_trang_thanh_ban_nhap() {
         // Sửa trang trong sandbox (như người thử), rồi đẩy về.
         let write = sandbox.database().write();
         write
-            .execute_raw(Statement::from_sql_and_values(
+            .execute_raw(autoxide_kernel::database::statement(
                 write.get_database_backend(),
                 "UPDATE content_entries SET title = $1 WHERE id = $2",
                 ["About us (new)".into(), copied_about.parse::<uuid::Uuid>().unwrap().into()],
@@ -227,7 +227,7 @@ async fn sao_cau_hinh_vao_sandbox_va_day_trang_thanh_ban_nhap() {
         // Trùng slug ở khách thật → `conflict` cho mục đó.
         page(&app, "contact", None).await;
         write
-            .execute_raw(Statement::from_sql_and_values(
+            .execute_raw(autoxide_kernel::database::statement(
                 write.get_database_backend(),
                 "UPDATE content_entries SET slug = 'contact' WHERE id = $1",
                 [copied_about.parse::<uuid::Uuid>().unwrap().into()],

@@ -145,7 +145,7 @@ async fn run(database: &Database, sql: &str, values: Vec<sea_orm::Value>) {
     };
     database
         .write()
-        .execute_raw(Statement::from_sql_and_values(backend, sql, values))
+        .execute_raw(autoxide_kernel::database::statement(backend, sql, values))
         .await
         .unwrap();
 }

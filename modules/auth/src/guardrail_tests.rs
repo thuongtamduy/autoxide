@@ -8,7 +8,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 
 use crate::user::NewUser;
@@ -78,7 +78,7 @@ async fn rao_khach_con_chan_ca_admin_va_khach_chau() {
         for (up, down) in [(&grandpa, &parent), (&parent, &child)] {
             control
                 .write()
-                .execute_raw(Statement::from_sql_and_values(
+                .execute_raw(autoxide_kernel::database::statement(
                     control.write().get_database_backend(),
                     "UPDATE kernel_tenants SET parent_id = $1 WHERE id = $2",
                     [up.id().as_uuid().into(), down.id().as_uuid().into()],
@@ -178,7 +178,7 @@ async fn tach_khach_dang_bi_rao_khach_moi_van_bi_rao() {
         let control = app.database();
         control
             .write()
-            .execute_raw(Statement::from_sql_and_values(
+            .execute_raw(autoxide_kernel::database::statement(
                 control.write().get_database_backend(),
                 "UPDATE kernel_tenants SET parent_id = $1 WHERE id = $2",
                 [parent.id().as_uuid().into(), child.id().as_uuid().into()],

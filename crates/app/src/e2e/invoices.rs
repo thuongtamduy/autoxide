@@ -440,7 +440,7 @@ async fn hoi_lai_nha_cung_cap_hoa_don_ngay() {
         let write = app.database().write();
         let backend = write.get_database_backend();
         write
-            .execute_raw(sea_orm::Statement::from_sql_and_values(
+            .execute_raw(autoxide_kernel::database::statement(
                 backend,
                 "UPDATE invoices_documents SET status = 'submitting', authority_code = NULL \
                  WHERE id = $1",

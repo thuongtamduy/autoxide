@@ -9,8 +9,8 @@ use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use jiff::SignedDuration;
+use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::ExprTrait as _;
-use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 use std::time::Duration;
 
@@ -100,7 +100,7 @@ async fn create(app: &TestApp, token: &str, shop: &TenantContext) -> String {
 async fn sandbox_status(app: &TestApp, id: &str) -> String {
     let read = app.registry().control().read();
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             read.get_database_backend(),
             "SELECT status FROM kernel_tenants WHERE id = $1",
             [id.parse::<uuid::Uuid>().unwrap().into()],

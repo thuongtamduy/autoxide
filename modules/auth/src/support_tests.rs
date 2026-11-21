@@ -10,8 +10,8 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
+use sea_orm::ConnectionTrait;
 use sea_orm::sea_query::ExprTrait as _;
-use sea_orm::{ConnectionTrait, Statement};
 use serde_json::{Value, json};
 
 use crate::role::RoleInput;
@@ -190,7 +190,7 @@ async fn ho_tro_het_han_thi_mat_quyen() {
             .shop
             .database()
             .read()
-            .query_all_raw(Statement::from_sql_and_values(
+            .query_all_raw(autoxide_kernel::database::statement(
                 setup.shop.database().read().get_database_backend(),
                 "SELECT name FROM auth_events WHERE tenant_id = $1 ORDER BY id",
                 [setup.shop.id().as_uuid().into()],

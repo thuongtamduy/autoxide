@@ -141,7 +141,7 @@ async fn xoa_tai_khoan_xoa_so_dien_thoai_va_ban_xuat_co_phan_compliance() {
             "SELECT COUNT(*) AS n FROM compliance_account_verifications WHERE user_id = ?"
         };
         let row = read
-            .query_one_raw(Statement::from_sql_and_values(backend, sql, [user.into()]))
+            .query_one_raw(autoxide_kernel::database::statement(backend, sql, [user.into()]))
             .await
             .unwrap()
             .unwrap();

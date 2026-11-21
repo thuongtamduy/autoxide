@@ -124,7 +124,7 @@ async fn set(database: &Database, id: &str, value: &str) -> Result<(), Error> {
         sea_orm::DbBackend::Postgres => "UPDATE vault_items SET value = $1 WHERE id = $2",
         _ => "UPDATE vault_items SET value = ? WHERE id = ?",
     };
-    let statement = Statement::from_sql_and_values(backend, sql, [value.into(), id.into()]);
+    let statement = autoxide_kernel::database::statement(backend, sql, [value.into(), id.into()]);
     database.write().execute_raw(statement).await?;
     Ok(())
 }

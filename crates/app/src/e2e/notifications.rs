@@ -89,7 +89,7 @@ async fn settle(app: &TestApp) {
 async fn inbox(tenant: &TenantContext) -> Vec<(Uuid, String)> {
     let connection = tenant.database().read();
     let rows = connection
-        .query_all_raw(Statement::from_sql_and_values(
+        .query_all_raw(autoxide_kernel::database::statement(
             connection.get_database_backend(),
             if connection.get_database_backend() == sea_orm::DbBackend::Postgres {
                 "SELECT user_id, kind FROM notifications_inbox WHERE tenant_id = $1 ORDER BY id"

@@ -2,7 +2,7 @@
 
 use autoxide_testkit::{TestApp, TestDatabase, branch_leak_check, leak_check, tool};
 use axum::http::StatusCode;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::json;
 use uuid::Uuid;
 
@@ -13,7 +13,7 @@ async fn events_named(app: &TestApp, name: &str) -> i64 {
     let read = app.database().read();
     let backend = read.get_database_backend();
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(
+        .query_one_raw(autoxide_kernel::database::statement(
             backend,
             match backend {
                 sea_orm::DatabaseBackend::Postgres => {

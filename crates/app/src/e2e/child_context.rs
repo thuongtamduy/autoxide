@@ -7,7 +7,7 @@ use autoxide_auth::api::{Accounts, NewAccount};
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 
 const PASSWORD: &str = "correct horse battery staple";
@@ -58,7 +58,7 @@ async fn sign_in(app: &TestApp, email: &str) -> String {
 async fn audit(tenant: &TenantContext) -> Vec<(String, String)> {
     let read = tenant.database().read();
     let rows = read
-        .query_all_raw(Statement::from_sql_and_values(
+        .query_all_raw(autoxide_kernel::database::statement(
             read.get_database_backend(),
             "SELECT action, details FROM audit_entry WHERE tenant_id = $1 ORDER BY id",
             [tenant.id().as_uuid().into()],

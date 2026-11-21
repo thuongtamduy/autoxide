@@ -279,6 +279,9 @@ sẵn lệnh.
   là `x_…`, kể cả bảng lịch sử `x_migrations`. Migration phải có `down`.
 - **SeaORM là mặc định.** Chỉ viết SQL trực tiếp ở chỗ đã **đo được** là chậm, câu
   SQL đó phải chạy trên cả hai database, và ghi lý do bằng skill `record-decision`.
+  Câu viết tay (cả trong test) dựng bằng `autoxide_kernel::database::statement`, không bằng
+  `Statement::from_sql_and_values`: nó thêm kiểu cho giá trị thời gian mà Postgres cần
+  (D-20261121-raw-statement).
 
 ## Luật code
 

@@ -10,7 +10,7 @@ use autoxide_kernel::job::{EnqueueOptions, JobQueue};
 use autoxide_kernel::tenancy::OrgId;
 use autoxide_testkit::{TestApp, TestDatabase};
 use futures_util::future::join_all;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use uuid::Uuid;
 
 use super::{assert_consistent, drain, level, shop, stock_in};
@@ -45,7 +45,7 @@ async fn allocated(app: &TestApp, order: Uuid) -> i64 {
         }
     };
     let row = read
-        .query_one_raw(Statement::from_sql_and_values(backend, sql, [order.into()]))
+        .query_one_raw(autoxide_kernel::database::statement(backend, sql, [order.into()]))
         .await
         .unwrap()
         .unwrap();

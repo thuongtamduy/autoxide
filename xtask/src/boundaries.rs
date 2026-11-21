@@ -22,6 +22,8 @@
 //! 8. `handler-database` — handler (`src/http…`) và tool MCP (`src/tools…`) không tự
 //!    đọc hay ghi database: việc đó thuộc service (luật kiến trúc 5 và 8 của CLAUDE.md).
 //! 9. `entity-tenant` — entity là bảng cấp khách hàng, có `tenant_id` (bước 33; ở `tenancy.rs`).
+//! 10. `raw-statement` — câu SQL viết tay dựng bằng `autoxide_kernel::database::statement` (ở
+//!     `raw_statement.rs`): nó thêm kiểu cho giá trị thời gian mà Postgres cần.
 //!
 //! Luật 4–6 đọc mã nguồn theo dòng, dựa vào việc `cargo fmt` đã chuẩn hoá định
 //! dạng (gate chạy fmt trước). Đây là lưới chặn lỗi vô ý, không phải bộ phân
@@ -33,6 +35,7 @@ use std::path::Path;
 
 use crate::workspace::{DepKind, Package, Role, Workspace};
 
+mod raw_statement;
 mod test_layout;
 
 /// License mọi crate phải khai (D-021).
@@ -67,6 +70,7 @@ pub fn check_workspace(workspace: &Workspace) -> Result<Vec<Violation>, String> 
 
     for package in &workspace.packages {
         violations.extend(test_layout::check(&workspace.root, package));
+        violations.extend(raw_statement::check(&workspace.root, package)?);
     }
 
     for package in &workspace.packages {

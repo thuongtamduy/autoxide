@@ -191,12 +191,12 @@ async fn columns<C: ConnectionTrait>(
 ) -> Result<Vec<Column>, TransferError> {
     let backend = connection.get_database_backend();
     let statement = match backend {
-        DatabaseBackend::Sqlite => Statement::from_sql_and_values(
+        DatabaseBackend::Sqlite => crate::database::statement(
             backend,
             "SELECT name, type AS kind FROM pragma_table_info(?) ORDER BY cid",
             [table.into()],
         ),
-        DatabaseBackend::Postgres => Statement::from_sql_and_values(
+        DatabaseBackend::Postgres => crate::database::statement(
             backend,
             "SELECT column_name::text AS name, data_type::text AS kind \
              FROM information_schema.columns WHERE table_schema = current_schema() \

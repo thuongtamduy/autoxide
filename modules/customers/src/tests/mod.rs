@@ -447,9 +447,9 @@ pub(crate) async fn call(
 
 /// Số event `name` trong outbox của `customers`.
 pub(crate) async fn events_named(app: &TestApp, name: &str) -> Vec<Value> {
-    use sea_orm::{ConnectionTrait, Statement};
+    use sea_orm::ConnectionTrait;
     let read = app.database().read();
-    let statement = Statement::from_sql_and_values(
+    let statement = autoxide_kernel::database::statement(
         read.get_database_backend(),
         match read.get_database_backend() {
             sea_orm::DatabaseBackend::Postgres => {

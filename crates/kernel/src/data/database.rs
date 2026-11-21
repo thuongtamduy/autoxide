@@ -399,3 +399,86 @@ mod tests {
         }
     }
 }
+
+/// Câu SQL viết tay kèm tham số — dùng THAY `sea_orm::Statement::from_sql_and_values` (`cargo xtask check` chặn
+/// cách cũ, luật `raw-statement`).
+///
+/// Vì sao: giá trị thời gian của kernel (`Timestamp`, `Date`) đi xuống driver dưới dạng chuỗi kèm tên kiểu
+/// (`timestamptz`, `date`) — SQLite cần đúng chuỗi ta viết. Builder của SeaORM / sea-query tự chèn tên kiểu vào
+/// câu lệnh Postgres (`$1::"timestamptz"`); câu viết tay thì không ai chèn, Postgres nhận chuỗi và từ chối (lỗi
+/// 42804). Hàm này chèn y như builder: mỗi tham số mang tên kiểu thì `$n` thành `$n::"<kiểu>"` (chỉ Postgres;
+/// SQLite giữ nguyên). Đừng tự viết `CAST(? AS timestamptz)`: SQLite đọc kiểu lạ thành số.
+///
+/// Câu viết cho Postgres dùng `$1`, `$2`… như thường lệ; chuỗi `$n` nằm trong literal `'…'` cũng bị đổi, nên
+/// đừng viết `$` trong literal của câu có tham số thời gian.
+pub fn statement<I>(
+    backend: sea_orm::DbBackend,
+    sql: impl Into<String>,
+    values: I,
+) -> sea_orm::Statement
+where
+    I: IntoIterator<Item = sea_orm::Value>,
+{
+    let values: Vec<sea_orm::Value> = values.into_iter().collect();
+    let mut sql: String = sql.into();
+    if backend == sea_orm::DbBackend::Postgres {
+        for (index, value) in values.iter().enumerate() {
+            let type_name = match value {
+                sea_orm::Value::Enum(sea_orm::sea_query::OptionEnum::Some(inner)) => {
+                    inner.type_name.to_string()
+                }
+                sea_orm::Value::Enum(sea_orm::sea_query::OptionEnum::None(type_name)) => {
+                    type_name.to_string()
+                }
+                _ => continue,
+            };
+            sql = cast_placeholder(&sql, index + 1, &type_name);
+        }
+    }
+    sea_orm::Statement::from_sql_and_values(backend, sql, values)
+}
+
+/// Thêm `::"<type_name>"` sau mỗi `$<number>` đứng riêng (không phải `$1` trong `$10`, chưa có `::` theo sau).
+fn cast_placeholder(sql: &str, number: usize, type_name: &str) -> String {
+    let placeholder = format!("${number}");
+    let mut out = String::with_capacity(sql.len() + 16);
+    let mut rest = sql;
+    while let Some(position) = rest.find(&placeholder) {
+        let after = &rest[position + placeholder.len()..];
+        out.push_str(&rest[..position + placeholder.len()]);
+        let standalone = !after.starts_with(|c: char| c.is_ascii_digit());
+        if standalone && !after.starts_with("::") {
+            out.push_str("::\"");
+            out.push_str(type_name);
+            out.push('"');
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(test)]
+mod statement_tests {
+    use super::{cast_placeholder, statement};
+    use crate::time::{Date, Timestamp};
+    use sea_orm::DbBackend;
+
+    #[test]
+    fn chen_ten_kieu_dung_cho_tham_so_postgres() {
+        assert_eq!(
+            cast_placeholder("a = $1 AND b = $10", 1, "date"),
+            "a = $1::\"date\" AND b = $10"
+        );
+        assert_eq!(cast_placeholder("a = $1::text", 1, "date"), "a = $1::text", "đã có kiểu: giữ");
+        let at = Timestamp::UNIX_EPOCH;
+        let day = Date::new(2026, 11, 21).unwrap();
+        let sql = "UPDATE t SET at = $1, day = $2, n = $3 WHERE id = $4";
+        let values = || [at.into(), day.into(), 1_i64.into(), None::<Timestamp>.into()];
+        assert_eq!(
+            statement(DbBackend::Postgres, sql, values()).sql,
+            "UPDATE t SET at = $1::\"timestamptz\", day = $2::\"date\", n = $3 WHERE id = $4::\"timestamptz\""
+        );
+        assert_eq!(statement(DbBackend::Sqlite, sql, values()).sql, sql, "SQLite giữ nguyên");
+    }
+}

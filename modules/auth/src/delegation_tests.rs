@@ -8,7 +8,7 @@ use autoxide_kernel::mail::Mailer;
 use autoxide_kernel::tenancy::TenantContext;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
-use sea_orm::{ConnectionTrait, Statement};
+use sea_orm::ConnectionTrait;
 use serde_json::{Value, json};
 
 use crate::role::RoleInput;
@@ -70,7 +70,7 @@ async fn chain(test: &TestDatabase) -> (Chain, crate::testing::Services) {
     let control = app.database();
     control
         .write()
-        .execute_raw(Statement::from_sql_and_values(
+        .execute_raw(autoxide_kernel::database::statement(
             control.write().get_database_backend(),
             "UPDATE kernel_tenants SET parent_id = $1 WHERE id = $2",
             [parent.id().as_uuid().into(), child.id().as_uuid().into()],
@@ -155,7 +155,7 @@ async fn uy_quyen_cha_vao_con_va_audit_hai_phia() {
         let path = format!("/customers/{}", buyer.id);
         let (status, _) = call(&chain, "PATCH", &path, &chain.agent, Some("child"), Some(json!({"disabled": true}))).await;
         assert_eq!(status, StatusCode::OK);
-        let rows = chain.child.database().read().query_all_raw(Statement::from_sql_and_values(
+        let rows = chain.child.database().read().query_all_raw(autoxide_kernel::database::statement(
             chain.child.database().read().get_database_backend(),
             "SELECT actor_access, actor_access_id FROM auth_events WHERE tenant_id = $1 AND name = 'auth.user_updated'",
             [chain.child.id().as_uuid().into()],
@@ -163,7 +163,7 @@ async fn uy_quyen_cha_vao_con_va_audit_hai_phia() {
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].try_get::<Option<String>>("", "actor_access").unwrap().as_deref(), Some("delegation"));
         assert_eq!(rows[0].try_get::<Option<uuid::Uuid>>("", "actor_access_id").unwrap().map(|id| id.to_string()), Some(delegation.clone()));
-        let granted_rows = chain.parent.database().read().query_all_raw(Statement::from_sql_and_values(
+        let granted_rows = chain.parent.database().read().query_all_raw(autoxide_kernel::database::statement(
             chain.parent.database().read().get_database_backend(),
             "SELECT id FROM auth_events WHERE tenant_id = $1 AND name = 'auth.delegation_granted'",
             [chain.parent.id().as_uuid().into()],
