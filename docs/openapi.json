@@ -29723,6 +29723,10 @@
                 },
                 "type": "array"
               },
+              "stability": {
+                "description": "`official`, or `experimental`: the module's API and data may still change between\nreleases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).",
+                "type": "string"
+              },
               "subscriptions": {
                 "description": "Events the module listens to; `*` means every event.",
                 "items": {
@@ -29757,7 +29761,8 @@
               "features",
               "limits",
               "always_enabled",
-              "requires"
+              "requires",
+              "stability"
             ],
             "type": "object"
           }
@@ -44574,6 +44579,10 @@
                   },
                   "type": "array"
                 },
+                "stability": {
+                  "description": "`official`, or `experimental`: the module's API and data may still change between\nreleases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).",
+                  "type": "string"
+                },
                 "subscriptions": {
                   "description": "Events the module listens to; `*` means every event.",
                   "items": {
@@ -44608,7 +44617,8 @@
                 "features",
                 "limits",
                 "always_enabled",
-                "requires"
+                "requires",
+                "stability"
               ],
               "type": "object"
             },
@@ -59595,6 +59605,10 @@
             },
             "type": "array"
           },
+          "stability": {
+            "description": "`official`, or `experimental`: the module's API and data may still change between\nreleases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).",
+            "type": "string"
+          },
           "subscriptions": {
             "description": "Events the module listens to; `*` means every event.",
             "items": {
@@ -59629,7 +59643,8 @@
           "features",
           "limits",
           "always_enabled",
-          "requires"
+          "requires",
+          "stability"
         ],
         "type": "object"
       },

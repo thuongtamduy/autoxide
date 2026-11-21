@@ -89,7 +89,7 @@ Xong cả giai đoạn (33–37, 40): xem [`roadmap/done.md`](roadmap/done.md).
 Thứ cộng đồng cần là lý do để tin và đường để đóng góp. Không dựng module mới trước bản 1.0, trừ bộ nối nhà cung cấp
 thật (P7).
 
-- [ ] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
+- [x] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
       MCP, không job, không nhận event, không chạy migration trên database mới; database đã có bảng của module tắt thì
       giữ nguyên dữ liệu; bật thiếu phụ thuộc thì báo rõ phải bật thêm gì; `doctor` liệt kê module bật / tắt;
       `docs/openapi.json` trong repo vẫn sinh với mọi module; test tập tối thiểu trên cả hai database
@@ -97,7 +97,7 @@ thật (P7).
       chính thức + module của họ, đủ lệnh CLI); `examples/external-module/` là workspace riêng, CI build và test trên
       cả hai database; hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`; phụ thuộc bằng git tag dùng được ngay;
       `cargo publish --dry-run` qua cho kernel và testkit (đăng thật ở P5)
-- [ ] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
+- [x] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
       hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
       cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm
 - [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module

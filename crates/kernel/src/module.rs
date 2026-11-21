@@ -36,7 +36,10 @@ use crate::privacy::{PersonalData, PersonalDataExport};
 pub mod navigation;
 mod registry;
 
+mod selection;
+
 pub use registry::{ModuleError, Modules};
+pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
 
 /// Những gì một module khai với core.
 ///
@@ -158,6 +161,29 @@ pub trait Module: Send + Sync {
     /// gói chi phối — chưa bật cho khách thì route, tool MCP, job, event của nó bị chặn.
     fn always_enabled(&self) -> bool {
         false
+    }
+
+    /// Hạng của module (bước 70 P3): `Official` (mặc định) chạy khi người cài không chọn gì;
+    /// `Experimental` — API và bảng còn có thể đổi — chỉ chạy khi được bật rõ trong
+    /// `AUTOXIDE_MODULES`. Module chính thức chỉ được phụ thuộc module chính thức.
+    fn stability(&self) -> Stability {
+        Stability::Official
+    }
+
+    /// Core không chạy được nếu thiếu module này (đăng nhập, idempotency…): luôn bật, `-tên` trong
+    /// `AUTOXIDE_MODULES` bị từ chối. Module mà nó [`depends_on`](Self::depends_on) cũng vậy.
+    /// Mặc định `false`. Khác [`always_enabled`](Self::always_enabled) — cái đó nói về GÓI của
+    /// từng khách, cái này nói về cả bản cài.
+    fn essential(&self) -> bool {
+        false
+    }
+
+    /// Tên các module mà module này BUỘC phải có: mỗi `context.require::<…>()?` tới trait của một
+    /// module khác (và event của module khác mà nó nghe) là một tên ở đây. Bật module này thì các
+    /// module đó được bật kèm. Thứ dùng "nếu có" (`.require::<…>().ok()`) KHÔNG khai ở đây. Mặc
+    /// định rỗng.
+    fn depends_on(&self) -> Vec<&'static str> {
+        Vec::new()
     }
 
     /// Đọc cấu hình riêng của module và giữ lại trong chính nó. Gọi một lần lúc
@@ -895,8 +921,9 @@ impl Apis {
         }
         self.get().ok_or_else(|| {
             Error::internal(format!(
-                "module `{module}` requires `{}`, which no earlier module provides; register \
-                     the providing module before `{module}` in crates/app/src/modules.rs",
+                "module `{module}` requires `{}`, which no enabled module registered before it \
+                 provides. The providing module must be registered before `{module}`, be named \
+                 in `Module::depends_on` of `{module}`, and not be left out by AUTOXIDE_MODULES",
                 std::any::type_name::<T>()
             ))
         })

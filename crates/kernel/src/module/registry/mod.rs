@@ -24,6 +24,10 @@ mod runtime;
 pub struct ModuleError(String);
 
 impl ModuleError {
+    pub(super) fn new(message: String) -> Self {
+        ModuleError(message)
+    }
+
     /// Nội dung lỗi, không kèm tiền tố `modules:`.
     pub fn message(&self) -> &str {
         &self.0
@@ -95,6 +99,12 @@ pub struct Modules {
     sandbox: crate::tenancy::sandbox::SandboxCatalog,
     /// Thời hạn giữ luồng thay đổi đồng bộ (`AUTOXIDE_SYNC_RETENTION_DAYS`, bước 69 P2).
     sync_keep: SignedDuration,
+    /// Module có trong binary nhưng `AUTOXIDE_MODULES` không bật (`Modules::select`).
+    pub(super) inactive: Vec<super::InactiveModule>,
+    /// `(module được bật kèm, module cần nó)` (`Modules::select`).
+    pub(super) implied: Vec<(&'static str, &'static str)>,
+    /// Nguyên văn `AUTOXIDE_MODULES` người cài viết, nếu có.
+    pub(super) selection_text: Option<String>,
 }
 
 impl Modules {
@@ -282,6 +292,9 @@ impl Modules {
                 automations,
                 sandbox: Default::default(),
                 sync_keep: SignedDuration::from_hours(24 * 30),
+                inactive: Vec::new(),
+                implied: Vec::new(),
+                selection_text: None,
             })
         } else {
             Err(ModuleError(problems.join("; ")))

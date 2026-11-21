@@ -65,6 +65,11 @@ impl Module for ConversationsModule {
         "conversations"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn description(&self) -> &'static str {
         "Customer chat with a shop or a marketplace store: shared inbox, assignment, read cursors, \
          real-time events, notices for people offline, hand-over to support tickets and automatic \

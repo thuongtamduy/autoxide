@@ -3,7 +3,13 @@
 //! Thêm một module = thêm một dòng vào [`all`] (và một dòng phụ thuộc trong
 //! `Cargo.toml` của crate này). Không chỗ nào khác trong core phải sửa.
 
-use autoxide_kernel::module::Module;
+//!
+//! Module nào CHẠY ở một bản cài là việc của `AUTOXIDE_MODULES` (bước 70 P1): `settings.rs` đưa
+//! danh sách này qua `Modules::select`. Nửa sau file là các câu báo cho người cài về lựa chọn đó
+//! (log khởi động, `autoxide doctor`, lệnh chép / backup).
+
+use autoxide_kernel::database::Database;
+use autoxide_kernel::module::{DormantModule, Module, Modules};
 
 /// Mọi module của chương trình, theo thứ tự đăng ký.
 pub fn all() -> Vec<Box<dyn Module>> {
@@ -113,6 +119,103 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // qua sổ tool của kernel, nên đứng CUỐI CÙNG (sau cả `reporting`).
         Box::new(autoxide_automations::module()),
     ]
+}
+
+/// Hai module nội bộ của kernel luôn chạy; không liệt kê cho người cài.
+const BUILT_IN: [&str; 2] = ["kernel", "antispam"];
+
+/// Một câu nói module nào đang chạy, module nào tắt — cho log khởi động và `autoxide doctor`.
+pub fn summary(modules: &Modules) -> String {
+    let enabled: Vec<&str> =
+        modules.names().into_iter().filter(|name| !BUILT_IN.contains(name)).collect();
+    let mut text = format!("{} modules run: {}.", enabled.len(), enabled.join(", "));
+    let inactive = modules.inactive();
+    if inactive.is_empty() {
+        text.push_str(" No module is turned off.");
+    } else {
+        let listed: Vec<String> = inactive
+            .iter()
+            .map(|module| format!("{} ({})", module.name, module.stability))
+            .collect();
+        text.push_str(&format!(" Turned off: {}.", listed.join(", ")));
+    }
+    for (module, needed_by) in modules.implied() {
+        text.push_str(&format!(" `{module}` runs because `{needed_by}` depends on it."));
+    }
+    text
+}
+
+/// Module đang tắt mà `database` còn DỮ LIỆU của nó (bảng có dòng). Bảng trống không tính: bản
+/// cài trước 0.18 tạo bảng cho mọi module, kể cả module chưa ai dùng.
+pub async fn dormant_with_data(
+    modules: &Modules,
+    database: &Database,
+) -> Result<Vec<DormantModule>, String> {
+    let dormant = modules.dormant(database).await.map_err(|error| format!("database: {error}"))?;
+    Ok(dormant.into_iter().filter(|module| !module.tables_with_data.is_empty()).collect())
+}
+
+/// Câu nói module nào tắt mà còn dữ liệu, và dòng cấu hình bật lại chúng.
+pub fn dormant_notice(modules: &Modules, dormant: &[DormantModule]) -> (String, String) {
+    let names: Vec<&str> = dormant.iter().map(|module| module.name).collect();
+    let listed: Vec<String> = dormant
+        .iter()
+        .map(|module| {
+            format!("{} ({} table(s) with rows)", module.name, module.tables_with_data.len())
+        })
+        .collect();
+    let message = format!(
+        "The database holds data of modules that are turned off: {}. Their endpoints, MCP tools, \
+         jobs and events do not run; the data is kept untouched.",
+        listed.join(", ")
+    );
+    let hint = format!(
+        "To keep using them, set `{}` and restart (experimental modules are no longer on by \
+         default; see docs/MODULES.md).",
+        modules.setting_enabling(&names)
+    );
+    (message, hint)
+}
+
+/// Ghi vào log lúc `serve` khởi động: module nào chạy, module nào tắt, và — điều người nâng cấp
+/// không được bỏ lỡ — module tắt mà database còn dữ liệu của nó, kèm đúng dòng cấu hình cần thêm.
+pub async fn log_at_start(modules: &Modules, database: &Database) {
+    tracing::info!(summary = %summary(modules), "modules");
+    match dormant_with_data(modules, database).await {
+        Ok(dormant) if dormant.is_empty() => {}
+        Ok(dormant) => {
+            let (message, hint) = dormant_notice(modules, &dormant);
+            // Người cài tự viết `AUTOXIDE_MODULES` thì đã chọn; mặc định thì có thể họ chưa biết.
+            if modules.selection_is_explicit() {
+                tracing::info!(hint, "{message}");
+            } else {
+                tracing::warn!(hint, "{message}");
+            }
+        }
+        // Không đọc được catalog (vd quyền): không chặn khởi động vì một câu nhắc.
+        Err(error) => tracing::warn!(error, "cannot check for data of modules that are turned off"),
+    }
+}
+
+/// Lỗi nếu `database` còn dữ liệu của module đang tắt: lệnh chép dữ liệu (`copy`, `backup`) chỉ
+/// thấy bảng của module đang bật, nên chạy tiếp sẽ để lại dữ liệu đó trong im lặng.
+pub async fn refuse_dormant_data(
+    modules: &Modules,
+    database: &Database,
+    command: &str,
+) -> Result<(), String> {
+    let dormant = dormant_with_data(modules, database).await?;
+    if dormant.is_empty() {
+        return Ok(());
+    }
+    let names: Vec<&str> = dormant.iter().map(|module| module.name).collect();
+    Err(format!(
+        "the database holds data of modules that are turned off ({}), and `autoxide {command}` \
+         only handles the modules that are on, so that data would be left out. Run the command \
+         with `{}` (or `AUTOXIDE_MODULES=all`).",
+        names.join(", "),
+        modules.setting_enabling(&names)
+    ))
 }
 
 #[cfg(test)]
