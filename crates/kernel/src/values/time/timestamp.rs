@@ -9,7 +9,7 @@ use jiff::{RoundMode, SignedDuration, TimestampRound, Unit};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::format::{self, UtcSuffix};
-use super::{Date, ParseError};
+use super::{Date, ParseError, Precision};
 
 /// Một thời điểm (UTC). Thay `chrono::DateTime<Utc>` / `sea_orm::prelude::DateTimeUtc` (D-20261121-time-library).
 ///
@@ -89,9 +89,49 @@ impl Timestamp {
         Date::from(self.0.to_zoned_datetime(zone.clone()).date())
     }
 
-    /// RFC 3339 UTC như JSON trả ra: `2026-11-21T10:00:00.123456Z`.
-    pub fn to_rfc3339(self) -> String {
+    /// RFC 3339 như JSON trả ra: `2026-11-21T10:00:00.123456Z` (UTC, đuôi `Z`, phần lẻ 0/3/6/9 chữ số).
+    pub fn to_json_string(self) -> String {
         format::write_timestamp(self.0, UtcSuffix::Z)
+    }
+
+    /// RFC 3339 đuôi `+00:00` — đúng chuỗi `chrono::DateTime<Utc>::to_rfc3339()` cho ra (file xuất, chuỗi
+    /// gửi ra ngoài đã có từ trước giữ nguyên).
+    pub fn to_rfc3339(self) -> String {
+        format::write_timestamp(self.0, UtcSuffix::Offset)
+    }
+
+    /// RFC 3339 với số chữ số lẻ cố định (`precision`) và đuôi `Z` (`use_z`) hay `+00:00` — như
+    /// `chrono::DateTime::to_rfc3339_opts`.
+    pub fn to_rfc3339_opts(self, precision: Precision, use_z: bool) -> String {
+        let suffix = if use_z { UtcSuffix::Z } else { UtcSuffix::Offset };
+        format::write_timestamp_with(self.0, precision, suffix)
+    }
+
+    /// Định dạng theo mẫu `strftime` (`%Y-%m-%d`, `%H:%M`, `%a, %d %b %Y %H:%M:%S GMT`…), giờ UTC. Mẫu sai
+    /// (lỗi của người viết code) cho chuỗi rỗng.
+    pub fn format(self, pattern: &str) -> String {
+        let zoned = self.0.to_zoned_datetime(TimeZone::UTC);
+        jiff::fmt::strtime::format(pattern, &zoned).unwrap_or_default()
+    }
+
+    /// Ngày theo lịch ở UTC.
+    pub fn date_utc(self) -> Date {
+        self.date_in(&TimeZone::UTC)
+    }
+
+    /// Thời điểm này ở múi giờ `zone` (để lấy giờ địa phương, thứ…).
+    pub fn in_zone(self, zone: &TimeZone) -> jiff::ZonedDateTime {
+        self.0.to_zoned_datetime(zone.clone())
+    }
+
+    /// Từ số mili giây kể từ 1970-01-01T00:00:00Z.
+    pub fn from_unix_millis(millis: i64) -> Option<Self> {
+        jiff::Timestamp::from_millisecond(millis).ok().map(Timestamp)
+    }
+
+    /// Số mili giây kể từ 1970-01-01T00:00:00Z (phần nhỏ hơn bị cắt).
+    pub fn as_unix_millis(self) -> i64 {
+        self.0.as_millisecond()
     }
 
     /// Chuỗi lưu ở cột SQLite (`…+00:00`), cũng là chuỗi Postgres đọc vào `timestamptz`.
@@ -139,15 +179,18 @@ impl Sub for Timestamp {
     }
 }
 
+// `Display` như `chrono::DateTime<Utc>` (`2026-11-21 10:00:00.123456 UTC`): câu thông báo, log, tên file đã có
+// từ trước giữ nguyên.
 impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_rfc3339())
+        f.write_str(&format::write_display(self.0))
     }
 }
 
+// `Debug` như `chrono` (RFC 3339, đuôi `Z`).
 impl fmt::Debug for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.to_rfc3339())
+        f.write_str(&self.to_json_string())
     }
 }
 
@@ -164,7 +207,7 @@ impl FromStr for Timestamp {
 
 impl Serialize for Timestamp {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.to_rfc3339())
+        serializer.serialize_str(&self.to_json_string())
     }
 }
 

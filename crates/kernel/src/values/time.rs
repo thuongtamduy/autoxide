@@ -33,6 +33,21 @@ use std::fmt;
 pub use date::Date;
 pub use timestamp::Timestamp;
 
+/// Số chữ số lẻ của giây khi viết RFC 3339 (như `chrono::SecondsFormat`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Precision {
+    /// Không phần lẻ.
+    Seconds,
+    /// 3 chữ số.
+    Millis,
+    /// 6 chữ số.
+    Micros,
+    /// 9 chữ số.
+    Nanos,
+    /// Không có, hay 3, 6, 9 chữ số tuỳ giá trị (`SecondsFormat::AutoSi`).
+    Auto,
+}
+
 /// Chuỗi không đọc được thành thời điểm hay ngày.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParseError {

@@ -7,6 +7,8 @@ use jiff::civil;
 use jiff::fmt::temporal::DateTimeParser;
 use jiff::tz::TimeZone;
 
+use super::Precision;
+
 /// Đuôi của giờ UTC: JSON dùng `Z`, cột SQLite dùng `+00:00` (như `chrono` qua `sqlx` đã ghi).
 #[derive(Clone, Copy)]
 pub(super) enum UtcSuffix {
@@ -23,26 +25,64 @@ static PARSER: DateTimeParser = DateTimeParser::new();
 /// Vì sao không dùng `Display` của `jiff`: nó cắt số 0 cuối (`.12Z`), mà chuỗi như vậy so sánh sai thứ tự
 /// (`.12Z` > `.125Z` vì `Z` > `5`) và khác chuỗi đã lưu.
 pub(super) fn write_timestamp(timestamp: jiff::Timestamp, suffix: UtcSuffix) -> String {
+    write_timestamp_with(timestamp, Precision::Auto, suffix)
+}
+
+/// Như [`write_timestamp`] với số chữ số lẻ chọn trước (`chrono::SecondsFormat`).
+pub(super) fn write_timestamp_with(
+    timestamp: jiff::Timestamp,
+    precision: Precision,
+    suffix: UtcSuffix,
+) -> String {
     let datetime = timestamp.to_zoned_datetime(TimeZone::UTC).datetime();
     let mut out = String::with_capacity(32);
     write_date_parts(&mut out, datetime.year(), datetime.month(), datetime.day());
     // `write!` vào `String` không bao giờ lỗi; bỏ qua `Result` thay vì `unwrap` (cấm ngoài test).
     let _ =
         write!(out, "T{:02}:{:02}:{:02}", datetime.hour(), datetime.minute(), datetime.second());
-    let nanos = datetime.subsec_nanosecond();
-    if nanos != 0 {
-        if nanos % 1_000_000 == 0 {
-            let _ = write!(out, ".{:03}", nanos / 1_000_000);
-        } else if nanos % 1_000 == 0 {
-            let _ = write!(out, ".{:06}", nanos / 1_000);
-        } else {
-            let _ = write!(out, ".{nanos:09}");
-        }
-    }
+    write_fraction(&mut out, datetime.subsec_nanosecond(), precision);
     out.push_str(match suffix {
         UtcSuffix::Z => "Z",
         UtcSuffix::Offset => "+00:00",
     });
+    out
+}
+
+/// Phần lẻ của giây: `Auto` như `chrono` (`SecondsFormat::AutoSi`) — không có, hay 3, 6, 9 chữ số.
+fn write_fraction(out: &mut String, nanos: i32, precision: Precision) {
+    match precision {
+        Precision::Seconds => {}
+        Precision::Millis => {
+            let _ = write!(out, ".{:03}", nanos / 1_000_000);
+        }
+        Precision::Micros => {
+            let _ = write!(out, ".{:06}", nanos / 1_000);
+        }
+        Precision::Nanos => {
+            let _ = write!(out, ".{nanos:09}");
+        }
+        Precision::Auto if nanos == 0 => {}
+        Precision::Auto if nanos % 1_000_000 == 0 => {
+            let _ = write!(out, ".{:03}", nanos / 1_000_000);
+        }
+        Precision::Auto if nanos % 1_000 == 0 => {
+            let _ = write!(out, ".{:06}", nanos / 1_000);
+        }
+        Precision::Auto => {
+            let _ = write!(out, ".{nanos:09}");
+        }
+    }
+}
+
+/// `2026-11-21 10:00:00.123456 UTC` — `Display` của `chrono::DateTime<Utc>`.
+pub(super) fn write_display(timestamp: jiff::Timestamp) -> String {
+    let datetime = timestamp.to_zoned_datetime(TimeZone::UTC).datetime();
+    let mut out = String::with_capacity(32);
+    write_date_parts(&mut out, datetime.year(), datetime.month(), datetime.day());
+    let _ =
+        write!(out, " {:02}:{:02}:{:02}", datetime.hour(), datetime.minute(), datetime.second());
+    write_fraction(&mut out, datetime.subsec_nanosecond(), Precision::Auto);
+    out.push_str(" UTC");
     out
 }
 
