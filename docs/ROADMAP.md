@@ -5,14 +5,18 @@ và Postgres**) bắt buộc xanh trước mỗi lần phát hành (D-300). Chi 
 thư viện: [`STACK.md`](../STACK.md). Cách làm từng bước: [`docs/steps/`](steps/README.md).
 
 Trạng thái: **bước 0–38 và 40 xong** — đã chuyển sang [`docs/roadmap/done.md`](roadmap/done.md) (D-228);
-**kế tiếp bước 51**; bước 50 chờ chủ dự án công khai repo (D-199); bản
+**kế tiếp bước 70** (core cho cộng đồng, D-20261121-community-first); bước 50 chờ chủ dự án công khai repo (D-199); bản
 phát hành mới nhất `v0.17.0`. CI trên GitHub (`.github/workflows/ci.yml`) chạy gate đầy đủ trên mỗi pull request và mỗi lần push lên `main` (D-175, D-197); `./gate.sh` trên máy vẫn là định nghĩa "xong".
 
 **Số bước là mã cố định, không phải thứ tự** (D-228): bước mang số lớn vẫn có thể làm trước. Các bước dưới đây
 xếp theo **thứ tự làm**; bước kế tiếp là bước đầu tiên (từ trên xuống) còn mục `[ ]` mà các bước nó phụ
-thuộc đã xong.
+thuộc đã xong. **Bước ghi "tạm dừng tới sau 1.0" không bao giờ là bước kế tiếp** (D-20261121-community-first).
 
-## Thứ tự làm (D-228)
+## Thứ tự làm (D-228, D-20261121-community-first)
+
+**Từ ngày 21/11/2026:** bước 70 (P1–P3) làm trước mọi bước còn mở; sau đó tới phần còn dở của các module đã có (đuôi
+của 51, 68, 41, 43, 45, 55), rồi 54, 52, 67. Không dựng module mới trước bản 1.0: các bước 46, 48, 49, 56, 59, 62, 63,
+64, 65 tạm dừng. Bảng dưới là thứ tự gốc của D-228, giữ để tra phụ thuộc.
 
 | Giai đoạn | Bước, theo thứ tự | Vì sao ở đây |
 |---|---|---|
@@ -66,6 +70,42 @@ Bước lớn nhất là 33 (sửa mọi bảng của mọi module): một ngư�
 ## Giai đoạn A — Hợp đồng và nền lõi
 
 Xong cả giai đoạn (33–37, 40): xem [`roadmap/done.md`](roadmap/done.md).
+
+## Giai đoạn F — Core cho cộng đồng (làm trước, chủ dự án quyết ngày 21/11/2026, D-20261121-community-first)
+
+## 70. Core cho cộng đồng: chạy phần mình cần, mở rộng không fork, cam kết ổn định
+
+Thứ cộng đồng cần là lý do để tin và đường để đóng góp. Không dựng module mới trước bản 1.0, trừ bộ nối nhà cung cấp
+thật (P7).
+
+- [ ] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
+      MCP, không job, không nhận event, không chạy migration trên database mới; database đã có bảng của module tắt thì
+      giữ nguyên dữ liệu; bật thiếu phụ thuộc thì báo rõ phải bật thêm gì; `doctor` liệt kê module bật / tắt;
+      `docs/openapi.json` trong repo vẫn sinh với mọi module; test tập tối thiểu trên cả hai database
+- [ ] P2 — Module viết ngoài repo, không fork: crate `autoxide` dùng được như thư viện (binary của người ngoài = module
+      chính thức + module của họ, đủ lệnh CLI); `examples/external-module/` là workspace riêng, CI build và test trên
+      cả hai database; hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`; phụ thuộc bằng git tag dùng được ngay;
+      `cargo publish --dry-run` qua cho kernel và testkit (đăng thật ở P5)
+- [ ] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
+      hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
+      cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm
+- [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
+      ngoài; `cargo-semver-checks` trong bước phát hành; dòng hỗ trợ dài hạn (vá bảo mật bao lâu) ghi ở
+      `docs/RELEASING.md` và `SECURITY.md`
+- [ ] P5 — Đăng gói: SDK TypeScript lên npm, kernel và testkit lên crates.io, tự động lúc phát hành — **ghi nợ, làm
+      sau** (D-20261121-vn-providers); cần tài khoản npm và crates.io của chủ dự án
+- [ ] P6 — Rà soát bảo mật toàn bộ trước 1.0 bằng một phiên AI độc lập (chưa thuê bên ngoài, D-20261121-vn-providers);
+      làm sau khi P1–P4 đã vào `main`; `SECURITY.md` ghi đúng đây là rà soát nội bộ có AI hỗ trợ, không phải kiểm toán
+      của bên thứ ba
+- [ ] P7 — Bộ nối nhà cung cấp thật ở Việt Nam (D-20261121-vn-providers), mỗi bộ nối một module nhỏ sau trait của core,
+      viết theo tài liệu công khai trước, hạng thử nghiệm cho tới khi chạy thử bằng tài khoản thật:
+  - [ ] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
+        webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
+  - [ ] Thanh toán: SePay
+  - [ ] Thanh toán: MoMo
+  - [ ] Vận chuyển: Giao Hàng Nhanh
+  - [ ] SMS: eSMS
+  - [ ] Hoá đơn điện tử: SePay eInvoice
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 
@@ -410,7 +450,7 @@ Bắt đầu SAU bước 34 và 40 (đăng nhập OIDC).
 - [x] Nhân viên `active=false` thì khoá và thu hồi phiên, API key ngay; nhóm ánh xạ sang role ở nút; test trên
       cả hai database
 
-## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221)
+## 65. Chợ ứng dụng qua OAuth 2.0 (`apps`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/65-apps.md`](steps/65-apps.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -657,7 +697,7 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
       — đã có cách trả, ngày giao dự kiến theo nơi bán, `return_until` / `buyer_cancel_until`, đếm có ảnh và theo
       biến thể, chủ đề kèm tóm tắt đã duyệt (D-20261120-step45-warranty-installment-fields); số điểm chờ bước 47
 
-## 46. Sàn (`marketplace`)
+## 46. Sàn (`marketplace`) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/46-marketplace.md`](steps/46-marketplace.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -716,7 +756,7 @@ Bắt đầu SAU bước 45. Người mua là tài khoản theo từng khách (b
 - [x] Website bán hàng (16/11/2026): đăng nhập / tạo tài khoản công khai cho người mua bằng OTP qua SMS hay
       passkey (gửi SMS qua đối tác, không giữ secret trong code) — D-20261120-phone-accounts
 
-## 48. Bán đa kênh (`channels`)
+## 48. Bán đa kênh (`channels`) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/48-channels.md`](steps/48-channels.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -736,7 +776,7 @@ Facebook / Zalo; một kho, một danh sách sản phẩm, đơn từ mọi nơi
       job theo cửa hàng, ngôn ngữ, tiền tệ; link công khai có token; báo lỗi từng sản phẩm (thiếu GTIN,
       ảnh); không lộ số tồn hay giá vốn
 
-## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`)
+## 49. Tiếp thị liên kết và bán qua livestream (`affiliate`) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/49-affiliate.md`](steps/49-affiliate.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -794,7 +834,7 @@ họ dữ liệu để vẽ trang chủ, trang danh mục, chân trang mà khôn
       chính sách, link chỉ tới hàng của chính người bán, không phải quảng cáo trong sàn
       — **chờ bước 46** (`marketplace` chưa có); không làm trước (D-20261120-step55-close)
 
-## 56. Chuyển dữ liệu từ nền tảng khác (`imports`, D-219)
+## 56. Chuyển dữ liệu từ nền tảng khác (`imports`, D-219) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/56-imports.md`](steps/56-imports.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -816,7 +856,7 @@ không nhập lại tay và không mất thứ hạng tìm kiếm của đườn
       khách đặt lại qua link; file tải lên xoá sau khi xong
 - [ ] Báo cáo sau khi nhập (đã tạo, bỏ qua, lỗi, cần làm tay); hướng dẫn chuyển từ từng nền tảng (EN + VI)
 
-## 59. Bán sỉ B2B (`wholesale`) (chủ dự án giao ngày 14/11/2026, D-221)
+## 59. Bán sỉ B2B (`wholesale`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/59-wholesale.md`](steps/59-wholesale.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -864,7 +904,7 @@ Bắt đầu SAU bước 40 (SSE) và 53 (`support`).
       ghi âm tắt mặc định và phải thông báo trước; bộ nối thật cần tài khoản — dừng hỏi chủ dự án — xong
       (19/11, D-20261119-step61-voice; bộ nối thật chưa làm: chờ chủ dự án có tài khoản nhà cung cấp)
 
-## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221)
+## 62. Sản phẩm bán theo kỳ (`recurring`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/62-recurring.md`](steps/62-recurring.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -875,7 +915,7 @@ Bắt đầu SAU bước 45 và 36. Người mua trả cho cửa hàng theo kỳ
 - [ ] Người mua tự tạm dừng, bỏ qua kỳ, đổi sản phẩm, đổi phương thức, huỷ dễ như đăng ký; báo trước khi trừ tiền
       và khi đổi giá; không lưu số thẻ; số liệu MRR và tỉ lệ rời bỏ; test trên cả hai database
 
-## 63. Đa tiền tệ và bán xuyên biên giới (chủ dự án giao ngày 14/11/2026, D-221)
+## 63. Đa tiền tệ và bán xuyên biên giới (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/63-multi-currency.md`](steps/63-multi-currency.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -890,7 +930,7 @@ Bắt đầu SAU bước 36, 41, 44, 45. Mở rộng module có sẵn, không mo
       ngày hiệu lực, KYC hồ sơ nước ngoài, công bố quốc gia và nơi gửi hàng, chi trả ngoại tệ; hàng nhập khẩu
       cho người mua ngoài phạm vi
 
-## 64. Quảng cáo trong sàn (`ads`) (chủ dự án giao ngày 14/11/2026, D-221)
+## 64. Quảng cáo trong sàn (`ads`) (chủ dự án giao ngày 14/11/2026, D-221) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
 Đặc tả: [`docs/steps/64-ads.md`](steps/64-ads.md) — đọc cùng [`docs/steps/README.md`](steps/README.md).
 
@@ -929,14 +969,18 @@ Thứ tự ưu tiên chủ dự án đồng ý; mỗi mục khi làm thì ghi qu
       `auth`, cần quyết định) — làm cùng bước 47 (chuyển từ bước 45) — D-20261120-phone-accounts (không phá vỡ:
       `email = ""`)
 - [ ] Nối nhà cung cấp thật đầu tiên cho luồng bán chính: thanh toán, SMS, vận chuyển, hoá đơn điện tử (mỗi loại một
-      đối tác; chủ dự án chọn đối tác và cấp tài khoản thử) — hiện mọi nhà cung cấp chỉ có bộ giả
+      đối tác; chủ dự án chọn đối tác và cấp tài khoản thử) — hiện mọi nhà cung cấp chỉ có bộ giả — **chuyển thành P7
+      của bước 70**
 - [ ] Ghép lô chạy thêm test Postgres cho crate bị sửa (lỗi đồng thời của #246 và luồng sự kiện chỉ lộ trên Postgres
-      ở CI); rà mọi chỗ "đọc → so → ghi event" ở các module tìm chỗ thiếu khoá
+      ở CI) — **xong phần này**: PR lô chờ CI đủ cả hai database rồi mới merge (D-20261121-ci-batch-release-faster); còn
+      lại: rà mọi chỗ "đọc → so → ghi event" ở các module tìm chỗ thiếu khoá
 - [ ] `/kernel/find`, `/kernel/work` bỏ nguồn chậm khi máy bận: đo lại hạn mỗi nguồn và để client hiện rõ phần thiếu
 - [ ] Tách kernel (nút thắt build: sửa kernel phải build lại gần hết, xem D-20261120-build-faster)
-- [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn; cài `cargo-semver-checks` cho bước phát hành
-- [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án)
-- [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); `chrono` không còn bảo trì (D-346, chờ sqlx / sea-orm)
+- [ ] Phát hành thường hơn (1–2 tuần) cho CHANGELOG mỗi bản gọn (phát hành nay tự chạy khi merge PR phát hành,
+      D-20261121-auto-release); cài `cargo-semver-checks` cho bước phát hành — **chuyển thành P4 của bước 70**
+- [ ] Đăng SDK TypeScript lên npm (chờ tài khoản của chủ dự án) — **chuyển thành P5 của bước 70**
+- [ ] Nợ nhỏ: tách các file `.rs` trên 800 dòng (đang làm); ~~`chrono` không còn bảo trì~~ — đã thay bằng `jiff`
+      (D-20261121-time-library)
 
 ## Chờ chủ dự án
 

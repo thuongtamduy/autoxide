@@ -3,8 +3,6 @@
 # Thư mục dữ liệu mặc định khi chạy test hay lệnh trong thư mục của một crate.
 **/data/mail/
 **/data/files/
-# Mật khẩu tự sinh của quản trị viên đầu tiên (D-20261121-admin-password-file).
-**/data/initial-admin-password
 .env
 .env.*
 !.env.example
