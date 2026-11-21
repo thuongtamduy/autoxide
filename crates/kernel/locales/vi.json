@@ -27,6 +27,7 @@
   "field:give 1 to {max} event names, comma-separated (`module.event` or `module.*`)": "hãy nêu 1 đến {max} tên event, cách nhau bằng dấu phẩy (`module.event` hay `module.*`)",
   "field:give both the access key and its secret, or neither": "phải có cả khoá truy cập lẫn secret của nó, hoặc không có cả hai",
   "field:has a length out of the field's range": "có độ dài ngoài khoảng của trường",
+  "field:uses `autoescape` at line {line}, column {column}: templates cannot turn off HTML escaping": "dùng `autoescape` ở dòng {line}, cột {column}: mẫu không được tắt thoát HTML",
   "field:has a syntax error at line {line}, column {column}: {reason}": "có lỗi cú pháp ở dòng {line}, cột {column}: {reason}",
   "field:has an invalid length": "có độ dài không hợp lệ",
   "field:has an invalid value": "có giá trị không hợp lệ",

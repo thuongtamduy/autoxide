@@ -35,12 +35,18 @@ pub(crate) mod rule {
         pub actions: String,
         /// `active`, `disabled`, `pending_approval`, `paused`.
         pub status: String,
-        /// Vì sao luật bị tạm dừng (`rate_limit`, `permission_lost`, `owner_unavailable`).
+        /// Vì sao luật bị tạm dừng (`rate_limit`, `permission_lost`, `owner_unavailable`, `credential_revoked`).
         pub status_reason: Option<String>,
         /// Múi giờ IANA của lịch.
         pub timezone: String,
         /// Hành động chạy với quyền HIỆN TẠI của người này.
         pub run_as: Uuid,
+        /// API key đã tạo / sửa / bật luật (`None`: người dùng đăng nhập). Key bị thu hồi thì luật
+        /// tạm dừng.
+        pub run_as_api_key: Option<Uuid>,
+        /// Bản chụp quyền của key (JSON `PrincipalSnapshot`): luật không bao giờ có hơn quyền
+        /// của key, kể cả hàng rào nút.
+        pub run_as_limit: Option<String>,
         pub created_by: Uuid,
         /// `user`, `agent`, `service`… (loại bên tạo luật).
         pub created_by_kind: String,

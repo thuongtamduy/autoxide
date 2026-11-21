@@ -543,6 +543,8 @@ pub(crate) async fn call_tool(
     principal: Principal,
     arguments: Value,
 ) -> Result<Value, Error> {
+    // Như REST: permission nhạy cảm cần xác nhận lại gần đây (step-up), không chỉ "có permission".
+    tool.authorize(&principal)?;
     // Gói của khách không có module của tool: cùng lỗi như REST.
     let (enabled, plan_read_only) = tool_allowed(entitlements, tool, tenant.id()).await?;
     if !enabled {

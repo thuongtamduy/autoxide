@@ -164,7 +164,7 @@ impl InventoryService {
         let scope = principal.scope_condition(&PURCHASING_READ, supplier::Column::OrgId, None)?;
         let mut select = supplier::Entity::find().scoped(tenant).filter(scope);
         if let Some(q) = q.map(str::trim).filter(|q| !q.is_empty()) {
-            select = select.filter(supplier::Column::NameKey.contains(search::fold(q)));
+            select = select.filter(search::contains(supplier::Column::NameKey, q));
         }
         if let Some(active) = active {
             select = select.filter(supplier::Column::Active.eq(active));

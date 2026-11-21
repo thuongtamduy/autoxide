@@ -70,8 +70,17 @@ pub fn contains<C: ColumnTrait>(column: C, text: &str) -> Expr {
     column.like(LikeExpr::new(pattern).escape('\\'))
 }
 
-/// Thoát `\`, `%` và `_` để dùng trong mẫu `LIKE … ESCAPE '\'`.
-fn escape_like(text: &str) -> String {
+/// Điều kiện "cột `column` bắt đầu bằng đúng chuỗi `prefix`" (so nguyên văn, không gấp dấu). Thay
+/// `ColumnTrait::starts_with` của SeaORM — hàm đó không thoát `%` / `_`, nên `prefix` do người dùng
+/// đặt (slug, mã tham chiếu) thành ký tự đại diện. Chạy như nhau trên SQLite và Postgres.
+pub fn starts_with<C: ColumnTrait>(column: C, prefix: &str) -> Expr {
+    let pattern = format!("{}%", escape_like(prefix));
+    column.like(LikeExpr::new(pattern).escape('\\'))
+}
+
+/// Thoát `\`, `%` và `_` để dùng trong mẫu `LIKE … ESCAPE '\'`. Mọi mẫu `LIKE` dựng từ dữ liệu
+/// người dùng đi qua đây (hay qua [`contains`], [`starts_with`]).
+pub fn escape_like(text: &str) -> String {
     let mut escaped = String::with_capacity(text.len());
     for character in text.chars() {
         if matches!(character, '\\' | '%' | '_') {

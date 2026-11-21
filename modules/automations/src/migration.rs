@@ -18,7 +18,61 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
             ],
         ),
         autoxide_kernel::event::outbox_access_migration("m0006_event_access", "automations"),
+        Box::new(RuleCredential),
     ]
+}
+
+/// Luật tạo / sửa / bật bằng API key mang quyền của key (D-20261121-automation-credential):
+/// `run_as_api_key` (ID key, để tắt luật khi key bị thu hồi) và `run_as_limit` (bản chụp quyền của
+/// key — permission, hàng rào nút — JSON `PrincipalSnapshot`). Cả hai `NULL`: người dùng đăng nhập.
+struct RuleCredential;
+
+impl MigrationName for RuleCredential {
+    fn name(&self) -> &str {
+        "m0007_rule_credential"
+    }
+}
+
+#[async_trait::async_trait]
+impl MigrationTrait for RuleCredential {
+    async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        // Mỗi lệnh một cột: SQLite chỉ thêm được một cột mỗi `ALTER TABLE`.
+        for column in [schema::uuid_null("run_as_api_key"), schema::text_null("run_as_limit")] {
+            let mut column = column;
+            manager
+                .alter_table(
+                    Table::alter().table("automations_rules").add_column(&mut column).to_owned(),
+                )
+                .await?;
+        }
+        index(
+            manager,
+            "automations_rules",
+            "automations_rules_api_key_idx",
+            &["tenant_id", "run_as_api_key"],
+            false,
+        )
+        .await
+    }
+
+    async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
+        manager
+            .drop_index(
+                Index::drop()
+                    .name("automations_rules_api_key_idx")
+                    .table(Alias::new("automations_rules"))
+                    .to_owned(),
+            )
+            .await?;
+        for column in ["run_as_limit", "run_as_api_key"] {
+            manager
+                .alter_table(
+                    Table::alter().table("automations_rules").drop_column(column).to_owned(),
+                )
+                .await?;
+        }
+        Ok(())
+    }
 }
 
 async fn index(

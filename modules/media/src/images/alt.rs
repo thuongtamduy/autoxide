@@ -186,9 +186,7 @@ impl MediaService {
         }
         let original = variants::read_all(self.read(tenant, item, None).await?).await?;
         // Giải mã và đổi cỡ tốn CPU: chạy trên thread riêng của tokio cho việc chặn.
-        let shrunk = tokio::task::spawn_blocking(move || variants::shrink(&original, AI_MAX_SIDE))
-            .await
-            .map_err(Error::internal)?;
+        let shrunk = self.decode_image(move || variants::shrink(&original, AI_MAX_SIDE)).await?;
         shrunk.map_err(|problem| {
             tracing::warn!(media_item_id = %item.id, problem, "cannot shrink an image for AI");
             unsupported_image()
