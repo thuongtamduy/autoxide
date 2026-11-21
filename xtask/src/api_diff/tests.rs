@@ -2,8 +2,8 @@ use serde_json::json;
 
 use super::*;
 
-fn today() -> NaiveDate {
-    NaiveDate::from_ymd_opt(2026, 11, 15).unwrap()
+fn today() -> Date {
+    Date::new(2026, 11, 15).unwrap()
 }
 
 /// Tài liệu một operation `method path`, kèm `components.schemas`.
