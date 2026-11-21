@@ -509,6 +509,10 @@ impl ComplianceService {
             updated_at: at,
         };
         let transaction = tenant.database().begin_write().await?;
+        if restrict {
+            // Cùng khoá với lệnh khôi phục của vụ khác trên cùng đích (xem `save_case`).
+            lock_target(&transaction, tenant, &row.target).await?;
+        }
         let saved = case::ActiveModel::from(row).insert(&transaction).await?;
         if let Some(checked) = claim
             && let Claim::Replay { .. } = checked
@@ -765,6 +769,12 @@ impl ComplianceService {
     ) -> Result<case::Model, Error> {
         after.updated_at = now();
         let transaction = tenant.database().begin_write().await?;
+        if restriction.is_some() {
+            // Khoá mọi vụ cùng đích trước khi xét "còn vụ khác đang ẩn" (D-181): hai vụ cùng ẩn
+            // một đích được khôi phục cùng lúc từng cùng thấy vụ kia còn ẩn trên Postgres, nên
+            // không bên nào phát `target_restored` — nội dung bị ẩn vĩnh viễn.
+            lock_target(&transaction, tenant, &after.target).await?;
+        }
         let result = case::Entity::update_many()
             .set(case::ActiveModel::from(after.clone()).reset_all())
             .filter(case::Column::TenantId.eq(tenant.id().as_uuid()))
@@ -820,7 +830,7 @@ impl ComplianceService {
         Ok(after)
     }
 
-    /// Còn vụ khác đang ẩn cùng đích không (thì không hiện lại).
+    /// Còn vụ khác đang ẩn cùng đích không (thì không hiện lại). Gọi sau [`lock_target`].
     async fn restricted_elsewhere<C: ConnectionTrait>(
         &self,
         connection: &C,
@@ -945,4 +955,22 @@ mod tests {
         assert_eq!(parse_target("content.entry:"), None);
         assert_eq!(parse_target("content.entry:a b"), None);
     }
+}
+
+/// Khoá mọi vụ của đích `target` tới hết `transaction` ghi, theo ID tăng dần (không deadlock).
+async fn lock_target(
+    transaction: &sea_orm::DatabaseTransaction,
+    tenant: &TenantContext,
+    target: &str,
+) -> Result<(), Error> {
+    if target.is_empty() {
+        return Ok(());
+    }
+    autoxide_kernel::rows::lock(
+        transaction,
+        case::Entity::find().scoped(tenant).filter(case::Column::Target.eq(target)),
+        case::Column::Id,
+    )
+    .await?;
+    Ok(())
 }
