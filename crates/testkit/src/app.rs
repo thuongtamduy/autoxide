@@ -286,8 +286,13 @@ impl TestApp {
 
     /// Như [`TestApp::mcp`], tới endpoint MCP ở `path` — vd `/mcp/notes`, endpoint riêng của một
     /// module.
+    ///
+    /// Nối xong thì gọi `server/discover` (như client bắt tay lúc nối): người gọi không vào được endpoint
+    /// (sai token, khách bị khoá…) thì lỗi ngay ở đây.
     pub async fn mcp_at(&self, token: &str, path: &str) -> Result<McpClient, TestAppError> {
-        Ok(McpClient::new(self.router.clone(), path, Some(token)))
+        let client = McpClient::new(self.router.clone(), path, Some(token));
+        client.discover().await.map_err(|e| fail("mcp", e))?;
+        Ok(client)
     }
 }
 
