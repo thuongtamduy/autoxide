@@ -1,4 +1,4 @@
-# Phát hành khi đẩy tag `vX.Y.Z` (D-078, D-175): kiểm tag khớp phiên bản trong Cargo.toml, chạy
+# Phát hành khi đẩy tag `vX.Y.Z` hay khi auto-release.yml gọi trên tag (D-078, D-175, D-20261121-auto-release): kiểm tag khớp phiên bản trong Cargo.toml, chạy
 # lại gate (chia nhiều máy, dùng chung gate.yml với ci.yml), build image Docker cho `linux/amd64` và `linux/arm64` trên máy build gốc của GitHub
 # (không giả lập), đăng lên GitHub Container Registry bằng `GITHUB_TOKEN`, đính kèm chứng thực
 # nguồn gốc build và SBOM đã ký, rồi tạo bản phát hành GitHub với ghi chú lấy từ CHANGELOG.md.
@@ -141,6 +141,10 @@ jobs:
 
   publish:
     needs: image
+    # Điều kiện mặc định (`success()`) bỏ qua job khi BẤT KỲ job nào phía trên trong chuỗi `needs` bị bỏ qua — kể cả
+    # `gate` bị bỏ qua có chủ đích khi dùng lại CI xanh (D-20261121-ci-batch-release-faster). v0.17.0 dính lỗi này:
+    # image build xong nhưng không gắn thẻ, không cập nhật trang Release. Chỉ cần `image` xanh.
+    if: ${{ !cancelled() && needs.image.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:

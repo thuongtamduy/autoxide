@@ -125,7 +125,7 @@ What the core contains, in build order (see [`docs/ROADMAP.md`](docs/ROADMAP.md)
 
 The same as the [Quickstart](#quickstart), step by step with plain `docker run` (works with every
 release): nothing to compile, SQLite inside a Docker volume. You need [Docker](https://docs.docker.com/get-docker/) and `openssl`. The
-image is about 630 MB on disk and the server is ready about a second after it starts.
+image is about 410 MB on disk and the server is ready about a second after it starts.
 
 ```bash
 # Two secrets, made up here and kept in a file (use the same ones on every start; never commit it)
@@ -133,7 +133,7 @@ printf 'AUTOXIDE_AUTH_TOKEN_SECRET=%s\nAUTOXIDE_SECRET_KEY=%s\n' \
   "$(openssl rand -base64 48 | tr -d '\n')" "$(openssl rand -base64 48 | tr -d '\n')" > autoxide.env
 chmod 600 autoxide.env
 
-IMAGE=ghcr.io/thuongtamduy/autoxide:0.15.0   # a release from the GitHub Releases page
+IMAGE=ghcr.io/thuongtamduy/autoxide:0.17.0   # a release from the GitHub Releases page
 RUN="docker run --rm --env-file autoxide.env -v autoxide-data:/var/lib/autoxide/data"
 
 # 1. Create the tables (the server will not start before this, and again after every update)

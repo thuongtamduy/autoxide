@@ -1,0 +1,65 @@
+# Tự phát hành khi PR phát hành đã vào `main` và CI của đúng commit đó xanh (D-20261121-auto-release).
+#
+# Chạy sau mỗi lần workflow CI (ci.yml) do push vào `main` kết thúc `success`. Đọc `version` trong Cargo.toml của
+# đúng commit vừa chạy CI; tag `vX.Y.Z` chưa có (và CHANGELOG.md có mục `## [X.Y.Z]`) thì tạo tag trên commit đó rồi
+# gọi workflow Release (release.yml) trên tag. Tag đã có (mọi lần push không đổi phiên bản) thì không làm gì.
+#
+# Vì sao phải gọi Release bằng tay: tag do `GITHUB_TOKEN` tạo không kích hoạt workflow nào theo `push: tags`
+# (GitHub chặn để tránh vòng lặp); riêng `workflow_dispatch` thì được phép. Release chạy trên tag nên đọc đúng
+# `github.ref_name` / `github.sha`, và job `ci-result` của nó thấy CI xanh của commit này nên bỏ qua gate.
+name: Auto release
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Hai lần CI xong gần nhau không cùng tạo một tag.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    if: >-
+      ${{ !github.event.repository.private
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      # Tạo tag.
+      contents: write
+      # Gọi workflow Release bằng `workflow_dispatch`.
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+      - name: Tag the release commit and start Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)"
+          tag="v$version"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists: nothing to release."
+            exit 0
+          fi
+          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
+            echo "::notice::Version $version has no section in CHANGELOG.md: not a release commit, no tag created."
+            exit 0
+          fi
+          # Tag có chú thích (annotated) như docs/RELEASING.md: đối tượng tag trước, rồi ref trỏ vào nó.
+          object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags" \
+            -f tag="$tag" -f message="Autoxide $tag" -f object="$SHA" -f type=commit --jq .sha)"
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f ref="refs/tags/$tag" -f sha="$object" >/dev/null
+          echo "Created tag $tag on $SHA."
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref "$tag"
+          echo "Started the Release workflow on $tag."
