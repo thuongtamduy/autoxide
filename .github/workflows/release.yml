@@ -141,6 +141,10 @@ jobs:
 
   publish:
     needs: image
+    # Điều kiện mặc định (`success()`) bỏ qua job khi BẤT KỲ job nào phía trên trong chuỗi `needs` bị bỏ qua — kể cả
+    # `gate` bị bỏ qua có chủ đích khi dùng lại CI xanh (D-20261121-ci-batch-release-faster). v0.17.0 dính lỗi này:
+    # image build xong nhưng không gắn thẻ, không cập nhật trang Release. Chỉ cần `image` xanh.
+    if: ${{ !cancelled() && needs.image.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     permissions:
