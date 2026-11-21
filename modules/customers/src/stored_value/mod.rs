@@ -255,6 +255,7 @@ impl CustomersService {
             return Ok((existing, None));
         }
         let row = gift_card::Entity::find_by_id(id)
+            .scoped(tenant)
             .one(&transaction)
             .await?
             .ok_or_else(|| Error::internal("new gift card vanished"))?;

@@ -239,3 +239,30 @@ async fn ma_cong_khai_cho_trang_san_pham() {
     .await
     .unwrap();
 }
+
+#[tokio::test]
+async fn evaluate_chi_trong_pham_vi_nut_ca_rest_va_mcp() {
+    TestDatabase::run(async |test| {
+        let setup = setup(test, true).await;
+        let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
+        running(&setup, body(setup.tree.a, json!({}))).await;
+        let cart = serde_json::to_value(setup.cart(&[(variant, 1)])).unwrap();
+        // Giỏ của cửa hàng A: A tính được, B thì không (REST và MCP cùng luật).
+        let (status, _) =
+            call(&setup.app, "POST", "/evaluate", "store_a", Some(cart.clone())).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, error) =
+            call(&setup.app, "POST", "/evaluate", "store_b", Some(cart.clone())).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{error}");
+        assert_eq!(error["code"], "org_out_of_scope");
+        let client = setup.app.mcp("store_b").await.unwrap();
+        let answer = client
+            .call_tool(tool("promotions.evaluate_cart", json!({"cart": cart})))
+            .await
+            .unwrap();
+        assert_eq!(answer.is_error, Some(true), "{answer:?}");
+        client.cancel().await.unwrap();
+    })
+    .await
+    .unwrap();
+}

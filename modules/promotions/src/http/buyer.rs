@@ -20,7 +20,6 @@ use uuid::Uuid;
 use validator::Validate;
 
 use crate::api::{Cart, Evaluation, Redemption, Voucher, VoucherStatus};
-use crate::evaluate::Options;
 use crate::http::dto::{LegalLimitDto, NoticeRuleDto};
 use crate::permissions::{PUBLISH, READ, USE};
 use crate::service::PromotionsService;
@@ -45,7 +44,7 @@ pub(crate) struct CartBody(pub Cart);
 
 /// Compute the promotions of a cart, without holding or changing anything.
 ///
-/// Requires `promotions.read`. The same computation `orders` uses: every discount shared out to
+/// Requires `promotions.read` covering the unit of the cart (`org_id`). The same computation `orders` uses: every discount shared out to
 /// the lines with a reason the buyer can read, gifts, codes and vouchers that do not apply (with
 /// reasons, the cart still works), and the `fingerprint` to send back when the order holds them.
 #[utoipa::path(
@@ -58,7 +57,7 @@ pub(crate) struct CartBody(pub Cart);
     responses(
         (status = 200, description = "The promotions of the cart.", body = Data<Evaluation>),
         (status = 401, description = "Not signed in; see `GET /api/v1/auth/me` for the codes.", body = Problem),
-        (status = 403, description = "Missing `promotions.read`; code `permission_denied`.", body = Problem),
+        (status = 403, description = "Missing `promotions.read` (`permission_denied`) or the unit of the cart is outside your scope (`org_out_of_scope`).", body = Problem),
         (status = 422, description = "The cart is invalid (see `errors`) or has too many codes (`promotions.too_many_codes`).", body = Problem),
     )
 )]
@@ -69,7 +68,7 @@ async fn evaluate(
     ValidJson(cart): ValidJson<CartBody>,
 ) -> Result<Data<Evaluation>, Error> {
     principal.require(&READ)?;
-    let outcome = service.evaluate_cart(&tenant, &cart.0, &Options::default()).await?;
+    let outcome = service.evaluate_for(&tenant, &principal, &cart.0).await?;
     Ok(Data { data: outcome.evaluation })
 }
 

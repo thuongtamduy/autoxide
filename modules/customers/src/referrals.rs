@@ -388,6 +388,7 @@ impl CustomersService {
             let (Some(promotion), Some(user)) = (
                 promotion,
                 profile::Entity::find_by_id(profile_id)
+                    .scoped(tenant)
                     .one(read)
                     .await?
                     .and_then(|profile| profile.user_id),
