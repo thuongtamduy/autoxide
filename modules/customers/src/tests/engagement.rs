@@ -203,6 +203,42 @@ async fn referral_rewarded_once_after_first_order_completed() {
 }
 
 #[tokio::test]
+async fn referral_reward_taken_back_when_qualifying_order_refunded_below_minimum() {
+    TestDatabase::run(async |test| {
+        let shop = shop(test).await;
+        with_referral_rule(&shop).await;
+        let (_, mine) = call(&shop, "GET", "/me/referral", "buyer2", None).await;
+        let code = mine["data"]["code"].as_str().unwrap().to_owned();
+        let (status, body) =
+            call(&shop, "POST", "/me/referral/apply", "buyer", Some(json!({"code": code}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{body}");
+        let order = Order::of(BUYER, shop.tree.a, 200_000);
+        shop.order_event(&order.placed()).await;
+        shop.order_event(&order.status("completed")).await;
+        drain(&shop).await;
+        // Hoàn một phần, đơn còn trên mức tối thiểu (100.000): thưởng giữ nguyên.
+        shop.order_event(&order.refunded(Uuid::now_v7(), 50_000)).await;
+        drain(&shop).await;
+        let (_, referrer) = call(&shop, "GET", "/me/points", "buyer2", None).await;
+        assert_eq!(referrer["data"]["balance"], 50, "{referrer}");
+        // Hoàn tiếp, còn 50.000 < mức tối thiểu: thu hồi thưởng hai bên; event tới lại không thu thêm.
+        let refund = order.refunded(Uuid::now_v7(), 100_000);
+        shop.order_event(&refund).await;
+        shop.order_event(&refund).await;
+        drain(&shop).await;
+        let (_, referrer) = call(&shop, "GET", "/me/points", "buyer2", None).await;
+        assert_eq!(referrer["data"]["balance"], 0, "{referrer}");
+        let (_, referee) = call(&shop, "GET", "/me/points", "buyer", None).await;
+        // Điểm tích của đơn (20) thu hồi theo tỉ lệ tiền hoàn: còn 20 − 5 − 10 = 5; thưởng 20 thu hết.
+        assert_eq!(referee["data"]["balance"], 5, "{referee}");
+        let (_, mine) = call(&shop, "GET", "/me/referral", "buyer2", None).await;
+        assert_eq!(mine["data"]["rewarded"], 0);
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
 async fn self_referral_same_phone_rejected() {
     TestDatabase::run(async |test| {
         let shop = shop(test).await;

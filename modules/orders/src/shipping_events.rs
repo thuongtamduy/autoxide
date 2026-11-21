@@ -160,6 +160,10 @@ impl OrdersService {
                     .scoped(tenant)
                     .one(&transaction)
                     .await?;
+                // Vận đơn không ứng với lần giao nào (đơn giao một lần, không chia): tiền COD hãng
+                // thu là cho cả đơn — khoản COD xong ngay lần đầu, nên event tới lại không còn khoản
+                // `pending` nào để cộng thêm.
+                let whole_order = delivery.is_none();
                 if let Some(delivery) = delivery {
                     if delivery.cod_collected_minor.is_some() {
                         return Ok(());
@@ -177,7 +181,7 @@ impl OrdersService {
                 let paid_minor = current.paid_minor + amount.minor();
                 let fully = paid_minor >= due;
                 let now = crate::service::now();
-                if fully {
+                if fully || whole_order {
                     let mut paid: payment::ActiveModel = row.into();
                     paid.status = Set(payments::SUCCEEDED.to_owned());
                     paid.succeeded_at = Set(Some(now));

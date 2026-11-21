@@ -353,6 +353,8 @@ impl CustomersService {
             if fact.status == COMPLETED {
                 // Phần đã cộng vào tổng chi: trừ lại (không trừ quá tiền hàng của đơn).
                 let counted = (fact.net_minor - fact.refunded_minor).max(0);
+                let net_after = (counted - amount.minor()).max(0);
+                self.revoke_referral(&transaction, tenant, &fact, net_after).await?;
                 let delta = amount.minor().min(counted);
                 if delta > 0 {
                     self.change_spent(

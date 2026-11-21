@@ -217,9 +217,10 @@ async fn gift_card_lookup_throttled_on_wrong_codes() {
         let (status, body) = lookup(&code).await;
         assert_eq!(status, StatusCode::TOO_MANY_REQUESTS, "{body}");
         assert_eq!(body["code"], "customers.lookup_throttled");
-        // Người khác không bị ảnh hưởng.
+        // Người khác không bị ảnh hưởng (thẻ khác: thẻ trên đã là của `buyer`).
+        let other = issue(&shop, 100_000, "POS-2").await["code"].as_str().unwrap().to_owned();
         let (status, _) =
-            call(&shop, "POST", "/me/gift-cards/attach", "buyer2", Some(json!({"code": code})))
+            call(&shop, "POST", "/me/gift-cards/attach", "buyer2", Some(json!({"code": other})))
                 .await;
         assert_eq!(status, StatusCode::OK);
     })
@@ -372,6 +373,44 @@ async fn store_credit_adjusted_by_staff_and_spent_once() {
         tender.release(&tenant, "orders:b").await.unwrap();
         let (_, mine) = call(&shop, "GET", "/me/store-credit", "buyer", None).await;
         assert_eq!(minor(&mine["data"]["balance"]), 20_000, "{mine}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn gift_card_attached_to_an_account_only_its_owner_can_spend() {
+    TestDatabase::run(async |test| {
+        let shop = shop_with(test, &[ON]).await;
+        let issued = issue(&shop, 300_000, "POS-OWN").await;
+        let code = issued["code"].as_str().unwrap().to_owned();
+        let hold = async |buyer: u128, reference: &str| {
+            shop.tender("gift_card")
+                .unwrap()
+                .hold(
+                    &shop.default_tenant(),
+                    reference,
+                    Some(Uuid::from_u128(buyer)),
+                    &json!({"code": code}),
+                    vnd(100_000),
+                    Timestamp::now() + SignedDuration::from_mins(30),
+                )
+                .await
+        };
+        // Chưa gắn chủ: ai có mã cũng dùng được (thẻ vô danh, như thẻ cào).
+        assert_eq!(hold(102, "orders:a").await.unwrap().minor(), 100_000);
+        let (status, body) =
+            call(&shop, "POST", "/me/gift-cards/attach", "buyer", Some(json!({"code": code})))
+                .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        let (status, body) =
+            call(&shop, "POST", "/me/gift-cards/attach", "buyer2", Some(json!({"code": code})))
+                .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+        // Đã gắn: người khác biết mã nhận lỗi như mã sai; chủ dùng được.
+        let error = hold(102, "orders:b").await.unwrap_err();
+        assert_eq!(error.code(), "customers.gift_card_not_found");
+        assert_eq!(hold(BUYER, "orders:c").await.unwrap().minor(), 100_000);
     })
     .await
     .unwrap();

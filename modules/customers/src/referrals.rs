@@ -25,6 +25,8 @@ use crate::service::{CustomersService, now};
 const PENDING: &str = "pending";
 const REWARDED: &str = "rewarded";
 const REJECTED: &str = "rejected";
+/// Đơn đủ điều kiện bị hoàn tới dưới mức tối thiểu: điểm thưởng đã thu hồi (phần chưa dùng).
+const REVOKED: &str = "revoked";
 /// Chữ dễ đọc, không nhập nhằng (bỏ 0/O, 1/I/L).
 const ALPHABET: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
@@ -313,6 +315,61 @@ impl CustomersService {
             )
             .await?;
         Ok(Some((row, rule)))
+    }
+
+    /// Đơn đủ điều kiện `fact` vừa được hoàn (trong transaction của `facts`; `net_after`: tiền hàng
+    /// còn lại sau lần hoàn): tụt dưới mức tối thiểu của quy tắc lúc thưởng → `revoked` và thu hồi
+    /// điểm thưởng hai bên (phần chưa dùng, như hoàn tiền thu hồi điểm tích của đơn). Voucher đã cấp
+    /// không thu hồi ở đây. Gọi lại (event giao lại) không thu thêm: chỉ dòng còn `rewarded` đổi.
+    pub(crate) async fn revoke_referral<C: ConnectionTrait>(
+        &self,
+        connection: &C,
+        tenant: &TenantContext,
+        fact: &order_fact::Model,
+        net_after: i64,
+    ) -> Result<(), Error> {
+        let Some(row) = referral::Entity::find()
+            .filter(referral::Column::QualifyingOrderId.eq(fact.order_id))
+            .filter(referral::Column::Status.eq(REWARDED))
+            .scoped(tenant)
+            .one(connection)
+            .await?
+        else {
+            return Ok(());
+        };
+        let rule = referral_rule::Entity::find()
+            .filter(referral_rule::Column::EffectiveFrom.lte(row.updated_at))
+            .scoped(tenant)
+            .order_by_desc(referral_rule::Column::EffectiveFrom)
+            .one(connection)
+            .await?;
+        let minimum = rule.map_or(1, |rule| Ord::max(rule.min_first_order_minor, 1));
+        if net_after >= minimum {
+            return Ok(());
+        }
+        let changed = referral::Entity::update_many()
+            .col_expr(referral::Column::Status, Expr::value(REVOKED))
+            .col_expr(referral::Column::UpdatedAt, Expr::value(now()))
+            .filter(referral::Column::Id.eq(row.id))
+            .filter(referral::Column::Status.eq(REWARDED))
+            .scoped(tenant)
+            .exec(connection)
+            .await?
+            .rows_affected;
+        if changed == 0 {
+            return Ok(());
+        }
+        for side in ["referrer", "referee"] {
+            self.take_back(
+                connection,
+                tenant,
+                &format!("referral:{}:{side}", row.id),
+                |lot| lot.earned,
+                &format!("referral:{}:{side}:revoked", row.id),
+            )
+            .await?;
+        }
+        Ok(())
     }
 
     /// Voucher thưởng giới thiệu (sau commit, ngoài transaction ghi).

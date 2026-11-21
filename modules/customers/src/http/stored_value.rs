@@ -266,7 +266,8 @@ pub(crate) async fn my_gift_cards(
 
 /// Attach a gift card to your account.
 ///
-/// Any signed-in buyer, when gift cards are on. The card still works only in this shop.
+/// Any signed-in buyer, when gift cards are on. The card still works only in this shop, and from
+/// then on only for your account; a card attached to another account answers like a wrong code.
 #[utoipa::path(
     post, path = "/me/gift-cards/attach", extensions(("x-permissions" = json!([]))),
     operation_id = "attach_my_gift_card", security(("bearer" = [])), request_body = GiftCardCodeRequest,
