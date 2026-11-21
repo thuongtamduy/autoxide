@@ -60,7 +60,8 @@ pub(crate) const AVIF: Setting = Setting::new(
     "Also make an AVIF copy of every smaller copy of an image (`true` or `false`), in the \
      background after upload; it is usually a third smaller than the WebP copy but takes seconds \
      of CPU per image. Websites ask for it with `format=avif`. Turning it off keeps the AVIF \
-     copies already made.",
+     copies already made. Needs a server built with the `avif` cargo feature \
+     (`cargo build --release --features avif`); the default build has no AVIF encoder.",
 )
 .with_default("false");
 
@@ -185,6 +186,13 @@ impl MediaConfig {
             }
         });
         let avif = reader.get_with(&AVIF, |raw| match raw.trim() {
+            // Bộ mã hoá AVIF (`rav1e`) chỉ có trong bản build bật feature `avif` (D-20261121-avif-feature):
+            // bật cấu hình trên bản không có thì báo ngay lúc khởi động, không để job hỏng âm thầm.
+            "true" if !cfg!(feature = "avif") => Err(
+                "is `true`, but this server was built without the `avif` feature; build it with \
+                 `cargo build --release --features avif`, or set `false`"
+                    .to_owned(),
+            ),
             "true" => Ok(true),
             "false" => Ok(false),
             _ => Err("must be `true` or `false`".to_owned()),
@@ -282,6 +290,18 @@ mod tests {
         let mut reader = ConfigReader::new(&source);
         let config = MediaConfig::read(&mut reader);
         reader.finish(config).map(|(config, _)| config).map_err(|errors| errors.to_string())
+    }
+
+    #[test]
+    fn avif_can_ban_build_co_feature() {
+        let on = read(&[("AUTOXIDE_MEDIA_AVIF", "true")]);
+        if cfg!(feature = "avif") {
+            assert!(on.unwrap().avif);
+        } else {
+            let error = on.unwrap_err();
+            assert!(error.contains("--features avif"), "{error}");
+        }
+        assert!(!read(&[("AUTOXIDE_MEDIA_AVIF", "false")]).unwrap().avif);
     }
 
     #[test]
