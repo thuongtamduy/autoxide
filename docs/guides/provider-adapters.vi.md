@@ -56,7 +56,9 @@ Trả chúng từ `Module::tenant_settings`. Khách quản lý bằng API đã c
 | Thử kết nối | `POST /api/v1/kernel/settings/{name}/test` | `kernel.test_connection` |
 | Xem địa chỉ webhook | `GET /api/v1/kernel/connections/webhooks` | `kernel.list_connection_webhooks` |
 
-Tất cả cần permission `kernel.settings.manage`, thuộc loại nhạy cảm.
+Tất cả cần permission `kernel.settings.manage`, thuộc loại nhạy cảm. Đặt hay bỏ một cấu hình nhóm
+`connection` còn cần lần đăng nhập gần đây (không thì `step_up_required`), vì nó đổi nơi tiền hay dữ liệu
+đi; mọi thay đổi có trong audit log, chỉ ghi tên.
 
 Cấu hình chứa địa chỉ do khách chọn phải được kiểm lúc lưu (`.checked(…)` với
 `autoxide_kernel::net::check_target_url`) và client phải dùng `Target::TenantChosen`, để máy chủ chỉ kết
@@ -150,6 +152,29 @@ Route nhận là `POST /api/v1/ledger/webhooks/{provider}/{hook}` (cổng thanh 
 `POST /api/v1/ledger/bank-feeds/{provider}/{hook}` (nguồn biến động số dư). Module nhận loại webhook
 khác thêm một route cùng dạng và tìm khách bằng `ProviderAccounts::resolve_webhook`.
 
+### Địa chỉ webhook trong request
+
+Có nhà cung cấp đòi địa chỉ trong từng request (`ipnUrl`, `CallbackUrl`). Lấy địa chỉ đầy đủ của khách
+bằng `ProviderAccounts::webhook_url(&tenant, path)`: nó ghép từ `AUTOXIDE_HTTP_PUBLIC_URL` của máy chủ và
+lỗi `public_url_missing` khi chưa đặt. Không bao giờ ghép từ header `Host` của request.
+`ProviderAccounts::webhook_token(&tenant, path)` chỉ trả đoạn cuối.
+
+### Tài khoản thử (sandbox)
+
+Tài khoản thử của nhà cung cấp thường chỉ chạy với địa chỉ sandbox của họ. Khi nhà cung cấp có sandbox,
+khai một cấu hình theo khách `<module>.connection.<loại>.environment` kiểm bằng `Environment::check`
+(`production`, mặc định, hay `sandbox`), và hai cấu hình của người vận hành `AUTOXIDE_<TÊN>_API_URL` và
+`AUTOXIDE_<TÊN>_SANDBOX_API_URL`. Khách chọn giữa hai địa chỉ cố định bằng `Environment::pick`; khách
+không bao giờ tự nhập địa chỉ. Khách sandbox của kernel thì không tới được bộ nối thật: kernel đưa cho
+nó các đối tác giả lập.
+
+## Bộ nối vận chuyển dùng tài khoản hãng của `shipping`
+
+Bộ nối vận chuyển thì khác: module `shipping` đã giữ tài khoản hãng theo khách (nhiều tài khoản mỗi
+khách, credential mã hoá), và `ShippingCarrier` nhận tài khoản trong từng lời gọi. Bộ nối loại này không
+khai cấu hình `connection`, không khai `ConnectionProbe` — tài khoản được thử bằng
+`ShippingCarrier::check` — và chỉ dùng `http_client`, `send`, các hàm chữ ký và các hàm webhook ở trên.
+
 ## 5. Test không ra mạng
 
 ```rust
@@ -177,6 +202,15 @@ hai khách hai tài khoản không bao giờ lẫn nhau.
 
 ## 6. Đăng ký và viết tài liệu
 
-- Thêm module vào `crates/app/src/modules.rs`, trước module dùng hợp đồng.
+- Thêm module vào `crates/app/src/modules.rs`, trước module dùng hợp đồng, và crate của nó vào
+  `Cargo.toml` và `crates/app/Cargo.toml`.
+- Cài `Module::description`, `Module::stability` (`Stability::Experimental` cho tới khi bộ nối chạy với
+  dịch vụ thật) và `Module::depends_on` (những gì `start` đòi).
+- Thêm tên module vào danh sách thử nghiệm ở `crates/app/src/e2e/module_selection.rs`, một dòng vào bảng
+  ở `docs/MODULES.md` và `docs/MODULES.vi.md`, và tên nó vào danh sách module kỳ vọng ở
+  `crates/app/tests/integration/cli.rs`.
+- Test cần module khác (`ledger`, `invoices`, `shipping`…) đặt ở `crates/app/src/e2e/`; test của chính
+  module không được gọi `module()` của module khác.
+- Ghi trong hướng dẫn của bộ nối cách bật: `AUTOXIDE_MODULES=official,<tên>`.
 - Thêm `locales/vi.json` cho mọi mã lỗi của bộ nối.
 - Thêm một mảnh changelog và, với tính năng tuân thủ, căn cứ pháp lý trong một quyết định.
