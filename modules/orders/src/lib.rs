@@ -193,6 +193,7 @@ impl Module for OrdersModule {
         context.provide::<dyn api::OrderHolds>(service.clone())?;
         context.provide::<dyn api::OrderRefunds>(service.clone())?;
         context.provide::<dyn api::OrderLookups>(service.clone())?;
+        context.provide::<dyn autoxide_kernel::sms::VerifiedPhoneTokens>(service.clone())?;
         // Trả lời tự động về trạng thái đơn cho `support` (D-230), khi có `support`.
         if let Ok(facts) = context.require::<dyn autoxide_support::api::SupportFacts>() {
             facts.attach(Arc::new(facts::OrderFacts::new(context.translations().clone())))?;

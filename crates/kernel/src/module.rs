@@ -33,11 +33,13 @@ use crate::i18n::Translations;
 use crate::job::{JobQueue, JobRegistration, Schedule};
 use crate::privacy::{PersonalData, PersonalDataExport};
 
+mod later;
 pub mod navigation;
 mod registry;
 
 mod selection;
 
+pub use later::Later;
 pub use registry::{ModuleError, Modules};
 pub(crate) use selection::inactive_with_tenant_data;
 pub use selection::{DormantModule, InactiveModule, MODULES, Selection, SelectionError, Stability};
@@ -767,6 +769,17 @@ impl StartContext<'_> {
         self.apis.require(self.module)
     }
 
+    /// Tay cầm tới trait `T` mà một module bất kỳ công bố — kể cả module đăng ký SAU (D-20261122-late-apis).
+    /// Kernel điền sau khi mọi module khởi động; đọc bằng [`Later::get`] lúc phục vụ, không trong
+    /// `start`. Không module nào công bố (tắt, chưa cài) → `None`. Dùng khi `require` không được vì
+    /// thứ tự đăng ký, vd `auth` hỏi `orders`: `let phones = context.later::<dyn VerifiedPhoneTokens>();`
+    pub fn later<T>(&mut self) -> Later<T>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        self.apis.later()
+    }
+
     /// Góp một bộ cài đặt cho trait mà NHIỀU module cùng cung cấp (bước 36), vd mỗi module bộ nối
     /// đối tác góp một `dyn PaymentGateway`: `context.contribute::<dyn PaymentGateway>(Arc::new(vnpay))?`.
     /// Khác [`provide`](Self::provide) (đúng một bên công bố): bao nhiêu module góp cũng được, mỗi
@@ -839,7 +852,12 @@ struct Apis {
     required: std::sync::Mutex<BTreeSet<(&'static str, &'static str)>>,
     /// Trait nhiều bên cùng góp (`contribute`): theo kiểu, danh sách `(module, Arc<T>)` theo thứ tự góp.
     contributed: HashMap<TypeId, Vec<Contribution>>,
+    /// Việc điền các tay cầm [`Later`], chạy một lần sau khi mọi module khởi động.
+    pending: Vec<PendingFill>,
 }
+
+/// Một lần điền tay cầm [`Later`]: nhận sổ trait đã đủ.
+type PendingFill = Box<dyn FnOnce(&Apis) + Send + Sync>;
 
 impl Apis {
     fn provide<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>
@@ -855,6 +873,23 @@ impl Apis {
         }
         self.provided.insert(TypeId::of::<T>(), (module, Box::new(api)));
         Ok(())
+    }
+
+    fn later<T>(&mut self) -> Later<T>
+    where
+        T: ?Sized + Send + Sync + 'static,
+    {
+        let later = Later::empty();
+        let slot = later.clone();
+        self.pending.push(Box::new(move |apis: &Apis| slot.fill(apis.get::<T>())));
+        later
+    }
+
+    /// Điền mọi tay cầm [`Later`] đã phát (gọi sau khi mọi module khởi động).
+    fn fill_later(&mut self) {
+        for fill in std::mem::take(&mut self.pending) {
+            fill(self);
+        }
     }
 
     fn contribute<T>(&mut self, module: &'static str, api: Arc<T>) -> Result<(), Error>

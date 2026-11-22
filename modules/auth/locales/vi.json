@@ -257,5 +257,9 @@
   "text:The identity provider deleted a SCIM group; its mapping rules went with it.": "Hệ thống danh tính xoá một nhóm SCIM; các luật ánh xạ của nó bị xoá theo.",
   "text:A rule now gives the members of a SCIM group a role at a unit (`after`: rule id, group, unit, role).": "Một luật cho thành viên của nhóm SCIM giữ một role ở một nút (`after`: id luật, nhóm, nút, role).",
   "text:A rule from a SCIM group to a role at a unit was removed (`before`: rule id, group, unit, role).": "Một luật từ nhóm SCIM sang role ở nút bị gỡ (`before`: id luật, nhóm, nút, role).",
-  "text:Map the SCIM group {group} to roles; its members get no roles from it yet": "Hãy ánh xạ nhóm SCIM {group} sang role; thành viên của nó chưa nhận role nào từ nhóm"
+  "text:Map the SCIM group {group} to roles; its members get no roles from it yet": "Hãy ánh xạ nhóm SCIM {group} sang role; thành viên của nó chưa nhận role nào từ nhóm",
+  "auth.phone_signup_unavailable": "Máy chủ này không có module cấp token xác thực số điện thoại (như tra đơn hàng).",
+  "auth.phone_taken": "Số điện thoại này đã có tài khoản. Hãy đăng nhập bằng mã gửi tới số đó.",
+  "auth.phone_signup_throttled": "Đã tạo quá nhiều tài khoản từ địa chỉ này. Thử lại sau {retry_after} giây.",
+  "field:is not valid or has expired; look the order up again": "không hợp lệ hoặc đã hết hạn; hãy tra lại đơn hàng"
 }

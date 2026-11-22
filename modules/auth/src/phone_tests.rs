@@ -197,3 +197,100 @@ async fn xac_nhan_lai_bang_ma_cua_dung_so() {
     .await
     .unwrap();
 }
+
+/// Bộ cấp token giả (thay `orders`): token `good-<số>` là số đã xác thực, token khác là hết hạn.
+struct FakeTokens;
+
+#[async_trait::async_trait]
+impl autoxide_kernel::sms::VerifiedPhoneTokens for FakeTokens {
+    async fn verified_phone(
+        &self,
+        _: &TenantContext,
+        token: &str,
+    ) -> Result<Option<PhoneNumber>, Error> {
+        Ok(token.strip_prefix("good-").and_then(|phone| PhoneNumber::parse(phone, "84")))
+    }
+}
+
+async fn with_tokens(test: &TestDatabase) -> (TestApp, Arc<FakeCodes>) {
+    let tokens: Arc<dyn autoxide_kernel::sms::VerifiedPhoneTokens> = Arc::new(FakeTokens);
+    let (app, _) = crate::http::test_support::app_built(test, false, |builder| {
+        builder.provide::<dyn autoxide_kernel::sms::VerifiedPhoneTokens>(tokens)
+    })
+    .await;
+    let codes = Arc::new(FakeCodes::default());
+    app.api::<dyn AuthExtensions>().unwrap().set_phone_codes(codes.clone()).unwrap();
+    (app, codes)
+}
+
+async fn sign_up(app: &TestApp, token: &str, name: Option<&str>) -> (StatusCode, Value) {
+    let body = json!({"lookup_token": token, "name": name});
+    let (status, _, answer) = call(app, "POST", "/phone-signups", None, Some(body)).await;
+    (status, answer)
+}
+
+#[tokio::test]
+async fn tao_tai_khoan_tu_token_xem_don_roi_dang_nhap_bang_ma() {
+    TestDatabase::run(async |test| {
+        let (app, codes) = with_tokens(test).await;
+        let (status, created) = sign_up(&app, "good-0912345678", Some("Lan")).await;
+        assert_eq!(status, StatusCode::CREATED, "{created}");
+        let account = me(&app, &created).await;
+        assert_eq!(
+            (
+                account["email"].as_str(),
+                account["name"].as_str(),
+                account["has_password"].as_bool()
+            ),
+            (Some(""), Some("Lan"), Some(false)),
+            "{account}"
+        );
+        // Số được ghi là số đã xác thực của tài khoản.
+        assert_eq!(
+            codes.recorded.lock().unwrap().clone(),
+            vec![(account["id"].as_str().unwrap().parse().unwrap(), "+84912345678".to_owned())]
+        );
+        // Lần sau đăng nhập bằng mã SMS vào đúng tài khoản đó (không cần mật khẩu).
+        let (status, again) = login(&app, "0912345678", None).await;
+        assert_eq!(status, StatusCode::OK, "{again}");
+        assert_eq!(me(&app, &again).await["id"], account["id"]);
+        // Số đã có tài khoản: 409, không đăng nhập hộ.
+        let (status, taken) = sign_up(&app, "good-+84912345678", None).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{taken}");
+        assert_eq!(taken["code"], "auth.phone_taken");
+        // Token hỏng hay hết hạn: lỗi của ô `lookup_token`.
+        let (status, bad) = sign_up(&app, "expired", None).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{bad}");
+        assert_eq!(bad["errors"][0]["field"], "lookup_token", "{bad}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn hai_lan_tao_dong_thoi_tu_cung_token_chi_mot_tai_khoan() {
+    TestDatabase::run(async |test| {
+        let (app, _) = with_tokens(test).await;
+        let ((a, left), (b, right)) = tokio::join!(
+            sign_up(&app, "good-0912000222", None),
+            sign_up(&app, "good-0912000222", None),
+        );
+        let mut statuses = [a, b];
+        statuses.sort();
+        assert_eq!(statuses, [StatusCode::CREATED, StatusCode::CONFLICT], "{left} {right}");
+    })
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+async fn khong_co_module_cap_token_thi_503() {
+    TestDatabase::run(async |test| {
+        let (app, _) = plugged(test).await;
+        let (status, answer) = sign_up(&app, "good-0912345678", None).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{answer}");
+        assert_eq!(answer["code"], "auth.phone_signup_unavailable");
+    })
+    .await
+    .unwrap();
+}
