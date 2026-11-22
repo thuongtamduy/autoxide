@@ -74,7 +74,7 @@ curl -X PUT https://your-server/api/v1/kernel/settings/esms.connection.sms.api_k
 | `esms.connection.sms.api_key` | có | ApiKey |
 | `esms.connection.sms.secret_key` | có | SecretKey |
 | `esms.connection.sms.brandname` | không | brandname đã đăng ký |
-| `esms.connection.sms.sandbox` | không | `true` để dùng môi trường test của eSMS: không tin nào về máy, không trừ tiền. Không đặt hoặc `false`: gửi thật. |
+| `esms.connection.sms.environment` | không | `sandbox` để dùng môi trường test của eSMS: không tin nào về máy, không trừ tiền. Không đặt hoặc `production`: gửi thật. |
 
 `GET /api/v1/kernel/settings?group=connection` cho biết trường nào đã đặt, kết nối được dùng lần cuối
 khi nào và lỗi cuối của nó.
@@ -88,7 +88,11 @@ curl -X POST https://your-server/api/v1/kernel/settings/esms.connection.sms.api_
 
 Lời gọi này hỏi eSMS số dư tài khoản (số dư không được trả ra). `"ok": true` nghĩa là ApiKey và
 SecretKey được nhận. Nó không kiểm brandname hay mẫu tin: muốn kiểm, đặt
-`esms.connection.sms.sandbox` thành `true`, cho gửi một mã, rồi đọc lỗi cuối của kết nối.
+`esms.connection.sms.environment` thành `sandbox`, cho gửi một mã, rồi đọc lỗi cuối của kết nối.
+
+eSMS không có địa chỉ sandbox hay tài khoản sandbox riêng: môi trường test là cùng API và cùng
+ApiKey / SecretKey, kèm cờ `Sandbox` mà bộ nối thêm vào từng request. Đặt lại cấu hình thành
+`production` (hoặc bỏ nó) để gửi thật.
 
 ## Webhook
 

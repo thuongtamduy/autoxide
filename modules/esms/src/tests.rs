@@ -169,7 +169,7 @@ async fn gui_dung_tai_lieu_va_hai_khach_khong_lan_tai_khoan() {
             [
                 ("esms.connection.sms.api_key".to_owned(), true, true),
                 ("esms.connection.sms.brandname".to_owned(), false, true),
-                ("esms.connection.sms.sandbox".to_owned(), false, false),
+                ("esms.connection.sms.environment".to_owned(), false, false),
                 ("esms.connection.sms.secret_key".to_owned(), true, true),
             ]
         );
@@ -198,9 +198,9 @@ async fn khach_chua_cau_hinh_bao_loi_ro_va_khong_dung_tai_khoan_khach_khac() {
         assert!(error.message().contains("esms.connection.sms.brandname"), "{}", error.message());
         assert!(fx.server.take_requests().is_empty());
 
-        // Brandname rỗng và cờ sandbox sai bị từ chối lúc lưu.
+        // Brandname rỗng và môi trường lạ bị từ chối lúc lưu.
         for (name, value) in
-            [("esms.connection.sms.brandname", "   "), ("esms.connection.sms.sandbox", "yes")]
+            [("esms.connection.sms.brandname", "   "), ("esms.connection.sms.environment", "test")]
         {
             let answer = fx
                 .app
@@ -350,12 +350,13 @@ async fn gui_lai_cung_reference_khong_thanh_tin_thu_hai() {
 }
 
 #[tokio::test]
-async fn sandbox_cua_khach_gui_truong_sandbox() {
+async fn moi_truong_sandbox_cua_khach_gui_truong_sandbox() {
     TestDatabase::run(async |test| {
         let fx = fixture(test).await;
         fx.account("one", "Baotrixemay").await;
         fx.account("two", "ShopHai").await;
-        fx.set("one-admin", "esms.connection.sms.sandbox", "true").await;
+        fx.set("one-admin", "esms.connection.sms.environment", "sandbox").await;
+        fx.set("two-admin", "esms.connection.sms.environment", "production").await;
 
         fx.accepted("a");
         fx.accepted("b");

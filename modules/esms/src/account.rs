@@ -2,7 +2,7 @@
 //! (D-20261121-provider-accounts). Khách đặt bằng `PUT /api/v1/kernel/settings/{name}`.
 
 use autoxide_kernel::error::{Error, FieldError};
-use autoxide_kernel::provider::ProviderAccounts;
+use autoxide_kernel::provider::{Environment, ProviderAccounts};
 use autoxide_kernel::tenancy::{CONNECTION_GROUP, SettingValue, TenantContext, TenantSetting};
 
 /// Kết nối mà bốn cấu hình dưới thuộc về (tên của `ConnectionProbe` và của trạng thái lần dùng cuối).
@@ -30,13 +30,17 @@ pub(crate) const BRANDNAME: TenantSetting = TenantSetting::new(
 .group(CONNECTION_GROUP)
 .checked(check_brandname);
 
-pub(crate) const SANDBOX: TenantSetting = TenantSetting::new(
-    "esms.connection.sms.sandbox",
-    "`true`: messages go to the eSMS test environment — the account and parameters are checked, \
-     nothing is delivered and nothing is charged. `false` or unset: messages are really sent.",
+// Quy ước chung của mọi bộ nối (D-20261122-provider-environments). eSMS không có host sandbox riêng:
+// môi trường thử là trường `Sandbox` trong thân request tới cùng một địa chỉ, nên ở đây môi trường
+// chỉ bật trường đó, không chọn địa chỉ.
+pub(crate) const ENVIRONMENT: TenantSetting = TenantSetting::new(
+    "esms.connection.sms.environment",
+    "`sandbox`: messages go to the eSMS test environment — the account and parameters are \
+     checked, nothing is delivered and nothing is charged. `production` or unset: messages are \
+     really sent.",
 )
 .group(CONNECTION_GROUP)
-.checked(check_flag);
+.checked(Environment::check);
 
 fn check_brandname(raw: &str) -> Result<(), FieldError> {
     let length = raw.trim().chars().count();
@@ -47,19 +51,12 @@ fn check_brandname(raw: &str) -> Result<(), FieldError> {
     }
 }
 
-fn check_flag(raw: &str) -> Result<(), FieldError> {
-    match raw {
-        "true" | "false" => Ok(()),
-        _ => Err(FieldError::new("value", "invalid", "must be `true` or `false`")),
-    }
-}
-
 /// Tài khoản đã đọc của một khách. Không `Debug`: có secret.
 pub(crate) struct Account {
     pub api_key: SettingValue,
     pub secret_key: SettingValue,
     pub brandname: String,
-    pub sandbox: bool,
+    pub environment: Environment,
 }
 
 impl Account {
@@ -72,8 +69,11 @@ impl Account {
         let api_key = accounts.require(tenant, &API_KEY).await?;
         let secret_key = accounts.require(tenant, &SECRET_KEY).await?;
         let brandname = accounts.require(tenant, &BRANDNAME).await?.as_str().trim().to_owned();
-        let sandbox =
-            accounts.get(tenant, &SANDBOX).await?.is_some_and(|value| value.as_str() == "true");
-        Ok(Account { api_key, secret_key, brandname, sandbox })
+        // Giá trị đã được kiểm lúc lưu; giá trị lạ (không thể có) coi như gửi thật thì nguy hiểm hơn
+        // là báo lỗi, nên báo lỗi cấu hình.
+        let stored = accounts.get(tenant, &ENVIRONMENT).await?;
+        let environment = Environment::parse(stored.as_ref().map(|value| value.as_str()))
+            .ok_or_else(|| autoxide_kernel::provider::not_configured(ENVIRONMENT.name()))?;
+        Ok(Account { api_key, secret_key, brandname, environment })
     }
 }
