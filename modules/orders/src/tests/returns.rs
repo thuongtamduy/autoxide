@@ -171,14 +171,12 @@ async fn partial_return_refunds_proportionally_restocks_and_reverses_revenue() {
 
         // Bút toán của lượt hoàn: trả tiền và đảo doanh thu, mỗi bút toán Nợ = Có = 100.000.
         let refund_id = refunds[0]["id"].as_str().unwrap();
-        let entries = shop.ledger.entries.lock().unwrap().clone();
+        let entries = shop.ledger.entries();
         for suffix in ["paid", "revenue"] {
             let reference = format!("orders:{id}:refund:{refund_id}:{suffix}");
-            let posted: Vec<_> = entries.iter().filter(|(r, _)| *r == reference).collect();
+            let posted: Vec<_> = entries.iter().filter(|e| e.reference == reference).collect();
             assert_eq!(posted.len(), 1, "{reference}");
-            let side = |wanted: Side| -> i64 {
-                posted[0].1.iter().filter(|l| l.1 == wanted).map(|l| l.2).sum()
-            };
+            let side = |wanted: Side| posted[0].total(wanted);
             assert_eq!((side(Side::Debit), side(Side::Credit)), (100_000, 100_000), "{suffix}");
         }
         // Đã hoàn xong: không còn hoãn, đơn hoàn tất.
@@ -249,7 +247,7 @@ async fn concurrent_refunds_never_exceed_what_was_paid() {
         let (status, placed) = checkout(&buyer, Some("pay"), body(&cart, &quote, "card")).await;
         assert_eq!(status, StatusCode::CREATED, "{placed}");
         let id: Uuid = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
-        let payment = shop.ledger.payments.lock().unwrap().last().cloned().unwrap();
+        let payment = shop.ledger.last_payment().unwrap();
         emit(&shop, &PaymentSucceeded(json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount}))).await;
         drain(&shop).await;
         let paid = payment.amount.minor();
@@ -286,7 +284,7 @@ async fn concurrent_refunds_never_exceed_what_was_paid() {
             )
             .await;
         assert_eq!(status, StatusCode::OK);
-        let refunded: i64 = shop.ledger.refunds.lock().unwrap().iter().map(|r| r.1).sum();
+        let refunded: i64 = super::refund_rows(&shop.ledger).iter().map(|r| r.1).sum();
         assert!(refunded <= paid);
         assert_eq!(refunded, quarter * 4);
         // Không có `orders.refund`: 403.

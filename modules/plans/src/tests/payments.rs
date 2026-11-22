@@ -5,12 +5,13 @@
 use std::sync::Arc;
 
 use autoxide_kernel::money::Money;
+use autoxide_kernel::tenancy::TenantContext;
+use autoxide_ledger::api::testing::{FakeLedger, FakeLedgerModule};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::Method;
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use super::fake_ledger::{FakeLedgerModule, succeed};
 use super::lifecycle::{ok, priced, sql, tick};
 
 async fn app(test: &TestDatabase, ledger: FakeLedgerModule) -> TestApp {
@@ -26,6 +27,16 @@ async fn app(test: &TestDatabase, ledger: FakeLedgerModule) -> TestApp {
         .unwrap()
 }
 
+/// `ledger.payment_succeeded` của kỳ `period` với số thực thu `amount` (lượt thu không qua sổ giả:
+/// `plans` nhận kỳ qua `source_id`). Chưa giao: cần chạy dispatcher.
+async fn succeed(ledger: &FakeLedger, tenant: &TenantContext, period: Uuid, amount: Money) {
+    let payload = json!({
+        "payment_id": Uuid::now_v7(), "source_module": "plans", "source_id": period.to_string(),
+        "provider_ref": format!("ref-{}", amount.minor()), "amount": amount,
+    });
+    ledger.record_payment_succeeded(tenant, payload).await.unwrap();
+}
+
 async fn renewal(app: &TestApp) -> Value {
     let periods = ok(app, Method::GET, "/plans/billing-periods", "owner", None).await;
     periods["data"].as_array().unwrap().iter().find(|p| p["kind"] == "renewal").unwrap().clone()
@@ -39,9 +50,8 @@ async fn deliver(app: &TestApp) {
 #[tokio::test]
 async fn thu_thieu_khong_danh_dau_ky_da_tra() {
     TestDatabase::run(async |test| {
-        let ledger = FakeLedgerModule::default();
-        let outbox = Arc::clone(&ledger.outbox);
-        let app = app(test, ledger).await;
+        let ledger = Arc::new(FakeLedger::new());
+        let app = app(test, ledger.module()).await;
         let pro = priced(&app, "pro", 199_000, 0).await;
         let tenant = app.tenant("acme").await.unwrap().id();
         let body = json!({"plan_id": pro.0, "price_id": pro.1, "trial": false});
@@ -56,16 +66,16 @@ async fn thu_thieu_khong_danh_dau_ky_da_tra() {
         let operator = app.default_tenant();
 
         // Thu thiếu (đối soát chấp nhận số thực nhận): kỳ vẫn mở.
-        succeed(&outbox, &operator, id, Money::parse("150000", "VND").unwrap()).await;
+        succeed(&ledger, &operator, id, Money::parse("150000", "VND").unwrap()).await;
         deliver(&app).await;
         assert_eq!(renewal(&app).await["status"], "open");
         // Khác loại tiền: không coi là đủ.
-        succeed(&outbox, &operator, id, Money::parse("199000", "USD").unwrap()).await;
+        succeed(&ledger, &operator, id, Money::parse("199000", "USD").unwrap()).await;
         deliver(&app).await;
         assert_eq!(renewal(&app).await["status"], "open");
 
         // Thu đủ: đã trả.
-        succeed(&outbox, &operator, id, Money::parse("199000", "VND").unwrap()).await;
+        succeed(&ledger, &operator, id, Money::parse("199000", "VND").unwrap()).await;
         deliver(&app).await;
         let paid = renewal(&app).await;
         assert_eq!(paid["status"], "paid", "{paid}");

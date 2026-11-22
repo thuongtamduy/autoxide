@@ -7,7 +7,6 @@ mod advance;
 mod buyer_keys;
 mod carts;
 mod checkout;
-mod fake_ledger;
 mod fakes;
 mod guests;
 mod invoices_pos;
@@ -21,8 +20,17 @@ mod statements;
 mod tenders;
 mod warranty_fields;
 
-pub(crate) use fake_ledger::FakeLedger;
+pub(crate) use autoxide_ledger::api::testing::FakeLedger;
 pub(crate) use fakes::{FakeInventory, FakePromotions};
+
+/// Lượt hoàn sổ cái giả đã nhận: (ID thanh toán, số tiền, lý do).
+pub(crate) fn refund_rows(ledger: &FakeLedger) -> Vec<(Uuid, i64, String)> {
+    ledger
+        .refunds()
+        .into_iter()
+        .map(|refund| (refund.payment_id, refund.amount.minor(), refund.reason))
+        .collect()
+}
 
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;

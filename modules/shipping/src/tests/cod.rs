@@ -9,7 +9,7 @@ use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::{AccountKey, Counterparty, Ledger};
 use jiff::SignedDuration;
 
-use super::fake_ledger::FakeLedger;
+use autoxide_ledger::api::testing::FakeLedger;
 use sea_orm::sea_query::Expr;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 

@@ -11,30 +11,16 @@ use sea_orm::{ConnectionTrait, Statement};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use super::fakes::{FakeLedger, FakeLedgerModule};
 use super::{Shop, admin, app_with, call, next_monday, service, set_setting, staff, utc};
+use autoxide_ledger::api::testing::FakeLedger;
 
 /// Khách có tài khoản (không permission nào).
 const CUSTOMERS: [(&str, u128); 5] =
     [("ann", 0xa1), ("ben", 0xb1), ("cam", 0xc1), ("dan", 0xd1), ("eve", 0xe1)];
 
-/// Sổ cái giả và outbox của nó (để phát `ledger.payment_succeeded`).
-struct Payments {
-    ledger: Arc<FakeLedger>,
-    outbox: Arc<std::sync::Mutex<Option<autoxide_kernel::event::Outbox>>>,
-}
-
-impl std::ops::Deref for Payments {
-    type Target = FakeLedger;
-    fn deref(&self) -> &FakeLedger {
-        &self.ledger
-    }
-}
-
-async fn shop(test: &TestDatabase) -> (Shop, Payments) {
-    let ledger = Arc::new(FakeLedger::default());
-    let outbox = Arc::new(std::sync::Mutex::new(None));
-    let module = FakeLedgerModule { ledger: ledger.clone(), outbox: outbox.clone() };
+async fn shop(test: &TestDatabase) -> (Shop, Arc<FakeLedger>) {
+    let ledger = Arc::new(FakeLedger::new());
+    let module = ledger.module();
     let shop = app_with(test, |mut builder| {
         for (token, id) in CUSTOMERS {
             builder = builder.user(token, id, &[]);
@@ -42,7 +28,6 @@ async fn shop(test: &TestDatabase) -> (Shop, Payments) {
         builder.module(module)
     })
     .await;
-    let ledger = Payments { ledger, outbox };
     // Cửa hàng ở Việt Nam: lịch 9:00–12:00 giờ VN = 02:00–05:00 UTC.
     set_setting(&shop, "organizations.timezone", json!("Asia/Ho_Chi_Minh"));
     (shop, ledger)
@@ -106,16 +91,13 @@ async fn sql(app: &TestApp, statement: &str) {
 }
 
 /// `ledger` báo đã thu cọc của lịch `booking` (event `ledger.payment_succeeded`), rồi giao event.
-async fn paid(shop: &Shop, ledger: &Payments, booking: &str) {
+async fn paid(shop: &Shop, ledger: &FakeLedger, booking: &str) {
     let payment = ledger
-        .payments
-        .lock()
-        .unwrap()
-        .iter()
+        .payments()
+        .into_iter()
         .find(|payment| payment.source_id.as_deref() == Some(booking))
-        .cloned()
         .unwrap();
-    FakeLedger::succeed(&ledger.outbox, &shop.default_tenant(), &payment).await;
+    ledger.succeed(&shop.default_tenant(), &payment).await.unwrap();
     drain(shop).await;
 }
 
@@ -271,9 +253,10 @@ async fn giu_tam_het_han_tra_cho() {
         let held = &body["data"]["booking"];
         assert_eq!(held["status"], "held");
         assert_eq!(held["deposit"]["amount"]["amount"], "100000");
-        assert_eq!(body["data"]["checkout"]["checkout_url"], "https://pay.example.com/checkout");
         let id = held["id"].as_str().unwrap().to_owned();
-        assert_eq!(ledger.last_payment().source_id.as_deref(), Some(id.as_str()));
+        let payment = ledger.last_payment().unwrap();
+        assert_eq!(payment.source_id.as_deref(), Some(id.as_str()));
+        assert_eq!(body["data"]["checkout"]["checkout_url"], json!(payment.checkout_url));
 
         // Đang giữ: người khác không đặt được.
         let (status, _) = book(&shop, "ben", &haircut, start, json!({})).await;
@@ -301,7 +284,7 @@ async fn giu_tam_het_han_tra_cho() {
         assert_eq!(status, StatusCode::CREATED, "{body}");
 
         // Tiền về muộn sau khi đã hết hạn: hoàn đủ, không giữ chỗ lại.
-        let late_payment = ledger.payments.lock().unwrap()[0].clone();
+        let late_payment = ledger.payments()[0].clone();
         // Event đến hai lần: chỉ hoàn một lần.
         paid(&shop, &ledger, &id).await;
         paid(&shop, &ledger, &id).await;
@@ -341,11 +324,11 @@ async fn thu_thieu_coc_khong_xac_nhan_va_hoan_so_da_thu() {
         let (status, body) = book(&shop, "ann", &haircut, at(next_monday(), 9, 0), json!({})).await;
         assert_eq!(status, StatusCode::CREATED, "{body}");
         let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
-        let payment = ledger.last_payment();
+        let payment = ledger.last_payment().unwrap();
         let short = autoxide_kernel::money::Money::parse("40000", "VND").unwrap();
         // Event đến hai lần: chỉ hoàn một lần.
         for _ in 0..2 {
-            FakeLedger::succeed_with(&ledger.outbox, &shop.default_tenant(), &payment, short).await;
+            ledger.succeed_with(&shop.default_tenant(), &payment, short).await.unwrap();
             drain(&shop).await;
         }
         drain(&shop).await;
@@ -378,7 +361,7 @@ async fn huy_muon_giu_coc_theo_chinh_sach() {
         let (_, body) = book(&shop, "ann", &haircut, at(day, 9, 0), json!({})).await;
         let id = body["data"]["booking"]["id"].as_str().unwrap().to_owned();
         paid(&shop, &ledger, &id).await;
-        let payment = ledger.last_payment().id;
+        let payment = ledger.last_payment().unwrap().id;
 
         // Người khác không huỷ được lịch của ann (không thấy).
         let (status, _) = call(
@@ -450,10 +433,8 @@ async fn huy_muon_giu_coc_theo_chinh_sach() {
         let (status, _) = book(&shop, "cam", &haircut, at(day, 9, 0), json!({})).await;
         assert_eq!(status, StatusCode::CREATED, "giờ cũ được trả");
         let shop_payment = ledger
-            .payments
-            .lock()
-            .unwrap()
-            .iter()
+            .payments()
+            .into_iter()
             .find(|p| p.source_id.as_deref() == Some(shop_id.as_str()))
             .unwrap()
             .id;

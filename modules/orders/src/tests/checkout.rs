@@ -338,7 +338,7 @@ async fn online_payment_confirms_once_and_unpaid_order_expires() {
         assert_eq!(status, StatusCode::NOT_FOUND);
 
         // `ledger` báo đã thu, hai lần.
-        let payment = shop.ledger.payments.lock().unwrap()[0].clone();
+        let payment = shop.ledger.payments()[0].clone();
         let event = json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount, "reference": payment.reference});
         emit(&shop, &PaymentSucceeded(event.clone())).await;
         emit(&shop, &PaymentSucceeded(event)).await;
@@ -370,12 +370,12 @@ async fn online_payment_confirms_once_and_unpaid_order_expires() {
         assert_eq!(cancelled["data"]["status"], "cancelled");
         assert_eq!(cancelled["data"]["cancel_reason"], "payment_expired");
         assert_eq!(shop.promotions.redemption_status(late), Some("released"));
-        let payment = shop.ledger.payments.lock().unwrap()[1].clone();
+        let payment = shop.ledger.payments()[1].clone();
         emit(&shop, &PaymentSucceeded(json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount}))).await;
         drain(&shop).await;
         let (_, still) = buyer2.send("GET", &format!("/me/orders/{late}"), None).await;
         assert_eq!(still["data"]["status"], "cancelled");
-        let refunds = shop.ledger.refunds.lock().unwrap().clone();
+        let refunds = super::refund_rows(&shop.ledger);
         assert_eq!(refunds, vec![(payment.id, payment.amount.minor(), "late_payment".to_owned())]);
     })
     .await
