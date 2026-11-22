@@ -9,7 +9,9 @@ use std::time::{Duration, Instant};
 use autoxide_kernel::connections::ConnectionStatus;
 use autoxide_kernel::einvoice::{provider_unavailable, rejected};
 use autoxide_kernel::error::Error;
-use autoxide_kernel::provider::{ProviderAccounts, ProviderReply, Target, http_client, send};
+use autoxide_kernel::provider::{
+    Environment, ProviderAccounts, ProviderReply, Target, http_client, send,
+};
 use autoxide_kernel::tenancy::{TenantContext, TenantId};
 use serde_json::Value;
 

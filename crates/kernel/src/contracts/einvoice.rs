@@ -336,7 +336,9 @@ pub enum EInvoiceStatus {
         /// thuế — `invoices` lưu và trả ra cùng mã cơ quan thuế (D-20261122-einvoice-provider-number).
         number: Option<i64>,
     },
-    Rejected { reason: String },
+    Rejected {
+        reason: String,
+    },
 }
 
 /// Huỷ / thông báo sai sót một hoá đơn.
