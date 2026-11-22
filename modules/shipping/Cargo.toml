@@ -34,6 +34,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Sổ cái giả dùng chung (`autoxide_ledger::api::testing`).
+autoxide-ledger = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 # MCP client thật cho test tool của module.
 

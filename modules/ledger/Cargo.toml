@@ -11,6 +11,11 @@ keywords.workspace = true
 categories.workspace = true
 publish.workspace = true
 
+[features]
+# `api::testing::FakeLedger`: sổ cái giả cho test của module khác. Chỉ bật ở `[dev-dependencies]`
+# (D-20261122-module-test-fakes).
+testing = []
+
 [dependencies]
 jiff.workspace = true
 async-trait.workspace = true

@@ -1,4 +1,5 @@
 {
+  "text:A payment was collected.": "Đã thu một khoản thanh toán.",
   "field:an entry needs at least two lines": "một bút toán cần ít nhất hai dòng",
   "field:is not a bank feed set up on this server": "không phải nguồn biến động số dư đã cấu hình trên máy chủ này",
   "field:is not a known bank BIN (6 digits, e.g. `970436`)": "không phải mã BIN ngân hàng đã biết (6 chữ số, vd `970436`)",

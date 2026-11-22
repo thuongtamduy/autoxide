@@ -125,6 +125,15 @@ thật (P7).
       thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
       ra thì sửa hoặc ghi thành mục
+- [ ] P10 — Trải nghiệm người viết module (dev và AI agent viết module không phải chép code của core):
+  - [x] Bản giả dùng chung của trait module: `autoxide_ledger::api::testing::FakeLedger` (feature `testing`) thay sáu
+        bản chép tay ở test của các module thương mại; quy ước `api::testing` cho bản giả khác
+        (D-20261122-module-test-fakes)
+  - [ ] Hàm gộp migration bảng phụ trợ của kernel (outbox, job) cho module mới, dùng trong ví dụ module ngoài và
+        hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`
+  - [ ] Bản mẫu khởi tạo repo module ngoài bằng một lệnh: workspace riêng chạy được ngay (module, migration, route có
+        OpenAPI, test `TestApp::builder` trên cả hai database, CI mẫu, README EN + VI); có test sinh khung rồi build và
+        test nó
 
 ## Giai đoạn B — Lớp cho giao diện và phân quyền
 

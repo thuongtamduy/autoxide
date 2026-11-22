@@ -30,6 +30,8 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Sổ cái giả dùng chung (`autoxide_ledger::api::testing`).
+autoxide-ledger = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 futures-util.workspace = true
 tokio.workspace = true

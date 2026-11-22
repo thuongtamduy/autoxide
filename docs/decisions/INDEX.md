@@ -128,6 +128,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-provider-accounts](D-20261121-provider-accounts.md)** Một cách cho mọi bộ nối nhà cung cấp: tài khoản theo khách, webhook theo khách — 2026-11-21
 - **[D-20261122-late-apis](D-20261122-late-apis.md)** Chỗ nối muộn `StartContext::later` và tạo tài khoản từ token xem đơn (`POST /auth/phone-signups`) — 2026-11-22
 - **[D-20261122-module-helpers](D-20261122-module-helpers.md)** Đồ dùng cho người viết module: `autoxide modules`, `helper_tables`, `SignedDuration`, `new-module --external` — 2026-11-22
+- **[D-20261122-module-test-fakes](D-20261122-module-test-fakes.md)** Bản giả của trait module nằm ở `api::testing` của module đó, sau feature `testing` — 2026-11-22
 - **[D-20261122-provider-environments](D-20261122-provider-environments.md)** Bộ nối: URL webhook đầy đủ theo khách, môi trường thử theo khách, xác thực lại khi đổi tài khoản — 2026-11-22
 
 ## Database, dữ liệu, job, event

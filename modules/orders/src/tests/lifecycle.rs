@@ -144,14 +144,14 @@ async fn buyer_cancels_per_policy_and_paid_order_is_refunded() {
         let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 1).await;
         let (_, placed) = checkout(&buyer, Some("pay"), body(&cart, &quote, "card")).await;
         let paid: Uuid = placed["data"]["orders"][0]["id"].as_str().unwrap().parse().unwrap();
-        let payment = shop.ledger.payments.lock().unwrap().last().cloned().unwrap();
+        let payment = shop.ledger.last_payment().unwrap();
         emit(&shop, &PaymentSucceeded(json!({"payment_id": payment.id, "source_module": "orders", "amount": payment.amount}))).await;
         drain(&shop).await;
         let (status, moved) = transition(&shop, paid, "cancelled", Some("*")).await;
         assert_eq!(status, StatusCode::OK, "{moved}");
         assert_eq!(moved["data"]["payment_status"], "refunded");
         assert_eq!(super::minor(&moved["data"]["totals"]["refunded"]), payment.amount.minor());
-        let refunds = shop.ledger.refunds.lock().unwrap().clone();
+        let refunds = super::refund_rows(&shop.ledger);
         assert_eq!(refunds, vec![(payment.id, payment.amount.minor(), "order_cancelled".to_owned())]);
         assert_eq!(count_events(&shop, "orders.refund_completed").await, 1);
     })
@@ -207,16 +207,14 @@ async fn shipment_request_and_carrier_events_drive_the_order_and_post_balanced_r
         assert_eq!(found["data"]["payment_status"], "paid");
         assert_eq!(super::minor(&found["data"]["totals"]["paid"]), 230_000);
         // Bút toán doanh thu: một lần, Nợ = Có.
-        let entries = shop.ledger.entries.lock().unwrap().clone();
+        let entries = shop.ledger.entries();
         let revenue: Vec<_> = entries
             .iter()
-            .filter(|(reference, _)| *reference == format!("orders:{id}:revenue"))
+            .filter(|entry| entry.reference == format!("orders:{id}:revenue"))
             .collect();
         assert_eq!(revenue.len(), 1);
-        let debit: i64 =
-            revenue[0].1.iter().filter(|line| line.1 == Side::Debit).map(|line| line.2).sum();
-        let credit: i64 =
-            revenue[0].1.iter().filter(|line| line.1 == Side::Credit).map(|line| line.2).sum();
+        let debit = revenue[0].total(Side::Debit);
+        let credit = revenue[0].total(Side::Credit);
         assert_eq!((debit, credit), (230_000, 230_000));
 
         // Hết hạn đổi trả: hoàn tất — trừ khi đang bị hoãn (tranh chấp, trả hàng).
