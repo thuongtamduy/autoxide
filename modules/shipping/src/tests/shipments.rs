@@ -415,7 +415,7 @@ async fn token_cua_khach_a_o_khach_b() {
             .tenant("a")
             .tenant("b")
             .user_in("a", "boss_a", 1, &["shipping.carriers.manage", "shipping.settings.manage"])
-            .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+            .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
             .module(crate::module())
             .build()
             .await

@@ -1,6 +1,7 @@
 //! Nhập hàng: nhà cung cấp (công nợ qua `ledger`), đơn đặt hàng nhận một phần, phiếu nhập ghi sổ
 //! cái đúng một lần, ghi lại khi lỗi, trả hàng nhà cung cấp đảo bút toán.
 
+use super::CatalogExt as _;
 use std::sync::Arc;
 
 use autoxide_ledger::api::Ledger;

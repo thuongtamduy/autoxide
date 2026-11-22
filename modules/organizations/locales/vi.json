@@ -3,7 +3,6 @@
   "field:`tenant` is the type of the root unit only; choose another type": "`tenant` chỉ dành cho nút gốc; hãy chọn loại khác",
   "field:addresses cannot be checked on this server": "máy chủ này không kiểm được địa chỉ",
   "field:an open day needs opens and closes written HH:MM, closing after opening": "ngày mở cửa cần giờ mở và giờ đóng dạng HH:MM, giờ đóng sau giờ mở",
-  "field:commune `{commune}` is not in province `{province}`": "xã / phường `{commune}` không thuộc tỉnh / thành `{province}`",
   "field:each day may appear once": "mỗi ngày chỉ được nêu một lần",
   "field:must be 1 (Monday) to 7 (Sunday)": "phải từ 1 (thứ Hai) đến 7 (Chủ nhật)",
   "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",

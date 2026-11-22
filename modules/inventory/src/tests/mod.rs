@@ -16,15 +16,12 @@ use autoxide_kernel::time::Timestamp;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use autoxide_catalog::api::{
-    BundleComponent, Catalog, PriceFloor, PriceQuery, PriceSnapshot, ProductKind, VariantSnapshot,
-};
+use autoxide_catalog::api::{BundleComponent, Catalog, ProductKind, VariantSnapshot};
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, EventInfo, Outbox};
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::module::{Module, StartContext};
-use autoxide_kernel::money::Currency;
 use autoxide_kernel::tenancy::{DEFAULT_TENANT, OrgId, OrgTree, TenantContext, root_of};
 use autoxide_organizations::api::{EffectiveSetting, OrgDirectory, Unit};
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
@@ -45,11 +42,46 @@ pub(crate) const ALL: [&str; 9] = [
     "inventory.purchasing.manage",
 ];
 
-/// Danh mục giả: biến thể khai bằng [`FakeCatalog::add`].
-#[derive(Default)]
-pub(crate) struct FakeCatalog {
-    variants: Mutex<HashMap<Uuid, VariantSnapshot>>,
-    bundles: Mutex<HashMap<Uuid, Vec<BundleComponent>>>,
+pub(crate) use autoxide_catalog::api::testing::FakeCatalog;
+
+/// Cách `inventory` khai biến thể vào catalog giả dùng chung.
+pub(crate) trait CatalogExt {
+    /// Thêm biến thể vật lý mới (sửa bằng `edit`); trả ID.
+    fn add(&self, edit: impl FnOnce(&mut VariantSnapshot)) -> Uuid;
+    /// Biến thể vật lý thường.
+    fn item(&self) -> Uuid;
+    /// Combo gồm các thành phần `(biến thể, số lượng)`.
+    fn bundle(&self, components: &[(Uuid, i64)]) -> Uuid;
+}
+
+impl CatalogExt for FakeCatalog {
+    fn add(&self, edit: impl FnOnce(&mut VariantSnapshot)) -> Uuid {
+        let id = Uuid::now_v7();
+        let mut variant = physical(id);
+        edit(&mut variant);
+        self.insert_variant(variant);
+        id
+    }
+
+    fn item(&self) -> Uuid {
+        self.add(|_| {})
+    }
+
+    fn bundle(&self, components: &[(Uuid, i64)]) -> Uuid {
+        let id = self.add(|variant| {
+            variant.kind = ProductKind::Bundle;
+            variant.track_inventory = false;
+        });
+        let parts = components
+            .iter()
+            .map(|(variant_id, quantity)| BundleComponent {
+                variant_id: *variant_id,
+                quantity: *quantity,
+            })
+            .collect();
+        self.set_bundle(id, parts);
+        id
+    }
 }
 
 /// Biến thể vật lý đang bán, theo dõi tồn.
@@ -67,88 +99,6 @@ pub(crate) fn physical(id: Uuid) -> VariantSnapshot {
     });
     // `VariantSnapshot` là `#[non_exhaustive]`: crate khác dựng qua serde.
     serde_json::from_value(json).unwrap()
-}
-
-impl FakeCatalog {
-    /// Thêm biến thể vật lý mới (sửa bằng `edit`); trả ID.
-    pub(crate) fn add(&self, edit: impl FnOnce(&mut VariantSnapshot)) -> Uuid {
-        let id = Uuid::now_v7();
-        let mut variant = physical(id);
-        edit(&mut variant);
-        self.variants.lock().unwrap().insert(id, variant);
-        id
-    }
-
-    /// Biến thể vật lý thường.
-    pub(crate) fn item(&self) -> Uuid {
-        self.add(|_| {})
-    }
-
-    /// Combo gồm các thành phần `(biến thể, số lượng)`.
-    #[allow(dead_code)]
-    pub(crate) fn bundle(&self, components: &[(Uuid, i64)]) -> Uuid {
-        let id = self.add(|variant| {
-            variant.kind = ProductKind::Bundle;
-            variant.track_inventory = false;
-        });
-        let parts = components
-            .iter()
-            .map(|(variant_id, quantity)| BundleComponent {
-                variant_id: *variant_id,
-                quantity: *quantity,
-            })
-            .collect();
-        self.bundles.lock().unwrap().insert(id, parts);
-        id
-    }
-}
-
-#[async_trait::async_trait]
-impl Catalog for FakeCatalog {
-    async fn variants(
-        &self,
-        _: &TenantContext,
-        ids: &[Uuid],
-        _: Option<&str>,
-    ) -> Result<Vec<VariantSnapshot>, Error> {
-        let variants = self.variants.lock().unwrap();
-        Ok(ids.iter().filter_map(|id| variants.get(id).cloned()).collect())
-    }
-    async fn variant_by_code(
-        &self,
-        _: &TenantContext,
-        code: &str,
-        _: Option<&str>,
-    ) -> Result<Option<VariantSnapshot>, Error> {
-        Ok(self.variants.lock().unwrap().values().find(|variant| variant.sku == code).cloned())
-    }
-    async fn prices(&self, _: &TenantContext, _: &PriceQuery) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(Vec::new())
-    }
-    async fn reference_prices(
-        &self,
-        _: &TenantContext,
-        _: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(Vec::new())
-    }
-    async fn price_floors(
-        &self,
-        _: &TenantContext,
-        _: OrgId,
-        _: Currency,
-        _: &[Uuid],
-    ) -> Result<Vec<PriceFloor>, Error> {
-        Ok(Vec::new())
-    }
-    async fn bundle_components(
-        &self,
-        _: &TenantContext,
-        ids: &[Uuid],
-    ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error> {
-        let bundles = self.bundles.lock().unwrap();
-        Ok(ids.iter().filter_map(|id| bundles.get(id).map(|parts| (*id, parts.clone()))).collect())
-    }
 }
 
 /// Cây tổ chức giả: loại của từng nút (mặc định `warehouse`).

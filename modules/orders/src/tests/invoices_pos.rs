@@ -2,6 +2,7 @@
 //! người mua, thư xác nhận / trạng thái qua `notifications`, và bán tại quầy (ca, bán, đóng ca có
 //! chênh lệch, duyệt).
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use autoxide_notifications::api::testing::FakeNotifier;
 use std::sync::{Arc, Mutex};

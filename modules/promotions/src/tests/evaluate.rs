@@ -1,6 +1,7 @@
 //! Tính giỏ qua service: trần pháp luật với giá tham chiếu thật của catalog, sàn giá, mã sai, lý
 //! do theo ngôn ngữ, dấu vân tay, REST / MCP / `dyn Promotions`.
 
+use super::CatalogExt as _;
 use autoxide_catalog::api::FloorAction;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::{TestDatabase, tool};
@@ -41,13 +42,13 @@ async fn cat_ve_tran_khi_tinh_va_san_gia() {
         assert_eq!((line("l0").amount.minor(), line("l0").capped_by_law), (25_000, true));
         assert_eq!((line("l1").amount.minor(), line("l1").capped_by_law), (40_000, false));
         // Sàn giá `block` của catalog cắt tiếp.
-        setup.catalog.floors.lock().unwrap().insert(dear, (money(280_000), FloorAction::Block));
+        setup.catalog.set_floor(dear, money(280_000), FloorAction::Block);
         let result = promotions.evaluate(&tenant, &setup.cart(&[(dear, 1)])).await.unwrap();
         assert_eq!(result.lines[0].amount.minor(), 20_000);
         assert!(result.lines[0].capped_by_floor);
         // Sản phẩm mới chưa có giá trước khuyến mại: giữ lại khoản giảm, có lý do.
         let fresh = setup.catalog.add(setup.tree.a, 100_000, &[category]);
-        setup.catalog.prices.lock().unwrap().insert(fresh, vec![(Timestamp::now() - SignedDuration::from_mins(5), money(100_000))]);
+        setup.catalog.set_price_history(fresh, vec![(Timestamp::now() - SignedDuration::from_mins(5), money(100_000))]);
         let result = promotions.evaluate(&tenant, &setup.cart(&[(fresh, 1)])).await.unwrap();
         assert!(result.lines.is_empty());
         assert_eq!(result.withheld[0].reason.code, "promotions.reason.no_reference_price");
@@ -157,7 +158,7 @@ async fn catalog_lay_gia_giam_tu_dong_qua_nguon_da_cam() {
         let setup = setup(test, true).await;
         let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
         let id = super::running(&setup, body(setup.tree.a, json!({}))).await;
-        let source = setup.catalog.sale_source.lock().unwrap().clone().unwrap();
+        let source = setup.catalog.sale_source().unwrap();
         let found = source
             .sale_prices(
                 &setup.tenant(),
@@ -192,7 +193,7 @@ async fn ma_cong_khai_cho_trang_san_pham() {
     TestDatabase::run(async |test| {
         let setup = setup(test, true).await;
         let variant = setup.catalog.add(setup.tree.a, 100_000, &[]);
-        let product = setup.catalog.variants.lock().unwrap()[&variant].0;
+        let product = setup.catalog.variant_of(variant).unwrap().product_id;
         let id = running(
             &setup,
             body(setup.tree.a, json!({"trigger": "code", "public": true, "usage_limit": 5})),

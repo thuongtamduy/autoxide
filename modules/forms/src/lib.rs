@@ -242,20 +242,21 @@ impl Module for FormsModule {
 pub(crate) mod testing {
     //! Đồ dùng chung cho test trong crate này.
 
-    use autoxide_kernel::tenancy::TenantContext;
-    use std::sync::atomic::{AtomicBool, Ordering};
-    use std::sync::{Arc, Mutex};
+    /// Bên gửi mail giả dùng chung (testkit).
+    pub use autoxide_testkit::FakeMailer;
+
+    use std::sync::Arc;
     use std::time::Duration;
 
     use autoxide_kernel::access::Principal;
     use autoxide_kernel::antispam::{AntispamConfig, SpamGuard};
     use autoxide_kernel::config::{Config, ConfigReader, ConfigSource};
     use autoxide_kernel::database::Database;
-    use autoxide_kernel::error::{Error, FieldError};
+
     use autoxide_kernel::event::Outbox;
     use autoxide_kernel::i18n::Translations;
     use autoxide_kernel::job::JobQueue;
-    use autoxide_kernel::mail::{Mail, Mailer};
+
     use autoxide_kernel::migration::{Migrator, ModuleMigrations};
     use autoxide_kernel::public_url::PublicUrl;
     use autoxide_kernel::secret::SecretKey;
@@ -264,35 +265,6 @@ pub(crate) mod testing {
 
     use crate::config::FormsConfig;
     use crate::service::{FormsService, Parts};
-
-    /// Bên gửi mail giả: giữ lại mọi mail. Bật `refuse_reply_to` thì từ chối mọi mail có
-    /// `reply_to`, như module `mail` từ chối địa chỉ nó không gửi được.
-    #[derive(Default)]
-    pub struct FakeMailer {
-        pub mails: Mutex<Vec<Mail>>,
-        pub refuse_reply_to: AtomicBool,
-    }
-
-    impl FakeMailer {
-        pub fn sent(&self) -> Vec<Mail> {
-            self.mails.lock().unwrap().clone()
-        }
-    }
-
-    #[async_trait::async_trait]
-    impl Mailer for FakeMailer {
-        async fn send(&self, _tenant: &TenantContext, mail: Mail) -> Result<(), Error> {
-            if mail.reply_to.is_some() && self.refuse_reply_to.load(Ordering::SeqCst) {
-                return Err(Error::validation(vec![FieldError::new(
-                    "reply_to",
-                    "email",
-                    "must be a mail address, like `ada@example.com`",
-                )]));
-            }
-            self.mails.lock().unwrap().push(mail);
-            Ok(())
-        }
-    }
 
     /// Service trên database (đã migrate) của test; chống spam không chờ 3 giây.
     pub async fn service(

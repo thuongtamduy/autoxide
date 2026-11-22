@@ -210,14 +210,8 @@ async fn dinh_kem_chi_tep_cua_chinh_minh() {
     TestDatabase::run(async |test| {
         let harness = harness(test).await;
         let app = &harness.app;
-        let mine = Uuid::now_v7();
-        let theirs = Uuid::now_v7();
-        harness
-            .media
-            .0
-            .lock()
-            .unwrap()
-            .extend([(mine, Some(Uuid::from_u128(BUYER))), (theirs, Some(Uuid::from_u128(0xb2)))]);
+        let mine = harness.media.upload(Uuid::from_u128(BUYER));
+        let theirs = harness.media.upload(Uuid::from_u128(0xb2));
         let id = open_as_buyer(app).await;
         let path = format!("/me/tickets/{id}/messages");
         let (status, problem) =

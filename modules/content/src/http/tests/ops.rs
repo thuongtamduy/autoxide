@@ -193,7 +193,7 @@ async fn gan_nhan_hang_loat() {
 #[tokio::test]
 async fn truong_cong_khai_va_cot_xuat() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let storage: Arc<dyn autoxide_kernel::storage::Storage> =

@@ -1,6 +1,8 @@
 //! Đặt hàng: `Idempotency-Key` bắt buộc và chống trùng, giữ chỗ / trả chỗ, số đơn liền, thanh toán qua
 //! `ledger`, hết hạn, thanh toán muộn, lượt đặt treo.
 
+use super::CatalogExt as _;
+use super::money;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::atomic::Ordering;
@@ -289,7 +291,7 @@ async fn quote_changed_between_quote_and_checkout() {
         shop.inventory.stock(shop.tree.a, shirt, 5);
         let buyer = Call::as_user(&shop, "buyer1");
         let (cart, _, quote) = ready_cart(&buyer, shop.tree.a, shirt, 1).await;
-        shop.catalog.set_price(shirt, 120_000);
+        shop.catalog.set_price(shirt, money(120_000));
         let (status, error) = checkout(&buyer, Some("k"), body(&cart, &quote, "cod")).await;
         assert_eq!(status, StatusCode::CONFLICT);
         assert_eq!(error["code"], "orders.quote_changed");

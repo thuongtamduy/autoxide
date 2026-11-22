@@ -260,9 +260,11 @@ async fn event_khong_mang_cau_tra_loi_va_mail_bao() {
         let notifier = crate::submissions::notify::Notifier(service.clone());
         notifier.handle(&delivered).await.unwrap();
         notifier.handle(&delivered).await.unwrap();
+        // Hai lời gọi, một mail: lần sau mang cùng `dedupe_key` nên bị bỏ như ở module `mail`.
+        assert_eq!(mailer.calls(), 2);
         let sent = mailer.sent();
-        assert_eq!(sent.len(), 2);
-        assert_eq!(sent[0].dedupe_key, sent[1].dedupe_key);
+        assert_eq!(sent.len(), 1);
+        assert!(sent[0].dedupe_key.is_some());
         assert_eq!(
             (sent[0].to.as_str(), sent[0].reply_to.as_deref()),
             ("owner@example.com", Some("ada@example.com"))
@@ -363,7 +365,7 @@ async fn mail_bao_bo_reply_to_khi_ben_gui_tu_choi() {
         )
         .await
         .unwrap();
-        mailer.refuse_reply_to.store(true, std::sync::atomic::Ordering::SeqCst);
+        mailer.reject_reply_to(true);
         assert_eq!(service.notify(&tenant, receipt.id).await.unwrap(), 1);
         let sent = mailer.sent();
         assert_eq!(sent.len(), 1);

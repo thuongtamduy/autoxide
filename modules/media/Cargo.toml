@@ -12,6 +12,9 @@ categories.workspace = true
 publish.workspace = true
 
 [features]
+# `api::testing::FakeMedia` cho test của module khác. Chỉ bật ở `[dev-dependencies]`
+# (D-20261122-module-test-fakes).
+testing = []
 # Bản AVIF của ảnh thu nhỏ (`AUTOXIDE_MEDIA_AVIF`, D-20261121-avif-feature). Không bật mặc định: bộ mã hoá
 # `rav1e` kéo proc-macro `paste` đã ngừng bảo trì (RUSTSEC-2024-0436), nên bản build mặc định không có nó.
 avif = ["dep:ravif"]

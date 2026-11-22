@@ -47,7 +47,7 @@ impl autoxide_kernel::module::Module for Shop {
 #[tokio::test]
 async fn embed_kind_chua_dang_ky_bi_tu_choi_va_bo_doi_tuong_khong_con_cong_khai() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)

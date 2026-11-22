@@ -29,7 +29,7 @@ async fn two_tenants(
     test: &TestDatabase,
     embedder: Arc<dyn Embedder>,
 ) -> (TestApp, Arc<ContentService>, TenantContext, TenantContext) {
-    let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+    let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
     let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
     let app = TestApp::builder(test)
         .tenant("a")
@@ -241,7 +241,7 @@ async fn lich_dang_chay_dung_khach() {
 #[tokio::test]
 async fn cau_hinh_module_theo_khach_ghi_de_bien_moi_truong() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let app = TestApp::builder(test)

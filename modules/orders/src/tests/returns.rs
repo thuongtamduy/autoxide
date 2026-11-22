@@ -2,6 +2,7 @@
 //! hàng / hoàn, tiền hoàn theo tỉ lệ, nhập lại kho qua event, bút toán đảo cân, yêu cầu mở hoãn hoàn
 //! tất; nhiều lệnh hoàn song song không vượt tiền đã thu.
 
+use super::CatalogExt as _;
 use autoxide_kernel::tenancy::ScopeExt;
 use autoxide_kernel::time::Timestamp;
 use autoxide_ledger::api::Side;

@@ -8,11 +8,11 @@ mod facts;
 pub(crate) mod rates;
 mod shipments;
 
+pub(crate) use autoxide_address::api::testing::FakeAdministrativeUnits;
 use std::sync::Arc;
 
-use autoxide_address::api::{AddressInput, AdministrativeUnit, AdministrativeUnits};
+use autoxide_address::api::AdministrativeUnits;
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::{Error, FieldError};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
@@ -20,62 +20,6 @@ use uuid::Uuid;
 
 pub(crate) const BUYER_X: u128 = 0x101;
 pub(crate) const BUYER_Y: u128 = 0x102;
-
-/// Danh mục hành chính giả: tỉnh 01 có xã 00004 (còn hiệu lực) và 00001 (hết hiệu lực từ
-/// 01/7/2025); tỉnh 79 có xã 26734.
-pub(crate) struct FakeUnits;
-
-#[async_trait::async_trait]
-impl AdministrativeUnits for FakeUnits {
-    async fn provinces(&self, _: &str, _: Option<&str>) -> Result<Vec<AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn communes(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<AdministrativeUnit>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn validate(
-        &self,
-        input: AddressInput,
-        field: &str,
-    ) -> Result<autoxide_address::api::Address, Vec<FieldError>> {
-        let (parent, name) = match input.commune_code.as_str() {
-            "00004" => ("01", "Phuong Ba Dinh"),
-            "26734" => ("79", "Phuong Sai Gon"),
-            "00001" => {
-                return Err(vec![FieldError::new(
-                    format!("{field}commune_code"),
-                    "address.unit_expired",
-                    "is no longer in force",
-                )]);
-            }
-            _ => ("", ""),
-        };
-        if parent != input.province_code {
-            return Err(vec![FieldError::new(
-                format!("{field}commune_code"),
-                "address.commune_not_in_province",
-                "is not in the province",
-            )]);
-        }
-        let province = if parent == "01" { "Thanh pho Ha Noi" } else { "Thanh pho Ho Chi Minh" };
-        Ok(serde_json::from_value(json!({
-            "country": "VN",
-            "province_code": input.province_code,
-            "province_name": province,
-            "commune_code": input.commune_code,
-            "commune_name": name,
-            "line": input.line,
-        }))
-        .unwrap())
-    }
-}
 
 /// App có `shipping` với danh mục hành chính giả; người mua `x`, `y` (tài khoản người mua, không
 /// permission) và nhân viên chăm sóc khách `care`.
@@ -85,7 +29,7 @@ pub(crate) async fn app(test: &TestDatabase) -> TestApp {
         .principal("y", Principal::customer(Uuid::from_u128(BUYER_Y)))
         .user("care", 3, &["shipping.addresses.read"])
         .user("nobody", 4, &[])
-        .provide::<dyn AdministrativeUnits>(Arc::new(FakeUnits))
+        .provide::<dyn AdministrativeUnits>(Arc::new(FakeAdministrativeUnits::sample()))
         .module(crate::module())
         .build()
         .await
@@ -113,7 +57,7 @@ pub(crate) fn service_of(app: &TestApp) -> Arc<crate::service::ShippingService> 
         reasons: Default::default(),
         catalog: None,
         orgs: None,
-        units: Some(Arc::new(FakeUnits)),
+        units: Some(Arc::new(FakeAdministrativeUnits::sample())),
     };
     Arc::new(crate::service::ShippingService::new(parts, Default::default()))
 }

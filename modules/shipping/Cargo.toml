@@ -34,6 +34,10 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Danh mục hành chính giả dùng chung (`autoxide_address::api::testing`).
+autoxide-address = { workspace = true, features = ["testing"] }
+# Catalog giả dùng chung (`autoxide_catalog::api::testing`).
+autoxide-catalog = { workspace = true, features = ["testing"] }
 # Sổ cái giả dùng chung (`autoxide_ledger::api::testing`).
 autoxide-ledger = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true

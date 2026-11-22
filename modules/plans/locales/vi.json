@@ -2,7 +2,6 @@
   "field:a metered price needs `limit_key`": "giá theo lượng dùng cần `limit_key`",
   "field:a module or feature override needs `enabled`": "ghi đè module hay tính năng cần `enabled`",
   "field:addresses cannot be checked on this server": "máy chủ này không kiểm được địa chỉ",
-  "field:commune `{commune}` is not in province `{province}`": "xã / phường `{commune}` không thuộc tỉnh / thành `{province}`",
   "field:is already taken": "đã có người dùng",
   "field:is not an active price of this plan": "không phải giá đang bán của gói này",
   "field:must be 1 to 200 characters long": "phải dài 1 đến 200 ký tự",

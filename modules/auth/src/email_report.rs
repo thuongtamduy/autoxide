@@ -269,7 +269,7 @@ mod tests {
 
     /// Token (43 ký tự base64url) trong mail cuối cùng gửi tới `to`.
     fn token_to(services: &Services, to: &str) -> String {
-        let sent = services.mails.sent.lock().unwrap();
+        let sent = services.mails.sent();
         let mail = sent.iter().rev().find(|mail| mail.to == to).unwrap();
         mail.text
             .split_whitespace()
@@ -316,7 +316,7 @@ mod tests {
             let (services, ada) = setup(test).await;
             let tenant = services.tenant.clone();
             change(&services, ada, "ada@new.example").await;
-            let mail = services.mails.sent.lock().unwrap().last().unwrap().clone();
+            let mail = services.mails.sent().last().unwrap().clone();
             assert_eq!(mail.to, "ada@example.com");
             assert_eq!(mail.subject, "Địa chỉ email của tài khoản đã đổi");
             assert!(mail.text.contains("a***@new.example"), "{}", mail.text);

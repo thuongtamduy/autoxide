@@ -1,6 +1,7 @@
 //! Chống bom hàng COD (D-194): quy tắc buộc trả trước khi rủi ro cao, danh sách chặn có lý do và
 //! hạn, dữ liệu chỉ trong khách. Báo cáo bán hàng theo phạm vi quyền.
 
+use super::CatalogExt as _;
 use autoxide_kernel::access::Scope;
 use autoxide_kernel::secret::SecretKey;
 use autoxide_kernel::sms::PhoneNumber;

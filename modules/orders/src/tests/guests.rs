@@ -1,6 +1,7 @@
 //! Mua không cần tài khoản (D-201, D-202, D-204): tra đơn bằng số đơn + mã một lần, token xem đơn,
 //! huỷ / đổi địa chỉ / mở hỗ trợ bằng token, gắn đơn vào tài khoản, trả lời tự động về trạng thái đơn.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use jiff::SignedDuration;
 use std::sync::{Arc, Mutex};

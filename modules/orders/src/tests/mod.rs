@@ -34,14 +34,10 @@ pub(crate) fn refund_rows(ledger: &FakeLedger) -> Vec<(Uuid, i64, String)> {
 }
 
 use autoxide_kernel::time::Timestamp;
-use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use autoxide_catalog::api::{
-    BundleComponent, Catalog, PriceFloor, PriceQuery, PriceSnapshot, ProductKind, ProductStatus,
-    SaleMode, VariantSnapshot,
-};
+use autoxide_catalog::api::{Catalog, ProductKind, ProductStatus, SaleMode, VariantSnapshot};
 use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::Error;
 use autoxide_kernel::event::{Actor, Event, EventInfo, Outbox};
@@ -80,102 +76,27 @@ pub(crate) fn physical(id: Uuid, org: OrgId) -> VariantSnapshot {
     .unwrap()
 }
 
-/// `dyn Catalog` giả: biến thể và giá (gồm thuế) đặt sẵn.
-#[derive(Default)]
-pub(crate) struct FakeCatalog {
-    pub variants: Mutex<HashMap<Uuid, VariantSnapshot>>,
-    pub prices: Mutex<HashMap<Uuid, Money>>,
+pub(crate) use autoxide_catalog::api::testing::FakeCatalog;
+
+/// Cách `orders` thêm hàng vào catalog giả dùng chung: biến thể [`physical`] của nút `org`, giá gồm
+/// thuế `price`.
+pub(crate) trait CatalogExt {
+    fn add_with(&self, org: OrgId, price: i64, edit: impl FnOnce(&mut VariantSnapshot)) -> Uuid;
+    fn add(&self, org: OrgId, price: i64) -> Uuid;
 }
 
-impl FakeCatalog {
-    /// Thêm biến thể của nút `org` giá `price`, sửa thêm bằng `edit`.
-    pub(crate) fn add_with(
-        &self,
-        org: OrgId,
-        price: i64,
-        edit: impl FnOnce(&mut VariantSnapshot),
-    ) -> Uuid {
+impl CatalogExt for FakeCatalog {
+    fn add_with(&self, org: OrgId, price: i64, edit: impl FnOnce(&mut VariantSnapshot)) -> Uuid {
         let id = Uuid::now_v7();
         let mut variant = physical(id, org);
         edit(&mut variant);
-        self.variants.lock().unwrap().insert(id, variant);
-        self.prices.lock().unwrap().insert(id, money(price));
+        self.insert_variant(variant);
+        self.set_price(id, money(price));
         id
     }
 
-    pub(crate) fn add(&self, org: OrgId, price: i64) -> Uuid {
+    fn add(&self, org: OrgId, price: i64) -> Uuid {
         self.add_with(org, price, |_| {})
-    }
-
-    pub(crate) fn set_price(&self, id: Uuid, price: i64) {
-        self.prices.lock().unwrap().insert(id, money(price));
-    }
-
-    fn price(&self, id: Uuid, at: Timestamp) -> Option<PriceSnapshot> {
-        let amount = *self.prices.lock().unwrap().get(&id)?;
-        serde_json::from_value(json!({
-            "variant_id": id, "price_list_id": Uuid::nil(), "price_id": Uuid::nil(),
-            "amount": amount, "tax_inclusive": true, "compare_at": null,
-            "valid_from": at - SignedDuration::from_hours(24 * 60), "valid_to": null,
-        }))
-        .ok()
-    }
-}
-
-#[async_trait::async_trait]
-impl Catalog for FakeCatalog {
-    async fn variants(
-        &self,
-        _tenant: &TenantContext,
-        ids: &[Uuid],
-        _locale: Option<&str>,
-    ) -> Result<Vec<VariantSnapshot>, Error> {
-        let variants = self.variants.lock().unwrap();
-        Ok(ids.iter().filter_map(|id| variants.get(id).cloned()).collect())
-    }
-
-    async fn variant_by_code(
-        &self,
-        _tenant: &TenantContext,
-        code: &str,
-        _locale: Option<&str>,
-    ) -> Result<Option<VariantSnapshot>, Error> {
-        let variants = self.variants.lock().unwrap();
-        Ok(variants.values().find(|variant| variant.sku == code).cloned())
-    }
-
-    async fn prices(
-        &self,
-        _tenant: &TenantContext,
-        query: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(query.variant_ids.iter().filter_map(|id| self.price(*id, query.at)).collect())
-    }
-
-    async fn reference_prices(
-        &self,
-        _tenant: &TenantContext,
-        query: &PriceQuery,
-    ) -> Result<Vec<PriceSnapshot>, Error> {
-        Ok(query.variant_ids.iter().filter_map(|id| self.price(*id, query.at)).collect())
-    }
-
-    async fn price_floors(
-        &self,
-        _tenant: &TenantContext,
-        _org_id: OrgId,
-        _currency: Currency,
-        _variant_ids: &[Uuid],
-    ) -> Result<Vec<PriceFloor>, Error> {
-        Ok(Vec::new())
-    }
-
-    async fn bundle_components(
-        &self,
-        _tenant: &TenantContext,
-        _variant_ids: &[Uuid],
-    ) -> Result<HashMap<Uuid, Vec<BundleComponent>>, Error> {
-        Ok(HashMap::new())
     }
 }
 

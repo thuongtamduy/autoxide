@@ -1,5 +1,6 @@
 //! Chương trình: tạo, sửa, khoá sau khi chạy, lưu vết, kiểm tuân thủ khi bật, rò rỉ giữa cửa hàng.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use autoxide_testkit::TestDatabase;
 use axum::http::StatusCode;

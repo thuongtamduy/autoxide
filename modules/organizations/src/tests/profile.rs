@@ -4,58 +4,6 @@
 
 use super::*;
 
-/// Danh mục giả (module `address` không được gọi thẳng từ đây): tỉnh 01 có xã 00004, tỉnh 79 có
-/// xã 26734.
-struct FakeUnits;
-
-#[async_trait::async_trait]
-impl autoxide_address::api::AdministrativeUnits for FakeUnits {
-    async fn provinces(
-        &self,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, autoxide_kernel::error::Error> {
-        Ok(Vec::new())
-    }
-
-    async fn communes(
-        &self,
-        _: &str,
-        _: &str,
-        _: Option<&str>,
-    ) -> Result<Vec<autoxide_address::api::AdministrativeUnit>, autoxide_kernel::error::Error> {
-        Ok(Vec::new())
-    }
-
-    async fn validate(
-        &self,
-        input: autoxide_address::api::AddressInput,
-        field: &str,
-    ) -> Result<autoxide_address::api::Address, Vec<autoxide_kernel::error::FieldError>> {
-        let parent = match input.commune_code.as_str() {
-            "00004" => "01",
-            "26734" => "79",
-            _ => "",
-        };
-        if parent != input.province_code {
-            return Err(vec![autoxide_kernel::error::FieldError::new(
-                format!("{field}commune_code"),
-                "address.commune_not_in_province",
-                "commune `{commune}` is not in province `{province}`",
-            )]);
-        }
-        Ok(serde_json::from_value(json!({
-            "country": input.country,
-            "province_code": input.province_code,
-            "province_name": "Thanh pho Ha Noi",
-            "commune_code": input.commune_code,
-            "commune_name": "Phuong Ba Dinh",
-            "line": input.line,
-        }))
-        .unwrap())
-    }
-}
-
 /// App có `organizations` (danh mục hành chính giả), hai khách.
 async fn app(test: &TestDatabase) -> TestApp {
     TestApp::builder(test)
@@ -76,7 +24,9 @@ async fn app(test: &TestDatabase) -> TestApp {
             ],
         )
         .user_in("b", "other", 2, &["organizations.units.read", "organizations.profile.manage"])
-        .provide::<dyn autoxide_address::api::AdministrativeUnits>(std::sync::Arc::new(FakeUnits))
+        .provide::<dyn autoxide_address::api::AdministrativeUnits>(std::sync::Arc::new(
+            autoxide_address::api::testing::FakeAdministrativeUnits::sample(),
+        ))
         .module(crate::module())
         .build()
         .await

@@ -2,6 +2,7 @@
 //! hai lần (COD thu theo từng lần), dời ngày thì báo và cho huỷ miễn phí, ngừng bán đặt trước thì
 //! huỷ phần chưa có hàng và hoàn tiền tự động.
 
+use super::CatalogExt as _;
 use autoxide_catalog::api::SaleMode;
 use autoxide_kernel::tenancy::ScopeExt;
 use autoxide_kernel::time::Timestamp;

@@ -1,6 +1,7 @@
 //! Báo khi có hàng lại (D-201): xác nhận hai bước, đồng ý riêng, một lần mỗi đợt có hàng, dừng bằng
 //! link, người đã đăng nhập báo vào tài khoản.
 
+use super::CatalogExt as _;
 use autoxide_kernel::time::Timestamp;
 use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;

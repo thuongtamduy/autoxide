@@ -7,8 +7,6 @@
   "shipping.carrier_unauthorized": "Hãng vận chuyển từ chối thông tin đăng nhập của tài khoản. Hãy kiểm tra lại rồi thử kết nối.",
   "shipping.webhook_signature": "Chữ ký webhook không hợp lệ.",
   "shipping.cancel_too_late": "Hãng đã lấy hàng; không huỷ được vận đơn.",
-  "field:is no longer in force": "không còn hiệu lực",
-  "field:is not in the province": "không thuộc tỉnh này",
   "field:is not valid": "không hợp lệ",
   "field:is required for an address in Vietnam": "bắt buộc với địa chỉ ở Việt Nam",
   "field:must be a phone number: digits, optionally starting with `+`": "phải là số điện thoại: chữ số, có thể bắt đầu bằng `+`",
