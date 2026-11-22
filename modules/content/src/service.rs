@@ -54,6 +54,10 @@ pub(crate) struct ContentService {
     pub(crate) legal: Option<Arc<dyn autoxide_compliance::api::LegalProfiles>>,
     /// Sổ khối của kernel (bước 67): kiểm thân `layout`, đọc dữ liệu khối khi đọc công khai.
     pub(crate) blocks: autoxide_kernel::blocks::Blocks,
+    /// Khung website đã tính (`GET /public/site`), giữ trong bộ nhớ của tiến trình.
+    pub(crate) site_cache: crate::site::SiteCache,
+    /// Phần của module khác trong khung website (`api::SiteExtensions`).
+    pub(crate) site_extensions: Arc<crate::site::ExtensionRegistry>,
 }
 
 /// Tính năng theo gói (bước 35): gợi ý và bản nháp do AI soạn (SEO, dịch).
@@ -102,6 +106,8 @@ impl ContentService {
             templates: Default::default(),
             legal: None,
             blocks: Default::default(),
+            site_cache: Default::default(),
+            site_extensions: Default::default(),
         }
     }
 

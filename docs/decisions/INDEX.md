@@ -475,6 +475,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-s3-client](D-20261121-s3-client.md)** Lưu file: `rusty-s3` + `reqwest` cho S3, ổ đĩa tự viết, thay `object_store` — 2026-11-21
 - **[D-20261122-layout-public](D-20261122-layout-public.md)** Đọc công khai trang dựng từ khối: dữ liệu khối trong `blocks_data`, ETag theo cả câu trả lời; số đo p99 — 2026-11-22
 - **[D-20261122-page-layout](D-20261122-page-layout.md)** Thân `layout` của trang: cùng cột `body`, sửa từng phần bằng JSON Patch tự viết, khoá sửa tách mục riêng — 2026-11-22
+- **[D-20261122-public-site](D-20261122-public-site.md)** Khung website: đầu / chân trang có nháp và đăng, `GET /public/site` cache trong bộ nhớ tới mốc đổi chủ đề, điểm cắm `SiteExtensions` — 2026-11-22
 - **[D-20261122-theme-tokens](D-20261122-theme-tokens.md)** Bộ giao diện website: token phẳng theo nút, ghi đè kế thừa, danh sách font cho phép, tương phản chỉ cảnh báo — 2026-11-22
 - **[D-20261122-theme-variants](D-20261122-theme-variants.md)** Chủ đề theo lịch: lịch JSON ba loại theo múi IANA của website, chọn đúng một bản, mẫu nhúng binary — 2026-11-22
 

@@ -15,6 +15,7 @@ mod placements;
 mod public;
 mod public_banners;
 mod redirects;
+mod site;
 mod templates;
 #[cfg(test)]
 mod tests;
@@ -112,6 +113,9 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(theme_variants::copy_theme_variant))
         .routes(routes!(theme_variants::list_theme_presets))
         .routes(routes!(theme_variants::preview_site_theme))
+        .routes(routes!(site::get_site_region, site::put_site_region))
+        .routes(routes!(site::publish_site_region))
+        .routes(routes!(site::public_site))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

@@ -238,6 +238,7 @@ impl ContentService {
             )
             .await?;
         transaction.commit().await?;
+        self.site_cache.invalidate();
         tracing::info!(org_id = %org, "theme changed");
         self.theme_view(tenant, &site).await
     }

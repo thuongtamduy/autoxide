@@ -522,6 +522,8 @@ impl ContentService {
         after: Option<&Variant>,
     ) -> Result<(), Error> {
         let view = |row: &Variant| json!({"kind": "variant", "id": row.id, "org_id": row.org_id, "name": row.name, "status": row.status});
+        // Khung website đã tính trên máy này hết hiệu lực ngay; máy khác thấy trong 30 giây.
+        self.site_cache.invalidate();
         let id = after.or(before).map_or(Uuid::nil(), |row| row.id);
         let event = events::ThemeChanged(Change {
             before: before.map(view),

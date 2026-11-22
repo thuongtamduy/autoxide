@@ -73,3 +73,30 @@ pub trait PublishedEntries: Send + Sync {
         entry_id: Uuid,
     ) -> Result<Option<PublishedSnapshot>, Error>;
 }
+
+/// Phần của module khác trong khung website (`GET /api/v1/content/public/site`, bước 67, D-234): vd
+/// cấu hình đồng ý cookie và mã theo dõi của `compliance`. `content` đăng ký trước các module đó nên
+/// không `require` được chúng; module sau tự cắm vào qua [`SiteExtensions`] (lấy bằng
+/// `context.require::<dyn SiteExtensions>()` trong `Module::start`). Kết quả nằm ở
+/// `extensions.<module>` của câu trả lời, cùng `ETag` và `max-age`. Chỉ trả dữ liệu công khai.
+//
+// `#[async_trait]`: gọi hàm `async` qua `dyn Trait`.
+#[async_trait::async_trait]
+pub trait SiteExtension: Send + Sync {
+    /// Phần của module cho website `request.site` ở ngôn ngữ `request.locale`; `None`: không có gì.
+    /// Gọi khi khung website được tính lại (tối đa mỗi 30 giây mỗi website), không mỗi request.
+    async fn site(
+        &self,
+        request: &autoxide_kernel::blocks::BlockRequest<'_>,
+    ) -> Result<Option<serde_json::Value>, Error>;
+}
+
+/// Sổ phần mở rộng của khung website.
+pub trait SiteExtensions: Send + Sync {
+    /// Cắm phần của `module` (tên module, mỗi module một lần) vào khung website.
+    fn register(
+        &self,
+        module: &'static str,
+        extension: std::sync::Arc<dyn SiteExtension>,
+    ) -> Result<(), Error>;
+}

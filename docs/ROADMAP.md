@@ -471,7 +471,7 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Chủ đề theo mùa, ngày lễ, khung giờ (D-234, D-20261122-theme-variants): bản chủ đề ghi đè một phần theme gốc theo lịch (một lần, hằng
       ngày, hằng tuần, theo múi giờ của website), ưu tiên khi trùng, thư viện chủ đề mẫu, chép sang năm sau, xem
       trước ở một thời điểm; hiệu ứng trang trí chỉ trong danh sách cho phép, không chạy ở trang thanh toán
-- [ ] Đầu trang và chân trang của cả website (D-234): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
+- [x] Đầu trang và chân trang của cả website (D-234, D-20261122-public-site): bố cục khối có nháp / đăng, theo ngôn ngữ, kế thừa theo nút,
       bản chủ đề kèm được bản riêng; `GET /public/site` một lời gọi cho khung website, cache tới đúng mốc đổi chủ
       đề, không query khi cache nóng; đo p99 trên cả hai database
 - [ ] Loại nội dung tự định nghĩa (D-235): khách tạo loại (đội ngũ, dự án, chi nhánh…) với trường riêng của bước

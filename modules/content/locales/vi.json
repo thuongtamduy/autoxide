@@ -281,5 +281,8 @@
   "field:must be one of the allowed effects: {effects}": "phải là một hiệu ứng trong danh sách cho phép: {effects}",
   "field:give a schedule (or a preset with dates for `year`)": "hãy nêu lịch (hoặc chủ đề mẫu có ngày cho `year`)",
   "field:must be from 0 to 1000": "phải từ 0 đến 1000",
-  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự"
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự",
+  "content.site_region_not_found": "Không có đầu trang hay chân trang {id} của website.",
+  "content.site_region_no_draft": "Không có bản nháp để đăng.",
+  "field:must be `header` or `footer`": "phải là `header` hoặc `footer`"
 }

@@ -779,3 +779,16 @@ archive nextest); `rust-cache` luôn bật, cache ấm; chạy bằng `workflow_
   trên cho đổi ở crate lá. Cache ghi bởi lần chạy trên nhánh PR chỉ nhánh đó và PR từ nó đọc được; PR mới đọc cache của `main`, nên hiệu
   quả thật phụ thuộc lần chạy trên `main` ghi đủ cache — theo dõi vài lượt đầu sau khi merge.
 - Rust 1.99 trên Linux đã dùng `rust-lld` mặc định: không thêm mold (không đo được lợi gì thêm).
+
+## Khung website `GET /api/v1/content/public/site` — 22/11/2026
+
+Bước 67 (D-20261122-public-site): website có 50 bản chủ đề đang bật, đầu trang và chân trang đã đăng; đo trong
+test `public_site_p99_nong_va_nguoi` (router thật, bản debug, máy phát triển, 100 lượt). "Nguội": lần đọc đầu sau
+khi sửa theme (cache bị xoá); "nóng": lần đọc ngay sau đó (không câu truy vấn nào của `content`).
+
+| Database | Nguội p50 | Nguội p99 | Nóng p50 | Nóng p99 |
+|---|---|---|---|---|
+| SQLite | 3,7 ms | 6,0 ms | 0,67 ms | 1,1 ms |
+| PostgreSQL 16 | 3,4 ms | 15,2 ms | 0,66 ms | 0,83 ms |
+
+Test chỉ chặn p99 dưới 2 giây (không chặn theo máy); số ở đây để so khi đổi đường đọc.
