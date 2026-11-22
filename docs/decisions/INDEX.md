@@ -160,6 +160,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-plans-reconcile-snapshot](D-20261121-plans-reconcile-snapshot.md)** Đối soát hạn mức của `plans` theo kiểu lạc quan: chụp sổ trước khi đếm, ghi dưới khoá chỉ khi sổ không đổi — 2026-11-21
 - **[D-20261121-raw-statement](D-20261121-raw-statement.md)** Câu SQL viết tay dựng bằng `autoxide_kernel::database::statement` — 2026-11-21
 - **[D-20261121-time-library](D-20261121-time-library.md)** Thay `chrono` / `chrono-tz` / `humantime` / `paste`: `jiff` qua lớp `autoxide_kernel::time`, kernel tự giữ migration và MCP server, S3 bằng `rusty-s3` — 2026-11-21
+- **[D-20261122-named-lock](D-20261122-named-lock.md)** `rows::lock_key`: khoá theo tên tới hết transaction ghi; `catalog` tính sản phẩm tương tự dưới một khoá — 2026-11-22
 
 ## HTTP, REST, OpenAPI
 
