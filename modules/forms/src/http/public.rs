@@ -106,7 +106,7 @@ pub(crate) struct PublicFormResponse {
 }
 
 impl PublicFormResponse {
-    fn new(form: &Form, locale: Locale) -> Self {
+    pub(crate) fn new(form: &Form, locale: Locale) -> Self {
         PublicFormResponse {
             key: form.row.key.clone(),
             name: form.row.name.clone(),

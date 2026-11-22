@@ -80,5 +80,7 @@
   "text:Send form submissions without the anti-spam checks for anonymous visitors — for a website server's own API key; still limited per account.": "Gửi bài nộp biểu mẫu mà không qua kiểm chống spam dành cho khách vãng lai — cho API key riêng của máy chủ website; vẫn bị giới hạn theo tài khoản.",
   "text:Submissions with the status `new` now, in the forms you may review at the chosen unit; spam is not counted.": "Bài nộp đang ở trạng thái `new` lúc này, trong các biểu mẫu bạn được duyệt ở nút đang chọn; không tính bài rác.",
   "text:The daily job deleted submissions past their retention time.": "Việc chạy hằng ngày đã xoá các bài nộp quá hạn lưu.",
-  "text:{actor} created the form “{name}”": "{actor} tạo biểu mẫu “{name}”"
+  "text:{actor} created the form “{name}”": "{actor} tạo biểu mẫu “{name}”",
+  "text:Form": "Form",
+  "text:Use to put a form of the website on the page (contact, quote request, registration) by its key.": "Dùng để đặt một form của website vào trang (liên hệ, yêu cầu báo giá, đăng ký) theo khoá."
 }

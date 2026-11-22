@@ -463,7 +463,7 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý), `content.embed`,
       `content.search_box`, `content.placement` (vị trí banner trong trang và đầu trang, D-20261120-step55-close);
       chân trang pháp lý `compliance.legal_footer` tự gắn dưới trang (D-20261122-base-blocks)
-- [ ] Khối của `forms`, `newsletter`, `comments`, `menus` (`menus.menu`, D-238); `media` không khai khối riêng —
+- [x] Khối của `forms`, `newsletter`, `comments`, `menus` (`menus.menu`, D-238); `media` không khai khối riêng —
       `content.image` / `gallery` / `video` dùng ID `media` (D-20261122-base-blocks)
 - [x] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
       đo p99 trang 50 khối trên cả hai database (D-20261122-layout-public)

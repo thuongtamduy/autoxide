@@ -9,6 +9,7 @@
 //! Đăng ký SAU `media` (ảnh của ô gợi ý) và `content` (nhập menu cũ); đối tượng của module đăng
 //! ký sau vẫn tra được, vì sổ đối tượng đọc lúc chạy.
 
+mod blocks;
 mod client_config;
 mod config;
 mod entity;
@@ -105,6 +106,10 @@ impl Module for MenusModule {
         Ok(())
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn translations(&self) -> Vec<(&'static str, &'static str)> {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
@@ -125,6 +130,8 @@ impl Module for MenusModule {
         };
         let service = Arc::new(MenuService::new(context.outbox()?, dependencies, config));
         context.reference_source(Arc::new(usages::Menus));
+        // Khối `menus.menu` của trang dựng từ khối (bước 67).
+        context.block_data(blocks::MENU.name, Arc::new(blocks::MenuBlocks(service.clone())))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())

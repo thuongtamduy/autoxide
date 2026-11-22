@@ -122,6 +122,14 @@ async fn vong_doi_qua_http() {
         let etag = public.header(header::ETAG).to_owned();
         let cached = send(&app, "GET", "/forms/public/contact?locale=vi", None, &[("if-none-match", &etag)], None).await;
         assert_eq!(cached.status(), StatusCode::NOT_MODIFIED);
+        // Khối `forms.embed` (bước 67): cùng định nghĩa công khai; khoá không có → `null`.
+        let tenant = app.default_tenant();
+        let site = autoxide_kernel::tenancy::Site::whole(&tenant);
+        let request = autoxide_kernel::blocks::BlockRequest::new(&tenant, &site, "vi");
+        let block = |id: &str, key: &str| ("forms.embed", autoxide_kernel::blocks::BlockRef::new(id, json!({"key": key})));
+        let data = app.blocks().resolve(&request, &[block("a", "contact"), block("b", "nope")]).await;
+        assert_eq!(data["a"], public.json()["data"], "{data:?}");
+        assert_eq!(data["b"], serde_json::Value::Null);
         assert_eq!(send(&app, "GET", "/forms/public/nope", None, &[], None).await.status(), StatusCode::NOT_FOUND);
         let french = send(&app, "GET", "/forms/public/contact?locale=fr", None, &[], None).await;
         assert_eq!((french.status(), french.json()["errors"][0]["field"].as_str()), (StatusCode::UNPROCESSABLE_ENTITY, Some("locale")));

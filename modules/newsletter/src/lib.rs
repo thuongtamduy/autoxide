@@ -8,6 +8,7 @@
 //! của kernel nên đăng ký SAU `content`. Hướng dẫn dùng: `docs/NEWSLETTER.md`.
 
 mod audience;
+mod blocks;
 mod bulk;
 mod campaigns;
 mod config;
@@ -140,6 +141,10 @@ impl Module for NewsletterModule {
 
     fn migrations(&self) -> Vec<Box<dyn MigrationTrait>> {
         migration::all()
+    }
+
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
     }
 
     fn permissions(&self) -> Vec<Permission> {
