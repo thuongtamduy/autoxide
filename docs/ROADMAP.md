@@ -458,7 +458,7 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [x] Trang có thân `layout` (cây khối JSON) cạnh thân `rich`: kiểm từ chối mặc định, theo cỡ màn hình, theo ngôn
       ngữ; sửa từng phần bằng JSON Patch + `If-Match`; nháp, lịch sử, xem trước, hẹn giờ dùng lại `content`
       (D-20261122-page-layout)
-- [ ] Khoá sửa trang (`POST/DELETE /entries/{id}/edit-lock`, giữ 2 phút, người khác thấy ai đang sửa; `If-Match` vẫn là
+- [x] Khoá sửa trang (`POST/DELETE /entries/{id}/edit-lock`, giữ 2 phút, người khác thấy ai đang sửa; `If-Match` vẫn là
       chốt cuối), test đồng thời trên cả hai database (tách khỏi mục trên — D-20261122-page-layout)
 - [ ] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý) và khối của
       `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238), `content` (`content.placement`:

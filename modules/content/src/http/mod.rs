@@ -5,6 +5,7 @@
 mod actions;
 mod assist;
 mod banners;
+mod edit_lock;
 pub(crate) mod entries;
 mod history;
 mod layout;
@@ -52,6 +53,11 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
         .routes(routes!(entries::list_entries, entries::create_entry))
         .routes(routes!(entries::get_entry, entries::update_entry, actions::delete_entry))
         .routes(routes!(layout::put_layout, layout::patch_layout))
+        .routes(routes!(
+            edit_lock::get_edit_lock,
+            edit_lock::acquire_edit_lock,
+            edit_lock::release_edit_lock
+        ))
         .routes(routes!(actions::publish_entry))
         .routes(routes!(actions::unpublish_entry))
         .routes(routes!(actions::archive_entry))

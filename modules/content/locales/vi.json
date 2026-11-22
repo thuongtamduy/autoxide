@@ -232,6 +232,7 @@
   "text:{actor} took down “{title}”": "{actor} gỡ “{title}”",
   "text:{same_title} other entries in this language have the same title; search engines may treat the pages as duplicates": "có {same_title} bài khác cùng ngôn ngữ trùng tiêu đề; máy tìm kiếm có thể coi các trang là trùng nhau",
   "content.not_layout": "Mục {id} có thân chữ (rich), không phải bố cục khối; hãy thay bằng `PUT /api/v1/content/entries/{id}/layout` trước.",
+  "content.edit_locked": "Người dùng {user} đang sửa trang này tới {until}; hãy thử lại sau lúc đó hoặc nhờ họ đóng trình sửa.",
   "field:must be a JSON object": "phải là một object JSON",
   "field:is not allowed here": "không được phép ở đây",
   "field:must be {schema}": "phải là {schema}",
