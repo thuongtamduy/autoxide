@@ -63,7 +63,8 @@ impl Modules {
                 }
             }
             for tool in declared {
-                let mut tool = tool.qualify(name);
+                let experimental = module.stability() == crate::module::Stability::Experimental;
+                let mut tool = tool.qualify(name).experimental(experimental);
                 if let Some(deprecation) = deprecated.iter().find(|deprecation| {
                     deprecation.tool.is_some_and(|short| tool.name() == format!("{name}.{short}"))
                 }) {
@@ -159,6 +160,15 @@ impl Modules {
             }
         }
         if problems.is_empty() { Ok(prompts) } else { Err(ModuleError(problems.join("; "))) }
+    }
+
+    /// Tên các module hạng thử nghiệm đang chạy — cho lớp HTTP đánh dấu operation của chúng.
+    pub fn experimental(&self) -> Vec<&'static str> {
+        self.modules
+            .iter()
+            .filter(|module| module.stability() == crate::module::Stability::Experimental)
+            .map(|module| module.name())
+            .collect()
     }
 
     /// Tên và mô tả một câu (`Module::description`) của mọi module, theo thứ tự đăng ký — cho

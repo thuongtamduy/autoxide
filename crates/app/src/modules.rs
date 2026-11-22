@@ -50,6 +50,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),
+        // Bộ nối SMS eSMS (bước 70 P7, thử nghiệm): công bố `dyn SmsSender` cho `compliance`, `notifications`,
+        // `bookings`, `orders` (đều đứng sau); tài khoản eSMS là của từng khách.
+        Box::new(autoxide_esms::module()),
         // Tuân thủ (bước 37): định danh (KYC), quy tắc pháp lý, văn bản pháp lý, sổ đồng ý. Dùng
         // `dyn IdentityVerifier` nếu có module cung cấp (đứng trước); `plans` (khách tự đăng ký) và module
         // thương mại chặn qua `dyn KycGate` / `dyn AcceptanceGate`.
@@ -156,7 +159,21 @@ pub async fn dormant_with_data(
     modules: &Modules,
     database: &Database,
 ) -> Result<Vec<DormantModule>, String> {
-    let dormant = modules.dormant(database).await.map_err(|error| format!("database: {error}"))?;
+    // Đã khởi động thì xem cả database của từng placement (khách có database riêng); chưa thì chỉ
+    // có database điều khiển để xem.
+    let dormant = if modules.tenancy().is_some() {
+        let (dormant, unreachable) =
+            modules.dormant_everywhere().await.map_err(|error| format!("database: {error}"))?;
+        if !unreachable.is_empty() {
+            tracing::warn!(
+                placements = %unreachable.join(", "),
+                "cannot reach these placements to check for data of modules that are turned off"
+            );
+        }
+        dormant
+    } else {
+        modules.dormant(database).await.map_err(|error| format!("database: {error}"))?
+    };
     Ok(dormant.into_iter().filter(|module| !module.tables_with_data.is_empty()).collect())
 }
 
@@ -166,7 +183,13 @@ pub fn dormant_notice(modules: &Modules, dormant: &[DormantModule]) -> (String, 
     let listed: Vec<String> = dormant
         .iter()
         .map(|module| {
-            format!("{} ({} table(s) with rows)", module.name, module.tables_with_data.len())
+            let mut text =
+                format!("{} ({} table(s) with rows", module.name, module.tables_with_data.len());
+            if !module.placements.is_empty() {
+                text.push_str(&format!("; also in placement {}", module.placements.join(", ")));
+            }
+            text.push(')');
+            text
         })
         .collect();
     let message = format!(

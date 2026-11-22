@@ -20,6 +20,14 @@ pub(crate) const OTP_MAX_ATTEMPTS: Setting = Setting::new(
 )
 .with_default("5");
 
+pub(crate) const OTP_WRONG_PER_PHONE_PER_DAY: Setting = Setting::new(
+    "AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY",
+    "Wrong sign-in codes allowed for one phone number over 24 hours, across all its codes; after \
+     that no code is sent or checked for the number until the oldest wrong entry is 24 hours old, \
+     1 to 1000.",
+)
+.with_default("10");
+
 pub(crate) const OTP_PER_PHONE_PER_HOUR: Setting = Setting::new(
     "AUTOXIDE_COMPLIANCE_OTP_PER_PHONE_PER_HOUR",
     "Phone verification codes sent to one phone number per hour, 1 to 100.",
@@ -76,6 +84,8 @@ fn tracking_url(raw: &str) -> Result<String, String> {
 pub(crate) struct Otp {
     pub ttl_seconds: i64,
     pub max_attempts: i32,
+    /// `AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY`.
+    pub wrong_per_phone_per_day: i32,
     pub per_phone_per_hour: u32,
     pub per_user_per_day: u32,
     pub per_ip_per_hour: u32,
@@ -86,6 +96,7 @@ impl Default for Otp {
         Otp {
             ttl_seconds: 300,
             max_attempts: 5,
+            wrong_per_phone_per_day: 10,
             per_phone_per_hour: 3,
             per_user_per_day: 10,
             per_ip_per_hour: 20,
@@ -123,6 +134,8 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
         reader.get_with(&KYC_CALLBACK_RETENTION_DAYS, |raw| parse_in_range(raw, 1i64, 3650));
     let ttl_seconds = reader.get_with(&OTP_TTL_SECONDS, |raw| parse_in_range(raw, 60i64, 3600));
     let max_attempts = reader.get_with(&OTP_MAX_ATTEMPTS, |raw| parse_in_range(raw, 1i32, 20));
+    let wrong_per_phone_per_day =
+        reader.get_with(&OTP_WRONG_PER_PHONE_PER_DAY, |raw| parse_in_range(raw, 1i32, 1000));
     let per_phone_per_hour =
         reader.get_with(&OTP_PER_PHONE_PER_HOUR, |raw| parse_in_range(raw, 1u32, 100));
     let per_user_per_day =
@@ -142,6 +155,7 @@ pub(crate) fn read(reader: &mut ConfigReader<'_>) -> Result<Config, Invalid> {
         otp: Otp {
             ttl_seconds: ttl_seconds?,
             max_attempts: max_attempts?,
+            wrong_per_phone_per_day: wrong_per_phone_per_day?,
             per_phone_per_hour: per_phone_per_hour?,
             per_user_per_day: per_user_per_day?,
             per_ip_per_hour: per_ip_per_hour?,

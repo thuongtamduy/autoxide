@@ -171,6 +171,10 @@ fn describe(tool: &Tool) -> Value {
         }
         _ => {}
     }
+    if tool.is_experimental() {
+        description.push(' ');
+        description.push_str(super::deprecation::EXPERIMENTAL_NOTE);
+    }
     if let Some(deprecation) = tool.deprecation() {
         description.push(' ');
         description.push_str(&deprecation.sentence(tool.name()));

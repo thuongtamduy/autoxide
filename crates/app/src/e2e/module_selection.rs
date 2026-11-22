@@ -65,6 +65,7 @@ fn hang_cua_tung_module_dung_nhu_da_chot() {
         [
             "sepay",
             "einvoice_sepay",
+            "esms",
             "bookings",
             "newsletter",
             "comments",
@@ -250,6 +251,26 @@ async fn database_co_du_lieu_cua_module_tat_van_khoi_dong_va_con_nguyen() {
         let (status, _, answer) =
             call(&old, "POST", "/api/v1/newsletter/lists", &headers, list).await;
         assert!(status.is_success(), "{status} {answer}");
+        // Hạng đọc được bằng máy (bước 70 P3): operation và tool của module thử nghiệm mang dấu,
+        // của module chính thức thì không.
+        let operation = |path: &str| old.api.openapi.paths.paths[path].get.clone().unwrap();
+        let experimental = operation("/api/v1/newsletter/lists");
+        let extensions = serde_json::to_value(&experimental.extensions).unwrap();
+        assert_eq!(extensions["x-stability"], "experimental", "{extensions}");
+        assert!(experimental.description.unwrap().contains("**Experimental**"));
+        let official = operation("/api/v1/auth/roles");
+        let extensions = serde_json::to_value(&official.extensions).unwrap();
+        assert!(extensions.get("x-stability").is_none(), "{extensions}");
+        for tool in old.modules.tools().unwrap() {
+            let expected = tool.name().starts_with("newsletter.") || {
+                let module = tool.name().split('.').next().unwrap();
+                ["bookings", "comments", "support", "conversations", "analytics", "reporting"]
+                    .contains(&module)
+                    || module == "automations"
+            };
+            assert_eq!(tool.is_experimental(), expected, "{}", tool.name());
+        }
+
         // Một role mang permission của module sắp tắt: role vẫn phải đọc được sau khi tắt.
         let role = json!({"name": "editor", "permissions": ["newsletter.manage", "content.read"]});
         let (status, _, answer) =
@@ -276,11 +297,18 @@ async fn database_co_du_lieu_cua_module_tat_van_khoi_dong_va_con_nguyen() {
         assert_eq!(status, 200, "{roles}");
         assert!(roles.to_string().contains("newsletter.manage"), "{roles}");
 
-        // Mọi module thử nghiệm đều còn bảng; chỉ `newsletter` có dữ liệu.
+        // Mọi module thử nghiệm có bảng đều còn bảng (bộ nối `esms` không có bảng nào); chỉ
+        // `newsletter` có dữ liệu.
         let dormant = new.modules.dormant(&new.database).await.unwrap();
-        // Bộ nối nhà cung cấp (`sepay`, `einvoice_sepay`) không có bảng nào nên không "ngủ".
-        let without_tables = ["sepay", "einvoice_sepay"];
-        assert_eq!(dormant.len(), new.modules.inactive().len() - without_tables.len());
+        // Bộ nối nhà cung cấp không có bảng nào nên không "ngủ".
+        let without_tables = ["sepay", "einvoice_sepay", "esms"];
+        let with_tables = new
+            .modules
+            .inactive()
+            .iter()
+            .filter(|module| !without_tables.contains(&module.name))
+            .count();
+        assert_eq!(dormant.len(), with_tables);
         let with_data =
             crate::modules::dormant_with_data(&new.modules, &new.database).await.unwrap();
         let names: Vec<&str> = with_data.iter().map(|module| module.name).collect();

@@ -1,0 +1,5 @@
+# Luật "không unwrap / expect / panic ngoài test": trong test thì được phép, vì
+# test hỏng PHẢI dừng ngay và báo rõ chỗ hỏng.
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true

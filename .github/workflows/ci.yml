@@ -79,6 +79,60 @@ jobs:
         working-directory: sdk/typescript
         run: npm ci && npx tsc --noEmit
 
+  # Hợp đồng Rust cho module ở repo riêng (D-20261121-external-modules): ở pull request PHÁT HÀNH (PR đổi
+  # `version` của Cargo.toml gốc), `cargo semver-checks` so kernel và testkit với tag trước và ghi mục
+  # `### Breaking (Rust)` vào tóm tắt của job, để chép vào CHANGELOG.md trước khi merge. Còn `0.x` thì chỉ báo
+  # cáo; từ 1.0 `cargo xtask semver` tự thất bại khi có phá vỡ (D-242). PR khác: bỏ qua, job vẫn báo xong.
+  semver:
+    name: Rust API of kernel and testkit (release pull requests)
+    if: ${{ github.event_name == 'pull_request' && !github.event.repository.private }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Cả lịch sử và tag: so với tag phát hành trước.
+          fetch-depth: 0
+      - name: changed
+        id: changed
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          version() { sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' | head -n 1; }
+          before="$(git show "$BASE_SHA:Cargo.toml" | version)"
+          after="$(version < Cargo.toml)"
+          if [ "$before" != "$after" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "The workspace version is unchanged ($after): not a release pull request, semver check skipped."
+          fi
+      - run: rustup toolchain install
+        if: steps.changed.outputs.run == 'true'
+      - uses: taiki-e/install-action@25f51f6b1bf4e18876107cece836f4f77ac17c8c # v2.90.7
+        if: steps.changed.outputs.run == 'true'
+        with:
+          tool: cargo-semver-checks@0.51.0
+      - name: cargo xtask semver
+        if: steps.changed.outputs.run == 'true'
+        run: |
+          set -o pipefail
+          cargo xtask semver --markdown | tee semver.md
+          {
+            echo "## Breaking changes to the Rust API of autoxide-kernel and autoxide-testkit"
+            echo
+            if [ -s semver.md ]; then
+              echo "Copy this section into the release's section of \`CHANGELOG.md\`:"
+              echo
+              cat semver.md
+            else
+              echo "None found."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   upgrade:
     # Bản phát hành trước ghi dữ liệu, bản này đọc lại trên cùng database (đặc tả 31 B1, D-246).
     # Không trong `./gate.sh`: cần tải hay build image của tag cũ.

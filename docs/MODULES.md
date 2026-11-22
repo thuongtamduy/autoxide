@@ -62,6 +62,7 @@ and stock holds from `inventory`), and simply offers less when they are off.
 | `customers` | official | — | Customer profiles keyed by buyer account or phone number, purchase history from orders, masked contact details with audited reveal, and manual or rule-based customer groups for price lists and promotions. |
 | `sepay` | experimental | — | Confirms VietQR bank transfers from SePay's bank transaction notifications, with one SePay account per tenant (experimental: written from the provider's public documentation; not yet verified against the live service). |
 | `einvoice_sepay` | experimental | — | Sends e-invoices to the Vietnamese tax authority through SePay eInvoice, with one SePay eInvoice account per tenant (experimental: written from the provider's public documentation; not yet verified against the live service). |
+| `esms` | experimental | — | SMS through eSMS (Vietnam): one-time codes and customer-care messages under each tenant's own eSMS account and brandname. Written from the provider's public documentation; not yet verified against the live service. |
 | `bookings` | experimental | — | Bookable services with staff, rooms and equipment, weekly schedules, public availability, bookings that never overlap, deposits through a licensed partner, cancellation policies and reminders. |
 | `newsletter` | experimental | `mail` | Newsletter lists, double opt-in subscribers, one-click unsubscribe and campaigns sent in rate-limited batches. |
 | `comments` | experimental | `mail` | Comments and questions on any record (posts, products…), with threads, moderation, reports, bans and answers. |
@@ -73,6 +74,9 @@ and stock holds from `inventory`), and simply offers less when they are off.
 <!-- modules:end -->
 
 `GET /api/v1/kernel/modules` lists the modules that run on a server, with `stability` for each.
+In the OpenAPI document every operation of an experimental module carries
+`"x-stability": "experimental"` (an operation without it belongs to an official module), and
+`docs/mcp-tools.json` has `stability` for every tool; both also say so in the description.
 
 ## Choosing: `AUTOXIDE_MODULES`
 
@@ -115,7 +119,8 @@ Mistakes are reported at startup, by every command, with what to write instead:
 `autoxide serve`'s log says the same), and `autoxide config` shows the value in use.
 
 Settings of a module that is turned off are not read: a leftover `AUTOXIDE_NEWSLETTER_…` line in
-`.env` is ignored. `AUTOXIDE_STARTUP_TASKS` must only name tasks of modules that are on.
+`.env` is ignored. A task in `AUTOXIDE_STARTUP_TASKS` whose module is off is skipped with a warning
+in the log; a task name that does not exist in a module that is on is still an error.
 
 ## What "turned off" means
 
@@ -154,8 +159,11 @@ So that data is not lost by accident:
 - `autoxide copy`, `autoxide backup create` and `autoxide backup restore` refuse to run while
   such data exists, because they only handle the modules that are on. Run them with the module
   turned on, or with `AUTOXIDE_MODULES=all`.
-- Move a tenant to another database, or split or merge tenants, with the same modules on as
-  hold data for that tenant.
+- Moving a tenant to another database, and splitting or merging tenants, are refused
+  (`409 tenant_move_modules_off`, also listed by the dry run) while the tenant has rows of a module
+  that is off: only the data of modules that are on is moved.
+
+The check for such data looks at the main database and at the database of every placement.
 
 To remove the data of a module for good: turn the module on, run
 `autoxide migrate down <module> --steps 1000` (this drops its tables — back up first), then turn it

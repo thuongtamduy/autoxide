@@ -344,3 +344,33 @@ async fn lock_one_shared_blocks_exclusive_lock() {
     .await
     .unwrap();
 }
+
+/// `rows::lock_key`: 20 transaction cùng đọc số dư rồi ghi lại số dư + 1 (đọc rồi ghi, không dùng
+/// `adjust`) dưới cùng một khoá theo tên — không lần cộng nào bị mất. Không có khoá, Postgres (READ
+/// COMMITTED) để hai bên cùng đọc một số rồi ghi đè nhau.
+#[tokio::test(flavor = "multi_thread")]
+async fn khoa_theo_ten_tuan_tu_hoa_doc_roi_ghi() {
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let id = open_wallet(&db, Money::new(0, Currency::USD)).await;
+        let mut tasks = tokio::task::JoinSet::new();
+        for _ in 0..20 {
+            let db = db.clone();
+            tasks.spawn(async move {
+                let transaction = db.begin_write().await.unwrap();
+                rows::lock_key(&transaction, "test.wallet:counter").await.unwrap();
+                let row = wallet::Entity::find_by_id(id).one(&transaction).await.unwrap().unwrap();
+                // Nhường thread để transaction khác chen vào nếu khoá không giữ.
+                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                let mut active: wallet::ActiveModel = row.clone().into();
+                active.balance_minor = Set(row.balance_minor + 1);
+                active.update(&transaction).await.unwrap();
+                transaction.commit().await.unwrap();
+            });
+        }
+        tasks.join_all().await;
+        assert_eq!(balance(&db, id).await, Money::new(20, Currency::USD));
+    })
+    .await
+    .unwrap();
+}

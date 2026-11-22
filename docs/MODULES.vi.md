@@ -62,6 +62,7 @@ và giữ kho qua `inventory`), và chỉ làm được ít hơn khi module đó
 | `customers` | official | — | Hồ sơ khách hàng theo tài khoản hoặc số điện thoại, lịch sử mua từ đơn hàng, thông tin liên hệ được che và xem có audit, nhóm khách thủ công hoặc theo luật cho bảng giá và khuyến mại. |
 | `sepay` | experimental | — | Xác nhận chuyển khoản VietQR từ thông báo biến động số dư của SePay, mỗi khách một tài khoản SePay (thử nghiệm: viết theo tài liệu công khai của nhà cung cấp, chưa kiểm với dịch vụ thật). |
 | `einvoice_sepay` | experimental | — | Gửi hoá đơn điện tử tới cơ quan thuế Việt Nam qua SePay eInvoice, mỗi khách một tài khoản SePay eInvoice (thử nghiệm: viết theo tài liệu công khai của nhà cung cấp, chưa kiểm với dịch vụ thật). |
+| `esms` | experimental | — | SMS qua eSMS (Việt Nam): mã một lần và tin chăm sóc khách hàng bằng tài khoản eSMS và brandname riêng của từng khách. Viết theo tài liệu công khai của nhà cung cấp; chưa kiểm với dịch vụ thật. |
 | `bookings` | experimental | — | Dịch vụ đặt lịch với nhân viên, phòng và thiết bị, lịch tuần, lịch trống công khai, lịch hẹn không chồng nhau, đặt cọc qua đối tác có giấy phép, chính sách huỷ và nhắc lịch. |
 | `newsletter` | experimental | `mail` | Danh sách bản tin, người đăng ký double opt-in, huỷ đăng ký một chạm và chiến dịch gửi theo lô có giới hạn tốc độ. |
 | `comments` | experimental | `mail` | Bình luận và câu hỏi trên mọi bản ghi (bài viết, sản phẩm…), có luồng trả lời, kiểm duyệt, báo cáo, cấm và trả lời. |
@@ -73,7 +74,9 @@ và giữ kho qua `inventory`), và chỉ làm được ít hơn khi module đó
 <!-- modules:end -->
 
 `GET /api/v1/kernel/modules` liệt kê các module đang chạy trên một máy chủ, kèm `stability` của
-từng cái.
+từng cái. Trong tài liệu OpenAPI, mọi operation của module thử nghiệm mang
+`"x-stability": "experimental"` (operation không có dấu này thuộc module chính thức), và
+`docs/mcp-tools.json` có `stability` cho từng tool; cả hai cũng ghi điều đó trong phần mô tả.
 
 ## Chọn: `AUTOXIDE_MODULES`
 
@@ -115,7 +118,8 @@ Viết sai thì mọi lệnh báo ngay lúc khởi động, kèm cách viết đ
 cũng nói vậy), và `autoxide config` cho thấy giá trị đang dùng.
 
 Cấu hình của module đang tắt không được đọc: dòng `AUTOXIDE_NEWSLETTER_…` còn sót trong `.env` bị
-bỏ qua. `AUTOXIDE_STARTUP_TASKS` chỉ được nêu task của module đang bật.
+bỏ qua. Task trong `AUTOXIDE_STARTUP_TASKS` mà module của nó đang tắt thì được bỏ qua kèm một cảnh
+báo trong log; tên task không tồn tại ở một module đang bật vẫn là lỗi.
 
 ## "Tắt" nghĩa là gì
 
@@ -154,8 +158,11 @@ Trong lúc tắt, không ai chăm dữ liệu đó:
 - `autoxide copy`, `autoxide backup create` và `autoxide backup restore` từ chối chạy khi còn dữ
   liệu như vậy, vì chúng chỉ xử lý module đang bật. Chạy chúng với module đó bật, hoặc với
   `AUTOXIDE_MODULES=all`.
-- Dời một khách sang database khác, hay tách / gộp khách, thì bật đủ các module đang giữ dữ liệu
-  của khách đó.
+- Dời một khách sang database khác, và tách / gộp khách, bị từ chối
+  (`409 tenant_move_modules_off`, dry run cũng nêu) khi khách còn dòng của một module đang tắt:
+  chỉ dữ liệu của module đang bật được chuyển.
+
+Việc kiểm dữ liệu như vậy xem database chính và database của từng placement.
 
 Muốn xoá hẳn dữ liệu của một module: bật module, chạy
 `autoxide migrate down <module> --steps 1000` (lệnh

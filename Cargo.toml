@@ -16,6 +16,14 @@ version = "0.17.0"
 edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/thuongtamduy/autoxide"
+homepage = "https://github.com/thuongtamduy/autoxide"
+readme = "README.md"
+keywords = ["backend", "rest", "openapi", "mcp", "multi-tenant"]
+categories = ["web-programming::http-server"]
+# Sẵn sàng cho crates.io nhưng CHƯA đăng (D-20261121-external-modules): đăng là việc không hoàn tác được,
+# chủ dự án quyết. Khi đăng, đổi thành `true` (xtask tự khai `publish = false`; module mẫu `notes` bị loại bằng `--exclude`), theo
+# docs/RELEASING.md mục "Đăng lên crates.io". `cargo xtask publish-check` đóng gói và build thử từng crate.
 publish = false
 
 # Luật code trong CLAUDE.md, do trình biên dịch và clippy thực thi.
@@ -35,44 +43,48 @@ dbg_macro = "deny"
 
 [workspace.dependencies]
 # --- Crate nội bộ ---
-autoxide-kernel = { path = "crates/kernel" }
-autoxide-testkit = { path = "crates/testkit" }
-autoxide-audit = { path = "modules/audit" }
-autoxide-auth = { path = "modules/auth" }
-autoxide-idempotency = { path = "modules/idempotency" }
-autoxide-mail = { path = "modules/mail" }
-autoxide-ai = { path = "modules/ai" }
-autoxide-files = { path = "modules/files" }
+# `version` ghim đúng phiên bản của workspace: cả bộ phát hành cùng nhau, và crates.io đòi phụ thuộc có
+# phiên bản (D-20261121-external-modules). Đổi `version` của workspace thì đổi cả các dòng này —
+# `cargo xtask check` (luật `publish-ready`) chặn chỗ lệch. Module mẫu `notes` không đăng nên không có.
+autoxide-kernel = { path = "crates/kernel", version = "=0.17.0" }
+autoxide-testkit = { path = "crates/testkit", version = "=0.17.0" }
+autoxide-audit = { path = "modules/audit", version = "=0.17.0" }
+autoxide-auth = { path = "modules/auth", version = "=0.17.0" }
+autoxide-idempotency = { path = "modules/idempotency", version = "=0.17.0" }
+autoxide-esms = { path = "modules/esms", version = "=0.17.0" }
+autoxide-mail = { path = "modules/mail", version = "=0.17.0" }
+autoxide-ai = { path = "modules/ai", version = "=0.17.0" }
+autoxide-files = { path = "modules/files", version = "=0.17.0" }
 autoxide-notes = { path = "modules/notes" }
-autoxide-webhooks = { path = "modules/webhooks" }
-autoxide-media = { path = "modules/media" }
-autoxide-content = { path = "modules/content" }
-autoxide-forms = { path = "modules/forms" }
-autoxide-newsletter = { path = "modules/newsletter" }
-autoxide-comments = { path = "modules/comments" }
-autoxide-menus = { path = "modules/menus" }
-autoxide-reporting = { path = "modules/reporting" }
-autoxide-automations = { path = "modules/automations" }
-autoxide-address = { path = "modules/address" }
-autoxide-organizations = { path = "modules/organizations" }
-autoxide-plans = { path = "modules/plans" }
-autoxide-tax = { path = "modules/tax" }
-autoxide-ledger = { path = "modules/ledger" }
-autoxide-sepay = { path = "modules/sepay" }
-autoxide-einvoice-sepay = { path = "modules/einvoice_sepay" }
-autoxide-invoices = { path = "modules/invoices" }
-autoxide-compliance = { path = "modules/compliance" }
-autoxide-notifications = { path = "modules/notifications" }
-autoxide-analytics = { path = "modules/analytics" }
-autoxide-catalog = { path = "modules/catalog" }
-autoxide-inventory = { path = "modules/inventory" }
-autoxide-shipping = { path = "modules/shipping" }
-autoxide-support = { path = "modules/support" }
-autoxide-bookings = { path = "modules/bookings" }
-autoxide-conversations = { path = "modules/conversations" }
-autoxide-promotions = { path = "modules/promotions" }
-autoxide-orders = { path = "modules/orders" }
-autoxide-customers = { path = "modules/customers" }
+autoxide-webhooks = { path = "modules/webhooks", version = "=0.17.0" }
+autoxide-media = { path = "modules/media", version = "=0.17.0" }
+autoxide-content = { path = "modules/content", version = "=0.17.0" }
+autoxide-forms = { path = "modules/forms", version = "=0.17.0" }
+autoxide-newsletter = { path = "modules/newsletter", version = "=0.17.0" }
+autoxide-comments = { path = "modules/comments", version = "=0.17.0" }
+autoxide-menus = { path = "modules/menus", version = "=0.17.0" }
+autoxide-reporting = { path = "modules/reporting", version = "=0.17.0" }
+autoxide-automations = { path = "modules/automations", version = "=0.17.0" }
+autoxide-address = { path = "modules/address", version = "=0.17.0" }
+autoxide-organizations = { path = "modules/organizations", version = "=0.17.0" }
+autoxide-plans = { path = "modules/plans", version = "=0.17.0" }
+autoxide-tax = { path = "modules/tax", version = "=0.17.0" }
+autoxide-ledger = { path = "modules/ledger", version = "=0.17.0" }
+autoxide-sepay = { path = "modules/sepay", version = "=0.17.0" }
+autoxide-einvoice-sepay = { path = "modules/einvoice_sepay", version = "=0.17.0" }
+autoxide-invoices = { path = "modules/invoices", version = "=0.17.0" }
+autoxide-compliance = { path = "modules/compliance", version = "=0.17.0" }
+autoxide-notifications = { path = "modules/notifications", version = "=0.17.0" }
+autoxide-analytics = { path = "modules/analytics", version = "=0.17.0" }
+autoxide-catalog = { path = "modules/catalog", version = "=0.17.0" }
+autoxide-inventory = { path = "modules/inventory", version = "=0.17.0" }
+autoxide-shipping = { path = "modules/shipping", version = "=0.17.0" }
+autoxide-support = { path = "modules/support", version = "=0.17.0" }
+autoxide-bookings = { path = "modules/bookings", version = "=0.17.0" }
+autoxide-conversations = { path = "modules/conversations", version = "=0.17.0" }
+autoxide-promotions = { path = "modules/promotions", version = "=0.17.0" }
+autoxide-orders = { path = "modules/orders", version = "=0.17.0" }
+autoxide-customers = { path = "modules/customers", version = "=0.17.0" }
 
 # --- Thư viện nền (STACK.md, bảng "Nền") ---
 tokio = { version = "1.54", features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }

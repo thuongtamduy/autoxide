@@ -15,6 +15,8 @@
 //!   sàn, và không bao giờ tràn `i64` (SQLite đổi số nguyên tràn thành số thực một cách âm thầm;
 //!   Postgres báo lỗi — chặn trước bằng điều kiện thì hai bên như nhau).
 //!
+//! - [`lock_key`]: khoá theo tên tới hết transaction ghi, khi không có dòng ổn định để khoá.
+//!
 //! Thứ tự khoá chống deadlock: khi một transaction khoá nhiều dòng, luôn khoá theo cùng một thứ
 //! tự (vd ID tăng dần — [`lock`] làm vậy khi được giao cột sắp xếp), và khoá trước khi ghi.
 //! Hai transaction khoá A rồi B và B rồi A sẽ chờ nhau mãi; Postgres phát hiện và huỷ một bên
@@ -22,8 +24,10 @@
 
 use sea_orm::sea_query::{Expr, ExprTrait as _, IntoCondition};
 use sea_orm::{
-    ColumnTrait, ConnectionTrait, DbErr, EntityTrait, QueryFilter, QueryOrder, QuerySelect, Select,
+    ColumnTrait, ConnectionTrait, DbBackend, DbErr, EntityTrait, QueryFilter, QueryOrder,
+    QuerySelect, Select,
 };
+use sha2::{Digest as _, Sha256};
 
 /// Đọc và khoá mọi dòng `select` chọn, tới hết `transaction`. `order` là cột sắp xếp khi khoá
 /// (thường là khoá chính): nhiều transaction khoá cùng nhóm dòng theo cùng thứ tự thì không
@@ -62,6 +66,41 @@ pub async fn lock_one_shared<E: EntityTrait, C: ConnectionTrait>(
     select: Select<E>,
 ) -> Result<Option<E::Model>, DbErr> {
     select.lock_shared().one(transaction).await
+}
+
+/// Khoá **theo tên** tới hết `transaction` ghi: hai transaction khoá cùng `key` thì bên sau chờ bên
+/// trước commit / rollback. Dùng khi việc cần tuần tự hoá không gắn với một dòng có sẵn — vd "mọi
+/// lần tính lại của (khách, ngôn ngữ)" khi chưa có dòng nào, hay khi các dòng bị xoá / chèn lại
+/// (đổi ID) giữa chừng nên khoá dòng không còn chắc trúng. Sau khi có khoá, đọc lại mọi thứ cần
+/// xét: câu đọc mới thấy những gì transaction trước đã commit.
+///
+/// Postgres: `pg_advisory_xact_lock` với số 64 bit lấy từ SHA-256 của `key` (trùng số giữa hai tên
+/// khác nhau chỉ làm chờ thừa, không sai). SQLite: không làm gì — transaction ghi mở bằng
+/// [`Database::begin_write`](crate::database::Database::begin_write) (`BEGIN IMMEDIATE`) đã giữ
+/// quyền ghi cả database. `transaction` phải là transaction GHI (ngoài transaction, khoá Postgres
+/// nhả ngay sau câu lệnh). Một transaction giữ nhiều khoá thì luôn lấy theo cùng thứ tự (vd tên
+/// tăng dần) để không deadlock. Đặt tên có tiền tố module (`catalog.similar:<…>`).
+pub async fn lock_key<C: ConnectionTrait>(transaction: &C, key: &str) -> Result<(), DbErr> {
+    let backend = transaction.get_database_backend();
+    if backend != DbBackend::Postgres {
+        return Ok(());
+    }
+    transaction
+        .execute_raw(crate::database::statement(
+            backend,
+            "SELECT pg_advisory_xact_lock($1)",
+            [key_number(key).into()],
+        ))
+        .await?;
+    Ok(())
+}
+
+/// Số khoá advisory của `key`: 8 byte đầu của SHA-256 — như nhau trên mọi máy và mọi phiên bản.
+fn key_number(key: &str) -> i64 {
+    let digest = Sha256::digest(key.as_bytes());
+    let mut bytes = [0u8; 8];
+    bytes.copy_from_slice(&digest[..8]);
+    i64::from_be_bytes(bytes)
 }
 
 /// Giới hạn cho [`adjust`]: giá trị của cột SAU khi cộng phải nằm trong `[floor, ceiling]`.
