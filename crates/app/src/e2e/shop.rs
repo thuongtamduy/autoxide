@@ -269,17 +269,27 @@ async fn mo_cua_hang_ban_don_dau_tien_tu_dau_den_cuoi() {
             "message": "Thành công.", "payUrl": "https://test-payment.momo.vn/pay/abc",
             "deeplink": "momo://app?action=pay", "qrCodeUrl": "00020101021226110007vn.momo",
             "responseTime": 1_795_000_000_000_i64}));
+        // Website quên `return_url`, cửa hàng chưa đặt trang quay về: MoMo từ chối khởi tạo; đơn vẫn
+        // đặt được (201), `payment_actions[0].error` nói lý do bằng ngôn ngữ của người gọi.
         let checkout = json!({"cart_id": cart_id, "quote_token": cart["data"]["quote_token"],
-            "payment_method": "wallet", "contact": {"name": "Nguyễn An", "phone": PHONE},
-            "return_url": "https://shop.example/thank-you"});
-        let headers = [guest[0], ("idempotency-key", "first-order")];
+            "payment_method": "wallet", "contact": {"name": "Nguyễn An", "phone": PHONE}});
+        let headers = [guest[0], ("idempotency-key", "first-order"), ("accept-language", "vi")];
         let (status, placed) = shop.public("POST", "/api/v1/orders/checkout", &headers, &checkout).await;
         assert_eq!(status, StatusCode::CREATED, "{placed}");
         let order_id = placed["data"]["orders"][0]["id"].as_str().unwrap().to_owned();
         assert_eq!(placed["data"]["orders"][0]["status"], "pending_payment");
         let action = &placed["data"]["payment_actions"][0];
-        assert_eq!(action["kind"], "redirect", "{placed}");
-        assert_eq!(action["redirect_url"], "https://test-payment.momo.vn/pay/abc", "{placed}");
+        assert_eq!(action["kind"], "none", "{placed}");
+        assert_eq!(action["error"]["code"], "momo.return_url_required", "{placed}");
+        assert!(action["error"]["message"].as_str().unwrap().starts_with("MoMo cần trang"), "{placed}");
+        // Cửa hàng đặt trang quay về rồi gửi lại link thanh toán.
+        shop.set("momo.connection.account.return_url", "https://shop.example/thank-you").await;
+        let (status, resent) = shop.admin("POST", &format!("/api/v1/orders/{order_id}/payment-link"), None).await;
+        assert_eq!(status, StatusCode::OK, "{resent}");
+        let action = &resent["data"][0];
+        assert_eq!(action["kind"], "redirect", "{resent}");
+        assert!(action.get("error").is_none(), "{resent}");
+        assert_eq!(action["redirect_url"], "https://test-payment.momo.vn/pay/abc", "{resent}");
         let sent = providers.momo.take_requests().into_iter().find(|r| r.path == MOMO_CREATE).unwrap().json();
         assert_eq!((&sent["partnerCode"], &sent["amount"]), (&json!(MOMO.0), &json!(332_000)));
         let payment_id = sent["orderId"].as_str().unwrap().to_owned();

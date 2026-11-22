@@ -252,10 +252,22 @@ impl OrdersService {
         let row = self.order(tenant, id).await?;
         let target = OrgTarget::new(OrgId::from_uuid(row.org_id), None);
         principal.require_at(tenant.database().read(), &MANAGE, target).await?;
-        // Phần còn lại của đơn trả trước một phần (D-232): mở lại link khi link trước đã hết hạn.
+        self.reopen_payments(tenant, &row, None).await
+    }
+
+    /// Mở lại việc thanh toán của đơn `row` (nhân viên gửi lại link, người mua vãng lai tự mở lại):
+    /// phần còn lại đã được yêu cầu (D-232) thì mở lại link phần đó; đơn chờ thanh toán còn hạn thì
+    /// tạo lại lượt thu chưa tạo được (với `return_url` mới nếu có). Trả các khoản đang chờ.
+    pub(crate) async fn reopen_payments(
+        &self,
+        tenant: &TenantContext,
+        row: &order::Model,
+        return_url: Option<String>,
+    ) -> Result<Vec<payment::Model>, Error> {
+        let id = row.id;
         let plan = self.advance_plan(tenant.database().read(), tenant, id).await?;
         if plan.is_some_and(|plan| plan.status == crate::advance::BALANCE_REQUESTED) {
-            return Ok(vec![self.reopen_balance(tenant, id).await?]);
+            return Ok(vec![self.reopen_balance(tenant, id, return_url).await?]);
         }
         if row.status != OrderStatus::PendingPayment.as_str() {
             return Err(errors::invalid_transition(
@@ -267,8 +279,17 @@ impl OrdersService {
             return Err(errors::payment_expired());
         }
         if Method::parse(&row.payment_method) != Method::Cod {
-            self.start_payment(tenant, id, None).await?;
+            self.start_payment(tenant, id, return_url).await?;
         }
+        self.pending_payments(tenant, id).await
+    }
+
+    /// Các khoản đang chờ thu của đơn.
+    pub(crate) async fn pending_payments(
+        &self,
+        tenant: &TenantContext,
+        id: Uuid,
+    ) -> Result<Vec<payment::Model>, Error> {
         Ok(payment::Entity::find()
             .filter(payment::Column::OrderId.eq(id))
             .filter(payment::Column::Status.eq(payments::PENDING))

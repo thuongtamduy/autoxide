@@ -45,6 +45,8 @@ pub(crate) fn routes(service: Arc<OrdersService>) -> OpenApiRouter {
         .routes(routes!(lifecycle::request_shipment))
         .routes(routes!(lifecycle::payment_link))
         .routes(routes!(lifecycle::pay_balance))
+        .routes(routes!(lifecycle::guest_payment_link))
+        .routes(routes!(lifecycle::my_payment_link))
         .routes(routes!(pickups::ready))
         .routes(routes!(pickups::handover))
         .routes(routes!(returns::request_return))

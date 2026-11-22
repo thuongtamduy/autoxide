@@ -31,7 +31,7 @@ use crate::guests::{
 use crate::service::OrdersService;
 
 /// `Idempotency-Key` của request (không bắt buộc với thao tác vãng lai).
-fn idempotency_key(headers: &HeaderMap) -> Option<String> {
+pub(super) fn idempotency_key(headers: &HeaderMap) -> Option<String> {
     headers
         .get("idempotency-key")
         .and_then(|value| value.to_str().ok())
@@ -40,7 +40,7 @@ fn idempotency_key(headers: &HeaderMap) -> Option<String> {
         .map(str::to_owned)
 }
 
-async fn access(
+pub(super) async fn access(
     service: &OrdersService,
     tenant: &TenantContext,
     headers: &HeaderMap,

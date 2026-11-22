@@ -452,9 +452,10 @@ impl OrdersService {
             return Err(error);
         }
 
-        // 8. Lượt thu ở đối tác (ngoài transaction). Đối tác lỗi: đơn vẫn chờ thanh toán, người mua
-        // mở lại bằng `POST /me/orders/{id}/payments`; hết hạn thì job huỷ. Trả đủ bằng tender: không
-        // còn gì để thu.
+        // 8. Lượt thu ở đối tác (ngoài transaction). Đối tác lỗi: đơn vẫn chờ thanh toán, lý do ghi ở
+        // `payment_actions[].error`; người mua mở lại bằng `POST /public/orders/{id}/payment-link`
+        // (token xem đơn) hay `POST /me/orders/{id}/payment-link`, nhân viên bằng
+        // `POST /{id}/payment-link`; hết hạn thì job huỷ. Trả đủ bằng tender: không còn gì để thu.
         if method != Method::Cod
             && holds.tendered_minor() < quote.total.minor()
             && let Err(error) = self.start_payment(tenant, order_id, input.return_url.clone()).await
