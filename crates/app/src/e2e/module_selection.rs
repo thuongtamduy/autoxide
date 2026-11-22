@@ -64,6 +64,7 @@ fn hang_cua_tung_module_dung_nhu_da_chot() {
         experimental,
         [
             "sepay",
+            "momo",
             "einvoice_sepay",
             "esms",
             "bookings",

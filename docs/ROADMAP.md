@@ -117,7 +117,7 @@ thật (P7).
   - [x] Nền chung: tài khoản nhà cung cấp theo từng khách, khách tự cấu hình qua API (mã hoá, không trả lại secret),
         webhook tìm đúng khách rồi kiểm chữ ký; hướng dẫn viết bộ nối khác
   - [x] Thanh toán: SePay
-  - [ ] Thanh toán: MoMo
+  - [x] Thanh toán: MoMo
   - [x] Vận chuyển: Giao Hàng Nhanh
   - [x] SMS: eSMS
   - [x] Hoá đơn điện tử: SePay eInvoice

@@ -41,6 +41,8 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_tax::module()),
         // Bộ nối SePay (bước 70 P7, thử nghiệm): góp `dyn BankFeed` cho `ledger`, nên đứng trước nó.
         Box::new(autoxide_sepay::module()),
+        // Bộ nối MoMo (bước 70 P7, thử nghiệm): góp `dyn PaymentGateway` cho `ledger`, nên đứng trước nó.
+        Box::new(autoxide_momo::module()),
         // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
         // toán và module thương mại (sau) ghi sổ qua `dyn Ledger`.
         Box::new(autoxide_ledger::module()),
