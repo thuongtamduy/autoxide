@@ -252,6 +252,7 @@ dependencies = [
  "autoxide-content",
  "autoxide-conversations",
  "autoxide-customers",
+ "autoxide-esms",
  "autoxide-files",
  "autoxide-forms",
  "autoxide-idempotency",
@@ -616,6 +617,20 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-esms"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

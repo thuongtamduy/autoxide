@@ -1,0 +1,17 @@
+{
+  "esms.account_inactive": "Tài khoản eSMS chưa được kích hoạt hoặc đã bị khoá (mã {code} của eSMS). Liên hệ eSMS.",
+  "esms.brandname_rejected": "eSMS không nhận brandname này (mã {code} của eSMS): brandname chưa đăng ký hoặc chưa được kích hoạt cho tin chăm sóc khách hàng. Sửa `esms.connection.sms.brandname` hoặc đăng ký brandname với eSMS.",
+  "esms.carrier_not_registered": "Brandname chưa được đăng ký với nhà mạng của số điện thoại này (mã {code} của eSMS). Đăng ký với eSMS.",
+  "esms.content_blocked": "eSMS từ chối nội dung tin vì có từ khoá bị chặn (mã {code} của eSMS).",
+  "esms.credentials_rejected": "eSMS từ chối ApiKey / SecretKey của khách này (mã {code} của eSMS). Đặt lại `esms.connection.sms.api_key` và `esms.connection.sms.secret_key`.",
+  "esms.insufficient_balance": "Tài khoản eSMS không đủ số dư để gửi tin (mã {code} của eSMS). Nạp thêm rồi thử lại.",
+  "esms.ip_not_allowed": "eSMS chưa cho phép địa chỉ IP của máy chủ này gửi tin (mã {code} của eSMS). Nhờ eSMS thêm IP vào danh sách cho phép.",
+  "esms.marketing_unsupported": "Bộ nối eSMS chỉ gửi mã một lần và tin chăm sóc khách hàng; tin quảng cáo không gửi qua đây.",
+  "esms.phone_rejected": "eSMS từ chối số điện thoại này: sai định dạng hoặc đang bị chặn (mã {code} của eSMS).",
+  "esms.phone_unsupported": "Bộ nối eSMS chỉ gửi tới số di động Việt Nam (+84).",
+  "esms.request_rejected": "eSMS từ chối yêu cầu (mã {code} của eSMS). Xem bảng mã lỗi của eSMS.",
+  "esms.template_rejected": "Nội dung tin không khớp mẫu tin chăm sóc khách hàng đã đăng ký cho brandname này (mã {code} của eSMS). Đăng ký mẫu tin với eSMS.",
+  "esms.unavailable": "Không gọi được eSMS lúc này; thử lại sau.",
+  "field:must be `true` or `false`": "phải là `true` hay `false`",
+  "field:must be a brandname of 1 to 50 characters": "phải là brandname dài 1 đến 50 ký tự"
+}
