@@ -142,8 +142,9 @@ thật (P7).
   - [x] Bản giả dùng chung của trait module: `autoxide_ledger::api::testing::FakeLedger` (feature `testing`) thay sáu
         bản chép tay ở test của các module thương mại; quy ước `api::testing` cho bản giả khác
         (D-20261122-module-test-fakes)
-  - [ ] Hàm gộp migration bảng phụ trợ của kernel (outbox, job) cho module mới, dùng trong ví dụ module ngoài và
-        hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`
+  - [x] Hàm gộp migration bảng phụ trợ của kernel (outbox, job) cho module mới: `helper_tables`
+        (D-20261122-module-helpers), dùng trong `examples/external-module/` và hướng dẫn
+        `docs/guides/writing-a-module.md` + `.vi.md`; `notes` giữ danh sách cũ (đổi là đổi tên migration đã áp dụng)
   - [ ] Bản mẫu khởi tạo repo module ngoài bằng một lệnh: workspace riêng chạy được ngay (module, migration, route có
         OpenAPI, test `TestApp::builder` trên cả hai database, CI mẫu, README EN + VI); có test sinh khung rồi build và
         test nó
