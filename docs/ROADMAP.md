@@ -717,12 +717,13 @@ tiền qua `PaymentGateway` và sổ cái của bước 36.
 - [x] Trả trước một phần cho hàng đặt trước (D-232): tỉ lệ hay số tiền, phần còn lại thu khi sẵn sàng giao,
       người bán huỷ hoàn đủ, người mua huỷ theo điều kiện công bố; không mặc định là "đặt cọc" (BLDS Điều 328)
       — thu phần còn lại bằng COD và hoá đơn lúc thu trước chưa làm (D-20261120-step45-preorder-advance)
-- [ ] Website bán hàng (16/11/2026): báo giá giỏ trả thêm số điểm tối đa dùng được, cách trả dùng được cho giỏ
+- [x] Website bán hàng (16/11/2026): báo giá giỏ trả thêm số điểm tối đa dùng được, cách trả dùng được cho giỏ
       (COD theo từng người bán), ngày giao dự kiến theo từng nơi bán; đơn có sẵn `return_until`,
       `buyer_cancel_until`; đánh giá: số đếm có ảnh và theo biến thể, "chủ đề người mua hay nhắc" kèm bản tóm tắt AI
       đã được người duyệt (D-109: AI chỉ là gợi ý)
       — đã có cách trả, ngày giao dự kiến theo nơi bán, `return_until` / `buyer_cancel_until`, đếm có ảnh và theo
-      biến thể, chủ đề kèm tóm tắt đã duyệt (D-20261120-step45-warranty-installment-fields); số điểm chờ bước 47
+      biến thể, chủ đề kèm tóm tắt đã duyệt (D-20261120-step45-warranty-installment-fields); số điểm tối đa: `tender_limits` của
+      giỏ qua `Tender::limit` (D-20261122-cart-tender-limits)
 
 ## 46. Sàn (`marketplace`) — **tạm dừng tới sau 1.0** (D-20261121-community-first)
 
