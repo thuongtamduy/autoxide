@@ -491,7 +491,8 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
 - [ ] Bộ nháp chiến dịch từ một chương trình khuyến mại (trang đích, banner, chiến dịch `newsletter`, mỗi thứ là bản
       nháp ở module của nó); hạn mức `content.ai_page_generations` theo gói
 - [ ] Kiểm tra sức khoẻ website vào hộp việc: thiếu SEO / alt, link gãy, khối tham chiếu bản ghi đã ẩn, đường dẫn
-      404 nhiều → gợi ý chuyển hướng; tool MCP như REST; hướng dẫn EN + VI cho người viết module khai khối
+      404 nhiều → gợi ý chuyển hướng; tool MCP như REST cho khối, bố cục, giao diện, loại nội dung, AI trang
+- [x] Hướng dẫn EN + VI cho người viết module khai khối (`docs/guides/page-blocks.md`, mục 9b của MODULE_GUIDE)
 - [ ] Thử A/B hai phiên bản trang (D-231, sau bước 57), **sau 1.0** — D-20261122-step67-after-1-0): chia cố định theo người xem (F5 không đổi), bot thấy bản
       gốc, chỉ thử bố cục và nội dung (không thử giá), số liệu và độ tin cậy, người chọn bản thắng
 - [ ] AI tạo ảnh (D-231), **sau 1.0** — D-20261122-step67-after-1-0): `ImageModel` mặc định tắt, chỉ banner / ảnh nền / minh hoạ, cờ `ai_generated` và nhãn,

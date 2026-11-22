@@ -731,6 +731,13 @@ once, next to its code (step 51). Every one of these is optional (default: nothi
   in `start` with `context.block_data(name, …)`: it answers all blocks of that kind on a page in one
   call, only with public data, `None` for a reference that is no longer public.
 
+### 9b. Blocks for pages built from blocks
+
+A module that has something to show on a website page (a form, a product grid, a menu) declares blocks
+with `Module::blocks()` and, for blocks that need current data, registers a `BlockData` in `start`.
+The step-by-step guide, with the props schema rules and tests, is
+[`docs/guides/page-blocks.md`](guides/page-blocks.md).
+
 ### 10. Translations
 
 Every error `code` and mail template key has a Vietnamese text in `locales/vi.json`,

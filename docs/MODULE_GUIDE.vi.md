@@ -713,6 +713,12 @@ của nó (bước 51). Mọi mục dưới đây đều tuỳ chọn (mặc đ�
   `context.block_data(tên, …)`: trả lời mọi khối loại đó của một trang trong một lần gọi, chỉ dữ
   liệu công khai, `None` cho tham chiếu không còn công khai.
 
+### 9b. Khối cho trang dựng từ khối
+
+Module có thứ cần hiện trên trang website (form, lưới sản phẩm, menu) khai khối bằng `Module::blocks()` và,
+với khối cần dữ liệu hiện tại, gắn một `BlockData` trong `start`. Hướng dẫn từng bước, kèm luật của schema
+props và cách test, ở [`docs/guides/page-blocks.vi.md`](guides/page-blocks.vi.md).
+
 ### 10. Bản dịch
 
 Mọi `code` lỗi và khoá mẫu mail có câu tiếng Việt trong `locales/vi.json`, trả từ
