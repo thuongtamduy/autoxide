@@ -6,6 +6,7 @@
 //! Mailer`, file xuất CSV lớn lưu qua `dyn Storage`, nên module đăng ký SAU module `mail` và
 //! `files`. Hướng dẫn dùng: `docs/FORMS.md`.
 
+mod blocks;
 mod config;
 mod entity;
 mod events;
@@ -153,6 +154,10 @@ impl Module for FormsModule {
         vec![("vi", include_str!("../locales/vi.json"))]
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn tenant_settings(&self) -> Vec<autoxide_kernel::tenancy::TenantSetting> {
         vec![config::TENANT_RETENTION_DAYS]
     }
@@ -177,6 +182,8 @@ impl Module for FormsModule {
         context.personal_data(service.clone())?;
         context.work_source(Arc::new(work::NewSubmissions))?;
         context.summary_metric(Arc::new(work::NewSubmissions))?;
+        // Khối `forms.embed` của trang dựng từ khối (bước 67).
+        context.block_data(blocks::EMBED.name, Arc::new(blocks::FormBlocks(service.clone())))?;
         self.service = Some(service);
         self.databases = Some(context.tenancy());
         Ok(())
