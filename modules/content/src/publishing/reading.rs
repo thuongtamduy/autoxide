@@ -58,7 +58,7 @@ impl ContentService {
         // (D-168). Ảnh tra theo ngôn ngữ của bài, để `alt` là bản dịch của ngôn ngữ đó nếu có
         // (D-202); ảnh đại diện tra chung với ngôn ngữ mặc định.
         let body_images: Vec<Vec<Uuid>> =
-            rows.iter().map(|row| crate::entries::body::stored_image_ids(&row.body)).collect();
+            rows.iter().map(|row| self.body_media_ids(&row.body)).collect();
         let mut wanted: BTreeMap<String, BTreeSet<Uuid>> = BTreeMap::new();
         for (row, images) in rows.iter().zip(&body_images) {
             let ids = wanted.entry(row.locale.clone()).or_default();

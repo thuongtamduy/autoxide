@@ -177,13 +177,7 @@ impl ContentService {
                 ));
                 return Ok(body::BodyInfo::default());
             }
-            let usable: layout::Usable = self
-                .blocks
-                .usable(tenant)
-                .await?
-                .into_iter()
-                .map(|info| (info.block.name, info))
-                .collect();
+            let usable = self.usable_blocks(tenant).await?;
             layout::check(body, &self.blocks, &usable)
         } else {
             body::check(body, self.config.max_body_bytes, &self.config.embed_hosts)
