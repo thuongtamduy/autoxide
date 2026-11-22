@@ -8,6 +8,7 @@ pub mod doctor;
 pub mod jobs;
 pub mod mcp_manifest;
 pub mod migrate;
+pub mod modules;
 pub mod openapi;
 pub mod placement;
 pub mod secrets;

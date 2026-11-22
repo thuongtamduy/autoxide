@@ -13,7 +13,7 @@ Hướng dẫn này đi từ một thư mục trống tới một module chạy 
 
 ## 1. Workspace
 
-Một repo, hai crate: module và máy chủ.
+Một repo, hai crate: module và máy chủ. Muốn sinh sẵn cả bố cục này — một bản sao của ví dụ với tên của bạn — chạy `cargo xtask new-module --external <dir> <module> <entity>` trong một bản checkout của Autoxide (ví dụ `cargo xtask new-module --external ../acme bookmarks bookmark`), rồi đọc tiếp để biết từng phần làm gì.
 
 ```text
 acme/
@@ -43,7 +43,6 @@ autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX
 
 async-trait = "0.1"
 axum = "0.8"
-jiff = { version = "1", default-features = false, features = ["std"] }
 sea-orm = { version = "2.0", default-features = false, features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -77,7 +76,6 @@ edition = "2024"
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
-jiff.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -211,7 +209,7 @@ AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD='correct horse battery staple' \
   cargo run -p acme-server -- serve               # http://127.0.0.1:8080; creates the first administrator
 ```
 
-Module nào chạy là một biến cấu hình, `AUTOXIDE_MODULES` (xem [`docs/MODULES.vi.md`](../MODULES.vi.md)): mặc định là mọi module chính thức và mọi module bạn thêm; `AUTOXIDE_MODULES=official,-bookmarks` tắt module của bạn, và module được bật kéo theo các module nó nêu trong `Module::depends_on`. `acme openapi` và `acme mcp-manifest` luôn in hợp đồng đầy đủ.
+Module nào chạy là một biến cấu hình, `AUTOXIDE_MODULES` (xem [`docs/MODULES.vi.md`](../MODULES.vi.md)): mặc định là mọi module chính thức và mọi module bạn thêm; `AUTOXIDE_MODULES=official,-bookmarks` tắt module của bạn, và module được bật kéo theo các module nó nêu trong `Module::depends_on`. `acme modules` liệt kê mọi module kèm hạng, đang bật hay tắt, và phụ thuộc (`--json` cho chương trình). `acme openapi` và `acme mcp-manifest` luôn in hợp đồng đầy đủ.
 
 Không cấu hình gì thì máy chủ giữ dữ liệu trong SQLite dưới `./data`. Dùng PostgreSQL thì đặt `DATABASE_URL=postgres://…`; không gì khác thay đổi. `acme config --env-example > .env.example` ghi ra danh sách mọi biến cấu hình kèm mô tả, và `acme doctor` kiểm một bản cài từng bước.
 

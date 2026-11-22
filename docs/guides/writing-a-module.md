@@ -13,7 +13,7 @@ This guide goes from an empty directory to a module that runs, has tests on SQLi
 
 ## 1. The workspace
 
-One repository, two crates: the module and the server.
+One repository, two crates: the module and the server. To get this whole layout generated — a copy of the example with your names — run `cargo xtask new-module --external <dir> <module> <entity>` in a checkout of Autoxide (for example `cargo xtask new-module --external ../acme bookmarks bookmark`), then read on to see what each part does.
 
 ```text
 acme/
@@ -43,7 +43,6 @@ autoxide-testkit = { git = "https://github.com/thuongtamduy/autoxide", tag = "vX
 
 async-trait = "0.1"
 axum = "0.8"
-jiff = { version = "1", default-features = false, features = ["std"] }
 sea-orm = { version = "2.0", default-features = false, features = ["macros"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -77,7 +76,6 @@ edition = "2024"
 async-trait.workspace = true
 autoxide-kernel.workspace = true
 axum.workspace = true
-jiff.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -211,7 +209,7 @@ AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD='correct horse battery staple' \
   cargo run -p acme-server -- serve               # http://127.0.0.1:8080; creates the first administrator
 ```
 
-Which modules run is a setting, `AUTOXIDE_MODULES` (see [`docs/MODULES.md`](../MODULES.md)): by default every official module and every module you added; `AUTOXIDE_MODULES=official,-bookmarks` turns yours off, and a module turned on brings the modules it names in `Module::depends_on`. `acme openapi` and `acme mcp-manifest` always print the full contract.
+Which modules run is a setting, `AUTOXIDE_MODULES` (see [`docs/MODULES.md`](../MODULES.md)): by default every official module and every module you added; `AUTOXIDE_MODULES=official,-bookmarks` turns yours off, and a module turned on brings the modules it names in `Module::depends_on`. `acme modules` lists every module with its tier, whether it is on, and what it depends on (`--json` for programs). `acme openapi` and `acme mcp-manifest` always print the full contract.
 
 With no settings the server keeps its data in SQLite under `./data`. For PostgreSQL set `DATABASE_URL=postgres://…`; nothing else changes. `acme config --env-example > .env.example` writes a documented list of every setting, and `acme doctor` checks an installation step by step.
 

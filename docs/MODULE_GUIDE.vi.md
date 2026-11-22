@@ -71,7 +71,10 @@ Mỗi migration là một file trong `src/migration/` và một dòng ở cuối
   trùng — database, chứ không phải một câu `SELECT` trước đó, quyết khi hai lệnh ghi
   cùng lúc.
 - Module ghi event thêm `autoxide_kernel::event::outbox_migration(...)`; module có job
-  nền thêm `autoxide_kernel::job::jobs_migration(...)`.
+  nền thêm `autoxide_kernel::job::jobs_migration(...)`. Module **mới** có cả hai bảng ở dạng hiện
+  tại bằng một lời gọi,
+  `migrations.extend(autoxide_kernel::migration::helper_tables("<module>", &[HelperTable::Events, HelperTable::Jobs]))`,
+  thay vì liệt kê từng bước lịch sử như các module có sẵn.
 
 Entity dùng SeaORM (`src/entity.rs`). Đọc bằng `Database::read()`, ghi bằng
 `Database::write()`, nhiều lệnh ghi đi cùng nhau thì `Database::begin_write()`. Giữ

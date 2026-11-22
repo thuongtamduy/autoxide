@@ -38,6 +38,84 @@ pub fn new_module(root: &Path, module: &str, entity: &str) -> Result<Vec<PathBuf
     generate(&root.join(TEMPLATE), &target, module, entity)
 }
 
+/// Khuôn của module ở repo riêng (D-20261121-external-modules): workspace Cargo riêng gồm module
+/// `bookmarks` và binary ghép nó với module chính thức; CI build và test nó ở mỗi thay đổi.
+const EXTERNAL_TEMPLATE: &str = "examples/external-module";
+const EXTERNAL_MODULE: &str = "bookmarks";
+const EXTERNAL_ENTITY: &str = "bookmark";
+/// Repo mà workspace sinh ra phụ thuộc vào bằng git tag.
+const REPOSITORY: &str = "https://github.com/thuongtamduy/autoxide";
+
+/// `cargo xtask new-module --external <dir> <module> <entity>`: sinh vào `target` (chưa có) một
+/// workspace Cargo riêng từ `examples/external-module` — module `<module>` và binary `acme` — phụ
+/// thuộc core bằng git tag `v<version>` thay cho đường dẫn trong repo (D-20261122-module-helpers).
+/// Trả về các file đã ghi.
+pub fn new_external(
+    root: &Path,
+    target: &Path,
+    module: &str,
+    entity: &str,
+    version: &str,
+) -> Result<Vec<PathBuf>, String> {
+    // Module chính thức chạy cùng binary: tên (tiền tố bảng) không được đụng chúng.
+    let existing = existing_modules(&root.join("modules"))?;
+    validate(module, entity, &existing)?;
+    if target.exists() {
+        return Err(format!("{} already exists", target.display()));
+    }
+    let template = root.join(EXTERNAL_TEMPLATE);
+    let renames = renames_from(EXTERNAL_MODULE, EXTERNAL_ENTITY, module, entity);
+    let mut written = Vec::new();
+    for relative in files(&template, Path::new(""))? {
+        // Kết quả build và file sinh lúc chạy của khuôn không phải mã nguồn.
+        let skipped = relative.components().any(|part| {
+            matches!(part.as_os_str().to_str(), Some("target" | "data" | "Cargo.lock"))
+        });
+        if skipped {
+            continue;
+        }
+        let source = template.join(&relative);
+        let text = fs::read_to_string(&source)
+            .map_err(|error| format!("cannot read {}: {error}", source.display()))?;
+        let mut text = rename(&text, &renames);
+        if relative == Path::new("Cargo.toml") {
+            text = external_manifest(&text, version)?;
+        }
+        let destination = target.join(rename(&relative.to_string_lossy(), &renames));
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|error| format!("cannot create {}: {error}", parent.display()))?;
+        }
+        fs::write(&destination, text)
+            .map_err(|error| format!("cannot write {}: {error}", destination.display()))?;
+        // `check.sh` chạy được ngay.
+        #[cfg(unix)]
+        if relative.extension().is_some_and(|extension| extension == "sh") {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(&destination, fs::Permissions::from_mode(0o755));
+        }
+        written.push(destination);
+    }
+    Ok(written)
+}
+
+/// `Cargo.toml` của workspace sinh ra: ba crate của core theo git tag `v<version>` thay cho đường
+/// dẫn trong repo. Lỗi nếu khuôn không còn các dòng đường dẫn đó (khuôn đổi mà quên chỗ này).
+fn external_manifest(text: &str, version: &str) -> Result<String, String> {
+    let mut out = text.to_owned();
+    for (name, dir) in
+        [("autoxide", "app"), ("autoxide-kernel", "kernel"), ("autoxide-testkit", "testkit")]
+    {
+        let path = format!("{name} = {{ path = \"../../crates/{dir}\" }}");
+        if !out.contains(&path) {
+            return Err(format!("{EXTERNAL_TEMPLATE}/Cargo.toml: line `{path}` not found"));
+        }
+        let git = format!("{name} = {{ git = \"{REPOSITORY}\", tag = \"v{version}\" }}");
+        out = out.replace(&path, &git);
+    }
+    Ok(out)
+}
+
 /// Tên module hiện có trong `modules/`.
 fn existing_modules(dir: &Path) -> Result<Vec<String>, String> {
     let entries =
@@ -151,11 +229,21 @@ fn files(root: &Path, relative: &Path) -> Result<Vec<PathBuf>, String> {
 
 /// Sáu dạng chữ, dạng dài trước dạng ngắn (`Notes` trước `Note`).
 fn renames(module: &str, entity: &str) -> Vec<Rename> {
+    renames_from(TEMPLATE_MODULE, TEMPLATE_ENTITY, module, entity)
+}
+
+/// Như [`renames`], với khuôn mang tên `template_module` / `template_entity`.
+fn renames_from(
+    template_module: &str,
+    template_entity: &str,
+    module: &str,
+    entity: &str,
+) -> Vec<Rename> {
     let forms = |name: &str| [pascal(name), name.to_ascii_uppercase(), name.to_owned()];
     let [module_pascal, module_upper, module_lower] = forms(module);
     let [entity_pascal, entity_upper, entity_lower] = forms(entity);
-    let [template_pascal, template_upper, template_lower] = forms(TEMPLATE_MODULE);
-    let [one_pascal, one_upper, one_lower] = forms(TEMPLATE_ENTITY);
+    let [template_pascal, template_upper, template_lower] = forms(template_module);
+    let [one_pascal, one_upper, one_lower] = forms(template_entity);
     vec![
         Rename { from: template_pascal, to: module_pascal },
         Rename { from: one_pascal, to: entity_pascal },
@@ -289,6 +377,56 @@ mod tests {
             "NotebooksModule notebooks_notebook NOTEBOOK_CREATED NotebookService"
         );
         assert_eq!(pascal("reading_lists"), "ReadingLists");
+    }
+
+    /// Sinh thật workspace của module ở repo riêng từ `examples/external-module`: đổi hết tên,
+    /// phụ thuộc core bằng git tag, không còn đường dẫn vào repo này.
+    #[test]
+    fn sinh_workspace_ngoai_repo_tu_vi_du_that() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let target =
+            std::env::temp_dir().join(format!("autoxide-scaffold-external-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&target);
+        let written =
+            new_external(&root, &target, "reading_lists", "reading_list", "1.2.3").unwrap();
+
+        let relative: Vec<String> = written
+            .iter()
+            .map(|path| path.strip_prefix(&target).unwrap().to_string_lossy().into_owned())
+            .collect();
+        for expected in [
+            "Cargo.toml",
+            "check.sh",
+            "reading_lists/Cargo.toml",
+            "reading_lists/src/lib.rs",
+            "reading_lists/locales/vi.json",
+            "reading_lists/src/migration/m0001_create_reading_list.rs",
+            "server/src/main.rs",
+        ] {
+            assert!(relative.contains(&expected.to_owned()), "{expected} missing: {relative:?}");
+        }
+        assert!(!relative.iter().any(|path| path.starts_with("target") || path == "Cargo.lock"));
+        let manifest = fs::read_to_string(target.join("Cargo.toml")).unwrap();
+        assert!(
+            manifest.contains(
+                "autoxide-kernel = { git = \"https://github.com/thuongtamduy/autoxide\", tag = \"v1.2.3\" }"
+            ),
+            "{manifest}"
+        );
+        assert!(!manifest.contains("path = \"../../crates"), "{manifest}");
+        for path in &written {
+            let text = fs::read_to_string(path).unwrap();
+            assert!(
+                !text.to_lowercase().contains("bookmark"),
+                "`bookmark` left in {}",
+                path.display()
+            );
+        }
+        // Tên đụng module chính thức, hay thư mục đã có, bị từ chối.
+        assert!(new_external(&root, &target, "reading_lists", "reading_list", "1.2.3").is_err());
+        let other = target.with_extension("other");
+        assert!(new_external(&root, &other, "auth", "user", "1.2.3").is_err());
+        fs::remove_dir_all(&target).unwrap();
     }
 
     /// Sinh thật từ `modules/notes` vào thư mục tạm: không còn chữ `note` nào, không có bench,

@@ -230,3 +230,34 @@ async fn migration_da_ap_dung_ma_mat_khoi_code_la_loi() {
     .await
     .unwrap();
 }
+
+/// `helper_tables` cho module mới: bảng event và job tạo được, đúng luật đa khách (`tenant_id`
+/// đứng đầu mọi khoá và index), ghi được event, và gỡ xuống được — trên cả hai database.
+#[tokio::test]
+async fn helper_tables_tao_bang_event_va_job_dung_luat() {
+    use autoxide_kernel::migration::{HelperTable, helper_tables};
+    TestDatabase::run(async |database| {
+        let db = connect(database).await;
+        let migrator = Migrator::new(vec![ModuleMigrations::new(
+            "demo",
+            helper_tables("demo", &[HelperTable::Events, HelperTable::Jobs]),
+        )])
+        .unwrap();
+
+        let applied = migrator.up(&db).await.unwrap();
+        assert_eq!(applied.len(), 6);
+        assert!(has_table(&db, "demo_events").await);
+        assert!(has_table(&db, "demo_jobs").await);
+        let snapshot = autoxide_testkit::schema_snapshot(db.write()).await.unwrap();
+        assert_eq!(
+            autoxide_testkit::schema_tenancy_violations(&snapshot, &[]),
+            Vec::<String>::new()
+        );
+
+        migrator.down(&db, "demo", 6).await.unwrap();
+        assert!(!has_table(&db, "demo_events").await);
+        assert!(!has_table(&db, "demo_jobs").await);
+    })
+    .await
+    .unwrap();
+}

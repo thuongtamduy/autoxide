@@ -109,11 +109,16 @@ jobs:
     env:
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # Như job `build tests`: sccache giữ từng crate đã biên dịch giữa các lần chạy, mold link nhanh — job này
+      # build lại cả core nên không có chúng nó thành job dài nhất của CI (D-20261122-module-helpers).
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: sccache
       # Database dùng xong bỏ của CI: mật khẩu này không bảo vệ gì.
       GATE_POSTGRES_URL: postgres://postgres:postgres@127.0.0.1:5432/postgres
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - run: rustup toolchain install
+      - uses: mozilla-actions/sccache-action@fc920bf0ec8de6ee65d409111f7ec508035751ba # v0.0.11
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           shared-key: example
@@ -122,7 +127,10 @@ jobs:
             . -> target
             examples/external-module -> target
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: rui314/setup-mold@339e96b4ff1f3bd865856ba4cbbe8818a7acb038 # v1
       - run: ./gate.sh --only example
+      - run: sccache --show-stats
+        if: always()
 
   # Build mọi chương trình test MỘT lần thành archive của nextest (`./gate.sh --only build`); các job
   # `tests` tải archive về và chạy, không biên dịch lại (D-20261120-ci-nextest-archive). Gate đầy đủ
