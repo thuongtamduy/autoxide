@@ -17,7 +17,6 @@ edition = "2024"
 rust-version = "1.99"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/thuongtamduy/autoxide"
-homepage = "https://github.com/thuongtamduy/autoxide"
 readme = "README.md"
 keywords = ["backend", "rest", "openapi", "mcp", "multi-tenant"]
 categories = ["web-programming::http-server"]
@@ -51,6 +50,7 @@ autoxide-testkit = { path = "crates/testkit", version = "=0.17.0" }
 autoxide-audit = { path = "modules/audit", version = "=0.17.0" }
 autoxide-auth = { path = "modules/auth", version = "=0.17.0" }
 autoxide-idempotency = { path = "modules/idempotency", version = "=0.17.0" }
+autoxide-esms = { path = "modules/esms", version = "=0.17.0" }
 autoxide-mail = { path = "modules/mail", version = "=0.17.0" }
 autoxide-ai = { path = "modules/ai", version = "=0.17.0" }
 autoxide-files = { path = "modules/files", version = "=0.17.0" }
@@ -69,6 +69,8 @@ autoxide-organizations = { path = "modules/organizations", version = "=0.17.0" }
 autoxide-plans = { path = "modules/plans", version = "=0.17.0" }
 autoxide-tax = { path = "modules/tax", version = "=0.17.0" }
 autoxide-ledger = { path = "modules/ledger", version = "=0.17.0" }
+autoxide-sepay = { path = "modules/sepay", version = "=0.17.0" }
+autoxide-einvoice-sepay = { path = "modules/einvoice_sepay", version = "=0.17.0" }
 autoxide-invoices = { path = "modules/invoices", version = "=0.17.0" }
 autoxide-compliance = { path = "modules/compliance", version = "=0.17.0" }
 autoxide-notifications = { path = "modules/notifications", version = "=0.17.0" }

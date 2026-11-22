@@ -566,7 +566,7 @@ impl EInvoiceProvider for GuardedEInvoices {
             return self.inner.status(tenant, provider_ref).await;
         }
         let authority_code = Some(format!("{SANDBOX_PREFIX}AUTHORITY"));
-        Ok(EInvoiceStatus::Accepted { authority_code })
+        Ok(EInvoiceStatus::Accepted { authority_code, number: None })
     }
 
     async fn cancel(&self, tenant: TenantId, request: &EInvoiceCancel) -> Result<(), Error> {

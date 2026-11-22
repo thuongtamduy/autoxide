@@ -1,5 +1,5 @@
 # Ghim toolchain: máy dev, CI và Docker build ra cùng một kết quả.
-# Nâng phiên bản là một quyết định — ghi vào docs/DECISIONS.md.
+# Nâng phiên bản là một quyết định — ghi bằng skill `record-decision`.
 [toolchain]
-channel = "1.99.1"
+channel = "1.100.0"
 components = ["rustfmt", "clippy", "rust-analyzer"]

@@ -19,7 +19,7 @@ use crate::workspace::Workspace;
 pub const UNPUBLISHED: [&str; 2] = ["xtask", "autoxide-notes"];
 
 /// Dòng mỗi crate sẽ đăng phải có trong `Cargo.toml` (thừa hưởng từ `[workspace.package]`).
-const INHERITED: [&str; 5] = ["repository", "homepage", "readme", "keywords", "categories"];
+const INHERITED: [&str; 4] = ["repository", "readme", "keywords", "categories"];
 
 /// Luật `publish-ready` trên workspace ở đĩa.
 pub fn check(workspace: &Workspace) -> Result<Vec<Violation>, String> {
@@ -269,8 +269,8 @@ mod tests {
 
     #[test]
     fn metadata_thieu_duoc_neu_ten() {
-        let good = "description = \"x\"\nrepository.workspace = true\nhomepage.workspace = true\n\
-                    readme.workspace = true\nkeywords.workspace = true\ncategories.workspace = true\n";
+        let good = "description = \"x\"\nrepository.workspace = true\nreadme.workspace = true\n\
+                    keywords.workspace = true\ncategories.workspace = true\n";
         assert_eq!(check_metadata("crates/kernel", good), Vec::new());
         let bad = check_metadata("crates/kernel", "repository.workspace = true\n");
         assert_eq!(bad.len(), 1);

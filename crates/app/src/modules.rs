@@ -39,12 +39,20 @@ pub fn all() -> Vec<Box<dyn Module>> {
         Box::new(autoxide_webhooks::module()),
         // Thuế (bước 36): sổ cái và chứng từ (sau) cần `dyn TaxEngine`, nên đứng trước chúng.
         Box::new(autoxide_tax::module()),
+        // Bộ nối SePay (bước 70 P7, thử nghiệm): góp `dyn BankFeed` cho `ledger`, nên đứng trước nó.
+        Box::new(autoxide_sepay::module()),
         // Sổ cái kép (bước 36): cần `dyn OrgDirectory` (múi giờ, tiền tệ của nút); chứng từ, thanh
         // toán và module thương mại (sau) ghi sổ qua `dyn Ledger`.
         Box::new(autoxide_ledger::module()),
+        // Bộ nối SePay eInvoice (bước 70 P7, thử nghiệm): góp `dyn EInvoiceProvider` cho `invoices`,
+        // nên đứng trước nó.
+        Box::new(autoxide_einvoice_sepay::module()),
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),
+        // Bộ nối SMS eSMS (bước 70 P7, thử nghiệm): công bố `dyn SmsSender` cho `compliance`, `notifications`,
+        // `bookings`, `orders` (đều đứng sau); tài khoản eSMS là của từng khách.
+        Box::new(autoxide_esms::module()),
         // Tuân thủ (bước 37): định danh (KYC), quy tắc pháp lý, văn bản pháp lý, sổ đồng ý. Dùng
         // `dyn IdentityVerifier` nếu có module cung cấp (đứng trước); `plans` (khách tự đăng ký) và module
         // thương mại chặn qua `dyn KycGate` / `dyn AcceptanceGate`.

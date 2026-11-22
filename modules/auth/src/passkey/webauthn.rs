@@ -138,19 +138,16 @@ impl Engine {
         let registered = server
             .verify(&self.rp_id, &response, &options)
             .map_err(|error| Rejected(error.to_string()))?;
+        // `encode` của thư viện trả lỗi kiểu `Infallible` (không bao giờ lỗi): `let Ok(…) = …` không
+        // cần nhánh lỗi.
+        let Ok(static_state) = registered.static_state().encode();
+        let Ok(dynamic_state) = registered.dynamic_state().encode();
         Ok(Registered {
             aaguid: super::authenticators::from_bytes(registered.metadata().aaguid.data()),
             credential_id: registered.id().as_ref().to_vec(),
             user_handle: registered.user_id().as_ref().to_vec(),
-            static_state: registered
-                .static_state()
-                .encode()
-                .map_err(|error| Rejected(error.to_string()))?,
-            dynamic_state: registered
-                .dynamic_state()
-                .encode()
-                .map_err(|error| Rejected(error.to_string()))?
-                .to_vec(),
+            static_state,
+            dynamic_state: dynamic_state.to_vec(),
         })
     }
 
@@ -213,8 +210,8 @@ impl Engine {
         if !changed {
             return Ok(None);
         }
-        let encoded =
-            credential.dynamic_state().encode().map_err(|error| Rejected(error.to_string()))?;
+        // `encode` trả lỗi kiểu `Infallible` (không bao giờ lỗi).
+        let Ok(encoded) = credential.dynamic_state().encode();
         Ok(Some(encoded.to_vec()))
     }
 }
