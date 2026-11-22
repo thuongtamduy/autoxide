@@ -17,6 +17,7 @@ pub(crate) mod redirect;
 pub(crate) mod revision;
 pub(crate) mod schedule;
 pub(crate) mod shared_section;
+pub(crate) mod site_region;
 pub(crate) mod term;
 pub(crate) mod term_translation;
 pub(crate) mod theme;

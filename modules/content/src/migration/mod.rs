@@ -20,6 +20,7 @@ mod m0023_themes;
 mod m0024_shared_sections;
 mod m0025_page_templates;
 mod m0026_theme_variants;
+mod m0027_site_regions;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -173,5 +174,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0025_page_templates::Migration),
         // Bản chủ đề theo lịch: mùa, ngày lễ, khung giờ (bước 67, D-234).
         Box::new(m0026_theme_variants::Migration),
+        // Đầu trang, chân trang của website (bước 67, D-234).
+        Box::new(m0027_site_regions::Migration),
     ]
 }
