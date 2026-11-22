@@ -68,6 +68,13 @@ impl TenantMoves {
         let target_db = self.database(&target).await;
         match (source_db, target_db) {
             (Ok(source_db), Ok(target_db)) => {
+                // Lượt dời chỉ chép bảng của module đang bật (bước 70 P1): còn dữ liệu của module
+                // đang tắt thì dừng, không để nó ở lại database nguồn.
+                let left_behind =
+                    self.setup.inactive_with_data(&source_db, TenantId::from_uuid(row.id)).await?;
+                if !left_behind.is_empty() {
+                    blockers.push(errors::tenant_move_modules_off(&left_behind.join(", ")));
+                }
                 let schema = self.schema_problems(&source, &source_db, &target, &target_db).await?;
                 let schema_ok = schema.is_empty();
                 blockers.extend(schema);

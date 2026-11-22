@@ -91,6 +91,8 @@ fn describe(tool: &Tool) -> Value {
         "input_schema": tool.input_schema(),
         // `Tool` chưa khai schema kết quả (đặc tả 31 A6).
         "output_schema": Value::Null,
+        // `experimental`: tool của module thử nghiệm, có thể đổi giữa các bản (bước 70 P3).
+        "stability": if tool.is_experimental() { "experimental" } else { "official" },
         "deprecation": tool.deprecation().map(|deprecation| json!({
             "since": deprecation.since,
             "sunset": deprecation.sunset,
