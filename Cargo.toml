@@ -40,6 +40,7 @@ autoxide-testkit = { path = "crates/testkit" }
 autoxide-audit = { path = "modules/audit" }
 autoxide-auth = { path = "modules/auth" }
 autoxide-idempotency = { path = "modules/idempotency" }
+autoxide-esms = { path = "modules/esms" }
 autoxide-mail = { path = "modules/mail" }
 autoxide-ai = { path = "modules/ai" }
 autoxide-files = { path = "modules/files" }

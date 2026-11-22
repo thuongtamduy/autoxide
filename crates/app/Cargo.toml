@@ -25,6 +25,7 @@ jiff.workspace = true
 autoxide-audit.workspace = true
 autoxide-auth.workspace = true
 autoxide-idempotency.workspace = true
+autoxide-esms.workspace = true
 autoxide-mail.workspace = true
 autoxide-ai.workspace = true
 autoxide-files.workspace = true
