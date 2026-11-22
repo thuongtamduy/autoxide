@@ -71,7 +71,7 @@ impl Module for EsmsModule {
     }
 
     fn tenant_settings(&self) -> Vec<TenantSetting> {
-        vec![account::API_KEY, account::SECRET_KEY, account::BRANDNAME, account::SANDBOX]
+        vec![account::API_KEY, account::SECRET_KEY, account::BRANDNAME, account::ENVIRONMENT]
     }
 
     fn configure(&mut self, reader: &mut ConfigReader<'_>) -> Result<(), Invalid> {
