@@ -9,6 +9,317 @@ endpoints are marked deprecated with a sunset date first.
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-22
+
+### Added
+
+- `cargo xtask check` checks the shape of every `/api/v1` endpoint in `docs/openapi.json`: request
+  bodies refuse unknown fields, errors are `Problem`, lists are paged (`Page<T>` with `limit` and
+  `cursor`); exceptions are listed with a reason in `xtask/api-shape-allow.txt`.
+- Module `auth`: `POST /api/v1/auth/oidc/{slug}/start` and `POST /api/v1/auth/me/identities/{slug}/start`
+  accept `bind_browser`; the returned `browser_secret` must then be sent to the callback.
+- Module `auth`: `POST /api/v1/auth/phone-signups` creates a buyer account from a verified order lookup
+  token (no email, no password) and signs in; later sign-ins use an SMS code or a passkey.
+- Kernel: `StartContext::later` gives a module a handle to a contract that a module registered after
+  it provides; `autoxide_kernel::sms::VerifiedPhoneTokens` is the neutral contract for tokens issued
+  after a one-time code to a phone number.
+- Module `auth`: `POST /api/v1/auth/registrations` creates your own account and answers the same
+  way whether the email already has one (the owner of an existing account gets a notice).
+- Kernel: block registry for pages built from blocks. Modules declare blocks with `Module::blocks()`
+  (name, category, label, AI hint, props JSON Schema, plan feature) and serve their data in batches through
+  `BlockData`; `GET /api/v1/kernel/blocks` lists the blocks the tenant can use, with their schema.
+- Module `orders`: carts return `tender_limits`, the most each plugged-in way to pay can cover before
+  checkout; with `customers`, the most loyalty points the buyer can use (`kind: points`).
+- Page blocks for selling: `catalog.product_grid`, `catalog.product_card`, `catalog.collection`,
+  `promotions.flash_sale`, `promotions.voucher_claim`, `orders.add_to_cart`, `orders.buy_now`, `orders.cart_link` and
+  `orders.reviews`. Data blocks carry the same public data as the public endpoints (current prices, units left,
+  ratings), read once per block type for the whole page.
+- `content`: base blocks for block-layout pages — columns, spacer, divider, text, button, FAQ, image, gallery,
+  video, hero, announcement bar, countdown, email sign-up popup (always with consent and the privacy policy link),
+  embedded record, search box and banner placement (`content.placement`, its scheduled banners in `blocks_data`).
+- `compliance`: the legal footer block `compliance.legal_footer` (owner information and the ministry logo).
+  `GET /api/v1/content/public/resolve` returns it as `legal_footer` below every block-layout page; a page cannot
+  place or remove it.
+- `content`: edit locks for pages and posts — `POST /api/v1/content/entries/{id}/edit-lock` takes or renews a
+  2-minute lock, `GET` shows who is editing and until when, `DELETE` releases it. Someone else's live lock gives
+  `409 content.edit_locked`. The lock is advisory: saving still needs a matching `If-Match`.
+- `content`: page templates — `POST /api/v1/content/page-templates/presets` installs ready-made layouts for retail,
+  food and drink, services, events and recruiting (English and Vietnamese); `POST /page-templates` saves a page as
+  a template; `POST /entries/from-template` starts a draft page from one, leaving out blocks of modules the tenant
+  does not have (`dropped_blocks`).
+- `content`: shared sections — blocks placed on many pages with `content.shared_section` and edited in one place
+  (`/api/v1/content/shared-sections`). Public pages show the section's current blocks without being published
+  again; deleting a section still in use answers `409 content.shared_section_in_use`.
+- `content`: website themes — `GET` / `PUT /api/v1/content/themes/{org_id}` set colors, fonts, spacing, radius and
+  logo as flat tokens per organization unit; a store inherits its chain's tokens and overrides only what it sets.
+  `effective` gives every token the website uses; colors below WCAG AA contrast come back as `warnings`. New
+  permission `content.themes.manage`.
+- `content`: scheduled theme variants — override part of a website's theme for a holiday, a season or an hour
+  (`/api/v1/content/theme-variants`, schedules `once` / `daily` / `weekly` in the website's time zone, priority,
+  draft → active → paused, copy to next year), nine ready-made presets (`GET /theme-presets`: Tết, Valentine, 8/3,
+  30/4, Mid-Autumn, 20/10, Black Friday, Christmas, golden hour) and `GET /site/{org_id}/preview?at=` to see the
+  website's look at any moment. New setting `AUTOXIDE_CONTENT_THEME_VARIANTS_MAX`.
+- Module `invoices`: when an e-invoice is accepted, the invoice number given by the provider is stored on the document
+  as `provider_number`, next to the tax authority's code (providers that assign numbers after sending).
+- New experimental module `esms`: sends one-time codes and customer-care SMS through eSMS (Vietnam) under each
+  tenant's own account (`esms.connection.sms.api_key`, `.secret_key`, `.brandname`, `.environment`), with a connection
+  test. Advertising messages are refused. Off by default; turn on with `AUTOXIDE_MODULES=official,esms`. Written
+  from the provider's public documentation; not yet verified against the live service. Guide:
+  `docs/guides/providers/esms.md`.
+- `cargo xtask new-module --external` now also writes a `README.md` + `README.vi.md`, an `AGENTS.md`
+  with the rules for AI agents (`CLAUDE.md` links to it) and a CI workflow that runs `check.sh` on
+  SQLite and PostgreSQL; `--core-path <checkout>` depends on a local checkout of Autoxide instead of
+  the release tag. The gate now builds and tests a generated workspace.
+- Modules can live in a repository of their own, without forking Autoxide: the `autoxide` crate is
+  now also a library with one entry point, `autoxide::Autoxide::new().module(your_crate::module).run()`,
+  which runs the standard command line and server with the official modules plus yours. Added modules
+  get migrations, permissions, events, jobs, OpenAPI routes, MCP tools, translations and settings like
+  built-in ones. Guide: `docs/guides/writing-a-module.md`; working example (its own Cargo workspace,
+  tested on SQLite and PostgreSQL by CI): `examples/external-module`.
+- `cargo xtask check-module <dir>` runs the module rules of `cargo xtask check` on a crate outside
+  the repository.
+- The module contract now states what is stable for modules kept elsewhere (`autoxide-kernel`,
+  `autoxide-testkit`, `autoxide::Autoxide`, the `api` of official modules) and how it may change
+  before and after 1.0 (`docs/MODULE_GUIDE.md`, "Stability of the module contract").
+- Module `catalog`: feature `testing` adds `autoxide_catalog::api::testing::FakeCatalog`, an in-memory
+  catalog (variants, price history, reference prices, floors, bundles, display prices, the sale-price
+  hook) for the tests of modules that sell, stock or discount products.
+- `autoxide-testkit`: `FakeMailer`, an in-memory `Mailer` with the real `dedupe_key` rule. Module
+  `address`: feature `testing` adds `autoxide_address::api::testing::FakeAdministrativeUnits`, a small
+  in-memory list of provinces and communes for the tests of modules that check addresses.
+- Module `media`: feature `testing` adds `autoxide_media::api::testing::FakeMedia`, an in-memory media
+  library (visibility, size, alt per language, uploader, image for AI) for the tests of modules that
+  attach media.
+- New experimental module `ghn`: connector for the carrier Giao Hang Nhanh (GHN) behind `shipping` — connection test,
+  quotes, bookings, labels, cancellation, tracking and status webhooks, with each tenant's own GHN account (token and
+  shop id on the carrier account). Written from GHN's public documentation; not yet verified against the live
+  service. Turn it on with `AUTOXIDE_MODULES=official,ghn`. Guide: `docs/guides/providers/ghn.md`.
+- `shipping`: the `webhook_path` of a new carrier account now names the tenant
+  (`/api/v1/shipping/webhooks/{carrier_code}/{hook}/{token}`), so a carrier needs no tenant header or tenant domain.
+  Addresses given out before keep working.
+- Documentation: the README quickstart explains where the first administrator's password file is
+  (`/var/lib/autoxide/data/initial-admin-password` in the data volume) and how to remove it, lists the
+  modules the image contains, shows `If-Match` with `curl`, and notes curl 7.82 for `--json`, the
+  build time from source and building behind a company proxy. `docs/DEPLOY.md` adds a minimal
+  Kubernetes example (`deploy/kubernetes/autoxide.yaml`), encrypted off-site backups and
+  point-in-time recovery on PostgreSQL.
+- Kernel: `rows::lock_key` serialises write transactions on a name (a Postgres transaction-level
+  advisory lock; nothing extra on SQLite, whose write transactions already run one at a time).
+- Module `content`: `GET /api/v1/content/public/resolve` and preview links return a page's block layout with
+  `blocks_data`, the data of its data blocks read once per block type; a failing block is `null` and the page still
+  answers. The `ETag` covers the block data.
+- `AUTOXIDE_HTTP_METRICS_ADDRESS`: serve `/metrics` (which has no authentication) on its own port
+  that only the metrics collector reaches; `/metrics` then leaves the API port. Metrics stay off by
+  default.
+- Blocks for block-layout pages from four modules: `forms.embed` (a form by key, its public definition in
+  `blocks_data`), `menus.menu` (a website menu by key, resolved like `GET /api/v1/menus/public/{key}`),
+  `newsletter.signup` (sign-up box, consent text and privacy link required) and `comments.thread`.
+- `autoxide modules` lists every module of the program — official ones and those a binary of your
+  own added — with its tier, whether it is on, what it depends on and, for modules that are off,
+  the tables that still hold data. `--json` prints the same for programs and agents.
+- For module authors: `autoxide_kernel::migration::helper_tables` creates a new module's event and
+  job tables with one call; `autoxide_kernel::time::SignedDuration` (no need to depend on `jiff`);
+  `cargo xtask new-module --external <dir> <module> <entity>` generates a workspace of your own
+  (a module and its server) from `examples/external-module`.
+- OpenAPI: every operation of an experimental module carries `"x-stability": "experimental"` and
+  says so in its description; `docs/mcp-tools.json` has `stability` for every tool, and MCP tool
+  descriptions of experimental modules say they may change.
+- Moving a tenant to another database, and splitting or merging tenants, answer
+  `409 tenant_move_modules_off` while the tenant has data of a module that is turned off, instead
+  of leaving that data behind. The startup warning and `autoxide doctor` now also look at the
+  database of every placement for such data.
+- `AUTOXIDE_MODULES` chooses which modules run: `core`, `official` (the default), `all`, module
+  names to add and `-name` to leave one out; modules that an enabled module needs are turned on
+  with it. A module that is off serves no routes, MCP tools, jobs or events, is absent from the
+  OpenAPI document served by the server and from `/llms.txt`, and its migrations do not run; data
+  it already has is kept. `docs/openapi.json`, `docs/mcp-tools.json` and the SDKs still describe
+  every module. See `docs/MODULES.md`.
+- Modules have a tier: core (cannot be turned off: `auth`, `mail`, `idempotency`), official, and
+  experimental (`bookings`, `newsletter`, `comments`, `support`, `conversations`, `analytics`,
+  `reporting`, `automations`), whose API may still change between releases.
+  `GET /api/v1/kernel/modules` returns `stability` for each module, and `autoxide doctor` lists
+  the modules that run and those that are off.
+- Module authors: `Module::stability`, `Module::essential` and `Module::depends_on` (all with
+  defaults).
+- New experimental module `momo`: the MoMo payment gateway (Vietnam) behind `PaymentGateway`, with one MoMo business
+  account per tenant (`momo.connection.account.partner_code`, `.access_key`, `.secret_key`, optional `.environment`
+  and `.return_url`). Payment links and QR codes, payment notifications (IPN) at each tenant's own address, status
+  checks, full and partial refunds, and "test connection" from the settings API. New settings `AUTOXIDE_MOMO_API_URL`
+  and `AUTOXIDE_MOMO_SANDBOX_API_URL`; new error codes `momo.account_rejected`, `momo.amount_out_of_range`,
+  `momo.currency_not_supported`, `momo.notification_not_final`, `momo.order_already_created`,
+  `momo.refund_already_sent` and `momo.return_url_required`. Written from the provider's public documentation; not yet
+  verified against the live service. Turn it on with `AUTOXIDE_MODULES=official,momo`. Guide:
+  `docs/guides/providers/momo.md`.
+- Module `content`: pages can have a block layout body (`{"type": "layout", …}`) instead of rich text, checked
+  against the block registry (deny by default, values per screen size, visibility per screen size, one layout per
+  translation). `PUT /api/v1/content/entries/{id}/layout` replaces it and `PATCH` changes part of it with JSON Patch
+  (RFC 6902), both with `If-Match`; drafts, revisions, previews and schedules work as for rich text. First base
+  blocks: `content.section`, `content.heading`.
+- Partner connections per tenant (provider adapters): each tenant's own webhook address at
+  `GET /api/v1/kernel/connections/webhooks`, received at `POST /api/v1/ledger/webhooks/{provider}/{hook}` and
+  `POST /api/v1/ledger/bank-feeds/{provider}/{hook}`; new MCP tools `kernel.set_setting` (not for secrets),
+  `kernel.delete_setting`, `kernel.test_connection`, `kernel.list_connection_webhooks`; new error codes
+  `provider.not_configured` and `provider.webhook_unknown`. Guide: `docs/guides/provider-adapters.md`.
+- Module `sepay` (experimental; written from the provider's public documentation, not yet verified against the live
+  service): confirms VietQR bank transfers from SePay's bank transaction notifications. Each tenant connects its own
+  SePay account (`sepay.connection.bank.*` settings); signed webhooks (HMAC-SHA256 or API key) at
+  `POST /api/v1/ledger/bank-feeds/sepay/{hook}` and the SePay transaction API for missed notifications. New setting
+  `AUTOXIDE_SEPAY_API_URL`. Guide: `docs/guides/sepay.md`.
+- Module `einvoice_sepay` (experimental; written from the provider's public documentation, not yet verified against
+  the live service): sends issued invoices to the tax authority through SePay eInvoice (e-invoice provider `sepay`).
+  Each tenant connects its own account (`einvoice_sepay.connection.api.*` settings). VAT and sales invoices in VND,
+  replacements and adjustments, status until the tax authority answers, PDF / XML download. New settings
+  `AUTOXIDE_EINVOICE_SEPAY_API_URL` and `AUTOXIDE_EINVOICE_SEPAY_SANDBOX_API_URL` (per-tenant `environment`). Guide: `docs/guides/sepay-einvoice.md`.
+- Module `ledger`: feature `testing` adds `autoxide_ledger::api::testing::FakeLedger` and `FakeLedgerModule`, an
+  in-memory ledger for the tests of modules that post entries, take payments or listen to
+  `ledger.payment_succeeded`, so module authors no longer copy a fake ledger into their tests.
+- Modules `notifications` and `compliance`: feature `testing` adds
+  `autoxide_notifications::api::testing::FakeNotifier` and
+  `autoxide_compliance::api::testing::FakeConsentLedger`, in-memory fakes for the tests of modules
+  that send notifications or check consents.
+- Guide "Opening a shop" (`docs/guides/shop.md`, Vietnamese `shop.vi.md`): from the quickstart to a first
+  order paid with MoMo, delivered by GHN, with SMS through eSMS and an e-invoice through SePay eInvoice;
+  the same flow runs as an end-to-end test on SQLite and PostgreSQL.
+- Module `ledger`: the tenant setting `ledger.payments.default_provider` picks the payment partner when
+  a payment does not name one and the server has several.
+
+### Changed
+
+- New setting `AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD_OUT` (default `data/initial-admin-password`): where `autoxide serve`
+  writes the generated password of the first administrator.
+- **Request bodies refuse unknown fields everywhere.** Most endpoints already answered a field they do
+  not know (often a misspelt one) with `422 invalid_body`; the remaining ones — sign-in, sessions,
+  password and email changes, users and roles in `auth`, tags, notes, views, texts, approvals, bulk
+  actions and exports in the kernel, address validation, a few `catalog`, `forms` and `promotions`
+  bodies — now do the same instead of ignoring it, and their schemas say `additionalProperties:
+  false`. The MCP tools `auth.create_api_key` and `auth.create_role`, which share those bodies, refuse unknown fields too. A client that sent extra fields to these endpoints must stop sending them. SCIM 2.0,
+  partner callbacks, the cart line (`PUT /api/v1/orders/carts/{id}/lines/{variant_id}`) and bodies
+  built from several parts are unchanged.
+- The example module in its own repository (`examples/external-module`, and so `cargo xtask new-module
+  --external`) now pins the same Rust toolchain as the core (1.100.0).
+- Guide "Writing a module in your own repository": explains `helper_tables` for the event and job
+  tables of a new module.
+- `AUTOXIDE_STARTUP_TASKS`: a task of a module that is turned off is skipped with a warning
+  instead of stopping the server; an unknown task of a module that is on is still an error.
+- **Upgrade action:** experimental modules (`bookings`, `newsletter`, `comments`, `support`,
+  `conversations`, `analytics`, `reporting`, `automations`) no longer run unless
+  `AUTOXIDE_MODULES` names them. If you use any of them, add for example
+  `AUTOXIDE_MODULES=official,newsletter,comments` (or `AUTOXIDE_MODULES=all` for the behavior of
+  0.17) before restarting. Nothing is deleted: when the database holds rows of a module that is
+  off, `autoxide serve` logs a warning and `autoxide doctor` reports `modules_turned_off`, both
+  with the exact line to add; `autoxide copy` and `autoxide backup create` / `restore` refuse to
+  run until those modules are on. See "Upgrading from 0.17 or earlier" in `docs/MODULES.md`.
+- Setting or removing a tenant setting of the `connection` group (a partner account) now needs a recent sign-in:
+  `PUT` / `DELETE /api/v1/kernel/settings/{name}` answer `401 step_up_required` otherwise (API keys are not asked).
+  For adapter authors: `ProviderAccounts::webhook_url`, `provider::Environment` (sandbox accounts per tenant) and
+  `Principal::require_fresh`.
+- Build: the pinned Rust toolchain (`rust-toolchain.toml` and the Docker build image) is now 1.100.0.
+- Module `shipping`: carrier quotes carry the recipient and the parcel's size when the cart has them;
+  GHN quotes no longer send placeholder recipient values once the buyer entered a name and phone.
+- Module `notifications`: a message whose provider account the tenant has not set up yet
+  (`provider.not_configured`) is skipped with the reason `channel_disabled` instead of failing.
+
+### Deprecated
+
+- Module `auth`: `POST /api/v1/auth/register` (sunset 2027-05-21); use
+  `POST /api/v1/auth/registrations`.
+
+### Fixed
+
+- Module `catalog`: similar-product lists no longer lose entries when two index jobs for the same
+  product, or the very first products of a tenant, are indexed at the same time.
+- Module `catalog`: similar-product lists stay complete when several embedding index jobs run at the
+  same time; a later job no longer deletes the entries an earlier job had just written.
+- Module `organizations`: `%` and `_` in the `q` filter of `GET /units` and `GET /groups` are matched
+  literally instead of acting as wildcards.
+- Modules `plans` and `bookings`: a `ledger.payment_succeeded` event whose amount is less than what is
+  due (a short payment accepted during reconciliation) no longer marks a billing period paid or
+  confirms a booking; a short booking deposit is refunded instead.
+- Module `orders`: first-order promotions now apply to buyers with no earlier order (by account or
+  phone number) instead of never applying.
+
+### Security
+
+- Module `auth`: signing out, ending a session, changing or resetting the password and disabling an
+  account now stop the access tokens of the ended sessions at once (`401 auth.session_ended`), instead
+  of letting them work until they expire (15 minutes by default). Checked in the same database query
+  as before, so requests make no extra round trip.
+- Module `auth`: granting roles (memberships, invitations, SCIM group mappings, OIDC default roles)
+  now compares the scope of each permission, not only its name; an invitation is checked again
+  against the inviter's current permissions when it is accepted.
+- Module `auth`: SCIM only links, deactivates or changes the email of accounts whose permissions the
+  token's creator also has; an email changed through SCIM on a linked pre-existing account is no
+  longer marked as verified.
+- Module `auth`: recovering an account by password reset also removes its outside sign-in links,
+  and every password change revokes pending sign-in links and confirmation tokens.
+- Module `auth`: a sign-in provider links an existing account by email only when whoever last
+  configured the provider has all of that account's permissions (new column
+  `auth_oidc_provider.configured_by`).
+- Module `auth`: failed sign-ins are counted per email and client address, with a wider limit for
+  the email as a whole, so one client can no longer lock someone else's account. Wrong current
+  passwords and second-factor codes are counted per account.
+- Module `auth`: customers confirm their current password against their own account kind.
+- Module `auth`: using a sign-in link on an account whose email was never verified verifies it and
+  removes any password, session, passkey, API key, authenticator app and outside sign-in set up
+  before.
+- Module `auth`: a passkey's signature counter is updated with a compare-and-swap.
+- Module `auth`: a multi-organization Microsoft Entra provider that allows sign-up must list
+  `allowed_email_domains`.
+- The release image is built from base images pinned by digest, and every GitHub Action in CI and release workflows is
+  pinned to a full commit SHA; Dependabot proposes updates weekly.
+- Module `customers`: a gift card attached to an account can only be spent or attached by that
+  account; a referral reward is taken back when the qualifying order is refunded below the
+  minimum order amount.
+- Module `ledger`: two bank transfers for the same VietQR payment matched at the same time never
+  lose the extra transfer; it always opens a `duplicate_payment` item.
+- Module `orders`: a cash-on-delivery collection for a shipment with no matching delivery is
+  counted once, even when the event arrives again.
+- Module `promotions`: `%` and `_` in the `q` search of promotions match themselves.
+- Module `promotions`: `POST /promotions/evaluate` and the MCP tool `promotions.evaluate_cart`
+  need `promotions.read` covering the unit of the cart (`org_out_of_scope` otherwise).
+- Modules `customers` and `orders`: every lookup by id is filtered by tenant.
+- MCP tools (and automation steps) ask for a recent sign-in confirmation for sensitive permissions, as REST does.
+- `webhooks`: subscribing an endpoint to an event needs the event's `stream_permission` (`*`: all of them), as the
+  event stream does.
+- Tenant templates cannot use `{% autoescape %}` (`template.autoescape_forbidden`).
+- `media`: uploaded SVG files may only contain known SVG elements; `<!DOCTYPE`, entities, CDATA and processing
+  instructions are refused. New setting `AUTOXIDE_MEDIA_IMAGE_JOBS` (default 2) limits how many images are decoded at
+  once.
+- The API reference page loads a pinned Scalar script with Subresource Integrity; the quickstart turns the page off by
+  default.
+- `AUTOXIDE_SECRET_KEY` set to the example value is refused; `compose.yml` requires it. A warning is logged when
+  `AUTOXIDE_HTTP_CLIENT_IP_HEADER` is set without `AUTOXIDE_HTTP_TRUSTED_PROXIES`.
+- Searches and slug checks escape `%` and `_` in user text.
+- `automations`: a rule created, edited or enabled with an API key runs with at most that key's permissions and unit
+  fence, and pauses (`credential_revoked`) when the key is revoked.
+- The generated password of the first administrator is written to `data/initial-admin-password` (mode 0600), not to
+  the log.
+- Kernel: exporting the data of another tenant (`/api/v1/kernel/tenants/{id}/exports…`, MCP `export_tenant`) and
+  making a sandbox of it now need access to that tenant (header `Autoxide-Tenant` under a support access grant in
+  force); requests, downloads and download links of an export are recorded in the tenant's own events
+  (`kernel.tenant_export_requested`, `kernel.tenant_export_accessed`). New codes
+  `kernel.export_needs_tenant_access`, `tenancy.sandbox_needs_tenant_access`.
+- Module `ledger`: resolving a reconciliation item with `match` now requires the amount collected
+  to equal the amount due and the payment to be the one the item is about and still waiting for
+  its money; a different amount needs the new action `accept_received`. The event
+  `ledger.payment_succeeded` carries the amount actually collected.
+- Module `compliance`: a phone number that entered too many wrong sign-in codes within 24 hours
+  (`AUTOXIDE_COMPLIANCE_OTP_WRONG_PER_PHONE_PER_DAY`, default 10, counted across all its codes) gets no
+  new code and no code check until the oldest wrong entry is 24 hours old (`compliance.otp_daily_limit`).
+- Modules `orders` and `promotions`: per-buyer promotion limits now count every buyer, signed in or
+  not, by account, phone number and delivery address; a promotion with a per-buyer limit is refused
+  when the buyer cannot be identified (`promotions.buyer_unidentified`).
+- Module `promotions`: the MCP tool `promotions.list_vouchers_of_user` only returns vouchers of
+  promotions in units the caller can read.
+- Request logs and traces record the matched route template (`http.route`, e.g. `/api/v1/notes/{id}`) instead of the
+  raw path; the span field `path` is removed.
+- Module `bookings`: the staff check on a booking reads the resource within the booking's tenant;
+  module `customers`: resetting a profile's total spent is also filtered by tenant.
+- `mail`: a tenant's own SMTP server (`mail.connection.smtp.url`) must be an `smtp://` or `smtps://` address on the
+  public Internet; it is checked when saved and again when connecting. New setting
+  `AUTOXIDE_MAIL_ALLOW_PRIVATE_NETWORKS` (default `false`) allows private networks. Connection errors shown to the
+  tenant are general.
+
 ## [0.17.0] - 2026-11-21
 
 ### Added
@@ -2291,7 +2602,8 @@ First release: the complete core.
 - Tooling: `autoxide copy` between SQLite and PostgreSQL, `autoxide backup` and
   `autoxide restore`, benchmarks and a load test, Docker image and Compose file, CI.
 
-[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/thuongtamduy/autoxide/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/thuongtamduy/autoxide/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/thuongtamduy/autoxide/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/thuongtamduy/autoxide/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/thuongtamduy/autoxide/compare/v0.14.0...v0.15.0

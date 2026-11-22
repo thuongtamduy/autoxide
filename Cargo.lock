@@ -236,7 +236,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 
 [[package]]
 name = "autoxide"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-address"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -320,7 +320,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-ai"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -342,7 +342,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-analytics"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-compliance",
@@ -366,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-audit"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-auth"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "argon2",
  "async-trait",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-automations"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-bookings"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-catalog"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-files",
@@ -495,7 +495,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-comments"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -517,7 +517,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-compliance"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -540,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-content"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-compliance",
@@ -567,7 +567,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-conversations"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-compliance",
@@ -597,7 +597,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-customers"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-catalog",
@@ -625,7 +625,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-einvoice-sepay"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -641,7 +641,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-esms"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -655,7 +655,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-files"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -683,7 +683,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-forms"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -708,7 +708,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-ghn"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -722,7 +722,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-idempotency"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -740,7 +740,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-inventory"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-catalog",
@@ -765,7 +765,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-invoices"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-kernel"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-testkit",
@@ -841,7 +841,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-ledger"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -866,7 +866,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-mail"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -885,7 +885,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-media"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -914,7 +914,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-menus"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-content",
@@ -939,7 +939,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-momo"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -953,7 +953,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-newsletter"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-compliance",
@@ -974,7 +974,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-notes"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -995,7 +995,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-notifications"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-auth",
@@ -1018,7 +1018,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-orders"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -1056,7 +1056,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-organizations"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -1077,7 +1077,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-plans"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -1105,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-promotions"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-catalog",
@@ -1129,7 +1129,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-reporting"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -1153,7 +1153,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-sepay"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -1169,7 +1169,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-shipping"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -1196,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-support"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-compliance",
@@ -1220,7 +1220,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-tax"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-address",
@@ -1241,7 +1241,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-testkit"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -1264,7 +1264,7 @@ dependencies = [
 
 [[package]]
 name = "autoxide-webhooks"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "async-trait",
  "autoxide-kernel",
@@ -6601,7 +6601,7 @@ checksum = "9440ea3e5aeabb0ac63af70daf835274065238cdd0cec83418f417eae38bacee"
 
 [[package]]
 name = "xtask"
-version = "0.17.0"
+version = "0.18.0"
 dependencies = [
  "jiff",
  "serde",
