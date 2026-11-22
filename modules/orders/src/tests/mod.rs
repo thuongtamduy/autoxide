@@ -4,6 +4,7 @@
 //! module thật nằm ở `crates/app/src/e2e/orders.rs`.
 
 mod advance;
+mod blocks;
 mod buyer_keys;
 mod carts;
 mod checkout;

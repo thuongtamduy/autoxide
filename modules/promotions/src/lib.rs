@@ -5,6 +5,7 @@
 //! Đặc tả: `docs/steps/43-promotions.md`.
 
 pub mod api;
+mod blocks;
 mod codes;
 mod compiled;
 mod compliance;
@@ -105,6 +106,10 @@ impl Module for PromotionsModule {
         permissions::all()
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn events(&self) -> Vec<EventInfo> {
         events::all()
     }
@@ -145,6 +150,11 @@ impl Module for PromotionsModule {
         });
         context.personal_data(service.clone())?;
         context.resource_type(resource::PROMOTION, Arc::new(resource::PromotionResolver))?;
+        // Khối flash sale và lưu voucher cho trang dựng từ khối (bước 67).
+        let block_data = Arc::new(blocks::PromotionBlocks(service.clone()));
+        for block in blocks::all() {
+            context.block_data(block.name, block_data.clone())?;
+        }
         self.service = Some(service.clone());
         // `catalog` không gọi thẳng `dyn Promotions` được (promotions phụ thuộc catalog — gọi ngược
         // là vòng phụ thuộc), nên promotions cắm nguồn giá giảm tự động vào catalog. Catalog thật

@@ -70,7 +70,7 @@ pub(crate) struct ReviewResponse {
 }
 
 impl ReviewResponse {
-    fn new(row: review::Model, voted: Option<bool>) -> Self {
+    pub(crate) fn new(row: review::Model, voted: Option<bool>) -> Self {
         ReviewResponse {
             id: row.id,
             product_id: row.product_id,
@@ -332,6 +332,11 @@ pub(crate) async fn review_stats(
 ) -> Result<Data<StatsResponse>, Error> {
     let locale = query.locale.unwrap_or_else(|| "vi".to_owned());
     let stats = service.review_stats(&tenant, product_id, &locale).await?;
+    Ok(Data { data: stats_response(stats) })
+}
+
+/// Số sao như endpoint công khai trả (dùng chung với khối `orders.reviews`).
+pub(crate) fn stats_response(stats: crate::review_stats::Stats) -> StatsResponse {
     let by_variant = stats
         .by_variant
         .iter()
@@ -341,16 +346,14 @@ pub(crate) async fn review_stats(
             average: average(sum, count).unwrap_or_default(),
         })
         .collect();
-    Ok(Data {
-        data: StatsResponse {
-            count: stats.count,
-            average: average(stats.rating_sum, stats.count),
-            stars: stats.stars,
-            with_media: stats.with_media,
-            by_variant,
-            summary: stats.summary.map(SummaryResponse::from),
-        },
-    })
+    StatsResponse {
+        count: stats.count,
+        average: average(stats.rating_sum, stats.count),
+        stars: stats.stars,
+        with_media: stats.with_media,
+        by_variant,
+        summary: stats.summary.map(SummaryResponse::from),
+    }
 }
 
 /// "Helpful" votes of a review.

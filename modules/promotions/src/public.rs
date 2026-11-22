@@ -131,7 +131,44 @@ impl PromotionsService {
             .filter(promotion::Column::EndsAt.gt(now))
             .scoped(tenant);
         let found = fetch_page(select, promotion::Column::Id, |row| row.id, page, read).await?;
-        let ids: Vec<Uuid> = found.data.iter().map(|row| row.id).collect();
+        let Page { data, pagination } = found;
+        let data = self.promotion_views(tenant, locale, data, now).await?;
+        Ok(Page { data, pagination })
+    }
+
+    /// Chương trình `public` đang chạy của website `site` có ID trong `ids` (khối của trang dựng
+    /// từ khối, bước 67): như [`public_promotions`](Self::public_promotions), không phân trang.
+    pub(crate) async fn public_promotions_by_id(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+        locale: &str,
+        ids: &[Uuid],
+    ) -> Result<Vec<PublicPromotion>, Error> {
+        let now = crate::service::now();
+        let rows = promotion::Entity::find()
+            .filter(promotion::Column::Id.is_in(ids.to_vec()))
+            .filter(promotion::Column::Status.eq(Status::Active.as_str()))
+            .filter(promotion::Column::Public.eq(true))
+            .filter(promotion::Column::OrgId.is_in(site.lineage_ids()))
+            .filter(promotion::Column::StartsAt.lte(now))
+            .filter(promotion::Column::EndsAt.gt(now))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        self.promotion_views(tenant, locale, rows, now).await
+    }
+
+    /// Ghép chữ, số thông báo và mức giảm tối đa theo luật cho các chương trình `rows`, giữ thứ tự.
+    async fn promotion_views(
+        &self,
+        tenant: &TenantContext,
+        locale: &str,
+        rows: Vec<promotion::Model>,
+        now: Timestamp,
+    ) -> Result<Vec<PublicPromotion>, Error> {
+        let read = tenant.database().read();
+        let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         let texts = translation::Entity::find()
             .filter(translation::Column::PromotionId.is_in(ids.clone()))
             .scoped(tenant)
@@ -153,48 +190,55 @@ impl PromotionsService {
             .await?;
         let legal = self.legal().await?;
         let today = legal_day(now);
-        Ok(found.map(|row| {
-            let text = texts
-                .iter()
-                .find(|text| text.promotion_id == row.id && text.locale == locale)
-                .or_else(|| texts.iter().find(|text| text.promotion_id == row.id));
-            let legal_limit = compiled.get(row.id).and_then(|program| {
-                let kind = legal_kind(program);
-                let limit =
-                    legal.limit(&self.config.jurisdiction, kind, program.program_kind, today)?;
-                Some(PublicLegalLimit {
-                    promotion_kind: kind.to_owned(),
-                    max_bp: limit.max_bp,
-                    legal_basis: limit.legal_basis.clone(),
-                })
-            });
-            PublicPromotion {
-                id: row.id,
-                org_id: row.org_id,
-                kind: row.kind,
-                trigger: row.trigger,
-                locale: text.map(|text| text.locale.clone()).unwrap_or_default(),
-                title: text.map(|text| text.title.clone()).unwrap_or_default(),
-                terms: text.map(|text| text.terms.clone()).unwrap_or_default(),
-                starts_at: row.starts_at,
-                ends_at: row.ends_at,
-                value_bp: row.value_bp,
-                value_minor: row.value_minor,
-                min_order_minor: row.min_order_minor,
-                currency: row.currency,
-                first_order_only: row.first_order_only,
-                claimable: row.claimable,
-                notices: notices
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let text = texts
                     .iter()
-                    .filter(|found| found.promotion_id == row.id)
-                    .map(|found| PublicNotice {
-                        authority_code: found.authority_code.clone(),
-                        reference: found.reference.clone(),
+                    .find(|text| text.promotion_id == row.id && text.locale == locale)
+                    .or_else(|| texts.iter().find(|text| text.promotion_id == row.id));
+                let legal_limit = compiled.get(row.id).and_then(|program| {
+                    let kind = legal_kind(program);
+                    let limit = legal.limit(
+                        &self.config.jurisdiction,
+                        kind,
+                        program.program_kind,
+                        today,
+                    )?;
+                    Some(PublicLegalLimit {
+                        promotion_kind: kind.to_owned(),
+                        max_bp: limit.max_bp,
+                        legal_basis: limit.legal_basis.clone(),
                     })
-                    .collect(),
-                legal_limit,
-            }
-        }))
+                });
+                PublicPromotion {
+                    id: row.id,
+                    org_id: row.org_id,
+                    kind: row.kind,
+                    trigger: row.trigger,
+                    locale: text.map(|text| text.locale.clone()).unwrap_or_default(),
+                    title: text.map(|text| text.title.clone()).unwrap_or_default(),
+                    terms: text.map(|text| text.terms.clone()).unwrap_or_default(),
+                    starts_at: row.starts_at,
+                    ends_at: row.ends_at,
+                    value_bp: row.value_bp,
+                    value_minor: row.value_minor,
+                    min_order_minor: row.min_order_minor,
+                    currency: row.currency,
+                    first_order_only: row.first_order_only,
+                    claimable: row.claimable,
+                    notices: notices
+                        .iter()
+                        .filter(|found| found.promotion_id == row.id)
+                        .map(|found| PublicNotice {
+                            authority_code: found.authority_code.clone(),
+                            reference: found.reference.clone(),
+                        })
+                        .collect(),
+                    legal_limit,
+                }
+            })
+            .collect())
     }
 }
 
@@ -223,7 +267,48 @@ impl PromotionsService {
             .filter(promotion::Column::EndsAt.gt(now))
             .scoped(tenant);
         let found = fetch_page(select, promotion::Column::Id, |row| row.id, page, read).await?;
-        let ids: Vec<Uuid> = found.data.iter().map(|row| row.id).collect();
+        let Page { data, pagination } = found;
+        let data = self.flash_sale_views(tenant, locale, data, now).await?;
+        Ok(Page { data, pagination })
+    }
+
+    /// Flash sale `public` đang chạy hay sắp chạy của website `site` có ID trong `ids` (khối
+    /// `promotions.flash_sale`, bước 67): như [`public_flash_sales`](Self::public_flash_sales), không
+    /// phân trang và không giới hạn 24 giờ — trang đếm ngược tới lúc bắt đầu.
+    pub(crate) async fn public_flash_sales_by_id(
+        &self,
+        tenant: &TenantContext,
+        site: &Site,
+        locale: &str,
+        ids: &[Uuid],
+    ) -> Result<Vec<PublicFlashSale>, Error> {
+        let now = crate::service::now();
+        let rows = promotion::Entity::find()
+            .filter(promotion::Column::Id.is_in(ids.to_vec()))
+            .filter(promotion::Column::Kind.eq(Kind::FlashSale.as_str()))
+            .filter(
+                promotion::Column::Status
+                    .is_in([Status::Active.as_str(), Status::Scheduled.as_str()]),
+            )
+            .filter(promotion::Column::Public.eq(true))
+            .filter(promotion::Column::OrgId.is_in(site.lineage_ids()))
+            .filter(promotion::Column::EndsAt.gt(now))
+            .scoped(tenant)
+            .all(tenant.database().read())
+            .await?;
+        self.flash_sale_views(tenant, locale, rows, now).await
+    }
+
+    /// Ghép chữ và sản phẩm cho các flash sale `rows`, giữ thứ tự; suất còn là số thật.
+    async fn flash_sale_views(
+        &self,
+        tenant: &TenantContext,
+        locale: &str,
+        rows: Vec<promotion::Model>,
+        now: Timestamp,
+    ) -> Result<Vec<PublicFlashSale>, Error> {
+        let read = tenant.database().read();
+        let ids: Vec<Uuid> = rows.iter().map(|row| row.id).collect();
         let texts = translation::Entity::find()
             .filter(translation::Column::PromotionId.is_in(ids.clone()))
             .scoped(tenant)
@@ -236,35 +321,38 @@ impl PromotionsService {
             .order_by_asc(flash_item::Column::Id)
             .all(read)
             .await?;
-        Ok(found.map(|row| {
-            let text = texts
-                .iter()
-                .find(|text| text.promotion_id == row.id && text.locale == locale)
-                .or_else(|| texts.iter().find(|text| text.promotion_id == row.id));
-            let running = row.status == Status::Active.as_str() && row.starts_at <= now;
-            PublicFlashSale {
-                id: row.id,
-                org_id: row.org_id,
-                state: if running { "running" } else { "upcoming" }.to_owned(),
-                title: text.map(|text| text.title.clone()).unwrap_or_default(),
-                terms: text.map(|text| text.terms.clone()).unwrap_or_default(),
-                starts_at: row.starts_at,
-                ends_at: row.ends_at,
-                currency: row.currency,
-                items: items
+        Ok(rows
+            .into_iter()
+            .map(|row| {
+                let text = texts
                     .iter()
-                    .filter(|item| item.promotion_id == row.id)
-                    .map(|item| PublicFlashItem {
-                        variant_id: item.variant_id,
-                        sale_price_minor: item.sale_price_minor,
-                        value_bp: item.value_bp,
-                        quantity_left: item
-                            .quantity_limit
-                            .map(|limit| (limit - item.quantity_used).max(0)),
-                        per_customer_quantity_limit: item.per_customer_quantity_limit,
-                    })
-                    .collect(),
-            }
-        }))
+                    .find(|text| text.promotion_id == row.id && text.locale == locale)
+                    .or_else(|| texts.iter().find(|text| text.promotion_id == row.id));
+                let running = row.status == Status::Active.as_str() && row.starts_at <= now;
+                PublicFlashSale {
+                    id: row.id,
+                    org_id: row.org_id,
+                    state: if running { "running" } else { "upcoming" }.to_owned(),
+                    title: text.map(|text| text.title.clone()).unwrap_or_default(),
+                    terms: text.map(|text| text.terms.clone()).unwrap_or_default(),
+                    starts_at: row.starts_at,
+                    ends_at: row.ends_at,
+                    currency: row.currency,
+                    items: items
+                        .iter()
+                        .filter(|item| item.promotion_id == row.id)
+                        .map(|item| PublicFlashItem {
+                            variant_id: item.variant_id,
+                            sale_price_minor: item.sale_price_minor,
+                            value_bp: item.value_bp,
+                            quantity_left: item
+                                .quantity_limit
+                                .map(|limit| (limit - item.quantity_used).max(0)),
+                            per_customer_quantity_limit: item.per_customer_quantity_limit,
+                        })
+                        .collect(),
+                }
+            })
+            .collect())
     }
 }

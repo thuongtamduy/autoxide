@@ -11,7 +11,7 @@ mod orders;
 mod pickups;
 mod pos;
 pub(crate) mod returns;
-mod reviews;
+pub(crate) mod reviews;
 mod risk;
 pub(crate) mod warranty;
 

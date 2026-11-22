@@ -238,5 +238,13 @@
   "text:on its way": "đang trên đường giao",
   "text:waiting for payment": "đang chờ thanh toán",
   "orders.tender_unavailable": "Cửa hàng không nhận `{kind}` làm cách trả tiền.",
-  "field:is given twice": "được gửi hai lần"
+  "field:is given twice": "được gửi hai lần",
+  "text:Add to cart": "Thêm vào giỏ",
+  "text:Use for a button that puts a product in the cart; pair it with a product block so buyers see the price.": "Dùng cho nút thêm sản phẩm vào giỏ; đặt cạnh khối sản phẩm để người mua thấy giá.",
+  "text:Buy now": "Mua ngay",
+  "text:Use for a button that takes the buyer straight to checkout with one product.": "Dùng cho nút đưa người mua thẳng tới thanh toán với một sản phẩm.",
+  "text:Cart": "Giỏ hàng",
+  "text:Use in the header for a link to the cart with the number of items.": "Dùng ở đầu trang cho link tới giỏ hàng kèm số món.",
+  "text:Reviews": "Đánh giá",
+  "text:Use to show what verified buyers say about a product: star counts and the latest reviews.": "Dùng để hiện người mua đã nhận hàng nói gì về sản phẩm: số sao và các đánh giá mới nhất."
 }
