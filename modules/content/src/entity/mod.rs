@@ -2,6 +2,7 @@
 
 pub(crate) mod author;
 pub(crate) mod banner;
+pub(crate) mod edit_lock;
 pub(crate) mod embedding;
 pub(crate) mod embedding_state;
 pub(crate) mod entry;
