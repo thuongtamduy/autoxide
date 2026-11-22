@@ -2,13 +2,13 @@
 //! link, người đã đăng nhập báo vào tài khoản.
 
 use autoxide_kernel::time::Timestamp;
+use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use autoxide_kernel::access::Principal;
-use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantId, root_of};
-use autoxide_notifications::api::{Notification, NotificationKind, Notifier, Outcome, Recipient};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
+use autoxide_notifications::api::{Notification, Notifier, Recipient};
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::{Method, StatusCode};
 use serde_json::{Value, json};
@@ -18,31 +18,6 @@ use super::{Shop, call, drain, shop_with, stock_in};
 use crate::api::{Inventory, ReserveLine, ReserveRequest};
 
 const BUYER: u128 = 77;
-
-#[derive(Default)]
-struct FakeNotifier(Mutex<Vec<Notification>>);
-
-impl FakeNotifier {
-    fn of(&self, kind: &str) -> Vec<Notification> {
-        self.0.lock().unwrap().iter().filter(|sent| sent.kind == kind).cloned().collect()
-    }
-}
-
-#[async_trait::async_trait]
-impl Notifier for FakeNotifier {
-    fn declare(&self, _kind: NotificationKind) -> Result<(), Error> {
-        Ok(())
-    }
-
-    async fn notify(&self, _: TenantId, notification: Notification) -> Result<Outcome, Error> {
-        let mut sent = self.0.lock().unwrap();
-        // Như `notifications`: cùng khoá chống trùng thì không thêm tin.
-        if !sent.iter().any(|old| old.dedupe_key == notification.dedupe_key) {
-            sent.push(notification);
-        }
-        Ok(Outcome::default())
-    }
-}
 
 async fn post(app: &TestApp, uri: &str, token: Option<&str>, body: Value) -> (StatusCode, Value) {
     let mut request =
@@ -125,7 +100,7 @@ async fn bao_co_hang_lai_mot_lan_moi_dot() {
         let (status, answer) = post(&shop, "/restock-alerts", None, body).await;
         assert_eq!(status, StatusCode::ACCEPTED, "{answer}");
         assert_eq!(answer["data"]["accepted"], true);
-        let confirms = notifier.of("inventory.restock_confirm");
+        let confirms = notifier.sent_of("inventory.restock_confirm");
         assert_eq!(confirms.len(), 1);
         assert_eq!(confirms[0].recipient, Recipient::Email("ada@example.com".into()));
         // Biến thể không có: cũng 202, không lưu, không gửi.
@@ -134,7 +109,7 @@ async fn bao_co_hang_lai_mot_lan_moi_dot() {
         ghost["form_token"] = json!(form_token(&shop).await);
         let (status, _) = post(&shop, "/restock-alerts", None, ghost).await;
         assert_eq!(status, StatusCode::ACCEPTED);
-        assert_eq!(notifier.of("inventory.restock_confirm").len(), 1);
+        assert_eq!(notifier.sent_of("inventory.restock_confirm").len(), 1);
 
         let token = token_of(&confirms[0]);
         for _ in 0..2 {
@@ -164,19 +139,19 @@ async fn bao_co_hang_lai_mot_lan_moi_dot() {
         // Hàng về: mỗi người một tin; hàng về thêm (không qua 0) không báo lại.
         stock_in(&shop, shop.tree.a, item, 3, None).await;
         drain(&shop).await;
-        let back = notifier.of("inventory.back_in_stock");
+        let back = notifier.sent_of("inventory.back_in_stock");
         assert_eq!(back.len(), 2, "{back:?}");
         assert!(back.iter().any(|sent| sent.recipient == Recipient::User(Uuid::from_u128(BUYER))));
         stock_in(&shop, shop.tree.a, item, 2, None).await;
         drain(&shop).await;
-        assert_eq!(notifier.of("inventory.back_in_stock").len(), 2);
+        assert_eq!(notifier.sent_of("inventory.back_in_stock").len(), 2);
 
         // Bán hết rồi về lại: đợt mới, mỗi người thêm một tin.
         sell_all(&shop, item, 5).await;
         drain(&shop).await;
         stock_in(&shop, shop.tree.a, item, 4, None).await;
         drain(&shop).await;
-        let back = notifier.of("inventory.back_in_stock");
+        let back = notifier.sent_of("inventory.back_in_stock");
         assert_eq!(back.len(), 4);
 
         // Khách vãng lai dừng bằng link trong tin: đợt sau chỉ còn người đăng nhập.
@@ -192,7 +167,7 @@ async fn bao_co_hang_lai_mot_lan_moi_dot() {
         drain(&shop).await;
         stock_in(&shop, shop.tree.a, item, 1, None).await;
         drain(&shop).await;
-        let back = notifier.of("inventory.back_in_stock");
+        let back = notifier.sent_of("inventory.back_in_stock");
         assert_eq!(back.len(), 5);
         assert_eq!(back[4].recipient, Recipient::User(Uuid::from_u128(BUYER)));
     })

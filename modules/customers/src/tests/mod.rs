@@ -11,7 +11,9 @@ mod profiles;
 mod stored_value;
 mod wishlist_alerts;
 
+pub(crate) use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
+pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -145,7 +147,7 @@ pub(crate) struct Shop {
     pub accounts: Arc<FakeAccounts>,
     pub promotions: Arc<FakePromotions>,
     pub notifier: Arc<FakeNotifier>,
-    pub consents: Arc<FakeConsents>,
+    pub consents: Arc<FakeConsentLedger>,
     pub catalog: Arc<fake_shop::FakeCatalog>,
     pub inventory: Arc<fake_shop::FakeInventory>,
     pub rules: Arc<FakeRules>,
@@ -179,7 +181,7 @@ pub(crate) async fn shop_with(test: &TestDatabase, settings: &[(&str, &str)]) ->
     let accounts = Arc::new(FakeAccounts::default());
     let promotions = Arc::new(FakePromotions::default());
     let notifier = Arc::new(FakeNotifier::default());
-    let consents = Arc::new(FakeConsents::default());
+    let consents = Arc::new(FakeConsentLedger::new());
     let catalog = Arc::new(fake_shop::FakeCatalog::default());
     let inventory = Arc::new(fake_shop::FakeInventory::default());
     let rules = Arc::new(FakeRules::default());
@@ -649,109 +651,36 @@ impl autoxide_compliance::api::ComplianceRules for FakeRules {
     }
 }
 
-/// `Notifier` giả: ghi lại tin.
-#[derive(Default)]
-pub(crate) struct FakeNotifier(pub Mutex<Vec<autoxide_notifications::api::Notification>>);
-
-#[async_trait::async_trait]
-impl autoxide_notifications::api::Notifier for FakeNotifier {
-    fn declare(&self, _: autoxide_notifications::api::NotificationKind) -> Result<(), Error> {
-        Ok(())
-    }
-    async fn notify(
-        &self,
-        _: TenantId,
-        notification: autoxide_notifications::api::Notification,
-    ) -> Result<autoxide_notifications::api::Outcome, Error> {
-        let mut sent = self.0.lock().unwrap();
-        if !sent.iter().any(|old| old.dedupe_key == notification.dedupe_key) {
-            sent.push(notification);
-        }
-        Ok(autoxide_notifications::api::Outcome::default())
-    }
+/// Người mua `user` đồng ý nhận quảng cáo (`marketing`, mọi kênh).
+pub(crate) fn allow_marketing(consents: &FakeConsentLedger, user: u128) {
+    consents.allow(
+        autoxide_compliance::api::ConsentSubject::User(Uuid::from_u128(user)),
+        autoxide_compliance::api::ConsentKey::new("marketing", "", ""),
+    );
 }
 
-/// Sổ đồng ý giả: tài khoản có đồng ý `marketing` (`.0`) và đồng ý báo yêu thích (`.1`, ghi qua
-/// `grant` / `withdraw`).
-#[derive(Default)]
-pub(crate) struct FakeConsents(pub Mutex<Vec<Uuid>>, pub Mutex<Vec<Uuid>>);
-
-fn consent_of(
-    key: &autoxide_compliance::api::ConsentKey,
-    state: &str,
-) -> autoxide_compliance::api::Consent {
-    autoxide_compliance::api::Consent {
-        id: Uuid::now_v7(),
-        purpose: key.purpose.clone(),
-        scope: key.scope.clone(),
-        channel: key.channel.clone(),
-        state: state.to_owned(),
-        granted_at: Some(Timestamp::now()),
-        withdrawn_at: None,
-        subject_value: None,
-    }
+/// Người mua `user` rút đồng ý nhận quảng cáo.
+pub(crate) fn deny_marketing(consents: &FakeConsentLedger, user: u128) {
+    consents.deny(
+        autoxide_compliance::api::ConsentSubject::User(Uuid::from_u128(user)),
+        autoxide_compliance::api::ConsentKey::new("marketing", "", ""),
+    );
 }
 
-#[async_trait::async_trait]
-impl autoxide_compliance::api::ConsentLedger for FakeConsents {
-    async fn grant(
-        &self,
-        _: TenantId,
-        subject: autoxide_compliance::api::ConsentSubject,
-        key: autoxide_compliance::api::ConsentKey,
-        _: autoxide_compliance::api::ConsentEvidence,
-        _: &str,
-    ) -> Result<autoxide_compliance::api::Consent, Error> {
-        if let autoxide_compliance::api::ConsentSubject::User(user) = subject {
-            let mut alerts = self.1.lock().unwrap();
-            if !alerts.contains(&user) {
-                alerts.push(user);
-            }
-        }
-        Ok(consent_of(&key, "granted"))
-    }
-    async fn withdraw(
-        &self,
-        _: TenantId,
-        subject: autoxide_compliance::api::ConsentSubject,
-        key: autoxide_compliance::api::ConsentKey,
-        _: &str,
-        _: &str,
-    ) -> Result<autoxide_compliance::api::Consent, Error> {
-        if let autoxide_compliance::api::ConsentSubject::User(user) = subject {
-            self.1.lock().unwrap().retain(|old| *old != user);
-        }
-        Ok(consent_of(&key, "withdrawn"))
-    }
-    async fn is_granted(
-        &self,
-        _: TenantId,
-        subject: &autoxide_compliance::api::ConsentSubject,
-        key: &autoxide_compliance::api::ConsentKey,
-    ) -> Result<bool, Error> {
-        let list = if key.purpose == crate::wishlist_alerts::PURPOSE { &self.1 } else { &self.0 };
-        Ok((key.purpose == "marketing" || key.purpose == crate::wishlist_alerts::PURPOSE)
-            && matches!(subject, autoxide_compliance::api::ConsentSubject::User(user) if list.lock().unwrap().contains(user)))
-    }
-    async fn granted_many(
-        &self,
-        tenant: TenantId,
-        subjects: &[autoxide_compliance::api::ConsentSubject],
-        key: &autoxide_compliance::api::ConsentKey,
-    ) -> Result<Vec<bool>, Error> {
-        let mut out = Vec::new();
-        for subject in subjects {
-            out.push(self.is_granted(tenant, subject, key).await?);
-        }
-        Ok(out)
-    }
-    async fn get(
-        &self,
-        _: TenantId,
-        _: Uuid,
-    ) -> Result<Option<autoxide_compliance::api::Consent>, Error> {
-        Ok(None)
-    }
+/// Người đang đồng ý nhận báo yêu thích (ghi qua module bằng `grant` / `withdraw`).
+pub(crate) fn alert_subscribers(consents: &FakeConsentLedger) -> Vec<Uuid> {
+    consents
+        .records()
+        .into_iter()
+        .filter(|record| {
+            record.consent.purpose == crate::wishlist_alerts::PURPOSE
+                && record.consent.state == "granted"
+        })
+        .filter_map(|record| match record.subject {
+            autoxide_compliance::api::ConsentSubject::User(user) => Some(user),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Cho mọi job đang chờ của `customers` tới hạn ngay (giả lập thời gian trôi).

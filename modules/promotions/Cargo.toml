@@ -30,6 +30,10 @@ uuid.workspace = true
 validator.workspace = true
 
 [dev-dependencies]
+# Sổ đồng ý giả dùng chung (`autoxide_compliance::api::testing`).
+autoxide-compliance = { workspace = true, features = ["testing"] }
+# Bộ gửi thông báo giả dùng chung (`autoxide_notifications::api::testing`).
+autoxide-notifications = { workspace = true, features = ["testing"] }
 autoxide-testkit.workspace = true
 # MCP client thật cho test tool của module.
 tokio.workspace = true

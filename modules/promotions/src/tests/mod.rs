@@ -9,7 +9,9 @@ mod programs;
 mod redemption;
 mod vouchers;
 
+pub(crate) use autoxide_compliance::api::testing::FakeConsentLedger;
 use autoxide_kernel::time::Timestamp;
+pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
 use jiff::SignedDuration;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -203,109 +205,7 @@ pub(crate) struct Setup {
     pub tree: Tree,
     pub catalog: Arc<FakeCatalog>,
     pub notifier: Arc<FakeNotifier>,
-    pub consents: Arc<FakeLedger>,
-}
-
-/// `dyn Notifier` giả: giữ mọi thông báo đã gửi; cùng `dedupe_key` không giữ hai lần.
-#[derive(Default)]
-pub(crate) struct FakeNotifier(pub Mutex<Vec<autoxide_notifications::api::Notification>>);
-
-#[async_trait::async_trait]
-impl autoxide_notifications::api::Notifier for FakeNotifier {
-    fn declare(&self, _kind: autoxide_notifications::api::NotificationKind) -> Result<(), Error> {
-        Ok(())
-    }
-
-    async fn notify(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        notification: autoxide_notifications::api::Notification,
-    ) -> Result<autoxide_notifications::api::Outcome, Error> {
-        let mut sent = self.0.lock().unwrap();
-        if !sent.iter().any(|found| found.dedupe_key == notification.dedupe_key) {
-            sent.push(notification);
-        }
-        Ok(autoxide_notifications::api::Outcome::default())
-    }
-}
-
-/// Sổ đồng ý giả: (khoá, `source_ref`, còn hiệu lực).
-#[derive(Default)]
-pub(crate) struct FakeLedger(pub Mutex<Vec<(autoxide_compliance::api::ConsentKey, String, bool)>>);
-
-impl FakeLedger {
-    fn consent(
-        key: &autoxide_compliance::api::ConsentKey,
-        granted: bool,
-    ) -> autoxide_compliance::api::Consent {
-        autoxide_compliance::api::Consent {
-            id: Uuid::now_v7(),
-            purpose: key.purpose.clone(),
-            scope: key.scope.clone(),
-            channel: key.channel.clone(),
-            state: if granted { "granted" } else { "withdrawn" }.to_owned(),
-            granted_at: Some(Timestamp::now()),
-            withdrawn_at: (!granted).then(Timestamp::now),
-            subject_value: None,
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl autoxide_compliance::api::ConsentLedger for FakeLedger {
-    async fn grant(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        _subject: autoxide_compliance::api::ConsentSubject,
-        key: autoxide_compliance::api::ConsentKey,
-        _evidence: autoxide_compliance::api::ConsentEvidence,
-        source_ref: &str,
-    ) -> Result<autoxide_compliance::api::Consent, Error> {
-        self.0.lock().unwrap().push((key.clone(), source_ref.to_owned(), true));
-        Ok(Self::consent(&key, true))
-    }
-
-    async fn withdraw(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        _subject: autoxide_compliance::api::ConsentSubject,
-        key: autoxide_compliance::api::ConsentKey,
-        _source: &str,
-        source_ref: &str,
-    ) -> Result<autoxide_compliance::api::Consent, Error> {
-        for row in self.0.lock().unwrap().iter_mut() {
-            if row.0 == key && row.1 == source_ref {
-                row.2 = false;
-            }
-        }
-        Ok(Self::consent(&key, false))
-    }
-
-    async fn is_granted(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        _subject: &autoxide_compliance::api::ConsentSubject,
-        key: &autoxide_compliance::api::ConsentKey,
-    ) -> Result<bool, Error> {
-        Ok(self.0.lock().unwrap().iter().any(|row| &row.0 == key && row.2))
-    }
-
-    async fn granted_many(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        subjects: &[autoxide_compliance::api::ConsentSubject],
-        _key: &autoxide_compliance::api::ConsentKey,
-    ) -> Result<Vec<bool>, Error> {
-        Ok(vec![false; subjects.len()])
-    }
-
-    async fn get(
-        &self,
-        _tenant: autoxide_kernel::tenancy::TenantId,
-        _consent_id: Uuid,
-    ) -> Result<Option<autoxide_compliance::api::Consent>, Error> {
-        Ok(None)
-    }
+    pub consents: Arc<FakeConsentLedger>,
 }
 
 impl Setup {
@@ -335,7 +235,7 @@ pub(crate) async fn setup(test: &TestDatabase, legal: bool) -> Setup {
     let scoped = |scope: Scope| STAFF.map(|name| (name, scope));
     let catalog = Arc::new(FakeCatalog::default());
     let notifier = Arc::new(FakeNotifier::default());
-    let consents = Arc::new(FakeLedger::default());
+    let consents = Arc::new(FakeConsentLedger::new());
     let mut builder = TestApp::builder(test)
         .member("boss", 1, root_of(DEFAULT_TENANT), &scoped(Scope::Tenant))
         .member("store_a", 2, tree.a, &scoped(Scope::Unit))

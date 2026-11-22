@@ -32,13 +32,7 @@ async fn abandon(shop: &Shop, user: u128) -> Uuid {
 }
 
 fn reminders(shop: &Shop) -> usize {
-    shop.notifier
-        .0
-        .lock()
-        .unwrap()
-        .iter()
-        .filter(|sent| sent.kind == "customers.cart_reminder")
-        .count()
+    shop.notifier.sent().iter().filter(|sent| sent.kind == "customers.cart_reminder").count()
 }
 
 #[tokio::test]
@@ -102,7 +96,7 @@ async fn cart_reminder_only_with_marketing_consent() {
         drain(&shop).await;
         assert_eq!(reminders(&shop), 0);
         // Có đồng ý: hai lần nhắc, mỗi lần một tin (job chạy lại không gửi thêm).
-        shop.consents.0.lock().unwrap().push(Uuid::from_u128(102));
+        super::allow_marketing(&shop.consents, 102);
         abandon(&shop, 102).await;
         jobs_due_now(&shop).await;
         drain(&shop).await;
@@ -119,9 +113,9 @@ async fn consent_withdrawn_cancels_pending_reminders() {
     TestDatabase::run(async |test| {
         let shop = shop(test).await;
         with_reminders(&shop).await;
-        shop.consents.0.lock().unwrap().push(Uuid::from_u128(BUYER));
+        super::allow_marketing(&shop.consents, BUYER);
         abandon(&shop, BUYER).await;
-        shop.consents.0.lock().unwrap().clear();
+        super::deny_marketing(&shop.consents, BUYER);
         shop.compliance_event(&ConsentWithdrawn(json!({"consent_id": Uuid::now_v7(), "purpose": "marketing", "scope": "", "channel": ""}))).await;
         drain(&shop).await;
         jobs_due_now(&shop).await;
@@ -137,7 +131,7 @@ async fn order_placed_cancels_reminder() {
     TestDatabase::run(async |test| {
         let shop = shop(test).await;
         with_reminders(&shop).await;
-        shop.consents.0.lock().unwrap().push(Uuid::from_u128(BUYER));
+        super::allow_marketing(&shop.consents, BUYER);
         abandon(&shop, BUYER).await;
         let order = Order::of(BUYER, shop.tree.a, 100_000);
         shop.order_event(&order.placed()).await;
