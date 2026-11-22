@@ -24,8 +24,8 @@ use autoxide_kernel::job::{EnqueueOptions, Job, JobContext, JobHandler};
 use autoxide_kernel::rows;
 use autoxide_kernel::tenancy::{ScopeExt, TenantContext};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set,
+    ActiveModelTrait, ColumnTrait, ConnectionTrait, DatabaseTransaction, EntityTrait, QueryFilter,
+    QueryOrder, QuerySelect, Set,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as _, Sha256};
@@ -127,36 +127,23 @@ impl CatalogService {
             .into_iter()
             .collect();
         let gone: Vec<Uuid> = products.iter().copied().filter(|id| !active.contains(id)).collect();
-        if !gone.is_empty() {
-            let write = tenant.database().begin_write().await?;
-            embedding::Entity::delete_many()
-                .filter(embedding::Column::ProductId.is_in(gone.clone()))
+        let mut texts = Vec::new();
+        let mut stored: HashMap<(Uuid, String), embedding::Model> = HashMap::new();
+        if !active.is_empty() {
+            texts = translation::Entity::find()
+                .filter(translation::Column::ProductId.is_in(active.iter().copied()))
                 .scoped(tenant)
-                .exec(&write)
+                .all(read)
                 .await?;
-            similar_product::Entity::delete_many()
-                .filter(similar_product::Column::ProductId.is_in(gone))
+            stored = embedding::Entity::find()
+                .filter(embedding::Column::ProductId.is_in(active.iter().copied()))
                 .scoped(tenant)
-                .exec(&write)
-                .await?;
-            write.commit().await?;
+                .all(read)
+                .await?
+                .into_iter()
+                .map(|row| ((row.product_id, row.locale.clone()), row))
+                .collect();
         }
-        if active.is_empty() {
-            return Ok(());
-        }
-        let texts = translation::Entity::find()
-            .filter(translation::Column::ProductId.is_in(active.iter().copied()))
-            .scoped(tenant)
-            .all(read)
-            .await?;
-        let stored: HashMap<(Uuid, String), embedding::Model> = embedding::Entity::find()
-            .filter(embedding::Column::ProductId.is_in(active.iter().copied()))
-            .scoped(tenant)
-            .all(read)
-            .await?
-            .into_iter()
-            .map(|row| ((row.product_id, row.locale.clone()), row))
-            .collect();
         // Bản dịch có chữ đổi (hay đổi mô hình) cần tính lại.
         let mut todo: Vec<(Uuid, String, String, String)> = Vec::new();
         for row in &texts {
@@ -169,37 +156,63 @@ impl CatalogService {
                 todo.push((row.product_id, row.locale.clone(), text, digest));
             }
         }
-        let mut changed: Vec<(Uuid, String)> = Vec::new();
+        if gone.is_empty() && todo.is_empty() {
+            return Ok(());
+        }
+        // Gọi mô hình NGOÀI transaction (gọi mạng, D-109).
+        let mut fresh: Vec<(Uuid, String, String, Vec<f32>)> = Vec::new();
         for batch in todo.chunks(EMBED_BATCH) {
             let inputs: Vec<String> = batch.iter().map(|(_, _, text, _)| text.clone()).collect();
             let vectors = embedder
                 .embed(tenant, "catalog.similar_products", &inputs, EmbedKind::Document)
                 .await?;
-            let write = tenant.database().begin_write().await?;
             for ((product_id, locale, _, digest), mut values) in batch.iter().zip(vectors) {
                 vector::normalize(&mut values);
-                embedding::Entity::delete_many()
-                    .filter(embedding::Column::ProductId.eq(*product_id))
-                    .filter(embedding::Column::Locale.eq(locale.as_str()))
-                    .scoped(tenant)
-                    .exec(&write)
-                    .await?;
-                embedding::ActiveModel {
-                    id: Set(Uuid::now_v7()),
-                    tenant_id: Set(tenant.id().as_uuid()),
-                    product_id: Set(*product_id),
-                    locale: Set(locale.clone()),
-                    content_hash: Set(digest.clone()),
-                    model: Set(model.clone()),
-                    dimensions: Set(i32::try_from(values.len()).unwrap_or(i32::MAX)),
-                    vector: Set(vector::encode(&values)),
-                    updated_at: Set(now()),
-                }
-                .insert(&write)
-                .await?;
-                changed.push((*product_id, locale.clone()));
+                fresh.push((*product_id, locale.clone(), digest.clone(), values));
             }
-            write.commit().await?;
+        }
+        // Mọi thay đổi vector và danh sách của (khách, mô hình) đi qua MỘT khoá theo tên, trong MỘT
+        // transaction: hai job chạy song song (worker nhiều slot, hay hai job của cùng sản phẩm) đi
+        // lần lượt, job sau đọc lại và thấy vector lẫn dòng đối xứng job trước vừa ghi. Khoá theo
+        // dòng embedding không đủ: ghi lại vector là xoá + chèn (đổi ID), và lúc bảng rỗng không có
+        // dòng nào để khoá.
+        let write = tenant.database().begin_write().await?;
+        rows::lock_key(&write, &format!("catalog.similar:{}:{model}", tenant.id().as_uuid()))
+            .await?;
+        if !gone.is_empty() {
+            embedding::Entity::delete_many()
+                .filter(embedding::Column::ProductId.is_in(gone.clone()))
+                .scoped(tenant)
+                .exec(&write)
+                .await?;
+            similar_product::Entity::delete_many()
+                .filter(similar_product::Column::ProductId.is_in(gone))
+                .scoped(tenant)
+                .exec(&write)
+                .await?;
+        }
+        let mut changed: Vec<(Uuid, String)> = Vec::new();
+        for (product_id, locale, digest, values) in fresh {
+            embedding::Entity::delete_many()
+                .filter(embedding::Column::ProductId.eq(product_id))
+                .filter(embedding::Column::Locale.eq(locale.as_str()))
+                .scoped(tenant)
+                .exec(&write)
+                .await?;
+            embedding::ActiveModel {
+                id: Set(Uuid::now_v7()),
+                tenant_id: Set(tenant.id().as_uuid()),
+                product_id: Set(product_id),
+                locale: Set(locale.clone()),
+                content_hash: Set(digest),
+                model: Set(model.clone()),
+                dimensions: Set(i32::try_from(values.len()).unwrap_or(i32::MAX)),
+                vector: Set(vector::encode(&values)),
+                updated_at: Set(now()),
+            }
+            .insert(&write)
+            .await?;
+            changed.push((product_id, locale));
         }
         let mut locales: BTreeSet<&str> = BTreeSet::new();
         for (_, locale) in &changed {
@@ -208,41 +221,28 @@ impl CatalogService {
         for locale in locales {
             let mine: Vec<Uuid> =
                 changed.iter().filter(|(_, l)| l == locale).map(|(id, _)| *id).collect();
-            self.recompute_similar(tenant, &model, locale, &mine).await?;
+            self.recompute_similar(&write, tenant, &model, locale, &mine).await?;
         }
+        write.commit().await?;
         Ok(())
     }
 
     /// Tính lại danh sách tương tự của `products` ở `locale`, và thêm mỗi sản phẩm vào danh sách
-    /// của hàng giống nó.
-    ///
-    /// Đọc vector và ghi danh sách trong CÙNG một transaction ghi, sau khi khoá mọi dòng embedding
-    /// cùng khách + ngôn ngữ + mô hình. Hai job lập index chạy song song (worker nhiều slot) vì thế
-    /// đi lần lượt: job sau chờ job trước commit rồi mới đọc, nên thấy cả vector lẫn dòng đối xứng
-    /// job trước vừa ghi. Đọc qua kết nối đọc rồi mới mở transaction (như trước) thì job sau có thể
-    /// xoá mất dòng "A giống B" mà job của B vừa ghi.
+    /// của hàng giống nó. Chạy trong transaction của [`index_embeddings`](Self::index_embeddings),
+    /// SAU khi đã lấy khoá: đọc vector qua chính transaction đó nên thấy mọi thứ đã commit.
     async fn recompute_similar(
         &self,
+        write: &DatabaseTransaction,
         tenant: &TenantContext,
         model: &str,
         locale: &str,
         products: &[Uuid],
     ) -> Result<(), Error> {
-        let select = || {
-            embedding::Entity::find()
-                .filter(embedding::Column::Locale.eq(locale))
-                .filter(embedding::Column::Model.eq(model))
-                .scoped(tenant)
-        };
-        let write = tenant.database().begin_write().await?;
-        // Khoá theo ID tăng dần (không deadlock giữa các job). Postgres: `FOR UPDATE`; SQLite:
-        // `BEGIN IMMEDIATE` đã giữ quyền ghi cả database. Hai job luôn cùng khoá ít nhất một dòng:
-        // job chạy sau thấy vector của job chạy trước (đã commit trước khi nó khoá).
-        rows::lock(&write, select(), embedding::Column::Id).await?;
-        // Đọc lại SAU khi có khoá: ở READ COMMITTED của Postgres, câu khoá ở trên giữ bức ảnh từ
-        // lúc nó bắt đầu (có thể trước khi job kia commit); câu mới thấy mọi thứ đã commit.
-        let all: Vec<(Uuid, Vec<f32>)> = select()
-            .all(&write)
+        let all: Vec<(Uuid, Vec<f32>)> = embedding::Entity::find()
+            .filter(embedding::Column::Locale.eq(locale))
+            .filter(embedding::Column::Model.eq(model))
+            .scoped(tenant)
+            .all(write)
             .await?
             .into_iter()
             .filter_map(|row| Some((row.product_id, vector::decode(&row.vector)?)))
@@ -263,16 +263,15 @@ impl CatalogService {
                 .filter(similar_product::Column::ProductId.eq(*product))
                 .filter(similar_product::Column::Locale.eq(locale))
                 .scoped(tenant)
-                .exec(&write)
+                .exec(write)
                 .await?;
             for (other, value) in &ranked {
-                self.put_similar(&write, tenant, locale, (*product, *other, *value), at).await?;
+                self.put_similar(write, tenant, locale, (*product, *other, *value), at).await?;
                 // Đối xứng: P cũng là hàng tương tự của Q; giữ Q tối đa `TOP` dòng tốt nhất.
-                self.put_similar(&write, tenant, locale, (*other, *product, *value), at).await?;
-                self.trim_similar(&write, tenant, *other, locale).await?;
+                self.put_similar(write, tenant, locale, (*other, *product, *value), at).await?;
+                self.trim_similar(write, tenant, *other, locale).await?;
             }
         }
-        write.commit().await?;
         Ok(())
     }
 

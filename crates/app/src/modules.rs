@@ -45,6 +45,9 @@ pub fn all() -> Vec<Box<dyn Module>> {
         // Chứng từ (bước 36): cần `dyn TaxEngine` và `dyn Ledger`; `plans` (tính tiền thuê bao) và module
         // thương mại lập chứng từ qua `dyn Invoices`.
         Box::new(autoxide_invoices::module()),
+        // Bộ nối SMS eSMS (bước 70 P7, thử nghiệm): công bố `dyn SmsSender` cho `compliance`, `notifications`,
+        // `bookings`, `orders` (đều đứng sau); tài khoản eSMS là của từng khách.
+        Box::new(autoxide_esms::module()),
         // Tuân thủ (bước 37): định danh (KYC), quy tắc pháp lý, văn bản pháp lý, sổ đồng ý. Dùng
         // `dyn IdentityVerifier` nếu có module cung cấp (đứng trước); `plans` (khách tự đăng ký) và module
         // thương mại chặn qua `dyn KycGate` / `dyn AcceptanceGate`.
