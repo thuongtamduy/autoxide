@@ -69,6 +69,7 @@ pub(crate) struct AppliedGuardrailsResponse {
 
 /// A guardrail to set.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct GuardrailRequest {
     /// The permissions roles of that tenant may grant at most (see
     /// `GET /api/v1/auth/permissions`). `[]` leaves no permission.

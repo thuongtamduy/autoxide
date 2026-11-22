@@ -10,18 +10,4 @@
 #   phải thêm `.scoped(tenant)` để chắc (luật D-253).
 # - nhầm: đã lọc theo cách luật không nhận ra — thêm `.scoped` hay chú thích cho rõ.
 
-tenant-scope 1 modules/ai/src/usage.rs  # dòng 159 — job: xoá usage cũ của mọi khách
-tenant-scope 1 modules/audit/src/relocation.rs  # dòng 86 — job: dời khách sang database khác, đọc ở đích
-tenant-scope 1 modules/bookings/src/actions.rs  # dòng 133 — nhầm: tự so `tenant_id` sau khi đọc; nên `.scoped`
-tenant-scope 3 modules/comments/src/retention.rs  # dòng 112, 122, 136 — job: hạn lưu IP / người báo cáo
-tenant-scope 4 modules/conversations/src/privacy.rs  # dòng 170, 181, 186, 191 — job: xoá cuộc trò chuyện quá hạn lưu
-tenant-scope 1 modules/customers/src/engagement.rs  # dòng 262 — job: xoá lượt xem cũ
-tenant-scope 1 modules/customers/src/facts.rs  # dòng 297 — nhầm: điều kiện `same_currency` đã có `TenantId`
-tenant-scope 2 modules/forms/src/retention.rs  # dòng 103, 113 — job: hạn lưu IP, bài mồ côi
-tenant-scope 1 modules/idempotency/src/store.rs  # dòng 169 — job: xoá idempotency key hết hạn
-tenant-scope 1 modules/orders/src/abandoned.rs  # dòng 34 — job: quét giỏ bỏ dở của mọi khách
-tenant-scope 1 modules/orders/src/warranty.rs  # dòng 426 — job: hết hạn bảo hành
-tenant-scope 1 modules/webhooks/src/delivery.rs  # dòng 386 — job: xoá lần gửi webhook cũ
 
-mcp-principal 1 modules/catalog/src/tools.rs  # dòng 307 `list_categories` — nhầm: REST cũng đọc cả khách; thêm chú thích
-mcp-principal 1 modules/content/src/tools.rs  # dòng 637 `resolve` — nghi: tra địa chỉ công khai (chỉ bản đã đăng); có thể cố ý, cần chú thích

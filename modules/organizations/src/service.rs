@@ -16,7 +16,7 @@ use autoxide_kernel::access::{OrgTarget, Principal};
 use autoxide_kernel::error::{Error, FieldError};
 use autoxide_kernel::event::{Actor, Outbox};
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::search::fold;
+use autoxide_kernel::search::{self, fold};
 use autoxide_kernel::tenancy::{OrgId, OrgTree, ScopeExt, TenantContext, root_immutable, root_of};
 use autoxide_kernel::time::Timestamp;
 use sea_orm::{
@@ -188,7 +188,7 @@ impl OrgService {
             select = select.filter(unit::Column::Status.eq(status.as_str()));
         }
         if let Some(q) = filter.q.as_deref().map(fold).filter(|q| !q.is_empty()) {
-            select = select.filter(unit::Column::NameFolded.contains(q));
+            select = select.filter(search::contains(unit::Column::NameFolded, &q));
         }
         fetch_page(select, unit::Column::Id, |row| row.id, page, tenant.database().read()).await
     }

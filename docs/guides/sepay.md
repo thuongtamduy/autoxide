@@ -9,7 +9,8 @@ Vietnamese: [`sepay.vi.md`](sepay.vi.md).
 > **Experimental.** This adapter was written from the provider's public documentation; not yet verified
 > against the live service. Try it with a small real transfer (or SePay's test mode) before relying on it.
 
-Each tenant connects **its own** SePay account. Nothing here is a server-wide setting, and the secrets you
+The operator turns the adapter on by naming it: `AUTOXIDE_MODULES=official,sepay` (experimental modules
+are off by default). Each tenant connects **its own** SePay account. Nothing here is a server-wide setting, and the secrets you
 store are encrypted and never shown again.
 
 ## 1. Store your SePay account

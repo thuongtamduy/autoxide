@@ -10,7 +10,8 @@ Tiếng Anh: [`sepay.md`](sepay.md).
 > (written from the provider's public documentation; not yet verified against the live service). Hãy thử
 > bằng một khoản chuyển nhỏ thật (hoặc chế độ thử của SePay) trước khi dựa vào nó.
 
-Mỗi khách (tenant) nối tài khoản SePay **của riêng mình**. Không có gì ở đây là cấu hình chung của máy
+Người vận hành bật bộ nối bằng cách nêu tên nó: `AUTOXIDE_MODULES=official,sepay` (module thử nghiệm mặc
+định tắt). Mỗi khách (tenant) nối tài khoản SePay **của riêng mình**. Không có gì ở đây là cấu hình chung của máy
 chủ; secret bạn lưu được mã hoá và không bao giờ hiện lại.
 
 ## 1. Lưu tài khoản SePay của bạn

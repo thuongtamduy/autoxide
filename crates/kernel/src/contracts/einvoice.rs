@@ -329,7 +329,13 @@ impl IssuedEInvoice {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EInvoiceStatus {
     Pending,
-    Accepted { authority_code: Option<String> },
+    Accepted {
+        authority_code: Option<String>,
+        /// Số hoá đơn do nhà cung cấp cấp, khi nhà cung cấp tự cấp số và chỉ biết số lúc được chấp
+        /// nhận (`None`: không có, hay đã trả ở [`IssuedEInvoice::number`]). Đây là số hợp lệ về
+        /// thuế — `invoices` lưu và trả ra cùng mã cơ quan thuế (D-20261122-einvoice-provider-number).
+        number: Option<i64>,
+    },
     Rejected { reason: String },
 }
 

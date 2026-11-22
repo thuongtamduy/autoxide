@@ -127,9 +127,13 @@ impl SepayEInvoice {
             (Some("issued"), Some("3" | "5")) if authority_code.is_none() => {
                 EInvoiceStatus::Pending
             }
-            (Some("issued"), _) => {
-                EInvoiceStatus::Accepted { authority_code: authority_code.map(str::to_owned) }
-            }
+            (Some("issued"), _) => EInvoiceStatus::Accepted {
+                authority_code: authority_code.map(str::to_owned),
+                // `invoice_number` là chuỗi số (vd `"589"`); `"0"` là nháp.
+                number: text("invoice_number")
+                    .and_then(|number| number.parse::<i64>().ok())
+                    .filter(|number| *number > 0),
+            },
             // Còn là nháp ở SePay (một lần gửi trước dừng giữa chừng): bộ nối không tự phát hành
             // nháp. Báo rõ để người dùng phát hành hoặc xoá nháp ở SePay rồi gửi lại.
             (Some("draft"), _) => EInvoiceStatus::Rejected {

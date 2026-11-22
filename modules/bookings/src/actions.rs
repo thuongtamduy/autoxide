@@ -130,13 +130,13 @@ impl BookingsService {
                     return Ok(Role::Viewer);
                 }
                 if principal.require_at(connection, &BOOKINGS_STAFF, at(row.org_id)).await.is_ok() {
+                    // tenant-scope: hàm không có `TenantContext`; lọc theo `tenant_id` của lịch
+                    // (lịch đã đọc qua `.scoped`).
                     let mine = resource::Entity::find_by_id(row.resource_id)
+                        .filter(resource::Column::TenantId.eq(row.tenant_id))
                         .one(connection)
                         .await?
-                        .is_some_and(|found| {
-                            found.tenant_id == row.tenant_id
-                                && found.user_id == Some(principal.user_id())
-                        });
+                        .is_some_and(|found| found.user_id == Some(principal.user_id()));
                     if mine {
                         return Ok(Role::Staff);
                     }

@@ -54,6 +54,10 @@ chmod 600 .env
 docker compose up -d --build
 ```
 
+Lần build đầu biên dịch mọi thứ từ mã nguồn: tính khoảng 20 phút tới hơn một giờ, và ít nhất 4 GB bộ nhớ
+cho Docker. Sau proxy của công ty thì cấu hình proxy cho Docker trước (xem
+[Yêu cầu trong README](../README.vi.md#yêu-cầu)).
+
 Hoặc khỏi build, dùng image đã phát hành (xem các bản phát hành trên GitHub của dự án):
 
 ```bash
@@ -170,6 +174,12 @@ docker compose up -d --build
 ```
 
 Service `migrate` áp dụng migration mới trước khi máy chủ mới khởi động.
+
+**Cập nhật từ 0.17 trở về trước:** module thử nghiệm (bookings, newsletter, comments, support,
+conversations, analytics, reporting, automations) không còn chạy nếu `AUTOXIDE_MODULES` không nêu
+tên. Không gì bị xoá, và log khởi động lẫn `autoxide doctor` báo khi database còn dữ liệu của một
+module đang tắt, kèm dòng cần thêm — xem
+[MODULES.vi.md](MODULES.vi.md#nâng-cấp-từ-017-trở-về-trước). Điều này áp dụng cả cho cách B và C.
 
 ### 6. Backup và khôi phục
 
@@ -375,6 +385,7 @@ database mới.
 | Biến | Dùng để |
 | --- | --- |
 | `DATABASE_URL` | `sqlite://data/autoxide.sqlite` (mặc định) hoặc `postgres://user:password@host:5432/db` |
+| `AUTOXIDE_MODULES` | Module nào chạy: `official` (mặc định), `core`, `all`, tên để thêm, `-tên` để bỏ. Module thử nghiệm phải nêu tên. Xem [MODULES.vi.md](MODULES.vi.md) |
 | `AUTOXIDE_AUTH_TOKEN_SECRET` | Ký access token; bắt buộc ở production, giống nhau trên mọi máy chủ |
 | `AUTOXIDE_SECRET_KEY` | Ký các token sống ngắn của mọi module và làm khoá băm địa chỉ IP của người lạ; không bắt buộc: không đặt thì máy chủ sinh một lần và lưu trong database. Khi chạy thật nên đặt (ngoài database, giống nhau trên mọi máy chủ): khoá nằm trong database thì ai có bản backup database cũng mở được các secret đã mã hoá và tính ngược được khối IP từ các bản băm đã lưu |
 | `AUTOXIDE_SECRET_KEY_PREVIOUS` | Các giá trị cũ của `AUTOXIDE_SECRET_KEY`, cách nhau dấu phẩy, trong lúc xoay khoá; bỏ đi sau khi chạy `autoxide secrets reseal` |
@@ -393,7 +404,7 @@ database mới.
 | `AUTOXIDE_PROCESS_ROLE` | `api` / `worker` để chạy API và việc nền ở tiến trình riêng |
 | `AUTOXIDE_HTTP_COMPRESSION` | `true` (mặc định): nén JSON và chữ bằng gzip hay brotli; `false` khi reverse proxy hay CDN phía trước đã nén |
 | `AUTOXIDE_HTTP_PUBLIC_CACHE_SECONDS` | CDN được giữ một lượt đọc công khai bao lâu (mặc định `60`), xem [CDN phía trước Autoxide](#cdn-phía-trước-autoxide) |
-| `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, cùng cổng với API: khi bật, hãy chặn `/metrics` ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
+| `AUTOXIDE_HTTP_METRICS` | Metrics Prometheus ở `/metrics`, không có xác thực. Thêm `AUTOXIDE_HTTP_METRICS_ADDRESS` (vd `127.0.0.1:9090`) để phục vụ nó ở port riêng, tách khỏi API; không có biến đó thì `/metrics` nằm cùng port với API: hãy chặn nó ở reverse proxy (Caddy: `respond /metrics 404`) và lấy số đo ngay trên máy chủ |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Gửi trace tới một OpenTelemetry collector |
 
 Kiểm cấu hình mà không khởi động gì: `autoxide config`. Lệnh liệt kê mọi biến kèm giá
@@ -756,6 +767,32 @@ Mặc định giới hạn request đếm theo từng tiến trình: với N má
 (một phần tư `AUTOXIDE_HTTP_RATE_LIMIT_API_KEY_BURST`), nên mỗi phút một key được vượt giới hạn
 nhiều nhất một lô cho mỗi máy chủ. Giới hạn theo địa chỉ vẫn đếm theo từng tiến trình.
 
+## Kubernetes
+
+[`deploy/kubernetes/autoxide.yaml`](../deploy/kubernetes/autoxide.yaml) là một ví dụ tối thiểu, có chú
+thích: một `Job` chạy migration, một `Deployment` hai pod, một `Service` và một `Ingress` có HTTPS. Nó theo
+đúng các luật ở [Chạy nhiều máy chủ](#chạy-nhiều-máy-chủ):
+
+- PostgreSQL chạy bên ngoài file này (database có quản lý hay operator của bạn); SQLite chỉ cho một tiến
+  trình nên không hợp ở đây.
+- File lưu trên S3 (`AUTOXIDE_FILES_S3_BUCKET`), thư gửi qua SMTP (`AUTOXIDE_MAIL_SMTP_URL`): pod không giữ
+  gì trên đĩa, nên pod nào cũng thay được.
+- Secret (`DATABASE_URL`, `AUTOXIDE_AUTH_TOKEN_SECRET`, `AUTOXIDE_SECRET_KEY`, key S3, URL SMTP) nằm trong
+  một `Secret` của Kubernetes bạn tạo bằng `kubectl create secret`, không bao giờ nằm trong file.
+- Migration chạy một lần mỗi bản phát hành trong `Job`; pod từ chối khởi động khi còn migration chưa áp
+  dụng, nên pod cũ vẫn phục vụ tới khi `Job` xong.
+- `readinessProbe` trỏ `/health/ready`, `livenessProbe` trỏ `/health/live`, khoảng rút 15 giây và
+  `terminationGracePeriodSeconds: 50` cho phép cập nhật cuốn chiếu không rơi request (xem
+  [Cập nhật không làm rơi request](#cập-nhật-không-làm-rơi-request)).
+- `AUTOXIDE_HTTP_RATE_LIMIT_STORE=database` chia giới hạn theo key giữa các pod, và
+  `AUTOXIDE_HTTP_CLIENT_IP_HEADER` với một proxy tin cậy đọc địa chỉ client mà ingress controller chuyển
+  tiếp.
+- Pod chạy bằng người dùng không phải root của image (`10001`), không thêm đặc quyền.
+
+Lệnh tạo secret, áp file và cập nhật nằm ở đầu file. Muốn tách API khỏi việc nền thì chép `Deployment`
+thành một cái thứ hai với `AUTOXIDE_PROCESS_ROLE=worker` (không cần `Service`, ít nhất một pod) và đặt
+`AUTOXIDE_PROCESS_ROLE=api` cho cái thứ nhất.
+
 ## Tải thẳng lên S3
 
 Khi file nằm trên S3, client tải được file lớn thẳng lên bucket (`POST /api/v1/files/uploads`,
@@ -849,10 +886,100 @@ gate.
    cùng cách. Muốn lấy lại dữ liệu của riêng một khách: khôi phục bản backup vào một bản cài tạm rồi đọc
    hay xuất dữ liệu của khách đó từ đó; chưa có lệnh khôi phục một khách vào database đang chạy.
 
+## Backup mã hoá ở nơi khác và khôi phục về một thời điểm
+
+`autoxide backup` và backup theo lịch là ảnh chụp nhất quán: khôi phục một bản đưa dữ liệu về đúng lúc
+chụp, còn những gì xảy ra sau đó thì mất. Hai phần dưới đây bù chỗ còn lại.
+
+### Mã hoá backup trước khi rời máy
+
+Một bản backup chứa dữ liệu của mọi module, kể cả dữ liệu cá nhân. Mã hoá nó trước khi chép sang máy khác
+hay lên bucket, ví dụ bằng [age](https://age-encryption.org) với một cặp khoá mà nửa riêng tư cất ngoại
+tuyến:
+
+```bash
+age-keygen -o backup-key.txt            # một lần; cất backup-key.txt ngoại tuyến, tách khỏi backup
+age-keygen -y backup-key.txt            # in khoá công khai age1…, dùng ở dưới
+
+autoxide backup "backups/$(date +%F)"
+tar -C backups -c "$(date +%F)" | age -r age1… > "autoxide-$(date +%F).tar.age"
+# chép autoxide-<ngày>.tar.age đi nơi khác, rồi xoá thư mục chưa mã hoá
+
+# khôi phục: giải mã, rồi khôi phục thư mục như ở "Khôi phục từng bước"
+age -d -i backup-key.txt autoxide-2026-11-21.tar.age | tar -x -C restore/
+```
+
+Cũng giữ `AUTOXIDE_SECRET_KEY` tách khỏi backup: thiếu nó thì secret đã mã hoá bên trong backup không đọc
+được, và đó chính là mục đích.
+
+### Khôi phục về một thời điểm trên PostgreSQL
+
+Muốn đưa database về đúng trạng thái ở một giây bất kỳ — ví dụ ngay trước một lần sửa hàng loạt sai —
+PostgreSQL phải giữ nhật ký ghi trước (WAL) bên cạnh các bản backup nền định kỳ. Autoxide không cần gì đặc
+biệt: đây là cách cài chuẩn của PostgreSQL.
+
+- **PostgreSQL có quản lý** (Amazon RDS, Google Cloud SQL, Azure, …): bật backup tự động có khôi phục về
+  thời điểm (point-in-time recovery) và mã hoá ổ lưu trong trang quản lý của nhà cung cấp; khôi phục tạo
+  một database mới ở thời điểm bạn chọn. Trỏ `DATABASE_URL` tới nó.
+- **Máy chủ của bạn**: [pgBackRest](https://pgbackrest.org) giữ backup nền và WAL trong một bucket, mã hoá
+  ngay trên máy database trước khi gửi đi. Phác thảo (đối chiếu hướng dẫn của pgBackRest đúng phiên bản bạn
+  dùng; trên Debian hay Ubuntu: `apt install pgbackrest`; với container PostgreSQL của `compose.yml` thì
+  dùng một image có thêm nó):
+
+  ```ini
+  # /etc/pgbackrest/pgbackrest.conf
+  [global]
+  repo1-type=s3
+  repo1-s3-bucket=<bucket>
+  repo1-s3-endpoint=s3.<region>.amazonaws.com
+  repo1-s3-region=<region>
+  repo1-path=/pgbackrest
+  # mã hoá phía client: một giá trị ngẫu nhiên dài, cất tách khỏi bucket
+  repo1-cipher-type=aes-256-cbc
+  repo1-cipher-pass=<openssl rand -base64 48>
+  repo1-retention-full=2
+
+  [autoxide]
+  pg1-path=/var/lib/postgresql/16/main
+  ```
+
+  ```ini
+  # postgresql.conf
+  wal_level = replica
+  archive_mode = on
+  archive_command = 'pgbackrest --stanza=autoxide archive-push %p'
+  ```
+
+  Key S3 đặt trong `PGBACKREST_REPO1_S3_KEY` và `PGBACKREST_REPO1_S3_KEY_SECRET` (hoặc `repo1-s3-key`,
+  `repo1-s3-key-secret` trong một file chỉ `postgres` đọc được). Rồi, bằng người dùng `postgres`:
+
+  ```bash
+  pgbackrest --stanza=autoxide stanza-create
+  pgbackrest --stanza=autoxide check
+  pgbackrest --stanza=autoxide --type=full backup   # hằng tuần, từ cron
+  pgbackrest --stanza=autoxide --type=diff backup   # hằng ngày, từ cron
+  ```
+
+  Muốn quay về một thời điểm: dừng các máy chủ Autoxide và PostgreSQL, rồi
+
+  ```bash
+  pgbackrest --stanza=autoxide --delta --type=time --target-action=promote \
+    "--target=2026-11-21 09:59:00+00" restore
+  ```
+
+  khởi động PostgreSQL, chạy `autoxide doctor`, rồi khởi động các máy chủ.
+
+Khôi phục về thời điểm chỉ áp cho database. File trên S3 không quay lui theo: bật versioning của bucket để
+lấy lại file đã xoá hay bị ghi đè. Ở chế độ nhiều khách, mỗi placement là một database riêng và cần cài
+riêng. Tập khôi phục trước khi cần, như với ảnh chụp.
+
 ## Theo dõi (monitoring)
 
-Bật `AUTOXIDE_HTTP_METRICS=true` và để Prometheus đọc `/metrics` ngay trên máy (chặn `/metrics` ở
-reverse proxy). Ngoài số đo request (`http_requests_total`, `http_request_duration_seconds`), mọi tiến
+Bật `AUTOXIDE_HTTP_METRICS=true`. `/metrics` không có xác thực, nên cho nó port riêng bằng
+`AUTOXIDE_HTTP_METRICS_ADDRESS` — `127.0.0.1:9090` trên một máy, `0.0.0.0:9090` trong container hay pod
+Kubernetes (chỉ mở port đó cho Prometheus, không bao giờ ra internet) — rồi trỏ Prometheus vào đó;
+`/metrics` khi ấy rời port của API. Không có biến đó thì `/metrics` nằm cùng port với API: chặn nó ở
+reverse proxy và để Prometheus đọc ngay trên máy. Ngoài số đo request (`http_requests_total`, `http_request_duration_seconds`), mọi tiến
 trình chạy việc nền (`AUTOXIDE_PROCESS_ROLE` là `all` hay `worker`) cập nhật các gauge tồn đọng mỗi
 `AUTOXIDE_METRICS_BACKLOG_SECONDS` giây (mặc định 30), gắn nhãn `database` và `module`:
 

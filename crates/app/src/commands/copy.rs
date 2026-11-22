@@ -70,6 +70,14 @@ async fn copy(settings: Settings, target: DatabaseConfig) -> Result<String, Stri
             pending.len()
         ));
     }
+    // Chỉ bảng của module đang bật được chép: còn dữ liệu của module đang tắt thì dừng, không để
+    // nó ở lại trong im lặng (bước 70 P1).
+    if let Err(error) =
+        crate::modules::refuse_dormant_data(&settings.modules, &source, "copy").await
+    {
+        let _ = source.close().await;
+        return Err(error);
+    }
     let target = match Database::connect(&target).await {
         Ok(target) => target,
         Err(error) => {

@@ -220,6 +220,16 @@ pub(crate) fn invalid_token() -> Error {
     Error::unauthenticated("auth.invalid_token", "Your sign-in is not valid. Sign in again.")
 }
 
+/// Access token của một phiên đã đăng xuất hay bị thu hồi (đổi mật khẩu, thu hồi phiên, khoá tài
+/// khoản): bị từ chối ngay, không chờ hết hạn.
+pub(crate) fn session_ended() -> Error {
+    Error::unauthenticated(
+        "auth.session_ended",
+        "This session has been signed out (signed out, revoked, or the password was changed). \
+         Sign in again.",
+    )
+}
+
 /// Băm SHA-256 của refresh token, để lưu. Database chỉ giữ bản băm: lộ bảng cũng
 /// không dùng được token. Không cần Argon2 ở đây — token đã ngẫu nhiên 256 bit,
 /// không đoán thử được như mật khẩu.

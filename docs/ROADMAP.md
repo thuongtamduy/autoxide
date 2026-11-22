@@ -89,7 +89,7 @@ Xong cả giai đoạn (33–37, 40): xem [`roadmap/done.md`](roadmap/done.md).
 Thứ cộng đồng cần là lý do để tin và đường để đóng góp. Không dựng module mới trước bản 1.0, trừ bộ nối nhà cung cấp
 thật (P7).
 
-- [ ] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
+- [x] P1 — Bật/tắt module bằng cấu hình: module tắt không route, không có trong OpenAPI phục vụ lúc chạy, không tool
       MCP, không job, không nhận event, không chạy migration trên database mới; database đã có bảng của module tắt thì
       giữ nguyên dữ liệu; bật thiếu phụ thuộc thì báo rõ phải bật thêm gì; `doctor` liệt kê module bật / tắt;
       `docs/openapi.json` trong repo vẫn sinh với mọi module; test tập tối thiểu trên cả hai database
@@ -97,7 +97,7 @@ thật (P7).
       chính thức + module của họ, đủ lệnh CLI); `examples/external-module/` là workspace riêng, CI build và test trên
       cả hai database; hướng dẫn `docs/guides/writing-a-module.md` + `.vi.md`; phụ thuộc bằng git tag dùng được ngay;
       `cargo publish --dry-run` qua cho kernel và testkit (đăng thật ở P5)
-- [ ] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
+- [x] P3 — Hai hạng module: chính thức (giữ ổn định) và thử nghiệm (ghi rõ "có thể đổi", không bật khi không đặt cấu
       hình); danh sách và phụ thuộc ở `docs/MODULES.md` + `.vi.md`; người nâng cấp có dữ liệu của module đang tắt được
       cảnh báo rõ ở log khởi động và `doctor`, kèm đúng dòng cấu hình cần thêm
 - [ ] P4 — Bản 1.0 có cam kết: chính sách tương thích cho API, mã lỗi, cấu hình, migration và phần kernel mở cho module
@@ -1057,7 +1057,11 @@ banner (55, D-236); rà lộ trình lần hai (D-237); module `menus` cho menu c
 Đã đưa lên lộ trình (D-20261119-step69-multiplatform): nền cho ứng dụng đa nền tảng — SDK di động, đồng bộ
 ngoại tuyến, WebSocket, mua trong ứng dụng, hướng dẫn cho người làm app (69).
 
-Để sau: (trống — ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A).
+Để sau: ý tưởng mới ghi một dòng ở đây, chưa viết đặc tả, cho tới khi xong giai đoạn A.
+
+- Rà 139 danh sách `Data<Vec<T>>` trong `xtask/api-shape-allow.txt` (D-20261121-api-shape): danh sách nào không có
+  giới hạn thật (vd nhãn, view, ghi chú, biến thể, hoàn tiền của đơn) thì làm endpoint mới trả `Page<T>` và khai
+  endpoint cũ qua `Module::deprecations` (D-059).
 
 Đã cân nhắc và không làm: API dữ liệu tự
 sinh từ bảng, plugin WASM nạp lúc chạy, trang quản trị dựng sẵn (`docs/research/frameworks.md`,

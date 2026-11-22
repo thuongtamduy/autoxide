@@ -64,6 +64,12 @@ impl Module for SepayEInvoiceModule {
          documentation; not yet verified against the live service)."
     }
 
+    // Thử nghiệm (bước 70 P3): viết theo tài liệu công khai, chưa chạy với dịch vụ thật — chỉ chạy khi
+    // được bật rõ trong `AUTOXIDE_MODULES`.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn tenant_settings(&self) -> Vec<TenantSetting> {
         settings::all()
     }

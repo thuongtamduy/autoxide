@@ -30,6 +30,7 @@ pub(crate) fn routes(service: Arc<CatalogService>) -> OpenApiRouter {
 /// Draft a product from photos.
 #[derive(Debug, Deserialize, Validate, ToSchema)]
 #[schema(as = CatalogImageDraftRequest)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct ImageDraftRequest {
     /// 1 to 8 images of the media library (JPEG, PNG, GIF or WebP). Public ones become the
     /// product's images.

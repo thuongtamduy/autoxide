@@ -11,7 +11,8 @@ Tiếng Anh: [`sepay-einvoice.md`](sepay-einvoice.md).
 > với sandbox của SePay trước khi dựa vào nó. Bạn vẫn chịu trách nhiệm về nội dung hoá đơn của mình; hướng
 > dẫn này không phải tư vấn pháp lý.
 
-Mỗi khách (tenant) nối tài khoản SePay eInvoice **của riêng mình**. Client secret được lưu mã hoá và
+Người vận hành bật bộ nối bằng cách nêu tên nó: `AUTOXIDE_MODULES=official,einvoice_sepay` (module thử
+nghiệm mặc định tắt). Mỗi khách (tenant) nối tài khoản SePay eInvoice **của riêng mình**. Client secret được lưu mã hoá và
 không bao giờ hiện lại.
 
 ## 1. Lưu tài khoản SePay eInvoice của bạn
@@ -35,6 +36,7 @@ curl -X POST "$API/api/v1/kernel/settings/einvoice_sepay.connection.api.client_i
 | --- | --- |
 | `einvoice_sepay.connection.api.client_id` | Client id của tài khoản SePay eInvoice của bạn. |
 | `einvoice_sepay.connection.api.client_secret` | Client secret của nó. |
+| `einvoice_sepay.connection.api.environment` | `production` (mặc định) hay `sandbox`. Đặt `sandbox` cho tài khoản thử của SePay eInvoice: khi đó nó gọi sang sandbox của SePay và chỉ xuất hoá đơn thử. |
 | `einvoice_sepay.connection.api.provider_account_id` | Tài khoản nhà cung cấp hoá đơn dùng để phát hành. Có thể để trống khi tài khoản SePay của bạn có đúng một tài khoản nhà cung cấp đang hoạt động. |
 
 ## 2. Trỏ một ký hiệu hoá đơn vào SePay
@@ -49,8 +51,6 @@ hành, và được hỏi trạng thái cho tới khi cơ quan thuế trả lờ
 - Thuế suất 0, 5, 8 và 10 %, và "không chịu thuế". Thuế suất khác bị từ chối trước khi gửi.
 - Hoá đơn sửa sai được gửi dưới dạng thay thế hoặc điều chỉnh hoá đơn gốc.
 - Gửi lại cùng một chứng từ không bao giờ tạo hoá đơn thứ hai: SePay nhận ra nó theo ID chứng từ.
-- **Số hoá đơn do nhà cung cấp cấp.** Số này nằm trên file PDF và XML bạn tải về; số của chứng từ trong
-  Autoxide có thể khác.
+- **Số hoá đơn do nhà cung cấp cấp.** Khi hoá đơn được chấp nhận, số này có trên chứng từ ở
+  `provider_number`, cạnh mã của cơ quan thuế; `number` riêng của chứng từ trong Autoxide có thể khác.
 - **Không có huỷ hoá đơn** qua API của SePay: sửa hoá đơn bằng thay thế hoặc điều chỉnh.
-- Người vận hành dùng sandbox của SePay bằng
-  `AUTOXIDE_EINVOICE_SEPAY_API_URL=https://einvoice-api-sandbox.sepay.vn`.

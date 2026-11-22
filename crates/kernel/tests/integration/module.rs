@@ -153,7 +153,12 @@ async fn can_trait_cua_module_dang_ky_sau_thi_bao_ro_cach_sua() {
             error.contains("requires `dyn ") && error.contains("module::UserDirectory`"),
             "{error}"
         );
-        assert!(error.contains("register the providing module before `notes`"), "{error}");
+        assert!(
+            error.contains("The providing module must be registered before `notes`")
+                && error.contains("`Module::depends_on`")
+                && error.contains("AUTOXIDE_MODULES"),
+            "{error}"
+        );
         assert!(seen.lock().unwrap().is_empty());
     })
     .await

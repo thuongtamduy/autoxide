@@ -42,7 +42,11 @@ async fn set(app: &TestApp, token: &str, field: &str, value: &str) {
 
 fn provider(app: &TestApp, server: &FakeProviderServer) -> SepayEInvoice {
     let accounts: ProviderAccounts = (*app.api::<ProviderAccounts>().unwrap()).clone();
-    let config = EInvoiceConfig { api_url: server.url().to_owned() };
+    let config = EInvoiceConfig {
+        api_url: server.url().to_owned(),
+        // Khách đặt `environment = sandbox` gọi sang đường `/sandbox` của máy chủ giả.
+        sandbox_api_url: format!("{}/sandbox", server.url()),
+    };
     SepayEInvoice::new(Client::new(accounts, ConnectionStatus, config).unwrap())
 }
 
@@ -149,11 +153,21 @@ async fn xuat_hoa_don_dung_tai_lieu_bang_tai_khoan_cua_tung_khach() {
         assert_eq!((&body["template_code"], &body["invoice_series"]), (&json!("2"), &json!("C26MSE")));
         assert!(body["items"][0].get("tax_rate").is_none() && body["items"][0].get("tax_amount").is_none());
 
+        // Khách hai dùng tài khoản thử: mọi lời gọi của khách hai sang địa chỉ sandbox, khách một không.
+        set(&app, "two", "environment", "sandbox").await;
+        server.reply("POST", "/sandbox/v1/token", 200, token_reply("token-two"));
+        server.reply("GET", &format!("/sandbox/v1/provider-accounts/{ACCOUNT}"), 200, account_detail());
+        server.reply("POST", "/sandbox/v1/invoices/create", 200, tracking("trk-s"));
         // Khách hai: token riêng, lấy bằng tài khoản riêng.
         provider.issue(two.id(), &invoice(Uuid::now_v7(), EInvoiceKind::Vat)).await.unwrap();
         let seen = server.take_requests();
         assert_eq!(seen[0].header("authorization"), Some(basic("id-two", "secret-two").as_str()));
         assert!(seen[1..].iter().all(|request| request.header("authorization") == Some("Bearer token-two")));
+        assert!(seen.iter().all(|request| request.path.starts_with("/sandbox/v1/")), "{seen:?}");
+        // Giá trị lạ bị từ chối lúc đặt.
+        let uri = "/api/v1/kernel/settings/einvoice_sepay.connection.api.environment";
+        let refused = app.put(uri).token("two").json(json!({"value": "test"})).send().await.unwrap();
+        assert_eq!(refused.status(), StatusCode::UNPROCESSABLE_ENTITY);
     })
     .await
     .unwrap();
@@ -204,7 +218,10 @@ async fn gui_lai_trang_thai_va_tai_file() {
             "invoice_number": "589", "status": "issued", "provider_status": "4", "tax_authority_code": "M1-26-ABCDE-00000000589"}}));
         // Đã xuất nhưng cơ quan thuế chưa phản hồi: còn chờ.
         assert_eq!(provider.status(one.id(), &reference).await.unwrap(), EInvoiceStatus::Pending);
-        let accepted = EInvoiceStatus::Accepted { authority_code: Some("M1-26-ABCDE-00000000589".to_owned()) };
+        let accepted = EInvoiceStatus::Accepted {
+            authority_code: Some("M1-26-ABCDE-00000000589".to_owned()),
+            number: Some(589),
+        };
         assert_eq!(provider.status(one.id(), &reference).await.unwrap(), accepted);
         // Không có mã tracking (trường hợp 409 ở trên): hỏi thẳng theo mã tham chiếu.
         server.take_requests();

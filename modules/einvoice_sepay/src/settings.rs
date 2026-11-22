@@ -24,6 +24,15 @@ pub(crate) const PROVIDER_ACCOUNT_ID: TenantSetting = TenantSetting::new(
 )
 .group(CONNECTION_GROUP);
 
+/// Môi trường của tài khoản (D-20261122-provider-environments): tài khoản thử chỉ chạy với sandbox.
+pub(crate) const ENVIRONMENT: TenantSetting = TenantSetting::new(
+    "einvoice_sepay.connection.api.environment",
+    "`production` (the default) or `sandbox`: which SePay eInvoice environment this tenant's \
+     account belongs to. A sandbox account issues test invoices only.",
+)
+.checked(autoxide_kernel::provider::Environment::check)
+.group(CONNECTION_GROUP);
+
 pub(crate) fn all() -> Vec<TenantSetting> {
-    vec![CLIENT_ID, CLIENT_SECRET, PROVIDER_ACCOUNT_ID]
+    vec![CLIENT_ID, CLIENT_SECRET, PROVIDER_ACCOUNT_ID, ENVIRONMENT]
 }

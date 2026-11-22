@@ -9849,6 +9849,11 @@ export type Data_ModuleInfo = {
     resources: ModuleResource[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
+    /**
+     * `official`, or `experimental`: the module's API and data may still change between
+     * releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
+     */
+    stability: string;
     /** Events the module listens to; `*` means every event. */
     subscriptions: string[];
     /** MCP tools the module offers at `/mcp`. */
@@ -14533,6 +14538,11 @@ export type Data_Vec_ModuleInfo = {
     resources: ModuleResource[];
     /** Recurring jobs the module schedules. */
     schedules: ModuleSchedule[];
+    /**
+     * `official`, or `experimental`: the module's API and data may still change between
+     * releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
+     */
+    stability: string;
     /** Events the module listens to; `*` means every event. */
     subscriptions: string[];
     /** MCP tools the module offers at `/mcp`. */
@@ -19423,6 +19433,11 @@ export type ModuleInfo = {
   resources: ModuleResource[];
   /** Recurring jobs the module schedules. */
   schedules: ModuleSchedule[];
+  /**
+   * `official`, or `experimental`: the module's API and data may still change between
+   * releases, and it only runs where the installation turns it on (`AUTOXIDE_MODULES`).
+   */
+  stability: string;
   /** Events the module listens to; `*` means every event. */
   subscriptions: string[];
   /** MCP tools the module offers at `/mcp`. */

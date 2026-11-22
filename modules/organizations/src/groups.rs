@@ -13,7 +13,7 @@ use autoxide_kernel::access::Principal;
 use autoxide_kernel::error::{Error, ErrorKind, FieldError};
 use autoxide_kernel::event::Actor;
 use autoxide_kernel::pagination::{Page, PageRequest, fetch_page};
-use autoxide_kernel::search::fold;
+use autoxide_kernel::search::{self, fold};
 use autoxide_kernel::tenancy::{OrgId, ScopeExt, TenantContext};
 use sea_orm::sea_query::OnConflict;
 use sea_orm::{
@@ -210,7 +210,7 @@ impl OrgService {
         let read = tenant.database().read();
         let mut select = group::Entity::find().scoped(tenant);
         if let Some(q) = q.map(fold).filter(|q| !q.is_empty()) {
-            select = select.filter(group::Column::NameFolded.contains(q));
+            select = select.filter(search::contains(group::Column::NameFolded, &q));
         }
         let page = fetch_page(select, group::Column::Id, |row| row.id, page, read).await?;
         let ids: Vec<Uuid> = page.data.iter().map(|row| row.id).collect();

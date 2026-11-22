@@ -10,9 +10,14 @@
 #    data/initial-admin-password in the data volume, never to the log).
 #
 # 2. docker compose -f compose.quickstart.yml up -d
-#    docker compose -f compose.quickstart.yml logs autoxide | grep "generated password"
+#    docker compose -f compose.quickstart.yml exec autoxide cat data/initial-admin-password
 #
-# 3. Open http://127.0.0.1:8080/ (links), http://127.0.0.1:8080/api/docs (API reference).
+#    The file (`/var/lib/autoxide/data/initial-admin-password` in the `data` volume, readable only by
+#    the server's user) holds the administrator's email and generated password. Delete it once you
+#    have changed the password: docker compose -f compose.quickstart.yml exec autoxide rm data/initial-admin-password
+#
+# 3. Open http://127.0.0.1:8080/ (links). The API reference at /api/docs is off unless you add
+#    AUTOXIDE_HTTP_API_DOCS=true to `.env`.
 #
 # On start the server applies the migrations, creates the first administrator while there is none,
 # and loads the reference data shipped with it (addresses, taxes, promotion limits); each start
@@ -30,6 +35,11 @@ services:
       # Optional (empty = unset): without it the root key is kept in the database and the server warns.
       AUTOXIDE_SECRET_KEY: ${AUTOXIDE_SECRET_KEY:-}
       AUTOXIDE_MIGRATE_ON_START: "true"
+      # Which modules run. `official` (the default) is every official module; experimental ones
+      # (bookings, newsletter, comments, support…) must be named, e.g. `official,newsletter`.
+      # A smaller set also works (e.g. `content,forms,menus` for a website backend), but then
+      # remove from AUTOXIDE_STARTUP_TASKS below the tasks of modules you left out. docs/MODULES.md
+      AUTOXIDE_MODULES: ${AUTOXIDE_MODULES:-official}
       AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL: ${AUTOXIDE_BOOTSTRAP_ADMIN_EMAIL:-admin@example.com}
       AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD: ${AUTOXIDE_BOOTSTRAP_ADMIN_PASSWORD:-}
       AUTOXIDE_STARTUP_TASKS: address.import,tax.import_pack,promotions.load_legal_data

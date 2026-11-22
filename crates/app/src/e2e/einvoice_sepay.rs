@@ -140,6 +140,8 @@ async fn chung_tu_phat_hanh_duoc_gui_qua_sepay_va_duoc_chap_nhan() {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["data"]["status"], "accepted", "{body}");
         assert_eq!(body["data"]["authority_code"], "M1-26-ABCDE-00000000589");
+        // Số do nhà cung cấp cấp (số hợp lệ về thuế) được lưu và trả ra cùng mã cơ quan thuế.
+        assert_eq!(body["data"]["provider_number"], 589, "{body}");
 
         let file = app
             .get(&format!("/api/v1/invoices/documents/{}/einvoice?format=pdf", found.id))

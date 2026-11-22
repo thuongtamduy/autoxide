@@ -71,6 +71,11 @@ impl Module for AutomationsModule {
         "automations"
     }
 
+    // Thử nghiệm (bước 70 P3): API và bảng còn có thể đổi; chỉ chạy khi `AUTOXIDE_MODULES` nêu tên.
+    fn stability(&self) -> autoxide_kernel::module::Stability {
+        autoxide_kernel::module::Stability::Experimental
+    }
+
     fn navigation(&self) -> autoxide_kernel::module::navigation::Navigation {
         use autoxide_kernel::module::navigation::{NavGroup, NavItem, Navigation};
         Navigation::default().group(NavGroup::new("settings", "Settings", "gear", 110)).item(

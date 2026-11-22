@@ -113,7 +113,7 @@ impl<'c> SchemaManager<'c> {
 }
 
 /// Bảng `table` có không — chỉ đọc catalog (chạy được với người dùng không có quyền DDL), như `sea-schema`.
-pub(super) async fn has_table<C: ConnectionTrait>(
+pub(crate) async fn has_table<C: ConnectionTrait>(
     connection: &C,
     table: &str,
 ) -> Result<bool, DbErr> {

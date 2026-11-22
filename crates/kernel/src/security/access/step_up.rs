@@ -36,10 +36,18 @@ impl Principal {
     /// `Ok` khi `permission` không cần xác nhận lại, hay lần xác thực gần nhất còn trong cửa sổ;
     /// không thì 401 `step_up_required` kèm `WWW-Authenticate` của RFC 9470.
     pub(super) fn fresh_for(&self, permission: &Permission) -> Result<(), Error> {
-        let Some(step_up) = self.step_up else { return Ok(()) };
         if !matches!(permission.risk(), Risk::Destructive | Risk::Money) {
             return Ok(());
         }
+        self.require_fresh(permission)
+    }
+
+    /// Đòi xác nhận lại cho MỘT việc cụ thể dù `permission` của nó không thuộc loại rủi ro cao —
+    /// vd đặt tài khoản nhà cung cấp (đổi nơi tiền về) dưới `kernel.settings.manage`
+    /// (D-20261122-provider-environments). Người gọi không gắn [`StepUp`] (API key, job) không bị đòi,
+    /// như [`require`](Self::require).
+    pub fn require_fresh(&self, permission: &Permission) -> Result<(), Error> {
+        let Some(step_up) = self.step_up else { return Ok(()) };
         let fresh =
             step_up.authenticated_at.is_some_and(|at| Timestamp::now() - at <= step_up.window);
         if fresh {

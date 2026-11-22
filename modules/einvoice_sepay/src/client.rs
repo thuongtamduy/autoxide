@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::api::PROVIDER;
 use crate::config::EInvoiceConfig;
-use crate::settings::{CLIENT_ID, CLIENT_SECRET};
+use crate::settings::{CLIENT_ID, CLIENT_SECRET, ENVIRONMENT};
 
 const TIMEOUT: Duration = Duration::from_secs(20);
 /// Bỏ token sớm chừng này trước hạn (tài liệu: token sống 86400 giây).
@@ -59,6 +59,15 @@ impl Client {
         })
     }
 
+    /// Địa chỉ API cho khách: một trong HAI địa chỉ cố định của người vận hành, theo cấu hình
+    /// `environment` của khách. Giá trị đã lưu mà không còn hợp lệ → từ chối, không đoán.
+    async fn base_url(&self, tenant: &TenantContext) -> Result<&str, Error> {
+        let chosen = self.accounts.get(tenant, &ENVIRONMENT).await?;
+        let environment = Environment::parse(chosen.as_ref().map(|value| value.as_str()))
+            .ok_or_else(|| autoxide_kernel::provider::not_configured(ENVIRONMENT.name()))?;
+        Ok(environment.pick(&self.config.api_url, &self.config.sandbox_api_url))
+    }
+
     fn forget(&self, tenant: TenantId) {
         self.tokens.lock().unwrap_or_else(PoisonError::into_inner).remove(&tenant);
     }
@@ -68,8 +77,13 @@ impl Client {
     async fn token(&self, tenant: &TenantContext) -> Result<String, Error> {
         let id = self.accounts.require(tenant, &CLIENT_ID).await?;
         let secret = self.accounts.require(tenant, &CLIENT_SECRET).await?;
-        let fingerprint =
-            autoxide_kernel::secret::sha256(&format!("{}\n{}", id.as_str(), secret.as_str()));
+        let base = self.base_url(tenant).await?;
+        // Môi trường nằm trong dấu vân tay: đổi môi trường thì token cũ không được dùng nữa.
+        let fingerprint = autoxide_kernel::secret::sha256(&format!(
+            "{base}\n{}\n{}",
+            id.as_str(),
+            secret.as_str()
+        ));
         {
             let tokens = self.tokens.lock().unwrap_or_else(PoisonError::into_inner);
             if let Some(cached) = tokens.get(&tenant.id())
@@ -81,7 +95,7 @@ impl Client {
         }
         let request = self
             .http
-            .post(format!("{}/v1/token", self.config.api_url))
+            .post(format!("{base}/v1/token"))
             .basic_auth(id.as_str(), Some(secret.as_str()));
         let reply = send(request, PROVIDER, "token").await.map_err(|_| provider_unavailable())?;
         if reply.status == 400 || reply.status == 401 {
@@ -110,11 +124,12 @@ impl Client {
         purpose: &'static str,
     ) -> Result<ProviderReply, Error> {
         let token = self.token(tenant).await?;
+        let base = self.base_url(tenant).await?;
         let request = match call {
-            Call::Get(path) => self.http.get(format!("{}{path}", self.config.api_url)),
+            Call::Get(path) => self.http.get(format!("{base}{path}")),
             Call::Post(path, body) => self
                 .http
-                .post(format!("{}{path}", self.config.api_url))
+                .post(format!("{base}{path}"))
                 .header("content-type", "application/json")
                 .body(serde_json::to_vec(body).map_err(Error::internal)?),
         };

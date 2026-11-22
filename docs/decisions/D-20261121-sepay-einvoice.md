@@ -20,11 +20,13 @@ Quyết định (bước 70 P7, "Hoá đơn điện tử: SePay eInvoice"; theo 
    nhận; lỗi ký hay không đủ điều kiện cấp mã → từ chối; cơ quan thuế chưa phản hồi → chờ.
 4. **Giới hạn ghi rõ**: chỉ đồng Việt Nam; chỉ hoá đơn GTGT và hoá đơn bán hàng; thuế suất 0 / 5 / 8 / 10 % và không
    chịu thuế; không có huỷ hoá đơn (tài liệu SePay không có API huỷ hoá đơn đã phát hành — xử lý sai sót bằng thay thế
-   / điều chỉnh); **số hoá đơn do nhà cung cấp cấp** chỉ có sau khi phát hành, mà hợp đồng `EInvoiceStatus` chưa mang số
-   về — số hợp lệ về thuế là số trên file tải từ SePay, số nội bộ của chứng từ có thể khác. Không đổi hợp đồng core vì
-   một nhà cung cấp (D-20261121-vn-providers); cần thì mở mục riêng.
-5. Địa chỉ API là cấu hình của người vận hành `AUTOXIDE_EINVOICE_SEPAY_API_URL` (mặc định
-   `https://einvoice-api.sepay.vn`; sandbox `https://einvoice-api-sandbox.sepay.vn`).
+   / điều chỉnh); **số hoá đơn do nhà cung cấp cấp** chỉ có sau khi phát hành — trả về qua
+   `EInvoiceStatus::Accepted::number` và lưu ở `provider_number` của chứng từ (D-20261122-einvoice-provider-number); số
+   nội bộ của chứng từ có thể khác.
+5. Địa chỉ API là cấu hình của người vận hành: `AUTOXIDE_EINVOICE_SEPAY_API_URL` (mặc định
+   `https://einvoice-api.sepay.vn`) và `AUTOXIDE_EINVOICE_SEPAY_SANDBOX_API_URL` (mặc định
+   `https://einvoice-api-sandbox.sepay.vn`); khách chọn bằng `einvoice_sepay.connection.api.environment`
+   (D-20261122-provider-environments).
 
 Căn cứ pháp lý (cần đối chiếu văn bản gốc / người có chuyên môn pháp lý):
 

@@ -5,6 +5,9 @@ và ví dụ TypeScript dùng SDK ở [`sdk/typescript`](../../sdk/typescript/).
 
 Tiếng Anh: [`README.md`](README.md).
 
+Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`curl --version`). Với curl cũ hơn, thay
+`--json '…'` bằng `-H 'Content-Type: application/json' -H 'Accept: application/json' -d '…'`.
+
 - [Hiện bài viết và ảnh trên website](website.vi.md): endpoint công khai, `srcset` và WebP, ETag và 304
 - [Dựng trang chủ của cửa hàng từ API](storefront.vi.md): vị trí và banner, bộ sưu tập, thương hiệu và liên hệ, cache
 - [Đăng nhập và giữ phiên đăng nhập](authentication.vi.md): access token và refresh token, đăng xuất

@@ -71,6 +71,12 @@ impl Module for MenusModule {
         "menus"
     }
 
+    // Module buộc phải có (`context.require::<…>()?` trong `start`); bật module này thì chúng được
+    // bật kèm (bước 70 P1). Thứ dùng "nếu có" (`.ok()`) không khai ở đây.
+    fn depends_on(&self) -> Vec<&'static str> {
+        vec!["media"]
+    }
+
     fn description(&self) -> &'static str {
         "Website menus (top bar, mega menu, footer) whose items point to addresses or to \
          records of any module."
