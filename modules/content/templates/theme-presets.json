@@ -1,0 +1,74 @@
+[
+  {
+    "key": "tet",
+    "name": {"en": "Lunar New Year (Tết)", "vi": "Tết Nguyên đán"},
+    "overrides": {"color.primary": "#b91c1c", "color.on_primary": "#ffffff", "color.secondary": "#a16207", "color.on_secondary": "#ffffff"},
+    "effect": "petals",
+    "effect_intensity": "low",
+    "dates": {"2027": ["2027-01-27", "2027-02-14"], "2028": ["2028-01-17", "2028-02-03"], "2029": ["2029-02-03", "2029-02-20"]}
+  },
+  {
+    "key": "valentine",
+    "name": {"en": "Valentine's Day", "vi": "Lễ Tình nhân"},
+    "overrides": {"color.primary": "#be123c", "color.on_primary": "#ffffff"},
+    "effect": "hearts",
+    "effect_intensity": "low",
+    "yearly": ["02-10", "02-14"]
+  },
+  {
+    "key": "womens_day",
+    "name": {"en": "International Women's Day (8/3)", "vi": "Quốc tế Phụ nữ 8/3"},
+    "overrides": {"color.primary": "#be185d", "color.on_primary": "#ffffff"},
+    "effect": "petals",
+    "effect_intensity": "low",
+    "yearly": ["03-04", "03-08"]
+  },
+  {
+    "key": "reunification",
+    "name": {"en": "Reunification Day and Labour Day (30/4–1/5)", "vi": "Giải phóng miền Nam và Quốc tế Lao động (30/4–1/5)"},
+    "overrides": {"color.primary": "#b91c1c", "color.on_primary": "#ffffff", "color.secondary": "#a16207", "color.on_secondary": "#ffffff"},
+    "effect": "fireworks",
+    "effect_intensity": "low",
+    "yearly": ["04-27", "05-01"]
+  },
+  {
+    "key": "mid_autumn",
+    "name": {"en": "Mid-Autumn Festival", "vi": "Tết Trung thu"},
+    "overrides": {"color.primary": "#c2410c", "color.on_primary": "#ffffff"},
+    "effect": "lanterns",
+    "effect_intensity": "low",
+    "dates": {"2027": ["2027-09-08", "2027-09-15"], "2028": ["2028-09-26", "2028-10-03"], "2029": ["2029-09-15", "2029-09-22"]}
+  },
+  {
+    "key": "vietnamese_womens_day",
+    "name": {"en": "Vietnamese Women's Day (20/10)", "vi": "Phụ nữ Việt Nam 20/10"},
+    "overrides": {"color.primary": "#9d174d", "color.on_primary": "#ffffff"},
+    "effect": "petals",
+    "effect_intensity": "low",
+    "yearly": ["10-16", "10-20"]
+  },
+  {
+    "key": "black_friday",
+    "name": {"en": "Black Friday", "vi": "Black Friday"},
+    "overrides": {"color.primary": "#18181b", "color.on_primary": "#ffffff", "color.secondary": "#ca8a04", "color.on_secondary": "#18181b"},
+    "effect": "confetti",
+    "effect_intensity": "low",
+    "dates": {"2027": ["2027-11-26", "2027-11-29"], "2028": ["2028-11-24", "2028-11-27"], "2029": ["2029-11-23", "2029-11-26"]}
+  },
+  {
+    "key": "christmas",
+    "name": {"en": "Christmas", "vi": "Giáng sinh"},
+    "overrides": {"color.primary": "#15803d", "color.on_primary": "#ffffff", "color.secondary": "#b91c1c", "color.on_secondary": "#ffffff"},
+    "effect": "snow",
+    "effect_intensity": "low",
+    "yearly": ["12-15", "12-26"]
+  },
+  {
+    "key": "golden_hour",
+    "name": {"en": "Golden hour (20:00–22:00 every day)", "vi": "Giờ vàng (20:00–22:00 mỗi ngày)"},
+    "overrides": {"color.primary": "#b45309", "color.on_primary": "#ffffff"},
+    "effect": null,
+    "effect_intensity": null,
+    "schedule": {"kind": "daily", "start": "20:00", "end": "22:00"}
+  }
+]

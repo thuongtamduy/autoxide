@@ -266,5 +266,20 @@
   "field:must be a color written `#rrggbb`": "phải là màu viết dạng `#rrggbb`",
   "field:must be one of the allowed fonts: {fonts}": "phải là một font trong danh sách cho phép: {fonts}",
   "field:must be a whole number in {range}": "phải là số nguyên trong khoảng {range}",
-  "field:media item {id} does not exist or is not public": "ảnh {id} không có hoặc chưa công khai"
+  "field:media item {id} does not exist or is not public": "ảnh {id} không có hoặc chưa công khai",
+  "content.theme_variant_not_found": "Không có bản chủ đề {id}.",
+  "content.theme_variants_limit": "Website đã có {max} bản chủ đề; hãy xoá bớt một bản trước.",
+  "content.theme_variant_active": "Bản chủ đề đang bật; tạm dừng trước khi xoá.",
+  "field:must be `once`, `daily` or `weekly`": "phải là `once`, `daily` hoặc `weekly`",
+  "field:must differ from `start`": "phải khác `start`",
+  "field:must not be before `from`": "không được trước `from`",
+  "field:must list days among `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`": "phải liệt kê các thứ trong `mon`, `tue`, `wed`, `thu`, `fri`, `sat`, `sun`",
+  "field:must be a date and time (RFC 3339)": "phải là ngày giờ (RFC 3339)",
+  "field:must be a local time written `HH:MM`": "phải là giờ địa phương viết dạng `HH:MM`",
+  "field:must be a date written `YYYY-MM-DD`": "phải là ngày viết dạng `YYYY-MM-DD`",
+  "field:there is no theme preset `{key}`": "không có chủ đề mẫu `{key}`",
+  "field:must be one of the allowed effects: {effects}": "phải là một hiệu ứng trong danh sách cho phép: {effects}",
+  "field:give a schedule (or a preset with dates for `year`)": "hãy nêu lịch (hoặc chủ đề mẫu có ngày cho `year`)",
+  "field:must be from 0 to 1000": "phải từ 0 đến 1000",
+  "field:must be 1 to {max} characters": "phải dài 1 đến {max} ký tự"
 }

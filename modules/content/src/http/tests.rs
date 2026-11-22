@@ -22,6 +22,7 @@ mod embed;
 mod layout;
 mod layout_public;
 mod ops;
+mod theme_variants;
 mod themes;
 mod versions;
 

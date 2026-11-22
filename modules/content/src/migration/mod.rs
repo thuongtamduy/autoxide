@@ -16,6 +16,7 @@ mod m0018_custom_fields;
 mod m0020_published_custom_fields;
 mod m0021_banners;
 mod m0023_themes;
+mod m0026_theme_variants;
 
 use autoxide_kernel::migration::prelude::MigrationTrait;
 use autoxide_kernel::tenancy::migration::TenantTable;
@@ -161,5 +162,7 @@ pub(crate) fn all() -> Vec<Box<dyn MigrationTrait>> {
         Box::new(m0021_banners::Migration),
         // Bộ giao diện của website: token ghi đè theo nút (bước 67).
         Box::new(m0023_themes::Migration),
+        // Bản chủ đề theo lịch: mùa, ngày lễ, khung giờ (bước 67, D-234).
+        Box::new(m0026_theme_variants::Migration),
     ]
 }

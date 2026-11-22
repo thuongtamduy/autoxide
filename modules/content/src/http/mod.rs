@@ -26,6 +26,7 @@ mod tests_compliance;
 mod tests_tenancy;
 #[cfg(test)]
 mod tests_web;
+mod theme_variants;
 mod themes;
 
 use std::collections::HashMap;
@@ -100,6 +101,17 @@ pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
             redirects::delete_redirect
         ))
         .routes(routes!(themes::get_theme, themes::put_theme))
+        .routes(routes!(theme_variants::list_theme_variants, theme_variants::create_theme_variant))
+        .routes(routes!(
+            theme_variants::get_theme_variant,
+            theme_variants::put_theme_variant,
+            theme_variants::delete_theme_variant
+        ))
+        .routes(routes!(theme_variants::activate_theme_variant))
+        .routes(routes!(theme_variants::pause_theme_variant))
+        .routes(routes!(theme_variants::copy_theme_variant))
+        .routes(routes!(theme_variants::list_theme_presets))
+        .routes(routes!(theme_variants::preview_site_theme))
         .routes(routes!(templates::list_templates))
         .routes(routes!(templates::draft_from_template))
         .routes(routes!(public::preview_token))

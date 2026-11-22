@@ -79,6 +79,12 @@ pub(crate) const PUBLIC_SEMANTIC_SEARCH: Setting = Setting::new(
 )
 .with_default("false");
 
+pub(crate) const THEME_VARIANTS_MAX: Setting = Setting::new(
+    "AUTOXIDE_CONTENT_THEME_VARIANTS_MAX",
+    "Most scheduled theme variants (seasons, holidays, hours) one website may have (1 to 500).",
+)
+.with_default("50");
+
 pub(crate) const PUBLIC_SEARCH_PER_MINUTE: Setting = Setting::new(
     "AUTOXIDE_CONTENT_PUBLIC_SEARCH_PER_MINUTE",
     "Public searches by meaning per minute (1 to 10000), one budget shared by every reader and \
@@ -101,6 +107,7 @@ pub(crate) struct ContentConfig {
     pub translate_batch_tokens: u32,
     pub public_semantic_search: bool,
     pub public_search_per_minute: u32,
+    pub theme_variants_max: u32,
 }
 
 impl ContentConfig {
@@ -163,6 +170,8 @@ impl ContentConfig {
             });
         let public_search_per_minute =
             reader.get_with(&PUBLIC_SEARCH_PER_MINUTE, |raw| parse_in_range(raw, 1u32, 10_000));
+        let theme_variants_max =
+            reader.get_with(&THEME_VARIANTS_MAX, |raw| parse_in_range(raw, 1u32, 500));
         let (locales, default_locale) = (locales?, default_locale?);
         if !locales.contains(&default_locale) {
             return reader.reject(
@@ -183,6 +192,7 @@ impl ContentConfig {
             translate_batch_tokens: translate_batch_tokens?,
             public_semantic_search: public_semantic_search?,
             public_search_per_minute: public_search_per_minute?,
+            theme_variants_max: theme_variants_max?,
         })
     }
 }
