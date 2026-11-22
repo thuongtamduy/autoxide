@@ -58,7 +58,7 @@ pub fn run(arguments: &Arguments) -> ExitCode {
     let config = settings.config.clone();
     let outcome = run_with_observability(&config, async move {
         // Database chỉ để biết module tắt còn dữ liệu không: không kết nối được thì bỏ cột đó.
-        let data = match Database::connect(&config.database).await {
+        let data = match Database::connect(&settings.config.database).await {
             Ok(database) => {
                 let data = dormant_data(&settings.modules, &database).await;
                 let _ = database.close().await;
