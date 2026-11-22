@@ -1,0 +1,10 @@
+{
+  "field:must be an address such as `https://shop.example/checkout/done`": "phải là một địa chỉ, ví dụ `https://shop.example/checkout/done`",
+  "momo.account_rejected": "MoMo từ chối tài khoản của khách này (mã kết quả {code}). Kiểm tra Partner Code, Access Key, Secret Key và môi trường ở `momo.connection.account`.",
+  "momo.amount_out_of_range": "Một thanh toán bằng ví MoMo phải từ {min} đến {max} VND.",
+  "momo.currency_not_supported": "MoMo chỉ nhận thanh toán bằng VND, không nhận {currency}.",
+  "momo.notification_not_final": "Thông báo này của MoMo (mã kết quả {code}) chưa phải kết quả cuối; không ghi nhận gì.",
+  "momo.order_already_created": "MoMo đã có thanh toán này từ một lần gọi trước và không cấp lại link thanh toán. Hãy tạo một thanh toán mới với mã tham chiếu mới.",
+  "momo.refund_already_sent": "MoMo đã nhận lệnh hoàn tiền này ở một lần gọi trước nên không gửi lại. Hãy xem kết quả ở trang MoMo for Business.",
+  "momo.return_url_required": "MoMo cần trang người mua quay về sau khi trả tiền. Gửi `return_url` kèm thanh toán, hoặc đặt `momo.connection.account.return_url` cho khách này."
+}

@@ -27,6 +27,7 @@ Ví dụ `curl` gửi JSON bằng `--json '…'`, cần curl 7.82 trở lên (`c
 - [Gửi SMS qua eSMS](providers/esms.vi.md): lấy gì ở eSMS, cấu hình tài khoản của khách, thử kết nối, lỗi (thử nghiệm)
 - [Xác nhận chuyển khoản bằng SePay](sepay.vi.md): tài khoản SePay riêng của từng khách, địa chỉ webhook, thanh toán VietQR tự được xác nhận (thử nghiệm)
 - [Xuất hoá đơn điện tử qua SePay eInvoice](sepay-einvoice.vi.md): tài khoản SePay eInvoice riêng của từng khách, gửi gì và không gửi gì tới cơ quan thuế (thử nghiệm)
+- [Nhận thanh toán qua MoMo](providers/momo.vi.md): mỗi khách một tài khoản MoMo doanh nghiệp riêng, link thanh toán, thông báo kết quả, hoàn tiền (thử nghiệm)
 
 Cho lập trình viên mở rộng core:
 

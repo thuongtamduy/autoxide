@@ -27,6 +27,7 @@ older curl, replace `--json '…'` with `-H 'Content-Type: application/json' -H 
 - [Sending SMS through eSMS](providers/esms.md): what to get from eSMS, the tenant's account settings, testing, errors (experimental)
 - [Confirming bank transfers with SePay](sepay.md): your own SePay account per tenant, the webhook address, VietQR payments confirmed by themselves (experimental)
 - [Issuing e-invoices through SePay eInvoice](sepay-einvoice.md): your own SePay eInvoice account per tenant, what is sent to the tax authority and what is not (experimental)
+- [Taking payments with MoMo](providers/momo.md): your own MoMo business account per tenant, payment links, notifications, refunds (experimental)
 
 For developers who extend the core:
 

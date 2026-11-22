@@ -576,6 +576,7 @@ Gom theo chủ đề (dòng `Chủ đề:` của mục, không có thì đoán t
 - **[D-20261121-catalog-draft-from-images](D-20261121-catalog-draft-from-images.md)** Tạo sản phẩm nháp từ ảnh: ảnh qua `Media::ai_image`, job, kết quả luôn là nháp — 2026-11-21
 - **[D-20261121-esms-adapter](D-20261121-esms-adapter.md)** Bộ nối eSMS: chỉ gửi mã một lần và tin chăm sóc khách hàng, từ chối tin quảng cáo, chưa nhận callback — 2026-11-21 · *thay một phần bởi D-20261122-esms-environment*
 - **[D-20261121-ghn-carrier](D-20261121-ghn-carrier.md)** Bộ nối Giao Hàng Nhanh: dùng tài khoản hãng của `shipping`, địa chỉ hai cấp theo tên, webhook không chữ ký — 2026-11-21
+- **[D-20261121-momo-adapter](D-20261121-momo-adapter.md)** Bộ nối MoMo: cổng thanh toán ví qua `PaymentGateway`, API v2, mã đơn là ID trong sổ — 2026-11-21
 - **[D-20261121-money-low-fixes](D-20261121-money-low-fixes.md)** Thu hồi thưởng giới thiệu khi hoàn tiền; thẻ quà tặng đã gắn chỉ chủ dùng; khớp biến động số dư theo lượt nhận — 2026-11-21
 - **[D-20261121-payment-amount-check](D-20261121-payment-amount-check.md)** `plans` và `bookings` so số thực thu của `ledger.payment_succeeded` với số phải trả — 2026-11-21
 - **[D-20261121-sepay-bank-feed](D-20261121-sepay-bank-feed.md)** Bộ nối SePay là nguồn biến động số dư (`BankFeed`), không phải cổng giữ tiền — 2026-11-21
