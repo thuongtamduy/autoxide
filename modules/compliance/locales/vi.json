@@ -201,5 +201,7 @@
   "text:The target of a case may be shown again (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).": "Đối tượng của một vụ việc được hiện lại (`case_id`, `target`, `case_kind`; hợp đồng `autoxide_kernel::moderation`).",
   "text:The target of a case must be hidden by the module that owns it (`case_id`, `target`, `case_kind`; contract `autoxide_kernel::moderation`).": "Module sở hữu phải ẩn đối tượng của một vụ việc (`case_id`, `target`, `case_kind`; hợp đồng `autoxide_kernel::moderation`).",
   "text:Where the tenant must keep its data changed (`data_residency`, `previous`).": "Nơi khách buộc lưu dữ liệu vừa thay đổi (`data_residency`, `previous`).",
-  "compliance.otp_daily_limit": "Số điện thoại này đã nhập sai mã quá nhiều lần hôm nay. Hãy chờ {seconds} giây rồi thử lại."
+  "compliance.otp_daily_limit": "Số điện thoại này đã nhập sai mã quá nhiều lần hôm nay. Hãy chờ {seconds} giây rồi thử lại.",
+  "text:Legal footer": "Chân trang pháp lý",
+  "text:Never place this block: the website adds the owner information and the ministry logo below every page by itself.": "Không bao giờ đặt khối này: website tự gắn thông tin chủ sở hữu và logo Bộ Công Thương dưới mọi trang."
 }

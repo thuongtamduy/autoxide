@@ -123,7 +123,7 @@ fn banner(ready: ReadyBanner) -> PublicBanner {
     }
 }
 
-fn placement(ready: ReadyPlacement) -> PublicPlacement {
+pub(crate) fn placement(ready: ReadyPlacement) -> PublicPlacement {
     let row = ready.placement;
     let ratio = |w: Option<i32>, h: Option<i32>| Some(Ratio::new(w?, h?));
     PublicPlacement {

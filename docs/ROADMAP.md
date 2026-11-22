@@ -460,10 +460,11 @@ sẵn, không sinh code; kết quả luôn là bản nháp.
       (D-20261122-page-layout)
 - [ ] Khoá sửa trang (`POST/DELETE /entries/{id}/edit-lock`, giữ 2 phút, người khác thấy ai đang sửa; `If-Match` vẫn là
       chốt cuối), test đồng thời trên cả hai database (tách khỏi mục trên — D-20261122-page-layout)
-- [ ] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý) và khối của
-      `forms`, `newsletter`, `comments`, `media`, `menus` (`menus.menu`, D-238), `content` (`content.placement`:
-      vị trí banner trong trang và đầu trang, D-20261120-step55-close); chân trang pháp lý tự gắn cho
-      website bán hàng
+- [x] Khối nền (bố cục, chữ, media, FAQ, thanh thông báo, đếm ngược, popup thu email có đồng ý), `content.embed`,
+      `content.search_box`, `content.placement` (vị trí banner trong trang và đầu trang, D-20261120-step55-close);
+      chân trang pháp lý `compliance.legal_footer` tự gắn dưới trang (D-20261122-base-blocks)
+- [ ] Khối của `forms`, `newsletter`, `comments`, `menus` (`menus.menu`, D-238); `media` không khai khối riêng —
+      `content.image` / `gallery` / `video` dùng ID `media` (D-20261122-base-blocks)
 - [x] Đọc công khai trả bố cục kèm dữ liệu khối, một lần gọi mỗi loại khối, khối lỗi không hỏng trang, ETag;
       đo p99 trang 50 khối trên cả hai database (D-20261122-layout-public)
 - [ ] Bộ giao diện của website (token màu, chữ, khoảng cách, kế thừa theo nút, kiểm tương phản), khu dùng chung

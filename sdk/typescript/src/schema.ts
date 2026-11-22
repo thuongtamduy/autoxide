@@ -15287,6 +15287,13 @@ export type Data_Vec_PublicEntryResponse = {
     /** Stable id (also the id of feed items). */
     id: string;
     kind: Kind;
+    /**
+     * For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw
+     * below the page, outside the layout (owner information and the Ministry of Industry and
+     * Trade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the
+     * website has no legal profile yet or the `compliance` module is off. Pages cannot remove it.
+     */
+    legal_footer?: Record<string, unknown> | null;
     locale: string;
     parent_id?: string | null;
     /** Address computed by the server, without domain or language prefix. */
@@ -24598,6 +24605,13 @@ export type Page_PublicEntryResponse = {
     /** Stable id (also the id of feed items). */
     id: string;
     kind: Kind;
+    /**
+     * For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw
+     * below the page, outside the layout (owner information and the Ministry of Industry and
+     * Trade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the
+     * website has no legal profile yet or the `compliance` module is off. Pages cannot remove it.
+     */
+    legal_footer?: Record<string, unknown> | null;
     locale: string;
     parent_id?: string | null;
     /** Address computed by the server, without domain or language prefix. */
@@ -27612,6 +27626,13 @@ export type PublicEntryResponse = {
   /** Stable id (also the id of feed items). */
   id: string;
   kind: Kind;
+  /**
+   * For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw
+   * below the page, outside the layout (owner information and the Ministry of Industry and
+   * Trade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the
+   * website has no legal profile yet or the `compliance` module is off. Pages cannot remove it.
+   */
+  legal_footer?: Record<string, unknown> | null;
   locale: string;
   parent_id?: string | null;
   /** Address computed by the server, without domain or language prefix. */

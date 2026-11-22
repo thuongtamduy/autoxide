@@ -178,7 +178,7 @@ impl ContentService {
                 return Ok(body::BodyInfo::default());
             }
             let usable = self.usable_blocks(tenant).await?;
-            layout::check(body, &self.blocks, &usable)
+            layout::check(body, &self.blocks, &usable, &self.config.embed_hosts)
         } else {
             body::check(body, self.config.max_body_bytes, &self.config.embed_hosts)
         };

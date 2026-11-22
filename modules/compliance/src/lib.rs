@@ -12,6 +12,7 @@
 //! pháp lý trước khi chạy thật.
 
 pub mod api;
+mod blocks;
 mod cases;
 mod checklist;
 mod complaint_intake;
@@ -206,6 +207,10 @@ impl Module for ComplianceModule {
         permissions::all()
     }
 
+    fn blocks(&self) -> Vec<autoxide_kernel::blocks::BlockType> {
+        blocks::all()
+    }
+
     fn events(&self) -> Vec<EventInfo> {
         events::all()
     }
@@ -237,6 +242,11 @@ impl Module for ComplianceModule {
             public_reports_per_hour: self.config.public_reports_per_hour,
             case_tracking_url: self.config.case_tracking_url.clone(),
         });
+        // Chân trang pháp lý mà `content` tự gắn dưới mọi trang dựng từ khối (bước 67).
+        context.block_data(
+            blocks::LEGAL_FOOTER.name,
+            Arc::new(blocks::LegalFooter(service.clone())),
+        )?;
         self.service = Some(service.clone());
         context.personal_data(Arc::new(privacy::CompliancePersonalData(service.clone())))?;
         // Mã đăng nhập bằng số cho `auth` (đăng ký trước): không có `auth` (chương trình rút gọn) thì bỏ qua.

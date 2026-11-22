@@ -254,6 +254,11 @@ impl Module for ContentModule {
         context.provide::<dyn api::LegacyMenus>(service.clone())?;
         // Ảnh chụp bản đã đăng cho module khác (bước 37 C1).
         context.provide::<dyn api::PublishedEntries>(service.clone())?;
+        // Dữ liệu khối vùng banner của trang dựng từ khối (bước 67).
+        context.block_data(
+            blocks::PLACEMENT.name,
+            Arc::new(blocks::data::ContentBlocks(service.clone())),
+        )?;
         self.service = Some(service);
         Ok(())
     }

@@ -47040,6 +47040,13 @@
                 "kind": {
                   "$ref": "#/components/schemas/Kind"
                 },
+                "legal_footer": {
+                  "description": "For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw\nbelow the page, outside the layout (owner information and the Ministry of Industry and\nTrade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the\nwebsite has no legal profile yet or the `compliance` module is off. Pages cannot remove it.",
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
                 "locale": {
                   "type": "string"
                 },
@@ -76448,6 +76455,13 @@
                 "kind": {
                   "$ref": "#/components/schemas/Kind"
                 },
+                "legal_footer": {
+                  "description": "For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw\nbelow the page, outside the layout (owner information and the Ministry of Industry and\nTrade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the\nwebsite has no legal profile yet or the `compliance` module is off. Pages cannot remove it.",
+                  "type": [
+                    "object",
+                    "null"
+                  ]
+                },
                 "locale": {
                   "type": "string"
                 },
@@ -85974,6 +85988,13 @@
           },
           "kind": {
             "$ref": "#/components/schemas/Kind"
+          },
+          "legal_footer": {
+            "description": "For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw\nbelow the page, outside the layout (owner information and the Ministry of Industry and\nTrade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the\nwebsite has no legal profile yet or the `compliance` module is off. Pages cannot remove it.",
+            "type": [
+              "object",
+              "null"
+            ]
           },
           "locale": {
             "type": "string"

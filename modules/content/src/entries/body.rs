@@ -93,7 +93,7 @@ pub(crate) fn stored_image_ids(body: &str) -> Vec<Uuid> {
     found
 }
 
-/// Bản ghi nhúng (node `embed` dạng `{kind, id}`) trong thân bài đã lưu `body`, theo thứ tự xuất
+/// Bản ghi nhúng (node `embed` dạng `{kind, id}`, khối `content.embed`) trong thân bài đã lưu `body`, theo thứ tự xuất
 /// hiện, không lặp. Như [`stored_image_ids`]: không có chữ `"kind"` thì khỏi đọc JSON.
 pub(crate) fn stored_records(body: &str) -> Vec<(String, String)> {
     if !body.contains("\"kind\"") {
@@ -105,18 +105,26 @@ pub(crate) fn stored_records(body: &str) -> Vec<(String, String)> {
     let mut found = Vec::new();
     let mut pending = vec![&root];
     while let Some(node) = pending.pop() {
-        if node.get("type").and_then(Value::as_str) == Some("embed") {
-            let kind = node.pointer("/attrs/kind").and_then(Value::as_str);
-            let id = node.pointer("/attrs/id").and_then(Value::as_str);
-            if let (Some(kind), Some(id)) = (kind, id) {
-                let record = (kind.to_owned(), id.to_owned());
-                if !found.contains(&record) {
-                    found.push(record);
-                }
+        // Node `embed` của thân `rich`, hay khối `content.embed` của bố cục (bước 67).
+        let attrs = if node.get("type").and_then(Value::as_str) == Some("embed") {
+            node.get("attrs")
+        } else if node.get("block").and_then(Value::as_str) == Some("content.embed") {
+            node.get("props")
+        } else {
+            None
+        };
+        let kind = attrs.and_then(|attrs| attrs.get("kind")).and_then(Value::as_str);
+        let id = attrs.and_then(|attrs| attrs.get("id")).and_then(Value::as_str);
+        if let (Some(kind), Some(id)) = (kind, id) {
+            let record = (kind.to_owned(), id.to_owned());
+            if !found.contains(&record) {
+                found.push(record);
             }
         }
-        if let Some(children) = node.get("content").and_then(Value::as_array) {
-            pending.extend(children.iter().rev());
+        for key in ["content", "sections", "children"] {
+            if let Some(children) = node.get(key).and_then(Value::as_array) {
+                pending.extend(children.iter().rev());
+            }
         }
     }
     found
@@ -512,23 +520,7 @@ impl Checker<'_> {
         }
         let attrs = self.attrs(node, path, &["url"]).unwrap_or_default();
         let url = attrs.get("url").and_then(Value::as_str).unwrap_or_default();
-        // Trình duyệt coi `\` như `/` trong địa chỉ `https:` (chuẩn WHATWG URL):
-        // `https://evil.com\.youtube.com/x` mở `evil.com`. Có `\`, khoảng trắng hay ký tự
-        // điều khiển là từ chối, trước khi tách host.
-        let clean = !url.chars().any(|c| c == '\\' || c.is_whitespace() || c.is_control());
-        let host = clean
-            .then_some(url)
-            .and_then(|url| url.strip_prefix("https://"))
-            .and_then(|rest| rest.split(['/', '?', '#']).next())
-            .map(|host| host.trim_start_matches("www.").to_ascii_lowercase());
-        let allowed = host.as_deref().is_some_and(|host| {
-            !host.contains('@')
-                && !host.contains(':')
-                && self
-                    .embed_hosts
-                    .iter()
-                    .any(|allowed| host == allowed || host.ends_with(&format!(".{allowed}")))
-        });
+        let allowed = embed_host_allowed(url, self.embed_hosts);
         if !allowed {
             self.error(
                 FieldError::new(
@@ -575,6 +567,24 @@ impl Checker<'_> {
             self.info.records.insert((kind.to_owned(), id.to_owned()));
         }
     }
+}
+
+/// `url` là địa chỉ `https://` trên một host của `hosts` (hay tên miền con của nó).
+pub(crate) fn embed_host_allowed(url: &str, hosts: &[String]) -> bool {
+    // Trình duyệt coi `\` như `/` trong địa chỉ `https:` (chuẩn WHATWG URL):
+    // `https://evil.com\.youtube.com/x` mở `evil.com`. Có `\`, khoảng trắng hay ký tự
+    // điều khiển là từ chối, trước khi tách host.
+    let clean = !url.chars().any(|c| c == '\\' || c.is_whitespace() || c.is_control());
+    let host = clean
+        .then_some(url)
+        .and_then(|url| url.strip_prefix("https://"))
+        .and_then(|rest| rest.split(['/', '?', '#']).next())
+        .map(|host| host.trim_start_matches("www.").to_ascii_lowercase());
+    host.as_deref().is_some_and(|host| {
+        !host.contains('@')
+            && !host.contains(':')
+            && hosts.iter().any(|allowed| host == allowed || host.ends_with(&format!(".{allowed}")))
+    })
 }
 
 /// Link an toàn: `http`, `https`, `mailto`, hoặc đường dẫn trong site (`/…`, không `//`).

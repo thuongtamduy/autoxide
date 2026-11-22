@@ -17,6 +17,7 @@ use uuid::Uuid;
 use crate::testing::FakeMedia;
 
 mod agent;
+mod blocks_base;
 mod bulk;
 mod embed;
 mod layout;
