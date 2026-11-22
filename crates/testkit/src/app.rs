@@ -264,6 +264,12 @@ impl TestApp {
         self.modules.api::<T>()
     }
 
+    /// Sổ khối của các module trong app (bước 67): test gọi `BlockData` của module như `content`
+    /// gọi lúc đọc công khai.
+    pub fn blocks(&self) -> autoxide_kernel::blocks::Blocks {
+        self.modules.blocks()
+    }
+
     /// Bắt đầu một request. `uri` là đường dẫn đầy đủ, vd `/api/v1/notes/{id}`.
     pub fn request(&self, method: Method, uri: &str) -> TestRequest<'_> {
         TestRequest {

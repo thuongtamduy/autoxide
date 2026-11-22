@@ -183,6 +183,13 @@ pub(crate) struct PublicEntryResponse {
     /// hide that block. Blocks of modules the site no longer has are left out of `body`.
     #[schema(value_type = Object)]
     blocks_data: std::collections::BTreeMap<String, Value>,
+    /// For a page with a block layout, only in `GET /public/resolve`: the legal footer to draw
+    /// below the page, outside the layout (owner information and the Ministry of Industry and
+    /// Trade logo, as `GET /api/v1/compliance/public/owner` and `/public/badge`). Absent when the
+    /// website has no legal profile yet or the `compliance` module is off. Pages cannot remove it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<Object>)]
+    legal_footer: Option<Value>,
 }
 
 /// A record of another module embedded in an entry.
@@ -213,6 +220,7 @@ pub(crate) fn public_entry(view: PublicView) -> PublicEntryResponse {
     } = view;
     PublicEntryResponse {
         blocks_data: std::collections::BTreeMap::new(),
+        legal_footer: None,
         custom_fields,
         embeds: embeds
             .into_iter()
@@ -337,6 +345,7 @@ pub(crate) async fn resolution(
             if let Some(layout) = layout {
                 entry.body = layout.body;
                 entry.blocks_data = layout.data;
+                entry.legal_footer = layout.legal_footer;
             }
             (Resolution::Entry { entry: Box::new(entry) }, Some(version))
         }

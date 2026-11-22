@@ -825,13 +825,24 @@ async fn public_badge(
     if let Some(host) = TenantHint::from_headers(&headers).host() {
         domains.push(host.to_owned());
     }
-    if tenant.is_sandbox() {
-        let locale = query.locale.as_deref().unwrap_or("vi");
-        return Ok(sandbox_badge(&tenant, domains.into_iter().next(), locale));
-    }
-    let row = service.public_website(&tenant, &domains, site.org()).await?;
-    let rule = service.logo_rule(&tenant, &row.website_kind).await?;
     let locale = query.locale.as_deref().unwrap_or("vi");
+    badge(&service, &tenant, &domains, site.org(), locale).await
+}
+
+/// Logo của Bộ Công Thương cho website có nút `org` (hay một trong `domains`), ngôn ngữ `locale`.
+/// Dùng chung cho `GET /public/badge` và khối chân trang pháp lý (bước 67).
+pub(crate) async fn badge(
+    service: &ComplianceService,
+    tenant: &TenantContext,
+    domains: &[String],
+    org: autoxide_kernel::tenancy::OrgId,
+    locale: &str,
+) -> Result<Tagged<BadgeResponse>, Error> {
+    if tenant.is_sandbox() {
+        return Ok(sandbox_badge(tenant, domains.first().cloned(), locale));
+    }
+    let row = service.public_website(tenant, domains, org).await?;
+    let rule = service.logo_rule(tenant, &row.website_kind).await?;
     let logo = rule.logo(&row, locale).ok_or_else(crate::websites::website_not_found)?;
     Ok(Tagged {
         version: row.updated_at,
@@ -849,8 +860,6 @@ async fn public_badge(
     })
 }
 
-/// Nhãn "bản thử" thay logo của Bộ Công Thương ở sandbox (D-232): sandbox không phải website đã
-/// thông báo / đăng ký, không bao giờ mang logo hay link xác nhận.
 fn sandbox_badge(
     tenant: &TenantContext,
     domain: Option<String>,
@@ -917,8 +926,20 @@ async fn public_owner(
     tenant: TenantContext,
     site: Site,
 ) -> Result<Tagged<OwnerResponse>, Error> {
-    let row = service.profile_for_org(&tenant, site.org()).await?.ok_or_else(profile_not_found)?;
-    Ok(Tagged {
+    owner(&service, &tenant, site.org()).await?.ok_or_else(profile_not_found)
+}
+
+/// Chủ sở hữu của website có nút `org` (hồ sơ pháp lý của nút hay nút gần nhất phía trên có hồ
+/// sơ); `None`: chưa có hồ sơ. Dùng chung cho `GET /public/owner` và khối chân trang pháp lý.
+pub(crate) async fn owner(
+    service: &ComplianceService,
+    tenant: &TenantContext,
+    org: autoxide_kernel::tenancy::OrgId,
+) -> Result<Option<Tagged<OwnerResponse>>, Error> {
+    let Some(row) = service.profile_for_org(tenant, org).await? else {
+        return Ok(None);
+    };
+    Ok(Some(Tagged {
         version: row.updated_at,
         data: OwnerResponse {
             address: address_of(&row),
@@ -934,5 +955,5 @@ async fn public_owner(
             email: row.email,
             sandbox: tenant.is_sandbox(),
         },
-    })
+    }))
 }

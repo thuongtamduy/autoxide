@@ -47,6 +47,7 @@ pub(crate) use banners::{BannerResponse, banner_response};
 pub(crate) use entries::{EntriesQuery, EntryResponse, describe};
 pub(crate) use history::{RevisionResponse, revision};
 pub(crate) use public::{Resolution, resolution};
+pub(crate) use public_banners::placement as public_placement;
 
 pub(crate) fn routes(service: Arc<ContentService>) -> OpenApiRouter {
     OpenApiRouter::new()
