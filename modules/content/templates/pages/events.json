@@ -1,0 +1,212 @@
+{
+  "key": "events_signup",
+  "industry": "events",
+  "name": {
+    "en": "Event: sign up",
+    "vi": "Sự kiện: đăng ký tham gia"
+  },
+  "description": {
+    "en": "An event page with a countdown, programme, questions and a sign-up form.",
+    "vi": "Trang sự kiện có đếm ngược, chương trình, hỏi đáp và form đăng ký."
+  },
+  "layout": {
+    "en": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Our next event",
+            "text": "Join us for talks and workshops.",
+            "button_label": "Sign up",
+            "button_link": "/contact",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "count",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "countdown",
+              "block": "content.countdown",
+              "props": {
+                "ends_at": "2030-01-01T02:00:00Z",
+                "label": "Starts in",
+                "ended_text": "The event has started."
+              }
+            }
+          ]
+        },
+        {
+          "id": "programme",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "programme_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Programme",
+                "level": 2
+              }
+            },
+            {
+              "id": "p1",
+              "block": "content.text",
+              "props": {
+                "text": "Morning: talks.\n\nAfternoon: hands-on workshops."
+              }
+            }
+          ]
+        },
+        {
+          "id": "register",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "register_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Sign up",
+                "level": 2
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "vi": {
+      "type": "layout",
+      "schema": 1,
+      "sections": [
+        {
+          "id": "hero",
+          "block": "content.hero",
+          "props": {
+            "heading": "Sự kiện sắp tới",
+            "text": "Cùng tham gia các buổi nói chuyện và workshop.",
+            "button_label": "Đăng ký",
+            "button_link": "/contact",
+            "height": {
+              "base": "medium",
+              "lg": "large"
+            },
+            "overlay": "dark"
+          }
+        },
+        {
+          "id": "count",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "countdown",
+              "block": "content.countdown",
+              "props": {
+                "ends_at": "2030-01-01T02:00:00Z",
+                "label": "Bắt đầu sau",
+                "ended_text": "Sự kiện đã bắt đầu."
+              }
+            }
+          ]
+        },
+        {
+          "id": "programme",
+          "block": "content.section",
+          "props": {
+            "background": "none",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "programme_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Chương trình",
+                "level": 2
+              }
+            },
+            {
+              "id": "p1",
+              "block": "content.text",
+              "props": {
+                "text": "Buổi sáng: các bài nói.\n\nBuổi chiều: workshop thực hành."
+              }
+            }
+          ]
+        },
+        {
+          "id": "register",
+          "block": "content.section",
+          "props": {
+            "background": "surface",
+            "padding": {
+              "base": "medium",
+              "lg": "large"
+            }
+          },
+          "children": [
+            {
+              "id": "register_h",
+              "block": "content.heading",
+              "props": {
+                "text": "Đăng ký",
+                "level": 2
+              }
+            },
+            {
+              "id": "form",
+              "block": "forms.embed",
+              "props": {
+                "key": "contact"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -23,6 +23,7 @@ mod embed;
 mod layout;
 mod layout_public;
 mod ops;
+mod page_templates;
 mod versions;
 
 // Tìm nâng cao qua `/kernel/find`: tách riêng để file này không dài thêm (D-20261118-file-length).
