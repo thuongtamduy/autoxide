@@ -69,6 +69,8 @@ autoxide-organizations = { path = "modules/organizations", version = "=0.17.0" }
 autoxide-plans = { path = "modules/plans", version = "=0.17.0" }
 autoxide-tax = { path = "modules/tax", version = "=0.17.0" }
 autoxide-ledger = { path = "modules/ledger", version = "=0.17.0" }
+autoxide-sepay = { path = "modules/sepay", version = "=0.17.0" }
+autoxide-einvoice-sepay = { path = "modules/einvoice_sepay", version = "=0.17.0" }
 autoxide-invoices = { path = "modules/invoices", version = "=0.17.0" }
 autoxide-compliance = { path = "modules/compliance", version = "=0.17.0" }
 autoxide-notifications = { path = "modules/notifications", version = "=0.17.0" }

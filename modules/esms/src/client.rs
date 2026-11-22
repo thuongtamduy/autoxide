@@ -5,7 +5,9 @@ use std::time::Duration;
 
 use autoxide_kernel::connections::{ConnectionProbe, ConnectionStatus};
 use autoxide_kernel::error::{Error, ErrorKind};
-use autoxide_kernel::provider::{ProviderAccounts, ProviderReply, Target, hex, hmac_sha256, send};
+use autoxide_kernel::provider::{
+    Environment, ProviderAccounts, ProviderReply, Target, hex, hmac_sha256, send,
+};
 use autoxide_kernel::sms::{PhoneNumber, SmsMessage, SmsPurpose, SmsReceipt, SmsSender};
 use autoxide_kernel::tenancy::TenantContext;
 use serde_json::{Value, json};
@@ -69,7 +71,7 @@ impl Esms {
             "IsUnicode": if message.text.is_ascii() { "0" } else { "1" },
             "RequestId": request_id,
         });
-        if account.sandbox {
+        if account.environment == Environment::Sandbox {
             body["Sandbox"] = json!("1");
         }
         let reply = self.post(SEND_PATH, &body, "send_sms").await?;

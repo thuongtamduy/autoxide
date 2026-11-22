@@ -12,6 +12,5 @@
   "esms.request_rejected": "eSMS từ chối yêu cầu (mã {code} của eSMS). Xem bảng mã lỗi của eSMS.",
   "esms.template_rejected": "Nội dung tin không khớp mẫu tin chăm sóc khách hàng đã đăng ký cho brandname này (mã {code} của eSMS). Đăng ký mẫu tin với eSMS.",
   "esms.unavailable": "Không gọi được eSMS lúc này; thử lại sau.",
-  "field:must be `true` or `false`": "phải là `true` hay `false`",
   "field:must be a brandname of 1 to 50 characters": "phải là brandname dài 1 đến 50 ký tự"
 }

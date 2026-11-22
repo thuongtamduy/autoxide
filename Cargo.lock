@@ -252,6 +252,7 @@ dependencies = [
  "autoxide-content",
  "autoxide-conversations",
  "autoxide-customers",
+ "autoxide-einvoice-sepay",
  "autoxide-esms",
  "autoxide-files",
  "autoxide-forms",
@@ -271,6 +272,7 @@ dependencies = [
  "autoxide-plans",
  "autoxide-promotions",
  "autoxide-reporting",
+ "autoxide-sepay",
  "autoxide-shipping",
  "autoxide-support",
  "autoxide-tax",
@@ -617,6 +619,22 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-einvoice-sepay"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "base64 0.23.1",
+ "bytes",
+ "reqwest",
+ "serde_json",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -1101,6 +1119,22 @@ dependencies = [
  "utoipa-axum",
  "uuid",
  "validator",
+]
+
+[[package]]
+name = "autoxide-sepay"
+version = "0.17.0"
+dependencies = [
+ "async-trait",
+ "autoxide-kernel",
+ "autoxide-testkit",
+ "axum",
+ "jiff",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
