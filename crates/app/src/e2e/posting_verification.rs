@@ -27,7 +27,9 @@ async fn app(test: &TestDatabase, sms: Arc<FakeSmsSender>) -> TestApp {
         .user("admin", 1, &["compliance.policies.manage"])
         .user("alice", 2, &["comments.post"])
         .user("bob", 3, &["comments.post"]);
-    for module in crate::modules::all() {
+    // Bài này cấp bộ gửi SMS giả; bộ nối thật `esms` cũng công bố `dyn SmsSender` (một hợp đồng chỉ có
+    // một bên cung cấp) nên không nạp ở đây.
+    for module in crate::modules::all().into_iter().filter(|module| module.name() != "esms") {
         builder = builder.boxed_module(module);
     }
     builder.build().await.unwrap()

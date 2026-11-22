@@ -244,47 +244,86 @@ impl crate::entity::product_stat::Entity {
     }
 }
 
+/// `colors.len()` sản phẩm giống nhau; mỗi sản phẩm thêm `extra` job lập index trùng (nhiều thay đổi
+/// cùng sản phẩm); worker 8 slot chạy các job đan xen. Sau đó mỗi sản phẩm phải thấy đủ mọi hàng
+/// còn lại.
+async fn index_in_parallel(test: &TestDatabase, colors: &[&str], extra: usize) {
+    let embedder = Arc::new(FakeEmbedder::new(64));
+    let provided = embedder.clone();
+    let (app, tree) =
+        app_with(test, |builder| builder.provide::<dyn autoxide_kernel::ai::Embedder>(provided))
+            .await;
+    let list = price_list(&app, tree.chain).await;
+    let mut products = Vec::new();
+    for (index, color) in colors.iter().enumerate() {
+        let name = format!("Áo thun cotton màu {color}");
+        let (id, _) = on_sale(&app, &list, tree.chain, &format!("P-{index}"), &name, 1).await;
+        products.push((id, name));
+    }
+    if extra > 0 {
+        let tenant = app.default_tenant();
+        let queue = autoxide_kernel::job::JobQueue::new("catalog");
+        for (id, _) in &products {
+            let job = crate::similar::IndexJob { products: vec![id.parse().unwrap()] };
+            for _ in 0..extra {
+                let options = autoxide_kernel::job::EnqueueOptions::default();
+                queue.enqueue(tenant.database().write(), &tenant, &job, options).await.unwrap();
+            }
+        }
+    }
+    let worker = app.modules().worker(8).unwrap().blocked_delay(std::time::Duration::ZERO);
+    let dispatcher = app.modules().dispatcher().unwrap();
+    for _ in 0..10 {
+        let events = dispatcher.run_once().await.unwrap();
+        if worker.run_once().await.unwrap() + events == 0 {
+            break;
+        }
+    }
+    let site = tree.chain.as_uuid();
+    for (id, name) in &products {
+        let uri = format!("/products/{id}/similar?locale=vi&site={site}");
+        let (status, similar, _) = public(&app, &uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{similar}");
+        let mut got = names(&similar);
+        got.sort();
+        let mut want: Vec<String> =
+            products.iter().map(|(_, other)| other.clone()).filter(|o| o != name).collect();
+        want.sort();
+        assert_eq!(got, want, "{name}");
+    }
+}
+
 /// Nhiều job lập index chạy song song (worker nhiều slot): mỗi sản phẩm vẫn thấy mọi hàng giống nó.
 /// Trước đây job đọc embedding qua kết nối đọc rồi mới mở transaction ghi, nên job chạy sau có thể
 /// xoá dòng đối xứng job kia vừa ghi — danh sách trả `[]` ngẫu nhiên.
 #[tokio::test]
 async fn tuong_tu_dung_khi_nhieu_job_chay_song_song() {
     TestDatabase::run(async |test| {
-        let embedder = Arc::new(FakeEmbedder::new(64));
-        let provided = embedder.clone();
-        let (app, tree) = app_with(test, |builder| {
-            builder.provide::<dyn autoxide_kernel::ai::Embedder>(provided)
-        })
-        .await;
-        let list = price_list(&app, tree.chain).await;
         let colors = ["đỏ", "xanh", "vàng", "tím", "hồng", "nâu", "xám", "cam"];
-        let mut products = Vec::new();
-        for (index, color) in colors.iter().enumerate() {
-            let name = format!("Áo thun cotton màu {color}");
-            let (id, _) = on_sale(&app, &list, tree.chain, &format!("P-{index}"), &name, 1).await;
-            products.push((id, name));
-        }
-        // Worker 8 slot: các job của từng sản phẩm được nhận cùng lượt và chạy đan xen.
-        let worker = app.modules().worker(8).unwrap().blocked_delay(std::time::Duration::ZERO);
-        let dispatcher = app.modules().dispatcher().unwrap();
-        for _ in 0..10 {
-            let events = dispatcher.run_once().await.unwrap();
-            if worker.run_once().await.unwrap() + events == 0 {
-                break;
-            }
-        }
-        let site = tree.chain.as_uuid();
-        for (id, name) in &products {
-            let uri = format!("/products/{id}/similar?locale=vi&site={site}");
-            let (status, similar, _) = public(&app, &uri, None).await;
-            assert_eq!(status, StatusCode::OK, "{similar}");
-            let mut got = names(&similar);
-            got.sort();
-            let mut want: Vec<String> =
-                products.iter().map(|(_, other)| other.clone()).filter(|o| o != name).collect();
-            want.sort();
-            assert_eq!(got, want, "{name}");
-        }
+        index_in_parallel(test, &colors, 0).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Hai (ba) job của CÙNG một sản phẩm chạy cùng lúc: ghi lại vector là xoá + chèn (đổi ID dòng), nên
+/// khoá theo dòng embedding có thể trượt — danh sách vẫn phải đủ.
+#[tokio::test]
+async fn tuong_tu_dung_khi_hai_job_cung_san_pham() {
+    TestDatabase::run(async |test| {
+        let colors = ["đỏ", "xanh", "vàng", "tím", "hồng", "nâu"];
+        index_in_parallel(test, &colors, 2).await;
+    })
+    .await
+    .unwrap();
+}
+
+/// Bảng embedding còn rỗng: hai sản phẩm đầu tiên lập index cùng lúc (chưa có dòng nào để khoá)
+/// vẫn thấy nhau.
+#[tokio::test]
+async fn tuong_tu_dung_khi_bang_rong() {
+    TestDatabase::run(async |test| {
+        index_in_parallel(test, &["đỏ", "xanh"], 0).await;
     })
     .await
     .unwrap();

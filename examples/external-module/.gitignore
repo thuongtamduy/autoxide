@@ -1,0 +1,8 @@
+/target/
+# `./check.sh` copies the lock file of the core here, so both resolve the same versions.
+/Cargo.lock
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.env

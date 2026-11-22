@@ -1,0 +1,4 @@
+# The toolchain of the Autoxide release this example builds on.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]

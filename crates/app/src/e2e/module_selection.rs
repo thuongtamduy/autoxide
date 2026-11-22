@@ -63,6 +63,7 @@ fn hang_cua_tung_module_dung_nhu_da_chot() {
     assert_eq!(
         experimental,
         [
+            "esms",
             "bookings",
             "newsletter",
             "comments",
@@ -295,8 +296,8 @@ async fn database_co_du_lieu_cua_module_tat_van_khoi_dong_va_con_nguyen() {
         assert_eq!(status, 200, "{roles}");
         assert!(roles.to_string().contains("newsletter.manage"), "{roles}");
 
-        // Mọi module thử nghiệm có bảng đều còn bảng (bộ nối như `ghn` không có bảng nào); chỉ
-        // `newsletter` có dữ liệu.
+        // Mọi module thử nghiệm có bảng đều còn bảng (bộ nối như `esms`, `ghn` không có bảng nào);
+        // chỉ `newsletter` có dữ liệu.
         let dormant = new.modules.dormant(&new.database).await.unwrap();
         let with_tables = crate::modules::all()
             .iter()

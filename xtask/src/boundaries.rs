@@ -100,6 +100,25 @@ pub fn check_workspace(workspace: &Workspace) -> Result<Vec<Violation>, String> 
     Ok(violations)
 }
 
+/// Các luật của file này áp cho MỘT module nằm ngoài repo (`cargo xtask check-module`, xem
+/// `external.rs`): `workspace` chỉ có module đó. Không kiểm `layout`, `license`, `lints`,
+/// `dependency`, `test-binary` — quy ước của workspace này — và `module-import` (không biết các
+/// module khác; trình biên dịch vẫn chặn phần riêng tư của chúng).
+pub fn check_external_module(workspace: &Workspace) -> Result<Vec<Violation>, String> {
+    let mut violations = Vec::new();
+    for package in &workspace.packages {
+        let crate_dir = workspace.root.join(&package.dir);
+        violations.extend(raw_statement::check(&workspace.root, package)?);
+        for file in rust_files(&crate_dir.join("src"))? {
+            let text = read(&crate_dir.join(&file))?;
+            violations.extend(check_lint_allows(package, &file, &text));
+            violations.extend(check_env_access(package, &file, &text));
+            violations.extend(check_module_source(package, &file, &text, &[]));
+        }
+    }
+    Ok(violations)
+}
+
 /// Luật `layout`, `license`, `lints` cho một crate. `manifest` là nội dung
 /// `Cargo.toml` của nó.
 pub fn check_manifest(package: &Package, manifest: &str) -> Vec<Violation> {

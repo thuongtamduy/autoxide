@@ -197,6 +197,14 @@ impl ProviderAccounts {
         Ok(link_token(tenant, &self.raw_token(tenant.id(), path).await?))
     }
 
+    /// URL webhook đầy đủ của khách `tenant` cho đường `path` — cho bộ nối phải gửi URL nhận thông
+    /// báo trong từng request (vd `ipnUrl`, `CallbackUrl`). Ghép từ `AUTOXIDE_HTTP_PUBLIC_URL`;
+    /// chưa đặt → `public_url_missing` (503). Không bao giờ đoán từ header `Host` của request.
+    pub async fn webhook_url(&self, tenant: &TenantContext, path: &str) -> Result<String, Error> {
+        let token = self.webhook_token(tenant, path).await?;
+        self.0.public_url.link(&format!("{path}/{token}"))
+    }
+
     /// Khách của webhook tới đường `path` với định danh `token`. Định danh sai, khách không có hay
     /// không phục vụ được → [`webhook_unknown`] (cùng một lỗi cho mọi trường hợp). Sau bước này bộ
     /// nối vẫn PHẢI kiểm chữ ký bằng secret của khách tìm được: định danh chỉ để định tuyến.
@@ -230,6 +238,54 @@ impl ProviderAccounts {
         }
         found.sort_by(|a, b| a.path.cmp(&b.path));
         Ok(found)
+    }
+}
+
+// ---- Môi trường thử theo khách ----------------------------------------------------------------------
+
+/// Môi trường của tài khoản nhà cung cấp của một khách (D-20261122-provider-environments): tài
+/// khoản thử chỉ chạy với host sandbox của nhà cung cấp. Bộ nối có host sandbox khai cấu hình
+/// khách `<module>.connection.<loại>.environment` với `.checked(Environment::check)`, đọc bằng
+/// [`Environment::parse`], rồi chọn giữa HAI địa chỉ cố định của người vận hành
+/// (`AUTOXIDE_<TÊN>_API_URL`, `AUTOXIDE_<TÊN>_SANDBOX_API_URL`) — khách không bao giờ tự nhập địa chỉ.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Environment {
+    /// Mặc định khi khách không đặt.
+    #[default]
+    Production,
+    Sandbox,
+}
+
+impl Environment {
+    /// Giá trị khách đặt: `production` hay `sandbox`; không đặt là `Production`. Giá trị lạ → `None`.
+    pub fn parse(raw: Option<&str>) -> Option<Self> {
+        match raw.map(str::trim) {
+            None | Some("production") => Some(Environment::Production),
+            Some("sandbox") => Some(Environment::Sandbox),
+            Some(_) => None,
+        }
+    }
+
+    /// Bộ kiểm cho `TenantSetting::checked`.
+    pub fn check(raw: &str) -> Result<(), crate::error::FieldError> {
+        Environment::parse(Some(raw)).map(|_| ()).ok_or_else(|| {
+            crate::error::FieldError::new("value", "invalid", "must be `production` or `sandbox`")
+        })
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Environment::Production => "production",
+            Environment::Sandbox => "sandbox",
+        }
+    }
+
+    /// Chọn địa chỉ theo môi trường.
+    pub fn pick<'a>(self, production: &'a str, sandbox: &'a str) -> &'a str {
+        match self {
+            Environment::Production => production,
+            Environment::Sandbox => sandbox,
+        }
     }
 }
 
@@ -446,6 +502,16 @@ mod tests {
         // RFC 4231, test case 2.
         let mac = hmac_sha256(b"Jefe", b"what do ya want for nothing?");
         assert_eq!(hex(&mac), "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+    }
+
+    #[test]
+    fn moi_truong_cua_tai_khoan() {
+        assert_eq!(Environment::parse(None), Some(Environment::Production));
+        assert_eq!(Environment::parse(Some(" sandbox ")), Some(Environment::Sandbox));
+        assert_eq!(Environment::parse(Some("test")), None);
+        assert!(Environment::check("production").is_ok() && Environment::check("prod").is_err());
+        assert_eq!(Environment::Sandbox.pick("https://a", "https://b"), "https://b");
+        assert_eq!(Environment::default().as_str(), "production");
     }
 
     #[test]
