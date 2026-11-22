@@ -278,7 +278,9 @@ async fn database_co_du_lieu_cua_module_tat_van_khoi_dong_va_con_nguyen() {
 
         // Mọi module thử nghiệm đều còn bảng; chỉ `newsletter` có dữ liệu.
         let dormant = new.modules.dormant(&new.database).await.unwrap();
-        assert_eq!(dormant.len(), new.modules.inactive().len());
+        // Bộ nối nhà cung cấp (`sepay`, `einvoice_sepay`) không có bảng nào nên không "ngủ".
+        let without_tables = ["sepay", "einvoice_sepay"];
+        assert_eq!(dormant.len(), new.modules.inactive().len() - without_tables.len());
         let with_data =
             crate::modules::dormant_with_data(&new.modules, &new.database).await.unwrap();
         let names: Vec<&str> = with_data.iter().map(|module| module.name).collect();

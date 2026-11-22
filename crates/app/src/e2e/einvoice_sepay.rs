@@ -119,8 +119,9 @@ async fn chung_tu_phat_hanh_duoc_gui_qua_sepay_va_duoc_chap_nhan() {
         assert_eq!(status, StatusCode::OK, "{body}");
         drain(&app).await;
         let detail = format!("/api/v1/invoices/documents/{}", found.id);
+        // Job gửi hỏi trạng thái ngay một lần (SePay còn xử lý); các lượt hỏi sau có thể đã chạy.
         let (_, body) = call(&app, Method::GET, &detail, None).await;
-        assert_eq!(body["data"]["status"], "submitting", "{body}");
+        assert!(["submitting", "accepted"].contains(&body["data"]["status"].as_str().unwrap()), "{body}");
 
         // Thân gửi đi đúng tài liệu: mã tham chiếu là ID chứng từ, ký hiệu của SePay, phát hành luôn.
         let seen = server.take_requests();
