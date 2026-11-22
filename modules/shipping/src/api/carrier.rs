@@ -137,6 +137,9 @@ pub struct CarrierQuoteRequest {
     pub cod_amount: Option<Money>,
     /// Dịch vụ của hãng phương thức chọn; `None`: mọi dịch vụ.
     pub service_code: Option<String>,
+    /// Người nhận (tên, số điện thoại) khi giỏ đã có — hãng nào buộc có người nhận lúc báo giá thì
+    /// khỏi gửi giá trị giữ chỗ. `None`: chưa biết.
+    pub recipient: Option<(String, String)>,
 }
 
 impl CarrierQuoteRequest {
@@ -148,7 +151,14 @@ impl CarrierQuoteRequest {
             declared_value,
             cod_amount: None,
             service_code: None,
+            recipient: None,
         }
+    }
+
+    /// Người nhận (tên, số điện thoại), nếu đã biết.
+    pub fn recipient(mut self, recipient: Option<(String, String)>) -> Self {
+        self.recipient = recipient;
+        self
     }
 
     pub fn origin(mut self, origin: Option<Address>) -> Self {

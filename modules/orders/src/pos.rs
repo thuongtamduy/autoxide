@@ -417,6 +417,7 @@ impl OrdersService {
             buyer_keys: cart.customer_id.map(|id| vec![format!("user:{id}")]).unwrap_or_default(),
             profile: crate::api::BuyerProfile::default(),
             destination: None,
+            recipient: None,
             shipping_option: None,
             payment_method: None,
             client: Some("pos".to_owned()),

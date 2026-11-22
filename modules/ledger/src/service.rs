@@ -43,7 +43,17 @@ pub(crate) struct LedgerService {
     pub config: crate::config::LedgerConfig,
     /// Định tuyến webhook về đúng khách theo định danh trong URL (bước 70 P7).
     pub accounts: Option<autoxide_kernel::provider::ProviderAccounts>,
+    /// Cấu hình theo khách (cổng thanh toán mặc định khi có nhiều cổng).
+    pub settings: Option<Arc<dyn autoxide_kernel::tenancy::TenantSettings>>,
 }
+
+/// Cổng thanh toán dùng khi một lượt thu không nêu `provider` mà máy chủ có nhiều cổng (bước 70 P8).
+pub(crate) const DEFAULT_PROVIDER: autoxide_kernel::tenancy::TenantSetting =
+    autoxide_kernel::tenancy::TenantSetting::new(
+        "ledger.payments.default_provider",
+        "Payment partner used when a payment does not name one and this server has several (e.g. \
+         `momo`). Unset: each payment must name its partner.",
+    );
 
 impl LedgerService {
     /// Khách của webhook tới `/api/v1/ledger/{kind}/{provider}/{hook}`: tìm từ định danh `hook`

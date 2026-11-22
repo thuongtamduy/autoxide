@@ -8,7 +8,6 @@
   "field:is required in this mode": "là bắt buộc ở chế độ này",
   "field:is required when the partner splits the payment": "là bắt buộc khi đối tác chia tiền tại cổng",
   "field:is required with `match` and `accept_received`": "bắt buộc khi dùng `match` hay `accept_received`",
-  "field:is required: this server has several payment partners": "là bắt buộc: máy chủ này có nhiều đối tác thanh toán",
   "field:is required: this unit has several bank accounts": "là bắt buộc: nút này có nhiều tài khoản ngân hàng",
   "field:must be 0 to 365": "phải từ 0 đến 365",
   "field:must be 1 to 100 visible ASCII characters": "phải gồm 1 đến 100 ký tự ASCII nhìn thấy được",
@@ -114,5 +113,6 @@
   "text:The payout partner refused a payout; the amount is back on the seller's available balance (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).": "Đối tác chi hộ từ chối một lượt chi; số tiền đã trở lại số dư khả dụng của người bán (`payout_id`, `org_id`, `payee_org_id`, `amount`, `provider`, `reason`).",
   "field:this kind of item cannot be matched to a payment": "loại mục chờ này không ghi được cho một thanh toán",
   "field:must be the payment named in the item": "phải là thanh toán mà mục chờ nêu",
-  "field:must be a payment in the currency of the money collected": "phải là thanh toán cùng tiền tệ với số tiền đã thu"
+  "field:must be a payment in the currency of the money collected": "phải là thanh toán cùng tiền tệ với số tiền đã thu",
+  "field:is required: this server has several payment partners and this shop has no default one (ledger.payments.default_provider)": "là bắt buộc: máy chủ này có nhiều đối tác thanh toán và cửa hàng chưa chọn đối tác mặc định (ledger.payments.default_provider)"
 }

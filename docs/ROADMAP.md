@@ -122,10 +122,15 @@ thật (P7).
   - [x] Vận chuyển: Giao Hàng Nhanh
   - [x] SMS: eSMS
   - [x] Hoá đơn điện tử: SePay eInvoice
-- [ ] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →
+- [x] P8 — Luồng bán hàng mẫu chạy trọn (D-20261121-shop-first-order): một bài test đi từ sản phẩm → giỏ → đơn →
       thanh toán → vận chuyển → hoá đơn điện tử → tin nhắn, qua máy chủ giả của các nhà cung cấp ở P7, trên cả hai
       database; hướng dẫn "mở một cửa hàng" `docs/guides/shop.md` + `.vi.md` làm theo được từ quickstart; chỗ vướng tìm
-      ra thì sửa hoặc ghi thành mục
+      ra thì sửa hoặc ghi thành mục — `crates/app/src/e2e/shop.rs`; sửa kèm (D-20261122-shop-flow-fixes): báo phí mang
+      người nhận và kích thước kiện, cổng thanh toán mặc định theo khách, `provider.not_configured` là "kênh chưa bật"
+  - [ ] Chỗ vướng còn lại (tìm ra ở P8): người mua vãng lai không tự mở lại được lượt thu khi lần đầu hỏng (vd thiếu
+        `return_url` của MoMo) — chỉ nhân viên (`POST /orders/{id}/payment-link`) hay người mua đã đăng nhập; thêm
+        đường cho token xem đơn (`Order-Token`); đặt hàng vẫn trả 201 với `payment_actions[].kind = none` khi đối tác
+        từ chối — cân nhắc báo lý do trong câu trả lời
 - [ ] P9 — **Ghi nợ, chủ dự án hoãn ngày 22/11/2026** (không chặn 1.0 khi chưa mở lại):
   - [ ] Chế độ "nghỉ": module tắt vẫn tham gia dữ liệu cá nhân và vòng đời khách (xuất, xoá, dời khách)
   - [ ] Mẫu câu OTP khách tự sửa cho khớp template đã đăng ký với nhà mạng (đang viết cứng ở `compliance`, `orders`,
