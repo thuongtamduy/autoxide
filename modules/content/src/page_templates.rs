@@ -267,6 +267,7 @@ impl ContentService {
                 principal,
                 NewEntry {
                     kind: Kind::Page,
+                    type_id: None,
                     locale: Some(template.locale.clone()),
                     parent_id: input.parent_id,
                     org_id: input.org_id,

@@ -528,6 +528,7 @@ impl ContentService {
             tenant_id: tenant.id().as_uuid(),
             org_id: version.org_id,
             kind: version.kind.clone(),
+            type_id: version.type_id,
             locale: version.locale.clone(),
             translation_group_id: version.translation_group_id,
             parent_id: version.parent_id,

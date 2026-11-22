@@ -51,10 +51,18 @@ impl ContentService {
             principal.require(&permissions::CONTENT_PUBLISH).map_err(|_| ai_label_locked())?;
         }
         let mut fields = fields;
+        let field_target = self.entry_field_target(tenant, &before).await?;
         if let Some(custom) = fields.custom_fields.take() {
             let current = stored_custom(&before);
             candidate.custom_fields = self
-                .custom_values(tenant, Some(&custom), current.as_ref(), false, &mut problems)
+                .custom_values(
+                    tenant,
+                    &field_target,
+                    Some(&custom),
+                    current.as_ref(),
+                    false,
+                    &mut problems,
+                )
                 .await?;
         }
         self.apply(tenant, &mut candidate, fields, &mut problems).await?;
@@ -102,7 +110,7 @@ impl ContentService {
                     &transaction,
                     tenant,
                     "content",
-                    crate::resource::ENTRY,
+                    &field_target,
                     after.id,
                     &stored_custom(&after).unwrap_or_default(),
                 )
@@ -139,16 +147,13 @@ impl ContentService {
     pub(crate) async fn custom_values(
         &self,
         tenant: &TenantContext,
+        target: &str,
         incoming: Option<&serde_json::Map<String, Value>>,
         current: Option<&serde_json::Map<String, Value>>,
         creating: bool,
         problems: &mut Vec<FieldError>,
     ) -> Result<Option<String>, Error> {
-        match self
-            .custom_fields
-            .validate(tenant, crate::resource::ENTRY, incoming, current, creating)
-            .await
-        {
+        match self.custom_fields.validate(tenant, target, incoming, current, creating).await {
             Ok(values) if values.is_empty() => Ok(None),
             Ok(values) => Ok(Some(Value::Object(values).to_string())),
             Err(error) if error.code() == "kernel.custom_field_invalid" => {
@@ -169,7 +174,8 @@ impl ContentService {
         problems: &mut Vec<FieldError>,
     ) -> Result<body::BodyInfo, Error> {
         let checked = if layout::is_layout(body) {
-            if kind != "page" {
+            // Trang, và mục của loại tự định nghĩa (loại khai `body = layout` thì giao diện dựng bố cục).
+            if kind != "page" && kind != "custom" {
                 problems.push(FieldError::new(
                     "body.type",
                     "invalid",

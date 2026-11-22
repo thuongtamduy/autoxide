@@ -405,6 +405,8 @@ impl ContentService {
             .filter(published::Column::Locale.eq(locale.as_str()))
             .filter(published::Column::Path.eq(path.as_str()))
             .filter(published::Column::OrgId.is_in(lineage.clone()))
+            // Mục của loại tự định nghĩa đã tắt ngừng công khai (D-235), không mất dữ liệu.
+            .filter(crate::types::public::type_is_active(tenant))
             .all(read)
             .await?;
         if let Some(found) = lineage

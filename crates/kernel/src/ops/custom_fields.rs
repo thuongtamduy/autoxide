@@ -94,6 +94,9 @@ pub struct CustomFieldTarget {
     pub write_permission: Permission,
     /// Mức hiện loại này hỗ trợ: `internal` (luôn có), `public`, `buyer_input`.
     pub visibilities: &'static [&'static str],
+    /// Nhận cả loại con `<target>.<khoá>` do khách tạo lúc chạy (vd `content.type.du_an` cho loại nội
+    /// dung tự định nghĩa — bước 67, D-235): mỗi loại con một bộ trường riêng, cùng permission.
+    pub subtypes: bool,
 }
 
 impl CustomFieldTarget {
@@ -103,7 +106,15 @@ impl CustomFieldTarget {
             read_permission: read,
             write_permission: write,
             visibilities: &["internal"],
+            subtypes: false,
         }
+    }
+
+    /// Nhận cả loại con `<target>.<khoá>` (khoá `snake_case`) do module tạo lúc chạy.
+    #[must_use]
+    pub const fn with_subtypes(mut self) -> Self {
+        self.subtypes = true;
+        self
     }
 
     pub const fn visibilities(mut self, visibilities: &'static [&'static str]) -> Self {
@@ -172,7 +183,13 @@ impl CustomFields {
     }
 
     fn target(&self, name: &str) -> Option<CustomFieldTarget> {
-        self.targets.get().and_then(|targets| targets.get(name)).copied()
+        let targets = self.targets.get()?;
+        if let Some(found) = targets.get(name) {
+            return Some(*found);
+        }
+        // Loại con `<target>.<khoá>` của loại khai `with_subtypes`.
+        let (parent, key) = name.rsplit_once('.')?;
+        targets.get(parent).filter(|target| target.subtypes && is_key(key)).copied()
     }
 
     /// Khoá các trường đang bật ở mức `public` của loại `target`: phần được đọc công khai.

@@ -29,6 +29,7 @@ mod public_site;
 mod shared_sections;
 mod theme_variants;
 mod themes;
+mod types;
 mod versions;
 
 // Tìm nâng cao qua `/kernel/find`: tách riêng để file này không dài thêm (D-20261118-file-length).

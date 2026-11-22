@@ -35,14 +35,57 @@ impl ContentService {
                     .with_param("title_max", TITLE_MAX),
             );
         }
-        if input.parent_id.is_some() && input.kind == Kind::Post {
+        if input.parent_id.is_some() && input.kind != Kind::Page {
             problems.push(FieldError::new("parent_id", "not_allowed", "only pages have a parent"));
         }
+        // Mục của loại tự định nghĩa (D-235): loại phải có và đang bật; slug không trùng trong loại.
+        let content_type = match (input.kind, input.type_id) {
+            (Kind::Custom, Some(type_id)) => {
+                let found = crate::entity::content_type::Entity::find_by_id(type_id)
+                    .scoped(tenant)
+                    .one(tenant.database().read())
+                    .await?
+                    .filter(|row| row.active);
+                if found.is_none() {
+                    problems.push(FieldError::new(
+                        "type_id",
+                        "not_found",
+                        "is not an active content type",
+                    ));
+                }
+                found
+            }
+            (Kind::Custom, None) => {
+                problems.push(FieldError::new(
+                    "type_id",
+                    "required",
+                    "entries of kind `custom` need a content type",
+                ));
+                None
+            }
+            (_, Some(_)) => {
+                problems.push(FieldError::new(
+                    "type_id",
+                    "not_allowed",
+                    "only entries of kind `custom` have a content type",
+                ));
+                None
+            }
+            (_, None) => None,
+        };
         let id = Uuid::now_v7();
         let now = now();
         let mut candidate =
             blank(tenant, id, input.kind, &locale, input.parent_id, principal.user_id(), now);
         candidate.created_by_api_key_id = principal.api_key_id();
+        if let Some(row) = &content_type {
+            candidate.type_id = Some(row.id);
+            candidate.parent_key = row.id;
+        }
+        let field_target = content_type.as_ref().map_or_else(
+            || crate::resource::ENTRY.to_owned(),
+            |row| crate::types::field_target(&row.key),
+        );
         // Nút: người tạo nêu, hay nút duy nhất họ viết được (bước 34). Kiểm phạm vi trong `insert`.
         let writer = if principal.has(&permissions::CONTENT_WRITE) {
             &permissions::CONTENT_WRITE
@@ -64,8 +107,9 @@ impl ContentService {
         let auto_slug = input.fields.slug.is_none();
         let mut fields = input.fields;
         let custom = fields.custom_fields.take();
-        candidate.custom_fields =
-            self.custom_values(tenant, custom.as_ref(), None, true, &mut problems).await?;
+        candidate.custom_fields = self
+            .custom_values(tenant, &field_target, custom.as_ref(), None, true, &mut problems)
+            .await?;
         self.apply(tenant, &mut candidate, fields, &mut problems).await?;
         mark_agent_written(principal, &mut candidate);
         if let Some(parent) = input.parent_id {
@@ -89,6 +133,7 @@ impl ContentService {
         source: Option<Uuid>,
     ) -> Result<Entry, Error> {
         let base = candidate.slug.clone();
+        let field_target = self.entry_field_target(tenant, &candidate).await?;
         for _ in 0..SLUG_ATTEMPTS {
             let transaction = tenant.database().begin_write().await?;
             // Nút của mục mới phải trong phạm vi viết của người tạo, và đang hoạt động (bước 34).
@@ -140,14 +185,7 @@ impl ContentService {
             };
             if let Some(values) = stored_custom(&entry) {
                 self.custom_fields
-                    .write_index(
-                        &transaction,
-                        tenant,
-                        "content",
-                        crate::resource::ENTRY,
-                        entry.id,
-                        &values,
-                    )
+                    .write_index(&transaction, tenant, "content", &field_target, entry.id, &values)
                     .await?;
             }
             revisions::record(
@@ -225,6 +263,9 @@ impl ContentService {
         }
         if let Some(kind) = filter.kind {
             select = select.filter(Column::Kind.eq(kind.as_str()));
+        }
+        if let Some(type_id) = filter.type_id {
+            select = select.filter(Column::TypeId.eq(type_id));
         }
         if let Some(locale) = &filter.locale {
             select = select.filter(Column::Locale.eq(locale.as_str()));
