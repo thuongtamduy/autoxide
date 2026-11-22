@@ -33770,6 +33770,10 @@
                 },
                 "type": "array"
               },
+              "blocks_data": {
+                "description": "For a page with a block layout: data of the blocks that carry data, by block `id`, as on\n`GET /public/resolve`.",
+                "type": "object"
+              },
               "body": {
                 "$ref": "#/components/schemas/BodyNode"
               },
@@ -33906,7 +33910,8 @@
               "updated_at",
               "term_ids",
               "author_ids",
-              "body_media"
+              "body_media",
+              "blocks_data"
             ],
             "type": "object"
           }
@@ -46973,6 +46978,10 @@
                   },
                   "type": "array"
                 },
+                "blocks_data": {
+                  "description": "For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:\ndata of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block\n`id`. `null` for a block whose data could not be read or whose record is no longer public:\nhide that block. Blocks of modules the site no longer has are left out of `body`.",
+                  "type": "object"
+                },
                 "body": {
                   "$ref": "#/components/schemas/BodyNode"
                 },
@@ -47112,7 +47121,8 @@
                 "ai_reviewed",
                 "ai_assisted",
                 "embeds",
-                "custom_fields"
+                "custom_fields",
+                "blocks_data"
               ],
               "type": "object"
             },
@@ -76376,6 +76386,10 @@
                   },
                   "type": "array"
                 },
+                "blocks_data": {
+                  "description": "For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:\ndata of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block\n`id`. `null` for a block whose data could not be read or whose record is no longer public:\nhide that block. Blocks of modules the site no longer has are left out of `body`.",
+                  "type": "object"
+                },
                 "body": {
                   "$ref": "#/components/schemas/BodyNode"
                 },
@@ -76515,7 +76529,8 @@
                 "ai_reviewed",
                 "ai_assisted",
                 "embeds",
-                "custom_fields"
+                "custom_fields",
+                "blocks_data"
               ],
               "type": "object"
             },
@@ -81367,6 +81382,10 @@
             },
             "type": "array"
           },
+          "blocks_data": {
+            "description": "For a page with a block layout: data of the blocks that carry data, by block `id`, as on\n`GET /public/resolve`.",
+            "type": "object"
+          },
           "body": {
             "$ref": "#/components/schemas/BodyNode"
           },
@@ -81503,7 +81522,8 @@
           "updated_at",
           "term_ids",
           "author_ids",
-          "body_media"
+          "body_media",
+          "blocks_data"
         ],
         "type": "object"
       },
@@ -85893,6 +85913,10 @@
             },
             "type": "array"
           },
+          "blocks_data": {
+            "description": "For a page with a block layout (`body.type` is `layout`), only in `GET /public/resolve`:\ndata of the blocks that carry data (`has_data` in `GET /api/v1/kernel/blocks`), by block\n`id`. `null` for a block whose data could not be read or whose record is no longer public:\nhide that block. Blocks of modules the site no longer has are left out of `body`.",
+            "type": "object"
+          },
           "body": {
             "$ref": "#/components/schemas/BodyNode"
           },
@@ -86032,7 +86056,8 @@
           "ai_reviewed",
           "ai_assisted",
           "embeds",
-          "custom_fields"
+          "custom_fields",
+          "blocks_data"
         ],
         "type": "object"
       },

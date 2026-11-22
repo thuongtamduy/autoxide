@@ -20,6 +20,7 @@ mod agent;
 mod bulk;
 mod embed;
 mod layout;
+mod layout_public;
 mod ops;
 mod versions;
 
