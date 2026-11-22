@@ -298,6 +298,8 @@ Các trait module hay gọi khác cũng có bản giả như vậy: `autoxide_no
 
 `autoxide_testkit::FakeMailer` giữ các mail module của bạn gửi (`sent()`, `to(address)`, `calls()`), đúng luật `dedupe_key` của module thật; `autoxide_address::api::testing::FakeAdministrativeUnits` giữ vài tỉnh và xã (`sample()`, hay tự dựng bằng `province` / `commune` / `expired_commune`) để địa chỉ được kiểm như module `address` thật.
 
+`autoxide_media::api::testing::FakeMedia` là thư viện media trong bộ nhớ: thêm item bằng `add(public)` / `add_with` / `insert`, `upload(user)` cho item do một người tải lên, `set_alt(id, locale, alt)`, `set_ai_image`, `remove`; ID nó không giữ thì không trả, như module `media` thật.
+
 ## 6. Luật của core, kiểm trên crate của bạn
 
 Trong repo Autoxide, `cargo xtask check` giữ các luật của module. Với một crate ở nơi khác, chạy đúng các luật đọc mã nguồn đó từ một bản checkout của Autoxide ở tag bạn dựa vào:

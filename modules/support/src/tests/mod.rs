@@ -9,13 +9,13 @@ mod sla;
 mod tickets;
 mod tools;
 
+pub(crate) use autoxide_media::api::testing::FakeMedia;
 pub(crate) use autoxide_notifications::api::testing::FakeNotifier;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use autoxide_kernel::access::{Principal, Scope};
-use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::{DEFAULT_TENANT, TenantContext, root_of};
-use autoxide_media::api::{Media, MediaRef, MediaVisibility};
+use autoxide_kernel::tenancy::{DEFAULT_TENANT, root_of};
+use autoxide_media::api::Media;
 use autoxide_notifications::api::Notifier;
 use autoxide_testkit::{TestApp, TestAppBuilder, TestDatabase};
 use axum::http::{Method, StatusCode};
@@ -45,41 +45,6 @@ pub(crate) fn last_code(notifier: &FakeNotifier) -> String {
         .find(|notification| notification.kind == "support.verification_code")
         .expect("a verification code was sent");
     code.params["code"].as_str().unwrap().to_owned()
-}
-
-/// Thư viện media giả: item `id` do người `owner` tải lên.
-#[derive(Default)]
-pub(crate) struct FakeMedia(pub Mutex<Vec<(Uuid, Option<Uuid>)>>);
-
-#[async_trait::async_trait]
-impl Media for FakeMedia {
-    async fn find_many(&self, _: &TenantContext, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
-        let known = self.0.lock().unwrap().clone();
-        Ok(ids
-            .iter()
-            .filter(|id| known.iter().any(|(item, _)| item == *id))
-            .map(|id| MediaRef {
-                id: *id,
-                visibility: MediaVisibility::Private,
-                content_type: "image/png".to_owned(),
-                width: None,
-                height: None,
-                alt: String::new(),
-                alt_ai_assisted: false,
-                url: format!("/api/v1/media/{id}/content"),
-                variants: Vec::new(),
-            })
-            .collect())
-    }
-
-    async fn uploaders(
-        &self,
-        _: &TenantContext,
-        ids: &[Uuid],
-    ) -> Result<Vec<(Uuid, Option<Uuid>)>, Error> {
-        let known = self.0.lock().unwrap().clone();
-        Ok(known.into_iter().filter(|(id, _)| ids.contains(id)).collect())
-    }
 }
 
 pub(crate) struct Harness {

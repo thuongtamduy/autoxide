@@ -298,6 +298,8 @@ The same pattern exists for the other traits modules most often call: `autoxide_
 
 `autoxide_testkit::FakeMailer` keeps the mails your module sends (`sent()`, `to(address)`, `calls()`) with the real `dedupe_key` rule, and `autoxide_address::api::testing::FakeAdministrativeUnits` holds a few provinces and communes (`sample()`, or your own with `province` / `commune` / `expired_commune`) so addresses validate like the real `address` module.
 
+`autoxide_media::api::testing::FakeMedia` is a media library in memory: `add(public)` / `add_with` / `insert` items, `upload(user)` for an item someone uploaded, `set_alt(id, locale, alt)`, `set_ai_image`, `remove`; IDs it does not hold are not returned, like the real `media` module.
+
 ## 6. The rules of the core, checked on your crate
 
 Inside the Autoxide repository, `cargo xtask check` enforces the module rules. For a crate anywhere else, run the same source rules from a checkout of Autoxide at the tag you build on:

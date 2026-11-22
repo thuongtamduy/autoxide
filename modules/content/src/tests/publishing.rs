@@ -287,7 +287,7 @@ async fn duong_dan_trung_va_anh_rieng_tu() {
             (error.code(), error.fields()[0].field.as_str()),
             ("content.media_not_public", "featured_media_id")
         );
-        media.0.lock().unwrap().insert(private, autoxide_media::api::MediaVisibility::Public);
+        media.set_visibility(private, true);
         content.publish(&tenant, &ada, photo.id, None, None, false).await.unwrap();
     })
     .await
@@ -323,7 +323,7 @@ async fn anh_trong_than_bai_cua_ban_cong_khai() {
         assert_eq!(body_media("/blog/gallery").await, [second, first]);
         assert!(body_media("/blog/plain").await.is_empty());
 
-        media.0.lock().unwrap().insert(second, autoxide_media::api::MediaVisibility::Private);
+        media.set_visibility(second, false);
         assert_eq!(body_media("/blog/gallery").await, [first]);
     })
     .await

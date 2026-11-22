@@ -8,6 +8,10 @@ use autoxide_kernel::error::Error;
 use autoxide_kernel::tenancy::TenantContext;
 use uuid::Uuid;
 
+/// Thư viện media giả cho test của module khác (feature `testing`).
+#[cfg(feature = "testing")]
+pub mod testing;
+
 /// Số ID tối đa mỗi lần gọi [`Media::find_many`].
 pub const MAX_IDS: usize = 500;
 
