@@ -38,7 +38,7 @@ impl autoxide_kernel::module::Module for FakeAuth {
 #[tokio::test]
 async fn phien_ban_kem_ten_nguoi_sua() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+        let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
         let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
         let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
         let named = TestApp::builder(test)

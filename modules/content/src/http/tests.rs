@@ -33,7 +33,7 @@ const SECRET: &str = "a-test-secret-that-is-long-enough-0123456789";
 /// chỉ viết bài của mình. Thư viện media giả thay cho module `media`; module `ai` giả (đã tắt):
 /// `content` cần `dyn TextModel` và `dyn Embedder`.
 async fn app(test: &TestDatabase) -> TestApp {
-    let media: Arc<dyn Media> = Arc::new(FakeMedia::default());
+    let media: Arc<dyn Media> = Arc::new(FakeMedia::new().tagging_locale());
     let text: Arc<dyn TextModel> = Arc::new(FakeTextModel::disabled());
     let embedder: Arc<dyn Embedder> = Arc::new(FakeEmbedder::disabled());
     let agent = ["content.read", "content.write_own"].map(str::to_owned);

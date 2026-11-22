@@ -6,9 +6,8 @@ use autoxide_kernel::time::Timestamp;
 use std::sync::{Arc, Mutex};
 
 use autoxide_kernel::ai::{Part, TextModel};
-use autoxide_kernel::error::Error;
-use autoxide_kernel::tenancy::TenantContext;
-use autoxide_media::api::{AiImage, Media, MediaRef, MediaVisibility};
+use autoxide_media::api::testing::{FakeMedia, image};
+use autoxide_media::api::{AiImage, Media};
 use autoxide_testkit::ai::FakeTextModel;
 use autoxide_testkit::{TestApp, TestDatabase};
 use axum::http::StatusCode;
@@ -17,34 +16,6 @@ use uuid::Uuid;
 
 use super::public::drain;
 use super::{Tree, app_with, call};
-
-/// Thư viện ảnh giả: chỉ các ID trong `known` có; mọi ảnh công khai.
-struct FakeMedia(Vec<Uuid>);
-
-#[async_trait::async_trait]
-impl Media for FakeMedia {
-    async fn find_many(&self, _: &TenantContext, ids: &[Uuid]) -> Result<Vec<MediaRef>, Error> {
-        Ok(ids
-            .iter()
-            .filter(|id| self.0.contains(id))
-            .map(|id| MediaRef {
-                id: *id,
-                visibility: MediaVisibility::Public,
-                content_type: "image/jpeg".to_owned(),
-                width: Some(800),
-                height: Some(800),
-                alt: String::new(),
-                alt_ai_assisted: false,
-                url: format!("/api/v1/media/{id}/content?v=1"),
-                variants: Vec::new(),
-            })
-            .collect())
-    }
-
-    async fn ai_image(&self, _: &TenantContext, id: Uuid) -> Result<Option<AiImage>, Error> {
-        Ok(self.0.contains(&id).then(|| AiImage::new("image/jpeg", vec![0xff, 0xd8, 0xff])))
-    }
-}
 
 const PHOTO: Uuid = Uuid::from_u128(0x0193_0000_0000_7000_8000_0000_0000_0101);
 
@@ -68,9 +39,17 @@ fn model(category: Arc<Mutex<String>>) -> Arc<FakeTextModel> {
     }))
 }
 
+/// Thư viện ảnh giả: chỉ có ảnh công khai `PHOTO`, gửi được cho AI.
+fn photo_library() -> Arc<FakeMedia> {
+    let media = FakeMedia::new();
+    media.insert(image(PHOTO, true));
+    media.set_ai_image(PHOTO, AiImage::new("image/jpeg", vec![0xff, 0xd8, 0xff]));
+    Arc::new(media)
+}
+
 async fn shop(test: &TestDatabase, ai: Arc<FakeTextModel>) -> (TestApp, Tree) {
     app_with(test, move |builder| {
-        builder.provide::<dyn TextModel>(ai).provide::<dyn Media>(Arc::new(FakeMedia(vec![PHOTO])))
+        builder.provide::<dyn TextModel>(ai).provide::<dyn Media>(photo_library())
     })
     .await
 }
@@ -197,9 +176,7 @@ async fn mo_hinh_khong_doc_anh_tra_503() {
     TestDatabase::run(async |test| {
         let blind = Arc::new(FakeTextModel::new(|_| Ok(json!({}))).without_images());
         let (app, _) = app_with(test, move |builder| {
-            builder
-                .provide::<dyn TextModel>(blind)
-                .provide::<dyn Media>(Arc::new(FakeMedia(vec![PHOTO])))
+            builder.provide::<dyn TextModel>(blind).provide::<dyn Media>(photo_library())
         })
         .await;
         let body = json!({"media_ids": [PHOTO], "locale": "vi", "tax_category": "vat.standard"});

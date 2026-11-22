@@ -10,7 +10,7 @@ use autoxide_testkit::{TestApp, TestDatabase, tool};
 use axum::http::{Method, StatusCode, header};
 use serde_json::{Value, json};
 
-use super::{Categories, FakeMedia, Items};
+use super::{Categories, Items, fake_media};
 
 /// Module giả cung cấp `shop.item` và `shop.category` cho sổ đối tượng.
 struct Shop;
@@ -33,7 +33,7 @@ impl Module for Shop {
 }
 
 async fn app(test: &TestDatabase) -> TestApp {
-    let media: Arc<dyn Media> = Arc::new(FakeMedia);
+    let media: Arc<dyn Media> = Arc::new(fake_media());
     TestApp::builder(test)
         .user("admin", 1, &["menus.read", "menus.manage"])
         .user("reader", 2, &["menus.read"])
@@ -264,7 +264,7 @@ async fn giu_id_muc_etag_khi_tao_va_so_muc_trong_danh_sach() {
 #[tokio::test]
 async fn hai_khach_cung_menu_khong_ro_ri() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let media: Arc<dyn Media> = Arc::new(fake_media());
         let all = ["menus.read", "menus.manage"];
         let app = TestApp::builder(test)
             .tenant("a")
@@ -327,7 +327,7 @@ async fn menu_theo_website_va_nhanh() {
     TestDatabase::run(async |test| {
         let org = || OrgId::from_uuid(uuid::Uuid::now_v7());
         let (a, b) = (org(), org());
-        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let media: Arc<dyn Media> = Arc::new(fake_media());
         let manage = [("menus.read", Scope::Subtree), ("menus.manage", Scope::Subtree)];
         let app = TestApp::builder(test)
             .user("admin", 1, &["menus.read", "menus.manage"])
@@ -452,7 +452,7 @@ async fn doc_menu_kem_tinh_trang_dich_va_nhap_menu_cu() {
 #[tokio::test]
 async fn menu_tro_toi_ban_ghi_hien_o_dang_dung_o_dau() {
     TestDatabase::run(async |test| {
-        let media: Arc<dyn Media> = Arc::new(FakeMedia);
+        let media: Arc<dyn Media> = Arc::new(fake_media());
         let app = TestApp::builder(test)
             .user("admin", 1, &["menus.read", "menus.manage", "shop.read"])
             .user("seller", 2, &["shop.read"])

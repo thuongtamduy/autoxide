@@ -76,7 +76,7 @@ fn ids(page: &Value) -> Vec<String> {
 #[tokio::test]
 async fn bo_loc_moi_va_truong_moi_cua_danh_sach_bai() {
     TestDatabase::run(async |test| {
-        let app = app(test, Arc::new(FakeMedia::default())).await;
+        let app = app(test, Arc::new(FakeMedia::new().tagging_locale())).await;
         let mine = create(&app, "admin", json!({"kind": "post", "title": "Của tôi"})).await;
         let ai =
             create(&app, "bob", json!({"kind": "post", "title": "AI viết", "ai_generated": true}))
@@ -184,7 +184,7 @@ async fn bo_loc_moi_va_truong_moi_cua_danh_sach_bai() {
 #[tokio::test]
 async fn so_bai_va_tim_danh_muc_tac_gia_seo_va_xem_truoc() {
     TestDatabase::run(async |test| {
-        let media = Arc::new(FakeMedia::default());
+        let media = Arc::new(FakeMedia::new().tagging_locale());
         let image = media.add(true);
         let app = app(test, media.clone()).await;
         let term = send(
